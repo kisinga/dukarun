@@ -27,7 +27,6 @@ export interface NotificationData {
         [class.bg-warning/20]="typeClass() === 'warning'"
         [class.bg-success/20]="typeClass() === 'success'"
         [class.bg-info/20]="typeClass() === 'info'"
-        [class.bg-error/20]="typeClass() === 'error'"
       >
         {{ icon() }}
       </div>
