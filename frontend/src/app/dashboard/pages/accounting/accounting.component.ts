@@ -8,24 +8,24 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import {
-  LedgerService,
-  LedgerAccount,
-  JournalEntry,
-} from '../../../core/services/ledger/ledger.service';
 import { forkJoin } from 'rxjs';
-import { TransactionDetailModalComponent } from './components/transaction-detail-modal.component';
-import { AccountingStatsComponent, AccountingStats } from './components/accounting-stats.component';
 import {
-  AccountingFiltersComponent,
+  JournalEntry,
+  LedgerAccount,
+  LedgerService,
+} from '../../../core/services/ledger/ledger.service';
+import {
   AccountingFilters,
+  AccountingFiltersComponent,
 } from './components/accounting-filters.component';
-import { AccountingTabsComponent } from './components/accounting-tabs.component';
+import { AccountingStats, AccountingStatsComponent } from './components/accounting-stats.component';
 import type { TabType } from './components/accounting-tabs.component';
-import { OverviewTabComponent } from './components/overview-tab.component';
+import { AccountingTabsComponent } from './components/accounting-tabs.component';
 import { AccountsTabComponent, type AccountNode } from './components/accounts-tab.component';
-import { TransactionsTabComponent } from './components/transactions-tab.component';
+import { OverviewTabComponent } from './components/overview-tab.component';
 import { ReconciliationTabComponent } from './components/reconciliation-tab.component';
+import { TransactionDetailModalComponent } from './components/transaction-detail-modal.component';
+import { TransactionsTabComponent } from './components/transactions-tab.component';
 
 @Component({
   selector: 'app-accounting',

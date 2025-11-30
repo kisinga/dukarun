@@ -10,6 +10,7 @@ import { NotificationTestComponent } from './components/notification-test.compon
 import { PaymentMethodsComponent } from './components/payment-methods.component';
 import { SubscriptionStatusComponent } from './components/subscription-status.component';
 import { SubscriptionTiersComponent } from './components/subscription-tiers.component';
+import { TeamComponent } from '../team/team.component';
 
 @Component({
   selector: 'app-settings',
@@ -24,14 +25,23 @@ import { SubscriptionTiersComponent } from './components/subscription-tiers.comp
     PaymentMethodsComponent,
     SubscriptionStatusComponent,
     SubscriptionTiersComponent,
+    TeamComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="space-y-6">
-      <h1 class="text-3xl font-bold">⚙️ Settings</h1>
+    <div class="space-y-5 lg:space-y-6">
+      <!-- Header -->
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Settings</h1>
+          <p class="text-sm text-base-content/60 mt-1">
+            Manage your channel configuration and preferences
+          </p>
+        </div>
+      </div>
 
       <!-- Tabs -->
-      <div role="tablist" class="tabs tabs-box">
+      <div role="tablist" class="tabs tabs-box overflow-x-auto">
         <input
           type="radio"
           name="settings_tabs"
@@ -96,6 +106,14 @@ import { SubscriptionTiersComponent } from './components/subscription-tiers.comp
           [checked]="activeTab() === 'subscription'"
           (change)="setActiveTab('subscription')"
         />
+        <input
+          type="radio"
+          name="settings_tabs"
+          class="tab"
+          aria-label="Team"
+          [checked]="activeTab() === 'team'"
+          (change)="setActiveTab('team')"
+        />
       </div>
 
       <!-- Tab Content -->
@@ -127,6 +145,9 @@ import { SubscriptionTiersComponent } from './components/subscription-tiers.comp
             <app-subscription-tiers />
           </div>
         }
+        @case ('team') {
+          <app-team />
+        }
       }
     </div>
   `,
@@ -144,6 +165,7 @@ export class SettingsComponent implements OnInit {
     | 'payments'
     | 'audit-trail'
     | 'subscription'
+    | 'team'
   >('general');
 
   ngOnInit() {
@@ -161,6 +183,7 @@ export class SettingsComponent implements OnInit {
             'payments',
             'audit-trail',
             'subscription',
+            'team',
           ].includes(tab)
         ) {
           this.activeTab.set(tab as any);
@@ -178,7 +201,8 @@ export class SettingsComponent implements OnInit {
       | 'admins'
       | 'payments'
       | 'audit-trail'
-      | 'subscription',
+      | 'subscription'
+      | 'team',
   ): void {
     this.activeTab.set(tab);
     // Update URL query params

@@ -64,16 +64,10 @@ export class DashboardLayoutComponent implements OnInit {
       { label: 'Suppliers', icon: '🏢', route: '/dashboard/suppliers' },
       { label: 'Purchases', icon: '🛒', route: '/dashboard/purchases' },
       { label: 'Accounting', icon: '📋', route: '/dashboard/accounting' },
-      { label: 'Reports', icon: '📈', route: '/dashboard/reports' },
     ];
 
     if (this.authService.hasCreditManagementPermission()) {
       baseItems.splice(4, 0, { label: 'Credit', icon: '💳', route: '/dashboard/credit' });
-    }
-
-    // Add Team if user has settings permission (same as Settings page)
-    if (this.authService.hasUpdateSettingsPermission()) {
-      baseItems.push({ label: 'Team', icon: '👥', route: '/dashboard/team' });
     }
 
     // Only add Stock Adjustments if user has ManageStockAdjustmentsPermission
