@@ -222,6 +222,10 @@ export class CartItemComponent {
 
   // State
   readonly quantitySheetOpen = signal<boolean>(false);
+  
+  // Price modification undo/redo buffers (per variant)
+  private priceUndoStacks = new Map<string, number[]>();
+  private priceRedoStacks = new Map<string, number[]>();
 
   // Computed
   isPriceOverridden = computed(() => this.item().customLinePrice !== undefined);
@@ -261,8 +265,13 @@ export class CartItemComponent {
 
     // Reset custom line price when quantity changes
     if (this.item().customLinePrice !== undefined) {
+      // Clear undo/redo stacks when quantity changes
+      const variantId = this.item().variant.id;
+      this.priceUndoStacks.delete(variantId);
+      this.priceRedoStacks.delete(variantId);
+      
       this.priceChange.emit({
-        variantId: this.item().variant.id,
+        variantId,
         customLinePrice: undefined,
         reason: 'Quantity changed - reset price',
       });
@@ -278,8 +287,13 @@ export class CartItemComponent {
 
       // Reset custom line price when quantity changes
       if (this.item().customLinePrice !== undefined) {
+        // Clear undo/redo stacks when quantity changes
+        const variantId = this.item().variant.id;
+        this.priceUndoStacks.delete(variantId);
+        this.priceRedoStacks.delete(variantId);
+        
         this.priceChange.emit({
-          variantId: this.item().variant.id,
+          variantId,
           customLinePrice: undefined,
           reason: 'Quantity changed - reset price',
         });
@@ -290,35 +304,93 @@ export class CartItemComponent {
   increasePrice(): void {
     if (!this.canOverridePrices()) return;
 
+    const variantId = this.item().variant.id;
     // Get current line total in cents
     const currentLineTotalCents =
       this.item().customLinePrice || Math.round(this.item().subtotal * 100);
 
-    // Apply 3% increase in cents, then round to nearest whole number
-    const newLineTotalCents = Math.round(currentLineTotalCents * 1.03);
+    // Initialize stacks if needed
+    if (!this.priceUndoStacks.has(variantId)) {
+      this.priceUndoStacks.set(variantId, []);
+    }
+    if (!this.priceRedoStacks.has(variantId)) {
+      this.priceRedoStacks.set(variantId, []);
+    }
 
-    this.priceChange.emit({
-      variantId: this.item().variant.id,
-      customLinePrice: newLineTotalCents,
-      reason: '3% increase',
-    });
+    const undoStack = this.priceUndoStacks.get(variantId)!;
+    const redoStack = this.priceRedoStacks.get(variantId)!;
+
+    // If there's something in undo stack, restore it (undo)
+    if (undoStack.length > 0) {
+      // Move current price to redo stack
+      redoStack.push(currentLineTotalCents);
+      // Pop previous price from undo stack and restore
+      const previousPrice = undoStack.pop()!;
+      this.priceChange.emit({
+        variantId,
+        customLinePrice: previousPrice,
+        reason: 'Price restored',
+      });
+    } else {
+      // No undo available, apply increase
+      // Store current price in undo stack before increasing
+      undoStack.push(currentLineTotalCents);
+      // Clear redo stack (new action invalidates redo)
+      redoStack.length = 0;
+      // Apply 3% increase in cents, then round to nearest whole number
+      const newLineTotalCents = Math.round(currentLineTotalCents * 1.03);
+      this.priceChange.emit({
+        variantId,
+        customLinePrice: newLineTotalCents,
+        reason: '3% increase',
+      });
+    }
   }
 
   decreasePrice(): void {
     if (!this.canOverridePrices()) return;
 
+    const variantId = this.item().variant.id;
     // Get current line total in cents
     const currentLineTotalCents =
       this.item().customLinePrice || Math.round(this.item().subtotal * 100);
 
-    // Apply 3% decrease in cents, then round to nearest whole number
-    const newLineTotalCents = Math.round(currentLineTotalCents * 0.97);
+    // Initialize stacks if needed
+    if (!this.priceUndoStacks.has(variantId)) {
+      this.priceUndoStacks.set(variantId, []);
+    }
+    if (!this.priceRedoStacks.has(variantId)) {
+      this.priceRedoStacks.set(variantId, []);
+    }
 
-    this.priceChange.emit({
-      variantId: this.item().variant.id,
-      customLinePrice: newLineTotalCents,
-      reason: '3% decrease',
-    });
+    const undoStack = this.priceUndoStacks.get(variantId)!;
+    const redoStack = this.priceRedoStacks.get(variantId)!;
+
+    // If there's something in undo stack, restore it (undo)
+    if (undoStack.length > 0) {
+      // Move current price to redo stack
+      redoStack.push(currentLineTotalCents);
+      // Pop previous price from undo stack and restore
+      const previousPrice = undoStack.pop()!;
+      this.priceChange.emit({
+        variantId,
+        customLinePrice: previousPrice,
+        reason: 'Price restored',
+      });
+    } else {
+      // No undo available, apply decrease
+      // Store current price in undo stack before decreasing
+      undoStack.push(currentLineTotalCents);
+      // Clear redo stack (new action invalidates redo)
+      redoStack.length = 0;
+      // Apply 3% decrease in cents, then round to nearest whole number
+      const newLineTotalCents = Math.round(currentLineTotalCents * 0.97);
+      this.priceChange.emit({
+        variantId,
+        customLinePrice: newLineTotalCents,
+        reason: '3% decrease',
+      });
+    }
   }
 
   getFormattedLinePrice(): string {
@@ -333,18 +405,19 @@ export class CartItemComponent {
   getFormattedPerItemPrice(): string {
     // If custom line price exists, calculate per-item price in cents
     if (this.item().customLinePrice !== undefined) {
+      // customLinePrice is in cents, divide by quantity to get per-item price in cents
       return this.currencyService.format(
         Math.round(this.item().customLinePrice! / this.item().quantity),
         false,
       );
     }
-    // Otherwise, use the original variant price (convert to cents)
-    return this.currencyService.format(Math.round(this.item().variant.priceWithTax * 100), false);
+    // Otherwise, use the original variant price (already in cents from Vendure)
+    return this.currencyService.format(this.item().variant.priceWithTax, false);
   }
 
   getFormattedBasePrice(): string {
-    // Always show the original base price
-    return this.currencyService.format(Math.round(this.item().variant.priceWithTax * 100), false);
+    // Always show the original base price (already in cents from Vendure)
+    return this.currencyService.format(this.item().variant.priceWithTax, false);
   }
 
   // ============================================================================

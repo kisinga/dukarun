@@ -4,6 +4,7 @@ import {
   DetectionCoordinatorOptions,
   DetectionResult,
 } from './detection.types';
+import { BarcodeNotFoundError } from './barcode-detector';
 
 /**
  * Detection Coordinator
@@ -31,6 +32,8 @@ export class DetectionCoordinator {
   private lastFrameTime = 0;
 
   private onDetection: DetectionCallback | null = null;
+  private onTimeout: (() => void) | null = null;
+  private onBarcodeNotFound: ((barcode: string) => void) | null = null;
   private options: DetectionCoordinatorOptions;
 
   constructor(options: DetectionCoordinatorOptions = {}) {
@@ -89,7 +92,12 @@ export class DetectionCoordinator {
   /**
    * Start detection loop
    */
-  start(video: HTMLVideoElement, onDetection: DetectionCallback): void {
+  start(
+    video: HTMLVideoElement,
+    onDetection: DetectionCallback,
+    onTimeout?: () => void,
+    onBarcodeNotFound?: (barcode: string) => void,
+  ): void {
     if (this.running) {
       console.warn('[DetectionCoordinator] Already running');
       return;
@@ -104,6 +112,8 @@ export class DetectionCoordinator {
     this.running = true;
     this.isPaused = false;
     this.onDetection = onDetection;
+    this.onTimeout = onTimeout || null;
+    this.onBarcodeNotFound = onBarcodeNotFound || null;
     this.currentDetectorIndex = 0;
     this.lastFrameTime = 0;
 
@@ -116,6 +126,10 @@ export class DetectionCoordinator {
       this.timeoutId = setTimeout(() => {
         console.log('[DetectionCoordinator] Timeout reached');
         this.stop();
+        // Notify parent component about timeout
+        if (this.onTimeout) {
+          this.onTimeout();
+        }
       }, this.options.timeoutMs);
     }
 
@@ -170,6 +184,7 @@ export class DetectionCoordinator {
     }
 
     this.onDetection = null;
+    this.onTimeout = null;
     console.log('[DetectionCoordinator] Stopped');
   }
 
@@ -318,8 +333,15 @@ export class DetectionCoordinator {
         console.log(`[DetectionCoordinator] Detection from ${detector.name}:`, result.product.name);
         this.handleDetection(result);
       }
-    } catch (error) {
-      console.error(`[DetectionCoordinator] Error in ${detector.name}:`, error);
+    } catch (error: any) {
+      // Check if this is a BarcodeNotFoundError
+      if (error instanceof BarcodeNotFoundError && this.onBarcodeNotFound) {
+        console.log(`[DetectionCoordinator] Barcode detected but not found: ${error.barcode}`);
+        this.onBarcodeNotFound(error.barcode);
+        // Don't stop detection - allow user to scan another barcode
+      } else {
+        console.error(`[DetectionCoordinator] Error in ${detector.name}:`, error);
+      }
     }
   }
 

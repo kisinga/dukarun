@@ -68,6 +68,7 @@
 <app-product-confirm-modal
   [isOpen]="showConfirmModal()"
   [product]="detectedProduct()"
+  [canOverridePrices]="canOverridePrices()"
   (variantSelected)="handleVariantSelected($event)"
   (closeModal)="handleConfirmModalClose()"
 />

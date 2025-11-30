@@ -72,6 +72,30 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
 
           <!-- Status Footer -->
           <div class="text-center text-xs opacity-60 mt-2">Point camera at product or barcode</div>
+          
+          <!-- Barcode Not Found Feedback -->
+          @if (barcodeNotFoundMessage()) {
+            <div class="alert alert-warning mt-2 animate-in">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <div>
+                <div class="font-semibold">Barcode Not Found</div>
+                <div class="text-sm">Barcode "{{ barcodeNotFoundMessage() }}" is not in the system</div>
+              </div>
+            </div>
+          }
         </div>
       </div>
     }
@@ -146,6 +170,7 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
   readonly scannerStatus = signal<ScannerStatus>('idle');
   readonly isScanning = signal<boolean>(false);
   readonly activeDetectors = signal<string[]>([]);
+  readonly barcodeNotFoundMessage = signal<string | null>(null);
 
   // Detection coordinator
   private coordinator: DetectionCoordinator | null = null;
@@ -284,9 +309,21 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
 
       // Start detection coordinator (it has its own 250ms delay built-in)
       if (this.coordinator) {
-        this.coordinator.start(videoEl, (result: DetectionResult) => {
-          this.handleDetection(result);
-        });
+        this.coordinator.start(
+          videoEl,
+          (result: DetectionResult) => {
+            this.handleDetection(result);
+          },
+          () => {
+            // Timeout callback - stop camera viewfinder
+            console.log('[ProductScanner] Detection timeout - stopping camera');
+            this.stopScanner();
+          },
+          (barcode: string) => {
+            // Barcode detected but not found in database
+            this.handleBarcodeNotFound(barcode);
+          },
+        );
         this.activeDetectors.set(this.coordinator.getReadyDetectors());
       }
     } catch (error: any) {
@@ -317,6 +354,9 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
       }
     }
 
+    // Clear barcode not found message
+    this.barcodeNotFoundMessage.set(null);
+
     this.isScanning.set(false);
     this.scannerStatus.set('ready');
     this.scanningStateChange.emit(false);
@@ -339,11 +379,27 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
   private handleDetection(result: DetectionResult): void {
     console.log(`[ProductScanner] Detection from ${result.type}:`, result.product.name);
 
+    // Clear any barcode not found message
+    this.barcodeNotFoundMessage.set(null);
+
     // Stop scanner
     this.stopScanner();
 
     // Emit product to parent
     this.productDetected.emit(result.product);
+  }
+
+  /**
+   * Handle barcode detected but not found in database
+   */
+  private handleBarcodeNotFound(barcode: string): void {
+    console.log(`[ProductScanner] Barcode "${barcode}" detected but not found in database`);
+    this.barcodeNotFoundMessage.set(barcode);
+    
+    // Clear message after 3 seconds
+    setTimeout(() => {
+      this.barcodeNotFoundMessage.set(null);
+    }, 3000);
   }
 
   /**

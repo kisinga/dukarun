@@ -190,8 +190,12 @@ export class SellComponent implements OnInit {
   }
 
   // Product Confirmation Handlers
-  handleVariantSelected(data: { variant: ProductVariant; quantity: number }): void {
-    this.addToCart(data.variant, data.quantity);
+  handleVariantSelected(data: {
+    variant: ProductVariant;
+    quantity: number;
+    priceOverride?: { variantId: string; customLinePrice?: number; reason?: string };
+  }): void {
+    this.addToCart(data.variant, data.quantity, data.priceOverride);
   }
 
   handleConfirmModalClose(): void {
@@ -211,12 +215,29 @@ export class SellComponent implements OnInit {
   }
 
   // Cart Management
-  private addToCart(variant: ProductVariant, quantity: number): void {
+  private addToCart(
+    variant: ProductVariant,
+    quantity: number,
+    priceOverride?: { variantId: string; customLinePrice?: number; reason?: string },
+  ): void {
     // Use CartService for persistence
     this.cartService.addItemLocal(variant, quantity);
 
     // Update local state
-    this.cartItems.set(this.cartService.cartItems());
+    const items = this.cartService.cartItems();
+    this.cartItems.set(items);
+
+    // Apply price override if provided
+    if (priceOverride?.customLinePrice) {
+      const item = items.find((i) => i.variant.id === variant.id);
+      if (item) {
+        item.customLinePrice = priceOverride.customLinePrice;
+        item.priceOverrideReason = priceOverride.reason;
+        item.subtotal = priceOverride.customLinePrice / 100;
+        this.cartItems.set([...items]);
+      }
+    }
+
     this.showConfirmModal.set(false);
     this.detectedProduct.set(null);
 
