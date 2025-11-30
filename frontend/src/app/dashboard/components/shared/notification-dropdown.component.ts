@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  HostListener,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
 import { NotificationData } from './notification-item.component';
 import { NotificationListComponent } from './notification-list.component';
 
@@ -7,21 +15,17 @@ export type { NotificationData as NotificationItem } from './notification-item.c
 
 /**
  * Notification dropdown component.
- * Uses daisyUI dropdown pattern for consistent UX with avatar menu.
- * Designed to fit well on both mobile and desktop with responsive sizing.
+ * Uses daisyUI details/summary pattern for proper open/close behavior.
  */
 @Component({
   selector: 'app-notification-dropdown',
   imports: [NotificationListComponent],
   styleUrls: ['./notification-dropdown.component.scss'],
   template: `
-    <div class="dropdown dropdown-end notification-dropdown-wrapper">
+    <details #detailsRef class="dropdown dropdown-end notification-dropdown-wrapper">
       <!-- Trigger Button -->
-      <button
-        type="button"
-        tabindex="0"
-        role="button"
-        class="btn btn-ghost btn-square btn-md indicator"
+      <summary
+        class="btn btn-ghost btn-square btn-md indicator list-none cursor-pointer"
         [class.animate-pulse]="unreadCount() > 0"
         aria-label="View notifications"
       >
@@ -44,11 +48,10 @@ export type { NotificationData as NotificationItem } from './notification-item.c
             {{ unreadCount() > 99 ? '99+' : unreadCount() }}
           </span>
         }
-      </button>
+      </summary>
 
       <!-- Dropdown Content -->
       <div
-        tabindex="0"
         class="dropdown-content notification-dropdown-content bg-base-100 rounded-xl z-50 mt-2 w-[calc(100vw-1rem)] sm:w-96 shadow-xl border border-base-300 flex flex-col max-h-[calc(100vh-6rem)]"
       >
         <!-- Header -->
@@ -80,7 +83,7 @@ export type { NotificationData as NotificationItem } from './notification-item.c
           (itemClicked)="onItemClicked($event)"
         />
       </div>
-    </div>
+    </details>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -97,13 +100,45 @@ export class NotificationDropdownComponent {
   /** Emitted when "Mark all read" is clicked */
   markAllRead = output<void>();
 
+  /** Reference to the details element */
+  detailsRef = viewChild<ElementRef<HTMLDetailsElement>>('detailsRef');
+
   /** Handle notification item click */
   onItemClicked(notificationId: string): void {
     this.markAsRead.emit(notificationId);
+    this.closeDropdown();
   }
 
   /** Handle mark all read */
   onMarkAllRead(): void {
     this.markAllRead.emit();
+  }
+
+  /** Close the dropdown */
+  closeDropdown(): void {
+    const details = this.detailsRef()?.nativeElement;
+    if (details?.open) {
+      details.open = false;
+    }
+  }
+
+  /** Handle clicks outside to close dropdown */
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    const details = this.detailsRef()?.nativeElement;
+    if (!details?.open) {
+      return;
+    }
+
+    const target = event.target as Node;
+    if (!details.contains(target)) {
+      details.open = false;
+    }
+  }
+
+  /** Handle escape key to close dropdown */
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    this.closeDropdown();
   }
 }
