@@ -10,14 +10,11 @@ import { CompanyService } from '../../../../core/services/company.service';
     <div class="card bg-base-100 shadow-lg">
       <div class="card-body space-y-6">
         <!-- ML Model Status Header -->
-        <div class="flex items-center gap-4">
-          <div class="text-4xl">🤖</div>
-          <div>
-            <h2 class="text-2xl font-bold">ML Model Status</h2>
-            <p class="text-sm text-base-content/60">
-              Current machine learning model configuration and training status
-            </p>
-          </div>
+        <div>
+          <h2 class="text-2xl font-bold">ML Model Status</h2>
+          <p class="text-sm text-base-content/60 mt-1">
+            Current machine learning model configuration and training status
+          </p>
         </div>
 
         <!-- Model Assets Status -->
@@ -25,12 +22,9 @@ import { CompanyService } from '../../../../core/services/company.service';
           <!-- Model JSON Asset -->
           <div class="card bg-base-200">
             <div class="card-body p-4">
-              <div class="flex items-center gap-3">
-                <div class="text-2xl">📄</div>
-                <div>
-                  <h3 class="font-semibold">Model JSON</h3>
-                  <p class="text-xs text-base-content/60">Model architecture file</p>
-                </div>
+              <div>
+                <h3 class="font-semibold">Model JSON</h3>
+                <p class="text-xs text-base-content/60">Model architecture file</p>
               </div>
               <div class="mt-3">
                 @if (mlModelAssets()?.mlModelJsonAsset) {
@@ -46,8 +40,7 @@ import { CompanyService } from '../../../../core/services/company.service';
           <!-- Model Weights Asset -->
           <div class="card bg-base-200">
             <div class="card-body p-4">
-              <div class="flex items-center gap-3">
-                <div class="text-2xl">⚖️</div>
+              <div>
                 <div>
                   <h3 class="font-semibold">Model Weights</h3>
                   <p class="text-xs text-base-content/60">Trained model weights</p>
@@ -67,12 +60,9 @@ import { CompanyService } from '../../../../core/services/company.service';
           <!-- Metadata Asset -->
           <div class="card bg-base-200">
             <div class="card-body p-4">
-              <div class="flex items-center gap-3">
-                <div class="text-2xl">📊</div>
-                <div>
-                  <h3 class="font-semibold">Metadata</h3>
-                  <p class="text-xs text-base-content/60">Model metadata file</p>
-                </div>
+              <div>
+                <h3 class="font-semibold">Metadata</h3>
+                <p class="text-xs text-base-content/60">Model metadata file</p>
               </div>
               <div class="mt-3">
                 @if (mlModelAssets()?.mlMetadataAsset) {

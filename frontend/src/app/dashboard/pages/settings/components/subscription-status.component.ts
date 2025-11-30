@@ -23,11 +23,10 @@ import { ToastService } from '../../../../core/services/toast.service';
     <div class="card bg-base-100 shadow-lg">
       <div class="card-body space-y-6">
         <!-- Subscription Status Header -->
-        <div class="flex items-center gap-4">
-          <div class="text-4xl">💳</div>
-          <div class="flex-1">
+        <div class="flex items-start justify-between gap-4">
+          <div>
             <h2 class="text-2xl font-bold">Subscription Status</h2>
-            <p class="text-sm text-base-content/60">Manage your subscription and billing</p>
+            <p class="text-sm text-base-content/60 mt-1">Manage your subscription and billing</p>
           </div>
           @if (subscriptionService.isExpired()) {
             <button class="btn btn-primary" (click)="openPaymentModal()">Renew Now</button>

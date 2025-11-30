@@ -183,21 +183,10 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'reports',
-        loadComponent: () =>
-          import('./dashboard/pages/reports/reports.component').then((m) => m.ReportsComponent),
-      },
-      {
         path: 'settings',
         canActivate: [settingsGuard],
         loadComponent: () =>
           import('./dashboard/pages/settings/settings.component').then((m) => m.SettingsComponent),
-      },
-      {
-        path: 'team',
-        canActivate: [settingsGuard],
-        loadComponent: () =>
-          import('./dashboard/pages/team/team.component').then((m) => m.TeamComponent),
       },
       {
         path: 'accounting',

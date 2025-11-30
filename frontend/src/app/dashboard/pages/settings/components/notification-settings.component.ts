@@ -9,7 +9,7 @@ import { ToastService } from '../../../../core/services/toast.service';
     <div class="space-y-6">
       <div class="card bg-base-100 shadow-sm border border-base-300">
         <div class="card-body">
-          <h2 class="card-title text-xl">🔔 Push Notifications</h2>
+          <h2 class="card-title text-xl">Push Notifications</h2>
           <p class="text-sm opacity-70">
             Manage your notification preferences and subscription status
           </p>
@@ -88,7 +88,7 @@ import { ToastService } from '../../../../core/services/toast.service';
       <div class="card bg-base-100 shadow-sm border border-base-300">
         <div class="card-body">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="card-title text-xl">📋 Notification History</h2>
+            <h2 class="card-title text-xl">Notification History</h2>
             <div class="flex gap-2">
               <select
                 class="select select-sm select-bordered"

@@ -12,7 +12,7 @@ import { ToastService } from '../../../../core/services/toast.service';
     <div class="space-y-6">
       <div class="card bg-base-100 shadow-sm border border-base-300">
         <div class="card-body">
-          <h2 class="card-title text-xl">🔔 Notification System Status</h2>
+          <h2 class="card-title text-xl">Notification System Status</h2>
           <p class="text-sm opacity-70">
             Monitor notification system health and trigger test notifications from server
           </p>

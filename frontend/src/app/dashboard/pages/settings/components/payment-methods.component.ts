@@ -21,17 +21,32 @@ import {
     <div class="card bg-base-100 shadow-lg">
       <div class="card-body">
         <div class="flex justify-between items-center mb-4">
-          <h3 class="font-bold text-lg">💳 Payment Methods</h3>
-          <button class="btn btn-primary btn-sm" (click)="openCreateModal()">
-            ➕ Add Payment Method
+          <h3 class="font-bold text-lg">Payment Methods</h3>
+          <button class="btn btn-primary btn-sm lg:btn-md gap-2" (click)="openCreateModal()">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              />
+            </svg>
+            <span class="hidden sm:inline">Add Payment Method</span>
+            <span class="sm:hidden">Add</span>
           </button>
         </div>
 
         <!-- Payment Methods Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
           @for (method of paymentMethods(); track method.id) {
-            <div class="card bg-base-200">
-              <div class="card-body">
+            <div class="card bg-base-100 border border-base-300 shadow-sm">
+              <div class="card-body p-4">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-3">
                     @if (method.customFields?.imageAsset; as icon) {
@@ -41,8 +56,21 @@ import {
                         [alt]="method.name"
                       />
                     } @else {
-                      <div class="w-12 h-12 bg-base-300 rounded flex items-center justify-center">
-                        <span class="text-2xl">💳</span>
+                      <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="h-6 w-6 text-primary"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                          />
+                        </svg>
                       </div>
                     }
                     <div>
@@ -65,19 +93,47 @@ import {
                 </div>
 
                 @if (!isDefaultMethod(method.code)) {
-                  <div class="card-actions justify-end mt-2">
+                  <div class="card-actions justify-end mt-3 pt-3 border-t border-base-300">
                     <button
-                      class="btn btn-ghost btn-xs"
+                      class="btn btn-ghost btn-sm gap-1.5"
                       (click)="editMethod(method)"
                       [disabled]="settingsService.loading()"
                     >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                        />
+                      </svg>
                       Edit
                     </button>
                     <button
-                      class="btn btn-ghost btn-xs text-error"
+                      class="btn btn-error btn-outline btn-sm gap-1.5"
                       (click)="deleteMethod(method)"
                       [disabled]="settingsService.loading()"
                     >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
                       Delete
                     </button>
                   </div>

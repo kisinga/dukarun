@@ -132,8 +132,9 @@ import { UserDetailsModalComponent } from './user-details-modal.component';
 
         <!-- Desktop Table View -->
         @if (!isLoading() || auditLogs().length > 0) {
-          <div class="hidden md:block overflow-x-auto">
-            <table class="table table-zebra">
+          <div class="hidden md:block">
+            <div class="overflow-x-auto">
+              <table class="table table-zebra">
               <thead>
                 <tr>
                   <th>Time</th>
@@ -230,13 +231,40 @@ import { UserDetailsModalComponent } from './user-details-modal.component';
                 }
               </tbody>
             </table>
+            </div>
           </div>
 
           <!-- Mobile Card View -->
           <div class="md:hidden space-y-3">
             @for (log of paginatedLogs(); track log.id) {
-              <div class="card bg-base-200 shadow-sm">
-                <div class="card-body p-4">
+              <details class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-xl shadow-sm">
+                <summary class="collapse-title p-4 min-h-0">
+                  <div class="flex gap-3">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-start justify-between gap-2 mb-1">
+                        <div class="flex items-center gap-2">
+                          <span
+                            class="badge badge-sm"
+                            [class]="getEventTypeBadgeClass(log.eventType)"
+                          >
+                            {{ formatEventType(log.eventType) }}
+                          </span>
+                          <span
+                            class="badge badge-xs"
+                            [class.badge-info]="log.source === 'user_action'"
+                            [class.badge-neutral]="log.source === 'system_event'"
+                          >
+                            {{ log.source === 'user_action' ? 'User' : 'System' }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="text-xs opacity-70">{{ formatTimestamp(log.timestamp) }}</div>
+                      <div class="text-xs opacity-50">{{ formatRelativeTime(log.timestamp) }}</div>
+                    </div>
+                  </div>
+                </summary>
+                <div class="collapse-content px-4 pb-4 pt-0">
+                  <div class="divider my-2"></div>
                   <div class="flex justify-between items-start mb-2">
                     <div class="flex-1">
                       <div class="flex items-center gap-2 mb-1">
@@ -267,10 +295,10 @@ import { UserDetailsModalComponent } from './user-details-modal.component';
                   </div>
 
                   @if (log.entityType && log.entityId) {
-                    <div class="text-xs mb-2">
-                      <span class="opacity-60">Entity:</span>
+                    <div class="mb-3">
+                      <div class="text-xs text-base-content/60 mb-1">Entity</div>
                       <button
-                        class="badge badge-sm badge-outline hover:badge-primary cursor-pointer transition-colors ml-1"
+                        class="badge badge-sm badge-outline hover:badge-primary cursor-pointer transition-colors"
                         (click)="navigateToEntity(log.entityType!, log.entityId!)"
                         [title]="'View ' + log.entityType + ' ' + log.entityId"
                       >
@@ -283,10 +311,10 @@ import { UserDetailsModalComponent } from './user-details-modal.component';
                   }
 
                   @if (log.userId && log.userId !== 'null' && log.userId !== '') {
-                    <div class="text-xs mb-2">
-                      <span class="opacity-60">User:</span>
+                    <div class="mb-3">
+                      <div class="text-xs text-base-content/60 mb-1">User</div>
                       <button
-                        class="badge badge-sm badge-info hover:badge-info/80 cursor-pointer transition-colors ml-1"
+                        class="badge badge-sm badge-info hover:badge-info/80 cursor-pointer transition-colors"
                         (click)="showUserDetails(log.userId!, log.source)"
                         [title]="'View user ' + log.userId"
                       >
@@ -294,20 +322,20 @@ import { UserDetailsModalComponent } from './user-details-modal.component';
                       </button>
                     </div>
                   } @else {
-                    <div class="text-xs mb-2">
+                    <div class="mb-3">
+                      <div class="text-xs text-base-content/60 mb-1">Source</div>
                       <span class="badge badge-sm badge-neutral opacity-60">System Event</span>
                     </div>
                   }
 
-                  @if (expandedLogs().has(log.id)) {
-                    <div class="mt-3 pt-3 border-t border-base-300">
-                      <pre class="text-xs overflow-x-auto font-mono bg-base-300 p-2 rounded">{{
-                        formatData(log.data)
-                      }}</pre>
-                    </div>
-                  }
+                  <div class="mt-3 pt-3 border-t border-base-300">
+                    <div class="text-xs text-base-content/60 mb-2">Details</div>
+                    <pre class="text-xs overflow-x-auto font-mono bg-base-200 p-3 rounded">{{
+                      formatData(log.data)
+                    }}</pre>
+                  </div>
                 </div>
-              </div>
+              </details>
             } @empty {
               <div class="text-center py-8 text-base-content/60">
                 @if (hasActiveFilters()) {
