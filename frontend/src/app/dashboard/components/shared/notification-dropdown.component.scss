@@ -16,8 +16,27 @@
       transform: none !important;
       max-width: calc(100vw - 1rem) !important;
       top: 4.5rem !important; // Position below navbar (4rem navbar + 0.5rem margin)
+      z-index: 50 !important; // Ensure it's above navbar (z-40) but below modals
     }
   }
+}
+
+// Ensure summary element doesn't show default marker
+::ng-deep .notification-dropdown-wrapper summary {
+  list-style: none;
+  
+  &::-webkit-details-marker {
+    display: none;
+  }
+  
+  &::marker {
+    display: none;
+  }
+}
+
+// Ensure dropdown content has proper z-index on all screen sizes
+::ng-deep .notification-dropdown-content {
+  z-index: 50; // Above navbar (z-40), same level as modals but modals have backdrop
 }
 
 
