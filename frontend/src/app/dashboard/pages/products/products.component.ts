@@ -14,8 +14,8 @@ import { calculateProductStats } from '../../../core/services/stats/product-stat
 import {
   DeleteConfirmationData,
   DeleteConfirmationModalComponent,
-} from './components/delete-confirmation-modal.component';
-import { PaginationComponent } from './components/pagination.component';
+} from '../../components/shared/delete-confirmation-modal.component';
+import { PaginationComponent } from '../../components/shared/pagination.component';
 import { ProductAction, ProductCardComponent } from './components/product-card.component';
 import { ProductSearchBarComponent } from './components/product-search-bar.component';
 import { ProductStats, ProductStatsComponent } from './components/product-stats.component';
@@ -66,7 +66,11 @@ export class ProductsComponent implements OnInit {
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
-  readonly deleteModalData = signal<DeleteConfirmationData>({ productName: '', variantCount: 0 });
+  readonly deleteModalData = signal<DeleteConfirmationData>({
+    entityName: '',
+    relatedCount: 0,
+    relatedLabel: 'variant',
+  });
   readonly productToDelete = signal<string | null>(null);
 
   // Computed: filtered products
@@ -188,8 +192,13 @@ export class ProductsComponent implements OnInit {
 
     this.productToDelete.set(productId);
     this.deleteModalData.set({
-      productName: product.name,
-      variantCount: product.variants?.length || 0,
+      entityName: product.name,
+      relatedCount: product.variants?.length || 0,
+      relatedLabel: 'variant',
+      warningDetails: [
+        'All associated stock data',
+        'Sales history references',
+      ],
     });
 
     // Show modal

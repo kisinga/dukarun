@@ -10,6 +10,8 @@ import {
 } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { EntityAvatarComponent } from '../../components/shared/entity-avatar.component';
+import { ContactPickerService } from '../../../core/services/contact-picker.service';
 import { SupplierService } from '../../../core/services/supplier.service';
 
 /**
@@ -22,7 +24,7 @@ import { SupplierService } from '../../../core/services/supplier.service';
  */
 @Component({
   selector: 'app-supplier-create',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, EntityAvatarComponent],
   template: `
     <div class="min-h-screen bg-base-100">
       <!-- Header -->
@@ -92,174 +94,242 @@ import { SupplierService } from '../../../core/services/supplier.service';
 
         <!-- Step 1: Basic Person Info -->
         @if (step() === 1) {
-          <div class="mb-6">
-            <h2 class="text-lg font-semibold mb-4">Basic Information</h2>
-            <p class="text-sm text-base-content/70 mb-4">
-              Enter the basic contact information for this supplier.
-            </p>
+          <!-- Card-based form matching customer-create design -->
+          <div class="card bg-base-100 border border-base-300 shadow-sm max-w-md mx-auto">
+            <div class="card-body p-5">
+              <!-- Avatar Preview -->
+              <div class="flex justify-center mb-4">
+                <app-entity-avatar
+                  [firstName]="basicForm.value.businessName || ''"
+                  [lastName]="basicForm.value.contactPerson || ''"
+                  size="lg"
+                />
+              </div>
+
+              <form
+                [formGroup]="basicForm"
+                (ngSubmit)="onBasicSubmit()"
+                class="space-y-4"
+              >
+                <!-- Contact Picker Button -->
+                @if (isContactPickerSupported()) {
+                  <div class="form-control">
+                    <button
+                      type="button"
+                      class="btn btn-outline btn-sm w-full"
+                      (click)="importFromContacts()"
+                      [disabled]="isImportingContacts()"
+                    >
+                      @if (isImportingContacts()) {
+                        <span class="loading loading-spinner loading-xs"></span>
+                        Importing...
+                      } @else {
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 4v16m8-8H4"
+                          />
+                        </svg>
+                        Import from Contacts
+                      }
+                    </button>
+                  </div>
+                }
+
+                <!-- Business Name -->
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Business Name *</span>
+                  </label>
+                  <input
+                    type="text"
+                    formControlName="businessName"
+                    placeholder="Enter business name"
+                    class="input input-bordered w-full"
+                    [class.input-error]="hasBasicError('businessName')"
+                    autofocus
+                  />
+                  @if (hasBasicError('businessName')) {
+                    <label class="label">
+                      <span class="label-text-alt text-error">{{ getBasicErrorMessage('businessName') }}</span>
+                    </label>
+                  }
+                </div>
+
+                <!-- Contact Person -->
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Contact Person *</span>
+                  </label>
+                  <input
+                    type="text"
+                    formControlName="contactPerson"
+                    placeholder="Enter contact person name"
+                    class="input input-bordered w-full"
+                    [class.input-error]="hasBasicError('contactPerson')"
+                  />
+                  @if (hasBasicError('contactPerson')) {
+                    <label class="label">
+                      <span class="label-text-alt text-error">{{ getBasicErrorMessage('contactPerson') }}</span>
+                    </label>
+                  }
+                </div>
+
+                <!-- Email -->
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Email Address</span>
+                    <span class="label-text-alt">Optional</span>
+                  </label>
+                  <input
+                    type="email"
+                    formControlName="emailAddress"
+                    placeholder="Enter email address"
+                    class="input input-bordered w-full"
+                    [class.input-error]="hasBasicError('emailAddress')"
+                  />
+                  @if (hasBasicError('emailAddress')) {
+                    <label class="label">
+                      <span class="label-text-alt text-error">{{ getBasicErrorMessage('emailAddress') }}</span>
+                    </label>
+                  }
+                </div>
+
+                <!-- Phone Number -->
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Phone Number *</span>
+                  </label>
+                  <input
+                    type="tel"
+                    formControlName="phoneNumber"
+                    placeholder="07XXXXXXXX"
+                    class="input input-bordered w-full"
+                    [class.input-error]="hasBasicError('phoneNumber')"
+                  />
+                  @if (hasBasicError('phoneNumber')) {
+                    <label class="label">
+                      <span class="label-text-alt text-error">{{ getBasicErrorMessage('phoneNumber') }}</span>
+                    </label>
+                  }
+                </div>
+
+                <!-- Submit Button -->
+                <div class="form-control mt-6">
+                  <button type="submit" [disabled]="basicForm.invalid" class="btn btn-primary w-full">
+                    Next: Supplier Details
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-
-          <form
-            [formGroup]="basicForm"
-            (ngSubmit)="onBasicSubmit()"
-            class="space-y-4 max-w-md mx-auto"
-          >
-            <!-- Business Name -->
-            <div class="input-wrapper">
-              <label class="text-sm font-semibold label-text mb-1 block">
-                🏢 Business Name *
-              </label>
-              <input
-                type="text"
-                formControlName="businessName"
-                placeholder="Enter business name"
-                class="input input-bordered w-full"
-                [class.input-error]="hasBasicError('businessName')"
-                autofocus
-              />
-              @if (hasBasicError('businessName')) {
-                <p class="text-error text-xs mt-1">{{ getBasicErrorMessage('businessName') }}</p>
-              }
-            </div>
-
-            <!-- Contact Person -->
-            <div class="input-wrapper">
-              <label class="text-sm font-semibold label-text mb-1 block">
-                👤 Contact Person *
-              </label>
-              <input
-                type="text"
-                formControlName="contactPerson"
-                placeholder="Enter contact person name"
-                class="input input-bordered w-full"
-                [class.input-error]="hasBasicError('contactPerson')"
-              />
-              @if (hasBasicError('contactPerson')) {
-                <p class="text-error text-xs mt-1">{{ getBasicErrorMessage('contactPerson') }}</p>
-              }
-            </div>
-
-            <!-- Email -->
-            <div class="input-wrapper">
-              <label class="text-sm font-semibold label-text mb-1 block"> 📧 Email Address </label>
-              <input
-                type="email"
-                formControlName="emailAddress"
-                placeholder="Enter email address (optional)"
-                class="input input-bordered w-full"
-                [class.input-error]="hasBasicError('emailAddress')"
-              />
-              @if (hasBasicError('emailAddress')) {
-                <p class="text-error text-xs mt-1">{{ getBasicErrorMessage('emailAddress') }}</p>
-              }
-            </div>
-
-            <!-- Phone Number -->
-            <div class="input-wrapper">
-              <label class="text-sm font-semibold label-text mb-1 block"> 📱 Phone Number * </label>
-              <input
-                type="tel"
-                formControlName="phoneNumber"
-                placeholder="07XXXXXXXX (required)"
-                class="input input-bordered w-full"
-                [class.input-error]="hasBasicError('phoneNumber')"
-              />
-              @if (hasBasicError('phoneNumber')) {
-                <p class="text-error text-xs mt-1">{{ getBasicErrorMessage('phoneNumber') }}</p>
-              }
-            </div>
-
-            <!-- Submit Button -->
-            <div class="pt-4">
-              <button type="submit" [disabled]="basicForm.invalid" class="btn btn-primary w-full">
-                Next: Supplier Details
-              </button>
-            </div>
-          </form>
         }
 
         <!-- Step 2: Supplier Details -->
         @if (step() === 2) {
-          <div class="mb-6">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-lg font-semibold">Supplier Details</h2>
-              <button (click)="goToStep(1)" class="btn btn-ghost btn-sm">Edit Basic Info</button>
-            </div>
-            <p class="text-sm text-base-content/70 mb-4">
-              Add supplier-specific information (all fields are optional).
-            </p>
-          </div>
+          <!-- Card-based form matching customer-create design -->
+          <div class="card bg-base-100 border border-base-300 shadow-sm max-w-md mx-auto">
+            <div class="card-body p-5">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold">Supplier Details</h2>
+                <button (click)="goToStep(1)" class="btn btn-ghost btn-sm">Edit Basic Info</button>
+              </div>
+              <p class="text-sm text-base-content/70 mb-4">
+                Add supplier-specific information (all fields are optional).
+              </p>
 
-          <form
-            [formGroup]="supplierForm"
-            (ngSubmit)="onSupplierSubmit()"
-            class="space-y-4 max-w-md mx-auto"
-          >
-            <!-- Supplier Type -->
-            <div class="input-wrapper">
-              <label class="text-sm font-semibold label-text mb-1 block"> 🏭 Supplier Type </label>
-              <select formControlName="supplierType" class="select select-bordered w-full">
-                <option value="">Select type (optional)</option>
-                <option value="Manufacturer">Manufacturer</option>
-                <option value="Distributor">Distributor</option>
-                <option value="Wholesaler">Wholesaler</option>
-                <option value="Retailer">Retailer</option>
-                <option value="Service Provider">Service Provider</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <!-- Contact Person -->
-            <div class="input-wrapper">
-              <label class="text-sm font-semibold label-text mb-1 block"> 👥 Contact Person </label>
-              <input
-                type="text"
-                formControlName="contactPerson"
-                placeholder="Primary contact person (optional)"
-                class="input input-bordered w-full"
-              />
-            </div>
-
-            <!-- Payment Terms -->
-            <div class="input-wrapper">
-              <label class="text-sm font-semibold label-text mb-1 block"> 💳 Payment Terms </label>
-              <select formControlName="paymentTerms" class="select select-bordered w-full">
-                <option value="">Select payment terms (optional)</option>
-                <option value="Net 15">Net 15</option>
-                <option value="Net 30">Net 30</option>
-                <option value="Net 60">Net 60</option>
-                <option value="COD">Cash on Delivery</option>
-                <option value="Prepaid">Prepaid</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <!-- Notes -->
-            <div class="input-wrapper">
-              <label class="text-sm font-semibold label-text mb-1 block"> 📝 Notes </label>
-              <textarea
-                formControlName="notes"
-                placeholder="Additional notes about this supplier (optional)"
-                class="textarea textarea-bordered w-full h-20 resize-none"
-              ></textarea>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="pt-4">
-              <button
-                type="submit"
-                [disabled]="supplierService.isCreating()"
-                class="btn btn-primary w-full"
+              <form
+                [formGroup]="supplierForm"
+                (ngSubmit)="onSupplierSubmit()"
+                class="space-y-4"
               >
-                @if (supplierService.isCreating()) {
-                  <span class="loading loading-spinner loading-sm"></span>
-                  Creating Supplier...
-                } @else {
-                  Create Supplier
-                }
-              </button>
+                <!-- Supplier Type -->
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Supplier Type</span>
+                    <span class="label-text-alt">Optional</span>
+                  </label>
+                  <select formControlName="supplierType" class="select select-bordered w-full">
+                    <option value="">Select type</option>
+                    <option value="Manufacturer">Manufacturer</option>
+                    <option value="Distributor">Distributor</option>
+                    <option value="Wholesaler">Wholesaler</option>
+                    <option value="Retailer">Retailer</option>
+                    <option value="Service Provider">Service Provider</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <!-- Contact Person -->
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Contact Person</span>
+                    <span class="label-text-alt">Optional</span>
+                  </label>
+                  <input
+                    type="text"
+                    formControlName="contactPerson"
+                    placeholder="Primary contact person"
+                    class="input input-bordered w-full"
+                  />
+                </div>
+
+                <!-- Payment Terms -->
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Payment Terms</span>
+                    <span class="label-text-alt">Optional</span>
+                  </label>
+                  <select formControlName="paymentTerms" class="select select-bordered w-full">
+                    <option value="">Select payment terms</option>
+                    <option value="Net 15">Net 15</option>
+                    <option value="Net 30">Net 30</option>
+                    <option value="Net 60">Net 60</option>
+                    <option value="COD">Cash on Delivery</option>
+                    <option value="Prepaid">Prepaid</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <!-- Notes -->
+                <div class="form-control">
+                  <label class="label">
+                    <span class="label-text font-semibold">Notes</span>
+                    <span class="label-text-alt">Optional</span>
+                  </label>
+                  <textarea
+                    formControlName="notes"
+                    placeholder="Additional notes about this supplier"
+                    class="textarea textarea-bordered w-full h-24 resize-none"
+                  ></textarea>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="form-control mt-6">
+                  <button
+                    type="submit"
+                    [disabled]="supplierService.isCreating()"
+                    class="btn btn-primary w-full"
+                  >
+                    @if (supplierService.isCreating()) {
+                      <span class="loading loading-spinner loading-sm"></span>
+                      Creating Supplier...
+                    } @else {
+                      Create Supplier
+                    }
+                  </button>
+                </div>
+              </form>
             </div>
-          </form>
+          </div>
         }
       </div>
     </div>
@@ -270,6 +340,7 @@ export class SupplierCreateComponent {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   readonly supplierService = inject(SupplierService);
+  private readonly contactPickerService = inject(ContactPickerService);
 
   // Inputs for composability
   readonly mode = input<'page' | 'modal'>('page');
@@ -280,6 +351,7 @@ export class SupplierCreateComponent {
   // State
   readonly step = signal<number>(1);
   readonly error = signal<string | null>(null);
+  readonly isImportingContacts = signal(false);
   readonly basicForm: FormGroup;
   readonly supplierForm: FormGroup;
 
@@ -415,6 +487,62 @@ export class SupplierCreateComponent {
       if (this.mode() === 'page') {
         this.router.navigate(['/dashboard/suppliers']);
       }
+    }
+  }
+
+  /**
+   * Check if Contact Picker API is supported
+   */
+  isContactPickerSupported(): boolean {
+    return this.contactPickerService.isSupported();
+  }
+
+  /**
+   * Import contact from browser contacts
+   */
+  async importFromContacts(): Promise<void> {
+    if (!this.isContactPickerSupported()) {
+      this.error.set('Contact picker is not supported in this browser');
+      return;
+    }
+
+    this.isImportingContacts.set(true);
+    this.error.set(null);
+
+    try {
+      const contactData = await this.contactPickerService.selectContact();
+
+      if (contactData) {
+        const { firstName, lastName } = this.contactPickerService.parseName(contactData.name);
+
+        // Populate form fields
+        if (firstName) {
+          this.basicForm.patchValue({
+            businessName: firstName,
+            contactPerson: lastName || firstName,
+          });
+        }
+
+        if (contactData.email) {
+          this.basicForm.patchValue({ emailAddress: contactData.email });
+        }
+
+        if (contactData.phone) {
+          // Format phone number to match validation pattern (07XXXXXXXX)
+          const formattedPhone = this.contactPickerService.formatPhoneNumber(contactData.phone);
+          if (formattedPhone) {
+            this.basicForm.patchValue({ phoneNumber: formattedPhone });
+          } else {
+            // If formatting fails, still set the value but it will show validation error
+            this.basicForm.patchValue({ phoneNumber: contactData.phone.replace(/\D/g, '').substring(0, 10) });
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Contact picker error:', err);
+      this.error.set('Failed to import contact. Please enter manually.');
+    } finally {
+      this.isImportingContacts.set(false);
     }
   }
 

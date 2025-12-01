@@ -125,6 +125,11 @@ export class SellComponent implements OnInit {
   readonly customerSearchResults = signal<Customer[]>([]);
   readonly isSearchingCustomers = signal<boolean>(false);
 
+  // Customer state (for cash sales - optional)
+  readonly selectedCustomerForCash = signal<Customer | null>(null);
+  readonly customerSearchResultsForCash = signal<Customer[]>([]);
+  readonly isSearchingCustomersForCash = signal<boolean>(false);
+
   // Payment method state (for cash sales)
   readonly selectedPaymentMethod = signal<PaymentMethodCode | null>(null);
 
@@ -336,8 +341,10 @@ export class SellComponent implements OnInit {
   private resetCheckoutState(): void {
     this.checkoutError.set(null);
     this.selectedCustomer.set(null);
+    this.selectedCustomerForCash.set(null);
     this.selectedPaymentMethod.set(null);
     this.customerSearchResults.set([]);
+    this.customerSearchResultsForCash.set([]);
   }
 
   // Customer Handlers (Credit Sales)
@@ -424,6 +431,82 @@ export class SellComponent implements OnInit {
   // Payment Method Handler (Cash Sales)
   handlePaymentMethodSelect(method: PaymentMethodCode): void {
     this.selectedPaymentMethod.set(method);
+  }
+
+  // Customer Handlers (Cash Sales - Optional)
+  async handleCustomerSearchForCash(term: string): Promise<void> {
+    const trimmed = term.trim();
+    if (trimmed.length < 2) {
+      this.customerSearchResultsForCash.set([]);
+      return;
+    }
+
+    this.isSearchingCustomersForCash.set(true);
+    this.checkoutError.set(null);
+    try {
+      // Search all customers (not just credit-approved) for cash sales
+      const results = await this.customerService.searchCustomers(trimmed);
+      this.customerSearchResultsForCash.set(
+        results.map((c) => ({
+          id: c.id,
+          name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Customer',
+          phone: c.phoneNumber,
+          email: c.emailAddress,
+          isCreditApproved: c.customFields?.isCreditApproved ?? false,
+          creditLimit: c.customFields?.creditLimit ?? 0,
+          outstandingAmount: c.outstandingAmount ?? 0,
+          availableCredit: 0, // Not relevant for cash sales
+        })),
+      );
+    } catch (error) {
+      console.error('Customer search failed:', error);
+      this.customerSearchResultsForCash.set([]);
+      this.checkoutError.set('Customer search failed. Please try again.');
+    } finally {
+      this.isSearchingCustomersForCash.set(false);
+    }
+  }
+
+  handleCustomerSelectForCash(customer: Customer | null): void {
+    this.checkoutError.set(null);
+    this.customerSearchResultsForCash.set([]);
+    this.selectedCustomerForCash.set(customer);
+  }
+
+  async handleCustomerCreateForCash(data: {
+    name: string;
+    phone: string;
+    email?: string;
+  }): Promise<void> {
+    this.isProcessingCheckout.set(true);
+    this.checkoutError.set(null);
+    try {
+      const customerId = await this.customerService.quickCreateCustomer(data);
+      if (!customerId) {
+        this.checkoutError.set('Failed to create customer. Please try again.');
+        return;
+      }
+
+      // Get the created customer and select it
+      const customer = await this.customerService.getCustomerById(customerId);
+      if (customer) {
+        this.selectedCustomerForCash.set({
+          id: customer.id,
+          name: `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Customer',
+          phone: customer.phoneNumber,
+          email: customer.emailAddress,
+          isCreditApproved: false,
+          creditLimit: 0,
+          outstandingAmount: 0,
+          availableCredit: 0,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to create customer:', error);
+      this.checkoutError.set('Failed to create customer. Please try again.');
+    } finally {
+      this.isProcessingCheckout.set(false);
+    }
   }
 
   // Complete Checkout Flows
@@ -560,6 +643,8 @@ export class SellComponent implements OnInit {
     this.isProcessingCheckout.set(true);
     this.checkoutError.set(null);
 
+    const selectedCustomer = this.selectedCustomerForCash();
+
     try {
       const order = await this.orderService.createOrder({
         cartItems: this.cartItems().map((item) => ({
@@ -569,8 +654,13 @@ export class SellComponent implements OnInit {
           priceOverrideReason: item.priceOverrideReason,
         })),
         paymentMethodCode: this.selectedPaymentMethod()!,
+        customerId: selectedCustomer?.id, // Include customer ID if selected
         metadata: {
           paymentMethod: this.selectedPaymentMethod(),
+          ...(selectedCustomer && {
+            customerId: selectedCustomer.id,
+            customerName: selectedCustomer.name,
+          }),
         },
       });
 
@@ -580,7 +670,8 @@ export class SellComponent implements OnInit {
       this.cartService.clearCart();
       this.cartItems.set([]);
       this.showCheckoutModal.set(false);
-      this.showNotification(`Sale completed! Order ${order.code}`, 'success');
+      const customerMsg = selectedCustomer ? ` for ${selectedCustomer.name}` : '';
+      this.showNotification(`Sale completed${customerMsg}! Order ${order.code}`, 'success');
     } catch (error) {
       console.error('❌ Cash sale failed:', error);
       this.checkoutError.set('Failed to complete sale. Please try again.');

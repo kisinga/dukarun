@@ -91,7 +91,7 @@ import { PersonEditFormComponent } from '../shared/components/person-edit-form.c
             <!-- Credit Settings -->
             @if (hasCreditPermission()) {
               <div class="collapse collapse-arrow bg-base-100 border border-base-300 shadow-sm">
-                <input type="checkbox" />
+                <input type="checkbox" [checked]="shouldExpandCredit()" />
                 <div class="collapse-title text-lg font-semibold px-4 py-3">
                   💳 Credit Management
                 </div>
@@ -336,6 +336,13 @@ export class CustomerEditComponent {
 
   constructor() {
     this.loadCustomer();
+  }
+
+  /**
+   * Check if credit section should be expanded (from query param)
+   */
+  shouldExpandCredit(): boolean {
+    return this.route.snapshot.queryParams['expandCredit'] === 'true';
   }
 
   /**

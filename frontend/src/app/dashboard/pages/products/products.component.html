@@ -2,6 +2,9 @@
 <app-delete-confirmation-modal
   #deleteModal
   [data]="deleteModalData()"
+  title="Delete Product?"
+  entityType="product"
+  confirmButtonText="Delete Product"
   (confirm)="onDeleteConfirmed()"
   (cancel)="onDeleteCancelled()"
 />

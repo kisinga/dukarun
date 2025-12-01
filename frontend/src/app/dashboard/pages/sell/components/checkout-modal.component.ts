@@ -442,8 +442,58 @@ type PaymentMethodCode = string;
                 </svg>
               </div>
               <h4 class="font-bold text-xl mb-2">Cash Payment</h4>
-              <p class="text-base-content/60">Select your preferred payment method</p>
+              <p class="text-base-content/60">Link to customer (optional) and select payment method</p>
             </div>
+
+            <!-- Customer Selection (Optional for Cash Sales) -->
+            <div class="animate-in slide-in-from-top-2 duration-300 delay-100">
+              <div class="alert alert-info mb-4">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-5 w-5 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span class="text-sm">Optionally link this sale to a customer for tracking</span>
+              </div>
+              <app-customer-selector
+                [selectedCustomer]="selectedCustomerForCash()"
+                [searchResults]="customerSearchResultsForCash()"
+                [isSearching]="isSearchingCustomersForCash()"
+                [isCreating]="isProcessing()"
+                (searchTermChange)="customerSearchForCash.emit($event)"
+                (customerSelect)="customerSelectForCash.emit($event)"
+                (customerCreate)="customerCreateForCash.emit($event)"
+              />
+            </div>
+
+            @if (selectedCustomerForCash()) {
+            <div class="alert alert-success animate-in slide-in-from-top-2 duration-300 delay-200">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span class="text-sm">Sale will be linked to {{ selectedCustomerForCash()!.name }}</span>
+            </div>
+            }
 
             @if (paymentMethodsError()) {
             <div class="alert alert-error animate-in slide-in-from-top-2 duration-300 delay-100">
@@ -606,6 +656,9 @@ export class CheckoutModalComponent implements OnInit {
 
   // Cash sale inputs
   readonly selectedPaymentMethod = input<PaymentMethodCode | null>(null);
+  readonly selectedCustomerForCash = input<Customer | null>(null);
+  readonly customerSearchResultsForCash = input<Customer[]>([]);
+  readonly isSearchingCustomersForCash = input<boolean>(false);
 
   // Outputs
   readonly completeCashier = output<void>();
@@ -613,7 +666,10 @@ export class CheckoutModalComponent implements OnInit {
   readonly completeCash = output<void>();
   readonly customerSearch = output<string>();
   readonly customerSelect = output<Customer | null>();
+  readonly customerSearchForCash = output<string>();
+  readonly customerSelectForCash = output<Customer | null>();
   readonly customerCreate = output<{ name: string; phone: string; email?: string }>();
+  readonly customerCreateForCash = output<{ name: string; phone: string; email?: string }>();
   readonly paymentMethodSelect = output<PaymentMethodCode>();
   readonly closeModal = output<void>();
 

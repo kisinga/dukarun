@@ -246,8 +246,9 @@
       [totalPages]="totalPages()"
       [itemsPerPage]="itemsPerPage()"
       [pageOptions]="pageOptions"
-      [endItem]="endItem()"
       [totalItems]="filteredCustomers().length"
+      [showItemsPerPage]="true"
+      itemLabel="customers"
       (pageChange)="goToPage($event)"
       (itemsPerPageChange)="changeItemsPerPage($event)"
     />
@@ -258,8 +259,11 @@
 <app-delete-confirmation-modal
   #deleteModal
   [data]="deleteModalData()"
-  (confirmed)="onDeleteConfirmed()"
-  (cancelled)="onDeleteCancelled()"
+  title="Delete Customer?"
+  entityType="customer"
+  confirmButtonText="Delete Customer"
+  (confirm)="onDeleteConfirmed()"
+  (cancel)="onDeleteCancelled()"
 />
 
 <!-- Bulk Payment Modal -->

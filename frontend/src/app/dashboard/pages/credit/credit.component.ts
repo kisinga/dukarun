@@ -7,6 +7,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { CustomerService, CreditCustomerSummary } from '../../../core/services/customer.service';
@@ -252,7 +253,11 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
                         Approve
                       </button>
                     }
-                    <button class="btn btn-sm btn-ghost" (click)="startEditingLimit(customer)">
+                    <button
+                      class="btn btn-sm btn-ghost"
+                      (click)="navigateToEditLimit(customer)"
+                      [disabled]="actionInProgress() === customer.id"
+                    >
                       Edit Limit
                     </button>
                   </div>
@@ -390,6 +395,7 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
 export class CreditComponent implements OnInit {
   private readonly customerService = inject(CustomerService);
   private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
   readonly currencyService = inject(CurrencyService);
 
   readonly isLoading = signal(false);
@@ -445,6 +451,17 @@ export class CreditComponent implements OnInit {
     this.editingLimitCustomerId.set(customer.id);
     this.editLimitValue.set(customer.creditLimit);
     this.stopEditingDuration();
+  }
+
+  /**
+   * Navigate to customer edit page with credit section expanded
+   * Used on mobile for better UX
+   */
+  navigateToEditLimit(customer: CreditCustomerSummary): void {
+    // Navigate to customer edit page with query param to auto-expand credit section
+    this.router.navigate(['/dashboard/customers/edit', customer.id], {
+      queryParams: { expandCredit: 'true' },
+    });
   }
 
   stopEditingLimit(): void {

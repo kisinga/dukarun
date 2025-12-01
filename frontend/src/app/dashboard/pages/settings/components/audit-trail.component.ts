@@ -15,7 +15,7 @@ import {
   SettingsService,
 } from '../../../../core/services/settings.service';
 import { ToastService } from '../../../../core/services/toast.service';
-import { PaginationComponent } from '../../customers/components/pagination.component';
+import { PaginationComponent } from '../../../components/shared/pagination.component';
 import { AuditTrailFilterComponent } from './audit-trail-filter.component';
 import { UserDetailsModalComponent } from './user-details-modal.component';
 
@@ -351,8 +351,9 @@ import { UserDetailsModalComponent } from './user-details-modal.component';
           @if (totalPages() > 1 && filteredLogs().length > 0) {
             <div class="mt-4">
               <div class="text-xs text-base-content/60 mb-2">
-                Showing {{ (currentPage() - 1) * itemsPerPage() + 1 }} to {{ endItem() }} of
-                {{ totalItems() }} audit logs
+                Showing {{ (currentPage() - 1) * itemsPerPage() + 1 }} to
+                {{ endItem() }} of {{ totalItems() }}
+                audit logs
                 @if (hasActiveFilters()) {
                   <span class="opacity-70">(filtered from {{ auditLogs().length }} total)</span>
                 }
@@ -362,8 +363,9 @@ import { UserDetailsModalComponent } from './user-details-modal.component';
                 [totalPages]="totalPages()"
                 [itemsPerPage]="itemsPerPage()"
                 [pageOptions]="pageOptions"
-                [endItem]="endItem()"
                 [totalItems]="totalItems()"
+                [showItemsPerPage]="true"
+                itemLabel="audit logs"
                 (pageChange)="onPageChange($event)"
                 (itemsPerPageChange)="onItemsPerPageChange($event)"
               />

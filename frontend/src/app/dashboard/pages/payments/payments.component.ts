@@ -10,7 +10,7 @@ import {
 import { Router } from '@angular/router';
 import { PaymentsService, PaymentWithOrder } from '../../../core/services/payments.service';
 import { calculatePaymentStats } from '../../../core/services/stats/payment-stats.util';
-import { PaginationComponent } from '../customers/components/pagination.component';
+import { PaginationComponent } from '../../components/shared/pagination.component';
 import { OrderDetailComponent } from '../orders/order-detail/order-detail.component';
 import { PaymentAction, PaymentCardComponent } from './components/payment-card.component';
 import { PaymentSearchBarComponent } from './components/payment-search-bar.component';

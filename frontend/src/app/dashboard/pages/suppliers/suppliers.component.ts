@@ -14,8 +14,8 @@ import { calculateSupplierStats } from '../../../core/services/stats/supplier-st
 import {
   DeleteConfirmationData,
   DeleteConfirmationModalComponent,
-} from './components/delete-confirmation-modal.component';
-import { PaginationComponent } from './components/pagination.component';
+} from '../../components/shared/delete-confirmation-modal.component';
+import { PaginationComponent } from '../../components/shared/pagination.component';
 import { SupplierAction, SupplierCardComponent } from './components/supplier-card.component';
 import { SupplierSearchBarComponent } from './components/supplier-search-bar.component';
 import { SupplierStats, SupplierStatsComponent } from './components/supplier-stats.component';
@@ -66,7 +66,7 @@ export class SuppliersComponent implements OnInit {
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
-  readonly deleteModalData = signal<DeleteConfirmationData>({ supplierName: '', addressCount: 0 });
+  readonly deleteModalData = signal<DeleteConfirmationData>({ entityName: '', relatedCount: 0 });
   readonly supplierToDelete = signal<string | null>(null);
   readonly supplierToView = signal<any | null>(null);
 
@@ -161,8 +161,9 @@ export class SuppliersComponent implements OnInit {
 
     this.supplierToDelete.set(supplierId);
     this.deleteModalData.set({
-      supplierName: `${supplier.firstName} ${supplier.lastName}`,
-      addressCount: supplier.addresses?.length || 0,
+      entityName: `${supplier.firstName} ${supplier.lastName}`,
+      relatedCount: supplier.addresses?.length || 0,
+      relatedLabel: 'address',
     });
 
     // Show modal

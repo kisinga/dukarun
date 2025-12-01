@@ -2,19 +2,21 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { EntityAvatarComponent } from '../../components/shared/entity-avatar.component';
+import { ContactPickerService } from '../../../core/services/contact-picker.service';
 import { CustomerService } from '../../../core/services/customer.service';
 
 /**
  * Customer Create Component
  *
  * Mobile-optimized customer creation form.
- * Uses shared PersonFormComponent for consistent UX.
+ * Redesigned to match customers page design language.
  *
- * ARCHITECTURE: Simple form with minimal required fields.
+ * ARCHITECTURE: Simple form with minimal required fields, consistent with customers page.
  */
 @Component({
   selector: 'app-customer-create',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, EntityAvatarComponent],
   template: `
     <div class="min-h-screen bg-base-100">
       <!-- Header -->
@@ -53,85 +55,148 @@ import { CustomerService } from '../../../core/services/customer.service';
           </div>
         }
 
-        <!-- Mobile-optimized form -->
-        <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4 max-w-md mx-auto">
-          <!-- Business Name -->
-          <div class="input-wrapper">
-            <label class="text-sm font-semibold label-text mb-1 block"> 🏢 Business Name * </label>
-            <input
-              type="text"
-              formControlName="businessName"
-              placeholder="Enter business name"
-              class="input input-bordered w-full"
-              [class.input-error]="hasError('businessName')"
-              autofocus
-            />
-            @if (hasError('businessName')) {
-              <p class="text-error text-xs mt-1">{{ getErrorMessage('businessName') }}</p>
-            }
-          </div>
+        <!-- Card-based form matching customers page design -->
+        <div class="card bg-base-100 border border-base-300 shadow-sm max-w-md mx-auto">
+          <div class="card-body p-5">
+            <!-- Avatar Preview -->
+            <div class="flex justify-center mb-4">
+              <app-entity-avatar
+                [firstName]="form.value.businessName || ''"
+                [lastName]="form.value.contactPerson || ''"
+                size="lg"
+              />
+            </div>
 
-          <!-- Contact Person -->
-          <div class="input-wrapper">
-            <label class="text-sm font-semibold label-text mb-1 block"> 👤 Contact Person * </label>
-            <input
-              type="text"
-              formControlName="contactPerson"
-              placeholder="Enter contact person name"
-              class="input input-bordered w-full"
-              [class.input-error]="hasError('contactPerson')"
-            />
-            @if (hasError('contactPerson')) {
-              <p class="text-error text-xs mt-1">{{ getErrorMessage('contactPerson') }}</p>
-            }
-          </div>
-
-          <!-- Email -->
-          <div class="input-wrapper">
-            <label class="text-sm font-semibold label-text mb-1 block"> 📧 Email Address </label>
-            <input
-              type="email"
-              formControlName="emailAddress"
-              placeholder="Enter email address (optional)"
-              class="input input-bordered w-full"
-              [class.input-error]="hasError('emailAddress')"
-            />
-            @if (hasError('emailAddress')) {
-              <p class="text-error text-xs mt-1">{{ getErrorMessage('emailAddress') }}</p>
-            }
-          </div>
-
-          <!-- Phone Number -->
-          <div class="input-wrapper">
-            <label class="text-sm font-semibold label-text mb-1 block"> 📱 Phone Number * </label>
-            <input
-              type="tel"
-              formControlName="phoneNumber"
-              placeholder="07XXXXXXXX (required)"
-              class="input input-bordered w-full"
-              [class.input-error]="hasError('phoneNumber')"
-            />
-            @if (hasError('phoneNumber')) {
-              <p class="text-error text-xs mt-1">{{ getErrorMessage('phoneNumber') }}</p>
-            }
-          </div>
-
-          <!-- Submit Button -->
-          <div class="pt-4">
-            <button
-              type="submit"
-              [disabled]="form.invalid || customerService.isCreating()"
-              class="btn btn-primary w-full"
-            >
-              @if (customerService.isCreating()) {
-                <span class="loading loading-spinner loading-sm"></span>
-                Creating...
-              } @else {
-                Create Customer
+            <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+              <!-- Contact Picker Button -->
+              @if (isContactPickerSupported()) {
+                <div class="form-control">
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm w-full"
+                    (click)="importFromContacts()"
+                    [disabled]="isImportingContacts()"
+                  >
+                    @if (isImportingContacts()) {
+                      <span class="loading loading-spinner loading-xs"></span>
+                      Importing...
+                    } @else {
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                      Import from Contacts
+                    }
+                  </button>
+                </div>
               }
-            </button>
+
+              <!-- Business Name -->
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold">Business Name *</span>
+                </label>
+                <input
+                  type="text"
+                  formControlName="businessName"
+                  placeholder="Enter business name"
+                  class="input input-bordered w-full"
+                  [class.input-error]="hasError('businessName')"
+                  autofocus
+                />
+                @if (hasError('businessName')) {
+                  <label class="label">
+                    <span class="label-text-alt text-error">{{ getErrorMessage('businessName') }}</span>
+                  </label>
+                }
+              </div>
+
+              <!-- Contact Person -->
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold">Contact Person *</span>
+                </label>
+                <input
+                  type="text"
+                  formControlName="contactPerson"
+                  placeholder="Enter contact person name"
+                  class="input input-bordered w-full"
+                  [class.input-error]="hasError('contactPerson')"
+                />
+                @if (hasError('contactPerson')) {
+                  <label class="label">
+                    <span class="label-text-alt text-error">{{ getErrorMessage('contactPerson') }}</span>
+                  </label>
+                }
+              </div>
+
+              <!-- Email -->
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold">Email Address</span>
+                  <span class="label-text-alt">Optional</span>
+                </label>
+                <input
+                  type="email"
+                  formControlName="emailAddress"
+                  placeholder="Enter email address"
+                  class="input input-bordered w-full"
+                  [class.input-error]="hasError('emailAddress')"
+                />
+                @if (hasError('emailAddress')) {
+                  <label class="label">
+                    <span class="label-text-alt text-error">{{ getErrorMessage('emailAddress') }}</span>
+                  </label>
+                }
+              </div>
+
+              <!-- Phone Number -->
+              <div class="form-control">
+                <label class="label">
+                  <span class="label-text font-semibold">Phone Number *</span>
+                </label>
+                <input
+                  type="tel"
+                  formControlName="phoneNumber"
+                  placeholder="07XXXXXXXX"
+                  class="input input-bordered w-full"
+                  [class.input-error]="hasError('phoneNumber')"
+                />
+                @if (hasError('phoneNumber')) {
+                  <label class="label">
+                    <span class="label-text-alt text-error">{{ getErrorMessage('phoneNumber') }}</span>
+                  </label>
+                }
+              </div>
+
+              <!-- Submit Button -->
+              <div class="form-control mt-6">
+                <button
+                  type="submit"
+                  [disabled]="form.invalid || customerService.isCreating()"
+                  class="btn btn-primary w-full"
+                >
+                  @if (customerService.isCreating()) {
+                    <span class="loading loading-spinner loading-sm"></span>
+                    Creating...
+                  } @else {
+                    Create Customer
+                  }
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   `,
@@ -141,9 +206,11 @@ export class CustomerCreateComponent {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   readonly customerService = inject(CustomerService);
+  private readonly contactPickerService = inject(ContactPickerService);
 
   // State
   readonly error = signal<string | null>(null);
+  readonly isImportingContacts = signal(false);
   readonly form: FormGroup;
 
   constructor() {
@@ -153,6 +220,62 @@ export class CustomerCreateComponent {
       emailAddress: ['', [Validators.email]], // Optional
       phoneNumber: ['', [Validators.required, Validators.pattern(/^07\d{8}$/)]], // Required, format: 07XXXXXXXX
     });
+  }
+
+  /**
+   * Check if Contact Picker API is supported
+   */
+  isContactPickerSupported(): boolean {
+    return this.contactPickerService.isSupported();
+  }
+
+  /**
+   * Import contact from browser contacts
+   */
+  async importFromContacts(): Promise<void> {
+    if (!this.isContactPickerSupported()) {
+      this.error.set('Contact picker is not supported in this browser');
+      return;
+    }
+
+    this.isImportingContacts.set(true);
+    this.error.set(null);
+
+    try {
+      const contactData = await this.contactPickerService.selectContact();
+
+      if (contactData) {
+        const { firstName, lastName } = this.contactPickerService.parseName(contactData.name);
+
+        // Populate form fields
+        if (firstName) {
+          this.form.patchValue({
+            businessName: firstName,
+            contactPerson: lastName || firstName,
+          });
+        }
+
+        if (contactData.email) {
+          this.form.patchValue({ emailAddress: contactData.email });
+        }
+
+        if (contactData.phone) {
+          // Format phone number to match validation pattern (07XXXXXXXX)
+          const formattedPhone = this.contactPickerService.formatPhoneNumber(contactData.phone);
+          if (formattedPhone) {
+            this.form.patchValue({ phoneNumber: formattedPhone });
+          } else {
+            // If formatting fails, still set the value but it will show validation error
+            this.form.patchValue({ phoneNumber: contactData.phone.replace(/\D/g, '').substring(0, 10) });
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Contact picker error:', err);
+      this.error.set('Failed to import contact. Please enter manually.');
+    } finally {
+      this.isImportingContacts.set(false);
+    }
   }
 
   /**
