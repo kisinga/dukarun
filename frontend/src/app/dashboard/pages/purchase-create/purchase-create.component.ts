@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { DeepLinkService } from '../../../core/services/deep-link.service';
 import {
   ProductSearchService,
   ProductVariant,
@@ -151,6 +152,8 @@ import { PurchaseSupplierSelectorComponent } from './components/purchase-supplie
 })
 export class PurchaseCreateComponent implements OnInit {
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly deepLinkService = inject(DeepLinkService);
   readonly purchaseService = inject(PurchaseService);
   readonly supplierService = inject(SupplierService);
   readonly productSearchService = inject(ProductSearchService);
@@ -178,12 +181,26 @@ export class PurchaseCreateComponent implements OnInit {
     stockLocationId: '',
   });
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
     // Initialize draft (loads from cache if exists)
     this.purchaseService.initializeDraft();
     // Load suppliers and stock locations
     this.supplierService.fetchSuppliers({ take: 100, skip: 0 });
     this.stockLocationService.fetchStockLocations();
+
+    // Handle deep linking for variant pre-population
+    await this.deepLinkService.processQueryParams(this.route, {
+      params: {
+        variantId: { type: 'string', required: false },
+      },
+      handler: async (params) => {
+        if (params.variantId && typeof params.variantId === 'string') {
+          await this.handlePrepopulationFromVariantId(params.variantId);
+        }
+      },
+      clearAfterProcess: true,
+      strategy: 'immediate',
+    });
   }
 
   /**
@@ -313,5 +330,44 @@ export class PurchaseCreateComponent implements OnInit {
    */
   goBack(): void {
     this.router.navigate(['/dashboard/purchases']);
+  }
+
+  /**
+   * Handle pre-population from variant ID (deep linking)
+   * Fetches variant data and adds it to the purchase draft
+   */
+  private async handlePrepopulationFromVariantId(variantId: string): Promise<void> {
+    try {
+      // Fetch variant data
+      const variant = await this.productSearchService.getVariantById(variantId);
+
+      if (!variant) {
+        console.warn(`Variant ${variantId} not found`);
+        // Optionally show error to user
+        return;
+      }
+
+      // Get default stock location
+      const defaultLocation = this.stockLocations()[0];
+      if (!defaultLocation) {
+        console.warn('No stock locations available');
+        return;
+      }
+
+      // Create line item with variant data
+      const lineItem: PurchaseLineItem = {
+        variantId: variant.id,
+        variant: variant,
+        quantity: 1, // Default quantity
+        unitCost: 0, // User needs to enter this
+        stockLocationId: defaultLocation.id,
+      };
+
+      // Prepopulate the draft with the line item
+      this.purchaseService.prepopulateItems([lineItem]);
+    } catch (error) {
+      console.error('Failed to pre-populate from variant ID:', error);
+      // Optionally show error to user
+    }
   }
 }

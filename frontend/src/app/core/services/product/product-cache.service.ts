@@ -176,6 +176,22 @@ export class ProductCacheService {
   }
 
   /**
+   * Get variant by ID from cache
+   * @param variantId - Variant ID to lookup
+   * @returns ProductVariant if found, null otherwise
+   */
+  getVariantById(variantId: string): ProductVariant | null {
+    // Search through all cached products for the variant
+    for (const product of this.productsById.values()) {
+      const variant = product.variants.find((v) => v.id === variantId);
+      if (variant) {
+        return variant;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Clear cache
    */
   clearCache(): void {

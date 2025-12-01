@@ -175,4 +175,69 @@ export class ProductSearchService {
       return null;
     }
   }
+
+  /**
+   * Get variant by ID
+   * Searches through cached products first, then falls back to network
+   * @param variantId - Variant ID to lookup
+   * @returns ProductVariant if found, null otherwise
+   */
+  async getVariantById(variantId: string): Promise<ProductVariant | null> {
+    // Try cache first if available
+    if (this.cacheService.isCacheReady()) {
+      const cachedVariant = this.cacheService.getVariantById(variantId);
+      if (cachedVariant) {
+        console.log(`📦 Variant ${variantId} found in cache`);
+        return cachedVariant;
+      }
+    }
+
+    // Fallback: Search through all products (this is less efficient but works)
+    // In a production system, you might want to add a GraphQL query to get variant by ID directly
+    console.log(`🌐 Variant ${variantId} not in cache, searching products...`);
+
+    try {
+      // Search for products and find the variant
+      // This is a workaround - ideally we'd have a direct variant lookup query
+      const client = this.apolloService.getClient();
+      const result = await client.query<{
+        products: {
+          items: any[];
+        };
+      }>({
+        query: SEARCH_PRODUCTS,
+        variables: { term: '' }, // Empty search to get all products (may need pagination)
+        fetchPolicy: 'network-only',
+      });
+
+      if (!result.data?.products?.items) {
+        return null;
+      }
+
+      // Search through all products for the variant
+      for (const product of result.data.products.items) {
+        for (const variant of product.variants || []) {
+          if (variant.id === variantId) {
+            return {
+              id: variant.id,
+              name: variant.name,
+              sku: variant.sku,
+              priceWithTax: variant.priceWithTax?.value || variant.priceWithTax || 0,
+              stockLevel: variant.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
+              productId: product.id,
+              productName: product.name,
+              featuredAsset: product.featuredAsset
+                ? { preview: product.featuredAsset.preview }
+                : undefined,
+            };
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to fetch variant by ID:', error);
+      return null;
+    }
+  }
 }

@@ -166,12 +166,12 @@ export class ProductsComponent implements OnInit {
         break;
 
       case 'purchase':
-        // Navigate to purchases page with prepopulated variant
+        // Navigate to purchase create page with prepopulated variant
         const product = this.products().find((p) => p.id === productId);
         if (product?.variants && product.variants.length > 0) {
           // Use first variant for prepopulation
           const variantId = product.variants[0].id;
-          this.router.navigate(['/dashboard/purchases'], {
+          this.router.navigate(['/dashboard/purchases/create'], {
             queryParams: { variantId },
           });
         }
