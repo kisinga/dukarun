@@ -9,17 +9,22 @@ import {
   viewChild,
 } from '@angular/core';
 import {
+  AbstractControl,
+  AsyncValidatorFn,
   FormArray,
   FormBuilder,
   FormControl,
   FormGroup,
   ReactiveFormsModule,
+  ValidationErrors,
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AppInitService } from '../../../core/services/app-init.service';
 import { CompanyService } from '../../../core/services/company.service';
 import { ProductService } from '../../../core/services/product.service';
+import { ProductValidationService } from '../../../core/services/product/product-validation.service';
+import { ProductVariantService } from '../../../core/services/product/product-variant.service';
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { HowSoldSelectorComponent } from './components/how-sold-selector.component';
 import { IdentificationSelectorComponent } from './components/identification-selector.component';
@@ -87,8 +92,10 @@ export class ProductCreateComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly productService = inject(ProductService);
+  private readonly variantService = inject(ProductVariantService);
   private readonly stockLocationService = inject(StockLocationService);
   private readonly appInitService = inject(AppInitService);
+  private readonly validationService = inject(ProductValidationService);
   readonly companyService = inject(CompanyService);
 
   /**
@@ -231,7 +238,11 @@ export class ProductCreateComponent implements OnInit {
     // Initialize form: Product info + Multiple SKUs
     this.productForm = this.fb.group({
       // Product level - Identification (choose ONE method)
-      barcode: [''], // Method 1: Scan/enter barcode (for packaged goods)
+      barcode: [
+        '',
+        [],
+        [this.barcodeAsyncValidator()], // Async validator for duplicate check
+      ], // Method 1: Scan/enter barcode (for packaged goods)
       // Method 2: Label photos handled via PhotoManagerComponent (for fresh produce)
 
       // Product level - Basic info
@@ -310,8 +321,10 @@ export class ProductCreateComponent implements OnInit {
     stock: number = 0,
     allowFractionalQuantity: boolean = false,
     wholesalePrice: number = 0,
+    variantId: string | null = null,
   ): FormGroup {
     return this.fb.group({
+      variantId: [variantId], // Store variant ID for updates (null for new SKUs)
       name: [name, [Validators.required, Validators.minLength(1)]],
       sku: [skuCode, [Validators.required, Validators.minLength(1), Validators.maxLength(50)]],
       price: [price, [Validators.required, Validators.min(1)]],
@@ -526,7 +539,7 @@ export class ProductCreateComponent implements OnInit {
         const baseSku = this.generateSku(defaultName);
         const code = this.buildUniqueSkuCode(baseSku, 1);
         this.skus.push(
-          this.createSkuFormGroup(code, defaultName, 1, 0, this.productType() === 'measured', 0),
+          this.createSkuFormGroup(code, defaultName, 1, 0, this.productType() === 'measured', 0, null),
         );
       }
     }
@@ -565,7 +578,7 @@ export class ProductCreateComponent implements OnInit {
     const index = 1;
     const baseSku = this.generateSku(productName);
     const skuCode = this.buildUniqueSkuCode(baseSku, index);
-    const skuGroup = this.createSkuFormGroup(skuCode, productName, 1, 0, false, 0);
+    const skuGroup = this.createSkuFormGroup(skuCode, productName, 1, 0, false, 0, null);
     this.skus.push(skuGroup);
   }
 
@@ -581,7 +594,7 @@ export class ProductCreateComponent implements OnInit {
       const index = this.skus.length + 1;
       const baseSku = this.generateSku(unit);
       const skuCode = this.buildUniqueSkuCode(baseSku, index);
-      this.skus.push(this.createSkuFormGroup(skuCode, unit, 1, 0, true, 0));
+      this.skus.push(this.createSkuFormGroup(skuCode, unit, 1, 0, true, 0, null));
     } else {
       // Measured with variants: "Grade A - KG", "Grade B - KG"
       dimensions[0].options.forEach((option) => {
@@ -589,7 +602,7 @@ export class ProductCreateComponent implements OnInit {
         const index = this.skus.length + 1;
         const baseSku = this.generateSku(name);
         const skuCode = this.buildUniqueSkuCode(baseSku, index);
-        this.skus.push(this.createSkuFormGroup(skuCode, name, 1, 0, true, 0));
+        this.skus.push(this.createSkuFormGroup(skuCode, name, 1, 0, true, 0, null));
       });
     }
   }
@@ -606,14 +619,14 @@ export class ProductCreateComponent implements OnInit {
       const index = this.skus.length + 1;
       const baseSku = this.generateSku(name);
       const skuCode = this.buildUniqueSkuCode(baseSku, index);
-      this.skus.push(this.createSkuFormGroup(skuCode, name, 1, 0, false, 0));
+      this.skus.push(this.createSkuFormGroup(skuCode, name, 1, 0, false, 0, null));
     } else if (dimensions.length === 1) {
       // Single dimension: "Red", "Blue", "Yellow"
       dimensions[0].options.forEach((option) => {
         const index = this.skus.length + 1;
         const baseSku = this.generateSku(option);
         const skuCode = this.buildUniqueSkuCode(baseSku, index);
-        this.skus.push(this.createSkuFormGroup(skuCode, option, 1, 0, false, 0));
+        this.skus.push(this.createSkuFormGroup(skuCode, option, 1, 0, false, 0, null));
       });
     } else {
       // Multiple dimensions: Cartesian product
@@ -622,7 +635,7 @@ export class ProductCreateComponent implements OnInit {
         const index = this.skus.length + 1;
         const baseSku = this.generateSku(name);
         const skuCode = this.buildUniqueSkuCode(baseSku, index);
-        this.skus.push(this.createSkuFormGroup(skuCode, name, 1, 0, false, 0));
+        this.skus.push(this.createSkuFormGroup(skuCode, name, 1, 0, false, 0, null));
       });
     }
   }
@@ -649,7 +662,7 @@ export class ProductCreateComponent implements OnInit {
     const skuCode = this.buildUniqueSkuCode(baseSku, index);
 
     // Create SKU with pre-filled code to avoid validation issues
-    const skuGroup = this.createSkuFormGroup(skuCode, '', 0, 0, false, 0);
+    const skuGroup = this.createSkuFormGroup(skuCode, '', 0, 0, false, 0, null);
     this.skus.push(skuGroup);
 
     // Trigger validation update
@@ -706,13 +719,53 @@ export class ProductCreateComponent implements OnInit {
   }
 
   /**
+   * Async validator for barcode uniqueness
+   */
+  private barcodeAsyncValidator(): AsyncValidatorFn {
+    return (control: AbstractControl): Promise<ValidationErrors | null> => {
+      const barcode = control.value?.trim();
+
+      // Skip validation if barcode is empty
+      if (!barcode) {
+        return Promise.resolve(null);
+      }
+
+      return this.validationService
+        .checkBarcodeExists(barcode, this.productId() || undefined)
+        .then((result) => {
+          if (result.exists) {
+            return {
+              barcodeExists: {
+                message: `Barcode "${barcode}" is already used by product "${result.productName || 'another product'}"`,
+                productId: result.productId,
+                productName: result.productName,
+              },
+            };
+          }
+          return null;
+        })
+        .catch(() => {
+          // On error, don't block - let backend handle it
+          return null;
+        });
+    };
+  }
+
+  /**
    * Handle barcode scanned
    */
-  onBarcodeScanned(barcode: string): void {
+  async onBarcodeScanned(barcode: string): Promise<void> {
     this.productForm.patchValue({ barcode });
     this.barcodeValue.set(barcode);
     this.identificationMethod.set('barcode');
     console.log('Barcode scanned:', barcode);
+
+    // Trigger immediate validation
+    const barcodeControl = this.productForm.get('barcode');
+    if (barcodeControl) {
+      barcodeControl.markAsTouched();
+      await barcodeControl.updateValueAndValidity();
+    }
   }
 
   /**
@@ -748,20 +801,77 @@ export class ProductCreateComponent implements OnInit {
         this.barcodeValue.set(product.customFields.barcode);
       }
 
+      // Determine item type: Check if any variant has trackInventory: false → service
+      const isService = product.variants?.some(
+        (variant: any) => variant.trackInventory === false,
+      );
+      if (isService) {
+        this.itemType.set('service');
+      } else {
+        this.itemType.set('product');
+      }
+
       // Load variants as SKUs
       if (product.variants && product.variants.length > 0) {
+        // Determine product type from first variant's allowFractionalQuantity
+        const firstVariant = product.variants[0];
+        const allowFractional = firstVariant.customFields?.allowFractionalQuantity || false;
+
+        if (!isService) {
+          // Determine product type: measured vs discrete
+          if (allowFractional) {
+            this.productType.set('measured');
+            // Try to extract measurement unit from variant name (e.g., "Product - KG" or just "KG")
+            const variantName = firstVariant.name || '';
+            const unitMatch = variantName.match(/\b(KG|L|G|ML|KG|LITRE|LITER)\b/i);
+            if (unitMatch) {
+              const unit = unitMatch[0].toUpperCase();
+              // Normalize units
+              if (unit === 'LITRE' || unit === 'LITER') {
+                this.measurementUnit.set('L');
+              } else if (unit === 'G') {
+                this.measurementUnit.set('G');
+              } else if (unit === 'ML') {
+                this.measurementUnit.set('ML');
+              } else {
+                this.measurementUnit.set(unit);
+              }
+            } else {
+              // Default to KG if we can't determine
+              this.measurementUnit.set('KG');
+            }
+          } else {
+            this.productType.set('discrete');
+          }
+        }
+
+        // Restore all SKUs with variant IDs
         product.variants.forEach((variant: any) => {
+          // Convert price from cents to decimal
+          const priceDecimal = variant.priceWithTax / 100;
+          // Convert wholesalePrice from cents to decimal (if exists)
+          const wholesalePriceDecimal = variant.customFields?.wholesalePrice
+            ? variant.customFields.wholesalePrice / 100
+            : 0;
+
           const skuGroup = this.createSkuFormGroup(
             variant.sku,
             variant.name,
-            variant.priceWithTax,
+            priceDecimal,
             variant.stockOnHand || 0,
             variant.customFields?.allowFractionalQuantity || false,
-            variant.customFields?.wholesalePrice || 0,
+            wholesalePriceDecimal,
+            variant.id, // Store variant ID for updates
           );
           this.skus.push(skuGroup);
         });
+
+        // Trigger validation update
+        this.skuValidityTrigger.update((v) => v + 1);
       }
+
+      // Set initial stage to 2 (pricing) since basics are already filled
+      this.currentStage.set(2);
     } catch (error: any) {
       console.error('Failed to load product:', error);
       this.submitError.set('Failed to load product data');
@@ -846,59 +956,129 @@ export class ProductCreateComponent implements OnInit {
 
       console.log('Final variant inputs:', variantInputs);
 
-      const productId = await this.productService.createProductWithVariants(
-        productInput,
-        variantInputs,
-      );
+      // Handle edit mode vs create mode
+      if (this.isEditMode() && this.productId()) {
+        // EDIT MODE: Update existing product
+        const productId = this.productId()!;
 
-      if (productId) {
-        console.log('Transaction Phase 1 COMPLETE: Product & Variants created');
+        // Separate existing variants (with variantId) from new variants (without variantId)
+        const existingVariants = formValue.skus
+          .filter((sku: any) => sku.variantId)
+          .map((sku: any) => ({
+            id: sku.variantId,
+            name: sku.name.trim(),
+            price: Number(sku.price),
+          }));
 
-        // Upload photos if any were added (Phase 2 - non-blocking)
-        const identificationSelector = this.identificationSelector();
-        if (identificationSelector) {
-          const photoManager = identificationSelector.photoManager();
-          if (photoManager) {
-            const photos = photoManager.getPhotos();
-            if (photos.length > 0) {
-              console.log(`Transaction Phase 2: Uploading ${photos.length} photo(s)...`);
-              try {
-                const assetIds = await this.productService.uploadProductPhotos(productId, photos);
-                if (assetIds && assetIds.length > 0) {
-                  console.log('Transaction Phase 2 COMPLETE: Photos uploaded');
-                  this.submitSuccess.set(true);
-                } else {
-                  console.warn('Transaction Phase 2 FAILED: Photos upload failed');
-                  console.warn('But product was successfully created (photos can be added later)');
-                  // Show partial success message
+        const newVariants = formValue.skus
+          .filter((sku: any) => !sku.variantId)
+          .map((sku: any) => ({
+            sku: sku.sku.trim().toUpperCase(),
+            name: sku.name.trim(),
+            price: Number(sku.price),
+            trackInventory: this.itemType() === 'product', // true for products, false for services
+            stockOnHand: Number(sku.stockOnHand),
+            stockLocationId: stockLocationId!,
+            customFields: {
+              wholesalePrice: sku.wholesalePrice ? Number(sku.wholesalePrice) * 100 : null,
+              allowFractionalQuantity: Boolean(sku.allowFractionalQuantity),
+            },
+          }));
+
+        // Update product name and barcode
+        const updated = await this.productService.updateProductWithVariants(
+          productId,
+          productInput.name,
+          existingVariants,
+          productInput.barcode,
+        );
+
+        if (!updated) {
+          const error = this.productService.error();
+          this.submitError.set(error || 'Failed to update product');
+          return;
+        }
+
+        // Create new variants if any
+        if (newVariants.length > 0) {
+          console.log('Creating new variants for existing product:', newVariants.length);
+          const createdVariants = await this.variantService.createVariants(productId, newVariants);
+          if (!createdVariants || createdVariants.length === 0) {
+            this.submitError.set('Product updated, but failed to create new variants');
+            return;
+          }
+          console.log(`Created ${createdVariants.length} new variant(s)`);
+        }
+
+        console.log('Product update complete');
+
+        // Note: Audit trail entries are automatically created by the backend
+        // when product updates occur via the updateProduct mutation.
+        // The backend tracks: eventType, entityType, entityId, and changed data.
+        console.log('Audit trail: Product update logged automatically by backend');
+
+        this.submitSuccess.set(true);
+
+        // Navigate after a delay
+        setTimeout(() => {
+          this.router.navigate(['/dashboard/products']);
+        }, 1500);
+      } else {
+        // CREATE MODE: Create new product
+        const productId = await this.productService.createProductWithVariants(
+          productInput,
+          variantInputs,
+        );
+
+        if (productId) {
+          console.log('Transaction Phase 1 COMPLETE: Product & Variants created');
+
+          // Upload photos if any were added (Phase 2 - non-blocking)
+          const identificationSelector = this.identificationSelector();
+          if (identificationSelector) {
+            const photoManager = identificationSelector.photoManager();
+            if (photoManager) {
+              const photos = photoManager.getPhotos();
+              if (photos.length > 0) {
+                console.log(`Transaction Phase 2: Uploading ${photos.length} photo(s)...`);
+                try {
+                  const assetIds = await this.productService.uploadProductPhotos(productId, photos);
+                  if (assetIds && assetIds.length > 0) {
+                    console.log('Transaction Phase 2 COMPLETE: Photos uploaded');
+                    this.submitSuccess.set(true);
+                  } else {
+                    console.warn('Transaction Phase 2 FAILED: Photos upload failed');
+                    console.warn('But product was successfully created (photos can be added later)');
+                    // Show partial success message
+                    this.submitError.set(
+                      'Product created, but photo upload failed. You can add photos later.',
+                    );
+                  }
+                } catch (photoError: any) {
+                  console.error('Photo upload error:', photoError);
                   this.submitError.set(
                     'Product created, but photo upload failed. You can add photos later.',
                   );
                 }
-              } catch (photoError: any) {
-                console.error('Photo upload error:', photoError);
-                this.submitError.set(
-                  'Product created, but photo upload failed. You can add photos later.',
-                );
+              } else {
+                console.log('No photos to upload');
+                this.submitSuccess.set(true);
               }
             } else {
-              console.log('No photos to upload');
               this.submitSuccess.set(true);
             }
           } else {
             this.submitSuccess.set(true);
           }
-        } else {
-          this.submitSuccess.set(true);
-        }
 
-        // Navigate after a delay to show success/warning message
-        setTimeout(() => {
-          this.router.navigate(['/dashboard/products']);
-        }, 1500);
-      } else {
-        const error = this.productService.error();
-        this.submitError.set(error || `Failed to create product`);
+          // Navigate after a delay to show success/warning message
+          setTimeout(() => {
+            this.router.navigate(['/dashboard/products']);
+          }, 1500);
+        } else {
+          const error = this.productService.error();
+          this.submitError.set(error || `Failed to create product`);
+        }
       }
     } catch (error: any) {
       console.error(`${this.itemType()} creation failed:`, error);

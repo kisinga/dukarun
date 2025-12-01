@@ -10,7 +10,7 @@ import {
 import { Router } from '@angular/router';
 import { PurchaseService } from '../../../core/services/purchase.service';
 import { calculatePurchaseStats } from '../../../core/services/stats/purchase-stats.util';
-import { PaginationComponent } from '../products/components/pagination.component';
+import { PaginationComponent } from '../../components/shared/pagination.component';
 import { PurchaseCardComponent } from './components/purchase-card.component';
 import { PurchaseSearchBarComponent } from './components/purchase-search-bar.component';
 import { PurchaseStats, PurchaseStatsComponent } from './components/purchase-stats.component';

@@ -198,3 +198,40 @@ export function requiresReconciliation(paymentMethod: PaymentMethod): boolean {
   // Default to true if not explicitly set to false
   return customFields?.requiresReconciliation !== false;
 }
+
+/**
+ * Check if a PaymentMethod can participate in cash control
+ *
+ * A payment method can participate in cash control if it has:
+ * - A valid ledger account code (ledgerAccountCode)
+ * - Requires reconciliation (requiresReconciliation: true)
+ * - Has a reconciliation type other than 'none'
+ *
+ * This allows ANY payment method with a ledger account to participate in cash control,
+ * not just cashier-controlled ones.
+ *
+ * @param paymentMethod PaymentMethod entity
+ * @returns true if payment method can participate in cash control
+ */
+export function canParticipateInCashControl(paymentMethod: PaymentMethod): boolean {
+  const customFields = (paymentMethod as any).customFields;
+
+  // Must have a ledger account code
+  const ledgerAccountCode = customFields?.ledgerAccountCode;
+  if (!ledgerAccountCode || typeof ledgerAccountCode !== 'string' || ledgerAccountCode.trim() === '') {
+    // Fallback: check if handler-based mapping would provide an account
+    const accountCode = getAccountCodeFromPaymentMethod(paymentMethod);
+    if (!accountCode || accountCode === 'CLEARING_GENERIC') {
+      return false;
+    }
+  }
+
+  // Must require reconciliation
+  if (!requiresReconciliation(paymentMethod)) {
+    return false;
+  }
+
+  // Must have a reconciliation type other than 'none'
+  const reconType = getReconciliationTypeFromPaymentMethod(paymentMethod);
+  return reconType !== 'none';
+}

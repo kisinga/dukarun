@@ -1,5 +1,122 @@
 <app-navbar />
 
+<!-- Structured Data for SEO -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Dukarun",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web, iOS, Android",
+  "offers": {
+    "@type": "Offer",
+    "priceCurrency": "KES",
+    "price": "1500",
+    "priceValidUntil": "2025-12-31",
+    "availability": "https://schema.org/InStock",
+    "url": "https://dukarun.com/signup"
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "ratingCount": "500",
+    "bestRating": "5",
+    "worstRating": "1"
+  },
+  "description": "Point and sell POS system for Kenyan businesses. Works offline, accepts M-Pesa, requires no training.",
+  "url": "https://dukarun.com",
+  "logo": "https://dukarun.com/assets/logo/v3.png",
+  "screenshot": "https://dukarun.com/assets/logo/v3.png",
+  "featureList": [
+    "Point-and-sell product recognition",
+    "Offline-first POS with auto-sync",
+    "Real-time inventory tracking",
+    "M-Pesa payment integration",
+    "Customer credit tracking",
+    "Business intelligence dashboards"
+  ],
+  "areaServed": {
+    "@type": "Country",
+    "name": "Kenya"
+  },
+  "audience": {
+    "@type": "BusinessAudience",
+    "audienceType": "Small and Medium Enterprises",
+    "geographicArea": {
+      "@type": "Country",
+      "name": "Kenya"
+    }
+  }
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Dukarun",
+  "url": "https://dukarun.com",
+  "logo": "https://dukarun.com/assets/logo/v3.png",
+  "description": "Point and sell POS system for Kenyan businesses",
+  "address": {
+    "@type": "PostalAddress",
+    "addressCountry": "KE",
+    "addressLocality": "Kenya"
+  },
+  "sameAs": [
+    "https://twitter.com/dukarun",
+    "https://facebook.com/dukarun"
+  ],
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "contactType": "Customer Service",
+    "areaServed": "KE",
+    "availableLanguage": "en"
+  }
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What happens after my 30-day trial ends?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "After your free 30-day trial, you can upgrade to Pro (KES 1,500/month) to keep using all features, or pause your account. You can upgrade anytime. No credit card needed to start."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does the product recognition work?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Take a few photos of each product labels. When you sell, just point your camera at the label and it recognizes it in seconds. Works great for items without barcodes. Barcode scanning also works if available."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does it work without internet?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes! You can record up to 30 sales without internet. Everything is stored safely on your device. When you reconnect, it syncs automatically. Perfect for areas with unreliable internet."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my data safe?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Your business data is encrypted and kept private. We never share your information. Security is a top priority."
+      }
+    }
+  ]
+}
+</script>
+
 <main class="bg-base-100 text-base-content">
   <section id="hero" class="section scroll-mt-28 bg-base-100">
     <div
@@ -47,22 +164,25 @@
         </div>
       </div>
       <div class="home-hero-intro-delay flex justify-center">
-        <div
+        <figure
           class="group relative w-full max-w-lg overflow-hidden rounded-2xl border border-base-300 bg-base-200 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
         >
           <div
             class="aspect-video flex items-center justify-center bg-gradient-to-br from-base-200 to-base-300"
+            aria-label="Dukarun product demonstration video"
           >
             <div class="flex flex-col items-center gap-3 text-base-content/70">
               <div
                 class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20 transition-transform duration-200 group-hover:scale-110"
+                aria-hidden="true"
               >
                 <span class="text-3xl text-primary">▶</span>
               </div>
               <p class="text-sm font-medium">Branding video</p>
             </div>
           </div>
-        </div>
+          <figcaption class="sr-only">Watch how Dukarun helps Kenyan businesses sell faster</figcaption>
+        </figure>
       </div>
     </div>
   </section>
@@ -114,15 +234,17 @@
       </div>
     </div>
     <div class="container-app mt-10 flex justify-center">
-      <div
+      <figure
         class="group relative w-full max-w-xs overflow-hidden rounded-2xl border border-base-300 bg-base-200 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
       >
         <div
           class="aspect-[9/16] flex items-center justify-center bg-gradient-to-br from-base-200 to-base-300"
+          aria-label="Real-world Dukarun usage screen recording from a Kenyan shop"
         >
           <div class="flex flex-col items-center gap-3 text-base-content/70">
             <div
               class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20 transition-transform duration-200 group-hover:scale-110"
+              aria-hidden="true"
             >
               <span class="text-3xl text-primary">▶</span>
             </div>
@@ -131,7 +253,8 @@
             </p>
           </div>
         </div>
-      </div>
+        <figcaption class="sr-only">Screen recording showing Dukarun POS in action at a Kenyan retail shop</figcaption>
+      </figure>
     </div>
     <div class="container-app mt-10 grid gap-6 md:grid-cols-3">
       @for (testimonial of testimonials; track $index) {

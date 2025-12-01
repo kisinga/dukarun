@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Channel, ChannelService, RequestContext, TransactionalConnection } from '@vendure/core';
-import { env } from '../../infrastructure/config/environment.config';
 import { ChannelEventRouterService } from '../../infrastructure/events/channel-event-router.service';
 import { ActionCategory } from '../../infrastructure/events/types/action-category.enum';
 import { ChannelEventType } from '../../infrastructure/events/types/event-type.enum';
@@ -36,6 +35,7 @@ export class SubscriptionService {
   private readonly trialDays = parseInt(process.env.SUBSCRIPTION_TRIAL_DAYS || '30', 10);
   private readonly CACHE_TTL_SECONDS = 10; // 10 seconds (for Redis SETEX)
   private readonly CACHE_NAMESPACE = 'payment:status';
+  private readonly SYSTEM_EMAIL = 'malipo@dukarun.com';
 
   constructor(
     private channelService: ChannelService,
@@ -43,7 +43,7 @@ export class SubscriptionService {
     private paystackService: PaystackService,
     private eventRouter: ChannelEventRouterService,
     private redisCache: RedisCacheService
-  ) {}
+  ) { }
 
   /**
    * Check subscription status for a channel
@@ -174,6 +174,7 @@ export class SubscriptionService {
 
   /**
    * Initiate subscription purchase
+   * Note: email parameter is kept for API compatibility but always uses system email for Paystack
    */
   async initiatePurchase(
     ctx: RequestContext,
@@ -181,7 +182,7 @@ export class SubscriptionService {
     tierId: string,
     billingCycle: 'monthly' | 'yearly',
     phoneNumber: string,
-    email: string,
+    email: string, // Kept for API compatibility, not used
     paymentMethod?: string
   ): Promise<InitiatePurchaseResult> {
     try {
@@ -219,23 +220,13 @@ export class SubscriptionService {
       const amount = billingCycle === 'monthly' ? tier.priceMonthly : tier.priceYearly;
       const amountInKes = amount / 100; // Convert from cents to KES
 
-      // Generate placeholder email from phone number if email is not provided
-      // Format: {cleanedPhoneNumber}@placeholder.dukarun.com
-      // Clean phone number by removing + and spaces, keeping only digits
-      let effectiveEmail: string;
-      if (!email || email.trim() === '') {
-        const cleanedPhone = phoneNumber.replace(/[+\s-]/g, ''); // Remove +, spaces, and hyphens
-        effectiveEmail = `${cleanedPhone}@placeholder.dukarun.com`;
-      } else {
-        effectiveEmail = email;
-      }
-
       // Create or get Paystack customer
       let customerCode = (channel.customFields as any).paystackCustomerCode;
       if (!customerCode) {
         try {
+          // Always use system email for Paystack (email parameter kept for API compatibility only)
           const customer = await this.paystackService.createCustomer(
-            effectiveEmail,
+            this.SYSTEM_EMAIL,
             undefined,
             undefined,
             phoneNumber,
@@ -269,9 +260,10 @@ export class SubscriptionService {
       if (useCheckout) {
         // Redirect to Paystack checkout for card and other payment methods
         try {
+          // Always use system email for Paystack
           const transactionResponse = await this.paystackService.initializeTransaction(
             amountInKes,
-            effectiveEmail,
+            this.SYSTEM_EMAIL,
             phoneNumber,
             {
               channelId,
@@ -301,10 +293,11 @@ export class SubscriptionService {
 
       // Use STK push for mobile money (default behavior)
       try {
+        // Always use system email for Paystack
         const chargeResponse = await this.paystackService.chargeMobile(
           amountInKes,
           phoneNumber,
-          effectiveEmail,
+          this.SYSTEM_EMAIL,
           reference,
           {
             channelId,
@@ -354,9 +347,10 @@ export class SubscriptionService {
 
         // Attempt to generate payment link as fallback
         try {
+          // Always use system email for Paystack
           const transactionResponse = await this.paystackService.initializeTransaction(
             amountInKes,
-            effectiveEmail,
+            this.SYSTEM_EMAIL,
             phoneNumber,
             {
               channelId,

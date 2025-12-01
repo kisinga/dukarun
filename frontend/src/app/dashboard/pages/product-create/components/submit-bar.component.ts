@@ -14,24 +14,42 @@ import { ItemType } from '../types/product-creation.types';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="sticky bottom-4 bg-base-100 p-4 rounded-lg shadow-lg border">
-      <button
-        type="button"
-        class="btn btn-primary w-full"
-        [class.btn-disabled]="!canSubmit()"
-        [class.loading]="isLoading()"
-        (click)="onSubmit()"
-      >
-        @if (isLoading()) {
-          <span class="loading loading-spinner loading-sm"></span>
-          Creating...
-        } @else {
-          @if (isEditMode()) {
-            Update Product
+      <div class="flex flex-row gap-2">
+        <button
+          type="button"
+          class="btn btn-outline btn-neutral w-1/2"
+          (click)="onPrevious()"
+        >
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+          <span>Back</span>
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary w-1/2"
+          [class.btn-disabled]="!canSubmit()"
+          [class.loading]="isLoading()"
+          (click)="onSubmit()"
+        >
+          @if (isLoading()) {
+            <span class="loading loading-spinner loading-sm"></span>
+            <span>Saving...</span>
           } @else {
-            Create {{ itemType() === 'service' ? 'Service' : 'Product' }}
+            @if (isEditMode()) {
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 6 9 17l-5-5"/>
+              </svg>
+              <span>Update</span>
+            } @else {
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+              <span>Create</span>
+            }
           }
-        }
-      </button>
+        </button>
+      </div>
 
       @if (submitError()) {
         <div class="alert alert-error mt-2 text-xs flex items-center gap-2">
@@ -60,11 +78,19 @@ export class SubmitBarComponent {
 
   // Outputs
   readonly submit = output<void>();
+  readonly previous = output<void>();
 
   /**
    * Handle submit button click
    */
   onSubmit(): void {
     this.submit.emit();
+  }
+
+  /**
+   * Handle previous button click
+   */
+  onPrevious(): void {
+    this.previous.emit();
   }
 }

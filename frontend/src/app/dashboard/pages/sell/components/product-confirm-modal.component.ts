@@ -1,10 +1,21 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import {
   ProductSearchResult,
   ProductVariant,
 } from '../../../../core/services/product/product-search.service';
+import { PriceModificationService } from '../services/price-modification.service';
+import { PriceOverrideData } from './price-override.component';
 
 /**
  * Modal for confirming product and selecting variant/quantity
@@ -78,7 +89,7 @@ import {
               [class.cursor-not-allowed]="variant.stockLevel === 'OUT_OF_STOCK'"
               [class.opacity-60]="variant.stockLevel === 'OUT_OF_STOCK'"
               [disabled]="variant.stockLevel === 'OUT_OF_STOCK'"
-              (click)="variant.stockLevel === 'IN_STOCK' && variantSelected.emit({ variant, quantity: 1 })"
+              (click)="variant.stockLevel === 'IN_STOCK' && handleVariantClick(variant)"
             >
               <div class="text-left min-w-0 flex-1">
                 <div class="font-semibold text-sm truncate">{{ variant.name }}</div>
@@ -88,9 +99,48 @@ import {
                 }
               </div>
               <div class="text-right flex items-center gap-2">
-                <div class="text-base font-bold text-tabular">
-                  {{ currencyService.format(variant.priceWithTax) }}
-                </div>
+                @if (canOverridePrices() && variant.stockLevel === 'IN_STOCK') {
+                  <!-- Price Controls -->
+                  <div class="flex items-center gap-1">
+                    <button
+                      class="btn btn-square btn-xs btn-ghost"
+                      (click)="decreaseVariantPrice(variant)"
+                      aria-label="Decrease price by 3%"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-3.5 w-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <div class="text-base font-bold text-tabular min-w-[4rem] text-center">
+                      {{ getVariantPrice(variant) }}
+                    </div>
+                    <button
+                      class="btn btn-square btn-xs btn-ghost"
+                      (click)="increaseVariantPrice(variant)"
+                      aria-label="Increase price by 3%"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-3.5 w-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                } @else {
+                  <div class="text-base font-bold text-tabular">
+                    {{ currencyService.format(variant.priceWithTax) }}
+                  </div>
+                }
                 <div
                   class="badge badge-sm"
                   [class.badge-success]="variant.stockLevel === 'IN_STOCK'"
@@ -130,9 +180,48 @@ import {
                 }
               </div>
               <div class="text-right flex items-center gap-2">
-                <div class="text-xl font-bold text-primary text-tabular">
-                  {{ currencyService.format(product()!.variants[0].priceWithTax) }}
-                </div>
+                @if (canOverridePrices() && product()!.variants[0].stockLevel === 'IN_STOCK') {
+                  <!-- Price Controls -->
+                  <div class="flex items-center gap-1">
+                    <button
+                      class="btn btn-square btn-xs btn-ghost"
+                      (click)="decreaseSingleVariantPrice()"
+                      aria-label="Decrease price by 3%"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-3.5 w-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <div class="text-xl font-bold text-primary text-tabular min-w-[5rem] text-center">
+                      {{ getSingleVariantPrice() }}
+                    </div>
+                    <button
+                      class="btn btn-square btn-xs btn-ghost"
+                      (click)="increaseSingleVariantPrice()"
+                      aria-label="Increase price by 3%"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-3.5 w-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                } @else {
+                  <div class="text-xl font-bold text-primary text-tabular">
+                    {{ currencyService.format(product()!.variants[0].priceWithTax) }}
+                  </div>
+                }
                 <div
                   class="badge badge-sm"
                   [class.badge-success]="product()!.variants[0].stockLevel === 'IN_STOCK'"
@@ -204,7 +293,7 @@ import {
           <!-- Add to Cart Button -->
           <button
             class="btn btn-primary btn-block min-h-[3rem] hover:scale-105 active:scale-95 transition-transform"
-            (click)="variantSelected.emit({ variant: product()!.variants[0], quantity: +quantityInput.value })"
+            (click)="handleSingleVariantAdd(quantityInput.value)"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -292,10 +381,159 @@ import {
 })
 export class ProductConfirmModalComponent {
   readonly currencyService = inject(CurrencyService);
+  readonly priceModificationService = inject(PriceModificationService);
 
   readonly isOpen = input.required<boolean>();
   readonly product = input.required<ProductSearchResult | null>();
+  readonly canOverridePrices = input<boolean>(false);
 
-  readonly variantSelected = output<{ variant: ProductVariant; quantity: number }>();
+  readonly variantSelected = output<{ variant: ProductVariant; quantity: number; priceOverride?: PriceOverrideData }>();
   readonly closeModal = output<void>();
+
+  // Track price modifications per variant (in cents)
+  private variantPrices = signal<Map<string, number>>(new Map());
+
+  constructor() {
+    // Reset price modifications when product changes
+    effect(() => {
+      const prod = this.product();
+      if (!prod) {
+        // Clear stacks for previous variants (if any) when product is cleared
+        const previousPrices = untracked(() => this.variantPrices());
+        previousPrices.forEach((_, variantId) => {
+          this.priceModificationService.clearStacks(variantId);
+        });
+        this.variantPrices.set(new Map());
+      } else {
+        // Clear stacks for previous variants when product changes (new product loaded)
+        const previousPrices = untracked(() => this.variantPrices());
+        previousPrices.forEach((_, variantId) => {
+          this.priceModificationService.clearStacks(variantId);
+        });
+
+        // Initialize prices for all variants
+        const prices = new Map<string, number>();
+        prod.variants.forEach((variant) => {
+          // priceWithTax is already in cents from Vendure
+          prices.set(variant.id, Math.round(variant.priceWithTax));
+        });
+        this.variantPrices.set(prices);
+      }
+    });
+  }
+
+  getVariantPrice(variant: ProductVariant): string {
+    const prices = this.variantPrices();
+    const modifiedPrice = prices.get(variant.id);
+    if (modifiedPrice !== undefined && modifiedPrice !== Math.round(variant.priceWithTax)) {
+      return this.currencyService.format(modifiedPrice, false);
+    }
+    return this.currencyService.format(variant.priceWithTax, false);
+  }
+
+  getSingleVariantPrice(): string {
+    const variant = this.product()?.variants[0];
+    if (!variant) return '';
+    return this.getVariantPrice(variant);
+  }
+
+  increaseVariantPrice(variant: ProductVariant): void {
+    const prices = this.variantPrices();
+    const currentPrice = prices.get(variant.id) ?? Math.round(variant.priceWithTax);
+
+    const result = this.priceModificationService.increasePrice(
+      variant.id,
+      currentPrice,
+      'unit', // Unit price context for modal
+    );
+
+    // If result is null, stack is at maximum (10 steps) and action was declined
+    if (!result) return;
+
+    // Update price map
+    const newPrices = new Map(prices);
+    newPrices.set(variant.id, result.newPrice);
+    this.variantPrices.set(newPrices);
+  }
+
+  decreaseVariantPrice(variant: ProductVariant): void {
+    const prices = this.variantPrices();
+    const currentPrice = prices.get(variant.id) ?? Math.round(variant.priceWithTax);
+    const wholesalePrice = variant.customFields?.wholesalePrice;
+
+    const result = this.priceModificationService.decreasePrice(
+      variant.id,
+      currentPrice,
+      1, // Quantity is always 1 for unit prices in modal
+      wholesalePrice,
+      'unit', // Unit price context for modal
+    );
+
+    // If result is null, stack is at maximum (10 steps) and action was declined
+    if (!result) return;
+
+    // Update price map
+    const newPrices = new Map(prices);
+    newPrices.set(variant.id, result.newPrice);
+    this.variantPrices.set(newPrices);
+  }
+
+  increaseSingleVariantPrice(): void {
+    const variant = this.product()?.variants[0];
+    if (variant) {
+      this.increaseVariantPrice(variant);
+    }
+  }
+
+  decreaseSingleVariantPrice(): void {
+    const variant = this.product()?.variants[0];
+    if (variant) {
+      this.decreaseVariantPrice(variant);
+    }
+  }
+
+  handleVariantClick(variant: ProductVariant): void {
+    const prices = this.variantPrices();
+    const modifiedPrice = prices.get(variant.id);
+    const basePrice = Math.round(variant.priceWithTax);
+
+    const priceOverride: PriceOverrideData | undefined =
+      modifiedPrice !== undefined && modifiedPrice !== basePrice
+        ? {
+          variantId: variant.id,
+          customLinePrice: modifiedPrice,
+          reason: 'Price adjusted',
+        }
+        : undefined;
+
+    this.variantSelected.emit({
+      variant,
+      quantity: 1,
+      priceOverride,
+    });
+  }
+
+  handleSingleVariantAdd(quantityValue: string): void {
+    const variant = this.product()?.variants[0];
+    if (!variant) return;
+
+    const prices = this.variantPrices();
+    const modifiedPrice = prices.get(variant.id);
+    const basePrice = Math.round(variant.priceWithTax);
+
+    const priceOverride: PriceOverrideData | undefined =
+      modifiedPrice !== undefined && modifiedPrice !== basePrice
+        ? {
+          variantId: variant.id,
+          customLinePrice: modifiedPrice,
+          reason: 'Price adjusted',
+        }
+        : undefined;
+
+    this.variantSelected.emit({
+      variant,
+      quantity: +quantityValue,
+      priceOverride,
+    });
+  }
 }

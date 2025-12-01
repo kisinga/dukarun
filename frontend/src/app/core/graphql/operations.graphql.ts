@@ -231,6 +231,28 @@ export const CHECK_SKU_EXISTS = graphql(`
   }
 `);
 
+// Note: This query is automatically channel-scoped by Vendure's RequestContext.
+// Products are filtered to the active channel, so barcode uniqueness is checked
+// within the current channel only (multi-vendor support).
+export const CHECK_BARCODE_EXISTS = graphql(`
+  query CheckBarcodeExists($barcode: String!, $excludeProductId: ID) {
+    products(
+      options: {
+        filter: { barcode: { eq: $barcode } }
+        take: 1
+      }
+    ) {
+      items {
+        id
+        name
+        customFields {
+          barcode
+        }
+      }
+    }
+  }
+`);
+
 export const CREATE_PRODUCT = graphql(`
   mutation CreateProduct($input: CreateProductInput!) {
     createProduct(input: $input) {
@@ -344,6 +366,9 @@ export const GET_PRODUCT_DETAIL = graphql(`
       slug
       description
       enabled
+      customFields {
+        barcode
+      }
       assets {
         id
         name
@@ -361,6 +386,7 @@ export const GET_PRODUCT_DETAIL = graphql(`
         price
         priceWithTax
         stockOnHand
+        trackInventory
         customFields {
           wholesalePrice
           allowFractionalQuantity

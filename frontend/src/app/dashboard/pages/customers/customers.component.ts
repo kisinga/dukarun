@@ -20,8 +20,8 @@ import { CustomerViewModalComponent } from './components/customer-view-modal.com
 import {
   DeleteConfirmationData,
   DeleteConfirmationModalComponent,
-} from './components/delete-confirmation-modal.component';
-import { PaginationComponent } from './components/pagination.component';
+} from '../../components/shared/delete-confirmation-modal.component';
+import { PaginationComponent } from '../../components/shared/pagination.component';
 
 /**
  * Customers list page - similar to products page
@@ -69,7 +69,7 @@ export class CustomersComponent implements OnInit {
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
-  readonly deleteModalData = signal<DeleteConfirmationData>({ customerName: '', addressCount: 0 });
+  readonly deleteModalData = signal<DeleteConfirmationData>({ entityName: '', relatedCount: 0 });
   readonly customerToDelete = signal<string | null>(null);
   readonly customerForPayment = signal<{
     id: string;
@@ -193,8 +193,9 @@ export class CustomersComponent implements OnInit {
 
     this.customerToDelete.set(customerId);
     this.deleteModalData.set({
-      customerName: `${customer.firstName} ${customer.lastName}`,
-      addressCount: customer.addresses?.length || 0,
+      entityName: `${customer.firstName} ${customer.lastName}`,
+      relatedCount: customer.addresses?.length || 0,
+      relatedLabel: 'address',
     });
 
     // Show modal

@@ -14,7 +14,11 @@
             </div>
             <div>
               <h2 class="text-base sm:text-lg lg:text-xl font-semibold">
-                @if (isEditMode()) { Edit Product } @else { New Item }
+                @if (isEditMode()) {
+                  Edit {{ productForm.get('name')?.value || 'Product' }}
+                } @else {
+                  New Item
+                }
               </h2>
               <p class="hidden lg:block text-xs text-base-content/50">
                 @if (currentStage() === 1) { Fill in the basics } @else { Set your prices }
@@ -58,12 +62,14 @@
               (selectedChange)="onHowSoldSelected($event)"
             />
 
-            <!-- Size template (for multi-variant) -->
-            <app-size-template-selector
-              [visible]="howSoldPreset() === 'multi-variant'"
-              [selectedTemplate]="selectedSizeTemplate()"
-              (templateChange)="onSizeTemplateChange($event)"
-            />
+            <!-- Size template (for multi-variant) - Hidden in edit mode since template is not stored in DB -->
+            @if (!isEditMode()) {
+              <app-size-template-selector
+                [visible]="howSoldPreset() === 'multi-variant'"
+                [selectedTemplate]="selectedSizeTemplate()"
+                (templateChange)="onSizeTemplateChange($event)"
+              />
+            }
 
             <!-- Measurement unit (for measured presets) -->
             <app-measurement-unit-selector
@@ -150,6 +156,7 @@
               [submitError]="submitError()"
               [submitSuccess]="submitSuccess()"
               (submit)="submitForm()"
+              (previous)="goToStage1()"
             />
           </div>
         }

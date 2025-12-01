@@ -1,6 +1,23 @@
 <div class="card bg-base-100 border border-base-300">
   <div class="card-body p-4 lg:p-5">
     <div class="flex flex-col gap-4">
+      <!-- Items per page selector (if enabled) -->
+      @if (showItemsPerPage()) {
+        <div class="flex items-center justify-center gap-2">
+          <span class="text-sm text-base-content/70">Show</span>
+          <select
+            [value]="itemsPerPage()"
+            (change)="onItemsPerPageSelect($event)"
+            class="select select-bordered select-sm w-20"
+          >
+            @for (option of pageOptions(); track option) {
+              <option [value]="option">{{ option }}</option>
+            }
+          </select>
+          <span class="text-sm text-base-content/70">per page</span>
+        </div>
+      }
+
       <!-- Page Info -->
       <div class="text-center">
         <div class="text-sm text-base-content/60">
@@ -135,3 +152,4 @@
     </div>
   </div>
 </div>
+

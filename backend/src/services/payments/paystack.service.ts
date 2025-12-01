@@ -73,8 +73,14 @@ export class PaystackService {
     this.secretKey = process.env.PAYSTACK_SECRET_KEY || '';
     this.publicKey = process.env.PAYSTACK_PUBLIC_KEY || '';
 
-    if (!this.secretKey) {
-      this.logger.warn('PAYSTACK_SECRET_KEY not set. Paystack functionality will be limited.');
+    if (!this.secretKey || this.secretKey.trim() === '') {
+      this.logger.error(
+        'PAYSTACK_SECRET_KEY is not set or is empty. Paystack API requests will fail. Please set PAYSTACK_SECRET_KEY in your environment variables.'
+      );
+    } else if (!this.secretKey.startsWith('sk_test_') && !this.secretKey.startsWith('sk_live_')) {
+      this.logger.warn(
+        'PAYSTACK_SECRET_KEY does not appear to be in the correct format. Expected format: sk_test_xxx or sk_live_xxx'
+      );
     }
   }
 
@@ -84,6 +90,13 @@ export class PaystackService {
     body?: any,
     timeoutMs: number = 30000 // 30 seconds default timeout
   ): Promise<T> {
+    // Validate secret key before making request
+    if (!this.secretKey || this.secretKey.trim() === '') {
+      const errorMessage = 'PAYSTACK_SECRET_KEY is not set or is empty. Please configure the Paystack secret key in your environment variables.';
+      this.logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
     const url = `${this.baseUrl}${endpoint}`;
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.secretKey}`,

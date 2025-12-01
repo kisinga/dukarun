@@ -11,7 +11,7 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { OrdersService } from '../../../core/services/orders.service';
-import { PaginationComponent } from '../customers/components/pagination.component';
+import { PaginationComponent } from '../../components/shared/pagination.component';
 import { OrderAction, OrderCardComponent } from './components/order-card.component';
 import { OrderSearchBarComponent } from './components/order-search-bar.component';
 import { OrderStats, OrderStatsComponent } from './components/order-stats.component';

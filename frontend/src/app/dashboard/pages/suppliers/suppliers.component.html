@@ -246,8 +246,9 @@
       [totalPages]="totalPages()"
       [itemsPerPage]="itemsPerPage()"
       [pageOptions]="pageOptions"
-      [endItem]="endItem()"
       [totalItems]="filteredSuppliers().length"
+      [showItemsPerPage]="true"
+      itemLabel="suppliers"
       (pageChange)="goToPage($event)"
       (itemsPerPageChange)="changeItemsPerPage($event)"
     />
@@ -258,8 +259,11 @@
 <app-delete-confirmation-modal
   #deleteModal
   [data]="deleteModalData()"
-  (confirmed)="onDeleteConfirmed()"
-  (cancelled)="onDeleteCancelled()"
+  title="Delete Supplier?"
+  entityType="supplier"
+  confirmButtonText="Delete Supplier"
+  (confirm)="onDeleteConfirmed()"
+  (cancel)="onDeleteCancelled()"
 />
 
 <!-- Supplier View Modal -->

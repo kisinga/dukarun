@@ -75,7 +75,20 @@ import { PhotoManagerComponent } from './photo-manager.component';
                   </svg>
                 </button>
               </div>
-              @if (barcodeControl().value) {
+              @if (barcodeControl().invalid && (barcodeControl().dirty || barcodeControl().touched)) {
+                <div class="alert alert-error py-2">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  <div class="text-xs">
+                    @if (barcodeControl().errors?.['barcodeExists']) {
+                      <div>{{ barcodeControl().errors!['barcodeExists'].message }}</div>
+                    } @else {
+                      <div>Invalid barcode</div>
+                    }
+                  </div>
+                </div>
+              } @else if (barcodeControl().value && barcodeControl().valid) {
                 <div class="alert alert-success py-2">
                   <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10-3-3"/>

@@ -180,7 +180,8 @@
       [totalItems]="filteredPayments().length"
       [itemsPerPage]="itemsPerPage()"
       [pageOptions]="pageOptions"
-      [endItem]="endItem()"
+      [showItemsPerPage]="true"
+      itemLabel="payments"
       (pageChange)="goToPage($event)"
       (itemsPerPageChange)="changeItemsPerPage($event)"
     />

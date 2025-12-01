@@ -84,8 +84,8 @@ export const routes: Routes = [
       {
         path: 'products/edit/:id',
         loadComponent: () =>
-          import('./dashboard/pages/product-edit/product-edit.component').then(
-            (m) => m.ProductEditComponent,
+          import('./dashboard/pages/product-create/product-create.component').then(
+            (m) => m.ProductCreateComponent,
           ),
       },
       {

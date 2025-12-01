@@ -179,7 +179,8 @@
       [totalItems]="filteredOrders().length"
       [itemsPerPage]="itemsPerPage()"
       [pageOptions]="pageOptions"
-      [endItem]="endItem()"
+      [showItemsPerPage]="true"
+      itemLabel="orders"
       (pageChange)="goToPage($event)"
       (itemsPerPageChange)="changeItemsPerPage($event)"
     />
