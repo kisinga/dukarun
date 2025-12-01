@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { CHECK_SKU_EXISTS } from '../../graphql/operations.graphql';
+import { CHECK_BARCODE_EXISTS, CHECK_SKU_EXISTS } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { VariantInput } from '../product.service';
 
@@ -32,6 +32,51 @@ export class ProductValidationService {
     } catch (error) {
       console.error('SKU check failed:', error);
       return false;
+    }
+  }
+
+  /**
+   * Check if a barcode already exists
+   * @param barcode - The barcode to check
+   * @param excludeProductId - Optional product ID to exclude from check (for updates)
+   * @returns Object with exists flag and product info if found
+   */
+  async checkBarcodeExists(
+    barcode: string,
+    excludeProductId?: string,
+  ): Promise<{ exists: boolean; productId?: string; productName?: string }> {
+    if (!barcode || !barcode.trim()) {
+      return { exists: false };
+    }
+
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.query<any>({
+        query: CHECK_BARCODE_EXISTS as any,
+        variables: { barcode: barcode.trim(), excludeProductId },
+        fetchPolicy: 'network-only',
+      });
+
+      const items = result.data?.products?.items ?? [];
+      if (items.length === 0) {
+        return { exists: false };
+      }
+
+      // If excludeProductId is provided, check if the found product is different
+      const foundProduct = items[0];
+      if (excludeProductId && foundProduct.id === excludeProductId) {
+        return { exists: false };
+      }
+
+      return {
+        exists: true,
+        productId: foundProduct.id,
+        productName: foundProduct.name,
+      };
+    } catch (error) {
+      console.error('Barcode check failed:', error);
+      // On error, assume it doesn't exist to avoid blocking valid operations
+      return { exists: false };
     }
   }
 

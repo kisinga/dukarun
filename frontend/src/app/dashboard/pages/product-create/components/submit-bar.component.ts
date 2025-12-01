@@ -14,32 +14,38 @@ import { ItemType } from '../types/product-creation.types';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="sticky bottom-4 bg-base-100 p-4 rounded-lg shadow-lg border">
-      <div class="flex flex-col sm:flex-row gap-2">
+      <div class="flex flex-row gap-2">
         <button
           type="button"
-          class="btn btn-outline btn-neutral flex-1"
+          class="btn btn-outline btn-neutral w-1/2"
           (click)="onPrevious()"
         >
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="m15 18-6-6 6-6"/>
           </svg>
-          Previous
+          <span>Back</span>
         </button>
         <button
           type="button"
-          class="btn btn-primary flex-1"
+          class="btn btn-primary w-1/2"
           [class.btn-disabled]="!canSubmit()"
           [class.loading]="isLoading()"
           (click)="onSubmit()"
         >
           @if (isLoading()) {
             <span class="loading loading-spinner loading-sm"></span>
-            Creating...
+            <span>Saving...</span>
           } @else {
             @if (isEditMode()) {
-              Update Product
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 6 9 17l-5-5"/>
+              </svg>
+              <span>Update</span>
             } @else {
-              Create {{ itemType() === 'service' ? 'Service' : 'Product' }}
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+              <span>Create</span>
             }
           }
         </button>

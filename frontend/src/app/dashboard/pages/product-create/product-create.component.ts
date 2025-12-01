@@ -9,17 +9,21 @@ import {
   viewChild,
 } from '@angular/core';
 import {
+  AbstractControl,
+  AsyncValidatorFn,
   FormArray,
   FormBuilder,
   FormControl,
   FormGroup,
   ReactiveFormsModule,
+  ValidationErrors,
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AppInitService } from '../../../core/services/app-init.service';
 import { CompanyService } from '../../../core/services/company.service';
 import { ProductService } from '../../../core/services/product.service';
+import { ProductValidationService } from '../../../core/services/product/product-validation.service';
 import { ProductVariantService } from '../../../core/services/product/product-variant.service';
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { HowSoldSelectorComponent } from './components/how-sold-selector.component';
@@ -91,6 +95,7 @@ export class ProductCreateComponent implements OnInit {
   private readonly variantService = inject(ProductVariantService);
   private readonly stockLocationService = inject(StockLocationService);
   private readonly appInitService = inject(AppInitService);
+  private readonly validationService = inject(ProductValidationService);
   readonly companyService = inject(CompanyService);
 
   /**
@@ -233,7 +238,11 @@ export class ProductCreateComponent implements OnInit {
     // Initialize form: Product info + Multiple SKUs
     this.productForm = this.fb.group({
       // Product level - Identification (choose ONE method)
-      barcode: [''], // Method 1: Scan/enter barcode (for packaged goods)
+      barcode: [
+        '',
+        [],
+        [this.barcodeAsyncValidator()], // Async validator for duplicate check
+      ], // Method 1: Scan/enter barcode (for packaged goods)
       // Method 2: Label photos handled via PhotoManagerComponent (for fresh produce)
 
       // Product level - Basic info
@@ -710,13 +719,53 @@ export class ProductCreateComponent implements OnInit {
   }
 
   /**
+   * Async validator for barcode uniqueness
+   */
+  private barcodeAsyncValidator(): AsyncValidatorFn {
+    return (control: AbstractControl): Promise<ValidationErrors | null> => {
+      const barcode = control.value?.trim();
+
+      // Skip validation if barcode is empty
+      if (!barcode) {
+        return Promise.resolve(null);
+      }
+
+      return this.validationService
+        .checkBarcodeExists(barcode, this.productId() || undefined)
+        .then((result) => {
+          if (result.exists) {
+            return {
+              barcodeExists: {
+                message: `Barcode "${barcode}" is already used by product "${result.productName || 'another product'}"`,
+                productId: result.productId,
+                productName: result.productName,
+              },
+            };
+          }
+          return null;
+        })
+        .catch(() => {
+          // On error, don't block - let backend handle it
+          return null;
+        });
+    };
+  }
+
+  /**
    * Handle barcode scanned
    */
-  onBarcodeScanned(barcode: string): void {
+  async onBarcodeScanned(barcode: string): Promise<void> {
     this.productForm.patchValue({ barcode });
     this.barcodeValue.set(barcode);
     this.identificationMethod.set('barcode');
     console.log('Barcode scanned:', barcode);
+
+    // Trigger immediate validation
+    const barcodeControl = this.productForm.get('barcode');
+    if (barcodeControl) {
+      barcodeControl.markAsTouched();
+      await barcodeControl.updateValueAndValidity();
+    }
   }
 
   /**
@@ -962,7 +1011,7 @@ export class ProductCreateComponent implements OnInit {
         }
 
         console.log('Product update complete');
-        
+
         // Note: Audit trail entries are automatically created by the backend
         // when product updates occur via the updateProduct mutation.
         // The backend tracks: eventType, entityType, entityId, and changed data.
