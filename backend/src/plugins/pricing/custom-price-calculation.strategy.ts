@@ -46,7 +46,50 @@ export class CustomPriceCalculationStrategy implements OrderItemPriceCalculation
       throw new Error('Quantity can have at most 1 decimal place');
     }
 
-    // Fall back to variant price
+    // Check if channel uses tax-inclusive pricing
+    // When pricesIncludeTax is true, we need to return the tax-inclusive price
+    // This ensures orders show the correct price (e.g., KES 100.00 instead of KES 86.21)
+    const channelUsesTaxInclusivePricing = ctx.channel?.pricesIncludeTax === true;
+
+    if (channelUsesTaxInclusivePricing) {
+      // When channel uses tax-inclusive pricing, Vendure stores the base price (without tax)
+      // in productVariant.price. We need to calculate the tax-inclusive price.
+      // Example: basePrice = 8621 (KES 86.21), tax-inclusive = 10000 (KES 100.00) with 16% VAT
+      const basePrice = productVariant.price;
+
+      // Calculate tax-inclusive price by adding tax to base price
+      // Try multiple methods to get the tax rate, in order of preference:
+      let taxRate: number | null = null;
+
+      // Method 1: Get tax rate from variant's taxRateApplied if available
+      if ((productVariant as any).taxRateApplied?.value != null) {
+        taxRate = (productVariant as any).taxRateApplied.value; // e.g., 16 for 16%
+      }
+
+      // Method 2: If listPriceIncludesTax is true, price already includes tax - no calculation needed
+      if (productVariant.listPriceIncludesTax) {
+        return {
+          price: basePrice,
+          priceIncludesTax: true,
+        };
+      }
+
+      // Method 3: Fallback to 16% VAT (Kenya standard rate)
+      // All channels in Kenya geo use this rate based on migration data
+      if (taxRate == null) {
+        taxRate = 16;
+      }
+
+      // Calculate tax-inclusive price: basePrice * (1 + taxRate/100)
+      const taxInclusivePrice = Math.round(basePrice * (1 + taxRate / 100));
+
+      return {
+        price: taxInclusivePrice,
+        priceIncludesTax: true,
+      };
+    }
+
+    // Fall back to variant price (when channel doesn't use tax-inclusive pricing)
     return {
       price: productVariant.price,
       priceIncludesTax: productVariant.listPriceIncludesTax,

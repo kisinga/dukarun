@@ -88,6 +88,7 @@ export class OrderAddressService {
       throw new UserInputError('Order not found');
     }
 
+    // Verify country exists (but don't include full entity in address data)
     const country = await this.countryService.findOneByCode(ctx, addressInput.countryCode);
     if (!country) {
       throw new UserInputError(`Country ${addressInput.countryCode} not found`);
@@ -104,7 +105,8 @@ export class OrderAddressService {
     const AddressEntity = addressMetadata.target;
     const addressRepo = this.connection.getRepository(ctx, AddressEntity);
 
-    // Create addresses
+    // Create addresses - only include countryCode, not full Country entity
+    // The country relation will be resolved automatically by Vendure's ORM
     const addressData = {
       fullName: addressInput.fullName,
       streetLine1: addressInput.streetLine1,
@@ -112,7 +114,6 @@ export class OrderAddressService {
       city: addressInput.city,
       postalCode: addressInput.postalCode,
       countryCode: addressInput.countryCode,
-      country,
       phoneNumber: addressInput.phoneNumber,
     };
 

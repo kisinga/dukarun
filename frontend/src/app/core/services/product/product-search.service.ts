@@ -46,7 +46,7 @@ export class ProductSearchService {
   private readonly cacheService = inject(ProductCacheService);
 
   /**
-   * Search products by name or SKU (cache-first for offline support)
+   * Search products by name, SKU, or barcode (cache-first for offline support)
    */
   async searchProducts(searchTerm: string): Promise<ProductSearchResult[]> {
     // Try cache first if available
@@ -59,6 +59,25 @@ export class ProductSearchService {
     }
 
     try {
+      // First, try barcode search if the search term looks like a barcode (numeric, typically 8+ digits)
+      // Barcodes are typically numeric and longer
+      const isLikelyBarcode = /^\d{8,}$/.test(searchTerm.trim());
+      if (isLikelyBarcode) {
+        const barcodeVariant = await this.searchByBarcode(searchTerm.trim());
+        if (barcodeVariant) {
+          // Return as ProductSearchResult format
+          return [
+            {
+              id: barcodeVariant.productId,
+              name: barcodeVariant.productName,
+              featuredAsset: barcodeVariant.featuredAsset,
+              variants: [barcodeVariant],
+            },
+          ];
+        }
+      }
+
+      // Fall back to name/SKU search
       const client = this.apolloService.getClient();
       const result = await client.query<{
         products: {
@@ -87,9 +106,9 @@ export class ProductSearchService {
             productName: product.name,
             customFields: v.customFields
               ? {
-                wholesalePrice: v.customFields.wholesalePrice,
-                allowFractionalQuantity: v.customFields.allowFractionalQuantity,
-              }
+                  wholesalePrice: v.customFields.wholesalePrice,
+                  allowFractionalQuantity: v.customFields.allowFractionalQuantity,
+                }
               : undefined,
           })),
         })) || []
@@ -144,9 +163,9 @@ export class ProductSearchService {
           productName: product.name,
           customFields: v.customFields
             ? {
-              wholesalePrice: v.customFields.wholesalePrice,
-              allowFractionalQuantity: v.customFields.allowFractionalQuantity,
-            }
+                wholesalePrice: v.customFields.wholesalePrice,
+                allowFractionalQuantity: v.customFields.allowFractionalQuantity,
+              }
             : undefined,
         })),
       };
@@ -163,33 +182,42 @@ export class ProductSearchService {
     try {
       const client = this.apolloService.getClient();
       const result = await client.query<{
-        search: {
+        products: {
           items: any[];
         };
       }>({
-        query: SEARCH_BY_BARCODE,
-        variables: { sku: barcode },
+        query: SEARCH_BY_BARCODE as any,
+        variables: { barcode: barcode },
       });
 
-      if (!result.data?.search?.items.length) {
+      if (!result.data?.products?.items.length) {
         return null;
       }
 
-      const item = result.data.search.items[0];
+      const product = result.data.products.items[0];
+
+      // Return the first variant if available
+      if (!product.variants || product.variants.length === 0) {
+        return null;
+      }
+
+      const variant = product.variants[0];
       return {
-        id: item.productVariantId,
-        name: item.productVariantName,
-        sku: item.sku,
-        priceWithTax: item.priceWithTax.value, // Keep raw cents for currency service
-        stockLevel: 'IN_STOCK',
-        productId: item.productId,
-        productName: item.productName,
-        featuredAsset: item.productAsset ? { preview: item.productAsset.preview } : undefined,
-        customFields: item.customFields
+        id: variant.id,
+        name: variant.name,
+        sku: variant.sku,
+        priceWithTax: variant.priceWithTax?.value || variant.priceWithTax || 0, // Keep raw cents for currency service
+        stockLevel: variant.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
+        productId: product.id,
+        productName: product.name,
+        featuredAsset: product.featuredAsset
+          ? { preview: product.featuredAsset.preview }
+          : undefined,
+        customFields: variant.customFields
           ? {
-            wholesalePrice: item.customFields.wholesalePrice,
-            allowFractionalQuantity: item.customFields.allowFractionalQuantity,
-          }
+              wholesalePrice: variant.customFields.wholesalePrice,
+              allowFractionalQuantity: variant.customFields.allowFractionalQuantity,
+            }
           : undefined,
       };
     } catch (error) {
@@ -253,9 +281,9 @@ export class ProductSearchService {
                 : undefined,
               customFields: variant.customFields
                 ? {
-                  wholesalePrice: variant.customFields.wholesalePrice,
-                  allowFractionalQuantity: variant.customFields.allowFractionalQuantity,
-                }
+                    wholesalePrice: variant.customFields.wholesalePrice,
+                    allowFractionalQuantity: variant.customFields.allowFractionalQuantity,
+                  }
                 : undefined,
             };
           }
