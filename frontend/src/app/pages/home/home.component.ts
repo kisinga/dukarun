@@ -1,15 +1,17 @@
+import { Location } from '@angular/common';
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   inject,
   OnDestroy,
+  OnInit,
   signal,
 } from '@angular/core';
-import { Location } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FooterComponent } from '../../core/layout/footer/footer.component';
 import { NavbarComponent } from '../../core/layout/navbar/navbar.component';
+import { SEOService } from '../../core/services/seo.service';
 
 interface PricingPlan {
   name: string;
@@ -81,9 +83,10 @@ interface EaseOfUseBenefit {
   styleUrl: './home.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class HomeComponent implements AfterViewInit, OnDestroy {
+export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly location = inject(Location);
+  private readonly seoService = inject(SEOService);
   private observers: IntersectionObserver[] = [];
   private isUpdatingHash = false;
 
@@ -373,6 +376,19 @@ export class HomeComponent implements AfterViewInit, OnDestroy {
         'Pro-level business tool that gives you powerful information for gauging business status and making data-driven decisions to grow.',
     },
   ];
+
+  ngOnInit(): void {
+    // Set SEO meta tags for homepage
+    this.seoService.updateTags({
+      title:
+        'Dukarun - Point and Sell POS System for Kenyan Businesses | Fast, Offline, M-Pesa Ready',
+      description:
+        'Point your phone at products and sell in seconds. Join 500+ Kenyan businesses using Dukarun - the fastest POS system for shops, dukas, and retail. Works offline, accepts M-Pesa, requires no training. Start your free 30-day trial today.',
+      keywords:
+        'POS system Kenya, point of sale Kenya, retail software Kenya, duka management system, M-Pesa POS, offline POS Kenya, shop management Kenya, inventory management Kenya, barcode scanner Kenya, retail POS Nairobi, agrovet software Kenya, salon management Kenya, hardware store POS Kenya',
+      url: 'https://dukarun.com',
+    });
+  }
 
   ngAfterViewInit(): void {
     this.setupScrollSpy();
