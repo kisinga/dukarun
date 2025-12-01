@@ -195,10 +195,7 @@ export class ProductsComponent implements OnInit {
       entityName: product.name,
       relatedCount: product.variants?.length || 0,
       relatedLabel: 'variant',
-      warningDetails: [
-        'All associated stock data',
-        'Sales history references',
-      ],
+      warningDetails: ['All associated stock data', 'Sales history references'],
     });
 
     // Show modal
@@ -264,6 +261,13 @@ export class ProductsComponent implements OnInit {
   /**
    * Toggle low stock filter and sync with query params
    */
+  /**
+   * Handle low stock filter click from stats component
+   */
+  onLowStockStatsClick(): void {
+    this.toggleLowStockFilter(!this.showLowStockOnly());
+  }
+
   toggleLowStockFilter(enabled: boolean): void {
     this.showLowStockOnly.set(enabled);
     this.currentPage.set(1); // Reset to first page when filter changes

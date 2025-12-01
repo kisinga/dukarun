@@ -3,9 +3,7 @@
   <div class="flex items-start justify-between gap-4">
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Orders</h1>
-      <p class="text-sm text-base-content/60 mt-1">
-        View and manage all orders
-      </p>
+      <p class="text-sm text-base-content/60 mt-1">View and manage all orders</p>
     </div>
 
     <div class="flex gap-2 shrink-0">
@@ -36,10 +34,20 @@
   </div>
 
   <!-- Statistics Cards -->
-  <app-order-stats [stats]="stats()" />
+  <app-order-stats
+    [stats]="stats()"
+    [activeStateFilter]="stateFilter()"
+    (filterClick)="onStatsFilterClick($event)"
+  />
 
   <!-- Search & Filter Bar -->
-  <app-order-search-bar [(searchQuery)]="searchQuery" [(stateFilter)]="stateFilter" />
+  <app-order-search-bar
+    [(searchQuery)]="searchQuery"
+    [(stateFilter)]="stateFilter"
+    [activeStateFilter]="stateFilter()"
+    [filterColor]="stateFilterColor()"
+    (clearStateFilter)="clearStateFilter()"
+  />
 
   <!-- Error Alert -->
   @if (error()) {
@@ -185,4 +193,12 @@
       (itemsPerPageChange)="changeItemsPerPage($event)"
     />
   }
+
+  <!-- Payment Modal -->
+  <app-pay-order-modal
+    #payOrderModal
+    [orderData]="selectedOrderForPayment()"
+    (paymentRecorded)="onPaymentRecorded()"
+    (cancelled)="onPaymentModalCancelled()"
+  />
 </div>

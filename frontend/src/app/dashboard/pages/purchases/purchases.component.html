@@ -27,9 +27,7 @@
   <div class="flex items-start justify-between gap-4">
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Purchases</h1>
-      <p class="text-sm text-base-content/60 mt-1">
-        Manage your purchase records
-      </p>
+      <p class="text-sm text-base-content/60 mt-1">Manage your purchase records</p>
     </div>
 
     <div class="flex gap-2 shrink-0">
@@ -80,10 +78,18 @@
   </div>
 
   <!-- Statistics Cards -->
-  <app-purchase-stats [stats]="stats()" />
+  <app-purchase-stats
+    [stats]="stats()"
+    [pendingPaymentsActive]="pendingPaymentsFilter()"
+    (pendingPaymentsClick)="onPendingPaymentsStatsClick()"
+  />
 
   <!-- Search & Filter Bar -->
-  <app-purchase-search-bar [(searchQuery)]="searchQuery" />
+  <app-purchase-search-bar
+    [(searchQuery)]="searchQuery"
+    [pendingPaymentsActive]="pendingPaymentsFilter()"
+    (clearPendingPayments)="clearPendingPaymentsFilter()"
+  />
 
   <!-- Error Alert -->
   @if (error()) {

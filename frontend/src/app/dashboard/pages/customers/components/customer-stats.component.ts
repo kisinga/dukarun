@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
 export interface CustomerStats {
   totalCustomers: number;
@@ -19,7 +19,9 @@ export interface CustomerStats {
   template: `
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
       <!-- Total Customers -->
-      <div class="card bg-gradient-to-br from-info/10 to-info/5 border border-info/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+      <div
+        class="card bg-gradient-to-br from-info/10 to-info/5 border border-info/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+      >
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
@@ -49,7 +51,13 @@ export interface CustomerStats {
       </div>
 
       <!-- Verified Customers -->
-      <div class="card bg-gradient-to-br from-success/10 to-success/5 border border-success/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+      <div
+        class="card bg-gradient-to-br from-success/10 to-success/5 border border-success/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        [class.ring-2]="activeFilters().verified"
+        [class.ring-primary]="activeFilters().verified"
+        [class.bg-primary/20]="activeFilters().verified"
+        (click)="onFilterClick('verified')"
+      >
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
@@ -79,7 +87,13 @@ export interface CustomerStats {
       </div>
 
       <!-- Credit Approved Customers -->
-      <div class="card bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+      <div
+        class="card bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        [class.ring-2]="activeFilters().creditApproved"
+        [class.ring-primary]="activeFilters().creditApproved"
+        [class.bg-primary/20]="activeFilters().creditApproved"
+        (click)="onFilterClick('creditApproved')"
+      >
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -109,7 +123,13 @@ export interface CustomerStats {
       </div>
 
       <!-- Recent Customers -->
-      <div class="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+      <div
+        class="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        [class.ring-2]="activeFilters().recent"
+        [class.ring-primary]="activeFilters().recent"
+        [class.bg-primary/20]="activeFilters().recent"
+        (click)="onFilterClick('recent')"
+      >
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
@@ -142,4 +162,20 @@ export interface CustomerStats {
 })
 export class CustomerStatsComponent {
   readonly stats = input.required<CustomerStats>();
+  readonly activeFilters = input<{
+    verified?: boolean;
+    creditApproved?: boolean;
+    recent?: boolean;
+  }>({});
+  readonly filterClick = output<{ type: string; color: string }>();
+
+  onFilterClick(type: string): void {
+    // Map filter types to their badge colors
+    const colorMap: Record<string, string> = {
+      verified: 'success',
+      creditApproved: 'primary',
+      recent: 'warning',
+    };
+    this.filterClick.emit({ type, color: colorMap[type] || 'primary' });
+  }
 }

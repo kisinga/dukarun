@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
 export interface OrderStats {
   totalOrders: number;
@@ -24,7 +24,9 @@ export interface OrderStats {
       >
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
+            <div
+              class="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0"
+            >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-5 w-5 text-secondary"
@@ -51,7 +53,13 @@ export interface OrderStats {
       </div>
 
       <!-- Draft Orders -->
-      <div class="card bg-gradient-to-br from-neutral/10 to-neutral/5 border border-neutral/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+      <div
+        class="card bg-gradient-to-br from-neutral/10 to-neutral/5 border border-neutral/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        [class.ring-2]="activeStateFilter() === 'Draft'"
+        [class.ring-primary]="activeStateFilter() === 'Draft'"
+        [class.bg-primary/20]="activeStateFilter() === 'Draft'"
+        (click)="onFilterClick('Draft')"
+      >
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-neutral/10 flex items-center justify-center shrink-0">
@@ -81,7 +89,13 @@ export interface OrderStats {
       </div>
 
       <!-- Unpaid Orders -->
-      <div class="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+      <div
+        class="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        [class.ring-2]="activeStateFilter() === 'ArrangingPayment'"
+        [class.ring-primary]="activeStateFilter() === 'ArrangingPayment'"
+        [class.bg-primary/20]="activeStateFilter() === 'ArrangingPayment'"
+        (click)="onFilterClick('ArrangingPayment')"
+      >
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
@@ -111,7 +125,13 @@ export interface OrderStats {
       </div>
 
       <!-- Paid Orders -->
-      <div class="card bg-gradient-to-br from-success/10 to-success/5 border border-success/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+      <div
+        class="card bg-gradient-to-br from-success/10 to-success/5 border border-success/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        [class.ring-2]="activeStateFilter() === 'PaymentSettled'"
+        [class.ring-primary]="activeStateFilter() === 'PaymentSettled'"
+        [class.bg-primary/20]="activeStateFilter() === 'PaymentSettled'"
+        (click)="onFilterClick('PaymentSettled')"
+      >
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
@@ -144,4 +164,16 @@ export interface OrderStats {
 })
 export class OrderStatsComponent {
   readonly stats = input.required<OrderStats>();
+  readonly activeStateFilter = input<string>('');
+  readonly filterClick = output<{ type: string; value: string; color: string }>();
+
+  onFilterClick(value: string): void {
+    // Map filter values to their badge colors
+    const colorMap: Record<string, string> = {
+      Draft: 'neutral',
+      ArrangingPayment: 'warning',
+      PaymentSettled: 'success',
+    };
+    this.filterClick.emit({ type: 'state', value, color: colorMap[value] || 'primary' });
+  }
 }

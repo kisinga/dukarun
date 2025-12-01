@@ -54,6 +54,7 @@ export class PurchasesComponent implements OnInit {
 
   // Local UI state
   readonly searchQuery = signal('');
+  readonly pendingPaymentsFilter = signal(false);
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
@@ -61,8 +62,18 @@ export class PurchasesComponent implements OnInit {
   // Computed: filtered purchases
   readonly filteredPurchases = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
-    const allPurchases = this.purchases();
+    const pendingPayments = this.pendingPaymentsFilter();
+    let allPurchases = this.purchases();
 
+    // Apply pending payments filter (matches stats calculation: pending or partial)
+    if (pendingPayments) {
+      allPurchases = allPurchases.filter((purchase) => {
+        const status = purchase.paymentStatus?.toLowerCase() || '';
+        return status === 'pending' || status === 'partial';
+      });
+    }
+
+    // Apply search query
     if (!query) return allPurchases;
 
     return allPurchases.filter((purchase) => {
@@ -171,6 +182,22 @@ export class PurchasesComponent implements OnInit {
    */
   trackByPurchaseId(index: number, purchase: any): string {
     return purchase.id;
+  }
+
+  /**
+   * Handle pending payments filter click from stats component
+   */
+  onPendingPaymentsStatsClick(): void {
+    this.pendingPaymentsFilter.set(!this.pendingPaymentsFilter());
+    this.currentPage.set(1);
+  }
+
+  /**
+   * Clear pending payments filter
+   */
+  clearPendingPaymentsFilter(): void {
+    this.pendingPaymentsFilter.set(false);
+    this.currentPage.set(1);
   }
 
   /**

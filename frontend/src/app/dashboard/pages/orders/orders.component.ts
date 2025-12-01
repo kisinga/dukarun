@@ -7,12 +7,14 @@ import {
   effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { OrdersService } from '../../../core/services/orders.service';
 import { PaginationComponent } from '../../components/shared/pagination.component';
 import { OrderAction, OrderCardComponent } from './components/order-card.component';
+import { PayOrderModalComponent, PayOrderModalData } from './components/pay-order-modal.component';
 import { OrderSearchBarComponent } from './components/order-search-bar.component';
 import { OrderStats, OrderStatsComponent } from './components/order-stats.component';
 import { OrderTableRowComponent } from './components/order-table-row.component';
@@ -35,6 +37,7 @@ import { OrderTableRowComponent } from './components/order-table-row.component';
     OrderSearchBarComponent,
     OrderTableRowComponent,
     PaginationComponent,
+    PayOrderModalComponent,
   ],
   templateUrl: './orders.component.html',
   styleUrl: './orders.component.scss',
@@ -59,10 +62,13 @@ export class OrdersComponent implements OnInit {
   // Local UI state
   readonly searchQuery = signal('');
   readonly stateFilter = signal('');
+  readonly stateFilterColor = signal<string>('primary');
   readonly customerIdFilter = signal<string | null>(null);
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
+  readonly selectedOrderForPayment = signal<PayOrderModalData | null>(null);
+  private readonly payOrderModal = viewChild(PayOrderModalComponent);
 
   // Computed: filtered orders
   readonly filteredOrders = computed(() => {
@@ -80,7 +86,14 @@ export class OrdersComponent implements OnInit {
 
     // Apply state filter
     if (stateFilter) {
-      filtered = filtered.filter((order) => order.state === stateFilter);
+      // Handle "Paid" filter which includes both PaymentSettled and Fulfilled
+      if (stateFilter === 'PaymentSettled') {
+        filtered = filtered.filter(
+          (order) => order.state === 'PaymentSettled' || order.state === 'Fulfilled',
+        );
+      } else {
+        filtered = filtered.filter((order) => order.state === stateFilter);
+      }
     }
 
     // Apply search query
@@ -182,6 +195,18 @@ export class OrdersComponent implements OnInit {
         this.customerIdFilter.set(null);
       }
     });
+
+    // Effect to show payment modal when order is selected
+    effect(() => {
+      const orderData = this.selectedOrderForPayment();
+      const modal = this.payOrderModal();
+      if (orderData && modal) {
+        // Use setTimeout to ensure modal is ready
+        setTimeout(() => {
+          modal.show();
+        }, 0);
+      }
+    });
   }
 
   ngOnInit(): void {
@@ -215,7 +240,7 @@ export class OrdersComponent implements OnInit {
   }
 
   /**
-   * Handle order actions (view, print)
+   * Handle order actions (view, print, pay)
    */
   onOrderAction(event: { action: OrderAction; orderId: string }): void {
     const { action, orderId } = event;
@@ -228,7 +253,48 @@ export class OrdersComponent implements OnInit {
       case 'print':
         this.router.navigate(['/dashboard/orders', orderId], { queryParams: { print: true } });
         break;
+
+      case 'pay':
+        this.handlePayOrder(orderId);
+        break;
     }
+  }
+
+  /**
+   * Handle pay order action - prepare modal data and show modal
+   */
+  private handlePayOrder(orderId: string): void {
+    const order = this.orders().find((o) => o.id === orderId);
+    if (!order) return;
+
+    const customerName = order.customer
+      ? `${order.customer.firstName || ''} ${order.customer.lastName || ''}`.trim() ||
+        'Walk-in Customer'
+      : 'Walk-in Customer';
+
+    const modalData: PayOrderModalData = {
+      orderId: order.id,
+      orderCode: order.code || '',
+      customerName,
+      totalAmount: order.totalWithTax || order.total || 0,
+    };
+
+    this.selectedOrderForPayment.set(modalData);
+  }
+
+  /**
+   * Handle payment modal closed/cancelled
+   */
+  onPaymentModalCancelled(): void {
+    this.selectedOrderForPayment.set(null);
+  }
+
+  /**
+   * Handle payment recorded - refresh orders
+   */
+  async onPaymentRecorded(): Promise<void> {
+    this.selectedOrderForPayment.set(null);
+    await this.refreshOrders();
   }
 
   /**
@@ -260,6 +326,44 @@ export class OrdersComponent implements OnInit {
    */
   trackByOrderId(index: number, order: any): string {
     return order.id;
+  }
+
+  /**
+   * Handle filter click from stats component
+   */
+  onStatsFilterClick(event: { type: string; value: string; color: string }): void {
+    if (event.type === 'state') {
+      // Toggle filter if clicking the same filter
+      if (this.stateFilter() === event.value) {
+        this.stateFilter.set('');
+        this.stateFilterColor.set('primary');
+      } else {
+        this.stateFilter.set(event.value);
+        this.stateFilterColor.set(event.color);
+      }
+      // Reset to first page when filter changes
+      this.currentPage.set(1);
+    }
+  }
+
+  /**
+   * Clear state filter
+   */
+  clearStateFilter(): void {
+    this.stateFilter.set('');
+    this.stateFilterColor.set('primary');
+    this.currentPage.set(1);
+  }
+
+  /**
+   * Get filter label for display
+   */
+  getStateFilterLabel(): string {
+    const filter = this.stateFilter();
+    if (filter === 'Draft') return 'Draft';
+    if (filter === 'ArrangingPayment') return 'Unpaid';
+    if (filter === 'PaymentSettled') return 'Paid';
+    return '';
   }
 
   /**

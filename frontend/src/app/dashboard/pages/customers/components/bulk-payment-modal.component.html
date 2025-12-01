@@ -1,11 +1,14 @@
 <!-- Bulk Payment Modal -->
-<dialog #modal class="modal" (click)="onBackdropClick($event)">
-  <div class="modal-box max-w-md w-full mx-4" (click)="$event.stopPropagation()">
+<dialog #modal class="modal modal-bottom sm:modal-middle" (click)="onBackdropClick($event)">
+  <div
+    class="modal-box max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto p-4 sm:p-6"
+    (click)="$event.stopPropagation()"
+  >
     <!-- Header -->
     <div class="flex items-center justify-between mb-4 pb-3 border-b border-base-300">
       <h3 class="text-lg font-bold text-base-content">Record Payment</h3>
       <form method="dialog">
-        <button class="btn btn-sm btn-circle btn-ghost" type="submit">
+        <button class="btn btn-sm btn-circle btn-ghost" type="submit" aria-label="Close">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
@@ -19,8 +22,10 @@
     </div>
 
     <!-- Customer Info -->
-    <div class="mb-4 p-3 bg-base-200 rounded-lg">
-      <div class="text-sm font-semibold text-base-content mb-1">{{ customerName() }}</div>
+    <div class="mb-4 p-3 sm:p-4 bg-base-200 rounded-lg">
+      <div class="text-sm sm:text-base font-semibold text-base-content mb-1">
+        {{ customerName() }}
+      </div>
       <div class="text-xs text-base-content/70">{{ getOutstandingDisplay() }}</div>
     </div>
 
@@ -117,18 +122,10 @@
         </div>
 
         <!-- Actions -->
-        <div class="modal-action pt-4">
-          <button
-            type="button"
-            class="btn btn-ghost flex-1"
-            (click)="onCancel()"
-            [disabled]="isSubmitting()"
-          >
-            Cancel
-          </button>
+        <div class="modal-action pt-4 flex-col gap-2">
           <button
             type="submit"
-            class="btn btn-primary flex-1"
+            class="btn btn-primary w-full"
             [class.loading]="isSubmitting()"
             [disabled]="isSubmitting()"
           >
@@ -138,11 +135,19 @@
               Processing...
             }
           </button>
+          <button
+            type="button"
+            class="btn btn-ghost w-full"
+            (click)="onCancel()"
+            [disabled]="isSubmitting()"
+          >
+            Cancel
+          </button>
         </div>
       </form>
     } @else {
       <!-- Success State Actions -->
-      <div class="modal-action pt-4">
+      <div class="modal-action pt-4 flex-col gap-2">
         <button type="button" class="btn btn-primary w-full" (click)="onCancel()">Close</button>
       </div>
     }
