@@ -382,9 +382,11 @@ export class SellComponent implements OnInit {
     }
 
     try {
+      // Convert cart total from cents to shillings (base currency units) for credit validation
+      const cartTotalInShillings = this.cartTotal() / 100;
       const { summary, error } = await this.customerService.validateCustomerCredit(
         customer.id,
-        this.cartTotal(),
+        cartTotalInShillings,
         customer,
       );
       this.selectedCustomer.set(summary);
@@ -564,9 +566,11 @@ export class SellComponent implements OnInit {
 
     let validatedCustomer = selected;
     try {
+      // Convert cart total from cents to shillings (base currency units) for credit validation
+      const cartTotalInShillings = this.cartTotal() / 100;
       const validation = await this.customerService.validateCustomerCredit(
         selected.id,
-        this.cartTotal(),
+        cartTotalInShillings,
         selected,
       );
       validatedCustomer = validation.summary;

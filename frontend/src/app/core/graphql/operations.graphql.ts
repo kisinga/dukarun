@@ -236,12 +236,7 @@ export const CHECK_SKU_EXISTS = graphql(`
 // within the current channel only (multi-vendor support).
 export const CHECK_BARCODE_EXISTS = graphql(`
   query CheckBarcodeExists($barcode: String!, $excludeProductId: ID) {
-    products(
-      options: {
-        filter: { barcode: { eq: $barcode } }
-        take: 1
-      }
-    ) {
+    products(options: { filter: { barcode: { eq: $barcode } }, take: 1 }) {
       items {
         id
         name
@@ -598,21 +593,27 @@ export const GET_VARIANT_STOCK_LEVEL = graphql(`
 `);
 
 export const SEARCH_BY_BARCODE = graphql(`
-  query SearchByBarcode($sku: String!) {
-    search(input: { term: $sku, take: 1 }) {
+  query SearchByBarcode($barcode: String!) {
+    products(options: { filter: { barcode: { eq: $barcode } }, take: 1 }) {
       items {
-        productId
-        productName
-        productVariantId
-        productVariantName
-        sku
-        priceWithTax {
-          ... on SinglePrice {
-            value
-          }
+        id
+        name
+        customFields {
+          barcode
         }
-        productAsset {
+        featuredAsset {
           preview
+        }
+        variants {
+          id
+          name
+          sku
+          priceWithTax
+          stockOnHand
+          customFields {
+            wholesalePrice
+            allowFractionalQuantity
+          }
         }
       }
     }
@@ -1699,6 +1700,20 @@ export const GET_UNPAID_ORDERS_FOR_CUSTOMER = graphql(`
 export const ALLOCATE_BULK_PAYMENT = graphql(`
   mutation AllocateBulkPayment($input: PaymentAllocationInput!) {
     allocateBulkPayment(input: $input) {
+      ordersPaid {
+        orderId
+        orderCode
+        amountPaid
+      }
+      remainingBalance
+      totalAllocated
+    }
+  }
+`);
+
+export const PAY_SINGLE_ORDER = graphql(`
+  mutation PaySingleOrder($input: PaySingleOrderInput!) {
+    paySingleOrder(input: $input) {
       ordersPaid {
         orderId
         orderCode
