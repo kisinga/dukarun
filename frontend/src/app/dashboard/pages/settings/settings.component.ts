@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AdminManagementComponent } from './components/admin-management.component';
+import { TeamComponent } from '../team/team.component';
 import { AuditTrailComponent } from './components/audit-trail.component';
 import { GeneralSettingsComponent } from './components/general-settings.component';
 import { MlModelStatusComponent } from './components/ml-model-status.component';
@@ -10,14 +10,12 @@ import { NotificationTestComponent } from './components/notification-test.compon
 import { PaymentMethodsComponent } from './components/payment-methods.component';
 import { SubscriptionStatusComponent } from './components/subscription-status.component';
 import { SubscriptionTiersComponent } from './components/subscription-tiers.component';
-import { TeamComponent } from '../team/team.component';
 
 @Component({
   selector: 'app-settings',
   imports: [
     CommonModule,
     GeneralSettingsComponent,
-    AdminManagementComponent,
     AuditTrailComponent,
     MlModelStatusComponent,
     NotificationSettingsComponent,
@@ -78,14 +76,6 @@ import { TeamComponent } from '../team/team.component';
           type="radio"
           name="settings_tabs"
           class="tab"
-          aria-label="Admins"
-          [checked]="activeTab() === 'admins'"
-          (change)="setActiveTab('admins')"
-        />
-        <input
-          type="radio"
-          name="settings_tabs"
-          class="tab"
           aria-label="Payments"
           [checked]="activeTab() === 'payments'"
           (change)="setActiveTab('payments')"
@@ -130,9 +120,6 @@ import { TeamComponent } from '../team/team.component';
         @case ('test-notifications') {
           <app-notification-test />
         }
-        @case ('admins') {
-          <app-admin-management />
-        }
         @case ('payments') {
           <app-payment-methods />
         }
@@ -161,7 +148,6 @@ export class SettingsComponent implements OnInit {
     | 'ml-model'
     | 'notifications'
     | 'test-notifications'
-    | 'admins'
     | 'payments'
     | 'audit-trail'
     | 'subscription'
@@ -179,7 +165,6 @@ export class SettingsComponent implements OnInit {
             'ml-model',
             'notifications',
             'test-notifications',
-            'admins',
             'payments',
             'audit-trail',
             'subscription',
@@ -198,7 +183,6 @@ export class SettingsComponent implements OnInit {
       | 'ml-model'
       | 'notifications'
       | 'test-notifications'
-      | 'admins'
       | 'payments'
       | 'audit-trail'
       | 'subscription'
