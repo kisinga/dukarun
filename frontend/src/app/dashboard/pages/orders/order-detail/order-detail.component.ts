@@ -17,6 +17,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { OrdersService } from '../../../../core/services/orders.service';
 import { PrintService } from '../../../../core/services/print.service';
+import { CustomerPaymentService } from '../../../../core/services/customer/customer-payment.service';
+import { CurrencyService } from '../../../../core/services/currency.service';
 import { OrderDetailHeaderComponent } from './components/order-detail-header.component';
 import { OrderCustomerInfoComponent } from './components/order-customer-info.component';
 import { OrderAddressComponent } from './components/order-address.component';
@@ -59,6 +61,8 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
   private readonly printService = inject(PrintService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly paymentService = inject(CustomerPaymentService);
+  readonly currencyService = inject(CurrencyService);
 
   // Inputs for composable usage
   readonly orderId = input<string | null>(null);
@@ -128,6 +132,42 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
     const order = this.order();
     if (!order?.fulfillments || order.fulfillments.length === 0) return false;
     return !this.isWalkInCustomer();
+  });
+
+  readonly isCreditOrder = computed(() => {
+    const order = this.order();
+    if (!order?.payments) return false;
+    return order.payments.some(
+      (p: { metadata?: { paymentType?: string } }) => p.metadata?.paymentType === 'credit',
+    );
+  });
+
+  readonly isUnpaidCreditOrder = computed(() => {
+    const order = this.order();
+    if (!order || !this.isCreditOrder()) return false;
+
+    const settledPayments = (order.payments || [])
+      .filter((p: { state: string }) => p.state === 'Settled')
+      .reduce((sum: number, p: { amount: number }) => sum + p.amount, 0);
+
+    const orderTotal = order.totalWithTax || order.total;
+    return settledPayments < orderTotal;
+  });
+
+  readonly outstandingAmount = computed(() => {
+    const order = this.order();
+    if (!order) return 0;
+
+    const settledPayments = (order.payments || [])
+      .filter((p: { state: string }) => p.state === 'Settled')
+      .reduce((sum: number, p: { amount: number }) => sum + p.amount, 0);
+
+    const orderTotal = order.totalWithTax || order.total;
+    return Math.max(0, orderTotal - settledPayments); // Keep in cents for consistency
+  });
+
+  readonly showPayOrderButton = computed(() => {
+    return this.isCreditOrder() && this.isUnpaidCreditOrder();
   });
 
   // Convert route query params to signal
@@ -234,5 +274,42 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
 
   clearError(): void {
     this.ordersService.clearError();
+  }
+
+  readonly isProcessingPayment = signal(false);
+  readonly paymentError = signal<string | null>(null);
+  readonly paymentSuccess = signal<string | null>(null);
+
+  async handlePayOrder(): Promise<void> {
+    const order = this.order();
+    if (!order || !this.isUnpaidCreditOrder()) return;
+
+    this.isProcessingPayment.set(true);
+    this.paymentError.set(null);
+    this.paymentSuccess.set(null);
+
+    try {
+      const result = await this.paymentService.paySingleOrder(
+        order.id,
+        this.outstandingAmount() / 100, // Convert cents to shillings for backend
+      );
+
+      if (result) {
+        this.paymentSuccess.set(
+          `Payment recorded: ${result.totalAllocated > 0 ? this.currencyService.format(result.totalAllocated * 100) : 'Payment recorded'}`,
+        );
+        // Refresh order data
+        await this.ordersService.fetchOrderById(order.id);
+        // Clear success message after 3 seconds
+        setTimeout(() => this.paymentSuccess.set(null), 3000);
+      } else {
+        this.paymentError.set('Failed to process payment. Please try again.');
+      }
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      this.paymentError.set(error.message || 'Failed to process payment');
+    } finally {
+      this.isProcessingPayment.set(false);
+    }
   }
 }

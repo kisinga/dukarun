@@ -167,6 +167,37 @@
         <div class="collapse-title text-base font-semibold px-4 py-3">Payment Information</div>
         <div class="collapse-content px-4 pb-4">
           <app-order-payment-info [payments]="order()!.payments" />
+          @if (showPayOrderButton()) {
+            <div class="divider my-3"></div>
+            <div class="space-y-2">
+              @if (paymentError()) {
+                <div class="alert alert-error alert-sm">
+                  <span>{{ paymentError() }}</span>
+                  <button class="btn btn-ghost btn-xs" (click)="paymentError.set(null)">✕</button>
+                </div>
+              }
+              @if (paymentSuccess()) {
+                <div class="alert alert-success alert-sm">
+                  <span>{{ paymentSuccess() }}</span>
+                </div>
+              }
+              <button
+                class="btn btn-primary btn-sm w-full"
+                [disabled]="isProcessingPayment()"
+                (click)="handlePayOrder()"
+              >
+                @if (isProcessingPayment()) {
+                  <span class="loading loading-spinner loading-xs"></span>
+                  Processing...
+                } @else {
+                  💳 Pay Order
+                  @if (outstandingAmount() > 0) {
+                    ({{ currencyService.format(outstandingAmount() * 100) }})
+                  }
+                }
+              </button>
+            </div>
+          }
         </div>
       </div>
 
@@ -211,6 +242,37 @@
         <div class="card bg-base-100 shadow-sm border border-base-300/60">
           <div class="card-body p-4">
             <app-order-payment-info [payments]="order()!.payments" />
+            @if (showPayOrderButton()) {
+              <div class="divider my-3"></div>
+              <div class="space-y-2">
+                @if (paymentError()) {
+                  <div class="alert alert-error alert-sm">
+                    <span>{{ paymentError() }}</span>
+                    <button class="btn btn-ghost btn-xs" (click)="paymentError.set(null)">✕</button>
+                  </div>
+                }
+                @if (paymentSuccess()) {
+                  <div class="alert alert-success alert-sm">
+                    <span>{{ paymentSuccess() }}</span>
+                  </div>
+                }
+                <button
+                  class="btn btn-primary btn-sm w-full"
+                  [disabled]="isProcessingPayment()"
+                  (click)="handlePayOrder()"
+                >
+                  @if (isProcessingPayment()) {
+                    <span class="loading loading-spinner loading-xs"></span>
+                    Processing...
+                  } @else {
+                    💳 Pay Order
+                    @if (outstandingAmount() > 0) {
+                      ({{ currencyService.format(outstandingAmount()) }})
+                    }
+                  }
+                </button>
+              </div>
+            }
           </div>
         </div>
 

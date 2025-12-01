@@ -11,6 +11,7 @@ import {
 import { In } from 'typeorm';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { FinancialService } from '../financial/financial.service';
+import { CreditService } from '../credit/credit.service';
 import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
 import {
   PaymentAllocationItem,
@@ -44,6 +45,7 @@ export class PaymentAllocationService {
     private readonly orderService: OrderService,
     private readonly paymentService: PaymentService,
     private readonly financialService: FinancialService,
+    private readonly creditService: CreditService,
     @Optional() private readonly auditService?: AuditService
   ) {}
 
@@ -69,7 +71,9 @@ export class PaymentAllocationService {
       const settledPayments = (order.payments || [])
         .filter(p => p.state === 'Settled')
         .reduce((sum, p) => sum + p.amount, 0);
-      return order.total > settledPayments;
+      // Use totalWithTax for tax-inclusive pricing
+      const orderTotal = order.totalWithTax || order.total;
+      return orderTotal > settledPayments;
     });
   }
 
@@ -104,10 +108,12 @@ export class PaymentAllocationService {
           const settledPayments = (order.payments || [])
             .filter(p => p.state === 'Settled')
             .reduce((sum, p) => sum + p.amount, 0);
+          // Use totalWithTax for tax-inclusive pricing
+          const orderTotal = order.totalWithTax || order.total;
           return {
             id: order.id.toString(),
             code: order.code,
-            totalAmount: order.total,
+            totalAmount: orderTotal,
             paidAmount: settledPayments,
             createdAt: order.createdAt,
           };
@@ -191,10 +197,12 @@ export class PaymentAllocationService {
           const settledPayments = (order.payments || [])
             .filter(p => p.state === 'Settled')
             .reduce((sum, p) => sum + p.amount, 0);
+          // Use totalWithTax for tax-inclusive pricing
+          const orderTotal = order.totalWithTax || order.total;
           return {
             id: order.id.toString(),
             code: order.code,
-            totalAmount: order.total,
+            totalAmount: orderTotal,
             paidAmount: settledPayments,
             createdAt: order.createdAt,
           };
@@ -206,7 +214,16 @@ export class PaymentAllocationService {
         const excessPayment = calculation.excessPayment / 100;
         const remainingBalance = remainingBalanceInCents / 100;
 
-        // 5. Log audit event
+        // 9. Record repayment tracking if any payment was made
+        if (calculation.totalAllocated > 0) {
+          await this.creditService.releaseCreditCharge(
+            transactionCtx,
+            input.customerId,
+            totalAllocated // Amount in base currency units (shillings)
+          );
+        }
+
+        // 10. Log audit event
         if (this.auditService) {
           await this.auditService.log(transactionCtx, 'credit.payment.allocated', {
             entityType: 'Customer',
@@ -243,6 +260,51 @@ export class PaymentAllocationService {
         );
         throw error;
       }
+    });
+  }
+
+  /**
+   * Pay a single order (convenience method for individual order payments)
+   */
+  async paySingleOrder(
+    ctx: RequestContext,
+    orderId: string,
+    paymentAmount?: number // In base currency units (shillings), optional - defaults to outstanding amount
+  ): Promise<PaymentAllocationResult> {
+    // Get the order to find the customer
+    const order = await this.orderService.findOne(ctx, orderId, ['customer']);
+    if (!order) {
+      throw new UserInputError(`Order ${orderId} not found`);
+    }
+
+    if (!order.customer) {
+      throw new UserInputError(`Order ${orderId} has no customer associated`);
+    }
+
+    // Calculate outstanding amount for this order
+    const settledPayments = (order.payments || [])
+      .filter(p => p.state === 'Settled')
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    // Use totalWithTax for tax-inclusive pricing
+    const orderTotal = order.totalWithTax || order.total;
+    const outstandingAmount = orderTotal - settledPayments;
+    const outstandingAmountInShillings = outstandingAmount / 100;
+
+    // Use the outstanding amount as payment amount if not specified, or validate payment amount
+    const actualPaymentAmount = paymentAmount ?? outstandingAmountInShillings;
+
+    if (actualPaymentAmount > outstandingAmountInShillings) {
+      throw new UserInputError(
+        `Payment amount (${actualPaymentAmount}) cannot exceed outstanding amount (${outstandingAmountInShillings})`
+      );
+    }
+
+    // Use the existing bulk payment method with single order
+    return this.allocatePaymentToOrders(ctx, {
+      customerId: order.customer.id.toString(),
+      paymentAmount: actualPaymentAmount,
+      orderIds: [orderId],
     });
   }
 

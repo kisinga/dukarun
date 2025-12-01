@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { ALLOCATE_BULK_PAYMENT } from '../../graphql/operations.graphql';
+import { ALLOCATE_BULK_PAYMENT, PAY_SINGLE_ORDER } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { CustomerStateService } from './customer-state.service';
 
@@ -88,6 +88,73 @@ export class CustomerPaymentService {
     } catch (error: any) {
       console.error('❌ Bulk payment error:', error);
       this.stateService.setError(error.message || 'Failed to record payment');
+      return null;
+    }
+  }
+
+  /**
+   * Pay a single credit order directly
+   * @param orderId - Order ID to pay
+   * @param paymentAmount - Payment amount (optional, defaults to full outstanding amount)
+   * @returns Payment allocation result or null if failed
+   */
+  async paySingleOrder(
+    orderId: string,
+    paymentAmount?: number,
+  ): Promise<{
+    ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
+    remainingBalance: number;
+    totalAllocated: number;
+  } | null> {
+    this.stateService.setError(null);
+
+    try {
+      const client = this.apolloService.getClient();
+
+      const input: any = {
+        orderId,
+      };
+
+      if (paymentAmount !== undefined) {
+        input.paymentAmount = paymentAmount;
+      }
+
+      const result = await client.mutate<{
+        paySingleOrder: {
+          ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
+          remainingBalance: number;
+          totalAllocated: number;
+        };
+      }>({
+        mutation: PAY_SINGLE_ORDER as any,
+        variables: { input },
+      });
+
+      if (result.error) {
+        console.error('❌ GraphQL error:', result.error);
+        const errorMessage = result.error.message || 'Unknown error';
+        this.stateService.setError(`Failed to pay order: ${errorMessage}`);
+        return null;
+      }
+
+      const paymentResult = result.data?.paySingleOrder;
+      if (!paymentResult) {
+        this.stateService.setError('Failed to pay order: No data returned.');
+        return null;
+      }
+
+      console.log('✅ Single order payment recorded:', {
+        orderId,
+        paymentAmount,
+        ordersPaid: paymentResult.ordersPaid.length,
+        totalAllocated: paymentResult.totalAllocated,
+        remainingBalance: paymentResult.remainingBalance,
+      });
+
+      return paymentResult;
+    } catch (error: any) {
+      console.error('❌ Single order payment error:', error);
+      this.stateService.setError(error.message || 'Failed to pay order');
       return null;
     }
   }

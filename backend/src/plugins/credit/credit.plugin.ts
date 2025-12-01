@@ -101,6 +101,11 @@ const COMBINED_SCHEMA = gql`
     orderIds: [ID!]
   }
 
+  input PaySingleOrderInput {
+    orderId: ID!
+    paymentAmount: Float
+  }
+
   type CreditValidationResult {
     isValid: Boolean!
     error: String
@@ -130,6 +135,7 @@ const COMBINED_SCHEMA = gql`
     updateCreditDuration(input: UpdateCreditDurationInput!): CreditSummary!
     createOrder(input: CreateOrderInput!): Order!
     allocateBulkPayment(input: PaymentAllocationInput!): PaymentAllocationResult!
+    paySingleOrder(input: PaySingleOrderInput!): PaymentAllocationResult!
   }
 
   type SupplierCreditSummary {

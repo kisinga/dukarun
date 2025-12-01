@@ -6,6 +6,11 @@ import {
   PaymentAllocationResult,
 } from '../../services/payments/payment-allocation.service';
 
+interface PaySingleOrderInput {
+  orderId: string;
+  paymentAmount?: number;
+}
+
 @Resolver()
 export class PaymentAllocationResolver {
   constructor(private readonly paymentAllocationService: PaymentAllocationService) {}
@@ -26,5 +31,14 @@ export class PaymentAllocationResolver {
     @Args('input') input: PaymentAllocationInput
   ): Promise<PaymentAllocationResult> {
     return this.paymentAllocationService.allocatePaymentToOrders(ctx, input);
+  }
+
+  @Mutation()
+  @Allow(Permission.UpdateOrder)
+  async paySingleOrder(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: PaySingleOrderInput
+  ): Promise<PaymentAllocationResult> {
+    return this.paymentAllocationService.paySingleOrder(ctx, input.orderId, input.paymentAmount);
   }
 }

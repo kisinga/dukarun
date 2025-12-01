@@ -211,14 +211,17 @@ export class FinancialService {
       throw new Error('Order must have customer for credit sale');
     }
 
-    if (order.total <= 0) {
+    // Use totalWithTax to get the full tax-inclusive amount when prices include tax
+    const orderAmount = order.totalWithTax || order.total;
+
+    if (orderAmount <= 0) {
       throw new Error(
-        `Order ${order.id} has non-positive total (${order.total}) and cannot be posted as a credit sale`
+        `Order ${order.id} has non-positive total (${orderAmount}) and cannot be posted as a credit sale`
       );
     }
 
     const context: SalePostingContext = {
-      amount: order.total,
+      amount: orderAmount,
       orderId: order.id.toString(),
       orderCode: order.code,
       customerId: order.customer.id.toString(),
