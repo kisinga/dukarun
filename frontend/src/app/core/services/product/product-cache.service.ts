@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { PREFETCH_PRODUCTS } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
-import { ProductSearchResult } from './product-search.service';
+import { ProductSearchResult, ProductVariant } from './product-search.service';
 
 /**
  * Product cache status
@@ -182,7 +182,8 @@ export class ProductCacheService {
    */
   getVariantById(variantId: string): ProductVariant | null {
     // Search through all cached products for the variant
-    for (const product of this.productsById.values()) {
+    const products = Array.from(this.productsById.values());
+    for (const product of products) {
       const variant = product.variants.find((v) => v.id === variantId);
       if (variant) {
         return variant;

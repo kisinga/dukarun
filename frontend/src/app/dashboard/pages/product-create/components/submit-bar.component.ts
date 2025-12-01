@@ -14,24 +14,36 @@ import { ItemType } from '../types/product-creation.types';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="sticky bottom-4 bg-base-100 p-4 rounded-lg shadow-lg border">
-      <button
-        type="button"
-        class="btn btn-primary w-full"
-        [class.btn-disabled]="!canSubmit()"
-        [class.loading]="isLoading()"
-        (click)="onSubmit()"
-      >
-        @if (isLoading()) {
-          <span class="loading loading-spinner loading-sm"></span>
-          Creating...
-        } @else {
-          @if (isEditMode()) {
-            Update Product
+      <div class="flex flex-col sm:flex-row gap-2">
+        <button
+          type="button"
+          class="btn btn-outline btn-neutral flex-1"
+          (click)="onPrevious()"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m15 18-6-6 6-6"/>
+          </svg>
+          Previous
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary flex-1"
+          [class.btn-disabled]="!canSubmit()"
+          [class.loading]="isLoading()"
+          (click)="onSubmit()"
+        >
+          @if (isLoading()) {
+            <span class="loading loading-spinner loading-sm"></span>
+            Creating...
           } @else {
-            Create {{ itemType() === 'service' ? 'Service' : 'Product' }}
+            @if (isEditMode()) {
+              Update Product
+            } @else {
+              Create {{ itemType() === 'service' ? 'Service' : 'Product' }}
+            }
           }
-        }
-      </button>
+        </button>
+      </div>
 
       @if (submitError()) {
         <div class="alert alert-error mt-2 text-xs flex items-center gap-2">
@@ -60,11 +72,19 @@ export class SubmitBarComponent {
 
   // Outputs
   readonly submit = output<void>();
+  readonly previous = output<void>();
 
   /**
    * Handle submit button click
    */
   onSubmit(): void {
     this.submit.emit();
+  }
+
+  /**
+   * Handle previous button click
+   */
+  onPrevious(): void {
+    this.previous.emit();
   }
 }
