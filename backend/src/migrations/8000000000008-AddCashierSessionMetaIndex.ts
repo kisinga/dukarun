@@ -28,3 +28,5 @@ export class AddCashierSessionMetaIndex8000000000008 implements MigrationInterfa
 }
 
 
+
+

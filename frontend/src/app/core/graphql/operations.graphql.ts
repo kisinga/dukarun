@@ -344,6 +344,9 @@ export const GET_PRODUCT_DETAIL = graphql(`
       slug
       description
       enabled
+      customFields {
+        barcode
+      }
       assets {
         id
         name
@@ -361,6 +364,7 @@ export const GET_PRODUCT_DETAIL = graphql(`
         price
         priceWithTax
         stockOnHand
+        trackInventory
         customFields {
           wholesalePrice
           allowFractionalQuantity

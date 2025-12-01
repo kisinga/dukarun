@@ -9,10 +9,10 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - varianceNotificationThreshold: Minimum variance to trigger manager notification
  */
 export class AddChannelCashControlFields8000000000011 implements MigrationInterface {
-  name = 'AddChannelCashControlFields8000000000011';
+    name = 'AddChannelCashControlFields8000000000011';
 
-  public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`
             DO $$
             BEGIN
                 -- Add cash control fields to Channel
@@ -31,10 +31,10 @@ export class AddChannelCashControlFields8000000000011 implements MigrationInterf
                 END IF;
             END $$;
         `);
-  }
+    }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`
             DO $$
             BEGIN
                 -- Remove cash control fields from Channel
@@ -53,6 +53,7 @@ export class AddChannelCashControlFields8000000000011 implements MigrationInterf
                 END IF;
             END $$;
         `);
-  }
+    }
 }
+
 

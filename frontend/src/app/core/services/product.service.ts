@@ -257,16 +257,17 @@ export class ProductService {
   }
 
   /**
-   * Update product base data (name) and variant details (name + price).
+   * Update product base data (name, barcode) and variant details (name + price).
    * Used by the product edit screen.
    */
   async updateProductWithVariants(
     productId: string,
     name: string,
     variants: { id: string; name: string; price: number }[],
+    barcode?: string,
   ): Promise<boolean> {
     try {
-      const productUpdated = await this.apiService.updateProductName(productId, name);
+      const productUpdated = await this.apiService.updateProductName(productId, name, barcode);
       if (!productUpdated) {
         return false;
       }

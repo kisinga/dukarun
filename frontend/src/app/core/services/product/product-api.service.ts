@@ -56,18 +56,25 @@ export class ProductApiService {
   }
 
   /**
-   * Update basic product information such as name and slug.
+   * Update basic product information such as name, slug, and barcode.
    * Light wrapper around Vendure's updateProduct mutation.
    */
-  async updateProductName(productId: string, name: string): Promise<boolean> {
-    const UPDATE_PRODUCT_NAME = gql`
-      mutation UpdateProductName($id: ID!, $name: String!, $slug: String!) {
+  async updateProductName(productId: string, name: string, barcode?: string): Promise<boolean> {
+    const UPDATE_PRODUCT = gql`
+      mutation UpdateProduct($id: ID!, $name: String!, $slug: String!, $barcode: String) {
         updateProduct(
-          input: { id: $id, translations: [{ languageCode: en, name: $name, slug: $slug }] }
+          input: {
+            id: $id
+            translations: [{ languageCode: en, name: $name, slug: $slug }]
+            customFields: { barcode: $barcode }
+          }
         ) {
           id
           name
           slug
+          customFields {
+            barcode
+          }
         }
       }
     `;
@@ -77,13 +84,13 @@ export class ProductApiService {
       const slug = this.generateSlug(name);
 
       const result = await client.mutate<any>({
-        mutation: UPDATE_PRODUCT_NAME,
-        variables: { id: productId, name, slug },
+        mutation: UPDATE_PRODUCT,
+        variables: { id: productId, name, slug, barcode: barcode || null },
       });
 
       return !!result.data?.updateProduct?.id;
     } catch (error) {
-      console.error('Failed to update product name:', error);
+      console.error('Failed to update product:', error);
       return false;
     }
   }

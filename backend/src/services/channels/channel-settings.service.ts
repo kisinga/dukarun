@@ -90,6 +90,7 @@ export class ChannelSettingsService {
     const current = (channel.customFields ?? {}) as {
       cashierFlowEnabled?: boolean;
       cashierOpen?: boolean;
+      cashControlEnabled?: boolean;
       companyLogoAsset?: Asset | null;
     };
 
@@ -99,6 +100,17 @@ export class ChannelSettingsService {
     if (!nextCashierFlowEnabled && nextCashierOpen) {
       throw new BadRequestException(
         'Cashier cannot be open when the cashier approval flow is disabled.'
+      );
+    }
+
+    // Validation: If cashControlEnabled is true and cashierFlowEnabled is false, log a warning
+    // Cash control can work independently, but it's typically used together with cashier flow
+    const nextCashControlEnabled =
+      (channel.customFields as any)?.cashControlEnabled ?? false;
+    if (nextCashControlEnabled && !nextCashierFlowEnabled) {
+      this.logger.warn(
+        `Channel ${channelId} has cashControlEnabled=true but cashierFlowEnabled=false. ` +
+          `Cash control can work independently, but is typically used with cashier flow.`
       );
     }
 

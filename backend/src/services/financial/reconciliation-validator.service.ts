@@ -292,7 +292,7 @@ export class ReconciliationValidatorService {
 
   /**
    * Validate cashier session reconciliations for a period
-   * Only validates if cashier flow is enabled for the channel
+   * Only validates if cash control is enabled for the channel
    */
   private async validateCashierSessionReconciliations(
     ctx: RequestContext,
@@ -302,9 +302,9 @@ export class ReconciliationValidatorService {
     const errors: string[] = [];
     const missingReconciliations: MissingReconciliation[] = [];
 
-    // Check if cashier flow is enabled
-    const isCashierFlowEnabled = await this.isCashierFlowEnabled(ctx, channelId);
-    if (!isCashierFlowEnabled) {
+    // Check if cash control is enabled
+    const isCashControlEnabled = await this.isCashControlEnabled(ctx, channelId);
+    if (!isCashControlEnabled) {
       return { isValid: true, errors: [], missingReconciliations: [] };
     }
 
@@ -348,11 +348,10 @@ export class ReconciliationValidatorService {
   }
 
   /**
-   * Check if cashier flow is enabled for a channel
-   * Now determined by whether any payment method is cashier-controlled
+   * Check if cash control is enabled for a channel
+   * Determined by channel-level cashControlEnabled setting
    */
-  private async isCashierFlowEnabled(ctx: RequestContext, channelId: number): Promise<boolean> {
-    // First check channel-level setting
+  private async isCashControlEnabled(ctx: RequestContext, channelId: number): Promise<boolean> {
     const channelRepo = this.connection.getRepository(ctx, Channel);
     const channel = await channelRepo.findOne({
       where: { id: channelId },
@@ -362,15 +361,9 @@ export class ReconciliationValidatorService {
       return false;
     }
 
-    // Check channel customFields.cashControlEnabled first (if exists)
+    // Check channel customFields.cashControlEnabled
     const channelCashControl = (channel as any).customFields?.cashControlEnabled;
-    if (channelCashControl === false) {
-      return false;
-    }
-
-    // Then check if any payment method is cashier-controlled
-    const reconConfigs = await this.getRequiredReconciliations(ctx, channelId);
-    return reconConfigs.some(config => config.isCashierControlled);
+    return channelCashControl === true;
   }
 
   /**
