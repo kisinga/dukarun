@@ -238,7 +238,7 @@ export class SellComponent implements OnInit {
       if (item) {
         item.customLinePrice = priceOverride.customLinePrice;
         item.priceOverrideReason = priceOverride.reason;
-        item.subtotal = priceOverride.customLinePrice / 100;
+        item.subtotal = priceOverride.customLinePrice; // Already in cents
         this.cartItems.set([...items]);
       }
     }
@@ -297,11 +297,11 @@ export class SellComponent implements OnInit {
       if (data.customLinePrice && data.customLinePrice > 0) {
         item.customLinePrice = data.customLinePrice;
         item.priceOverrideReason = data.reason;
-        item.subtotal = data.customLinePrice / 100;
+        item.subtotal = data.customLinePrice; // Already in cents
       } else {
         item.customLinePrice = undefined;
         item.priceOverrideReason = undefined;
-        item.subtotal = item.quantity * item.variant.priceWithTax;
+        item.subtotal = item.quantity * item.variant.priceWithTax; // Already in cents
       }
 
       this.cartItems.set([...items]);

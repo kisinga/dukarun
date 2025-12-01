@@ -17,6 +17,10 @@ export interface ProductVariant {
   featuredAsset?: {
     preview: string;
   };
+  customFields?: {
+    wholesalePrice?: number;
+    allowFractionalQuantity?: boolean;
+  };
 }
 
 /**
@@ -81,6 +85,12 @@ export class ProductSearchService {
             stockLevel: v.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
             productId: product.id,
             productName: product.name,
+            customFields: v.customFields
+              ? {
+                wholesalePrice: v.customFields.wholesalePrice,
+                allowFractionalQuantity: v.customFields.allowFractionalQuantity,
+              }
+              : undefined,
           })),
         })) || []
       );
@@ -132,6 +142,12 @@ export class ProductSearchService {
           stockLevel: v.stockLevels?.[0]?.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
           productId: product.id,
           productName: product.name,
+          customFields: v.customFields
+            ? {
+              wholesalePrice: v.customFields.wholesalePrice,
+              allowFractionalQuantity: v.customFields.allowFractionalQuantity,
+            }
+            : undefined,
         })),
       };
     } catch (error) {
@@ -169,6 +185,12 @@ export class ProductSearchService {
         productId: item.productId,
         productName: item.productName,
         featuredAsset: item.productAsset ? { preview: item.productAsset.preview } : undefined,
+        customFields: item.customFields
+          ? {
+            wholesalePrice: item.customFields.wholesalePrice,
+            allowFractionalQuantity: item.customFields.allowFractionalQuantity,
+          }
+          : undefined,
       };
     } catch (error) {
       console.error('Barcode search failed:', error);
@@ -228,6 +250,12 @@ export class ProductSearchService {
               productName: product.name,
               featuredAsset: product.featuredAsset
                 ? { preview: product.featuredAsset.preview }
+                : undefined,
+              customFields: variant.customFields
+                ? {
+                  wholesalePrice: variant.customFields.wholesalePrice,
+                  allowFractionalQuantity: variant.customFields.allowFractionalQuantity,
+                }
                 : undefined,
             };
           }

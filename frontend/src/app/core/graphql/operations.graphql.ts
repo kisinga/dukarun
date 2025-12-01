@@ -238,7 +238,7 @@ export const CHECK_BARCODE_EXISTS = graphql(`
   query CheckBarcodeExists($barcode: String!, $excludeProductId: ID) {
     products(
       options: {
-        filter: { customFields: { barcode: { eq: $barcode } } }
+        filter: { barcode: { eq: $barcode } }
         take: 1
       }
     ) {

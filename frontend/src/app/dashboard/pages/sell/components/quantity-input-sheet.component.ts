@@ -266,7 +266,8 @@ export class QuantityInputSheetComponent {
   getFormattedPrice(): string {
     const data = this.data();
     if (!data) return '0';
-    return this.currencyService.format(Math.round(data.pricePerUnit * 100), false);
+    // pricePerUnit is already in cents
+    return this.currencyService.format(Math.round(data.pricePerUnit), false);
   }
 
   /**
@@ -277,7 +278,8 @@ export class QuantityInputSheetComponent {
     const quantity = this.quantityControl.value || 0;
     if (!data) return '0';
 
+    // pricePerUnit is already in cents, so total is also in cents
     const total = data.pricePerUnit * quantity;
-    return this.currencyService.format(Math.round(total * 100), false);
+    return this.currencyService.format(Math.round(total), false);
   }
 }

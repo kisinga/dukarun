@@ -7,12 +7,14 @@ import {
   input,
   output,
   signal,
+  untracked,
 } from '@angular/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import {
   ProductSearchResult,
   ProductVariant,
 } from '../../../../core/services/product/product-search.service';
+import { PriceModificationService } from '../services/price-modification.service';
 import { PriceOverrideData } from './price-override.component';
 
 /**
@@ -379,6 +381,7 @@ import { PriceOverrideData } from './price-override.component';
 })
 export class ProductConfirmModalComponent {
   readonly currencyService = inject(CurrencyService);
+  readonly priceModificationService = inject(PriceModificationService);
 
   readonly isOpen = input.required<boolean>();
   readonly product = input.required<ProductSearchResult | null>();
@@ -389,20 +392,25 @@ export class ProductConfirmModalComponent {
 
   // Track price modifications per variant (in cents)
   private variantPrices = signal<Map<string, number>>(new Map());
-  // Track undo stacks per variant
-  private variantUndoStacks = new Map<string, number[]>();
-  // Track redo stacks per variant
-  private variantRedoStacks = new Map<string, number[]>();
 
   constructor() {
     // Reset price modifications when product changes
     effect(() => {
       const prod = this.product();
       if (!prod) {
+        // Clear stacks for previous variants (if any) when product is cleared
+        const previousPrices = untracked(() => this.variantPrices());
+        previousPrices.forEach((_, variantId) => {
+          this.priceModificationService.clearStacks(variantId);
+        });
         this.variantPrices.set(new Map());
-        this.variantUndoStacks.clear();
-        this.variantRedoStacks.clear();
       } else {
+        // Clear stacks for previous variants when product changes (new product loaded)
+        const previousPrices = untracked(() => this.variantPrices());
+        previousPrices.forEach((_, variantId) => {
+          this.priceModificationService.clearStacks(variantId);
+        });
+
         // Initialize prices for all variants
         const prices = new Map<string, number>();
         prod.variants.forEach((variant) => {
@@ -432,80 +440,42 @@ export class ProductConfirmModalComponent {
   increaseVariantPrice(variant: ProductVariant): void {
     const prices = this.variantPrices();
     const currentPrice = prices.get(variant.id) ?? Math.round(variant.priceWithTax);
-    const basePrice = Math.round(variant.priceWithTax);
 
-    // Initialize stacks if needed
-    if (!this.variantUndoStacks.has(variant.id)) {
-      this.variantUndoStacks.set(variant.id, []);
-    }
-    if (!this.variantRedoStacks.has(variant.id)) {
-      this.variantRedoStacks.set(variant.id, []);
-    }
+    const result = this.priceModificationService.increasePrice(
+      variant.id,
+      currentPrice,
+      'unit', // Unit price context for modal
+    );
 
-    const undoStack = this.variantUndoStacks.get(variant.id)!;
-    const redoStack = this.variantRedoStacks.get(variant.id)!;
+    // If result is null, stack is at maximum (10 steps) and action was declined
+    if (!result) return;
 
-    // If there's something in undo stack, restore it (undo)
-    if (undoStack.length > 0) {
-      // Move current price to redo stack
-      redoStack.push(currentPrice);
-      // Pop previous price from undo stack and restore
-      const previousPrice = undoStack.pop()!;
-      const newPrices = new Map(prices);
-      newPrices.set(variant.id, previousPrice);
-      this.variantPrices.set(newPrices);
-    } else {
-      // No undo available, apply increase
-      // Store current price in undo stack before increasing
-      undoStack.push(currentPrice);
-      // Clear redo stack (new action invalidates redo)
-      redoStack.length = 0;
-      // Calculate new price (3% increase)
-      const newPrice = Math.round(currentPrice * 1.03);
-      // Update price map
-      const newPrices = new Map(prices);
-      newPrices.set(variant.id, newPrice);
-      this.variantPrices.set(newPrices);
-    }
+    // Update price map
+    const newPrices = new Map(prices);
+    newPrices.set(variant.id, result.newPrice);
+    this.variantPrices.set(newPrices);
   }
 
   decreaseVariantPrice(variant: ProductVariant): void {
     const prices = this.variantPrices();
     const currentPrice = prices.get(variant.id) ?? Math.round(variant.priceWithTax);
+    const wholesalePrice = variant.customFields?.wholesalePrice;
 
-    // Initialize stacks if needed
-    if (!this.variantUndoStacks.has(variant.id)) {
-      this.variantUndoStacks.set(variant.id, []);
-    }
-    if (!this.variantRedoStacks.has(variant.id)) {
-      this.variantRedoStacks.set(variant.id, []);
-    }
+    const result = this.priceModificationService.decreasePrice(
+      variant.id,
+      currentPrice,
+      1, // Quantity is always 1 for unit prices in modal
+      wholesalePrice,
+      'unit', // Unit price context for modal
+    );
 
-    const undoStack = this.variantUndoStacks.get(variant.id)!;
-    const redoStack = this.variantRedoStacks.get(variant.id)!;
+    // If result is null, stack is at maximum (10 steps) and action was declined
+    if (!result) return;
 
-    // If there's something in undo stack, restore it (undo)
-    if (undoStack.length > 0) {
-      // Move current price to redo stack
-      redoStack.push(currentPrice);
-      // Pop previous price from undo stack and restore
-      const previousPrice = undoStack.pop()!;
-      const newPrices = new Map(prices);
-      newPrices.set(variant.id, previousPrice);
-      this.variantPrices.set(newPrices);
-    } else {
-      // No undo available, apply decrease
-      // Store current price in undo stack before decreasing
-      undoStack.push(currentPrice);
-      // Clear redo stack (new action invalidates redo)
-      redoStack.length = 0;
-      // Calculate new price (3% decrease)
-      const newPrice = Math.round(currentPrice * 0.97);
-      // Update price map
-      const newPrices = new Map(prices);
-      newPrices.set(variant.id, newPrice);
-      this.variantPrices.set(newPrices);
-    }
+    // Update price map
+    const newPrices = new Map(prices);
+    newPrices.set(variant.id, result.newPrice);
+    this.variantPrices.set(newPrices);
   }
 
   increaseSingleVariantPrice(): void {
