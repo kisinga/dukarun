@@ -242,7 +242,7 @@ describe('Subscription Flow Integration', () => {
   });
 
   describe('Email Fallback', () => {
-    it('should use placeholder email when email is not provided', async () => {
+    it('should use system email when email is not provided', async () => {
       // Clear all mocks to ensure clean state
       jest.clearAllMocks();
 
@@ -275,9 +275,9 @@ describe('Subscription Flow Integration', () => {
       // Verify the method completed successfully
       expect(result.success).toBe(true);
 
-      // Verify Paystack was called with placeholder email
+      // Verify Paystack was called with system email (email parameter is kept for API compatibility only)
       expect(mockPaystackService.createCustomer).toHaveBeenCalledWith(
-        '254712345678@placeholder.dukarun.com',
+        'malipo@dukarun.com',
         undefined,
         undefined,
         phoneNumber,
@@ -285,7 +285,7 @@ describe('Subscription Flow Integration', () => {
       );
     });
 
-    it('should use placeholder email when email is undefined', async () => {
+    it('should use system email when email is undefined', async () => {
       // Clear all mocks to ensure clean state
       jest.clearAllMocks();
 
@@ -318,9 +318,9 @@ describe('Subscription Flow Integration', () => {
       // Verify the method completed successfully
       expect(result.success).toBe(true);
 
-      // Verify Paystack was called with placeholder email
+      // Verify Paystack was called with system email (email parameter is kept for API compatibility only)
       expect(mockPaystackService.createCustomer).toHaveBeenCalledWith(
-        '254712345678@placeholder.dukarun.com',
+        'malipo@dukarun.com',
         undefined,
         undefined,
         phoneNumber,

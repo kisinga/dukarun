@@ -37,18 +37,6 @@ export class SubscriptionService {
   private readonly CACHE_NAMESPACE = 'payment:status';
   private readonly SYSTEM_EMAIL = 'malipo@dukarun.com';
 
-  /**
-   * Generate placeholder email from phone number
-   * Extracts all digits from phone number and creates email in format: {digits}@placeholder.dukarun.com
-   * @param phoneNumber - Phone number (can be in any format)
-   * @returns Placeholder email address
-   */
-  private generatePlaceholderEmail(phoneNumber: string): string {
-    // Extract all digits from phone number
-    const digits = phoneNumber.replace(/\D/g, '');
-    return `${digits}@placeholder.dukarun.com`;
-  }
-
   constructor(
     private channelService: ChannelService,
     private connection: TransactionalConnection,
@@ -236,10 +224,9 @@ export class SubscriptionService {
       let customerCode = (channel.customFields as any).paystackCustomerCode;
       if (!customerCode) {
         try {
-          // Use placeholder email if email is not provided or is empty
-          const emailToUse = email && email.trim() ? email : this.generatePlaceholderEmail(phoneNumber);
+          // Always use system email for Paystack (email parameter kept for API compatibility only)
           const customer = await this.paystackService.createCustomer(
-            emailToUse,
+            this.SYSTEM_EMAIL,
             undefined,
             undefined,
             phoneNumber,
@@ -273,11 +260,10 @@ export class SubscriptionService {
       if (useCheckout) {
         // Redirect to Paystack checkout for card and other payment methods
         try {
-          // Use placeholder email if email is not provided or is empty
-          const emailToUse = email && email.trim() ? email : this.generatePlaceholderEmail(phoneNumber);
+          // Always use system email for Paystack
           const transactionResponse = await this.paystackService.initializeTransaction(
             amountInKes,
-            emailToUse,
+            this.SYSTEM_EMAIL,
             phoneNumber,
             {
               channelId,
@@ -307,12 +293,11 @@ export class SubscriptionService {
 
       // Use STK push for mobile money (default behavior)
       try {
-        // Use placeholder email if email is not provided or is empty
-        const emailToUse = email && email.trim() ? email : this.generatePlaceholderEmail(phoneNumber);
+        // Always use system email for Paystack
         const chargeResponse = await this.paystackService.chargeMobile(
           amountInKes,
           phoneNumber,
-          emailToUse,
+          this.SYSTEM_EMAIL,
           reference,
           {
             channelId,
@@ -362,11 +347,10 @@ export class SubscriptionService {
 
         // Attempt to generate payment link as fallback
         try {
-          // Use placeholder email if email is not provided or is empty
-          const emailToUse = email && email.trim() ? email : this.generatePlaceholderEmail(phoneNumber);
+          // Always use system email for Paystack
           const transactionResponse = await this.paystackService.initializeTransaction(
             amountInKes,
-            emailToUse,
+            this.SYSTEM_EMAIL,
             phoneNumber,
             {
               channelId,
