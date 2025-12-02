@@ -86,16 +86,16 @@ export class PurchaseService {
 
     const savedPurchase = await purchaseRepo.save(purchase);
 
-    // Post credit purchase to ledger (single source of truth)
-    if (savedPurchase.isCreditPurchase) {
-      await this.financialService.recordPurchase(
-        ctx,
-        savedPurchase.id,
-        savedPurchase.referenceNumber || savedPurchase.id,
-        input.supplierId.toString(),
-        totalCost
-      );
-    }
+    // Post purchase to ledger (single source of truth)
+    // Handles both credit purchases (AP) and cash purchases (Cash on Hand)
+    await this.financialService.recordPurchase(
+      ctx,
+      savedPurchase.id,
+      savedPurchase.referenceNumber || savedPurchase.id,
+      input.supplierId.toString(),
+      totalCost,
+      savedPurchase.isCreditPurchase
+    );
 
     // Create purchase lines
     const purchaseLines = input.lines.map(line => {
