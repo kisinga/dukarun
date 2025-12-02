@@ -8,6 +8,7 @@ import {
   UserInputError,
 } from '@vendure/core';
 import { FinancialService } from '../financial/financial.service';
+import { LedgerTransactionService } from '../financial/ledger-transaction.service';
 
 /**
  * Order Payment Service
@@ -22,7 +23,8 @@ export class OrderPaymentService {
   constructor(
     private readonly orderService: OrderService,
     private readonly paymentService: PaymentService,
-    private readonly financialService: FinancialService
+    private readonly financialService: FinancialService,
+    private readonly ledgerTransactionService: LedgerTransactionService
   ) {}
 
   /**
@@ -101,7 +103,21 @@ export class OrderPaymentService {
     }
 
     try {
-      await this.financialService.recordPayment(ctx, settledPayment, order);
+      // Post cash sale to ledger automatically (single source of truth)
+      const transactionData = {
+        ctx,
+        sourceId: settledPayment.id.toString(),
+        channelId: ctx.channelId as number,
+        payment: settledPayment,
+        order,
+        isCreditSale: false as const,
+      };
+
+      const result = await this.ledgerTransactionService.postTransaction(transactionData);
+      if (!result.success) {
+        throw new Error(`Failed to post payment to ledger: ${result.error}`);
+      }
+
       this.logger.log(
         `Posted payment ${settledPayment.id} to ledger for order ${order.code} (amount: ${settledPayment.amount})`
       );

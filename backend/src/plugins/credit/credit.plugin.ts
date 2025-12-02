@@ -10,6 +10,9 @@ import { ChartOfAccountsService } from '../../services/financial/chart-of-accoun
 import { FinancialService } from '../../services/financial/financial.service';
 import { LedgerPostingService } from '../../services/financial/ledger-posting.service';
 import { LedgerQueryService } from '../../services/financial/ledger-query.service';
+import { LedgerTransactionService } from '../../services/financial/ledger-transaction.service';
+import { PurchasePostingStrategy } from '../../services/financial/strategies/purchase-posting.strategy';
+import { SalePostingStrategy } from '../../services/financial/strategies/sale-posting.strategy';
 import { OrderAddressService } from '../../services/orders/order-address.service';
 import { OrderCreationService } from '../../services/orders/order-creation.service';
 import { OrderCreditValidatorService } from '../../services/orders/order-credit-validator.service';
@@ -209,6 +212,10 @@ const COMBINED_SCHEMA = gql`
     // Financial services (ledger infrastructure)
     LedgerQueryService,
     LedgerPostingService,
+    // Ledger transaction framework
+    PurchasePostingStrategy,
+    SalePostingStrategy,
+    LedgerTransactionService,
     FinancialService,
     ChartOfAccountsService,
     // Credit services
