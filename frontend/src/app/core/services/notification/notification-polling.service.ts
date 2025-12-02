@@ -1,4 +1,4 @@
-import { Injectable, effect, inject } from '@angular/core';
+import { Injectable, effect, inject, Injector } from '@angular/core';
 import {
   GetUnreadCountDocument,
   GetUserNotificationsDocument,
@@ -23,8 +23,16 @@ import { NotificationStateService } from './notification-state.service';
 })
 export class NotificationPollingService {
   private readonly apolloService = inject(ApolloService);
-  private readonly authService = inject(AuthService);
+  private readonly injector = inject(Injector);
   private readonly stateService = inject(NotificationStateService);
+
+  /**
+   * Lazy getter for AuthService to break circular dependency
+   * AuthService -> AuthLoginService -> AppInitService -> NotificationService -> NotificationPollingService -> AuthService
+   */
+  private get authService(): AuthService {
+    return this.injector.get(AuthService);
+  }
 
   private pollingInterval?: number;
   private consecutiveFailures = 0;

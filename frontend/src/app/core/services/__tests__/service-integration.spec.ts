@@ -7,6 +7,7 @@
 
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { SwPush } from '@angular/service-worker';
 import { ApolloService } from '../apollo.service';
 import { AuthService } from '../auth.service';
 import { CompanyService } from '../company.service';
@@ -17,8 +18,23 @@ describe('Service Integration', () => {
   let apolloService: ApolloService;
 
   beforeEach(() => {
+    const mockSwPush = {
+      isEnabled: false,
+      messages: { subscribe: () => ({ unsubscribe: () => {} }) },
+      notificationClicks: { subscribe: () => ({ unsubscribe: () => {} }) },
+      subscription: { toPromise: () => Promise.resolve(null) },
+      requestSubscription: () => Promise.reject(new Error('Not enabled in tests')),
+      unsubscribe: () => Promise.resolve(),
+    };
+
     TestBed.configureTestingModule({
-      providers: [provideZonelessChangeDetection(), AuthService, CompanyService, ApolloService],
+      providers: [
+        provideZonelessChangeDetection(),
+        AuthService,
+        CompanyService,
+        ApolloService,
+        { provide: SwPush, useValue: mockSwPush },
+      ],
     });
 
     authService = TestBed.inject(AuthService);
