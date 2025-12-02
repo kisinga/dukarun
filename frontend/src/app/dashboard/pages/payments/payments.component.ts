@@ -53,7 +53,6 @@ export class PaymentsComponent implements OnInit {
   // Local UI state
   readonly searchQuery = signal('');
   readonly stateFilter = signal('');
-  readonly stateFilterColor = signal<string>('primary');
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
@@ -69,20 +68,7 @@ export class PaymentsComponent implements OnInit {
 
     // Apply state filter
     if (stateFilter) {
-      // Handle "Pending" filter which includes both Created and Authorized
-      if (stateFilter === 'Created') {
-        filtered = filtered.filter(
-          (payment) => payment.state === 'Created' || payment.state === 'Authorized',
-        );
-      }
-      // Handle "Failed" filter which includes both Declined and Cancelled
-      else if (stateFilter === 'Declined') {
-        filtered = filtered.filter(
-          (payment) => payment.state === 'Declined' || payment.state === 'Cancelled',
-        );
-      } else {
-        filtered = filtered.filter((payment) => payment.state === stateFilter);
-      }
+      filtered = filtered.filter((payment) => payment.state === stateFilter);
     }
 
     // Apply search query
@@ -206,44 +192,6 @@ export class PaymentsComponent implements OnInit {
    */
   trackByPaymentId(index: number, payment: PaymentWithOrder): string {
     return payment.id;
-  }
-
-  /**
-   * Handle filter click from stats component
-   */
-  onStatsFilterClick(event: { type: string; value: string; color: string }): void {
-    if (event.type === 'state') {
-      // Toggle filter if clicking the same filter
-      if (this.stateFilter() === event.value) {
-        this.stateFilter.set('');
-        this.stateFilterColor.set('primary');
-      } else {
-        this.stateFilter.set(event.value);
-        this.stateFilterColor.set(event.color);
-      }
-      // Reset to first page when filter changes
-      this.currentPage.set(1);
-    }
-  }
-
-  /**
-   * Clear state filter
-   */
-  clearStateFilter(): void {
-    this.stateFilter.set('');
-    this.stateFilterColor.set('primary');
-    this.currentPage.set(1);
-  }
-
-  /**
-   * Get filter label for display
-   */
-  getStateFilterLabel(): string {
-    const filter = this.stateFilter();
-    if (filter === 'Settled') return 'Successful';
-    if (filter === 'Created') return 'Pending';
-    if (filter === 'Declined') return 'Failed';
-    return '';
   }
 
   /**

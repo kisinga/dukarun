@@ -63,14 +63,6 @@ export class SuppliersComponent implements OnInit {
 
   // Local UI state
   readonly searchQuery = signal('');
-  readonly verifiedFilter = signal(false);
-  readonly withAddressesFilter = signal(false);
-  readonly recentFilter = signal(false);
-  readonly activeFilterColors = signal<{
-    verified?: string;
-    withAddresses?: string;
-    recent?: string;
-  }>({});
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
@@ -81,33 +73,8 @@ export class SuppliersComponent implements OnInit {
   // Computed: filtered suppliers
   readonly filteredSuppliers = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
-    const verified = this.verifiedFilter();
-    const withAddresses = this.withAddressesFilter();
-    const recent = this.recentFilter();
-    let allSuppliers = this.suppliers();
+    const allSuppliers = this.suppliers();
 
-    // Apply verified filter
-    if (verified) {
-      allSuppliers = allSuppliers.filter((s) => s.user?.verified);
-    }
-
-    // Apply with addresses filter
-    if (withAddresses) {
-      allSuppliers = allSuppliers.filter((s) => s.addresses && s.addresses.length > 0);
-    }
-
-    // Apply recent filter (last 30 days)
-    if (recent) {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      allSuppliers = allSuppliers.filter((s) => {
-        if (!s.createdAt) return false;
-        const createdAt = new Date(s.createdAt);
-        return createdAt >= thirtyDaysAgo;
-      });
-    }
-
-    // Apply search query
     if (!query) return allSuppliers;
 
     return allSuppliers.filter(
@@ -301,47 +268,6 @@ export class SuppliersComponent implements OnInit {
    */
   onDeleteRequested(supplierId: string): void {
     this.confirmDeleteSupplier(supplierId);
-  }
-
-  /**
-   * Handle filter click from stats component
-   */
-  onStatsFilterClick(event: { type: string; color: string }): void {
-    const { type, color } = event;
-    const colors = this.activeFilterColors();
-    if (type === 'verified') {
-      const newValue = !this.verifiedFilter();
-      this.verifiedFilter.set(newValue);
-      this.activeFilterColors.set({ ...colors, verified: newValue ? color : undefined });
-    } else if (type === 'withAddresses') {
-      const newValue = !this.withAddressesFilter();
-      this.withAddressesFilter.set(newValue);
-      this.activeFilterColors.set({ ...colors, withAddresses: newValue ? color : undefined });
-    } else if (type === 'recent') {
-      const newValue = !this.recentFilter();
-      this.recentFilter.set(newValue);
-      this.activeFilterColors.set({ ...colors, recent: newValue ? color : undefined });
-    }
-    // Reset to first page when filter changes
-    this.currentPage.set(1);
-  }
-
-  /**
-   * Clear a specific filter
-   */
-  clearFilter(type: string): void {
-    const colors = this.activeFilterColors();
-    if (type === 'verified') {
-      this.verifiedFilter.set(false);
-      this.activeFilterColors.set({ ...colors, verified: undefined });
-    } else if (type === 'withAddresses') {
-      this.withAddressesFilter.set(false);
-      this.activeFilterColors.set({ ...colors, withAddresses: undefined });
-    } else if (type === 'recent') {
-      this.recentFilter.set(false);
-      this.activeFilterColors.set({ ...colors, recent: undefined });
-    }
-    this.currentPage.set(1);
   }
 
   /**

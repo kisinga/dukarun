@@ -186,7 +186,7 @@ export class ProductSearchService {
           items: any[];
         };
       }>({
-        query: SEARCH_BY_BARCODE,
+        query: SEARCH_BY_BARCODE as any,
         variables: { barcode: barcode },
       });
 

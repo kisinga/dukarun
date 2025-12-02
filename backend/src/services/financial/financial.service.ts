@@ -269,7 +269,7 @@ export class FinancialService {
   }
 
   /**
-   * Record a supplier purchase (credit or cash purchase)
+   * Record a supplier purchase (credit purchase)
    * Must be called within the same transaction as purchase creation
    */
   async recordPurchase(
@@ -277,8 +277,7 @@ export class FinancialService {
     purchaseId: string,
     purchaseReference: string,
     supplierId: string,
-    totalCost: number,
-    isCreditPurchase: boolean
+    totalCost: number
   ): Promise<void> {
     if (totalCost <= 0) {
       throw new Error(
@@ -290,18 +289,14 @@ export class FinancialService {
       purchaseId,
       purchaseReference,
       supplierId,
-      isCreditPurchase,
+      isCreditPurchase: true,
     };
 
     await this.postingService.postSupplierPurchase(ctx, purchaseId, context);
 
     // Invalidate cache
     this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.PURCHASES);
-    if (isCreditPurchase) {
-      this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.ACCOUNTS_PAYABLE);
-    } else {
-      this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.CASH_ON_HAND);
-    }
+    this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.ACCOUNTS_PAYABLE);
   }
 
   /**

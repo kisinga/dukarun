@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { OrderStateBadgeComponent } from './order-state-badge.component';
@@ -27,16 +27,9 @@ export interface OrderTableRowData {
       name: string;
     };
   }>;
-  payments?: Array<{
-    id: string;
-    state: string;
-    amount: number;
-    method: string;
-    createdAt: string;
-  }> | null;
 }
 
-export type OrderAction = 'view' | 'print' | 'pay';
+export type OrderAction = 'view' | 'print';
 
 /**
  * Order Table Row Component for desktop view
@@ -73,14 +66,6 @@ export type OrderAction = 'view' | 'print' | 'pay';
         >
           View
         </button>
-        @if (canPay()) {
-          <button
-            class="btn btn-sm btn-success"
-            (click)="onAction('pay'); $event.preventDefault(); $event.stopPropagation()"
-          >
-            Pay
-          </button>
-        }
         @if (canPrint()) {
           <button
             class="btn btn-sm btn-primary"
@@ -129,25 +114,6 @@ export class OrderTableRowComponent {
     const state = this.order().state;
     return state !== 'Draft';
   }
-
-  readonly canPay = computed(() => {
-    const order = this.order();
-    // Only show pay button for unpaid credit orders
-    if (order.state !== 'ArrangingPayment') return false;
-    if (!order.customer) return false; // Credit orders have customers
-
-    // Check if order has outstanding balance
-    const payments = order.payments || [];
-    const settledPayments = payments
-      .filter((p: any) => p.state === 'Settled')
-      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-
-    const orderTotal = order.totalWithTax || order.total || 0;
-    const outstandingAmount = orderTotal - settledPayments;
-
-    // Only show if there's outstanding balance
-    return outstandingAmount > 0;
-  });
 
   onAction(actionType: OrderAction): void {
     this.action.emit({ action: actionType, orderId: this.order().id });

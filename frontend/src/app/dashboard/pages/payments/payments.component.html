@@ -3,7 +3,9 @@
   <div class="flex items-start justify-between gap-4">
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Payments</h1>
-      <p class="text-sm text-base-content/60 mt-1">View and manage all payments</p>
+      <p class="text-sm text-base-content/60 mt-1">
+        View and manage all payments
+      </p>
     </div>
 
     <div class="flex gap-2 shrink-0">
@@ -34,20 +36,10 @@
   </div>
 
   <!-- Statistics Cards -->
-  <app-payment-stats
-    [stats]="stats()"
-    [activeStateFilter]="stateFilter()"
-    (filterClick)="onStatsFilterClick($event)"
-  />
+  <app-payment-stats [stats]="stats()" />
 
   <!-- Search & Filter Bar -->
-  <app-payment-search-bar
-    [(searchQuery)]="searchQuery"
-    [(stateFilter)]="stateFilter"
-    [activeStateFilter]="stateFilter()"
-    [filterColor]="stateFilterColor()"
-    (clearStateFilter)="clearStateFilter()"
-  />
+  <app-payment-search-bar [(searchQuery)]="searchQuery" [(stateFilter)]="stateFilter" />
 
   <!-- Error Alert -->
   @if (error()) {

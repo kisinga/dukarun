@@ -27,7 +27,9 @@
   <div class="flex items-start justify-between gap-4">
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Customers</h1>
-      <p class="text-sm text-base-content/60 mt-1">Manage your customer database</p>
+      <p class="text-sm text-base-content/60 mt-1">
+        Manage your customer database
+      </p>
     </div>
 
     <div class="flex gap-2 shrink-0">
@@ -78,27 +80,12 @@
   </div>
 
   <!-- Statistics Cards -->
-  <app-customer-stats
-    [stats]="stats()"
-    [activeFilters]="{
-      verified: verifiedFilter(),
-      creditApproved: creditApprovedFilter(),
-      recent: recentFilter(),
-    }"
-    (filterClick)="onStatsFilterClick($event)"
-  />
+  <app-customer-stats [stats]="stats()" />
 
   <!-- Search Bar -->
   <app-customer-search-bar
     [searchQuery]="searchQuery()"
     (searchChange)="searchQuery.set($event)"
-    [activeFilters]="{
-      verified: verifiedFilter(),
-      creditApproved: creditApprovedFilter(),
-      recent: recentFilter(),
-    }"
-    [filterColors]="activeFilterColors()"
-    (clearFilter)="clearFilter($event.type)"
   />
 
   <!-- Error Alert -->

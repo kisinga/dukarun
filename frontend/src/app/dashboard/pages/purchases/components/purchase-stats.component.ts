@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 
 export interface PurchaseStats {
@@ -22,15 +22,9 @@ export interface PurchaseStats {
 export class PurchaseStatsComponent {
   private readonly currencyService = inject(CurrencyService);
   readonly stats = input.required<PurchaseStats>();
-  readonly pendingPaymentsActive = input<boolean>(false);
-  readonly pendingPaymentsClick = output<void>();
 
   formatCurrency(amount: number): string {
     // totalValue is in cents, convert to currency format
     return this.currencyService.format(amount);
-  }
-
-  onPendingPaymentsClick(): void {
-    this.pendingPaymentsClick.emit();
   }
 }

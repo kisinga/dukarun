@@ -1,0 +1,50 @@
+<vdr-page-block>
+  <div class="page-header">
+    <h1>Subscription Tiers</h1>
+    <vdr-button (click)="createNew()" class="btn-primary">
+      <clr-icon shape="plus"></clr-icon>
+      Create Tier
+    </vdr-button>
+  </div>
+
+  <vdr-data-table
+    [items]="tiers$ | async"
+    [itemsPerPage]="itemsPerPage"
+    [totalItems]="totalItems$ | async"
+    [currentPage]="currentPage"
+    (pageChange)="setPageNumber($event)"
+    (itemsPerPageChange)="setItemsPerPage($event)"
+  >
+    <vdr-dt-column>Code</vdr-dt-column>
+    <vdr-dt-column>Name</vdr-dt-column>
+    <vdr-dt-column>Monthly Price</vdr-dt-column>
+    <vdr-dt-column>Yearly Price</vdr-dt-column>
+    <vdr-dt-column>Status</vdr-dt-column>
+    <vdr-dt-column>Actions</vdr-dt-column>
+
+    <vdr-dt-row *vdrDtrFor="let tier of tiers$ | async">
+      <vdr-dt-cell>{{ tier.code }}</vdr-dt-cell>
+      <vdr-dt-cell>{{ tier.name }}</vdr-dt-cell>
+      <vdr-dt-cell>{{ formatPrice(tier.priceMonthly) }}</vdr-dt-cell>
+      <vdr-dt-cell>{{ formatPrice(tier.priceYearly) }}</vdr-dt-cell>
+      <vdr-dt-cell>
+        <vdr-chip [colorType]="tier.isActive ? 'success' : 'warning'">
+          {{ tier.isActive ? 'Active' : 'Inactive' }}
+        </vdr-chip>
+      </vdr-dt-cell>
+      <vdr-dt-cell>
+        <vdr-action-bar>
+          <vdr-action-bar-items>
+            <vdr-button (click)="editTier(tier)" size="small">
+              Edit
+            </vdr-button>
+            <vdr-button (click)="deleteTier(tier)" size="small" [disabled]="!tier.isActive">
+              Delete
+            </vdr-button>
+          </vdr-action-bar-items>
+        </vdr-action-bar>
+      </vdr-dt-cell>
+    </vdr-dt-row>
+  </vdr-data-table>
+</vdr-page-block>
+

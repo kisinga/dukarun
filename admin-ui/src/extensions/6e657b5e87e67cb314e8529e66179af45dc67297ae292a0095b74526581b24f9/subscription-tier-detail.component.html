@@ -1,0 +1,73 @@
+<vdr-page-block>
+  <div class="page-header">
+    <h1>{{ isNew ? 'Create' : 'Edit' }} Subscription Tier</h1>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="save()">
+    <vdr-form-field label="Code" [required]="true">
+      <input
+        type="text"
+        formControlName="code"
+        [readonly]="!isNew"
+        class="form-control"
+      />
+      <vdr-form-field-error [field]="form.get('code')"></vdr-form-field-error>
+    </vdr-form-field>
+
+    <vdr-form-field label="Name" [required]="true">
+      <input type="text" formControlName="name" class="form-control" />
+      <vdr-form-field-error [field]="form.get('name')"></vdr-form-field-error>
+    </vdr-form-field>
+
+    <vdr-form-field label="Description">
+      <textarea
+        formControlName="description"
+        class="form-control"
+        rows="3"
+      ></textarea>
+    </vdr-form-field>
+
+    <vdr-form-field label="Monthly Price (in cents)" [required]="true">
+      <input
+        type="number"
+        formControlName="priceMonthly"
+        class="form-control"
+        min="0"
+      />
+      <vdr-form-field-error [field]="form.get('priceMonthly')"></vdr-form-field-error>
+    </vdr-form-field>
+
+    <vdr-form-field label="Yearly Price (in cents)" [required]="true">
+      <input
+        type="number"
+        formControlName="priceYearly"
+        class="form-control"
+        min="0"
+      />
+      <vdr-form-field-error [field]="form.get('priceYearly')"></vdr-form-field-error>
+    </vdr-form-field>
+
+    <vdr-form-field label="Features (JSON)">
+      <textarea
+        formControlName="features"
+        class="form-control"
+        rows="5"
+        placeholder='{"features": ["Feature 1", "Feature 2"]}'
+      ></textarea>
+    </vdr-form-field>
+
+    <vdr-form-field label="Active">
+      <vdr-toggle formControlName="isActive"></vdr-toggle>
+    </vdr-form-field>
+
+    <div class="button-group">
+      <vdr-button type="submit" [disabled]="form.invalid" class="btn-primary">
+        Save
+      </vdr-button>
+      <vdr-button type="button" (click)="cancel()" class="btn-secondary">
+        Cancel
+      </vdr-button>
+    </div>
+  </form>
+</vdr-page-block>
+

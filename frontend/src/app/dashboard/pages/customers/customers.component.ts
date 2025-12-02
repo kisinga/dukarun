@@ -66,14 +66,6 @@ export class CustomersComponent implements OnInit {
 
   // Local UI state
   readonly searchQuery = signal('');
-  readonly verifiedFilter = signal(false);
-  readonly creditApprovedFilter = signal(false);
-  readonly recentFilter = signal(false);
-  readonly activeFilterColors = signal<{
-    verified?: string;
-    creditApproved?: string;
-    recent?: string;
-  }>({});
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
@@ -90,33 +82,8 @@ export class CustomersComponent implements OnInit {
   // Computed: filtered customers
   readonly filteredCustomers = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
-    const verified = this.verifiedFilter();
-    const creditApproved = this.creditApprovedFilter();
-    const recent = this.recentFilter();
-    let allCustomers = this.customers();
+    const allCustomers = this.customers();
 
-    // Apply verified filter
-    if (verified) {
-      allCustomers = allCustomers.filter((c) => c.user?.verified);
-    }
-
-    // Apply credit approved filter
-    if (creditApproved) {
-      allCustomers = allCustomers.filter((c) => c.customFields?.isCreditApproved);
-    }
-
-    // Apply recent filter (last 30 days)
-    if (recent) {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      allCustomers = allCustomers.filter((c) => {
-        if (!c.createdAt) return false;
-        const createdAt = new Date(c.createdAt);
-        return createdAt >= thirtyDaysAgo;
-      });
-    }
-
-    // Apply search query
     if (!query) return allCustomers;
 
     return allCustomers.filter(
@@ -389,57 +356,6 @@ export class CustomersComponent implements OnInit {
    */
   onViewOrdersRequested(customerId: string): void {
     this.router.navigate(['/dashboard/orders'], { queryParams: { customerId } });
-  }
-
-  /**
-   * Handle filter click from stats component
-   */
-  onStatsFilterClick(event: { type: string; color: string }): void {
-    const { type, color } = event;
-    const colors = this.activeFilterColors();
-    if (type === 'verified') {
-      const newValue = !this.verifiedFilter();
-      this.verifiedFilter.set(newValue);
-      this.activeFilterColors.set({ ...colors, verified: newValue ? color : undefined });
-    } else if (type === 'creditApproved') {
-      const newValue = !this.creditApprovedFilter();
-      this.creditApprovedFilter.set(newValue);
-      this.activeFilterColors.set({ ...colors, creditApproved: newValue ? color : undefined });
-    } else if (type === 'recent') {
-      const newValue = !this.recentFilter();
-      this.recentFilter.set(newValue);
-      this.activeFilterColors.set({ ...colors, recent: newValue ? color : undefined });
-    }
-    // Reset to first page when filter changes
-    this.currentPage.set(1);
-  }
-
-  /**
-   * Clear a specific filter
-   */
-  clearFilter(type: string): void {
-    const colors = this.activeFilterColors();
-    if (type === 'verified') {
-      this.verifiedFilter.set(false);
-      this.activeFilterColors.set({ ...colors, verified: undefined });
-    } else if (type === 'creditApproved') {
-      this.creditApprovedFilter.set(false);
-      this.activeFilterColors.set({ ...colors, creditApproved: undefined });
-    } else if (type === 'recent') {
-      this.recentFilter.set(false);
-      this.activeFilterColors.set({ ...colors, recent: undefined });
-    }
-    this.currentPage.set(1);
-  }
-
-  /**
-   * Get filter label for display
-   */
-  getFilterLabel(type: string): string {
-    if (type === 'verified') return 'Verified';
-    if (type === 'creditApproved') return 'Credit Approved';
-    if (type === 'recent') return 'Recent';
-    return '';
   }
 
   /**

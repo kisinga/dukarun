@@ -221,21 +221,15 @@ export function createPaymentAllocationEntry(context: PaymentPostingContext): Jo
 }
 
 /**
- * Generate journal entry template for supplier purchase (credit or cash)
+ * Generate journal entry template for supplier credit purchase
  *
  * Debits: Purchases account (expense increase)
- * Credits:
- *   - Accounts Payable (liability increase - we owe supplier) for credit purchases
- *   - Cash on Hand (asset decrease - cash paid out) for cash purchases
+ * Credits: Accounts Payable (liability increase - we owe supplier)
  */
 export function createSupplierPurchaseEntry(context: PurchasePostingContext): JournalEntryTemplate {
-  const creditAccount = context.isCreditPurchase
-    ? ACCOUNT_CODES.ACCOUNTS_PAYABLE
-    : ACCOUNT_CODES.CASH_ON_HAND;
-
-  const memo = context.isCreditPurchase
-    ? `Credit purchase ${context.purchaseReference}`
-    : `Cash purchase ${context.purchaseReference}`;
+  if (!context.isCreditPurchase) {
+    throw new Error('createSupplierPurchaseEntry called for non-credit purchase');
+  }
 
   return {
     lines: [
@@ -249,7 +243,7 @@ export function createSupplierPurchaseEntry(context: PurchasePostingContext): Jo
         },
       },
       {
-        accountCode: creditAccount,
+        accountCode: ACCOUNT_CODES.ACCOUNTS_PAYABLE,
         credit: context.amount,
         meta: {
           purchaseId: context.purchaseId,
@@ -258,7 +252,7 @@ export function createSupplierPurchaseEntry(context: PurchasePostingContext): Jo
         },
       },
     ],
-    memo,
+    memo: `Credit purchase ${context.purchaseReference}`,
   };
 }
 

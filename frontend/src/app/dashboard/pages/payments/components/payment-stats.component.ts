@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 export interface PaymentStats {
   totalPayments: number;
@@ -51,13 +51,7 @@ export interface PaymentStats {
       </div>
 
       <!-- Successful Payments -->
-      <div
-        class="card bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
-        [class.ring-2]="activeStateFilter() === 'Settled'"
-        [class.ring-primary]="activeStateFilter() === 'Settled'"
-        [class.bg-primary/20]="activeStateFilter() === 'Settled'"
-        (click)="onFilterClick('Settled')"
-      >
+      <div class="card bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -87,13 +81,7 @@ export interface PaymentStats {
       </div>
 
       <!-- Pending Payments -->
-      <div
-        class="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
-        [class.ring-2]="activeStateFilter() === 'Created'"
-        [class.ring-primary]="activeStateFilter() === 'Created'"
-        [class.bg-primary/20]="activeStateFilter() === 'Created'"
-        (click)="onFilterClick('Created')"
-      >
+      <div class="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
@@ -123,13 +111,7 @@ export interface PaymentStats {
       </div>
 
       <!-- Failed Payments -->
-      <div
-        class="card bg-gradient-to-br from-error/10 to-error/5 border border-error/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
-        [class.ring-2]="activeStateFilter() === 'Declined'"
-        [class.ring-primary]="activeStateFilter() === 'Declined'"
-        [class.bg-primary/20]="activeStateFilter() === 'Declined'"
-        (click)="onFilterClick('Declined')"
-      >
+      <div class="card bg-gradient-to-br from-error/10 to-error/5 border border-error/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-error/10 flex items-center justify-center shrink-0">
@@ -162,16 +144,4 @@ export interface PaymentStats {
 })
 export class PaymentStatsComponent {
   readonly stats = input.required<PaymentStats>();
-  readonly activeStateFilter = input<string>('');
-  readonly filterClick = output<{ type: string; value: string; color: string }>();
-
-  onFilterClick(value: string): void {
-    // Map filter values to their badge colors
-    const colorMap: Record<string, string> = {
-      Settled: 'primary',
-      Created: 'warning',
-      Declined: 'error',
-    };
-    this.filterClick.emit({ type: 'state', value, color: colorMap[value] || 'primary' });
-  }
 }
