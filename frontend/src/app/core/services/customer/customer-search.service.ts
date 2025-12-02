@@ -4,6 +4,8 @@ import { ApolloService } from '../apollo.service';
 import { CustomerInput } from '../customer.service';
 import { CustomerApiService } from './customer-api.service';
 import { CustomerStateService } from './customer-state.service';
+import { formatPhoneNumber } from '../../utils/phone.utils';
+import { generateEmailFromPhone } from '../../utils/email.utils';
 
 /**
  * Customer Search Service
@@ -92,19 +94,73 @@ export class CustomerSearchService {
   }
 
   /**
+   * Find a customer by phone number
+   *
+   * @param phone - Phone number (will be normalized)
+   * @returns Customer if found, null otherwise
+   */
+  async findCustomerByPhone(phone: string): Promise<any | null> {
+    if (!phone || typeof phone !== 'string') {
+      return null;
+    }
+
+    try {
+      // Normalize phone number for consistent lookup
+      const normalizedPhone = formatPhoneNumber(phone);
+
+      const client = this.apolloService.getClient();
+      const result = await client.query<any>({
+        query: GET_CUSTOMERS,
+        variables: {
+          options: {
+            take: 1,
+            skip: 0,
+            filter: {
+              phoneNumber: { eq: normalizedPhone },
+            },
+          },
+        },
+        fetchPolicy: 'network-only',
+      });
+
+      const items = result.data?.customers?.items || [];
+      return items.length > 0 ? items[0] : null;
+    } catch (error) {
+      console.error('Failed to find customer by phone:', error);
+      return null;
+    }
+  }
+
+  /**
    * Quickly create a customer record for checkout flows.
+   *
+   * Checks for existing customer by phone number first to prevent duplicates.
+   * If no email is provided, generates one from the phone number.
    */
   async quickCreateCustomer(input: {
     name: string;
     phone: string;
     email?: string;
   }): Promise<string | null> {
+    // Normalize phone number
+    const normalizedPhone = formatPhoneNumber(input.phone);
+
+    // Check if customer with this phone number already exists
+    const existingCustomer = await this.findCustomerByPhone(normalizedPhone);
+    if (existingCustomer) {
+      console.log('✅ Found existing customer by phone:', existingCustomer.id);
+      return existingCustomer.id;
+    }
+
+    // Generate email from phone if not provided
+    const emailAddress = input.email?.trim() || generateEmailFromPhone(normalizedPhone);
+
     const { firstName, lastName } = this.splitName(input.name);
     return this.apiService.createCustomer({
       firstName,
       lastName,
-      emailAddress: input.email || '',
-      phoneNumber: input.phone,
+      emailAddress,
+      phoneNumber: normalizedPhone,
     });
   }
 
