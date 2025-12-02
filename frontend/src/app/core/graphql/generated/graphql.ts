@@ -5309,6 +5309,8 @@ export type PaginatedList = {
 export type PaySingleOrderInput = {
   orderId: Scalars['ID']['input'];
   paymentAmount?: InputMaybe<Scalars['Float']['input']>;
+  paymentMethodCode?: InputMaybe<Scalars['String']['input']>;
+  referenceNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Payment = Node & {

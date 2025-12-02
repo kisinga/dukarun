@@ -269,16 +269,25 @@ export class PaymentAllocationService {
   async paySingleOrder(
     ctx: RequestContext,
     orderId: string,
-    paymentAmount?: number // In base currency units (shillings), optional - defaults to outstanding amount
+    paymentAmount?: number, // In base currency units (shillings), optional - defaults to outstanding amount
+    paymentMethodCode?: string, // Payment method code (optional, defaults to credit)
+    referenceNumber?: string // Payment reference number (optional)
   ): Promise<PaymentAllocationResult> {
     // Get the order to find the customer
-    const order = await this.orderService.findOne(ctx, orderId, ['customer']);
+    const order = await this.orderService.findOne(ctx, orderId, ['customer', 'payments']);
     if (!order) {
       throw new UserInputError(`Order ${orderId} not found`);
     }
 
     if (!order.customer) {
       throw new UserInputError(`Order ${orderId} has no customer associated`);
+    }
+
+    // Check if the order is in a state that allows payment
+    if (!['ArrangingPayment', 'Fulfilled', 'PartiallyFulfilled'].includes(order.state)) {
+      throw new UserInputError(
+        `Order ${order.code} is in state "${order.state}" and cannot be paid. Only orders in "ArrangingPayment", "Fulfilled", or "PartiallyFulfilled" states can be paid.`
+      );
     }
 
     // Calculate outstanding amount for this order
@@ -291,6 +300,10 @@ export class PaymentAllocationService {
     const outstandingAmount = orderTotal - settledPayments;
     const outstandingAmountInShillings = outstandingAmount / 100;
 
+    if (outstandingAmount <= 0) {
+      throw new UserInputError(`Order ${order.code} has no outstanding payment.`);
+    }
+
     // Use the outstanding amount as payment amount if not specified, or validate payment amount
     const actualPaymentAmount = paymentAmount ?? outstandingAmountInShillings;
 
@@ -300,11 +313,200 @@ export class PaymentAllocationService {
       );
     }
 
-    // Use the existing bulk payment method with single order
-    return this.allocatePaymentToOrders(ctx, {
-      customerId: order.customer.id.toString(),
-      paymentAmount: actualPaymentAmount,
-      orderIds: [orderId],
+    // Store customer ID before transaction (TypeScript safety)
+    const customerId = order.customer.id.toString();
+
+    // Use payment method code if provided, otherwise default to credit
+    const actualPaymentMethodCode = paymentMethodCode || PAYMENT_METHOD_CODES.CREDIT;
+
+    // Prepare metadata with reference number if provided
+    const metadata: Record<string, any> = {
+      paymentType: 'credit',
+      customerId: customerId,
+      allocatedAmount: actualPaymentAmount * 100, // Convert back to cents for internal use
+    };
+    if (referenceNumber) {
+      metadata.referenceNumber = referenceNumber;
+    }
+
+    // Use the existing bulk payment method with single order, but we need to pass payment method
+    // Since allocatePaymentToOrders doesn't accept payment method, we'll handle it directly here
+    return this.connection.withTransaction(ctx, async transactionCtx => {
+      const paymentAmountInCents = Math.round(actualPaymentAmount * 100);
+
+      // Add payment to order using OrderService.addManualPaymentToOrder
+      const paymentResult = await this.orderService.addManualPaymentToOrder(transactionCtx, {
+        orderId: order.id,
+        method: actualPaymentMethodCode,
+        metadata,
+      });
+
+      if (paymentResult && 'errorCode' in paymentResult) {
+        throw new UserInputError(
+          `Failed to add payment: ${paymentResult.message || paymentResult.errorCode}`
+        );
+      }
+
+      // Use the order from the result if available, otherwise fetch it
+      // The result should contain the order with payments
+      let updatedOrder = paymentResult && 'id' in paymentResult ? paymentResult : null;
+
+      // Always fetch fresh order with payments to ensure we have the latest state
+      // The paymentResult might not have payments loaded
+      updatedOrder =
+        (await this.orderService.findOne(transactionCtx, order.id, ['payments'])) || null;
+
+      if (!updatedOrder) {
+        this.logger.error(`Order ${order.code} (${order.id}) not found after adding payment`);
+        throw new UserInputError('Failed to retrieve order after payment creation');
+      }
+
+      if (!updatedOrder.payments) {
+        this.logger.error(
+          `Order ${order.code} (${order.id}) has no payments array after adding payment`
+        );
+        throw new UserInputError('Failed to retrieve payments after creation');
+      }
+
+      if (updatedOrder.payments.length === 0) {
+        this.logger.error(
+          `Order ${order.code} (${order.id}) has empty payments array after adding payment`
+        );
+        throw new UserInputError('No payments found after creation');
+      }
+
+      // Find the payment that was just added
+      // Cash payments are created as "Settled" immediately, so we need to handle both settled and unsettled payments
+      // Try multiple strategies to find the payment:
+      // 1. Match by method, amount, and metadata (most specific) - allow settled for cash
+      // 2. Match by method and amount (fallback) - allow settled for cash
+      // 3. Match by method and most recent (last resort) - allow settled for cash
+      let payment = updatedOrder.payments.find(
+        p =>
+          p.method === actualPaymentMethodCode &&
+          p.amount === paymentAmountInCents &&
+          p.metadata?.allocatedAmount === paymentAmountInCents
+      );
+
+      if (!payment) {
+        // Fallback: match by method and amount (allow settled for cash payments)
+        payment = updatedOrder.payments.find(
+          p => p.method === actualPaymentMethodCode && p.amount === paymentAmountInCents
+        );
+      }
+
+      if (!payment) {
+        // Last resort: find most recent payment with matching method
+        // Sort by createdAt descending and take the first match
+        const matchingPayments = updatedOrder.payments
+          .filter(p => p.method === actualPaymentMethodCode)
+          .sort((a, b) => {
+            const aTime = a.createdAt?.getTime() || 0;
+            const bTime = b.createdAt?.getTime() || 0;
+            return bTime - aTime; // Most recent first
+          });
+        payment = matchingPayments[0];
+      }
+
+      if (!payment) {
+        this.logger.error(
+          `Payment not found after creation. Order: ${order.code}, Method: ${actualPaymentMethodCode}, Amount: ${paymentAmountInCents}`
+        );
+        this.logger.error(
+          `Available payments: ${JSON.stringify(
+            updatedOrder.payments.map(p => ({
+              id: p.id,
+              method: p.method,
+              amount: p.amount,
+              state: p.state,
+              metadata: p.metadata,
+            }))
+          )}`
+        );
+        throw new UserInputError('Payment not found after creation');
+      }
+
+      // Settle the payment only if it's not already settled
+      // Cash payments are already settled when created
+      if (payment.state !== 'Settled') {
+        await this.paymentService.settlePayment(transactionCtx, payment.id);
+      }
+
+      // Post to ledger via FinancialService
+      await this.financialService.recordPaymentAllocation(
+        transactionCtx,
+        payment.id.toString(),
+        updatedOrder,
+        actualPaymentMethodCode,
+        paymentAmountInCents
+      );
+
+      // Update order custom fields for user tracking
+      await this.updateOrderCustomFields(transactionCtx, order.id, {
+        lastModifiedByUserId: transactionCtx.activeUserId || undefined,
+      });
+
+      // Calculate remaining balance
+      const remainingUnpaidOrders = await this.getUnpaidOrdersForCustomer(
+        transactionCtx,
+        customerId
+      );
+
+      const remainingItems = remainingUnpaidOrders.map(o => {
+        const settled = (o.payments || [])
+          .filter(p => p.state === 'Settled')
+          .reduce((sum, p) => sum + p.amount, 0);
+        const total = o.totalWithTax || o.total;
+        return {
+          id: o.id.toString(),
+          code: o.code,
+          totalAmount: total,
+          paidAmount: settled,
+          createdAt: o.createdAt,
+        };
+      });
+
+      const remainingBalance = calculateRemainingBalance(remainingItems) / 100;
+
+      // Log audit event
+      if (this.auditService) {
+        await this.auditService.log(transactionCtx, 'credit.payment.allocated', {
+          entityType: 'Customer',
+          entityId: customerId,
+          data: {
+            paymentAmount: actualPaymentAmount,
+            totalAllocated: actualPaymentAmount,
+            remainingBalance,
+            excessPayment: 0,
+            ordersPaid: [
+              {
+                orderId: order.id.toString(),
+                orderCode: order.code,
+                amountPaid: actualPaymentAmount,
+              },
+            ],
+            paymentMethodCode: actualPaymentMethodCode,
+            referenceNumber: referenceNumber || null,
+          },
+        });
+      }
+
+      this.logger.log(
+        `Single order payment allocated: ${actualPaymentAmount} for order ${order.code} (${orderId}) using method ${actualPaymentMethodCode}. Remaining balance: ${remainingBalance}`
+      );
+
+      return {
+        ordersPaid: [
+          {
+            orderId: order.id.toString(),
+            orderCode: order.code,
+            amountPaid: actualPaymentAmount,
+          },
+        ],
+        remainingBalance,
+        totalAllocated: actualPaymentAmount,
+        excessPayment: 0,
+      };
     });
   }
 

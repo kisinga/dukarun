@@ -202,8 +202,8 @@ export class OrdersComponent implements OnInit {
       const modal = this.payOrderModal();
       if (orderData && modal) {
         // Use setTimeout to ensure modal is ready
-        setTimeout(() => {
-          modal.show();
+        setTimeout(async () => {
+          await modal.show();
         }, 0);
       }
     });

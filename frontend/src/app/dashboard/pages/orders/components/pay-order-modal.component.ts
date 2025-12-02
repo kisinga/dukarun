@@ -14,6 +14,10 @@ import { CustomerPaymentService } from '../../../../core/services/customer/custo
 import { CustomerStateService } from '../../../../core/services/customer/customer-state.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { OrdersService } from '../../../../core/services/orders.service';
+import {
+  PaymentMethod,
+  PaymentMethodService,
+} from '../../../../core/services/payment-method.service';
 
 export interface PayOrderModalData {
   orderId: string;
@@ -115,6 +119,103 @@ export interface PayOrderModalData {
               </div>
             </div>
 
+            <!-- Payment Method Selection -->
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-semibold">Payment Method</span>
+                <span class="label-text-alt text-error">Required</span>
+              </label>
+
+              @if (isLoadingPaymentMethods()) {
+                <div class="flex items-center justify-center py-8">
+                  <span class="loading loading-spinner loading-md"></span>
+                  <span class="ml-2 text-sm text-base-content/60">Loading payment methods...</span>
+                </div>
+              } @else if (paymentMethodsError()) {
+                <div class="alert alert-error">
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clip-rule="evenodd"
+                    ></path>
+                  </svg>
+                  <span class="text-sm">{{ paymentMethodsError() }}</span>
+                </div>
+              } @else if (paymentMethods().length === 0) {
+                <div class="alert alert-warning">
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fill-rule="evenodd"
+                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      clip-rule="evenodd"
+                    ></path>
+                  </svg>
+                  <span class="text-sm">No payment methods available</span>
+                </div>
+              } @else {
+                <!-- Payment Method Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  @for (method of paymentMethods(); track method.id; let i = $index) {
+                    <button
+                      type="button"
+                      class="card hover:bg-base-200 border-2 transition-all duration-200 p-4 hover:scale-105 active:scale-95"
+                      [class.border-primary]="selectedPaymentMethod() === method.code"
+                      [class.bg-primary/10]="selectedPaymentMethod() === method.code"
+                      [class.border-base-300]="selectedPaymentMethod() !== method.code"
+                      [disabled]="isProcessing()"
+                      (click)="selectedPaymentMethod.set(method.code)"
+                    >
+                      <div class="flex flex-col items-center gap-2">
+                        <div
+                          class="w-10 h-10 rounded-full flex items-center justify-center"
+                          [class.bg-primary/20]="selectedPaymentMethod() === method.code"
+                          [class.bg-base-200]="selectedPaymentMethod() !== method.code"
+                        >
+                          @if (method.customFields?.imageAsset?.preview) {
+                            <img
+                              [src]="method.customFields!.imageAsset!.preview"
+                              [alt]="method.name"
+                              class="w-8 h-8 object-contain"
+                            />
+                          } @else {
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              class="h-6 w-6"
+                              [class.text-primary]="selectedPaymentMethod() === method.code"
+                              [class.text-base-content/60]="selectedPaymentMethod() !== method.code"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                              />
+                            </svg>
+                          }
+                        </div>
+                        <span class="font-semibold text-xs text-center">{{ method.name }}</span>
+                      </div>
+                    </button>
+                  }
+                </div>
+              }
+
+              @if (
+                error() &&
+                !selectedPaymentMethod() &&
+                !isLoadingPaymentMethods() &&
+                paymentMethods().length > 0
+              ) {
+                <label class="label">
+                  <span class="label-text-alt text-error">Please select a payment method</span>
+                </label>
+              }
+            </div>
+
             <!-- Reference Code Input -->
             <div class="form-control">
               <label class="label" for="referenceCode">
@@ -160,7 +261,10 @@ export interface PayOrderModalData {
                 class="btn btn-primary w-full"
                 [class.loading]="isProcessing()"
                 [disabled]="
-                  isProcessing() || !referenceCode() || referenceCode().trim().length === 0
+                  isProcessing() ||
+                  !selectedPaymentMethod() ||
+                  !referenceCode() ||
+                  referenceCode().trim().length === 0
                 "
               >
                 @if (!isProcessing()) {
@@ -199,6 +303,7 @@ export class PayOrderModalComponent {
   private readonly stateService = inject(CustomerStateService);
   private readonly currencyService = inject(CurrencyService);
   private readonly ordersService = inject(OrdersService);
+  private readonly paymentMethodService = inject(PaymentMethodService);
 
   // Inputs
   readonly orderData = input<PayOrderModalData | null>(null);
@@ -214,6 +319,10 @@ export class PayOrderModalComponent {
   readonly isProcessing = signal(false);
   readonly error = signal<string | null>(null);
   readonly referenceCode = signal<string>('');
+  readonly selectedPaymentMethod = signal<string | null>(null);
+  readonly paymentMethods = signal<PaymentMethod[]>([]);
+  readonly isLoadingPaymentMethods = signal(false);
+  readonly paymentMethodsError = signal<string | null>(null);
   readonly successResult = signal<{
     ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
     remainingBalance: number;
@@ -223,16 +332,54 @@ export class PayOrderModalComponent {
   /**
    * Show the modal
    */
-  show(): void {
+  async show(): Promise<void> {
     // Reset state
     this.error.set(null);
     this.successResult.set(null);
     this.isProcessing.set(false);
     this.referenceCode.set('');
+    this.selectedPaymentMethod.set(null);
+    this.paymentMethodsError.set(null);
+
+    // Fetch payment methods
+    await this.loadPaymentMethods();
 
     // Show modal
     const modal = this.modalRef()?.nativeElement;
     modal?.showModal();
+  }
+
+  /**
+   * Load payment methods
+   */
+  async loadPaymentMethods(): Promise<void> {
+    this.isLoadingPaymentMethods.set(true);
+    this.paymentMethodsError.set(null);
+
+    try {
+      const methods = await this.paymentMethodService.getPaymentMethods();
+      // Filter to only enabled/active methods
+      const activeMethods = methods.filter((m) => m.enabled && m.customFields?.isActive !== false);
+      this.paymentMethods.set(activeMethods);
+    } catch (error: any) {
+      console.error('Failed to load payment methods:', error);
+      this.paymentMethodsError.set(
+        error.message || 'Failed to load payment methods. Please try again.',
+      );
+      this.paymentMethods.set([]);
+    } finally {
+      this.isLoadingPaymentMethods.set(false);
+    }
+  }
+
+  /**
+   * Get selected payment method name
+   */
+  getSelectedPaymentMethodName(): string {
+    const code = this.selectedPaymentMethod();
+    if (!code) return '';
+    const method = this.paymentMethods().find((m) => m.code === code);
+    return method?.name || code;
   }
 
   /**
@@ -250,6 +397,13 @@ export class PayOrderModalComponent {
     const data = this.orderData();
     if (!data) return;
 
+    // Validate payment method
+    const paymentMethodCode = this.selectedPaymentMethod();
+    if (!paymentMethodCode) {
+      this.error.set('Please select a payment method');
+      return;
+    }
+
     // Validate reference code
     const refCode = this.referenceCode().trim();
     if (!refCode || refCode.length === 0) {
@@ -264,7 +418,12 @@ export class PayOrderModalComponent {
       // Convert amount from cents to shillings for backend
       const paymentAmount = data.totalAmount / 100;
 
-      const result = await this.paymentService.paySingleOrder(data.orderId, paymentAmount);
+      const result = await this.paymentService.paySingleOrder(
+        data.orderId,
+        paymentAmount,
+        paymentMethodCode,
+        refCode,
+      );
 
       if (result) {
         this.successResult.set(result);

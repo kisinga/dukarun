@@ -4,8 +4,10 @@ import {
   Component,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { PurchaseService } from '../../../core/services/purchase.service';
@@ -18,6 +20,7 @@ import {
   PurchaseAction,
   PurchaseTableRowComponent,
 } from './components/purchase-table-row.component';
+import { PurchaseDetailComponent } from './purchase-detail/purchase-detail.component';
 
 /**
  * Purchases list page
@@ -37,6 +40,7 @@ import {
     PurchaseCardComponent,
     PurchaseTableRowComponent,
     PaginationComponent,
+    PurchaseDetailComponent,
   ],
   templateUrl: './purchases.component.html',
   styleUrl: './purchases.component.scss',
@@ -58,6 +62,8 @@ export class PurchasesComponent implements OnInit {
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
+  readonly selectedPurchaseId = signal<string | null>(null);
+  private readonly purchaseDetailModal = viewChild(PurchaseDetailComponent);
 
   // Computed: filtered purchases
   readonly filteredPurchases = computed(() => {
@@ -114,6 +120,20 @@ export class PurchasesComponent implements OnInit {
     return Math.min(this.currentPage() * this.itemsPerPage(), this.filteredPurchases().length);
   });
 
+  constructor() {
+    // Effect to show modal when purchase is selected
+    effect(() => {
+      const purchaseId = this.selectedPurchaseId();
+      const modal = this.purchaseDetailModal();
+      if (purchaseId && modal) {
+        // Use setTimeout to ensure modal is ready
+        setTimeout(async () => {
+          // The modal will auto-open when purchaseId is set
+        }, 0);
+      }
+    });
+  }
+
   ngOnInit(): void {
     this.loadPurchases();
   }
@@ -137,8 +157,8 @@ export class PurchasesComponent implements OnInit {
 
     switch (action) {
       case 'view':
-        // Navigate to purchase detail view (to be implemented)
-        console.log('View purchase:', purchaseId);
+        // Show purchase detail in modal
+        this.selectedPurchaseId.set(purchaseId);
         break;
 
       case 'edit':
@@ -151,6 +171,13 @@ export class PurchasesComponent implements OnInit {
         console.log('Delete purchase:', purchaseId);
         break;
     }
+  }
+
+  /**
+   * Handle purchase detail modal closed
+   */
+  onPurchaseDetailClosed(): void {
+    this.selectedPurchaseId.set(null);
   }
 
   /**

@@ -254,3 +254,12 @@
     />
   }
 </div>
+
+<!-- Purchase Detail Modal -->
+@if (selectedPurchaseId()) {
+  <app-purchase-detail
+    [purchaseId]="selectedPurchaseId()!"
+    [modalMode]="true"
+    (closed)="onPurchaseDetailClosed()"
+  />
+}

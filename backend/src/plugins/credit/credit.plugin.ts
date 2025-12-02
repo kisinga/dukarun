@@ -104,6 +104,8 @@ const COMBINED_SCHEMA = gql`
   input PaySingleOrderInput {
     orderId: ID!
     paymentAmount: Float
+    paymentMethodCode: String
+    referenceNumber: String
   }
 
   type CreditValidationResult {

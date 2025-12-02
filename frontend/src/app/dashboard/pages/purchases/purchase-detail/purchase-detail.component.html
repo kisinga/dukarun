@@ -1,0 +1,195 @@
+@if (modalMode()) {
+  <!-- Modal Wrapper -->
+  <dialog #modalDialog [id]="modalId()" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-4xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-lg">Purchase Details</h3>
+        <button class="btn btn-ghost btn-sm btn-circle" (click)="close()" aria-label="Close">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      </div>
+      <!-- Purchase Content -->
+      <ng-container [ngTemplateOutlet]="purchaseContent"></ng-container>
+      <div class="modal-action mt-6">
+        <button class="btn btn-primary" (click)="close()">Close</button>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+      <button (click)="close()">close</button>
+    </form>
+  </dialog>
+} @else {
+  <!-- Page Mode -->
+  <div class="space-y-4 sm:space-y-6">
+    <!-- Header -->
+    @if (showHeader()) {
+      <div>
+        <button (click)="goBack()" class="btn btn-ghost btn-sm mb-2">← Back to Purchases</button>
+        <h1 class="text-3xl font-bold">Purchase Details</h1>
+      </div>
+    }
+
+    <!-- Error State -->
+    @if (error() && !isLoading()) {
+      <div class="alert alert-error">
+        <span>{{ error() }}</span>
+        <button class="btn btn-ghost btn-sm" (click)="error.set(null)">✕</button>
+      </div>
+    }
+
+    <!-- Loading State -->
+    @if (isLoading() && !purchase()) {
+      <div class="card bg-base-100 shadow">
+        <div class="card-body">
+          <div class="flex flex-col items-center justify-center py-16">
+            <span class="loading loading-spinner loading-lg text-primary"></span>
+            <p class="text-sm text-base-content/60 mt-4">Loading purchase...</p>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Purchase Details -->
+    @if (purchase()) {
+      <ng-container [ngTemplateOutlet]="purchaseDetailsContent"></ng-container>
+    }
+  </div>
+}
+
+<!-- Purchase Details Content Template (shared) -->
+<ng-template #purchaseDetailsContent>
+  <div class="space-y-4 sm:space-y-6">
+    <!-- Purchase Header -->
+    <div class="card bg-base-100 shadow-sm border border-base-300/60">
+      <div class="card-body p-4 sm:p-6">
+        <app-purchase-detail-header
+          [referenceNumber]="referenceNumber()"
+          [paymentStatus]="paymentStatus()"
+          [purchaseDate]="purchaseDate()"
+          [isCreditPurchase]="isCreditPurchase()"
+        />
+      </div>
+    </div>
+
+    <!-- Mobile: Expansion Panels -->
+    <div class="lg:hidden space-y-3">
+      <!-- Supplier Info -->
+      <div class="collapse collapse-arrow bg-base-100 border border-base-300/60 shadow-sm">
+        <input type="checkbox" checked="checked" />
+        <div class="collapse-title font-medium">Supplier Information</div>
+        <div class="collapse-content">
+          <app-purchase-supplier-info [supplier]="purchase()!.supplier" />
+        </div>
+      </div>
+
+      <!-- Items -->
+      <div class="collapse collapse-arrow bg-base-100 border border-base-300/60 shadow-sm">
+        <input type="checkbox" checked="checked" />
+        <div class="collapse-title font-medium">Items</div>
+        <div class="collapse-content">
+          <app-purchase-items-table [lines]="lines()" />
+        </div>
+      </div>
+
+      <!-- Totals -->
+      <div class="collapse collapse-arrow bg-base-100 border border-base-300/60 shadow-sm">
+        <input type="checkbox" checked="checked" />
+        <div class="collapse-title font-medium">Totals</div>
+        <div class="collapse-content">
+          <app-purchase-totals [totalCost]="totalCost()" />
+        </div>
+      </div>
+
+      <!-- Payment Info -->
+      <div class="collapse collapse-arrow bg-base-100 border border-base-300/60 shadow-sm">
+        <input type="checkbox" checked="checked" />
+        <div class="collapse-title font-medium">Payment Information</div>
+        <div class="collapse-content">
+          <app-purchase-payment-info
+            [paymentStatus]="paymentStatus()"
+            [isCreditPurchase]="isCreditPurchase()"
+            [totalCost]="totalCost()"
+          />
+        </div>
+      </div>
+
+      <!-- Notes -->
+      @if (notes()) {
+        <div class="collapse collapse-arrow bg-base-100 border border-base-300/60 shadow-sm">
+          <input type="checkbox" />
+          <div class="collapse-title font-medium">Notes</div>
+          <div class="collapse-content">
+            <p class="text-sm text-base-content/70 whitespace-pre-wrap">{{ notes() }}</p>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Desktop: Side-by-side Layout -->
+    <div class="hidden lg:grid lg:grid-cols-3 gap-4">
+      <!-- Left Column: Supplier & Payment -->
+      <div class="space-y-4">
+        <div class="card bg-base-100 shadow-sm border border-base-300/60">
+          <div class="card-body p-4">
+            <app-purchase-supplier-info [supplier]="purchase()!.supplier" />
+            <div class="divider my-3"></div>
+            <app-purchase-payment-info
+              [paymentStatus]="paymentStatus()"
+              [isCreditPurchase]="isCreditPurchase()"
+              [totalCost]="totalCost()"
+            />
+          </div>
+        </div>
+
+        @if (notes()) {
+          <div class="card bg-base-100 shadow-sm border border-base-300/60">
+            <div class="card-body p-4">
+              <h3 class="font-bold text-base mb-2">Notes</h3>
+              <p class="text-sm text-base-content/70 whitespace-pre-wrap">{{ notes() }}</p>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Right Column: Items & Totals -->
+      <div class="lg:col-span-2 space-y-4">
+        <div class="card bg-base-100 shadow-sm border border-base-300/60">
+          <div class="card-body p-4">
+            <app-purchase-items-table [lines]="lines()" />
+            <div class="divider my-4"></div>
+            <app-purchase-totals [totalCost]="totalCost()" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</ng-template>
+
+<!-- Purchase Content Template (for modal) -->
+<ng-template #purchaseContent>
+  @if (isLoading() && !purchase()) {
+    <div class="flex flex-col items-center justify-center py-16">
+      <span class="loading loading-spinner loading-lg text-primary"></span>
+      <p class="text-sm text-base-content/60 mt-4">Loading purchase...</p>
+    </div>
+  } @else if (error()) {
+    <div class="alert alert-error">
+      <span>{{ error() }}</span>
+    </div>
+  } @else if (purchase()) {
+    <ng-container [ngTemplateOutlet]="purchaseDetailsContent"></ng-container>
+  }
+</ng-template>
