@@ -25,9 +25,10 @@ export class SmsService {
    *
    * @param phoneNumber - Phone number in any format (will be normalized)
    * @param message - Message content to send
+   * @param isOtp - Optional flag indicating if this is an OTP message (for routing to dedicated endpoints)
    * @returns Promise resolving to SmsResult indicating success/failure
    */
-  async sendSms(phoneNumber: string, message: string): Promise<SmsResult> {
+  async sendSms(phoneNumber: string, message: string, isOtp?: boolean): Promise<SmsResult> {
     try {
       // In development mode, print SMS to console instead of sending
       if (env.isDevelopment()) {
@@ -64,7 +65,7 @@ export class SmsService {
       }
 
       // Delegate to provider
-      const result = await this.provider.sendSms(normalizedPhone, message);
+      const result = await this.provider.sendSms(normalizedPhone, message, isOtp);
 
       // Log result
       if (result.success) {

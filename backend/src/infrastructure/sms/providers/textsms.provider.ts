@@ -8,6 +8,9 @@ import { env } from '../../config/environment.config';
  * Implements SMS sending via TextSMS Bulk SMS API
  * API Documentation: https://textsms.co.ke/bulk-sms-api/
  *
+ * OTP messages are automatically routed to the dedicated OTP endpoint
+ * (/api/services/sendotp/) which handles sensitive transaction traffic.
+ *
  * SETUP INSTRUCTIONS:
  *
  * 1. Create Account:
@@ -43,6 +46,7 @@ export class TextsmsProvider implements ISmsProvider {
   private partnerId: string | null = null;
   private shortcode: string | null = null;
   private apiUrl = 'https://sms.textsms.co.ke/api/services/sendsms/';
+  private otpApiUrl = 'https://sms.textsms.co.ke/api/services/sendotp/';
 
   /**
    * Get configuration values (lazy-loaded to ensure env vars are available)
@@ -58,6 +62,7 @@ export class TextsmsProvider implements ISmsProvider {
       if (env.isDevelopment()) {
         this.logger.debug('Configuration loaded:', {
           apiUrl: this.apiUrl,
+          otpApiUrl: this.otpApiUrl,
           apiKey: this.apiKey ? '***' + this.apiKey.slice(-4) : 'NOT SET',
           partnerId: this.partnerId || 'NOT SET',
           shortcode: this.shortcode || 'NOT SET',
@@ -166,7 +171,7 @@ export class TextsmsProvider implements ISmsProvider {
     return `Failed to send SMS (response code: ${responseCode})`;
   }
 
-  async sendSms(phoneNumber: string, message: string): Promise<SmsResult> {
+  async sendSms(phoneNumber: string, message: string, isOtp?: boolean): Promise<SmsResult> {
     const config = this.getConfig();
 
     if (!this.isConfigured()) {
@@ -192,8 +197,11 @@ export class TextsmsProvider implements ISmsProvider {
         mobile: formattedPhone,
       };
 
+      // Use OTP endpoint for OTP messages, bulk SMS endpoint for regular messages
+      const endpointUrl = isOtp ? this.otpApiUrl : config.apiUrl;
+
       // Send SMS via TextSMS API
-      const response = await fetch(config.apiUrl, {
+      const response = await fetch(endpointUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

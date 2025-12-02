@@ -58,9 +58,10 @@ export interface ISmsProvider {
    *
    * @param phoneNumber - Phone number in any format (will be normalized by provider if needed)
    * @param message - Message content to send
+   * @param isOtp - Optional flag indicating if this is an OTP message (for routing to dedicated endpoints)
    * @returns Promise resolving to SmsResult indicating success/failure
    */
-  sendSms(phoneNumber: string, message: string): Promise<SmsResult>;
+  sendSms(phoneNumber: string, message: string, isOtp?: boolean): Promise<SmsResult>;
 
   /**
    * Get the provider name/identifier

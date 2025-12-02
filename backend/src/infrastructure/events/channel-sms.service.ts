@@ -80,8 +80,8 @@ export class ChannelSmsService {
     message: string,
     channelId?: string
   ): Promise<SmsResult> {
-    // Send SMS using existing service
-    const result = await this.smsService.sendSms(phoneNumber, message);
+    // Send SMS using existing service with isOtp flag to route to dedicated OTP endpoint
+    const result = await this.smsService.sendSms(phoneNumber, message, true);
 
     // Track as AUTHENTICATION category if channel ID is available
     if (channelId && result.success) {
