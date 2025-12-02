@@ -1,123 +1,170 @@
 <app-navbar />
 
 <main class="bg-base-100 text-base-content">
-  <section class="section scroll-mt-28">
-    <div class="container-app space-y-8">
-      <div class="space-y-4 text-center">
-        <span
-          class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/80"
-        >
-          Get in touch
-        </span>
-        <h1 class="text-4xl font-bold md:text-5xl">Contact us</h1>
-        <p class="mx-auto max-w-2xl text-lg text-base-content/70">
-          Have questions? Need help? We're here to support you. Reach out and we'll get back to you
-          as soon as possible.
-        </p>
-      </div>
+  <section class="section scroll-mt-28 bg-base-100 py-16">
+    <div class="container-app space-y-4 text-center">
+      <span class="badge badge-primary badge-soft badge-sm font-semibold uppercase tracking-wider">
+        Get in touch
+      </span>
+      <h1 class="text-3xl font-bold sm:text-4xl md:text-5xl lg:text-6xl">Contact us</h1>
+      <p class="mx-auto max-w-2xl text-base text-base-content/70">
+        Have questions? Need help? We're here to support you. Reach out and we'll get back to you as
+        soon as possible.
+      </p>
+    </div>
 
-      <div class="grid gap-8 lg:grid-cols-[1fr,1.2fr]">
-        <div class="space-y-6">
+    <div class="container-app mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <article
+        class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <div class="flex flex-col gap-4 flex-1">
           <div
-            class="rounded-2xl border border-base-300 bg-gradient-to-br from-base-200 to-base-100 p-6 shadow-lg"
+            class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
           >
-            <span class="text-3xl">📧</span>
-            <h3 class="mt-4 text-lg font-semibold">Email us</h3>
-            <p class="mt-2 text-base-content/70">
-              Send us an email and we'll respond within 24 hours.
-            </p>
-            <a href="mailto:support@dukarun.com" class="link link-primary mt-4 inline-block">
-              hello@dukarun.com
-            </a>
-          </div>
-
-          <div
-            class="rounded-2xl border border-base-300 bg-gradient-to-br from-base-200 to-base-100 p-6 shadow-lg"
-          >
-            <span class="text-3xl">📱</span>
-            <h3 class="mt-4 text-lg font-semibold">WhatsApp us</h3>
-            <p class="mt-2 text-base-content/70">
-              Chat with us on WhatsApp for quick responses and support.
-            </p>
-            <a
-              href="https://wa.me/254788922222"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="link link-primary mt-4 inline-block"
-            >
-              +254 788 922 222
-            </a>
-          </div>
-
-          <div
-            class="rounded-2xl border border-base-300 bg-gradient-to-br from-base-200 to-base-100 p-6 shadow-lg"
-          >
-            <span class="text-3xl">💬</span>
-            <h3 class="mt-4 text-lg font-semibold">Support</h3>
-            <p class="mt-2 text-base-content/70">
-              Need help with your account? Check out our
-              <a routerLink="/support" class="link link-primary">support page</a> for answers to
-              common questions.
-            </p>
-          </div>
-
-          <div
-            class="rounded-2xl border border-base-300 bg-gradient-to-br from-base-200 to-base-100 p-6 shadow-lg"
-          >
-            <span class="text-3xl">💼</span>
-            <h3 class="mt-4 text-lg font-semibold">Enterprise inquiries</h3>
-            <p class="mt-2 text-base-content/70">
-              Interested in Enterprise plans or custom solutions? We'd love to discuss how dukarun
-              can work for your business.
-            </p>
-            <a href="mailto:enterprise@dukarun.com" class="link link-primary mt-4 inline-block">
-              hello@dukarun.com
-            </a>
-          </div>
-        </div>
-
-        <div class="rounded-2xl border border-base-300 bg-base-200/60 p-8">
-          <h2 class="mb-6 text-2xl font-bold">Send us a message</h2>
-          <form class="space-y-4">
-            <div>
-              <label class="label">
-                <span class="label-text">Name</span>
-              </label>
-              <input type="text" placeholder="Your name" class="input input-bordered w-full" />
-            </div>
-            <div>
-              <label class="label">
-                <span class="label-text">Email</span>
-              </label>
-              <input
-                type="email"
-                placeholder="your@email.com"
-                class="input input-bordered w-full"
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
               />
-            </div>
-            <div>
-              <label class="label">
-                <span class="label-text">Subject</span>
-              </label>
-              <input
-                type="text"
-                placeholder="What's this about?"
-                class="input input-bordered w-full"
-              />
-            </div>
-            <div>
-              <label class="label">
-                <span class="label-text">Message</span>
-              </label>
-              <textarea
-                class="textarea textarea-bordered w-full"
-                placeholder="Tell us how we can help..."
-                rows="6"
-              ></textarea>
-            </div>
-            <button type="submit" class="btn btn-primary btn-lg w-full">Send message</button>
-          </form>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold">Email us</h3>
+          <p class="text-base-content/80 flex-1">
+            Send us an email and we'll respond within 24 hours.
+          </p>
+          <a href="mailto:hello@dukarun.com" class="link link-primary mt-auto">hello@dukarun.com</a>
         </div>
+      </article>
+
+      <article
+        class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <div class="flex flex-col gap-4 flex-1">
+          <div
+            class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
+          >
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold">WhatsApp us</h3>
+          <p class="text-base-content/80 flex-1">
+            Chat with us on WhatsApp for quick responses and support.
+          </p>
+          <a
+            href="https://wa.me/254788922222"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="link link-primary mt-auto"
+          >
+            +254 788 922 222
+          </a>
+        </div>
+      </article>
+
+      <article
+        class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <div class="flex flex-col gap-4 flex-1">
+          <div
+            class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
+          >
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold">Support</h3>
+          <p class="text-base-content/80 flex-1">
+            Need help with your account? Check out our
+            <a routerLink="/support" class="link link-primary">support page</a> for answers to
+            common questions.
+          </p>
+        </div>
+      </article>
+
+      <article
+        class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <div class="flex flex-col gap-4 flex-1">
+          <div
+            class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
+          >
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+              />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold">Enterprise inquiries</h3>
+          <p class="text-base-content/80 flex-1">
+            Interested in Enterprise plans or custom solutions? We'd love to discuss how dukarun can
+            work for your business.
+          </p>
+          <a href="mailto:hello@dukarun.com" class="link link-primary mt-auto">hello@dukarun.com</a>
+        </div>
+      </article>
+    </div>
+
+    <div class="container-app mt-10">
+      <div
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="mb-6 text-2xl font-bold">Send us a message</h2>
+        <form class="space-y-4">
+          <div>
+            <label class="label">
+              <span class="label-text">Name</span>
+            </label>
+            <input type="text" placeholder="Your name" class="input input-bordered w-full" />
+          </div>
+          <div>
+            <label class="label">
+              <span class="label-text">Email</span>
+            </label>
+            <input type="email" placeholder="your@email.com" class="input input-bordered w-full" />
+          </div>
+          <div>
+            <label class="label">
+              <span class="label-text">Subject</span>
+            </label>
+            <input
+              type="text"
+              placeholder="What's this about?"
+              class="input input-bordered w-full"
+            />
+          </div>
+          <div>
+            <label class="label">
+              <span class="label-text">Message</span>
+            </label>
+            <textarea
+              class="textarea textarea-bordered w-full"
+              placeholder="Tell us how we can help..."
+              rows="6"
+            ></textarea>
+          </div>
+          <button
+            type="submit"
+            class="btn btn-primary btn-lg w-full shadow-lg shadow-primary/20 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl"
+          >
+            Send message
+          </button>
+        </form>
       </div>
     </div>
   </section>

@@ -67,12 +67,4 @@ export class SupportComponent {
       open: false,
     },
   ]);
-
-  toggleFAQ(index: number): void {
-    this.faqItems.update((items) => {
-      const updated = [...items];
-      updated[index].open = !updated[index].open;
-      return updated;
-    });
-  }
 }

@@ -159,6 +159,8 @@ p {
   margin-right: auto;
   padding-left: var(--content-padding);
   padding-right: var(--content-padding);
+  // Prevent horizontal overflow on mobile
+  box-sizing: border-box;
 }
 
 // Section spacing
