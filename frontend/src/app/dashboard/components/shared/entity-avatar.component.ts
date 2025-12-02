@@ -7,7 +7,7 @@ type AvatarSize = 'sm' | 'md' | 'lg';
   imports: [],
   template: `
     <div class="avatar placeholder">
-      <div [class]="containerClasses()">
+      <div [class]="containerClasses()" class="flex items-center justify-center">
         <span [class]="textClasses()">{{ initials() }}</span>
       </div>
     </div>
@@ -27,7 +27,7 @@ export class EntityAvatarComponent {
 
   containerClasses = computed(() => {
     const size = this.size();
-    const sizeClass = size === 'sm' ? 'w-8' : size === 'lg' ? 'w-12' : 'w-10';
+    const sizeClass = size === 'sm' ? 'w-8 h-8' : size === 'lg' ? 'w-12 h-12' : 'w-10 h-10';
     return `bg-primary text-primary-content rounded-full ${sizeClass}`;
   });
 

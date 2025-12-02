@@ -18,6 +18,10 @@ export interface SupplierInput {
   taxId?: string;
   paymentTerms?: string;
   notes?: string;
+  // Credit fields (optional, requires permissions)
+  isCreditApproved?: boolean;
+  creditLimit?: number;
+  creditDuration?: number;
 }
 
 /**

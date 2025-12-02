@@ -136,11 +136,29 @@ export class CustomerApiService {
         return null;
       }
 
-      const normalizedInput = {
-        ...input,
+      // Build customFields if credit fields are provided
+      const customFields: any = {};
+      if (input.isCreditApproved !== undefined) {
+        customFields.isCreditApproved = input.isCreditApproved;
+      }
+      if (input.creditLimit !== undefined && input.creditLimit > 0) {
+        customFields.creditLimit = input.creditLimit;
+      }
+      if (input.creditDuration !== undefined && input.creditDuration > 0) {
+        customFields.creditDuration = input.creditDuration;
+      }
+
+      const normalizedInput: any = {
+        firstName: input.firstName,
+        lastName: input.lastName,
         phoneNumber: normalizedPhone,
         emailAddress,
       };
+
+      // Only include customFields if there are any credit fields
+      if (Object.keys(customFields).length > 0) {
+        normalizedInput.customFields = customFields;
+      }
 
       const result = await client.mutate<any>({
         mutation: CREATE_CUSTOMER,
@@ -164,6 +182,64 @@ export class CustomerApiService {
       return null;
     } finally {
       this.stateService.setIsCreating(false);
+    }
+  }
+
+  /**
+   * Check if a customer/supplier exists by phone number
+   * @param phoneNumber - Phone number to check (will be normalized)
+   * @returns Object with exists flag and customer info if found
+   */
+  async checkPhoneExists(phoneNumber: string): Promise<{
+    exists: boolean;
+    isSupplier: boolean;
+    customerId?: string;
+    customerName?: string;
+  }> {
+    if (!phoneNumber || !phoneNumber.trim()) {
+      return { exists: false, isSupplier: false };
+    }
+
+    try {
+      const client = this.apolloService.getClient();
+      const normalizedPhone = formatPhoneNumber(phoneNumber);
+
+      if (!normalizedPhone) {
+        return { exists: false, isSupplier: false };
+      }
+
+      const result = await client.query<any>({
+        query: GET_CUSTOMERS,
+        variables: {
+          options: {
+            take: 1,
+            skip: 0,
+            filter: {
+              phoneNumber: { eq: normalizedPhone },
+            },
+          },
+        },
+        fetchPolicy: 'network-only',
+      });
+
+      const items = result.data?.customers?.items ?? [];
+      if (items.length === 0) {
+        return { exists: false, isSupplier: false };
+      }
+
+      const customer = items[0];
+      const isSupplier = customer.customFields?.isSupplier === true;
+
+      return {
+        exists: true,
+        isSupplier,
+        customerId: customer.id,
+        customerName: `${customer.firstName} ${customer.lastName}`.trim(),
+      };
+    } catch (error) {
+      console.error('Phone check failed:', error);
+      // On error, assume it doesn't exist to avoid blocking valid operations
+      return { exists: false, isSupplier: false };
     }
   }
 

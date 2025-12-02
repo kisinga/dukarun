@@ -15,6 +15,10 @@ export interface CustomerInput {
   emailAddress: string;
   phoneNumber?: string;
   password?: string;
+  // Credit fields (optional, requires permissions)
+  isCreditApproved?: boolean;
+  creditLimit?: number;
+  creditDuration?: number;
 }
 
 /**

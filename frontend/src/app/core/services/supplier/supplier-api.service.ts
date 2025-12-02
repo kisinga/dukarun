@@ -106,6 +106,9 @@ export class SupplierApiService {
             taxId: input.taxId,
             paymentTerms: input.paymentTerms,
             notes: input.notes,
+            isCreditApproved: input.isCreditApproved,
+            creditLimit: input.creditLimit,
+            creditDuration: input.creditDuration,
           });
 
           // Use UPDATE_CUSTOMER to add supplier capability
@@ -147,20 +150,34 @@ export class SupplierApiService {
         return null;
       }
 
+      // Build customFields with supplier and credit fields
+      const customFields: any = {
+        isSupplier: true,
+        supplierType: input.supplierType,
+        contactPerson: input.contactPerson,
+        taxId: input.taxId,
+        paymentTerms: input.paymentTerms,
+        notes: input.notes,
+      };
+
+      // Add credit fields if provided
+      if (input.isCreditApproved !== undefined) {
+        customFields.isCreditApproved = input.isCreditApproved;
+      }
+      if (input.creditLimit !== undefined && input.creditLimit > 0) {
+        customFields.creditLimit = input.creditLimit;
+      }
+      if (input.creditDuration !== undefined && input.creditDuration > 0) {
+        customFields.creditDuration = input.creditDuration;
+      }
+
       // Prepare input with only basic customer fields at top level, supplier fields in customFields
       const supplierInput = {
         firstName: input.firstName,
         lastName: input.lastName,
         emailAddress,
         phoneNumber: normalizedPhone,
-        customFields: {
-          isSupplier: true,
-          supplierType: input.supplierType,
-          contactPerson: input.contactPerson,
-          taxId: input.taxId,
-          paymentTerms: input.paymentTerms,
-          notes: input.notes,
-        },
+        customFields,
       };
 
       const result = await client.mutate<any>({
@@ -185,6 +202,64 @@ export class SupplierApiService {
       return null;
     } finally {
       this.stateService.setIsCreating(false);
+    }
+  }
+
+  /**
+   * Check if a customer/supplier exists by phone number
+   * @param phoneNumber - Phone number to check (will be normalized)
+   * @returns Object with exists flag and customer info if found
+   */
+  async checkPhoneExists(phoneNumber: string): Promise<{
+    exists: boolean;
+    isSupplier: boolean;
+    customerId?: string;
+    customerName?: string;
+  }> {
+    if (!phoneNumber || !phoneNumber.trim()) {
+      return { exists: false, isSupplier: false };
+    }
+
+    try {
+      const client = this.apolloService.getClient();
+      const normalizedPhone = formatPhoneNumber(phoneNumber);
+
+      if (!normalizedPhone) {
+        return { exists: false, isSupplier: false };
+      }
+
+      const result = await client.query<any>({
+        query: GET_CUSTOMERS,
+        variables: {
+          options: {
+            take: 1,
+            skip: 0,
+            filter: {
+              phoneNumber: { eq: normalizedPhone },
+            },
+          },
+        },
+        fetchPolicy: 'network-only',
+      });
+
+      const items = result.data?.customers?.items ?? [];
+      if (items.length === 0) {
+        return { exists: false, isSupplier: false };
+      }
+
+      const customer = items[0];
+      const isSupplier = customer.customFields?.isSupplier === true;
+
+      return {
+        exists: true,
+        isSupplier,
+        customerId: customer.id,
+        customerName: `${customer.firstName} ${customer.lastName}`.trim(),
+      };
+    } catch (error) {
+      console.error('Phone check failed:', error);
+      // On error, assume it doesn't exist to avoid blocking valid operations
+      return { exists: false, isSupplier: false };
     }
   }
 

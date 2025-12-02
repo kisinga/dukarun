@@ -6,6 +6,26 @@
  */
 
 /**
+ * Strip GraphQL metadata fields from an object (__typename, etc.)
+ * These fields are only for query responses, not mutation inputs
+ *
+ * @param obj - Object that may contain GraphQL metadata
+ * @returns Cleaned object without GraphQL metadata
+ */
+function stripGraphQLMetadata(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(stripGraphQLMetadata);
+
+  const cleaned: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    // Skip __typename and other GraphQL metadata
+    if (key === '__typename') continue;
+    cleaned[key] = stripGraphQLMetadata(value);
+  }
+  return cleaned;
+}
+
+/**
  * Merge supplier capability into existing customer
  *
  * @param existing - Existing customer entity
@@ -24,6 +44,9 @@ export function mergeSupplierCapability(
     taxId?: string;
     paymentTerms?: string;
     notes?: string;
+    isCreditApproved?: boolean;
+    creditLimit?: number;
+    creditDuration?: number;
   },
 ): any {
   const existingCustomFields = existing.customFields || {};
@@ -50,31 +73,41 @@ export function mergeSupplierCapability(
     notes: supplierData.notes?.trim() || existingCustomFields.notes || null,
   };
 
-  // Preserve credit fields (these should never be overwritten when adding supplier capability)
-  const preservedCreditFields: any = {};
-  if (existingCustomFields.isCreditApproved !== undefined) {
-    preservedCreditFields.isCreditApproved = existingCustomFields.isCreditApproved;
+  // Merge credit fields: use new values if provided, otherwise preserve existing
+  const mergedCreditFields: any = {};
+  if (supplierData.isCreditApproved !== undefined) {
+    mergedCreditFields.isCreditApproved = supplierData.isCreditApproved;
+  } else if (existingCustomFields.isCreditApproved !== undefined) {
+    mergedCreditFields.isCreditApproved = existingCustomFields.isCreditApproved;
   }
-  if (existingCustomFields.creditLimit !== undefined) {
-    preservedCreditFields.creditLimit = existingCustomFields.creditLimit;
+  if (supplierData.creditLimit !== undefined && supplierData.creditLimit > 0) {
+    mergedCreditFields.creditLimit = supplierData.creditLimit;
+  } else if (existingCustomFields.creditLimit !== undefined) {
+    mergedCreditFields.creditLimit = existingCustomFields.creditLimit;
   }
-  if (existingCustomFields.creditDuration !== undefined) {
-    preservedCreditFields.creditDuration = existingCustomFields.creditDuration;
+  if (supplierData.creditDuration !== undefined && supplierData.creditDuration > 0) {
+    mergedCreditFields.creditDuration = supplierData.creditDuration;
+  } else if (existingCustomFields.creditDuration !== undefined) {
+    mergedCreditFields.creditDuration = existingCustomFields.creditDuration;
   }
+  // Always preserve repayment tracking fields (these are system-managed)
   if (existingCustomFields.lastRepaymentDate !== undefined) {
-    preservedCreditFields.lastRepaymentDate = existingCustomFields.lastRepaymentDate;
+    mergedCreditFields.lastRepaymentDate = existingCustomFields.lastRepaymentDate;
   }
   if (existingCustomFields.lastRepaymentAmount !== undefined) {
-    preservedCreditFields.lastRepaymentAmount = existingCustomFields.lastRepaymentAmount;
+    mergedCreditFields.lastRepaymentAmount = existingCustomFields.lastRepaymentAmount;
   }
+
+  // Strip GraphQL metadata from customFields before returning
+  const cleanedCustomFields = stripGraphQLMetadata({
+    ...mergedSupplierFields,
+    ...mergedCreditFields,
+  });
 
   return {
     id: existing.id,
     ...mergedCustomerFields,
-    customFields: {
-      ...mergedSupplierFields,
-      ...preservedCreditFields,
-    },
+    customFields: cleanedCustomFields,
   };
 }
 
@@ -106,7 +139,8 @@ export function mergeCustomerFields(
   };
 
   // Preserve all custom fields (supplier fields, credit fields, etc.)
-  const preservedCustomFields = { ...existingCustomFields };
+  // Strip GraphQL metadata (__typename) before returning
+  const preservedCustomFields = stripGraphQLMetadata({ ...existingCustomFields });
 
   return {
     id: existing.id,
