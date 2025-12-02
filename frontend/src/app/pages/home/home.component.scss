@@ -1,5 +1,28 @@
 :host {
   display: block;
+  // Prevent horizontal overflow
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
+}
+
+// Prevent hero section overflow
+#hero {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
+
+  .container-app {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  // Ensure badges don't overflow
+  .badge {
+    max-width: 100%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -21,5 +44,79 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+// Carousel styles - optimized for performance
+.carousel {
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  // Performance optimizations
+  contain: layout style paint;
+  will-change: scroll-position;
+}
+
+.carousel-item {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  // Lazy load optimization
+  content-visibility: auto;
+  contain-intrinsic-size: 0 400px;
+}
+
+// Make dividers flush separators without affecting section spacing
+.divider {
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  height: 1px;
+
+  // Remove default padding from divider lines
+  &::before,
+  &::after {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+// Journey section flow styles - optimized for mobile
+@media (min-width: 768px) {
+  .journey-step {
+    position: relative;
+    transition: transform 0.3s ease;
+    // Performance optimization
+    will-change: transform;
+
+    &:hover {
+      transform: translateY(-2px);
+    }
+  }
+
+  .journey-step-final {
+    // Subtle elevation for step 3
+    transform: translateY(-2px);
+  }
+
+  .journey-connector {
+    left: calc(-50% - 2rem);
+    right: calc(-50% - 2rem);
+    width: calc(100% + 4rem);
+    transition: all 0.3s ease;
+  }
+}
+
+// Mobile-first optimizations
+@media (max-width: 767px) {
+  // Reduce motion on mobile for better performance
+  @media (prefers-reduced-motion: no-preference) {
+    .journey-step {
+      transition: transform 0.2s ease;
+    }
+  }
+
+  // Optimize carousel for mobile
+  .carousel {
+    will-change: auto; // Remove will-change on mobile to save resources
   }
 }

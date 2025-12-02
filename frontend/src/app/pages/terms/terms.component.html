@@ -1,175 +1,179 @@
 <app-navbar />
 
 <main class="bg-base-100 text-base-content">
-  <section class="section scroll-mt-28">
-    <div class="container-app space-y-8">
-      <div class="space-y-4 text-center">
-        <span
-          class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/80"
-        >
-          Terms of Service
-        </span>
-        <h1 class="text-4xl font-bold md:text-5xl">Terms and conditions</h1>
-        <p class="mx-auto max-w-2xl text-lg text-base-content/70">
-          Please read these terms carefully before using dukarun. By using our services, you agree
-          to these terms.
+  <section class="section scroll-mt-28 bg-base-100 py-16">
+    <div class="container-app space-y-4 text-center">
+      <span class="badge badge-primary badge-soft badge-sm font-semibold uppercase tracking-wider">
+        Terms of Service
+      </span>
+      <h1 class="text-3xl font-bold sm:text-4xl md:text-5xl lg:text-6xl">Terms and conditions</h1>
+      <p class="mx-auto max-w-2xl text-base text-base-content/70">
+        Please read these terms carefully before using dukarun. By using our services, you agree to
+        these terms.
+      </p>
+      <p class="text-sm text-base-content/60">Last updated: {{ lastUpdated }}</p>
+    </div>
+
+    <div class="container-app mt-10 max-w-3xl space-y-6">
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">Acceptance of terms</h2>
+        <p class="text-base-content/70">
+          By accessing or using dukarun, you agree to be bound by these Terms of Service. If you
+          disagree with any part of these terms, you may not access or use our services.
         </p>
-        <p class="text-sm text-base-content/60">Last updated: {{ lastUpdated }}</p>
-      </div>
+      </section>
 
-      <div class="prose prose-base mx-auto max-w-3xl">
-        <div class="space-y-6 rounded-2xl border border-base-300 bg-base-200/60 p-8">
-          <section>
-            <h2 class="text-2xl font-bold">Acceptance of terms</h2>
-            <p class="mt-4 text-base-content/70">
-              By accessing or using dukarun, you agree to be bound by these Terms of Service. If
-              you disagree with any part of these terms, you may not access or use our services.
-            </p>
-          </section>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">Service description</h2>
+        <p class="text-base-content/70">
+          dukarun provides point-of-sale, inventory management, and business management software. We
+          reserve the right to modify, suspend, or discontinue any aspect of our services at any
+          time.
+        </p>
+      </section>
 
-          <section>
-            <h2 class="text-2xl font-bold">Service description</h2>
-            <p class="mt-4 text-base-content/70">
-              dukarun provides point-of-sale, inventory management, and business management
-              software. We reserve the right to modify, suspend, or discontinue any aspect of our
-              services at any time.
-            </p>
-          </section>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">User accounts</h2>
+        <p class="text-base-content/70 mb-4">You are responsible for:</p>
+        <ul class="list-disc space-y-2 pl-6 text-base-content/70">
+          <li>Maintaining the confidentiality of your account credentials</li>
+          <li>All activities that occur under your account</li>
+          <li>Providing accurate and complete information</li>
+          <li>Notifying us immediately of any unauthorized access</li>
+        </ul>
+      </section>
 
-          <section>
-            <h2 class="text-2xl font-bold">User accounts</h2>
-            <p class="mt-4 text-base-content/70">You are responsible for:</p>
-            <ul class="mt-4 list-disc space-y-2 pl-6 text-base-content/70">
-              <li>Maintaining the confidentiality of your account credentials</li>
-              <li>All activities that occur under your account</li>
-              <li>Providing accurate and complete information</li>
-              <li>Notifying us immediately of any unauthorized access</li>
-            </ul>
-          </section>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">Subscription and payment</h2>
+        <p class="text-base-content/70">
+          Subscription fees are billed monthly or annually as selected. You can cancel your
+          subscription at any time. Refunds are provided according to our refund policy. We reserve
+          the right to change pricing with 30 days' notice.
+        </p>
+      </section>
 
-          <section>
-            <h2 class="text-2xl font-bold">Subscription and payment</h2>
-            <p class="mt-4 text-base-content/70">
-              Subscription fees are billed monthly or annually as selected. You can cancel your
-              subscription at any time. Refunds are provided according to our refund policy. We
-              reserve the right to change pricing with 30 days' notice.
-            </p>
-          </section>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">Free trial</h2>
+        <p class="text-base-content/70">
+          We offer a 30-day free trial. No credit card is required to start. If you don't upgrade
+          after the trial, your account will be paused. You can upgrade at any time during or after
+          the trial period.
+        </p>
+      </section>
 
-          <section>
-            <h2 class="text-2xl font-bold">Free trial</h2>
-            <p class="mt-4 text-base-content/70">
-              We offer a 30-day free trial. No credit card is required to start. If you don't
-              upgrade after the trial, your account will be paused. You can upgrade at any time
-              during or after the trial period.
-            </p>
-          </section>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">User conduct</h2>
+        <p class="text-base-content/70 mb-4">You agree not to:</p>
+        <ul class="list-disc space-y-2 pl-6 text-base-content/70">
+          <li>Use the service for any illegal or unauthorized purpose</li>
+          <li>Violate any laws in your jurisdiction</li>
+          <li>Transmit any viruses or malicious code</li>
+          <li>Attempt to gain unauthorized access to our systems</li>
+          <li>Interfere with or disrupt the service</li>
+          <li>Use the service to infringe on others' rights</li>
+        </ul>
+      </section>
 
-          <section>
-            <h2 class="text-2xl font-bold">User conduct</h2>
-            <p class="mt-4 text-base-content/70">You agree not to:</p>
-            <ul class="mt-4 list-disc space-y-2 pl-6 text-base-content/70">
-              <li>Use the service for any illegal or unauthorized purpose</li>
-              <li>Violate any laws in your jurisdiction</li>
-              <li>Transmit any viruses or malicious code</li>
-              <li>Attempt to gain unauthorized access to our systems</li>
-              <li>Interfere with or disrupt the service</li>
-              <li>Use the service to infringe on others' rights</li>
-            </ul>
-          </section>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">Intellectual property</h2>
+        <p class="text-base-content/70">
+          All content, features, and functionality of dukarun are owned by us and protected by
+          copyright, trademark, and other laws. You may not copy, modify, or create derivative works
+          without our permission.
+        </p>
+      </section>
 
-          <section>
-            <h2 class="text-2xl font-bold">Intellectual property</h2>
-            <p class="mt-4 text-base-content/70">
-              All content, features, and functionality of dukarun are owned by us and protected by
-              copyright, trademark, and other laws. You may not copy, modify, or create derivative
-              works without our permission.
-            </p>
-          </section>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">Data ownership</h2>
+        <p class="text-base-content/70">
+          You retain ownership of all data you upload or create using dukarun. You grant us a
+          license to use, store, and process this data to provide and improve our services. You can
+          export your data at any time.
+        </p>
+      </section>
 
-          <section>
-            <h2 class="text-2xl font-bold">Data ownership</h2>
-            <p class="mt-4 text-base-content/70">
-              You retain ownership of all data you upload or create using dukarun. You grant us a
-              license to use, store, and process this data to provide and improve our services. You
-              can export your data at any time.
-            </p>
-          </section>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">Service availability</h2>
+        <p class="text-base-content/70">
+          We strive to maintain high availability but do not guarantee uninterrupted access. The
+          service may be unavailable due to maintenance, updates, or circumstances beyond our
+          control. dukarun is designed to work offline, allowing you to continue operations during
+          connectivity issues.
+        </p>
+      </section>
 
-          <section>
-            <h2 class="text-2xl font-bold">Service availability</h2>
-            <p class="mt-4 text-base-content/70">
-              We strive to maintain high availability but do not guarantee uninterrupted access.
-              The service may be unavailable due to maintenance, updates, or circumstances beyond
-              our control. dukarun is designed to work offline, allowing you to continue operations
-              during connectivity issues.
-            </p>
-          </section>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">Limitation of liability</h2>
+        <p class="text-base-content/70">
+          To the maximum extent permitted by law, dukarun shall not be liable for any indirect,
+          incidental, special, or consequential damages arising from your use of the service.
+        </p>
+      </section>
 
-          <section>
-            <h2 class="text-2xl font-bold">Limitation of liability</h2>
-            <p class="mt-4 text-base-content/70">
-              To the maximum extent permitted by law, dukarun shall not be liable for any indirect,
-              incidental, special, or consequential damages arising from your use of the service.
-            </p>
-          </section>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">Termination</h2>
+        <p class="text-base-content/70">
+          We may terminate or suspend your account immediately, without prior notice, for conduct
+          that we believe violates these Terms of Service or is harmful to other users, us, or third
+          parties. You may cancel your account at any time.
+        </p>
+      </section>
 
-          <section>
-            <h2 class="text-2xl font-bold">Termination</h2>
-            <p class="mt-4 text-base-content/70">
-              We may terminate or suspend your account immediately, without prior notice, for
-              conduct that we believe violates these Terms of Service or is harmful to other users,
-              us, or third parties. You may cancel your account at any time.
-            </p>
-          </section>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">Changes to terms</h2>
+        <p class="text-base-content/70">
+          We reserve the right to modify these terms at any time. We'll notify you of significant
+          changes by email or through our platform. Continued use after changes constitutes
+          acceptance of the updated terms.
+        </p>
+      </section>
 
-          <section>
-            <h2 class="text-2xl font-bold">Changes to terms</h2>
-            <p class="mt-4 text-base-content/70">
-              We reserve the right to modify these terms at any time. We'll notify you of
-              significant changes by email or through our platform. Continued use after changes
-              constitutes acceptance of the updated terms.
-            </p>
-          </section>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">Governing law</h2>
+        <p class="text-base-content/70">
+          These terms shall be governed by and construed in accordance with the laws of Kenya. Any
+          disputes shall be subject to the exclusive jurisdiction of Kenyan courts.
+        </p>
+      </section>
 
-          <section>
-            <h2 class="text-2xl font-bold">Governing law</h2>
-            <p class="mt-4 text-base-content/70">
-              These terms shall be governed by and construed in accordance with the laws of Kenya.
-              Any disputes shall be subject to the exclusive jurisdiction of Kenyan courts.
-            </p>
-          </section>
-
-          <section>
-            <h2 class="text-2xl font-bold">Contact us</h2>
-            <p class="mt-4 text-base-content/70">
-              If you have questions about these terms, please contact us at
-              <a href="mailto:legal@dukarun.com" class="link link-primary">legal@dukarun.com</a>
-              or through our
-              <a routerLink="/contact" class="link link-primary">contact page</a>.
-            </p>
-          </section>
-        </div>
-      </div>
+      <section
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="text-2xl font-bold mb-4">Contact us</h2>
+        <p class="text-base-content/70">
+          If you have questions about these terms, please contact us at
+          <a href="mailto:legal@dukarun.com" class="link link-primary">legal@dukarun.com</a> or
+          through our <a routerLink="/contact" class="link link-primary">contact page</a>.
+        </p>
+      </section>
     </div>
   </section>
 </main>
 
 <app-footer />
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

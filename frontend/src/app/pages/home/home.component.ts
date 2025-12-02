@@ -47,6 +47,7 @@ interface CorePillar {
   title: string;
   description: string;
   bullets: string[];
+  screenshot?: { src: string; alt: string; placeholder: boolean };
 }
 
 interface JourneyStage {
@@ -54,6 +55,7 @@ interface JourneyStage {
   title: string;
   summary: string;
   detail: string;
+  screenshot?: { src: string; alt: string; placeholder: boolean };
 }
 
 interface FAQItem {
@@ -99,7 +101,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   };
 
   protected readonly heroHighlights: FeatureHighlight[] = [
-    { icon: '📱', text: 'Start on your phone' },
+    { icon: '📱', text: 'Start on phone' },
     { icon: '🎓', text: 'No training needed' },
     { icon: '🖥️', text: 'Grow to any size' },
     { icon: '🤝', text: 'Trust in every sale' },
@@ -107,34 +109,38 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected readonly corePillars: CorePillar[] = [
     {
-      icon: '📷',
+      icon: 'camera',
       title: 'Faster selling',
       description: 'Point your phone at price labels or barcodes and ring up a sale instantly.',
       bullets: ['Label-photo recognition', 'Barcode scanning', '3-second checkout'],
+      screenshot: { src: '', alt: 'Point and sell interface', placeholder: true },
     },
     {
-      icon: '📦',
+      icon: 'package',
       title: 'Clear inventory',
       description: 'Always know what is in stock across every shelf, stall, or warehouse.',
       bullets: ['Real-time counts', 'Multi-location tracking', 'Low-stock nudges'],
+      screenshot: { src: '', alt: 'Inventory management dashboard', placeholder: true },
     },
     {
-      icon: '💰',
+      icon: 'currency',
       title: 'Healthy cash flow',
       description: 'Stay on top of customer and supplier balances without extra spreadsheets.',
       bullets: ['Credit limits & approvals', 'Automatic reminders', 'Ledger built in'],
+      screenshot: { src: '', alt: 'Cash flow and credit management', placeholder: true },
     },
     {
-      icon: '📈',
+      icon: 'chart',
       title: 'Decisions with data',
       description:
-        'Pro-level business intelligence at your fingertips. See daily trends, best sellers, and make data-driven decisions to grow your business to the next stage.',
+        'Pro-level business intelligence at your fingertips. See daily trends, best sellers, and make data-driven decisions to grow.',
       bullets: [
         'Dashboards & reports',
         'Top product insights',
         'Performance alerts',
         'Data-driven growth decisions',
       ],
+      screenshot: { src: '', alt: 'Business intelligence dashboard', placeholder: true },
     },
   ];
 
@@ -144,6 +150,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       title: 'Capture your catalog',
       summary: 'Scan barcodes or take five quick photos of the product label.',
       detail: 'dukarun learns each item so that you can sell it in seconds.',
+      screenshot: { src: '', alt: 'Product catalog capture interface', placeholder: true },
     },
     {
       number: '2',
@@ -151,12 +158,14 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       summary: 'Point, confirm, and accept cash or M-Pesa in seconds.',
       detail:
         'Accept cash and track M-Pesa payments automatically. No signal? Keep selling. Each sale syncs automatically when you reconnect.',
+      screenshot: { src: '', alt: 'Point and sell checkout interface', placeholder: true },
     },
     {
       number: '3',
       title: 'Stay in control',
       summary: 'Stock, cash, and credit update automatically after every sale.',
       detail: 'Reminders and dashboards keep your whole team aligned and confident.',
+      screenshot: { src: '', alt: 'Dashboard and control center', placeholder: true },
     },
   ];
 
@@ -287,18 +296,6 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       open: false,
     },
     {
-      question: 'What do you mean by "product labels"?',
-      answer:
-        'These are the price tags or cards that you use to display the price of the product. They are usually handwritten and are unique to each product.',
-      open: false,
-    },
-    {
-      question: 'Why product labels and not products?',
-      answer:
-        'Product labels are more reliable than products. They are consistent and unique. They are also easier to scan than products.',
-      open: false,
-    },
-    {
       question: 'Does it work without internet?',
       answer:
         'Yes! You can record up to 30 sales without internet. Everything is stored safely on your device. When you reconnect, it syncs automatically. Perfect for areas with unreliable internet.',
@@ -314,12 +311,6 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       question: 'How long does setup take?',
       answer:
         "Most businesses are set up in under an hour. Sign up, add products by scanning barcodes or taking photos, and you're ready to go. Simple and intuitive.",
-      open: false,
-    },
-    {
-      question: 'Can I track services too?',
-      answer:
-        'Yes! Create visual cards for services like haircuts or repairs. Track them just like products. Perfect for salons, barbers, and service businesses.',
       open: false,
     },
   ]);
@@ -338,39 +329,46 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected readonly stars = [1, 2, 3, 4, 5];
 
+  // Screenshot/carousel data
+  protected readonly heroScreenshots = [
+    { src: '', alt: 'Dukarun point and sell interface', placeholder: true },
+    { src: '', alt: 'Dukarun inventory management', placeholder: true },
+    { src: '', alt: 'Dukarun sales dashboard', placeholder: true },
+  ];
+
   protected readonly easeOfUseBenefits: EaseOfUseBenefit[] = [
     {
-      icon: '📱',
+      icon: 'phone',
       title: 'No complex hardware',
       description:
         'Works on any smartphone. No barcode scanners, printers, or special equipment needed. Your phone is all you need.',
     },
     {
-      icon: '🎓',
+      icon: 'graduation',
       title: 'No computer literacy required',
       description:
         'If you know how to use a smartphone, you can use Dukarun. No training needed — most things are intuitive.',
     },
     {
-      icon: '📚',
+      icon: 'book',
       title: 'Simple tutorials available',
       description:
         'Step-by-step guides teach you how to use the system, but most features work naturally once you start.',
     },
     {
-      icon: '💡',
+      icon: 'lightbulb',
       title: 'Intuitive smartphone interface',
       description:
         'Designed for touch and simplicity. Everything you need is just a tap away, just like using any modern app.',
     },
     {
-      icon: '📊',
+      icon: 'chart',
       title: 'Professional accounting made accessible',
       description:
         'Lowers the barrier to professional accounting. Get enterprise-level financial tracking without the complexity.',
     },
     {
-      icon: '🚀',
+      icon: 'rocket',
       title: 'Powerful insights at your fingertips',
       description:
         'Pro-level business tool that gives you powerful information for gauging business status and making data-driven decisions to grow.',
