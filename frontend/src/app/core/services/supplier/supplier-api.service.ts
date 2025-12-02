@@ -4,8 +4,13 @@ import {
   DELETE_SUPPLIER,
   GET_SUPPLIER,
   UPDATE_SUPPLIER,
+  GET_CUSTOMERS,
+  UPDATE_CUSTOMER,
+  GET_CUSTOMER,
 } from '../../graphql/operations.graphql';
 import { formatPhoneNumber } from '../../utils/phone.utils';
+import { generateEmailFromPhone } from '../../utils/email.utils';
+import { mergeSupplierCapability } from '../../utils/customer-merge.utils';
 import { ApolloService } from '../apollo.service';
 import { SupplierInput } from '../supplier.service';
 import { SupplierStateService } from './supplier-state.service';
@@ -35,21 +40,144 @@ export class SupplierApiService {
     try {
       const client = this.apolloService.getClient();
 
-      // Prepare input with only basic customer fields at top level, supplier fields in customFields
       // Normalize phone number to 07XXXXXXXX format
+      const normalizedPhone = input.phoneNumber ? formatPhoneNumber(input.phoneNumber) : undefined;
+
+      // Check for existing customer by phone number to prevent duplicates
+      // Note: We check for any customer (supplier or not) since a customer can become a supplier
+      if (normalizedPhone) {
+        const existingResult = await client.query<any>({
+          query: GET_CUSTOMERS,
+          variables: {
+            options: {
+              take: 1,
+              skip: 0,
+              filter: {
+                phoneNumber: { eq: normalizedPhone },
+              },
+            },
+          },
+          fetchPolicy: 'network-only',
+        });
+
+        const existingCustomers = existingResult.data?.customers?.items || [];
+        if (existingCustomers.length > 0) {
+          const existing = existingCustomers[0];
+          console.log('✅ Found existing customer by phone:', existing.id);
+
+          // Fetch full customer data including all custom fields
+          const fullCustomerResult = await client.query<any>({
+            query: GET_CUSTOMER,
+            variables: { id: existing.id },
+            fetchPolicy: 'network-only',
+          });
+
+          const fullCustomer = fullCustomerResult.data?.customer;
+          if (!fullCustomer) {
+            this.stateService.setError('Failed to fetch existing customer details');
+            return null;
+          }
+
+          const isAlreadySupplier = fullCustomer.customFields?.isSupplier === true;
+
+          if (isAlreadySupplier) {
+            console.log(
+              '📦 Existing entity already has supplier capability, updating supplier fields',
+            );
+          } else {
+            console.log('➕ Adding supplier capability to existing customer');
+          }
+
+          // Generate email from phone if missing
+          let emailAddress = input.emailAddress?.trim();
+          if (!emailAddress && normalizedPhone) {
+            emailAddress = generateEmailFromPhone(normalizedPhone);
+            console.log('📧 Generated email from phone:', emailAddress);
+          }
+
+          // Merge supplier capability with existing customer data
+          const updateInput = mergeSupplierCapability(fullCustomer, {
+            firstName: input.firstName,
+            lastName: input.lastName,
+            emailAddress: emailAddress || fullCustomer.emailAddress,
+            phoneNumber: normalizedPhone,
+            supplierType: input.supplierType,
+            contactPerson: input.contactPerson,
+            taxId: input.taxId,
+            paymentTerms: input.paymentTerms,
+            notes: input.notes,
+            isCreditApproved: input.isCreditApproved,
+            creditLimit: input.creditLimit,
+            creditDuration: input.creditDuration,
+          });
+
+          // Use UPDATE_CUSTOMER to add supplier capability
+          const updateResult = await client.mutate<any>({
+            mutation: UPDATE_CUSTOMER,
+            variables: { input: updateInput },
+          });
+
+          const updated = updateResult.data?.updateCustomer;
+          if (updated?.id) {
+            console.log(
+              `✅ ${isAlreadySupplier ? 'Supplier fields updated' : 'Supplier capability added'}:`,
+              updated.id,
+            );
+            this.stateService.setIsCreating(false);
+            return updated.id;
+          } else if (updated?.errorCode) {
+            this.stateService.setError(updated.message || 'Failed to add supplier capability');
+            return null;
+          } else {
+            this.stateService.setError('Failed to add supplier capability');
+            return null;
+          }
+        }
+      }
+
+      // Generate email from phone if missing or empty
+      let emailAddress = input.emailAddress?.trim();
+      if (!emailAddress && normalizedPhone) {
+        emailAddress = generateEmailFromPhone(normalizedPhone);
+        console.log('📧 Generated email from phone:', emailAddress);
+      }
+
+      // Ensure email is always present (required by Vendure)
+      if (!emailAddress) {
+        this.stateService.setError(
+          'Email address is required. Please provide an email or phone number.',
+        );
+        return null;
+      }
+
+      // Build customFields with supplier and credit fields
+      const customFields: any = {
+        isSupplier: true,
+        supplierType: input.supplierType,
+        contactPerson: input.contactPerson,
+        taxId: input.taxId,
+        paymentTerms: input.paymentTerms,
+        notes: input.notes,
+      };
+
+      // Add credit fields if provided
+      if (input.isCreditApproved !== undefined) {
+        customFields.isCreditApproved = input.isCreditApproved;
+      }
+      if (input.creditLimit !== undefined && input.creditLimit > 0) {
+        customFields.creditLimit = input.creditLimit;
+      }
+      if (input.creditDuration !== undefined && input.creditDuration > 0) {
+        customFields.creditDuration = input.creditDuration;
+      }
+
+      // Prepare input with only basic customer fields at top level, supplier fields in customFields
       const supplierInput = {
         firstName: input.firstName,
         lastName: input.lastName,
-        emailAddress: input.emailAddress,
-        phoneNumber: input.phoneNumber ? formatPhoneNumber(input.phoneNumber) : undefined,
-        customFields: {
-          isSupplier: true,
-          supplierType: input.supplierType,
-          contactPerson: input.contactPerson,
-          taxId: input.taxId,
-          paymentTerms: input.paymentTerms,
-          notes: input.notes,
-        },
+        emailAddress,
+        phoneNumber: normalizedPhone,
+        customFields,
       };
 
       const result = await client.mutate<any>({
@@ -74,6 +202,64 @@ export class SupplierApiService {
       return null;
     } finally {
       this.stateService.setIsCreating(false);
+    }
+  }
+
+  /**
+   * Check if a customer/supplier exists by phone number
+   * @param phoneNumber - Phone number to check (will be normalized)
+   * @returns Object with exists flag and customer info if found
+   */
+  async checkPhoneExists(phoneNumber: string): Promise<{
+    exists: boolean;
+    isSupplier: boolean;
+    customerId?: string;
+    customerName?: string;
+  }> {
+    if (!phoneNumber || !phoneNumber.trim()) {
+      return { exists: false, isSupplier: false };
+    }
+
+    try {
+      const client = this.apolloService.getClient();
+      const normalizedPhone = formatPhoneNumber(phoneNumber);
+
+      if (!normalizedPhone) {
+        return { exists: false, isSupplier: false };
+      }
+
+      const result = await client.query<any>({
+        query: GET_CUSTOMERS,
+        variables: {
+          options: {
+            take: 1,
+            skip: 0,
+            filter: {
+              phoneNumber: { eq: normalizedPhone },
+            },
+          },
+        },
+        fetchPolicy: 'network-only',
+      });
+
+      const items = result.data?.customers?.items ?? [];
+      if (items.length === 0) {
+        return { exists: false, isSupplier: false };
+      }
+
+      const customer = items[0];
+      const isSupplier = customer.customFields?.isSupplier === true;
+
+      return {
+        exists: true,
+        isSupplier,
+        customerId: customer.id,
+        customerName: `${customer.firstName} ${customer.lastName}`.trim(),
+      };
+    } catch (error) {
+      console.error('Phone check failed:', error);
+      // On error, assume it doesn't exist to avoid blocking valid operations
+      return { exists: false, isSupplier: false };
     }
   }
 

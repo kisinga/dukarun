@@ -1,4 +1,4 @@
-import { Injectable, effect, inject, signal } from '@angular/core';
+import { Injectable, effect, inject, Injector, signal } from '@angular/core';
 import { SwPush } from '@angular/service-worker';
 import { environment } from '../../../../environments/environment';
 import {
@@ -21,10 +21,18 @@ import { ToastService } from '../toast.service';
 })
 export class NotificationPushService {
   private readonly apolloService = inject(ApolloService);
-  private readonly authService = inject(AuthService);
+  private readonly injector = inject(Injector);
   private readonly swPush = inject(SwPush);
   private readonly toastService = inject(ToastService);
   private readonly pollingService = inject(NotificationPollingService);
+
+  /**
+   * Lazy getter for AuthService to break circular dependency
+   * AuthService -> AuthLoginService -> AppInitService -> NotificationService -> NotificationPushService -> AuthService
+   */
+  private get authService(): AuthService {
+    return this.injector.get(AuthService);
+  }
 
   // State signals
   private readonly isPushEnabledSignal = signal<boolean>(false);

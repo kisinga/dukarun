@@ -22,6 +22,7 @@ import { ChannelEventsPlugin } from './plugins/channels/channel-events.plugin';
 import { ChannelSettingsPlugin } from './plugins/channels/channel-settings.plugin';
 import { EnvironmentPlugin } from './plugins/core/environment.plugin';
 import { CreditPlugin } from './plugins/credit/credit.plugin';
+import { CustomerPlugin } from './plugins/customers/customer.plugin';
 import {
   ApproveCustomerCreditPermission,
   ManageCustomerCreditLimitPermission,
@@ -328,7 +329,8 @@ export const config: VendureConfig = {
         description: [
           {
             languageCode: LanguageCode.en,
-            value: 'Minimum variance (in cents) to trigger manager notification. Default 100 = 1 KES',
+            value:
+              'Minimum variance (in cents) to trigger manager notification. Default 100 = 1 KES',
           },
         ],
         defaultValue: 100,
@@ -1200,7 +1202,8 @@ export const config: VendureConfig = {
         description: [
           {
             languageCode: LanguageCode.en,
-            value: 'How this payment method should be reconciled: blind_count (cash), transaction_verification (mobile money), statement_match (bank), none',
+            value:
+              'How this payment method should be reconciled: blind_count (cash), transaction_verification (mobile money), statement_match (bank), none',
           },
         ],
         defaultValue: 'none',
@@ -1221,7 +1224,8 @@ export const config: VendureConfig = {
         description: [
           {
             languageCode: LanguageCode.en,
-            value: 'Account code for ledger postings (e.g., CASH_ON_HAND, CLEARING_MPESA). Auto-derived from handler if empty.',
+            value:
+              'Account code for ledger postings (e.g., CASH_ON_HAND, CLEARING_MPESA). Auto-derived from handler if empty.',
           },
         ],
         public: true,
@@ -1378,6 +1382,7 @@ export const config: VendureConfig = {
     LedgerPlugin, // Load before CreditPlugin - provides PostingService
     StockPlugin, // Load before CreditPlugin so StockPurchase type is available
     CreditPlugin, // Depends on LedgerPlugin
+    CustomerPlugin, // Customer duplicate prevention
     SubscriptionPlugin,
     ChannelEventsPlugin,
     AuditPlugin,

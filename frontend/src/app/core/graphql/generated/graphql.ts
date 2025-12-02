@@ -3610,6 +3610,12 @@ export type Mutation = {
   createCustomerAddress: Address;
   /** Create a new CustomerGroup */
   createCustomerGroup: CustomerGroup;
+  /**
+   * Create a customer with duplicate prevention by phone number.
+   * If a customer with the same phone number exists, returns the existing customer.
+   * This is a safety net - the frontend should also check for duplicates.
+   */
+  createCustomerSafe: Customer;
   /** Creates a draft Order */
   createDraftOrder: Order;
   /** Create a new Facet */
@@ -4112,6 +4118,10 @@ export type MutationCreateCustomerAddressArgs = {
 
 export type MutationCreateCustomerGroupArgs = {
   input: CreateCustomerGroupInput;
+};
+
+export type MutationCreateCustomerSafeArgs = {
+  input: CreateCustomerInput;
 };
 
 export type MutationCreateFacetArgs = {

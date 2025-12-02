@@ -225,7 +225,7 @@ export class AfricasTalkingProvider implements ISmsProvider {
     return '+' + cleanPhone;
   }
 
-  async sendSms(phoneNumber: string, message: string): Promise<SmsResult> {
+  async sendSms(phoneNumber: string, message: string, isOtp?: boolean): Promise<SmsResult> {
     const config = this.getConfig();
 
     if (!this.isConfigured()) {

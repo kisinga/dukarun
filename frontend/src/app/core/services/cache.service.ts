@@ -220,10 +220,14 @@ export class CacheService {
       if (config.storage === 'localStorage' || config.storage === 'sessionStorage') {
         const keysToRemove: string[] = [];
 
-        // Get all keys and filter by prefix
-        for (let i = 0; i < storage.getItem.length; i++) {
-          const key = storage.getItem(`key_${i}`);
-          if (key && key.startsWith(prefix)) {
+        // Get all keys from the actual storage object
+        const storageObj =
+          config.storage === 'localStorage' ? window.localStorage : window.sessionStorage;
+        const allKeys = Object.keys(storageObj);
+
+        // Filter keys by prefix
+        for (const key of allKeys) {
+          if (key.startsWith(prefix)) {
             keysToRemove.push(key);
           }
         }
@@ -238,6 +242,48 @@ export class CacheService {
     } catch (error) {
       console.error(`Failed to clear cache:`, error);
       this.status.update((s) => ({ ...s, error: 'Failed to clear cache' }));
+    }
+  }
+
+  /**
+   * Clear all cache entries for all cache configs
+   * Useful for complete cache invalidation (e.g., on login)
+   */
+  clearAll(): void {
+    try {
+      // Clear all predefined cache configs
+      Object.values(CACHE_CONFIGS).forEach((config) => {
+        // For channel-specific caches, we need to clear all possible channel combinations
+        // Since we don't know all channel IDs, we'll clear by prefix pattern
+        if (config.channelSpecific) {
+          // Clear all keys matching the prefix pattern (with or without channel ID)
+          const storage = this.getStorage(config.storage);
+          const prefix = config.keyPrefix + '_';
+
+          if (config.storage === 'localStorage' || config.storage === 'sessionStorage') {
+            const storageObj =
+              config.storage === 'localStorage' ? window.localStorage : window.sessionStorage;
+            const allKeys = Object.keys(storageObj);
+
+            allKeys.forEach((key) => {
+              if (key.startsWith(prefix)) {
+                storage.removeItem(key);
+              }
+            });
+          } else {
+            // For memory cache, clear all
+            storage.clear();
+          }
+        } else {
+          // For non-channel-specific caches, clear normally
+          this.clear(config);
+        }
+      });
+
+      console.log('🧹 Cleared all cache configs');
+    } catch (error) {
+      console.error('Failed to clear all caches:', error);
+      this.status.update((s) => ({ ...s, error: 'Failed to clear all caches' }));
     }
   }
 
