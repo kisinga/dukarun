@@ -7,6 +7,8 @@ import {
   UserInputError,
 } from '@vendure/core';
 import { FinancialService } from '../financial/financial.service';
+import { LedgerTransactionService } from '../financial/ledger-transaction.service';
+import { PurchaseTransactionData } from '../financial/strategies/purchase-posting.strategy';
 import { StockPurchase, StockPurchaseLine } from './entities/purchase.entity';
 import { StockValidationService } from './stock-validation.service';
 
@@ -40,7 +42,8 @@ export class PurchaseService {
   constructor(
     private readonly connection: TransactionalConnection,
     private readonly validationService: StockValidationService,
-    private readonly financialService: FinancialService
+    private readonly financialService: FinancialService,
+    private readonly ledgerTransactionService: LedgerTransactionService
   ) {}
 
   /**
@@ -86,16 +89,23 @@ export class PurchaseService {
 
     const savedPurchase = await purchaseRepo.save(purchase);
 
-    // Post purchase to ledger (single source of truth)
+    // Post purchase to ledger automatically (single source of truth)
     // Handles both credit purchases (AP) and cash purchases (Cash on Hand)
-    await this.financialService.recordPurchase(
+    const transactionData: PurchaseTransactionData = {
       ctx,
-      savedPurchase.id,
-      savedPurchase.referenceNumber || savedPurchase.id,
-      input.supplierId.toString(),
+      sourceId: savedPurchase.id,
+      channelId: ctx.channelId as number,
+      purchaseId: savedPurchase.id,
+      purchaseReference: savedPurchase.referenceNumber || savedPurchase.id,
+      supplierId: input.supplierId.toString(),
       totalCost,
-      savedPurchase.isCreditPurchase
-    );
+      isCreditPurchase: savedPurchase.isCreditPurchase,
+    };
+
+    const result = await this.ledgerTransactionService.postTransaction(transactionData);
+    if (!result.success) {
+      throw new Error(`Failed to post purchase to ledger: ${result.error}`);
+    }
 
     // Create purchase lines
     const purchaseLines = input.lines.map(line => {

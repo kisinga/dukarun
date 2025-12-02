@@ -10,6 +10,7 @@ import {
 } from '@vendure/core';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { FinancialService } from '../financial/financial.service';
+import { LedgerTransactionService } from '../financial/ledger-transaction.service';
 import { TracingService } from '../../infrastructure/observability/tracing.service';
 import { MetricsService } from '../../infrastructure/observability/metrics.service';
 import { OrderAddressService } from './order-address.service';
@@ -56,6 +57,7 @@ export class OrderCreationService {
     private readonly orderFulfillmentService: OrderFulfillmentService,
     @Optional() private readonly auditService?: AuditService,
     @Optional() private readonly financialService?: FinancialService, // Optional for migration period
+    @Optional() private readonly ledgerTransactionService?: LedgerTransactionService,
     @Optional() private readonly tracingService?: TracingService,
     @Optional() private readonly metricsService?: MetricsService
   ) {}
@@ -235,8 +237,22 @@ export class OrderCreationService {
       }
     }
 
-    // Post credit sale to ledger (single source of truth)
-    if (this.financialService) {
+    // Post credit sale to ledger automatically (single source of truth)
+    if (this.ledgerTransactionService) {
+      const transactionData = {
+        ctx,
+        sourceId: orderForPosting.id.toString(),
+        channelId: ctx.channelId as number,
+        order: orderForPosting,
+        isCreditSale: true as const,
+      };
+
+      const result = await this.ledgerTransactionService.postTransaction(transactionData);
+      if (!result.success) {
+        throw new Error(`Failed to post credit sale to ledger: ${result.error}`);
+      }
+    } else if (this.financialService) {
+      // Fallback to FinancialService for backward compatibility
       await this.financialService.recordSale(ctx, orderForPosting);
     }
 
