@@ -7,6 +7,8 @@ import type {
 } from '../../models/user.model';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 import { ApolloService } from '../apollo.service';
+import { AppInitService } from '../app-init.service';
+import { CacheService } from '../cache.service';
 import { CompanyService } from '../company.service';
 import { AuthOtpService } from './auth-otp.service';
 import { AuthSessionService } from './auth-session.service';
@@ -25,6 +27,33 @@ export class AuthLoginService {
   private readonly otpService = inject(AuthOtpService);
   private readonly sessionService = inject(AuthSessionService);
   private readonly companyService = inject(CompanyService);
+  private readonly cacheService = inject(CacheService);
+  private readonly appInitService = inject(AppInitService);
+
+  /**
+   * Clear all caches to ensure fresh state on login
+   * Called after successful authentication but before fetching user data
+   */
+  private async clearAllCaches(): Promise<void> {
+    try {
+      // Clear Apollo cache (GraphQL query results)
+      await this.apolloService.clearCache();
+
+      // Clear all CacheService caches (localStorage, sessionStorage, memory)
+      this.cacheService.clearAll();
+
+      // Clear company session data
+      this.companyService.clearActiveCompany();
+
+      // Clear app initialization cache (products, ML models, locations, etc.)
+      this.appInitService.clearCache();
+
+      console.log('🧹 All caches cleared on login');
+    } catch (error) {
+      // Don't fail login if cache clearing fails
+      console.error('Failed to clear some caches (non-critical):', error);
+    }
+  }
 
   /**
    * Login with phone number and OTP (passwordless)
@@ -61,6 +90,9 @@ export class AuthLoginService {
       if (!loginData || 'errorCode' in loginData) {
         throw new Error(loginData?.message || 'Login failed');
       }
+
+      // Clear all caches to ensure fresh state for the new session
+      await this.clearAllCaches();
 
       await this.sessionService.fetchActiveAdministrator();
     } catch (error: any) {
@@ -100,6 +132,9 @@ export class AuthLoginService {
 
       // Successful login
       if (loginResult?.__typename === 'CurrentUser') {
+        // Clear all caches to ensure fresh state for the new session
+        await this.clearAllCaches();
+
         // Set companies/channels from login response
         if (loginResult.channels && loginResult.channels.length > 0) {
           this.companyService.setCompaniesFromChannels(loginResult.channels);
