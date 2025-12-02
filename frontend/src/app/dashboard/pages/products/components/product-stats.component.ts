@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
 export interface ProductStats {
   totalProducts: number;
@@ -20,4 +20,10 @@ export interface ProductStats {
 })
 export class ProductStatsComponent {
   readonly stats = input.required<ProductStats>();
+  readonly lowStockActive = input<boolean>(false);
+  readonly lowStockClick = output<void>();
+
+  onLowStockClick(): void {
+    this.lowStockClick.emit();
+  }
 }

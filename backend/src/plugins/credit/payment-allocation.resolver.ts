@@ -9,6 +9,8 @@ import {
 interface PaySingleOrderInput {
   orderId: string;
   paymentAmount?: number;
+  paymentMethodCode?: string;
+  referenceNumber?: string;
 }
 
 @Resolver()
@@ -39,6 +41,12 @@ export class PaymentAllocationResolver {
     @Ctx() ctx: RequestContext,
     @Args('input') input: PaySingleOrderInput
   ): Promise<PaymentAllocationResult> {
-    return this.paymentAllocationService.paySingleOrder(ctx, input.orderId, input.paymentAmount);
+    return this.paymentAllocationService.paySingleOrder(
+      ctx,
+      input.orderId,
+      input.paymentAmount,
+      input.paymentMethodCode,
+      input.referenceNumber
+    );
   }
 }

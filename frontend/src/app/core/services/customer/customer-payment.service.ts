@@ -96,11 +96,15 @@ export class CustomerPaymentService {
    * Pay a single credit order directly
    * @param orderId - Order ID to pay
    * @param paymentAmount - Payment amount (optional, defaults to full outstanding amount)
+   * @param paymentMethodCode - Payment method code (optional)
+   * @param referenceNumber - Payment reference number (optional)
    * @returns Payment allocation result or null if failed
    */
   async paySingleOrder(
     orderId: string,
     paymentAmount?: number,
+    paymentMethodCode?: string,
+    referenceNumber?: string,
   ): Promise<{
     ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
     remainingBalance: number;
@@ -117,6 +121,14 @@ export class CustomerPaymentService {
 
       if (paymentAmount !== undefined) {
         input.paymentAmount = paymentAmount;
+      }
+
+      if (paymentMethodCode) {
+        input.paymentMethodCode = paymentMethodCode;
+      }
+
+      if (referenceNumber) {
+        input.referenceNumber = referenceNumber;
       }
 
       const result = await client.mutate<{
@@ -146,6 +158,8 @@ export class CustomerPaymentService {
       console.log('✅ Single order payment recorded:', {
         orderId,
         paymentAmount,
+        paymentMethodCode,
+        referenceNumber,
         ordersPaid: paymentResult.ordersPaid.length,
         totalAllocated: paymentResult.totalAllocated,
         remainingBalance: paymentResult.remainingBalance,

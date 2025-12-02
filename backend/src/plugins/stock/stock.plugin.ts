@@ -17,9 +17,10 @@ import {
   InventoryStockAdjustmentLine,
 } from '../../services/stock/entities/stock-adjustment.entity';
 import { CreditPlugin } from '../credit/credit.plugin';
+import { AuditPlugin } from '../audit/audit.plugin';
 
 @VendurePlugin({
-  imports: [PluginCommonModule, CreditPlugin],
+  imports: [PluginCommonModule, CreditPlugin, AuditPlugin],
   providers: [
     StockValidationService,
     StockMovementService,

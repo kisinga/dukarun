@@ -27,9 +27,7 @@
   <div class="flex items-start justify-between gap-4">
     <div class="flex-1 min-w-0">
       <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Suppliers</h1>
-      <p class="text-sm text-base-content/60 mt-1">
-        Manage your supplier network
-      </p>
+      <p class="text-sm text-base-content/60 mt-1">Manage your supplier network</p>
     </div>
 
     <div class="flex gap-2 shrink-0">
@@ -80,12 +78,27 @@
   </div>
 
   <!-- Statistics Cards -->
-  <app-supplier-stats [stats]="stats()" />
+  <app-supplier-stats
+    [stats]="stats()"
+    [activeFilters]="{
+      verified: verifiedFilter(),
+      withAddresses: withAddressesFilter(),
+      recent: recentFilter(),
+    }"
+    (filterClick)="onStatsFilterClick($event)"
+  />
 
   <!-- Search Bar -->
   <app-supplier-search-bar
     [searchQuery]="searchQuery()"
     (searchChange)="searchQuery.set($event)"
+    [activeFilters]="{
+      verified: verifiedFilter(),
+      withAddresses: withAddressesFilter(),
+      recent: recentFilter(),
+    }"
+    [filterColors]="activeFilterColors()"
+    (clearFilter)="clearFilter($event.type)"
   />
 
   <!-- Error Alert -->

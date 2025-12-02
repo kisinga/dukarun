@@ -4,8 +4,10 @@ import {
   Component,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { PurchaseService } from '../../../core/services/purchase.service';
@@ -18,6 +20,7 @@ import {
   PurchaseAction,
   PurchaseTableRowComponent,
 } from './components/purchase-table-row.component';
+import { PurchaseDetailComponent } from './purchase-detail/purchase-detail.component';
 
 /**
  * Purchases list page
@@ -37,6 +40,7 @@ import {
     PurchaseCardComponent,
     PurchaseTableRowComponent,
     PaginationComponent,
+    PurchaseDetailComponent,
   ],
   templateUrl: './purchases.component.html',
   styleUrl: './purchases.component.scss',
@@ -54,15 +58,28 @@ export class PurchasesComponent implements OnInit {
 
   // Local UI state
   readonly searchQuery = signal('');
+  readonly pendingPaymentsFilter = signal(false);
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
+  readonly selectedPurchaseId = signal<string | null>(null);
+  private readonly purchaseDetailModal = viewChild(PurchaseDetailComponent);
 
   // Computed: filtered purchases
   readonly filteredPurchases = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
-    const allPurchases = this.purchases();
+    const pendingPayments = this.pendingPaymentsFilter();
+    let allPurchases = this.purchases();
 
+    // Apply pending payments filter (matches stats calculation: pending or partial)
+    if (pendingPayments) {
+      allPurchases = allPurchases.filter((purchase) => {
+        const status = purchase.paymentStatus?.toLowerCase() || '';
+        return status === 'pending' || status === 'partial';
+      });
+    }
+
+    // Apply search query
     if (!query) return allPurchases;
 
     return allPurchases.filter((purchase) => {
@@ -103,6 +120,20 @@ export class PurchasesComponent implements OnInit {
     return Math.min(this.currentPage() * this.itemsPerPage(), this.filteredPurchases().length);
   });
 
+  constructor() {
+    // Effect to show modal when purchase is selected
+    effect(() => {
+      const purchaseId = this.selectedPurchaseId();
+      const modal = this.purchaseDetailModal();
+      if (purchaseId && modal) {
+        // Use setTimeout to ensure modal is ready
+        setTimeout(async () => {
+          // The modal will auto-open when purchaseId is set
+        }, 0);
+      }
+    });
+  }
+
   ngOnInit(): void {
     this.loadPurchases();
   }
@@ -126,8 +157,8 @@ export class PurchasesComponent implements OnInit {
 
     switch (action) {
       case 'view':
-        // Navigate to purchase detail view (to be implemented)
-        console.log('View purchase:', purchaseId);
+        // Show purchase detail in modal
+        this.selectedPurchaseId.set(purchaseId);
         break;
 
       case 'edit':
@@ -140,6 +171,13 @@ export class PurchasesComponent implements OnInit {
         console.log('Delete purchase:', purchaseId);
         break;
     }
+  }
+
+  /**
+   * Handle purchase detail modal closed
+   */
+  onPurchaseDetailClosed(): void {
+    this.selectedPurchaseId.set(null);
   }
 
   /**
@@ -171,6 +209,22 @@ export class PurchasesComponent implements OnInit {
    */
   trackByPurchaseId(index: number, purchase: any): string {
     return purchase.id;
+  }
+
+  /**
+   * Handle pending payments filter click from stats component
+   */
+  onPendingPaymentsStatsClick(): void {
+    this.pendingPaymentsFilter.set(!this.pendingPaymentsFilter());
+    this.currentPage.set(1);
+  }
+
+  /**
+   * Clear pending payments filter
+   */
+  clearPendingPaymentsFilter(): void {
+    this.pendingPaymentsFilter.set(false);
+    this.currentPage.set(1);
   }
 
   /**
