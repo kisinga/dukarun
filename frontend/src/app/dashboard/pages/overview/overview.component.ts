@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  OnDestroy,
   OnInit,
   computed,
   effect,
@@ -61,7 +62,7 @@ interface RecentActivity {
   styleUrl: './overview.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class OverviewComponent implements OnInit {
+export class OverviewComponent implements OnInit, OnDestroy {
   private readonly dashboardService = inject(DashboardService);
   private readonly companyService = inject(CompanyService);
   private readonly stockLocationService = inject(StockLocationService);
@@ -71,6 +72,8 @@ export class OverviewComponent implements OnInit {
   protected readonly expandedCategory = signal<string | null>(null);
   protected readonly showRecentActivity = signal(false);
   protected readonly showQuickActions = signal(false);
+
+  private resizeListener?: () => void;
 
   // Reactive data from service
   protected readonly isLoading = this.dashboardService.isLoading;
@@ -153,6 +156,39 @@ export class OverviewComponent implements OnInit {
 
     // Fetch dashboard data (channel-scoped)
     this.dashboardService.fetchDashboardData();
+
+    // Auto-expand sales breakdown on desktop
+    this.autoExpandSalesOnDesktop();
+  }
+
+  /**
+   * Automatically expand sales breakdown on desktop screens
+   */
+  private autoExpandSalesOnDesktop(): void {
+    // Check if we're on desktop (1024px and above, matching lg breakpoint)
+    const isDesktop = window.innerWidth >= 1024;
+
+    if (isDesktop) {
+      this.expandedCategory.set('sales');
+    }
+
+    // Also listen for window resize to handle orientation changes
+    this.resizeListener = () => {
+      const isDesktopNow = window.innerWidth >= 1024;
+      // Only auto-expand if we're on desktop and nothing is currently expanded
+      if (isDesktopNow && !this.expandedCategory()) {
+        this.expandedCategory.set('sales');
+      }
+    };
+
+    window.addEventListener('resize', this.resizeListener);
+  }
+
+  ngOnDestroy(): void {
+    // Clean up resize listener
+    if (this.resizeListener) {
+      window.removeEventListener('resize', this.resizeListener);
+    }
   }
 
   /**

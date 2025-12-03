@@ -1,92 +1,183 @@
 <app-navbar />
 
 <main class="bg-base-100 text-base-content">
-  <section class="section scroll-mt-28">
-    <div class="container-app space-y-8">
-      <div class="space-y-4 text-center">
-        <span
-          class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/80"
-        >
-          About dukarun
-        </span>
-        <h1 class="text-4xl font-bold md:text-5xl">Built for Kenyan businesses</h1>
-        <p class="mx-auto max-w-2xl text-lg text-base-content/70">
-          We're on a mission to help small and medium businesses in Kenya run smoother operations,
-          sell faster, and grow with confidence.
-        </p>
-      </div>
+  <section class="section scroll-mt-28 bg-base-100 py-16">
+    <div class="container-app space-y-4 text-center">
+      <span class="badge badge-primary badge-soft badge-sm font-semibold uppercase tracking-wider">
+        About dukarun
+      </span>
+      <h1 class="text-3xl font-bold sm:text-4xl md:text-5xl lg:text-6xl">
+        Built for Kenyan businesses
+      </h1>
+      <p class="mx-auto max-w-2xl text-base text-base-content/70">
+        We're on a mission to help small and medium businesses in Kenya run smoother operations,
+        sell faster, and grow with confidence.
+      </p>
+    </div>
 
-      <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-        <article
-          class="rounded-2xl border border-base-300 bg-gradient-to-br from-base-200 to-base-100 p-6 shadow-lg"
-        >
-          <span class="text-3xl">🎯</span>
-          <h3 class="mt-4 text-lg font-semibold">Our Mission</h3>
-          <p class="mt-2 text-base-content/70">
+    <div class="container-app mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <article
+        class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <div class="flex flex-col gap-4 flex-1">
+          <div
+            class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
+          >
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold">Our Mission</h3>
+          <p class="text-base-content/80">
             Make running a shop simpler. We believe every business owner deserves tools that work
             when they need them, even without perfect internet.
           </p>
-        </article>
+        </div>
+      </article>
 
-        <article
-          class="rounded-2xl border border-base-300 bg-gradient-to-br from-base-200 to-base-100 p-6 shadow-lg"
-        >
-          <span class="text-3xl">🇰🇪</span>
-          <h3 class="mt-4 text-lg font-semibold">Made for Kenya</h3>
-          <p class="mt-2 text-base-content/70">
+      <article
+        class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <div class="flex flex-col gap-4 flex-1">
+          <div
+            class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
+          >
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold">Made for Kenya</h3>
+          <p class="text-base-content/80">
             Built with M-Pesa, cash payments, and offline-first in mind. We understand the unique
             challenges Kenyan businesses face.
           </p>
-        </article>
+        </div>
+      </article>
 
-        <article
-          class="rounded-2xl border border-base-300 bg-gradient-to-br from-base-200 to-base-100 p-6 shadow-lg"
-        >
-          <span class="text-3xl">🤝</span>
-          <h3 class="mt-4 text-lg font-semibold">Your Success</h3>
-          <p class="mt-2 text-base-content/70">
+      <article
+        class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <div class="flex flex-col gap-4 flex-1">
+          <div
+            class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
+          >
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+              />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold">Your Success</h3>
+          <p class="text-base-content/80">
             When you succeed, we succeed. We're committed to providing ongoing support and building
             features that matter to you.
           </p>
-        </article>
-      </div>
+        </div>
+      </article>
+    </div>
 
-      <div class="rounded-2xl border border-base-300 bg-base-200/60 p-8">
-        <h2 class="mb-4 text-2xl font-bold">What makes dukarun different</h2>
-        <div class="grid gap-4 md:grid-cols-2">
-          <div class="flex items-start gap-3">
-            <span class="text-xl">📷</span>
+    <div class="container-app mt-10">
+      <div
+        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <h2 class="mb-6 text-2xl font-bold">What makes dukarun different</h2>
+        <div class="grid gap-6 md:grid-cols-2">
+          <div class="flex items-start gap-4">
+            <div
+              class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0"
+            >
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+            </div>
             <div>
-              <h3 class="font-semibold">Point and sell</h3>
-              <p class="text-sm text-base-content/70">
+              <h3 class="font-semibold mb-1">Point and sell</h3>
+              <p class="text-base md:text-sm text-base-content/70">
                 No barcode scanner needed. Point your phone at products and sell instantly.
               </p>
             </div>
           </div>
-          <div class="flex items-start gap-3">
-            <span class="text-xl">📡</span>
+          <div class="flex items-start gap-4">
+            <div
+              class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0"
+            >
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"
+                />
+              </svg>
+            </div>
             <div>
-              <h3 class="font-semibold">Works offline</h3>
-              <p class="text-sm text-base-content/70">
+              <h3 class="font-semibold mb-1">Works offline</h3>
+              <p class="text-base md:text-sm text-base-content/70">
                 Keep selling even when internet is down. Everything syncs when you reconnect.
               </p>
             </div>
           </div>
-          <div class="flex items-start gap-3">
-            <span class="text-xl">💰</span>
+          <div class="flex items-start gap-4">
+            <div
+              class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0"
+            >
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                />
+              </svg>
+            </div>
             <div>
-              <h3 class="font-semibold">Built-in accounting</h3>
-              <p class="text-sm text-base-content/70">
+              <h3 class="font-semibold mb-1">Built-in accounting</h3>
+              <p class="text-base md:text-sm text-base-content/70">
                 Every sale and purchase automatically updates your ledger. No separate software
                 needed.
               </p>
             </div>
           </div>
-          <div class="flex items-start gap-3">
-            <span class="text-xl">💳</span>
+          <div class="flex items-start gap-4">
+            <div
+              class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary flex-shrink-0"
+            >
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
             <div>
-              <h3 class="font-semibold">M-Pesa ready</h3>
-              <p class="text-sm text-base-content/70">
+              <h3 class="font-semibold mb-1">M-Pesa ready</h3>
+              <p class="text-base md:text-sm text-base-content/70">
                 Track M-Pesa payments automatically in your ledger. Record receipts from your
                 existing Till with full accounting integration.
               </p>
@@ -94,21 +185,30 @@
           </div>
         </div>
       </div>
+    </div>
 
-      <div
-        class="flex flex-col gap-4 rounded-2xl bg-gradient-to-r from-primary/20 to-secondary/10 p-6 md:flex-row md:items-center md:justify-between"
-      >
-        <p class="max-w-2xl">
+    <div
+      class="container-app mt-10 grid gap-6 rounded-3xl border border-base-300 bg-base-100 p-8 shadow-xl md:grid-cols-[2fr,1fr] md:items-center"
+    >
+      <div class="space-y-4">
+        <h2 class="text-2xl font-bold sm:text-3xl md:text-4xl lg:text-5xl">
           Ready to see how dukarun can help your business?
-          <a routerLink="/features" class="link link-primary">Explore features</a> or
-          <a routerLink="/signup" class="link link-primary">start your free trial</a>.
-        </p>
+        </h2>
+        <p class="text-base-content/70">Explore features or start your free trial.</p>
+      </div>
+      <div class="flex flex-col gap-3 md:flex-row md:justify-end">
+        <a
+          routerLink="/features"
+          class="btn btn-lg btn-outline border border-transparent transition-all duration-200 hover:-translate-y-0.5 hover:border-base-300 hover:bg-base-100"
+        >
+          Explore features
+        </a>
         <a
           routerLink="/signup"
           [queryParams]="{ plan: 'pro', trial: 'true' }"
-          class="btn btn-primary btn-lg"
+          class="btn btn-lg btn-primary shadow-lg shadow-primary/20 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl"
         >
-          Start free trial
+          Start free 30-day trial
         </a>
       </div>
     </div>
