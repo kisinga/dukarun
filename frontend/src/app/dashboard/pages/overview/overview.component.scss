@@ -1,115 +1,48 @@
-// Overview component styles - Mobile-first design
+// Overview - Mobile-first, performance optimized
 @use '../../styles/dashboard-animations' as *;
 
-// Hide scrollbar but allow scrolling
+:host {
+  display: block;
+}
+
+// Touch optimizations
+button,
+a,
+[role='button'] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+// Minimal touch targets (for items that need them)
+button:not(.btn-xs):not(.btn-square):not(.badge),
+a:not(.badge) {
+  min-height: 40px;
+}
+
+// Scrollbar hide utility
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
-  
   &::-webkit-scrollbar {
     display: none;
   }
 }
 
-// Snap scrolling for stats row on mobile
-.overflow-x-auto {
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  
-  > * {
-    scroll-snap-align: start;
+// Quick transitions on mobile
+@media (max-width: 639px) {
+  * {
+    transition-duration: 0.1s !important;
   }
 }
 
-// Touch-optimized interactions
-@media (hover: none) and (pointer: coarse) {
-  // Remove hover effects, rely on active states
-  button,
-  [role="button"] {
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-  }
-  
-  // Faster active feedback
-  .active\:scale-95:active,
-  .active\:scale-\[0\.98\]:active,
-  .active\:scale-\[0\.99\]:active {
-    transition-duration: 0.1s;
-  }
-}
-
-// Primary CTA button enhancement
-.btn-primary.btn-lg {
-  min-height: 3.5rem;
-  font-size: 1rem;
-  
-  @media (min-width: 640px) {
-    min-height: 3rem;
-  }
-}
-
-// Ensure proper touch targets (44px minimum)
-button,
-[role="button"],
-a {
-  min-height: 44px;
-  
-  &.btn-xs,
-  &.btn-sm,
-  &.badge {
-    min-height: auto;
-  }
-}
-
-// Compact badge sizing
-.badge-xs {
-  min-height: auto;
-  padding: 0 0.375rem;
-  font-size: 0.625rem;
-}
-
-// Stats card hover on desktop only
-@media (hover: hover) {
-  .rounded-xl[class*="bg-gradient"] {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px -8px oklch(var(--bc) / 0.1);
-    }
-  }
-}
-
-// Quick action cards
-.grid.grid-cols-3 button {
-  min-height: 100px;
-  
-  @media (min-width: 640px) {
-    min-height: 110px;
-  }
-}
-
-// Recent activity collapse animation
-.divide-y > div {
-  animation: slide-down 0.2s ease-out;
-}
-
-@keyframes slide-down {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-// Smooth expand/collapse for chevron
+// Chevron rotation
 .rotate-180 {
   transform: rotate(180deg);
 }
 
-svg[class*="transition-transform"] {
-  transition: transform 0.2s ease;
+// Reduced motion
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
 }

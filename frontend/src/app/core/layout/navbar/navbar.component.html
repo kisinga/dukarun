@@ -7,14 +7,14 @@
     (change)="toggleMenu()"
   />
   <div class="drawer-content flex flex-col">
-    <!-- Navbar -->
+    <!-- Navbar - Mobile optimized: compact height, tighter spacing -->
     <div
-      class="navbar bg-base-100 border-b border-base-300 w-full sticky top-0 z-30 backdrop-blur-md bg-base-100/90"
+      class="navbar bg-base-100/95 border-b border-base-300/40 w-full sticky top-0 z-30 backdrop-blur-xl min-h-14 sm:min-h-16 px-2 sm:px-4"
     >
-      <div class="navbar-start">
+      <div class="navbar-start gap-1">
         <label
           for="mobile-drawer"
-          class="btn btn-ghost btn-circle lg:hidden"
+          class="btn btn-ghost btn-sm btn-square lg:hidden"
           aria-label="Open menu"
         >
           <svg
@@ -32,94 +32,221 @@
             />
           </svg>
         </label>
-        <a routerLink="/" class="btn btn-ghost text-xl flex items-center gap-2">
-          <img src="favicon.svg" alt="dukarun" class="h-8 w-8" />
-          <span class="font-bold text-primary">dukarun</span>
+        <a routerLink="/" class="flex items-center gap-2 px-1 sm:px-2">
+          <img src="favicon.svg" alt="dukarun" class="h-7 w-7 sm:h-8 sm:w-8" />
+          <span class="font-bold text-primary text-base sm:text-lg tracking-tight">dukarun</span>
         </a>
       </div>
 
       <div class="navbar-center hidden lg:flex">
-        <ul class="menu menu-horizontal px-1 gap-2">
+        <ul class="menu menu-horizontal px-1 gap-0.5 text-sm">
           <li>
-            <a href="/#journey" class="font-medium hover:text-primary transition-colors"
+            <a
+              href="/#journey"
+              class="font-medium px-3 py-2 rounded-lg hover:bg-primary/10 hover:text-primary"
               >How It Works</a
             >
           </li>
           <li>
-            <a routerLink="/features" class="font-medium hover:text-primary transition-colors"
+            <a
+              routerLink="/features"
+              class="font-medium px-3 py-2 rounded-lg hover:bg-primary/10 hover:text-primary"
               >Features</a
             >
           </li>
           <li>
-            <a href="/#pricing-preview" class="font-medium hover:text-primary transition-colors"
+            <a
+              href="/#pricing-preview"
+              class="font-medium px-3 py-2 rounded-lg hover:bg-primary/10 hover:text-primary"
               >Pricing</a
             >
           </li>
-          <li><a href="/#faq" class="font-medium hover:text-primary transition-colors">FAQ</a></li>
+          <li>
+            <a
+              href="/#faq"
+              class="font-medium px-3 py-2 rounded-lg hover:bg-primary/10 hover:text-primary"
+              >FAQ</a
+            >
+          </li>
         </ul>
       </div>
 
-      <div class="navbar-end gap-2">
-        <a routerLink="/login" class="btn btn-ghost btn-sm hidden sm:inline-flex">Log in</a>
-        <a routerLink="/signup" class="btn btn-primary btn-sm">Get Started</a>
+      <div class="navbar-end gap-1.5 sm:gap-2">
+        <a
+          routerLink="/login"
+          class="btn btn-ghost btn-sm hidden sm:inline-flex font-medium text-sm"
+          >Log in</a
+        >
+        <a
+          routerLink="/signup"
+          class="btn btn-primary btn-sm text-xs sm:text-sm font-semibold shadow-sm px-3 sm:px-4"
+        >
+          <span class="hidden xs:inline">Get Started</span>
+          <span class="xs:hidden">Start</span>
+        </a>
       </div>
     </div>
   </div>
 
+  <!-- Mobile Drawer - Compact, fast, touch-optimized -->
   <div class="drawer-side z-40">
-    <label for="mobile-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
-    <ul
-      class="menu bg-base-100 min-h-full w-80 p-4 gap-2 text-base-content border-r border-base-300"
-    >
-      <!-- Sidebar Header -->
-      <li class="mb-4">
-        <div class="flex items-center justify-between p-0 hover:bg-transparent">
-          <div class="flex items-center gap-2">
-            <img src="favicon.svg" alt="dukarun" class="h-8 w-8" />
-            <span class="text-xl font-bold text-primary">dukarun</span>
+    <label
+      for="mobile-drawer"
+      aria-label="close sidebar"
+      class="drawer-overlay bg-base-content/20 backdrop-blur-sm"
+    ></label>
+    <div class="bg-base-100 min-h-full w-72 flex flex-col">
+      <!-- Drawer Header - Compact -->
+      <div
+        class="flex items-center justify-between p-3 border-b border-base-300/50 bg-gradient-to-r from-primary/8 to-transparent"
+      >
+        <div class="flex items-center gap-2.5">
+          <img src="favicon.svg" alt="dukarun" class="h-8 w-8" />
+          <div>
+            <span class="text-lg font-bold text-primary block leading-tight">dukarun</span>
+            <span class="text-[9px] text-base-content/40 uppercase tracking-wider font-medium"
+              >Point & Sell</span
+            >
           </div>
-          <label for="mobile-drawer" class="btn btn-ghost btn-circle btn-sm">
+        </div>
+        <label for="mobile-drawer" class="btn btn-ghost btn-sm btn-square" aria-label="Close menu">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </label>
+      </div>
+
+      <!-- Navigation - Large touch targets, minimal chrome -->
+      <nav class="flex-1 py-2 px-2">
+        <a
+          href="/#journey"
+          (click)="closeMenu()"
+          class="flex items-center gap-3 py-3 px-3 rounded-xl active:bg-primary/15 transition-colors"
+        >
+          <span
+            class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
+              class="h-4.5 w-4.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              stroke-width="2"
             >
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
+                d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-          </label>
-        </div>
-      </li>
-
-      <li>
-        <a href="/#journey" (click)="closeMenu()" class="py-3 text-lg font-medium">How It Works</a>
-      </li>
-      <li>
-        <a routerLink="/features" (click)="closeMenu()" class="py-3 text-lg font-medium"
-          >Features</a
+          </span>
+          <span class="font-semibold">How It Works</span>
+        </a>
+        <a
+          routerLink="/features"
+          (click)="closeMenu()"
+          class="flex items-center gap-3 py-3 px-3 rounded-xl active:bg-success/15 transition-colors"
         >
-      </li>
-      <li>
-        <a href="/#pricing-preview" (click)="closeMenu()" class="py-3 text-lg font-medium"
-          >Pricing</a
+          <span
+            class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center text-success shrink-0"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4.5 w-4.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+              />
+            </svg>
+          </span>
+          <span class="font-semibold">Features</span>
+        </a>
+        <a
+          href="/#pricing-preview"
+          (click)="closeMenu()"
+          class="flex items-center gap-3 py-3 px-3 rounded-xl active:bg-info/15 transition-colors"
         >
-      </li>
-      <li><a href="/#faq" (click)="closeMenu()" class="py-3 text-lg font-medium">FAQ</a></li>
-
-      <div class="divider my-2"></div>
-
-      <div class="flex flex-col gap-3 mt-2">
-        <a routerLink="/login" (click)="closeMenu()" class="btn btn-outline btn-block">Log in</a>
-        <a routerLink="/signup" (click)="closeMenu()" class="btn btn-primary btn-block"
-          >Get Started</a
+          <span
+            class="w-9 h-9 rounded-lg bg-info/10 flex items-center justify-center text-info shrink-0"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4.5 w-4.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </span>
+          <span class="font-semibold">Pricing</span>
+        </a>
+        <a
+          href="/#faq"
+          (click)="closeMenu()"
+          class="flex items-center gap-3 py-3 px-3 rounded-xl active:bg-accent/15 transition-colors"
         >
+          <span
+            class="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center text-accent shrink-0"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4.5 w-4.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </span>
+          <span class="font-semibold">FAQ</span>
+        </a>
+      </nav>
+
+      <!-- Footer CTAs - Prominent, clear actions -->
+      <div class="p-3 border-t border-base-300/50 bg-base-200/30 space-y-2">
+        <a
+          routerLink="/login"
+          (click)="closeMenu()"
+          class="btn btn-ghost btn-block btn-sm font-semibold"
+          >Log in</a
+        >
+        <a
+          routerLink="/signup"
+          (click)="closeMenu()"
+          class="btn btn-primary btn-block font-semibold"
+          >Start Free Trial</a
+        >
+        <p class="text-[9px] text-center text-base-content/40">30 days free · No card needed</p>
       </div>
-    </ul>
+    </div>
   </div>
 </div>

@@ -1,0 +1,86 @@
+// Marketing Navbar - Mobile-first, performance optimized
+
+:host {
+  display: block;
+}
+
+// Navbar - minimal on mobile, richer on desktop
+.navbar {
+  // GPU-accelerated backdrop
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+// Desktop-only enhancements (no extra overhead on mobile)
+@media (min-width: 1024px) {
+  .menu-horizontal a {
+    position: relative;
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%) scaleX(0);
+      width: 50%;
+      height: 2px;
+      background: oklch(var(--p));
+      border-radius: 2px;
+      transition: transform 0.15s ease;
+    }
+
+    &:hover::after {
+      transform: translateX(-50%) scaleX(1);
+    }
+  }
+}
+
+// Drawer - fast slide, touch-optimized
+.drawer-side > div {
+  animation: drawer-slide 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes drawer-slide {
+  from {
+    opacity: 0.5;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+// Touch-optimized nav items
+nav a {
+  // Instant touch feedback
+  -webkit-tap-highlight-color: transparent;
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+// Responsive breakpoint for extra-small screens
+@media (max-width: 360px) {
+  .navbar {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .btn-sm {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
+
+// Reduce motion
+@media (prefers-reduced-motion: reduce) {
+  .drawer-side > div {
+    animation: none;
+  }
+
+  nav a:active {
+    transform: none;
+  }
+}
