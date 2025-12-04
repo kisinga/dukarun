@@ -1,4 +1,4 @@
-import { ProductVariant, StockLocation, User } from '@vendure/core';
+import { Channel, ProductVariant, StockLocation, User } from '@vendure/core';
 import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 /**
@@ -10,6 +10,12 @@ import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'ty
 export class InventoryStockAdjustment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'integer' })
+  channelId: number;
+
+  @ManyToOne(() => Channel)
+  channel: Channel;
 
   @Column({ type: 'varchar' })
   reason: string; // 'damage', 'loss', 'found', 'correction', etc.

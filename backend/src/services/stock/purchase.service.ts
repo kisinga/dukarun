@@ -78,6 +78,7 @@ export class PurchaseService {
 
     // Create purchase entity
     const purchase = new StockPurchase();
+    purchase.channelId = ctx.channelId as number;
     // Convert Vendure ID (string) to integer for database
     purchase.supplierId = parseInt(String(input.supplierId), 10);
     purchase.purchaseDate = input.purchaseDate;

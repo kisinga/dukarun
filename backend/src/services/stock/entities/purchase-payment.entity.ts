@@ -15,6 +15,9 @@ export class PurchasePayment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ type: 'integer' })
+  channelId: number;
+
   @Column({ type: 'uuid' })
   purchaseId: string;
 
