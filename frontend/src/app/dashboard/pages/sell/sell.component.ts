@@ -190,8 +190,21 @@ export class SellComponent implements OnInit {
   }
 
   handleProductDetected(product: ProductSearchResult): void {
-    this.detectedProduct.set(product);
-    this.showConfirmModal.set(true);
+    try {
+      console.log('[SellComponent] handleProductDetected called with product:', product.name);
+      this.detectedProduct.set(product);
+      this.showConfirmModal.set(true);
+      console.log(
+        '[SellComponent] Modal state set - showConfirmModal:',
+        this.showConfirmModal(),
+        'detectedProduct:',
+        this.detectedProduct(),
+      );
+    } catch (error) {
+      console.error('[SellComponent] Error in handleProductDetected:', error);
+      // Show error notification
+      this.showNotification('Failed to process scanned product', 'error');
+    }
   }
 
   // Product Confirmation Handlers
@@ -204,8 +217,11 @@ export class SellComponent implements OnInit {
   }
 
   handleConfirmModalClose(): void {
+    console.log('[SellComponent] Modal closed, resetting state');
     this.showConfirmModal.set(false);
     this.detectedProduct.set(null);
+    // Scanner should be ready to start again - the scanner component will handle restart
+    // when user wants to scan again (via autoStartOnMobile or manual start)
   }
 
   // Notifications

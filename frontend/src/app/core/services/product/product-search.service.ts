@@ -14,6 +14,7 @@ export interface ProductVariant {
   stockLevel: string;
   productId: string;
   productName: string;
+  trackInventory?: boolean;
   featuredAsset?: {
     preview: string;
   };
@@ -104,6 +105,7 @@ export class ProductSearchService {
             stockLevel: v.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
             productId: product.id,
             productName: product.name,
+            trackInventory: v.trackInventory,
             customFields: v.customFields
               ? {
                   wholesalePrice: v.customFields.wholesalePrice,
@@ -210,6 +212,7 @@ export class ProductSearchService {
         stockLevel: variant.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
         productId: product.id,
         productName: product.name,
+        trackInventory: variant.trackInventory,
         featuredAsset: product.featuredAsset
           ? { preview: product.featuredAsset.preview }
           : undefined,

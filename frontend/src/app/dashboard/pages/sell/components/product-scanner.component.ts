@@ -72,7 +72,7 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
 
           <!-- Status Footer -->
           <div class="text-center text-xs opacity-60 mt-2">Point camera at product or barcode</div>
-          
+
           <!-- Barcode Not Found Feedback -->
           @if (barcodeNotFoundMessage()) {
             <div class="alert alert-warning mt-2 animate-in">
@@ -92,7 +92,9 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
               </svg>
               <div>
                 <div class="font-semibold">Barcode Not Found</div>
-                <div class="text-sm">Barcode "{{ barcodeNotFoundMessage() }}" is not in the system</div>
+                <div class="text-sm">
+                  Barcode "{{ barcodeNotFoundMessage() }}" is not in the system
+                </div>
               </div>
             </div>
           }
@@ -340,6 +342,8 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
    * Stop the scanner
    */
   stopScanner(): void {
+    console.log('[ProductScanner] stopScanner() called');
+
     // Stop coordinator
     this.coordinator?.stop();
 
@@ -357,9 +361,17 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
     // Clear barcode not found message
     this.barcodeNotFoundMessage.set(null);
 
+    // Update state to hide viewfinder
     this.isScanning.set(false);
     this.scannerStatus.set('ready');
     this.scanningStateChange.emit(false);
+
+    console.log(
+      '[ProductScanner] Scanner stopped - isScanning:',
+      this.isScanning(),
+      'status:',
+      this.scannerStatus(),
+    );
   }
 
   /**
@@ -369,7 +381,11 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
     if (this.isScanning()) {
       this.stopScanner();
     } else {
-      this.startScanner();
+      this.startScanner().catch((err) => {
+        console.error('[ProductScanner] Failed to start scanner:', err);
+        this.scannerStatus.set('error');
+        this.scannerError.emit(err.message || 'Failed to start scanner');
+      });
     }
   }
 
@@ -379,14 +395,22 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
   private handleDetection(result: DetectionResult): void {
     console.log(`[ProductScanner] Detection from ${result.type}:`, result.product.name);
 
-    // Clear any barcode not found message
-    this.barcodeNotFoundMessage.set(null);
+    try {
+      // Clear any barcode not found message
+      this.barcodeNotFoundMessage.set(null);
 
-    // Stop scanner
-    this.stopScanner();
+      // Stop scanner (this will hide the viewfinder)
+      this.stopScanner();
 
-    // Emit product to parent
-    this.productDetected.emit(result.product);
+      // Emit product to parent
+      console.log(`[ProductScanner] Emitting productDetected event for:`, result.product.name);
+      this.productDetected.emit(result.product);
+      console.log(`[ProductScanner] ProductDetected event emitted successfully`);
+    } catch (error) {
+      console.error(`[ProductScanner] Error in handleDetection:`, error);
+      // Even if there's an error, try to stop the scanner
+      this.stopScanner();
+    }
   }
 
   /**
@@ -395,7 +419,7 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
   private handleBarcodeNotFound(barcode: string): void {
     console.log(`[ProductScanner] Barcode "${barcode}" detected but not found in database`);
     this.barcodeNotFoundMessage.set(barcode);
-    
+
     // Clear message after 3 seconds
     setTimeout(() => {
       this.barcodeNotFoundMessage.set(null);
@@ -420,8 +444,8 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
         const videoEl = this.videoElement()?.nativeElement;
         if (videoEl) {
           resolve(videoEl);
-      return;
-    }
+          return;
+        }
 
         retries++;
         if (retries >= maxRetries) {
@@ -429,8 +453,8 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
             `[ProductScanner] Video element not found after ${maxRetries} retries (${maxRetries * retryDelay}ms)`,
           );
           resolve(null);
-      return;
-    }
+          return;
+        }
 
         setTimeout(checkForElement, retryDelay);
       };

@@ -3,8 +3,20 @@
     <div class="flex gap-3">
       <!-- Product Image -->
       <div class="avatar shrink-0">
-        <div class="w-16 h-16 rounded-lg ring-2 ring-base-300 ring-offset-1">
-          <img [src]="getThumbnail()" [alt]="product().name" class="object-cover" />
+        <div
+          class="w-16 h-16 rounded-lg ring-2 ring-base-300 ring-offset-1 bg-base-200 flex items-center justify-center"
+        >
+          @if (getThumbnail()) {
+            <img
+              [src]="getThumbnail()!"
+              [alt]="product().name"
+              class="object-cover w-full h-full rounded-lg"
+            />
+          } @else if (isService()) {
+            <span class="material-symbols-outlined text-3xl text-accent">build</span>
+          } @else {
+            <span class="material-symbols-outlined text-3xl text-primary">inventory_2</span>
+          }
         </div>
       </div>
 
@@ -28,11 +40,12 @@
           <span class="w-1 h-1 rounded-full bg-base-content/30"></span>
           <span
             class="font-medium"
-            [class.text-success]="totalStock() > 20"
-            [class.text-warning]="totalStock() > 0 && totalStock() <= 20"
-            [class.text-error]="totalStock() === 0"
+            [class.text-info]="isService()"
+            [class.text-success]="!isService() && totalStock() > 20"
+            [class.text-warning]="!isService() && totalStock() > 0 && totalStock() <= 20"
+            [class.text-error]="!isService() && totalStock() === 0"
           >
-            {{ totalStock() }} in stock
+            {{ getStockDisplay() }} in stock
           </span>
         </div>
 
@@ -85,9 +98,10 @@
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="h-4 w-4"
-            [class.text-success]="totalStock() > 20"
-            [class.text-warning]="totalStock() > 0 && totalStock() <= 20"
-            [class.text-error]="totalStock() === 0"
+            [class.text-info]="isService()"
+            [class.text-success]="!isService() && totalStock() > 20"
+            [class.text-warning]="!isService() && totalStock() > 0 && totalStock() <= 20"
+            [class.text-error]="!isService() && totalStock() === 0"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -99,7 +113,7 @@
               d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
             />
           </svg>
-          <span class="text-base font-bold">{{ totalStock() }}</span>
+          <span class="text-base font-bold">{{ getStockDisplay() }}</span>
         </div>
       </div>
     </div>

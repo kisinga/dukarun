@@ -1,5 +1,5 @@
 import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
-import { Customer } from '@vendure/core';
+import { Channel, Customer } from '@vendure/core';
 import { StockPurchase } from './purchase.entity';
 
 /**
@@ -11,12 +11,16 @@ import { StockPurchase } from './purchase.entity';
 @Entity('purchase_payment')
 @Index('IDX_purchase_payment_purchase', ['purchaseId'])
 @Index('IDX_purchase_payment_supplier', ['supplierId', 'paidAt'])
+@Index('IDX_purchase_payment_channel', ['channelId'])
 export class PurchasePayment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ type: 'integer' })
   channelId: number;
+
+  @ManyToOne(() => Channel)
+  channel: Channel;
 
   @Column({ type: 'uuid' })
   purchaseId: string;

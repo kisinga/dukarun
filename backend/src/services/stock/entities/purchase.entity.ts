@@ -1,7 +1,8 @@
 import { Channel, Customer, ProductVariant, StockLocation } from '@vendure/core';
-import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('stock_purchase')
+@Index('IDX_stock_purchase_channel', ['channelId'])
 export class StockPurchase {
   @PrimaryGeneratedColumn('uuid')
   id: string;

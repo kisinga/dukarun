@@ -424,6 +424,7 @@ export const GET_PRODUCTS = graphql(`
           price
           priceWithTax
           stockOnHand
+          trackInventory
           customFields {
             wholesalePrice
             allowFractionalQuantity
@@ -532,6 +533,7 @@ export const SEARCH_PRODUCTS = graphql(`
           price
           priceWithTax
           stockOnHand
+          trackInventory
           customFields {
             wholesalePrice
             allowFractionalQuantity
@@ -610,6 +612,7 @@ export const SEARCH_BY_BARCODE = graphql(`
           sku
           priceWithTax
           stockOnHand
+          trackInventory
           customFields {
             wholesalePrice
             allowFractionalQuantity
