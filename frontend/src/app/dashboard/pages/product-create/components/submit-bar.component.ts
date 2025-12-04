@@ -15,13 +15,15 @@ import { ItemType } from '../types/product-creation.types';
   template: `
     <div class="sticky bottom-4 bg-base-100 p-4 rounded-lg shadow-lg border">
       <div class="flex flex-row gap-2">
-        <button
-          type="button"
-          class="btn btn-outline btn-neutral w-1/2"
-          (click)="onPrevious()"
-        >
-          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="m15 18-6-6 6-6"/>
+        <button type="button" class="btn btn-soft w-1/2" (click)="onPrevious()">
+          <svg
+            class="w-5 h-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="m15 18-6-6 6-6" />
           </svg>
           <span>Back</span>
         </button>
@@ -37,13 +39,25 @@ import { ItemType } from '../types/product-creation.types';
             <span>Saving...</span>
           } @else {
             @if (isEditMode()) {
-              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 6 9 17l-5-5"/>
+              <svg
+                class="w-5 h-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M20 6 9 17l-5-5" />
               </svg>
               <span>Update</span>
             } @else {
-              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 5v14M5 12h14"/>
+              <svg
+                class="w-5 h-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M12 5v14M5 12h14" />
               </svg>
               <span>Create</span>
             }

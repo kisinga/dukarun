@@ -257,13 +257,13 @@ export class ProductService {
   }
 
   /**
-   * Update product base data (name, barcode) and variant details (name + price).
+   * Update product base data (name, barcode) and variant details (name + price + wholesalePrice).
    * Used by the product edit screen.
    */
   async updateProductWithVariants(
     productId: string,
     name: string,
-    variants: { id: string; name: string; price: number }[],
+    variants: { id: string; name: string; price: number; wholesalePrice?: number | null }[],
     barcode?: string,
   ): Promise<boolean> {
     try {
