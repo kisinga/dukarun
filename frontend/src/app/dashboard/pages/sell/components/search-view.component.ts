@@ -81,7 +81,13 @@ import { ProductSearchResult } from '../../../../core/services/product/product-s
                   />
                 } @else {
                   <div class="w-10 h-10 rounded bg-base-300 flex items-center justify-center">
-                    <span class="text-lg">📦</span>
+                    @if (isService(product)) {
+                      <span class="material-symbols-outlined text-xl text-accent">build</span>
+                    } @else {
+                      <span class="material-symbols-outlined text-xl text-primary"
+                        >inventory_2</span
+                      >
+                    }
                   </div>
                 }
 
@@ -132,6 +138,10 @@ export class SearchViewComponent {
 
   // Local state
   searchTerm = '';
+
+  isService(product: ProductSearchResult): boolean {
+    return product.variants?.some((v) => v.trackInventory === false) || false;
+  }
 
   onSearchChange(term: string): void {
     this.searchTermChange.emit(term);

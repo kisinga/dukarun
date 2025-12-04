@@ -1,8 +1,18 @@
 <!-- Thumbnail -->
 <td>
   <div class="avatar">
-    <div class="w-12 h-12 rounded">
-      <img [src]="getThumbnail()" [alt]="product().name" class="object-cover" />
+    <div class="w-12 h-12 rounded bg-base-200 flex items-center justify-center">
+      @if (getThumbnail()) {
+        <img
+          [src]="getThumbnail()!"
+          [alt]="product().name"
+          class="object-cover w-full h-full rounded"
+        />
+      } @else if (isService()) {
+        <span class="material-symbols-outlined text-2xl text-accent">build</span>
+      } @else {
+        <span class="material-symbols-outlined text-2xl text-primary">inventory_2</span>
+      }
     </div>
   </div>
 </td>
@@ -35,11 +45,12 @@
 <td class="text-center">
   <span
     class="badge badge-sm"
-    [class.badge-success]="totalStock() > 20"
-    [class.badge-warning]="totalStock() > 0 && totalStock() <= 20"
-    [class.badge-error]="totalStock() === 0"
+    [class.badge-info]="isService()"
+    [class.badge-success]="!isService() && totalStock() > 20"
+    [class.badge-warning]="!isService() && totalStock() > 0 && totalStock() <= 20"
+    [class.badge-error]="!isService() && totalStock() === 0"
   >
-    {{ totalStock() }}
+    {{ getStockDisplay() }}
   </span>
 </td>
 

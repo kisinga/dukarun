@@ -14,6 +14,7 @@ export interface ProductCardData {
     sku: string;
     priceWithTax: number;
     stockOnHand: number;
+    trackInventory?: boolean;
   }>;
 }
 
@@ -42,6 +43,17 @@ export class ProductCardComponent {
     return this.product().variants?.reduce((sum, v) => sum + (v.stockOnHand || 0), 0) || 0;
   }
 
+  isService(): boolean {
+    return this.product().variants?.some((v) => v.trackInventory === false) || false;
+  }
+
+  getStockDisplay(): string {
+    if (this.isService()) {
+      return '∞';
+    }
+    return this.totalStock().toString();
+  }
+
   priceRange(): string {
     const variants = this.product().variants;
     if (!variants || variants.length === 0) return 'N/A';
@@ -57,8 +69,8 @@ export class ProductCardComponent {
     return `${this.formatPrice(minPrice)} - ${this.formatPrice(maxPrice)}`;
   }
 
-  getThumbnail(): string {
-    return this.product().featuredAsset?.preview || 'https://picsum.photos/200/200';
+  getThumbnail(): string | null {
+    return this.product().featuredAsset?.preview || null;
   }
 
   private formatPrice(price: number): string {
