@@ -381,7 +381,11 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
     if (this.isScanning()) {
       this.stopScanner();
     } else {
-      this.startScanner();
+      this.startScanner().catch((err) => {
+        console.error('[ProductScanner] Failed to start scanner:', err);
+        this.scannerStatus.set('error');
+        this.scannerError.emit(err.message || 'Failed to start scanner');
+      });
     }
   }
 
