@@ -1,5 +1,5 @@
 import { Channel, ProductVariant, StockLocation, User } from '@vendure/core';
-import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 /**
  * Inventory Stock Adjustment Entity
@@ -7,6 +7,7 @@ import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'ty
  * Adds: reason tracking, notes, line items with previous/new stock values
  */
 @Entity('inventory_stock_adjustment')
+@Index('IDX_inventory_stock_adjustment_channel', ['channelId'])
 export class InventoryStockAdjustment {
   @PrimaryGeneratedColumn('uuid')
   id: string;

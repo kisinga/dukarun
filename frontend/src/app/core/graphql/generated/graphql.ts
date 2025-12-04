@@ -9058,6 +9058,7 @@ export type GetProductsQuery = {
         price: number;
         priceWithTax: number;
         stockOnHand: number;
+        trackInventory: GlobalFlag;
         customFields?: {
           __typename?: 'ProductVariantCustomFields';
           wholesalePrice?: number | null;
@@ -9176,6 +9177,7 @@ export type SearchProductsQuery = {
         price: number;
         priceWithTax: number;
         stockOnHand: number;
+        trackInventory: GlobalFlag;
         customFields?: {
           __typename?: 'ProductVariantCustomFields';
           wholesalePrice?: number | null;
@@ -9265,6 +9267,7 @@ export type SearchByBarcodeQuery = {
         sku: string;
         priceWithTax: number;
         stockOnHand: number;
+        trackInventory: GlobalFlag;
         customFields?: {
           __typename?: 'ProductVariantCustomFields';
           wholesalePrice?: number | null;
@@ -13233,6 +13236,7 @@ export const GetProductsDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'price' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'priceWithTax' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'stockOnHand' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'trackInventory' } },
                             {
                               kind: 'Field',
                               name: { kind: 'Name', value: 'customFields' },
@@ -13672,6 +13676,7 @@ export const SearchProductsDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'price' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'priceWithTax' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'stockOnHand' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'trackInventory' } },
                             {
                               kind: 'Field',
                               name: { kind: 'Name', value: 'customFields' },
@@ -13971,6 +13976,7 @@ export const SearchByBarcodeDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'sku' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'priceWithTax' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'stockOnHand' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'trackInventory' } },
                             {
                               kind: 'Field',
                               name: { kind: 'Name', value: 'customFields' },
