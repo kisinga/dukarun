@@ -1,10 +1,16 @@
-import { Customer, ProductVariant, StockLocation } from '@vendure/core';
+import { Channel, Customer, ProductVariant, StockLocation } from '@vendure/core';
 import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('stock_purchase')
 export class StockPurchase {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'integer' })
+  channelId: number;
+
+  @ManyToOne(() => Channel)
+  channel: Channel;
 
   @Column({ type: 'integer' })
   supplierId: number;

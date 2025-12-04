@@ -52,6 +52,7 @@ export class StockAdjustmentService {
 
     // Create adjustment entity
     const adjustment = new InventoryStockAdjustment();
+    adjustment.channelId = ctx.channelId as number;
     adjustment.reason = input.reason;
     adjustment.notes = input.notes || null;
     // Convert Vendure User ID (string) to integer for database

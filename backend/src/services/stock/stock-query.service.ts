@@ -44,6 +44,10 @@ export class StockQueryService {
     const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
     const baseFilterQb = purchaseRepo.createQueryBuilder('purchase');
 
+    // Always filter by channelId for security
+    const channelId = ctx.channelId as number;
+    baseFilterQb.andWhere('purchase.channelId = :channelId', { channelId });
+
     // Apply filters to base query (used for both count and items)
     if (options.filter?.supplierId) {
       baseFilterQb.andWhere('purchase.supplierId = :supplierId', {
@@ -73,6 +77,9 @@ export class StockQueryService {
       .leftJoinAndSelect('purchase.lines', 'lines')
       .leftJoinAndSelect('lines.variant', 'variant')
       .leftJoinAndSelect('lines.stockLocation', 'stockLocation');
+
+    // Always filter by channelId for security
+    itemsQb.andWhere('purchase.channelId = :channelId', { channelId });
 
     // Reapply filters to items query
     if (options.filter?.supplierId) {
@@ -120,6 +127,10 @@ export class StockQueryService {
     const adjustmentRepo = this.connection.getRepository(ctx, InventoryStockAdjustment);
     const baseFilterQb = adjustmentRepo.createQueryBuilder('adjustment');
 
+    // Always filter by channelId for security
+    const channelId = ctx.channelId as number;
+    baseFilterQb.andWhere('adjustment.channelId = :channelId', { channelId });
+
     // Apply filters to base query (used for both count and items)
     if (options.filter?.reason) {
       baseFilterQb.andWhere('adjustment.reason = :reason', {
@@ -149,6 +160,9 @@ export class StockQueryService {
       .leftJoinAndSelect('adjustment.lines', 'lines')
       .leftJoinAndSelect('lines.variant', 'variant')
       .leftJoinAndSelect('lines.stockLocation', 'stockLocation');
+
+    // Always filter by channelId for security
+    itemsQb.andWhere('adjustment.channelId = :channelId', { channelId });
 
     // Reapply filters to items query
     if (options.filter?.reason) {

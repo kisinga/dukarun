@@ -50,8 +50,10 @@ export class SupplierPaymentAllocationService {
     const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
 
     // Convert Vendure ID (string) to integer for database query
+    const channelId = ctx.channelId as number;
     const purchases = await purchaseRepo.find({
       where: {
+        channelId: channelId,
         supplierId: parseInt(String(supplierId), 10),
         isCreditPurchase: true,
         paymentStatus: In(['pending', 'partial']),
