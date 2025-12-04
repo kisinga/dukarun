@@ -54,8 +54,8 @@ export class ProductEditComponent implements OnInit {
   readonly productId = signal<string | null>(null);
   readonly isLoading = signal(false);
 
-  // 2-stage flow for editing (defaults to pricing & stock)
-  readonly currentStage = signal<1 | 2>(2);
+  // 2-stage flow for editing (defaults to details)
+  readonly currentStage = signal<1 | 2>(1);
 
   // Form
   readonly productForm: FormGroup;
@@ -137,6 +137,8 @@ export class ProductEditComponent implements OnInit {
       return;
     }
 
+    // Ensure we start on stage 1 (Details)
+    this.currentStage.set(1);
     this.productId.set(productId);
     await this.loadProduct(productId);
   }
@@ -146,6 +148,8 @@ export class ProductEditComponent implements OnInit {
    */
   private async loadProduct(productId: string): Promise<void> {
     this.isLoading.set(true);
+    // Ensure we stay on stage 1 after loading
+    this.currentStage.set(1);
     try {
       const product = await this.productService.getProductById(productId);
       if (!product) {
@@ -174,23 +178,32 @@ export class ProductEditComponent implements OnInit {
         product.variants.forEach((variant: any) => {
           // Convert price from cents to decimal
           const priceDecimal = variant.priceWithTax / 100;
+          // Convert wholesalePrice from cents to decimal (if exists)
+          const wholesalePriceDecimal = variant.customFields?.wholesalePrice
+            ? variant.customFields.wholesalePrice / 100
+            : null;
 
           const skuGroup = this.fb.group({
             id: [variant.id], // Store variant ID for updates
             name: [variant.name, [Validators.required, Validators.minLength(1)]],
             sku: [variant.sku], // Read-only, stored for display
             price: [priceDecimal, [Validators.required, Validators.min(0.01)]],
+            wholesalePrice: [wholesalePriceDecimal, [Validators.min(0)]],
             stockOnHand: [variant.stockOnHand || 0], // Read-only
           });
 
           this.skus.push(skuGroup);
         });
       }
+      // Ensure we stay on stage 1 after loading completes
+      this.currentStage.set(1);
     } catch (error: any) {
       console.error('Failed to load product:', error);
       this.submitError.set('Failed to load product data');
     } finally {
       this.isLoading.set(false);
+      // Final guarantee - stay on stage 1
+      this.currentStage.set(1);
     }
   }
 
@@ -203,6 +216,7 @@ export class ProductEditComponent implements OnInit {
       name: ['', [Validators.required, Validators.minLength(1)]],
       sku: ['AUTO'], // Auto-generated
       price: [0, [Validators.required, Validators.min(0.01)]],
+      wholesalePrice: [null, [Validators.min(0)]],
       stockOnHand: [0], // Locked to 0 for new SKUs
     });
 
@@ -257,6 +271,7 @@ export class ProductEditComponent implements OnInit {
         id: sku.id,
         name: sku.name.trim(),
         price: Number(sku.price),
+        wholesalePrice: sku.wholesalePrice ? Number(sku.wholesalePrice) : null,
       }));
 
       const ok = await this.productService.updateProductWithVariants(

@@ -271,7 +271,12 @@ export class DetectionCoordinator {
     }
 
     // Check if video has valid dimensions
-    if (!video.videoWidth || !video.videoHeight || video.videoWidth < 64 || video.videoHeight < 64) {
+    if (
+      !video.videoWidth ||
+      !video.videoHeight ||
+      video.videoWidth < 64 ||
+      video.videoHeight < 64
+    ) {
       this.scheduleNextFrame(video);
       return;
     }
@@ -349,13 +354,15 @@ export class DetectionCoordinator {
    * Handle successful detection
    */
   private handleDetection(result: DetectionResult): void {
-    // Stop detection loop
-    this.stop();
+    // Save callback reference before stopping (stop() clears it)
+    const callback = this.onDetection;
 
-    // Emit result
-    if (this.onDetection) {
-      this.onDetection(result);
+    // Emit result first, before stopping
+    if (callback) {
+      callback(result);
     }
+
+    // Stop detection loop after callback is called
+    this.stop();
   }
 }
-

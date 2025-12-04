@@ -5,7 +5,13 @@
   <div class="container-app py-2">
     <div class="flex items-center justify-between gap-2">
       <h1 class="text-lg font-bold">Edit product</h1>
-      <button type="button" (click)="cancel()" class="btn btn-sm btn-circle btn-ghost">✕</button>
+      <button
+        type="button"
+        (click)="cancel()"
+        class="btn btn-sm btn-circle bg-base-200 hover:bg-base-300 text-base-content border-0"
+      >
+        ✕
+      </button>
     </div>
 
     <!-- Steps -->
@@ -210,6 +216,22 @@
                           class="input input-sm input-bordered input-disabled w-full"
                         />
                       </div>
+                    </div>
+
+                    <!-- Wholesale Price -->
+                    <div>
+                      <label class="text-xs opacity-70 mb-1 block"
+                        >Wholesale Price (Optional)</label
+                      >
+                      <input
+                        type="number"
+                        formControlName="wholesalePrice"
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                        class="input input-sm input-bordered w-full"
+                      />
+                      <p class="text-xs opacity-60 mt-1">Discount limit guardrail</p>
                     </div>
                   </div>
                 </div>

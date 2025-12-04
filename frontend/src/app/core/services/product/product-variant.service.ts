@@ -90,6 +90,14 @@ export class ProductVariantService {
           input.optionIds = v.optionIds;
         }
 
+        // Include customFields if provided (e.g., wholesalePrice, allowFractionalQuantity)
+        // Check if customFields exists on the variant object (it's not in the VariantInput interface but is added dynamically)
+        const variantWithCustomFields = v as any;
+        if (variantWithCustomFields.customFields !== undefined) {
+          input.customFields = variantWithCustomFields.customFields;
+          console.log(`🔧 Including customFields for variant ${i + 1}:`, input.customFields);
+        }
+
         console.log(`🔧 Creating variant ${i + 1}/${variants.length}:`, v.sku);
         console.log(`🔧 Variant input data:`, JSON.stringify(input, null, 2));
 
@@ -190,17 +198,34 @@ export class ProductVariantService {
   }
 
   /**
-   * Update variant details (name + price) for existing variants.
+   * Update variant details (name + price + wholesalePrice) for existing variants.
    * Used by the product edit flow.
    */
   async updateVariantDetails(
-    variants: { id: string; name: string; price: number }[],
+    variants: { id: string; name: string; price: number; wholesalePrice?: number | null }[],
   ): Promise<boolean> {
     try {
       const client = this.apolloService.getClient();
 
       for (const variant of variants) {
         const priceInCents = Math.round(variant.price * 100);
+        const input: any = {
+          id: variant.id,
+          price: priceInCents,
+          prices: [
+            {
+              price: priceInCents,
+              currencyCode: 'KES' as any,
+            },
+          ],
+        };
+
+        // Include customFields if wholesalePrice is provided
+        if (variant.wholesalePrice !== undefined && variant.wholesalePrice !== null) {
+          input.customFields = {
+            wholesalePrice: Math.round(variant.wholesalePrice * 100), // Convert to cents
+          };
+        }
 
         const result = await client.mutate<
           UpdateProductVariantMutation,
@@ -208,16 +233,7 @@ export class ProductVariantService {
         >({
           mutation: UPDATE_PRODUCT_VARIANT,
           variables: {
-            input: {
-              id: variant.id,
-              price: priceInCents,
-              prices: [
-                {
-                  price: priceInCents,
-                  currencyCode: 'KES' as any,
-                },
-              ],
-            },
+            input,
           },
         });
 

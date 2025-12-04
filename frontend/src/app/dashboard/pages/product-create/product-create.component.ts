@@ -429,9 +429,9 @@ export class ProductCreateComponent implements OnInit {
     const optionsArray = Array.isArray(options)
       ? options
       : options
-        .split(',')
-        .map((opt) => opt.trim())
-        .filter((opt) => opt);
+          .split(',')
+          .map((opt) => opt.trim())
+          .filter((opt) => opt);
     this.variantDimensions.update((dims) =>
       dims.map((dim) => (dim.id === id ? { ...dim, options: optionsArray } : dim)),
     );
@@ -539,7 +539,15 @@ export class ProductCreateComponent implements OnInit {
         const baseSku = this.generateSku(defaultName);
         const code = this.buildUniqueSkuCode(baseSku, 1);
         this.skus.push(
-          this.createSkuFormGroup(code, defaultName, 1, 0, this.productType() === 'measured', 0, null),
+          this.createSkuFormGroup(
+            code,
+            defaultName,
+            1,
+            0,
+            this.productType() === 'measured',
+            0,
+            null,
+          ),
         );
       }
     }
@@ -802,9 +810,7 @@ export class ProductCreateComponent implements OnInit {
       }
 
       // Determine item type: Check if any variant has trackInventory: false → service
-      const isService = product.variants?.some(
-        (variant: any) => variant.trackInventory === false,
-      );
+      const isService = product.variants?.some((variant: any) => variant.trackInventory === false);
       if (isService) {
         this.itemType.set('service');
       } else {
@@ -939,8 +945,15 @@ export class ProductCreateComponent implements OnInit {
 
       const variantInputs = formValue.skus.map((sku: any, index: number) => {
         console.log(`Processing SKU ${index + 1}:`, sku);
+        console.log(`Wholesale price from form:`, sku.wholesalePrice);
 
-        return {
+        // Convert wholesalePrice to cents (null if not provided or 0)
+        const wholesalePriceCents =
+          sku.wholesalePrice && Number(sku.wholesalePrice) > 0
+            ? Math.round(Number(sku.wholesalePrice) * 100)
+            : null;
+
+        const variantInput: any = {
           sku: sku.sku.trim().toUpperCase(),
           name: sku.name.trim(),
           price: Number(sku.price),
@@ -948,10 +961,13 @@ export class ProductCreateComponent implements OnInit {
           stockOnHand: Number(sku.stockOnHand),
           stockLocationId: stockLocationId!,
           customFields: {
-            wholesalePrice: sku.wholesalePrice ? Number(sku.wholesalePrice) * 100 : null, // Convert to cents
+            wholesalePrice: wholesalePriceCents,
             allowFractionalQuantity: Boolean(sku.allowFractionalQuantity),
           },
         };
+
+        console.log(`Variant input ${index + 1} with customFields:`, variantInput.customFields);
+        return variantInput;
       });
 
       console.log('Final variant inputs:', variantInputs);
@@ -968,22 +984,32 @@ export class ProductCreateComponent implements OnInit {
             id: sku.variantId,
             name: sku.name.trim(),
             price: Number(sku.price),
+            wholesalePrice:
+              sku.wholesalePrice && Number(sku.wholesalePrice) > 0
+                ? Number(sku.wholesalePrice)
+                : null, // Keep in decimal for updateVariantDetails
           }));
 
         const newVariants = formValue.skus
           .filter((sku: any) => !sku.variantId)
-          .map((sku: any) => ({
-            sku: sku.sku.trim().toUpperCase(),
-            name: sku.name.trim(),
-            price: Number(sku.price),
-            trackInventory: this.itemType() === 'product', // true for products, false for services
-            stockOnHand: Number(sku.stockOnHand),
-            stockLocationId: stockLocationId!,
-            customFields: {
-              wholesalePrice: sku.wholesalePrice ? Number(sku.wholesalePrice) * 100 : null,
-              allowFractionalQuantity: Boolean(sku.allowFractionalQuantity),
-            },
-          }));
+          .map((sku: any) => {
+            const wholesalePriceCents =
+              sku.wholesalePrice && Number(sku.wholesalePrice) > 0
+                ? Math.round(Number(sku.wholesalePrice) * 100)
+                : null;
+            return {
+              sku: sku.sku.trim().toUpperCase(),
+              name: sku.name.trim(),
+              price: Number(sku.price),
+              trackInventory: this.itemType() === 'product', // true for products, false for services
+              stockOnHand: Number(sku.stockOnHand),
+              stockLocationId: stockLocationId!,
+              customFields: {
+                wholesalePrice: wholesalePriceCents,
+                allowFractionalQuantity: Boolean(sku.allowFractionalQuantity),
+              },
+            };
+          });
 
         // Update product name and barcode
         const updated = await this.productService.updateProductWithVariants(
@@ -1048,7 +1074,9 @@ export class ProductCreateComponent implements OnInit {
                     this.submitSuccess.set(true);
                   } else {
                     console.warn('Transaction Phase 2 FAILED: Photos upload failed');
-                    console.warn('But product was successfully created (photos can be added later)');
+                    console.warn(
+                      'But product was successfully created (photos can be added later)',
+                    );
                     // Show partial success message
                     this.submitError.set(
                       'Product created, but photo upload failed. You can add photos later.',
