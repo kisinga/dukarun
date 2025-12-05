@@ -129,6 +129,9 @@ export class PaymentAllocationService {
         // 6. Apply allocations to orders
         const ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }> = [];
 
+        // Track payment amounts allocated to each order for cache update
+        const paymentAllocationsByOrderId = new Map<string, number>();
+
         for (const allocation of calculation.allocations) {
           const order = unpaidOrders.find(o => o.id.toString() === allocation.itemId);
           if (!order) {
@@ -136,6 +139,7 @@ export class PaymentAllocationService {
           }
 
           const amountToAllocate = allocation.amountToAllocate;
+          paymentAllocationsByOrderId.set(allocation.itemId, amountToAllocate);
 
           // Add payment to order using OrderService.addManualPaymentToOrder
           const paymentResult = await this.orderService.addManualPaymentToOrder(transactionCtx, {
@@ -189,6 +193,10 @@ export class PaymentAllocationService {
         }
 
         // 7. Calculate remaining balance
+        // Note: We need to re-fetch unpaid orders to get accurate remaining balance
+        // because: (1) if orderIds was provided, we only processed selected orders,
+        // so remaining balance should include all unpaid orders; (2) payments may have
+        // been updated in the database, so we need fresh data
         const remainingUnpaidOrders = await this.getUnpaidOrdersForCustomer(
           transactionCtx,
           input.customerId
@@ -446,7 +454,9 @@ export class PaymentAllocationService {
         lastModifiedByUserId: transactionCtx.activeUserId || undefined,
       });
 
-      // Calculate remaining balance
+      // Calculate remaining balance (optimized - fetch only if needed for other orders)
+      // For single order payment, we can calculate from the updated order state
+      // But we still need to check other unpaid orders for the customer
       const remainingUnpaidOrders = await this.getUnpaidOrdersForCustomer(
         transactionCtx,
         customerId

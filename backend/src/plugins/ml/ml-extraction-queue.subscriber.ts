@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { RequestContext } from '@vendure/core';
+import pLimit from 'p-limit';
 import { MlExtractionQueueService } from '../../services/ml/ml-extraction-queue.service';
 import { MlTrainingService } from '../../services/ml/ml-training.service';
 
@@ -13,6 +14,9 @@ import { MlTrainingService } from '../../services/ml/ml-training.service';
 export class MlExtractionQueueSubscriber implements OnApplicationBootstrap {
   private readonly logger = new Logger(MlExtractionQueueSubscriber.name);
   private processingInterval: NodeJS.Timeout | null = null;
+  // Limit concurrent extractions to avoid overwhelming the system
+  // Process up to 4 channels concurrently, but each channel's extractions sequentially
+  private readonly extractionLimit = pLimit(4);
 
   constructor(
     private extractionQueueService: MlExtractionQueueService,
@@ -67,34 +71,66 @@ export class MlExtractionQueueSubscriber implements OnApplicationBootstrap {
       }
 
       this.logger.log(`Processing ${dueExtractions.length} due extractions`);
+
+      // Group extractions by channel to avoid processing same channel concurrently
+      const extractionsByChannel = new Map<string, typeof dueExtractions>();
       for (const extraction of dueExtractions) {
-        try {
-          this.logger.log(
-            `Processing extraction ${extraction.id} for channel ${extraction.channelId}`
-          );
-
-          // Mark as processing (this will emit ML_EXTRACTION_STARTED event)
-          await this.extractionQueueService.markAsProcessing(RequestContext.empty(), extraction.id);
-
-          // Perform the extraction
-          await this.mlTrainingService.scheduleAutoExtraction(
-            RequestContext.empty(),
-            extraction.channelId
-          );
-
-          // Mark as completed (this will emit ML_EXTRACTION_COMPLETED event)
-          await this.extractionQueueService.markAsCompleted(RequestContext.empty(), extraction.id);
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          this.logger.error(`Error processing extraction ${extraction.id}:`, error);
-          // Mark as failed (this will emit ML_EXTRACTION_FAILED event)
-          await this.extractionQueueService.markAsFailed(
-            RequestContext.empty(),
-            extraction.id,
-            errorMessage
-          );
+        const channelId = extraction.channelId;
+        if (!extractionsByChannel.has(channelId)) {
+          extractionsByChannel.set(channelId, []);
         }
+        extractionsByChannel.get(channelId)!.push(extraction);
       }
+
+      // Process each channel's extractions in parallel (with concurrency limit)
+      // But process each channel's extractions sequentially to avoid conflicts
+      const processChannelExtractions = async (
+        channelId: string,
+        extractions: typeof dueExtractions
+      ) => {
+        for (const extraction of extractions) {
+          try {
+            this.logger.log(
+              `Processing extraction ${extraction.id} for channel ${extraction.channelId}`
+            );
+
+            // Mark as processing (this will emit ML_EXTRACTION_STARTED event)
+            await this.extractionQueueService.markAsProcessing(
+              RequestContext.empty(),
+              extraction.id
+            );
+
+            // Perform the extraction
+            await this.mlTrainingService.scheduleAutoExtraction(
+              RequestContext.empty(),
+              extraction.channelId
+            );
+
+            // Mark as completed (this will emit ML_EXTRACTION_COMPLETED event)
+            await this.extractionQueueService.markAsCompleted(
+              RequestContext.empty(),
+              extraction.id
+            );
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(`Error processing extraction ${extraction.id}:`, error);
+            // Mark as failed (this will emit ML_EXTRACTION_FAILED event)
+            await this.extractionQueueService.markAsFailed(
+              RequestContext.empty(),
+              extraction.id,
+              errorMessage
+            );
+          }
+        }
+      };
+
+      // Process different channels in parallel with concurrency limit
+      const channelPromises = Array.from(extractionsByChannel.entries()).map(
+        ([channelId, extractions]) =>
+          this.extractionLimit(() => processChannelExtractions(channelId, extractions))
+      );
+
+      await Promise.all(channelPromises);
     } catch (error) {
       this.logger.error('Error getting due extractions:', error);
     }

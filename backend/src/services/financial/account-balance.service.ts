@@ -86,17 +86,15 @@ export class AccountBalanceService {
       };
     }
 
-    // Sum balances of all sub-accounts
-    let totalBalance = 0;
-    let totalDebit = 0;
-    let totalCredit = 0;
+    // Sum balances of all sub-accounts (parallelized for performance)
+    const subBalancePromises = subAccounts.map(subAccount =>
+      this.getSubAccountBalance(ctx, channelId, subAccount.id, asOfDate)
+    );
+    const subBalances = await Promise.all(subBalancePromises);
 
-    for (const subAccount of subAccounts) {
-      const subBalance = await this.getSubAccountBalance(ctx, channelId, subAccount.id, asOfDate);
-      totalBalance += subBalance.balance;
-      totalDebit += subBalance.debitTotal;
-      totalCredit += subBalance.creditTotal;
-    }
+    const totalBalance = subBalances.reduce((sum, balance) => sum + balance.balance, 0);
+    const totalDebit = subBalances.reduce((sum, balance) => sum + balance.debitTotal, 0);
+    const totalCredit = subBalances.reduce((sum, balance) => sum + balance.creditTotal, 0);
 
     return {
       accountCode: parentAccount.code,
