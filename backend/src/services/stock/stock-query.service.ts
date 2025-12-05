@@ -35,6 +35,36 @@ export class StockQueryService {
   constructor(private readonly connection: TransactionalConnection) {}
 
   /**
+   * Apply purchase filters to a query builder
+   */
+  private applyPurchaseFilters<T>(
+    qb: any,
+    alias: string,
+    channelId: number,
+    filter?: PurchaseListOptions['filter']
+  ): void {
+    qb.andWhere(`${alias}.channelId = :channelId`, { channelId });
+
+    if (filter?.supplierId) {
+      qb.andWhere(`${alias}.supplierId = :supplierId`, {
+        supplierId: parseInt(String(filter.supplierId), 10),
+      });
+    }
+
+    if (filter?.startDate) {
+      qb.andWhere(`${alias}.purchaseDate >= :startDate`, {
+        startDate: filter.startDate,
+      });
+    }
+
+    if (filter?.endDate) {
+      qb.andWhere(`${alias}.purchaseDate <= :endDate`, {
+        endDate: filter.endDate,
+      });
+    }
+  }
+
+  /**
    * Get purchases with filtering and pagination
    */
   async getPurchases(
@@ -42,30 +72,11 @@ export class StockQueryService {
     options: PurchaseListOptions = {}
   ): Promise<{ items: StockPurchase[]; totalItems: number }> {
     const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
-    const baseFilterQb = purchaseRepo.createQueryBuilder('purchase');
-
-    // Always filter by channelId for security
     const channelId = ctx.channelId as number;
-    baseFilterQb.andWhere('purchase.channelId = :channelId', { channelId });
 
-    // Apply filters to base query (used for both count and items)
-    if (options.filter?.supplierId) {
-      baseFilterQb.andWhere('purchase.supplierId = :supplierId', {
-        supplierId: parseInt(String(options.filter.supplierId), 10),
-      });
-    }
-
-    if (options.filter?.startDate) {
-      baseFilterQb.andWhere('purchase.purchaseDate >= :startDate', {
-        startDate: options.filter.startDate,
-      });
-    }
-
-    if (options.filter?.endDate) {
-      baseFilterQb.andWhere('purchase.purchaseDate <= :endDate', {
-        endDate: options.filter.endDate,
-      });
-    }
+    // Build base filter query for count
+    const baseFilterQb = purchaseRepo.createQueryBuilder('purchase');
+    this.applyPurchaseFilters(baseFilterQb, 'purchase', channelId, options.filter);
 
     // Get total count using lightweight query (no joins)
     const totalItems = await baseFilterQb.getCount();
@@ -78,27 +89,8 @@ export class StockQueryService {
       .leftJoinAndSelect('lines.variant', 'variant')
       .leftJoinAndSelect('lines.stockLocation', 'stockLocation');
 
-    // Always filter by channelId for security
-    itemsQb.andWhere('purchase.channelId = :channelId', { channelId });
-
-    // Reapply filters to items query
-    if (options.filter?.supplierId) {
-      itemsQb.andWhere('purchase.supplierId = :supplierId', {
-        supplierId: parseInt(String(options.filter.supplierId), 10),
-      });
-    }
-
-    if (options.filter?.startDate) {
-      itemsQb.andWhere('purchase.purchaseDate >= :startDate', {
-        startDate: options.filter.startDate,
-      });
-    }
-
-    if (options.filter?.endDate) {
-      itemsQb.andWhere('purchase.purchaseDate <= :endDate', {
-        endDate: options.filter.endDate,
-      });
-    }
+    // Apply same filters to items query
+    this.applyPurchaseFilters(itemsQb, 'purchase', channelId, options.filter);
 
     // Apply pagination
     if (options.skip !== undefined) {
@@ -118,6 +110,36 @@ export class StockQueryService {
   }
 
   /**
+   * Apply stock adjustment filters to a query builder
+   */
+  private applyStockAdjustmentFilters<T>(
+    qb: any,
+    alias: string,
+    channelId: number,
+    filter?: StockAdjustmentListOptions['filter']
+  ): void {
+    qb.andWhere(`${alias}.channelId = :channelId`, { channelId });
+
+    if (filter?.reason) {
+      qb.andWhere(`${alias}.reason = :reason`, {
+        reason: filter.reason,
+      });
+    }
+
+    if (filter?.startDate) {
+      qb.andWhere(`${alias}.createdAt >= :startDate`, {
+        startDate: filter.startDate,
+      });
+    }
+
+    if (filter?.endDate) {
+      qb.andWhere(`${alias}.createdAt <= :endDate`, {
+        endDate: filter.endDate,
+      });
+    }
+  }
+
+  /**
    * Get stock adjustments with filtering and pagination
    */
   async getStockAdjustments(
@@ -125,30 +147,11 @@ export class StockQueryService {
     options: StockAdjustmentListOptions = {}
   ): Promise<{ items: InventoryStockAdjustment[]; totalItems: number }> {
     const adjustmentRepo = this.connection.getRepository(ctx, InventoryStockAdjustment);
-    const baseFilterQb = adjustmentRepo.createQueryBuilder('adjustment');
-
-    // Always filter by channelId for security
     const channelId = ctx.channelId as number;
-    baseFilterQb.andWhere('adjustment.channelId = :channelId', { channelId });
 
-    // Apply filters to base query (used for both count and items)
-    if (options.filter?.reason) {
-      baseFilterQb.andWhere('adjustment.reason = :reason', {
-        reason: options.filter.reason,
-      });
-    }
-
-    if (options.filter?.startDate) {
-      baseFilterQb.andWhere('adjustment.createdAt >= :startDate', {
-        startDate: options.filter.startDate,
-      });
-    }
-
-    if (options.filter?.endDate) {
-      baseFilterQb.andWhere('adjustment.createdAt <= :endDate', {
-        endDate: options.filter.endDate,
-      });
-    }
+    // Build base filter query for count
+    const baseFilterQb = adjustmentRepo.createQueryBuilder('adjustment');
+    this.applyStockAdjustmentFilters(baseFilterQb, 'adjustment', channelId, options.filter);
 
     // Get total count using lightweight query (no joins)
     const totalItems = await baseFilterQb.getCount();
@@ -161,27 +164,8 @@ export class StockQueryService {
       .leftJoinAndSelect('lines.variant', 'variant')
       .leftJoinAndSelect('lines.stockLocation', 'stockLocation');
 
-    // Always filter by channelId for security
-    itemsQb.andWhere('adjustment.channelId = :channelId', { channelId });
-
-    // Reapply filters to items query
-    if (options.filter?.reason) {
-      itemsQb.andWhere('adjustment.reason = :reason', {
-        reason: options.filter.reason,
-      });
-    }
-
-    if (options.filter?.startDate) {
-      itemsQb.andWhere('adjustment.createdAt >= :startDate', {
-        startDate: options.filter.startDate,
-      });
-    }
-
-    if (options.filter?.endDate) {
-      itemsQb.andWhere('adjustment.createdAt <= :endDate', {
-        endDate: options.filter.endDate,
-      });
-    }
+    // Apply same filters to items query
+    this.applyStockAdjustmentFilters(itemsQb, 'adjustment', channelId, options.filter);
 
     // Apply pagination
     if (options.skip !== undefined) {

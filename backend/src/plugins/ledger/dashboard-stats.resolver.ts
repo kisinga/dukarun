@@ -37,13 +37,21 @@ export class DashboardStatsResolver {
     const periods = this.ledgerQueryService.calculatePeriods(now);
     const endDateStr = endDate ? endDate.toISOString().slice(0, 10) : undefined;
 
+    // Batch fetch account metadata once for getSalesBreakdown optimization
+    const accountIds = await this.ledgerQueryService.getAccountIdsForSalesBreakdown(channelId);
+
     // Fetch sales stats for all periods
     // Only fetch month breakdown for accounts (used in UI breakdown display)
     const [salesToday, salesWeek, salesMonth, salesBreakdownMonth] = await Promise.all([
       this.ledgerQueryService.getSalesTotal(channelId, periods.startOfToday, endDateStr),
       this.ledgerQueryService.getSalesTotal(channelId, periods.startOfWeek, endDateStr),
       this.ledgerQueryService.getSalesTotal(channelId, periods.startOfMonth, endDateStr),
-      this.ledgerQueryService.getSalesBreakdown(channelId, periods.startOfMonth, endDateStr),
+      this.ledgerQueryService.getSalesBreakdown(
+        channelId,
+        periods.startOfMonth,
+        endDateStr,
+        accountIds
+      ),
     ]);
 
     // Fetch purchase stats for all periods

@@ -281,53 +281,105 @@ export class LedgerQueryService {
    * Credit sales = debits to ACCOUNTS_RECEIVABLE that are part of sales entries
    *
    * We filter by entries that also have SALES credits to ensure we only count sales transactions
+   *
+   * @param accountIds Optional account IDs to avoid redundant lookups (for performance optimization)
    */
   async getSalesBreakdown(
     channelId: number,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    accountIds?: {
+      salesAccountId?: string;
+      cashOnHandAccountId?: string;
+      mpesaAccountId?: string;
+      arAccountId?: string;
+    }
   ): Promise<{ cashSales: number; creditSales: number }> {
-    // Get SALES account
-    const salesAccount = await this.dataSource.getRepository(Account).findOne({
-      where: {
-        channelId,
-        code: ACCOUNT_CODES.SALES,
-      },
-    });
+    // Get accounts (use provided IDs if available, otherwise fetch)
+    let salesAccount: Account | null = null;
+    let cashOnHandAccount: Account | null = null;
+    let mpesaAccount: Account | null = null;
+    let arAccount: Account | null = null;
 
-    if (!salesAccount) {
-      return { cashSales: 0, creditSales: 0 };
+    const accountRepo = this.dataSource.getRepository(Account);
+
+    if (
+      accountIds?.salesAccountId &&
+      accountIds?.cashOnHandAccountId &&
+      accountIds?.mpesaAccountId &&
+      accountIds?.arAccountId
+    ) {
+      // Batch fetch all accounts by ID (optimized path)
+      // IMPORTANT: Always filter by channelId to enforce multi-tenant data isolation
+      const [sales, cashOnHand, mpesa, ar] = await Promise.all([
+        accountRepo.findOne({
+          where: { id: accountIds.salesAccountId, channelId },
+        }),
+        accountRepo.findOne({
+          where: { id: accountIds.cashOnHandAccountId, channelId },
+        }),
+        accountRepo.findOne({
+          where: { id: accountIds.mpesaAccountId, channelId },
+        }),
+        accountRepo.findOne({
+          where: { id: accountIds.arAccountId, channelId },
+        }),
+      ]);
+      salesAccount = sales;
+      cashOnHandAccount = cashOnHand;
+      mpesaAccount = mpesa;
+      arAccount = ar;
+    } else {
+      // Fallback: fetch accounts by code (backward compatible)
+      const [sales, cashOnHand, mpesa, ar] = await Promise.all([
+        accountRepo.findOne({
+          where: {
+            channelId,
+            code: ACCOUNT_CODES.SALES,
+          },
+        }),
+        accountRepo.findOne({
+          where: {
+            channelId,
+            code: ACCOUNT_CODES.CASH_ON_HAND,
+          },
+        }),
+        accountRepo.findOne({
+          where: {
+            channelId,
+            code: ACCOUNT_CODES.CLEARING_MPESA,
+          },
+        }),
+        accountRepo.findOne({
+          where: {
+            channelId,
+            code: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE,
+          },
+        }),
+      ]);
+      salesAccount = sales;
+      cashOnHandAccount = cashOnHand;
+      mpesaAccount = mpesa;
+      arAccount = ar;
     }
 
-    // Get cash accounts
-    const cashOnHandAccount = await this.dataSource.getRepository(Account).findOne({
-      where: {
-        channelId,
-        code: ACCOUNT_CODES.CASH_ON_HAND,
-      },
-    });
-
-    const mpesaAccount = await this.dataSource.getRepository(Account).findOne({
-      where: {
-        channelId,
-        code: ACCOUNT_CODES.CLEARING_MPESA,
-      },
-    });
-
-    // Get AR account
-    const arAccount = await this.dataSource.getRepository(Account).findOne({
-      where: {
-        channelId,
-        code: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE,
-      },
-    });
-
-    if (!cashOnHandAccount || !mpesaAccount || !arAccount) {
+    if (!salesAccount || !cashOnHandAccount || !mpesaAccount || !arAccount) {
       return { cashSales: 0, creditSales: 0 };
     }
 
     // Query for cash sales: debits to CASH_ON_HAND or CLEARING_MPESA in entries that also credit SALES
-    // Use EXISTS subquery to check if entry has SALES credit
+    // Use subquery to find entries with sales credits, then join - more efficient than EXISTS and avoids duplicates
+    const salesEntrySubquery = this.dataSource
+      .getRepository(JournalLine)
+      .createQueryBuilder('salesLine')
+      .select('DISTINCT salesLine."entryId"')
+      .where('salesLine."accountId" = :salesAccountId', { salesAccountId: salesAccount.id })
+      .andWhere('CAST(salesLine.credit AS BIGINT) > 0');
+
+    const subqueryParams = salesEntrySubquery.getParameters();
+    const subquerySql = salesEntrySubquery.getQuery();
+
+    // Build cash sales query with all filters (including date filters)
     let cashSalesQuery = this.dataSource
       .getRepository(JournalLine)
       .createQueryBuilder('line')
@@ -338,17 +390,22 @@ export class LedgerQueryService {
         mpesaAccountId: mpesaAccount.id,
       })
       .andWhere('CAST(line.debit AS BIGINT) > 0')
-      .andWhere(
-        `EXISTS (
-          SELECT 1 FROM ledger_journal_line salesLine
-          WHERE salesLine."entryId" = entry.id
-          AND salesLine."accountId" = :salesAccountId
-          AND CAST(salesLine.credit AS BIGINT) > 0
-        )`,
-        { salesAccountId: salesAccount.id }
-      );
+      .andWhere(`entry.id IN (${subquerySql})`);
 
-    // Query for credit sales: debits to ACCOUNTS_RECEIVABLE in entries that also credit SALES
+    // Apply date filters before merging parameters
+    if (startDate) {
+      cashSalesQuery = cashSalesQuery.andWhere('entry.entryDate >= :startDate', { startDate });
+    }
+
+    if (endDate) {
+      cashSalesQuery = cashSalesQuery.andWhere('entry.entryDate <= :endDate', { endDate });
+    }
+
+    // Merge parameters: existing query parameters (including date filters) + subquery parameters
+    const cashSalesParams = cashSalesQuery.getParameters();
+    cashSalesQuery.setParameters({ ...cashSalesParams, ...subqueryParams });
+
+    // Build credit sales query with all filters (including date filters)
     let creditSalesQuery = this.dataSource
       .getRepository(JournalLine)
       .createQueryBuilder('line')
@@ -356,26 +413,20 @@ export class LedgerQueryService {
       .where('line.channelId = :channelId', { channelId })
       .andWhere('line.accountId = :arAccountId', { arAccountId: arAccount.id })
       .andWhere('CAST(line.debit AS BIGINT) > 0')
-      .andWhere(
-        `EXISTS (
-          SELECT 1 FROM ledger_journal_line salesLine
-          WHERE salesLine."entryId" = entry.id
-          AND salesLine."accountId" = :salesAccountId
-          AND CAST(salesLine.credit AS BIGINT) > 0
-        )`,
-        { salesAccountId: salesAccount.id }
-      );
+      .andWhere(`entry.id IN (${subquerySql})`);
 
-    // Apply date filters
+    // Apply date filters before merging parameters
     if (startDate) {
-      cashSalesQuery = cashSalesQuery.andWhere('entry.entryDate >= :startDate', { startDate });
       creditSalesQuery = creditSalesQuery.andWhere('entry.entryDate >= :startDate', { startDate });
     }
 
     if (endDate) {
-      cashSalesQuery = cashSalesQuery.andWhere('entry.entryDate <= :endDate', { endDate });
       creditSalesQuery = creditSalesQuery.andWhere('entry.entryDate <= :endDate', { endDate });
     }
+
+    // Merge parameters: existing query parameters (including date filters) + subquery parameters
+    const creditSalesParams = creditSalesQuery.getParameters();
+    creditSalesQuery.setParameters({ ...creditSalesParams, ...subqueryParams });
 
     // Get totals
     const cashSalesResult = await cashSalesQuery
@@ -392,6 +443,56 @@ export class LedgerQueryService {
     return {
       cashSales,
       creditSales,
+    };
+  }
+
+  /**
+   * Batch fetch account IDs needed for sales breakdown (performance optimization)
+   * Returns account IDs to avoid redundant lookups in getSalesBreakdown
+   */
+  async getAccountIdsForSalesBreakdown(channelId: number): Promise<{
+    salesAccountId?: string;
+    cashOnHandAccountId?: string;
+    mpesaAccountId?: string;
+    arAccountId?: string;
+  }> {
+    const accountRepo = this.dataSource.getRepository(Account);
+    const [salesAccount, cashOnHandAccount, mpesaAccount, arAccount] = await Promise.all([
+      accountRepo.findOne({
+        where: {
+          channelId,
+          code: ACCOUNT_CODES.SALES,
+        },
+        select: ['id'],
+      }),
+      accountRepo.findOne({
+        where: {
+          channelId,
+          code: ACCOUNT_CODES.CASH_ON_HAND,
+        },
+        select: ['id'],
+      }),
+      accountRepo.findOne({
+        where: {
+          channelId,
+          code: ACCOUNT_CODES.CLEARING_MPESA,
+        },
+        select: ['id'],
+      }),
+      accountRepo.findOne({
+        where: {
+          channelId,
+          code: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE,
+        },
+        select: ['id'],
+      }),
+    ]);
+
+    return {
+      salesAccountId: salesAccount?.id,
+      cashOnHandAccountId: cashOnHandAccount?.id,
+      mpesaAccountId: mpesaAccount?.id,
+      arAccountId: arAccount?.id,
     };
   }
 
