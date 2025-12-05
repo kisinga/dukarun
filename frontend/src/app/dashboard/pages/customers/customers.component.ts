@@ -107,12 +107,14 @@ export class CustomersComponent implements OnInit {
 
     // Apply recent filter (last 30 days)
     if (recent) {
+      // Calculate date threshold once (constant for filter evaluation)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thresholdTime = thirtyDaysAgo.getTime();
+
       allCustomers = allCustomers.filter((c) => {
         if (!c.createdAt) return false;
-        const createdAt = new Date(c.createdAt);
-        return createdAt >= thirtyDaysAgo;
+        return new Date(c.createdAt).getTime() >= thresholdTime;
       });
     }
 

@@ -23,20 +23,39 @@ export interface Product {
 /**
  * Calculate product stats from an array of products
  * Pure function - no side effects
+ * Single-pass algorithm for better performance
  *
  * @param products - Array of products (typically last X items from page or filtered data)
  * @returns ProductStats object with calculated metrics
  */
 export function calculateProductStats(products: Product[]): ProductStats {
-  const totalProducts = products.length;
-  const totalVariants = products.reduce((sum, p) => sum + (p.variants?.length || 0), 0);
-  const totalStock = products.reduce(
-    (sum, p) => sum + (p.variants?.reduce((vSum, v) => vSum + (v.stockOnHand || 0), 0) || 0),
-    0,
-  );
-  const lowStock = products.filter((p) =>
-    p.variants?.some((v) => (v.stockOnHand || 0) < 10),
-  ).length;
+  let totalVariants = 0;
+  let totalStock = 0;
+  let lowStock = 0;
 
-  return { totalProducts, totalVariants, totalStock, lowStock };
+  // Single-pass calculation: compute all metrics in one iteration
+  for (const product of products) {
+    const variants = product.variants || [];
+    totalVariants += variants.length;
+
+    let hasLowStock = false;
+    for (const variant of variants) {
+      const stock = variant.stockOnHand || 0;
+      totalStock += stock;
+      if (stock < 10) {
+        hasLowStock = true;
+      }
+    }
+
+    if (hasLowStock) {
+      lowStock++;
+    }
+  }
+
+  return {
+    totalProducts: products.length,
+    totalVariants,
+    totalStock,
+    lowStock,
+  };
 }

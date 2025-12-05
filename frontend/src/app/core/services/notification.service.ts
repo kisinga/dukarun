@@ -5,7 +5,7 @@ import {
   NotificationType,
 } from '../graphql/generated/graphql';
 import { ApolloService } from './apollo.service';
-import { NotificationPollingService } from './notification/notification-polling.service';
+import { NotificationLoaderService } from './notification/notification-loader.service';
 import { NotificationPushService } from './notification/notification-push.service';
 import { NotificationStateService } from './notification/notification-state.service';
 import { ToastService } from './toast.service';
@@ -15,7 +15,7 @@ import { ToastService } from './toast.service';
  *
  * Composable facade that delegates to specialized services:
  * - NotificationStateService: State management
- * - NotificationPollingService: Auth-aware polling
+ * - NotificationLoaderService: On-demand loading (no polling)
  * - NotificationPushService: Push subscription handling
  *
  * Maintains backward compatibility with existing public API.
@@ -26,7 +26,7 @@ import { ToastService } from './toast.service';
 export class NotificationService {
   private readonly apolloService = inject(ApolloService);
   private readonly stateService = inject(NotificationStateService);
-  private readonly pollingService = inject(NotificationPollingService);
+  private readonly loaderService = inject(NotificationLoaderService);
   private readonly pushService = inject(NotificationPushService);
   private readonly toastService = inject(ToastService);
 
@@ -45,14 +45,14 @@ export class NotificationService {
   async loadNotifications(
     options: { skip?: number; take?: number; type?: NotificationType } = {},
   ): Promise<void> {
-    return this.pollingService.loadNotifications(options);
+    return this.loaderService.loadNotifications(options);
   }
 
   /**
    * Load unread count
    */
   async loadUnreadCount(): Promise<void> {
-    return this.pollingService.loadUnreadCount();
+    return this.loaderService.loadUnreadCount();
   }
 
   /**
@@ -147,6 +147,6 @@ export class NotificationService {
    * Refresh notifications (manual trigger)
    */
   async refresh(): Promise<void> {
-    return this.pollingService.refresh();
+    return this.loaderService.loadAll();
   }
 }

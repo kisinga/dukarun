@@ -7,12 +7,14 @@ import {
   OnDestroy,
   OnInit,
   computed,
+  effect,
   inject,
   input,
   output,
   signal,
   viewChild,
 } from '@angular/core';
+import { BackgroundStateService } from '../../../../core/services/background-state.service';
 import { BarcodeScannerService } from '../../../../core/services/barcode-scanner.service';
 import { CameraService } from '../../../../core/services/camera.service';
 import { ProductSearchResult } from '../../../../core/services/product/product-search.service';
@@ -160,6 +162,7 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
 
   // Services
   private readonly injector = inject(Injector);
+  private readonly backgroundStateService = inject(BackgroundStateService);
   private readonly cameraService = inject(CameraService);
   private readonly barcodeService = inject(BarcodeScannerService);
   private readonly productSearchService = inject(ProductSearchService);
@@ -183,14 +186,33 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
     return status === 'idle' || status === 'ready' || status === 'error';
   });
 
+  constructor() {
+    // Watch background state and stop scanner when app goes to background
+    // effect() must be called during injection context (constructor), not in lifecycle hooks
+    effect(() => {
+      const isBackground = this.backgroundStateService.isBackground();
+      if (isBackground && this.isScanning()) {
+        console.log('[ProductScanner] App went to background - stopping scanner');
+        this.stopScanner();
+      }
+    });
+  }
+
   ngOnInit(): void {
     this.initializeScanner();
   }
 
   ngOnDestroy(): void {
+    // Ensure scanner is fully stopped and cleaned up
     this.stopScanner();
     this.coordinator?.cleanup();
     this.coordinator = null;
+
+    // Double-check camera is stopped
+    const videoEl = this.videoElement()?.nativeElement;
+    if (videoEl) {
+      this.cameraService.stopCamera(videoEl);
+    }
   }
 
   /**

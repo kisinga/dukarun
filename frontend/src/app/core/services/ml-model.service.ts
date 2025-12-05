@@ -1,6 +1,7 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { effect, inject, Injectable, signal } from '@angular/core';
 import type { LayersModel, Tensor } from '@tensorflow/tfjs';
 import { ApolloService } from './apollo.service';
+import { BackgroundStateService } from './background-state.service';
 import { CompanyService } from './company.service';
 
 /**
@@ -67,6 +68,7 @@ export interface ModelError {
 })
 export class MlModelService {
   private readonly apolloService = inject(ApolloService);
+  private readonly backgroundStateService = inject(BackgroundStateService);
   private readonly companyService = inject(CompanyService);
 
   private model: LayersModel | null = null;
@@ -90,6 +92,17 @@ export class MlModelService {
   readonly isLoading = this.isLoadingSignal.asReadonly();
   readonly isInitialized = this.isInitializedSignal.asReadonly();
   readonly error = this.errorSignal.asReadonly();
+
+  constructor() {
+    // Unload model when app goes to background to save memory and battery
+    effect(() => {
+      const isBackground = this.backgroundStateService.isBackground();
+      if (isBackground && this.model) {
+        console.log('[MlModelService] App went to background - unloading model to save resources');
+        this.unloadModel();
+      }
+    });
+  }
 
   /**
    * Get ML model asset sources for a channel
@@ -231,7 +244,8 @@ export class MlModelService {
         if (metadataResponse.status === 404) {
           const error: ModelError = {
             type: ModelErrorType.NOT_FOUND,
-            message: 'ML model not configured for this channel. Please set up the model asset IDs in channel settings.',
+            message:
+              'ML model not configured for this channel. Please set up the model asset IDs in channel settings.',
             technicalDetails: `Metadata URL returned HTTP ${metadataResponse.status}`,
           };
           this.errorSignal.set(error);
@@ -263,14 +277,14 @@ export class MlModelService {
     } catch (error: any) {
       // Parse error to determine if it's expected (404) or unexpected
       const parsedError = this.parseError(error);
-      
+
       // Use appropriate logging level based on error type
       if (parsedError.type === ModelErrorType.NOT_FOUND) {
         console.warn('⚠️ ML model not available:', parsedError.message);
       } else {
         console.error('❌ Failed to load model:', error);
       }
-      
+
       this.errorSignal.set(parsedError);
       this.model = null;
       this.metadata = null;

@@ -1,4 +1,5 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
+import { BackgroundStateService } from './background-state.service';
 import { ToastService } from './toast.service';
 
 /**
@@ -10,9 +11,11 @@ import { ToastService } from './toast.service';
 })
 export class NetworkService {
   private readonly toastService = inject(ToastService);
+  private readonly backgroundStateService = inject(BackgroundStateService);
   private readonly onlineStatusSignal = signal<boolean>(navigator.onLine);
   private readonly wasOfflineSignal = signal<boolean>(false);
   private previousStatus = navigator.onLine;
+  private statusBeforeBackground: boolean | null = null;
 
   /**
    * Current online status
@@ -35,8 +38,47 @@ export class NetworkService {
     // Show toast notifications when status changes
     effect(() => {
       const currentStatus = this.onlineStatusSignal();
+      const isReturningFromBackground = this.backgroundStateService.isReturningFromBackground();
+      const isBackground = this.backgroundStateService.isBackground();
 
-      // Only show notification when status actually changes
+      // Track status when going to background
+      if (isBackground && this.statusBeforeBackground === null) {
+        this.statusBeforeBackground = currentStatus;
+        return;
+      }
+
+      // When returning from background, check if status changed while we were away
+      if (isReturningFromBackground) {
+        // If status changed while backgrounded, we'll show notification after suppression window
+        // Don't update previousStatus yet - wait until suppression window closes
+        return;
+      }
+
+      // After suppression window closes, check if status changed while backgrounded
+      if (!isBackground && this.statusBeforeBackground !== null) {
+        const statusChangedWhileAway = currentStatus !== this.statusBeforeBackground;
+        // Reset tracking
+        this.statusBeforeBackground = null;
+
+        // If status changed while away, show notification now
+        if (statusChangedWhileAway) {
+          if (!currentStatus) {
+            // Went offline while backgrounded
+            this.wasOfflineSignal.set(true);
+            this.showOfflineNotification();
+          } else {
+            // Came online while backgrounded
+            if (this.wasOfflineSignal()) {
+              this.wasOfflineSignal.set(false);
+              this.showOnlineNotification();
+            }
+          }
+          this.previousStatus = currentStatus;
+          return;
+        }
+      }
+
+      // Normal foreground operation - show notification when status changes
       if (currentStatus !== this.previousStatus) {
         if (!currentStatus) {
           // Just went offline
