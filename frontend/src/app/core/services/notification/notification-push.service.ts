@@ -7,7 +7,7 @@ import {
 } from '../../graphql/generated/graphql';
 import { ApolloService } from '../apollo.service';
 import { AuthService } from '../auth.service';
-import { NotificationPollingService } from './notification-polling.service';
+import { NotificationLoaderService } from './notification-loader.service';
 import { ToastService } from '../toast.service';
 
 /**
@@ -24,7 +24,7 @@ export class NotificationPushService {
   private readonly injector = inject(Injector);
   private readonly swPush = inject(SwPush);
   private readonly toastService = inject(ToastService);
-  private readonly pollingService = inject(NotificationPollingService);
+  private readonly loaderService = inject(NotificationLoaderService);
 
   /**
    * Lazy getter for AuthService to break circular dependency
@@ -105,8 +105,8 @@ export class NotificationPushService {
   private handlePushMessage(message: any): void {
     console.log('Received push message:', message);
 
-    // Refresh notifications and unread count
-    this.pollingService.refresh();
+    // Refresh notifications and unread count when push arrives
+    this.loaderService.loadAll();
 
     // Show toast for foreground notification if payload has title/body
     if (message?.notification?.title) {

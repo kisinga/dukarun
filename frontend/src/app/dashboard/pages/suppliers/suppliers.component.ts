@@ -98,12 +98,14 @@ export class SuppliersComponent implements OnInit {
 
     // Apply recent filter (last 30 days)
     if (recent) {
+      // Calculate date threshold once (constant for filter evaluation)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thresholdTime = thirtyDaysAgo.getTime();
+
       allSuppliers = allSuppliers.filter((s) => {
         if (!s.createdAt) return false;
-        const createdAt = new Date(s.createdAt);
-        return createdAt >= thirtyDaysAgo;
+        return new Date(s.createdAt).getTime() >= thresholdTime;
       });
     }
 
