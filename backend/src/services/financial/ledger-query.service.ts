@@ -368,18 +368,8 @@ export class LedgerQueryService {
     }
 
     // Query for cash sales: debits to CASH_ON_HAND or CLEARING_MPESA in entries that also credit SALES
-    // Use subquery to find entries with sales credits, then join - more efficient than EXISTS and avoids duplicates
-    const salesEntrySubquery = this.dataSource
-      .getRepository(JournalLine)
-      .createQueryBuilder('salesLine')
-      .select('DISTINCT salesLine."entryId"')
-      .where('salesLine."accountId" = :salesAccountId', { salesAccountId: salesAccount.id })
-      .andWhere('CAST(salesLine.credit AS BIGINT) > 0');
-
-    const subqueryParams = salesEntrySubquery.getParameters();
-    const subquerySql = salesEntrySubquery.getQuery();
-
-    // Build cash sales query with all filters (including date filters)
+    // Use EXISTS subquery - more reliable than raw SQL string interpolation
+    // This approach is optimized by PostgreSQL query planner and avoids table alias issues
     let cashSalesQuery = this.dataSource
       .getRepository(JournalLine)
       .createQueryBuilder('line')
@@ -390,9 +380,17 @@ export class LedgerQueryService {
         mpesaAccountId: mpesaAccount.id,
       })
       .andWhere('CAST(line.debit AS BIGINT) > 0')
-      .andWhere(`entry.id IN (${subquerySql})`);
+      .andWhere(
+        `EXISTS (
+          SELECT 1 FROM ledger_journal_line salesLine
+          WHERE salesLine."entryId" = entry.id
+          AND salesLine."accountId" = :salesAccountId
+          AND CAST(salesLine.credit AS BIGINT) > 0
+        )`,
+        { salesAccountId: salesAccount.id }
+      );
 
-    // Apply date filters before merging parameters
+    // Apply date filters
     if (startDate) {
       cashSalesQuery = cashSalesQuery.andWhere('entry.entryDate >= :startDate', { startDate });
     }
@@ -401,11 +399,8 @@ export class LedgerQueryService {
       cashSalesQuery = cashSalesQuery.andWhere('entry.entryDate <= :endDate', { endDate });
     }
 
-    // Merge parameters: existing query parameters (including date filters) + subquery parameters
-    const cashSalesParams = cashSalesQuery.getParameters();
-    cashSalesQuery.setParameters({ ...cashSalesParams, ...subqueryParams });
-
-    // Build credit sales query with all filters (including date filters)
+    // Query for credit sales: debits to ACCOUNTS_RECEIVABLE in entries that also credit SALES
+    // Use EXISTS subquery for consistency and reliability
     let creditSalesQuery = this.dataSource
       .getRepository(JournalLine)
       .createQueryBuilder('line')
@@ -413,9 +408,17 @@ export class LedgerQueryService {
       .where('line.channelId = :channelId', { channelId })
       .andWhere('line.accountId = :arAccountId', { arAccountId: arAccount.id })
       .andWhere('CAST(line.debit AS BIGINT) > 0')
-      .andWhere(`entry.id IN (${subquerySql})`);
+      .andWhere(
+        `EXISTS (
+          SELECT 1 FROM ledger_journal_line salesLine
+          WHERE salesLine."entryId" = entry.id
+          AND salesLine."accountId" = :salesAccountId
+          AND CAST(salesLine.credit AS BIGINT) > 0
+        )`,
+        { salesAccountId: salesAccount.id }
+      );
 
-    // Apply date filters before merging parameters
+    // Apply date filters
     if (startDate) {
       creditSalesQuery = creditSalesQuery.andWhere('entry.entryDate >= :startDate', { startDate });
     }
@@ -423,10 +426,6 @@ export class LedgerQueryService {
     if (endDate) {
       creditSalesQuery = creditSalesQuery.andWhere('entry.entryDate <= :endDate', { endDate });
     }
-
-    // Merge parameters: existing query parameters (including date filters) + subquery parameters
-    const creditSalesParams = creditSalesQuery.getParameters();
-    creditSalesQuery.setParameters({ ...creditSalesParams, ...subqueryParams });
 
     // Get totals
     const cashSalesResult = await cashSalesQuery

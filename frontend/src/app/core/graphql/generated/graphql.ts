@@ -9929,6 +9929,8 @@ export type GetOrderFullQuery = {
     orderPlacedAt?: any | null;
     total: number;
     totalWithTax: number;
+    subTotal: number;
+    subTotalWithTax: number;
     currencyCode: CurrencyCode;
     customer?: {
       __typename?: 'Customer';
@@ -15940,6 +15942,8 @@ export const GetOrderFullDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'orderPlacedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'total' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'totalWithTax' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'subTotal' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'subTotalWithTax' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'currencyCode' } },
                 {
                   kind: 'Field',
