@@ -9,14 +9,13 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - purchase_payment.channelId -> channel.id
  *
  * IDEMPOTENT: Works across all environments:
- * - Checks if ANY FK exists on channelId that references channel(id)
- * - If correct FK exists (regardless of name): skip
- * - If no FK exists: create one (TypeORM will handle naming via synchronize)
- * - If wrong FK exists: drop and let TypeORM recreate
+ * - Checks if the correct TypeORM hash-based constraint name exists
+ * - If correct constraint name exists: skip
+ * - If wrong constraint name exists: drop and recreate with correct name
+ * - If no FK exists: create with correct TypeORM hash-based name
  *
- * Note: We don't hardcode FK names since TypeORM generates hash-based names
- * that may differ between environments. TypeORM's synchronize will ensure
- * the correct FK name exists after this migration runs.
+ * Note: TypeORM generates deterministic hash-based constraint names based on
+ * entity metadata. We must use the exact names TypeORM expects to avoid schema mismatches.
  */
 export class AddChannelIdForeignKeys8000000000014 implements MigrationInterface {
   name = 'AddChannelIdForeignKeys8000000000014';
@@ -26,26 +25,17 @@ export class AddChannelIdForeignKeys8000000000014 implements MigrationInterface 
     await queryRunner.query(`
       DO $$
       DECLARE
-        correct_fk_exists boolean;
+        correct_name_exists boolean;
         wrong_fk_name text;
       BEGIN
-        -- Check if a FK exists on channelId that references channel(id)
+        -- Check if the correct TypeORM hash-based constraint name exists
         SELECT EXISTS (
-          SELECT 1
-          FROM pg_constraint c
-          JOIN pg_class t ON c.conrelid = t.oid
-          JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
-          JOIN pg_class ref_t ON c.confrelid = ref_t.oid
-          JOIN pg_attribute ref_a ON ref_a.attrelid = ref_t.oid AND ref_a.attnum = ANY(c.confkey)
-          WHERE t.relname = 'stock_purchase'
-            AND a.attname = 'channelId'
-            AND ref_t.relname = 'channel'
-            AND ref_a.attname = 'id'
-            AND c.contype = 'f'
-        ) INTO correct_fk_exists;
+          SELECT 1 FROM pg_constraint 
+          WHERE conname = 'FK_f2dcdcc9376c26e6db204e92d0c'
+        ) INTO correct_name_exists;
 
-        IF NOT correct_fk_exists THEN
-          -- Check if any FK exists on this column (might be wrong target)
+        IF NOT correct_name_exists THEN
+          -- Check if any FK exists on this column (wrong name)
           SELECT conname INTO wrong_fk_name
           FROM pg_constraint c
           JOIN pg_class t ON c.conrelid = t.oid
@@ -60,9 +50,9 @@ export class AddChannelIdForeignKeys8000000000014 implements MigrationInterface 
             EXECUTE format('ALTER TABLE stock_purchase DROP CONSTRAINT %I', wrong_fk_name);
           END IF;
 
-          -- Create the FK (let PostgreSQL/TypeORM handle naming)
+          -- Create the FK with correct TypeORM hash-based name
           ALTER TABLE "stock_purchase" 
-          ADD CONSTRAINT "FK_stock_purchase_channel" 
+          ADD CONSTRAINT "FK_f2dcdcc9376c26e6db204e92d0c" 
           FOREIGN KEY ("channelId") 
           REFERENCES "channel"("id") 
           ON DELETE NO ACTION 
@@ -75,26 +65,17 @@ export class AddChannelIdForeignKeys8000000000014 implements MigrationInterface 
     await queryRunner.query(`
       DO $$
       DECLARE
-        correct_fk_exists boolean;
+        correct_name_exists boolean;
         wrong_fk_name text;
       BEGIN
-        -- Check if a FK exists on channelId that references channel(id)
+        -- Check if the correct TypeORM hash-based constraint name exists
         SELECT EXISTS (
-          SELECT 1
-          FROM pg_constraint c
-          JOIN pg_class t ON c.conrelid = t.oid
-          JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
-          JOIN pg_class ref_t ON c.confrelid = ref_t.oid
-          JOIN pg_attribute ref_a ON ref_a.attrelid = ref_t.oid AND ref_a.attnum = ANY(c.confkey)
-          WHERE t.relname = 'inventory_stock_adjustment'
-            AND a.attname = 'channelId'
-            AND ref_t.relname = 'channel'
-            AND ref_a.attname = 'id'
-            AND c.contype = 'f'
-        ) INTO correct_fk_exists;
+          SELECT 1 FROM pg_constraint 
+          WHERE conname = 'FK_ba4bb7998fa24453a7103687305'
+        ) INTO correct_name_exists;
 
-        IF NOT correct_fk_exists THEN
-          -- Check if any FK exists on this column (might be wrong target)
+        IF NOT correct_name_exists THEN
+          -- Check if any FK exists on this column (wrong name)
           SELECT conname INTO wrong_fk_name
           FROM pg_constraint c
           JOIN pg_class t ON c.conrelid = t.oid
@@ -109,9 +90,9 @@ export class AddChannelIdForeignKeys8000000000014 implements MigrationInterface 
             EXECUTE format('ALTER TABLE inventory_stock_adjustment DROP CONSTRAINT %I', wrong_fk_name);
           END IF;
 
-          -- Create the FK (let PostgreSQL/TypeORM handle naming)
+          -- Create the FK with correct TypeORM hash-based name
           ALTER TABLE "inventory_stock_adjustment" 
-          ADD CONSTRAINT "FK_inventory_stock_adjustment_channel" 
+          ADD CONSTRAINT "FK_ba4bb7998fa24453a7103687305" 
           FOREIGN KEY ("channelId") 
           REFERENCES "channel"("id") 
           ON DELETE NO ACTION 
@@ -124,26 +105,17 @@ export class AddChannelIdForeignKeys8000000000014 implements MigrationInterface 
     await queryRunner.query(`
       DO $$
       DECLARE
-        correct_fk_exists boolean;
+        correct_name_exists boolean;
         wrong_fk_name text;
       BEGIN
-        -- Check if a FK exists on channelId that references channel(id)
+        -- Check if the correct TypeORM hash-based constraint name exists
         SELECT EXISTS (
-          SELECT 1
-          FROM pg_constraint c
-          JOIN pg_class t ON c.conrelid = t.oid
-          JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
-          JOIN pg_class ref_t ON c.confrelid = ref_t.oid
-          JOIN pg_attribute ref_a ON ref_a.attrelid = ref_t.oid AND ref_a.attnum = ANY(c.confkey)
-          WHERE t.relname = 'purchase_payment'
-            AND a.attname = 'channelId'
-            AND ref_t.relname = 'channel'
-            AND ref_a.attname = 'id'
-            AND c.contype = 'f'
-        ) INTO correct_fk_exists;
+          SELECT 1 FROM pg_constraint 
+          WHERE conname = 'FK_79578e8f2067ae00e0d15980f10'
+        ) INTO correct_name_exists;
 
-        IF NOT correct_fk_exists THEN
-          -- Check if any FK exists on this column (might be wrong target)
+        IF NOT correct_name_exists THEN
+          -- Check if any FK exists on this column (wrong name)
           SELECT conname INTO wrong_fk_name
           FROM pg_constraint c
           JOIN pg_class t ON c.conrelid = t.oid
@@ -158,9 +130,9 @@ export class AddChannelIdForeignKeys8000000000014 implements MigrationInterface 
             EXECUTE format('ALTER TABLE purchase_payment DROP CONSTRAINT %I', wrong_fk_name);
           END IF;
 
-          -- Create the FK (let PostgreSQL/TypeORM handle naming)
+          -- Create the FK with correct TypeORM hash-based name
           ALTER TABLE "purchase_payment" 
-          ADD CONSTRAINT "FK_purchase_payment_channel" 
+          ADD CONSTRAINT "FK_79578e8f2067ae00e0d15980f10" 
           FOREIGN KEY ("channelId") 
           REFERENCES "channel"("id") 
           ON DELETE NO ACTION 
