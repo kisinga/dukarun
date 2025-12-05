@@ -368,8 +368,7 @@ export class LedgerQueryService {
     }
 
     // Query for cash sales: debits to CASH_ON_HAND or CLEARING_MPESA in entries that also credit SALES
-    // Use EXISTS subquery - more reliable than raw SQL string interpolation
-    // This approach is optimized by PostgreSQL query planner and avoids table alias issues
+    // Use EXISTS subquery with proper table reference to avoid alias resolution issues
     let cashSalesQuery = this.dataSource
       .getRepository(JournalLine)
       .createQueryBuilder('line')
@@ -383,7 +382,7 @@ export class LedgerQueryService {
       .andWhere(
         `EXISTS (
           SELECT 1 FROM ledger_journal_line salesLine
-          WHERE salesLine."entryId" = entry.id
+          WHERE salesLine."entryId" = line."entryId"
           AND salesLine."accountId" = :salesAccountId
           AND CAST(salesLine.credit AS BIGINT) > 0
         )`,
@@ -400,7 +399,7 @@ export class LedgerQueryService {
     }
 
     // Query for credit sales: debits to ACCOUNTS_RECEIVABLE in entries that also credit SALES
-    // Use EXISTS subquery for consistency and reliability
+    // Use EXISTS subquery with proper table reference
     let creditSalesQuery = this.dataSource
       .getRepository(JournalLine)
       .createQueryBuilder('line')
@@ -411,7 +410,7 @@ export class LedgerQueryService {
       .andWhere(
         `EXISTS (
           SELECT 1 FROM ledger_journal_line salesLine
-          WHERE salesLine."entryId" = entry.id
+          WHERE salesLine."entryId" = line."entryId"
           AND salesLine."accountId" = :salesAccountId
           AND CAST(salesLine.credit AS BIGINT) > 0
         )`,
