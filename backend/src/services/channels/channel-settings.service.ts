@@ -26,6 +26,8 @@ import { ActionCategory } from '../../infrastructure/events/types/action-categor
 import { ChannelActionType } from '../../infrastructure/events/types/action-type.enum';
 import { ROLE_TEMPLATES, RoleTemplate } from '../auth/provisioning/role-provisioner.service';
 import { SmsService } from '../../infrastructure/sms/sms.service';
+import { ChannelUpdateHelper } from './channel-update.helper';
+import { getChannelStatus } from '../../domain/channel-custom-fields';
 
 export interface ChannelSettings {
   cashierFlowEnabled: boolean;
@@ -74,7 +76,8 @@ export class ChannelSettingsService {
     private readonly connection: TransactionalConnection,
     private readonly auditService: AuditService,
     private readonly actionTrackingService: ChannelActionTrackingService,
-    private readonly smsService: SmsService
+    private readonly smsService: SmsService,
+    private readonly channelUpdateHelper: ChannelUpdateHelper
   ) {}
 
   async updateChannelSettings(
@@ -105,8 +108,7 @@ export class ChannelSettingsService {
 
     // Validation: If cashControlEnabled is true and cashierFlowEnabled is false, log a warning
     // Cash control can work independently, but it's typically used together with cashier flow
-    const nextCashControlEnabled =
-      (channel.customFields as any)?.cashControlEnabled ?? false;
+    const nextCashControlEnabled = (channel.customFields as any)?.cashControlEnabled ?? false;
     if (nextCashControlEnabled && !nextCashierFlowEnabled) {
       this.logger.warn(
         `Channel ${channelId} has cashControlEnabled=true but cashierFlowEnabled=false. ` +
@@ -155,31 +157,20 @@ export class ChannelSettingsService {
     }
 
     if (Object.keys(customFieldsUpdate).length > 0) {
-      await this.channelService.update(ctx, {
-        id: channelId,
-        customFields: customFieldsUpdate,
-      });
+      await this.channelUpdateHelper.updateChannelCustomFields(
+        ctx,
+        channelId.toString(),
+        customFieldsUpdate,
+        {
+          detectChanges: true,
+          auditEvent: 'channel.settings.updated',
+        }
+      );
 
       this.logger.log('Channel settings updated', {
         channelId,
         fields: Object.keys(customFieldsUpdate),
       });
-
-      // Log audit event
-      await this.auditService
-        .log(ctx, 'channel.settings.updated', {
-          entityType: 'Channel',
-          entityId: channelId.toString(),
-          data: {
-            fields: Object.keys(customFieldsUpdate),
-            changes: customFieldsUpdate,
-          },
-        })
-        .catch(err => {
-          this.logger.warn(
-            `Failed to log channel settings update audit: ${err instanceof Error ? err.message : String(err)}`
-          );
-        });
 
       const updatedChannel = await this.channelService.findOne(ctx, channelId);
       if (!updatedChannel) {
@@ -190,6 +181,37 @@ export class ChannelSettingsService {
     }
 
     return this.mapChannelSettings(channel);
+  }
+
+  /**
+   * Update channel status (UNAPPROVED/APPROVED/DISABLED/BANNED)
+   * SMS notifications are handled by ChannelStatusSubscriber via Vendure ChannelEvent
+   */
+  async updateChannelStatus(
+    ctx: RequestContext,
+    channelId: string,
+    status: 'UNAPPROVED' | 'APPROVED' | 'DISABLED' | 'BANNED'
+  ): Promise<Channel> {
+    const channel = await this.channelService.findOne(ctx, channelId);
+    if (!channel) {
+      throw new Error('Channel not found');
+    }
+
+    const currentStatus = getChannelStatus(channel.customFields);
+
+    await this.channelUpdateHelper.updateChannelCustomFields(ctx, channelId, { status } as any, {
+      detectChanges: true,
+      auditEvent: 'channel.status.updated',
+      // Note: SMS notifications are handled by ChannelStatusSubscriber
+      // which listens to Vendure ChannelEvent, so no need for onStatusChange callback
+    });
+
+    const updatedChannel = await this.channelService.findOne(ctx, channelId);
+    if (!updatedChannel) {
+      throw new Error('Channel not found after update');
+    }
+
+    return updatedChannel;
   }
 
   /**

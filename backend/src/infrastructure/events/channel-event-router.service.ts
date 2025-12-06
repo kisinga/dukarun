@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
 import {
   ChannelService,
   EventBus,
@@ -41,6 +41,7 @@ export class ChannelEventRouterService implements OnModuleInit {
     private readonly eventBus: EventBus,
     private readonly channelService: ChannelService,
     private readonly userService: UserService,
+    @Inject(forwardRef(() => ChannelActionTrackingService))
     private readonly actionTrackingService: ChannelActionTrackingService,
     private readonly notificationPreferenceService: NotificationPreferenceService,
     private readonly inAppHandler: InAppActionHandler,
@@ -220,7 +221,7 @@ export class ChannelEventRouterService implements OnModuleInit {
       let effectiveConfig: Record<string, ActionConfig>;
       if (isSystemEvent) {
         // System events use default config - no channel setup required
-        effectiveConfig = this.getDefaultSystemEventConfig();
+        effectiveConfig = this.getDefaultSystemEventConfig(event.type);
       } else {
         // Subscribable events require channel config
         const channelConfig = await this.getChannelConfig(event.channelId);
@@ -234,21 +235,29 @@ export class ChannelEventRouterService implements OnModuleInit {
       }
 
       // Determine target users
+      // Priority: explicit targetUserId > customer-facing event target > all channel admins (system events)
       let targetUserIds: string[] = [];
 
-      if (metadata.subscribable && metadata.customerFacing) {
-        // Customer-facing event: use target customer/user
-        if (event.targetUserId) {
-          targetUserIds = [event.targetUserId];
-        }
+      if (event.targetUserId) {
+        // Explicit target user provided (for both system and customer-facing events)
+        targetUserIds = [event.targetUserId];
+      } else if (metadata.subscribable && metadata.customerFacing) {
+        // Customer-facing event: targetUserId should be provided, but if not, we can't route
+        // (customer-facing events require explicit target)
+        this.logger.warn(
+          `Customer-facing event ${event.type} requires targetUserId but none provided`
+        );
+        return;
       } else {
-        // System event: get all channel admins
+        // System event: get all channel admins (only if no specific targetUserId provided)
         targetUserIds = await this.getChannelAdminUserIds(event.context, event.channelId);
       }
 
+      // Early validation: fail fast if no target users found
       if (targetUserIds.length === 0) {
-        this.logger.debug(
-          `No target users found for event ${event.type} in channel ${event.channelId}`
+        this.logger.warn(
+          `No target users found for event ${event.type} in channel ${event.channelId}. ` +
+            `System events require at least one channel admin.`
         );
         return;
       }
@@ -308,7 +317,15 @@ export class ChannelEventRouterService implements OnModuleInit {
 
       // Get handler
       const handler = this.handlers.get(actionType as ChannelActionType);
-      if (!handler || !handler.canHandle(userEvent)) {
+      if (!handler) {
+        this.logger.warn(`No handler found for action type ${actionType}`);
+        continue;
+      }
+
+      if (!handler.canHandle(userEvent)) {
+        this.logger.debug(
+          `Handler ${actionType} cannot handle event ${event.type} (missing phone number or customer ID)`
+        );
         continue;
       }
 
@@ -381,10 +398,20 @@ export class ChannelEventRouterService implements OnModuleInit {
   /**
    * Get default configuration for system events
    * System events always fire to channel admins with in-app notifications enabled
+   *
+   * Note: SMS is disabled for subscription_expired events due to phone number validation issues.
+   * This will be re-enabled once subscription refinement is complete.
    */
-  private getDefaultSystemEventConfig(): Record<string, ActionConfig> {
-    return {
+  private getDefaultSystemEventConfig(eventType?: ChannelEventType): Record<string, ActionConfig> {
+    const config: Record<string, ActionConfig> = {
       [ChannelActionType.IN_APP_NOTIFICATION]: { enabled: true },
     };
+
+    // Disable SMS for subscription_expired events (temporary - until subscription refinement)
+    if (eventType !== ChannelEventType.SUBSCRIPTION_EXPIRED) {
+      config[ChannelActionType.SMS] = { enabled: true };
+    }
+
+    return config;
   }
 }

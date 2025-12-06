@@ -1,5 +1,8 @@
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
+import { AuditDbConnection } from '../../infrastructure/audit/audit-db.connection';
+import { AuditService } from '../../infrastructure/audit/audit.service';
+import { UserContextResolver } from '../../infrastructure/audit/user-context.resolver';
 import { RedisCacheService } from '../../infrastructure/storage/redis-cache.service';
 import { SubscriptionResolver, SUBSCRIPTION_SCHEMA } from './subscription.resolver';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
@@ -10,6 +13,7 @@ import { SubscriptionGuard } from './subscription.guard';
 import { SubscriptionExpirySubscriber } from './subscription-expiry.subscriber';
 import { ChannelEventsPlugin } from '../channels/channel-events.plugin';
 import { PhoneAuthPlugin } from '../auth/phone-auth.plugin';
+import { ChannelUpdateHelper } from '../../services/channels/channel-update.helper';
 
 /**
  * Subscription Plugin
@@ -25,6 +29,13 @@ import { PhoneAuthPlugin } from '../auth/phone-auth.plugin';
   imports: [PluginCommonModule, ChannelEventsPlugin, PhoneAuthPlugin],
   entities: [SubscriptionTier],
   providers: [
+    // Audit dependencies for ChannelUpdateHelper
+    AuditDbConnection,
+    UserContextResolver,
+    AuditService,
+    // Channel update helper
+    ChannelUpdateHelper,
+    // Subscription services
     SubscriptionResolver,
     SubscriptionService,
     PaystackService,

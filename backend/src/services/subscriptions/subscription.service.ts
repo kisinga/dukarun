@@ -6,6 +6,7 @@ import { ChannelEventType } from '../../infrastructure/events/types/event-type.e
 import { RedisCacheService } from '../../infrastructure/storage/redis-cache.service';
 import { SubscriptionTier } from '../../plugins/subscriptions/subscription.entity';
 import { PaystackService } from '../payments/paystack.service';
+import { ChannelUpdateHelper } from '../channels/channel-update.helper';
 
 export interface SubscriptionStatus {
   isValid: boolean;
@@ -42,8 +43,9 @@ export class SubscriptionService {
     private connection: TransactionalConnection,
     private paystackService: PaystackService,
     private eventRouter: ChannelEventRouterService,
-    private redisCache: RedisCacheService
-  ) { }
+    private redisCache: RedisCacheService,
+    private channelUpdateHelper: ChannelUpdateHelper
+  ) {}
 
   /**
    * Check subscription status for a channel
@@ -235,12 +237,16 @@ export class SubscriptionService {
           customerCode = customer.data.customer_code;
 
           // Update channel with customer code
-          await this.channelService.update(ctx, {
-            id: channelId,
-            customFields: {
+          await this.channelUpdateHelper.updateChannelCustomFields(
+            ctx,
+            channelId,
+            {
               paystackCustomerCode: customerCode,
-            },
-          });
+            } as any,
+            {
+              auditEvent: 'channel.subscription.customer_code_updated',
+            }
+          );
         } catch (error) {
           this.logger.error(
             `Failed to create Paystack customer: ${error instanceof Error ? error.message : String(error)}`
@@ -467,16 +473,9 @@ export class SubscriptionService {
       updateData.paystackSubscriptionCode = paystackData.subscriptionCode;
     }
 
-    await this.channelService.update(ctx, {
-      id: channelId,
-      customFields: updateData,
-    });
-
-    this.logger.log(`Subscription activated for channel ${channelId}`);
-
-    // Emit subscription renewed event
-    await this.eventRouter
-      .routeEvent({
+    await this.channelUpdateHelper.updateChannelCustomFields(ctx, channelId, updateData as any, {
+      auditEvent: 'channel.subscription.activated',
+      routeEvent: {
         type: ChannelEventType.SUBSCRIPTION_RENEWED,
         channelId,
         category: ActionCategory.SYSTEM_NOTIFICATIONS,
@@ -486,12 +485,10 @@ export class SubscriptionService {
           billingCycle,
           amount: paystackData.amount,
         },
-      })
-      .catch(err => {
-        this.logger.warn(
-          `Failed to emit subscription renewed event: ${err instanceof Error ? err.message : String(err)}`
-        );
-      });
+      },
+    });
+
+    this.logger.log(`Subscription activated for channel ${channelId}`);
   }
 
   /**
@@ -636,12 +633,23 @@ export class SubscriptionService {
       return; // Already expired
     }
 
-    await this.channelService.update(ctx, {
-      id: channelId,
-      customFields: {
+    await this.channelUpdateHelper.updateChannelCustomFields(
+      ctx,
+      channelId,
+      {
         subscriptionStatus: 'expired',
-      },
-    });
+      } as any,
+      {
+        auditEvent: 'channel.subscription.expired',
+        routeEvent: {
+          type: ChannelEventType.SUBSCRIPTION_EXPIRED,
+          channelId,
+          category: ActionCategory.SYSTEM_NOTIFICATIONS,
+          context: ctx,
+          data: {},
+        },
+      }
+    );
 
     this.logger.log(`Subscription expired for channel ${channelId}`);
   }

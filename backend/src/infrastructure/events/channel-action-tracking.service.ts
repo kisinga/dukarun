@@ -3,6 +3,7 @@ import { Channel, ChannelService, RequestContext, TransactionalConnection } from
 import { ActionCategory } from './types/action-category.enum';
 import { ChannelActionType } from './types/action-type.enum';
 import { ChannelEventType } from './types/event-type.enum';
+import { ChannelUpdateHelper } from '../../services/channels/channel-update.helper';
 
 /**
  * Channel Action Tracking Service
@@ -16,7 +17,8 @@ export class ChannelActionTrackingService {
 
   constructor(
     private readonly connection: TransactionalConnection,
-    private readonly channelService: ChannelService
+    private readonly channelService: ChannelService,
+    private readonly channelUpdateHelper: ChannelUpdateHelper
   ) {}
 
   /**
@@ -65,10 +67,7 @@ export class ChannelActionTrackingService {
       customFields.actionCountTotal = currentGlobalTotal + 1;
 
       // Update channel
-      await this.channelService.update(ctx, {
-        id: channelId,
-        customFields,
-      });
+      await this.channelUpdateHelper.updateChannelCustomFields(ctx, channelId, customFields as any);
 
       this.logger.debug(
         `Tracked action: ${actionType} for event ${eventType} in channel ${channelId} (category: ${category})`
@@ -198,10 +197,7 @@ export class ChannelActionTrackingService {
       customFields.actionTrackingLastResetDate = new Date();
       customFields.actionTrackingResetType = resetType;
 
-      await this.channelService.update(ctx, {
-        id: channelId,
-        customFields,
-      });
+      await this.channelUpdateHelper.updateChannelCustomFields(ctx, channelId, customFields as any);
 
       this.logger.log(`Reset action counts for channel ${channelId} (${resetType})`);
     } catch (error) {
@@ -241,6 +237,7 @@ export class ChannelActionTrackingService {
       [ChannelEventType.SUBSCRIPTION_EXPIRING_SOON]: 'actionCountSysSubscriptionExpiringSoon',
       [ChannelEventType.SUBSCRIPTION_EXPIRED]: 'actionCountSysSubscriptionExpired',
       [ChannelEventType.SUBSCRIPTION_RENEWED]: 'actionCountSysSubscriptionRenewed',
+      [ChannelEventType.CHANNEL_APPROVED]: 'actionCountSysChannelApproved',
     };
 
     return fieldNameMap[eventType] || null;

@@ -75,12 +75,21 @@ describe('Subscription Flow Integration', () => {
       },
     };
 
+    // Mock ChannelUpdateHelper
+    const mockChannelUpdateHelper = {
+      updateChannelCustomFields: jest.fn(),
+    };
+    (
+      mockChannelUpdateHelper.updateChannelCustomFields as jest.MockedFunction<any>
+    ).mockResolvedValue({ id: '1' } as Channel);
+
     subscriptionService = new SubscriptionService(
       mockChannelService,
       mockConnection,
       mockPaystackService,
       mockEventRouter,
-      mockRedisCache
+      mockRedisCache,
+      mockChannelUpdateHelper as any
     );
   });
 

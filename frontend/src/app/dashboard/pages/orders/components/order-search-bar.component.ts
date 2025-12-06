@@ -48,8 +48,8 @@ import { ChangeDetectionStrategy, Component, input, model, output } from '@angul
             <option value="">All States</option>
             <option value="Draft">Draft</option>
             <option value="ArrangingPayment">Unpaid</option>
-            <option value="PaymentSettled">Paid (Unshipped)</option>
-            <option value="Fulfilled">Paid (Shipped)</option>
+            <option value="PaymentSettled">Paid</option>
+            <option value="Fulfilled">Paid</option>
           </select>
         </div>
       </div>

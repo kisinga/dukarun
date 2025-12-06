@@ -16,6 +16,8 @@ import { AuditService } from '../../infrastructure/audit/audit.service';
 import { AuditDbConnection } from '../../infrastructure/audit/audit-db.connection';
 import { UserContextResolver } from '../../infrastructure/audit/user-context.resolver';
 import { ChannelUserService } from '../../services/auth/channel-user.service';
+import { ChannelUpdateHelper } from '../../services/channels/channel-update.helper';
+import { PhoneNumberResolver } from '../../infrastructure/events/utils/phone-number-resolver';
 
 /**
  * Channel Events Plugin
@@ -27,20 +29,26 @@ import { ChannelUserService } from '../../services/auth/channel-user.service';
 @VendurePlugin({
   imports: [PluginCommonModule],
   providers: [
-    // Audit dependencies (must be available for ChannelEventRouterService)
+    // Audit dependencies (must be available for ChannelEventRouterService and ChannelUpdateHelper)
     // AuditDbConnection uses singleton pattern to prevent duplicate initialization
     AuditDbConnection,
     UserContextResolver,
     AuditService,
 
+    // Channel update helper (must be before ChannelActionTrackingService which uses it)
+    ChannelUpdateHelper,
     // Core services
     ChannelUserService,
+    // ChannelActionTrackingService must come before ChannelEventRouterService (which depends on it)
     ChannelActionTrackingService,
     ChannelEventRouterService,
     SmsProviderFactory, // Required by SmsService
     SmsService, // Required by ChannelSmsService
     ChannelSmsService,
     NotificationPreferenceService,
+
+    // Utilities
+    PhoneNumberResolver, // Required by SmsActionHandler
 
     // Required services for action handlers
     NotificationService, // Required by InAppActionHandler

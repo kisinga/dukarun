@@ -16,6 +16,7 @@ export const channelSettingsSchema = gql`
 
   extend type Mutation {
     updateChannelSettings(input: UpdateChannelSettingsInput!): ChannelSettings!
+    updateChannelStatus(channelId: ID!, status: String!): Channel!
     inviteChannelAdministrator(input: InviteAdministratorInput!): Administrator!
     createChannelAdmin(input: CreateChannelAdminInput!): Administrator!
     updateChannelAdmin(id: ID!, permissions: [String!]!): Administrator!
@@ -90,6 +91,24 @@ export class ChannelSettingsResolver {
     @Args('input') input: UpdateChannelSettingsInput
   ) {
     return this.channelSettingsService.updateChannelSettings(ctx, input);
+  }
+
+  @Mutation()
+  @Allow(Permission.UpdateSettings)
+  async updateChannelStatus(
+    @Ctx() ctx: RequestContext,
+    @Args('channelId') channelId: string,
+    @Args('status') status: string
+  ) {
+    const validStatuses = ['UNAPPROVED', 'APPROVED', 'DISABLED', 'BANNED'];
+    if (!validStatuses.includes(status)) {
+      throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    }
+    return this.channelSettingsService.updateChannelStatus(
+      ctx,
+      channelId,
+      status as 'UNAPPROVED' | 'APPROVED' | 'DISABLED' | 'BANNED'
+    );
   }
 
   @Mutation()
