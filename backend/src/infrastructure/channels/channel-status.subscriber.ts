@@ -62,6 +62,19 @@ export class ChannelStatusSubscriber implements OnModuleInit {
       return;
     }
 
+    // CRITICAL: Check if status field is in the update input
+    // If status is NOT being updated, we should exit early to avoid processing non-status updates
+    const inputCustomFields = (event.input as any)?.customFields;
+    const statusInInput = inputCustomFields && 'status' in inputCustomFields;
+
+    // Early exit: Only process if status field is explicitly being updated
+    if (!statusInInput) {
+      this.logger.debug(
+        `Channel ${channelIdStr} update does not include status field - skipping status change processing`
+      );
+      return;
+    }
+
     // CRITICAL: Check and set processing flag IMMEDIATELY to prevent race conditions
     // This must happen before any async operations
     if (this.processingChannels.has(channelIdStr)) {
@@ -75,47 +88,56 @@ export class ChannelStatusSubscriber implements OnModuleInit {
     this.processingChannels.add(channelIdStr);
 
     try {
-      // Get current status from database (this is the NEW state after update)
-      // Include seller relation for company name
-      const newChannel = await this.connection.getRepository(event.ctx, Channel).findOne({
+      // Get status from input (this is the NEW status being set)
+      const newStatusFromInput = inputCustomFields.status as ChannelStatus;
+
+      // Load channel from database to get current status after update
+      const updatedChannel = await this.connection.getRepository(event.ctx, Channel).findOne({
         where: { id: channelIdStr },
         select: ['id', 'customFields'],
         relations: ['seller'],
       });
 
-      if (!newChannel) {
+      if (!updatedChannel) {
         this.logger.warn(`Channel ${channelIdStr} not found after update event`);
         return;
       }
 
-      const dbStatus = getChannelStatus((newChannel.customFields || {}) as any);
+      // Get current status from database (this is the NEW state after update)
+      const currentDbStatus = getChannelStatus((updatedChannel.customFields || {}) as any);
+
+      // Get status from event entity (may be old or new state)
       const eventEntityStatus = getChannelStatus((channelFromEvent.customFields || {}) as any);
 
       // Determine old and new status
-      // Based on user feedback: event.entity contains NEW state when they differ
+      // The input status is what was SET, so that's the new status
+      const newStatus = newStatusFromInput;
       let oldStatus: ChannelStatus;
-      let newStatus: ChannelStatus;
 
-      if (eventEntityStatus !== dbStatus) {
-        // They differ - event.entity is NEW state (was updated), db might be OLD (before commit)
-        newStatus = eventEntityStatus;
-        oldStatus = dbStatus;
-      } else {
-        // They match - both have same status
-        // If status is in input, that's what's being set (NEW)
-        const inputCustomFields = (event.input as any)?.customFields;
-        if (inputCustomFields?.status && inputCustomFields.status !== eventEntityStatus) {
-          // Input has different status - this is the NEW status being set
-          newStatus = inputCustomFields.status as ChannelStatus;
-          oldStatus = eventEntityStatus; // Current status is OLD
+      // If input status matches current DB status, check if it's actually a change
+      if (newStatusFromInput === currentDbStatus) {
+        // Input status matches DB status - check if event entity has different status (old value)
+        if (eventEntityStatus !== newStatusFromInput) {
+          // Event entity has different status - that's the old status
+          oldStatus = eventEntityStatus;
         } else {
-          // No status change detected - status unchanged
+          // All statuses match - no actual change occurred (duplicate event or setting same status)
+          this.logger.debug(
+            `Channel ${channelIdStr} status update detected but no actual change (${newStatusFromInput}) - skipping`
+          );
           return;
         }
+      } else {
+        // Input status differs from DB status - real change occurred
+        // Current DB status is likely the old status before the update
+        oldStatus = currentDbStatus;
       }
 
-      // Only process if status actually changed
+      // Final validation: Only process if status actually changed
       if (oldStatus === newStatus) {
+        this.logger.debug(
+          `Channel ${channelIdStr} status unchanged (${oldStatus}) - skipping processing`
+        );
         return;
       }
 
@@ -145,7 +167,7 @@ export class ChannelStatusSubscriber implements OnModuleInit {
 
       // Only trigger if status changed to APPROVED
       if (newStatus === ChannelStatus.APPROVED && oldStatus !== ChannelStatus.APPROVED) {
-        await this.routeApprovalNotification(event.ctx, channelIdStr, newChannel);
+        await this.routeApprovalNotification(event.ctx, channelIdStr, updatedChannel);
       }
     } finally {
       // Always remove from processing set when done (even on error or early return)

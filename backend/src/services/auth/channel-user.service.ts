@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RequestContext, Role, TransactionalConnection, User } from '@vendure/core';
+import { RequestContext, Role, TransactionalConnection, User, Administrator } from '@vendure/core';
 
 @Injectable()
 export class ChannelUserService {
@@ -10,8 +10,10 @@ export class ChannelUserService {
   /**
    * Get all user IDs that have admin access to a channel.
    * This includes:
-   * 1. Users with roles explicitly assigned to the channel
-   * 2. SuperAdmins (global roles) if includeSuperAdmins is true (default)
+   * 1. Users with roles explicitly assigned to the channel AND have Administrator entity (not Customer)
+   * 2. SuperAdmins (global roles) if includeSuperAdmins is true (default) AND have Administrator entity
+   *
+   * This method ensures we only return actual admin accounts, not customer users.
    */
   async getChannelAdminUserIds(
     ctx: RequestContext,
@@ -21,36 +23,45 @@ export class ChannelUserService {
     const includeSuperAdmins = options.includeSuperAdmins ?? true;
 
     try {
-      // 1. Find Users who have Roles for this Channel
-      const users = await this.connection.rawConnection
-        .getRepository(User)
-        .createQueryBuilder('user')
+      // 1. Find Administrators whose Users have Roles for this specific Channel
+      // Query Administrator directly to ensure we only get admin accounts (not customers)
+      // In Vendure, if a User has an Administrator entity, they're an admin (not a customer)
+      // The innerJoin with role.channels and where clause ensures we only get admins
+      // for the specific channelId, even if Vendure has a default channel or roles
+      // are assigned to multiple channels
+      // Use innerJoinAndSelect to load the user relation
+      const administrators = await this.connection.rawConnection
+        .getRepository(Administrator)
+        .createQueryBuilder('administrator')
+        .innerJoinAndSelect('administrator.user', 'user')
         .innerJoin('user.roles', 'role')
         .innerJoin('role.channels', 'channel')
         .where('channel.id = :channelId', { channelId })
         .andWhere('user.deletedAt IS NULL')
         .getMany();
 
-      const userIds = new Set(users.map(u => u.id.toString()));
+      const userIds = new Set(
+        administrators.map(a => a.user?.id?.toString()).filter(Boolean) as string[]
+      );
 
-      // 2. Find SuperAdmins (roles with no specific channel or explicit superadmin role)
-      // In Vendure, SuperAdmin role usually has no channel restrictions (channels list might be empty or contain all)
-      // Standard convention: SuperAdmin role is not restricted to specific channels in the join table in a way that filters them out,
-      // but for our query, we look for users with roles that are NOT bound to this channel but have global access?
-      // Actually, existing logic in ChannelEventRouterService looked for 'channel.id IS NULL' on the left join
-      // which implies roles that are not linked to ANY channel (Global Roles).
-
+      // 2. Find SuperAdmins (Administrators with roles not linked to any channel)
+      // SuperAdmins have roles that are not linked to ANY channel (Global Roles)
       if (includeSuperAdmins) {
         const superAdmins = await this.connection.rawConnection
-          .getRepository(User)
-          .createQueryBuilder('user')
+          .getRepository(Administrator)
+          .createQueryBuilder('administrator')
+          .innerJoinAndSelect('administrator.user', 'user')
           .innerJoin('user.roles', 'role')
           .leftJoin('role.channels', 'channel')
           .where('channel.id IS NULL')
           .andWhere('user.deletedAt IS NULL')
           .getMany();
 
-        superAdmins.forEach(u => userIds.add(u.id.toString()));
+        superAdmins.forEach(a => {
+          if (a.user?.id) {
+            userIds.add(a.user.id.toString());
+          }
+        });
       }
 
       return Array.from(userIds);
