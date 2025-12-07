@@ -130,16 +130,16 @@
   <!-- Payments List -->
   @else {
     <!-- List Controls -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-1">
-      <div class="text-xs text-base-content/60">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1">
+      <div class="text-sm text-base-content/60">
         Showing {{ (currentPage() - 1) * itemsPerPage() + 1 }} to {{ endItem() }} of
         {{ filteredPayments().length }} payments
       </div>
 
       <div class="flex items-center gap-2">
-        <span class="text-xs text-base-content/60 hidden sm:inline">Per page:</span>
+        <span class="text-sm text-base-content/60">Per page:</span>
         <select
-          class="select select-xs select-bordered"
+          class="select select-sm select-bordered"
           [value]="itemsPerPage()"
           (change)="changeItemsPerPage(+$any($event.target).value)"
         >
@@ -151,7 +151,7 @@
     </div>
 
     <!-- Mobile: Card View -->
-    <div class="lg:hidden space-y-2.5 sm:space-y-3">
+    <div class="lg:hidden space-y-4">
       @for (payment of paginatedPayments(); track trackByPaymentId($index, payment)) {
         <app-payment-card [payment]="payment" (action)="onPaymentAction($event)" />
       }

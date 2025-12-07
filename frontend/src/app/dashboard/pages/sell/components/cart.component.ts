@@ -23,8 +23,8 @@ export interface CartItem {
     <div [class]="containerClasses()">
       <!-- Cart Header with Clear Button -->
       @if (items().length > 0) {
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="font-semibold text-lg">Cart Items</h3>
+        <div class="flex items-center justify-between mb-2 md:mb-3 p-2 -m-2 md:p-0 md:m-0">
+          <h3 class="font-semibold pl-2 text-sm md:text-base">Cart Items</h3>
           <button
             class="btn btn-ghost btn-sm text-error hover:bg-error/10"
             (click)="onClearCart()"
@@ -49,21 +49,45 @@ export interface CartItem {
         </div>
       }
 
-      <div
-        class="space-y-3"
-        [class.max-h-[60vh]]="displayMode() === 'modal'"
-        [class.overflow-y-auto]="displayMode() === 'modal'"
-      >
-        @for (item of items(); track item.variant.id) {
-          <app-cart-item
-            [item]="item"
-            [canOverridePrices]="canOverridePrices()"
-            (quantityChange)="onQuantityChange($event)"
-            (priceChange)="onPriceChange($event)"
-            (removeItem)="onRemove($event)"
-          />
-        }
-      </div>
+      <!-- Empty State -->
+      @if (items().length === 0) {
+        <div class="flex flex-col items-center justify-center py-6 opacity-60">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-12 w-12 mb-2"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+            />
+          </svg>
+          <p class="text-sm text-base-content/60">Cart is empty</p>
+        </div>
+      }
+
+      <!-- Cart Items -->
+      @if (items().length > 0) {
+        <div
+          class="space-y-3"
+          [class.max-h-[60vh]]="displayMode() === 'modal'"
+          [class.overflow-y-auto]="displayMode() === 'modal'"
+        >
+          @for (item of items(); track item.variant.id) {
+            <app-cart-item
+              [item]="item"
+              [canOverridePrices]="canOverridePrices()"
+              (quantityChange)="onQuantityChange($event)"
+              (priceChange)="onPriceChange($event)"
+              (removeItem)="onRemove($event)"
+            />
+          }
+        </div>
+      }
     </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
