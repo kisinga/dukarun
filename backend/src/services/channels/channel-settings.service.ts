@@ -151,7 +151,7 @@ export class ChannelSettingsService {
         }
 
         if (current.companyLogoAsset?.id !== input.companyLogoAssetId) {
-          customFieldsUpdate.companyLogoAsset = input.companyLogoAssetId;
+          customFieldsUpdate.companyLogoAsset = asset;
         }
       }
     }

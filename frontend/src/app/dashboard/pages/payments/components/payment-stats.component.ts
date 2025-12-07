@@ -17,20 +17,21 @@ export interface PaymentStats {
   selector: 'app-payment-stats',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 lg:gap-4">
       <!-- Total Payments -->
       <div
-        class="card bg-gradient-to-br from-success/10 to-success/5 border border-success/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+        class="card bg-gradient-to-br from-success/10 to-success/5 border border-success/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 touch-manipulation"
       >
-        <div class="card-body p-3 lg:p-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
+        <div class="card-body p-2.5 sm:p-3 lg:p-4">
+          <div class="flex items-center gap-2 sm:gap-3">
+            <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 text-success"
+                class="h-4 w-4 sm:h-5 sm:w-5 text-success"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                stroke-width="2"
               >
                 <path
                   stroke-linecap="round"
@@ -41,8 +42,8 @@ export interface PaymentStats {
               </svg>
             </div>
             <div class="flex-1 min-w-0">
-              <p class="text-xs text-base-content/60 truncate">Total Payments</p>
-              <p class="text-xl lg:text-2xl font-bold text-success tracking-tight">
+              <p class="text-[10px] sm:text-xs text-base-content/60 truncate">Total Payments</p>
+              <p class="text-lg sm:text-xl lg:text-2xl font-bold text-success tracking-tight">
                 {{ stats().totalPayments }}
               </p>
             </div>
@@ -52,21 +53,22 @@ export interface PaymentStats {
 
       <!-- Successful Payments -->
       <div
-        class="card bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        class="card bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer touch-manipulation"
         [class.ring-2]="activeStateFilter() === 'Settled'"
         [class.ring-primary]="activeStateFilter() === 'Settled'"
         [class.bg-primary/20]="activeStateFilter() === 'Settled'"
         (click)="onFilterClick('Settled')"
       >
-        <div class="card-body p-3 lg:p-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+        <div class="card-body p-2.5 sm:p-3 lg:p-4">
+          <div class="flex items-center gap-2 sm:gap-3">
+            <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 text-primary"
+                class="h-4 w-4 sm:h-5 sm:w-5 text-primary"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                stroke-width="2"
               >
                 <path
                   stroke-linecap="round"
@@ -77,8 +79,8 @@ export interface PaymentStats {
               </svg>
             </div>
             <div class="flex-1 min-w-0">
-              <p class="text-xs text-base-content/60 truncate">Successful</p>
-              <p class="text-xl lg:text-2xl font-bold text-primary tracking-tight">
+              <p class="text-[10px] sm:text-xs text-base-content/60 truncate">Successful</p>
+              <p class="text-lg sm:text-xl lg:text-2xl font-bold text-primary tracking-tight">
                 {{ stats().successfulPayments }}
               </p>
             </div>
@@ -88,21 +90,22 @@ export interface PaymentStats {
 
       <!-- Pending Payments -->
       <div
-        class="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        class="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer touch-manipulation"
         [class.ring-2]="activeStateFilter() === 'Created'"
         [class.ring-primary]="activeStateFilter() === 'Created'"
         [class.bg-primary/20]="activeStateFilter() === 'Created'"
         (click)="onFilterClick('Created')"
       >
-        <div class="card-body p-3 lg:p-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+        <div class="card-body p-2.5 sm:p-3 lg:p-4">
+          <div class="flex items-center gap-2 sm:gap-3">
+            <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 text-warning"
+                class="h-4 w-4 sm:h-5 sm:w-5 text-warning"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                stroke-width="2"
               >
                 <path
                   stroke-linecap="round"
@@ -113,8 +116,8 @@ export interface PaymentStats {
               </svg>
             </div>
             <div class="flex-1 min-w-0">
-              <p class="text-xs text-base-content/60 truncate">Pending</p>
-              <p class="text-xl lg:text-2xl font-bold text-warning tracking-tight">
+              <p class="text-[10px] sm:text-xs text-base-content/60 truncate">Pending</p>
+              <p class="text-lg sm:text-xl lg:text-2xl font-bold text-warning tracking-tight">
                 {{ stats().pendingPayments }}
               </p>
             </div>
@@ -124,21 +127,22 @@ export interface PaymentStats {
 
       <!-- Failed Payments -->
       <div
-        class="card bg-gradient-to-br from-error/10 to-error/5 border border-error/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+        class="card bg-gradient-to-br from-error/10 to-error/5 border border-error/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer touch-manipulation"
         [class.ring-2]="activeStateFilter() === 'Declined'"
         [class.ring-primary]="activeStateFilter() === 'Declined'"
         [class.bg-primary/20]="activeStateFilter() === 'Declined'"
         (click)="onFilterClick('Declined')"
       >
-        <div class="card-body p-3 lg:p-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-error/10 flex items-center justify-center shrink-0">
+        <div class="card-body p-2.5 sm:p-3 lg:p-4">
+          <div class="flex items-center gap-2 sm:gap-3">
+            <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-error/10 flex items-center justify-center shrink-0">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 text-error"
+                class="h-4 w-4 sm:h-5 sm:w-5 text-error"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                stroke-width="2"
               >
                 <path
                   stroke-linecap="round"
@@ -149,8 +153,8 @@ export interface PaymentStats {
               </svg>
             </div>
             <div class="flex-1 min-w-0">
-              <p class="text-xs text-base-content/60 truncate">Failed</p>
-              <p class="text-xl lg:text-2xl font-bold text-error tracking-tight">
+              <p class="text-[10px] sm:text-xs text-base-content/60 truncate">Failed</p>
+              <p class="text-lg sm:text-xl lg:text-2xl font-bold text-error tracking-tight">
                 {{ stats().failedPayments }}
               </p>
             </div>

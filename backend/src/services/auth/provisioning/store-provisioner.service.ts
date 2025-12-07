@@ -146,7 +146,7 @@ export class StoreProvisionerService {
 
     const stockLocationResult = await this.stockLocationService.create(ctx, {
       name: storeName,
-      description: registrationData.storeAddress?.trim() || '',
+      description: registrationData.storeAddress.trim(),
     });
 
     if ('errorCode' in stockLocationResult) {

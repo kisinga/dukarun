@@ -6,6 +6,8 @@ import {
   ID,
   Order,
   RequestContext,
+  StockLocation,
+  StockLocationService,
   TransactionalConnection,
   UserInputError,
 } from '@vendure/core';
@@ -33,7 +35,8 @@ export class OrderAddressService {
   constructor(
     private readonly connection: TransactionalConnection,
     private readonly countryService: CountryService,
-    private readonly entityHydrator: EntityHydrator
+    private readonly entityHydrator: EntityHydrator,
+    private readonly stockLocationService: StockLocationService
   ) {}
 
   /**
@@ -56,12 +59,16 @@ export class OrderAddressService {
 
       if (customer && customer.addresses && customer.addresses.length > 0) {
         const customerAddress = customer.addresses[0];
+        // Get channel store location for fallback
+        const storeLocation = await this.getChannelStoreLocation(ctx);
+        const storeAddress = storeLocation?.description || 'Store Location';
+        
         return {
           fullName:
             customerAddress.fullName ||
             `${customer.firstName || ''} ${customer.lastName || ''}`.trim() ||
             'Customer',
-          streetLine1: customerAddress.streetLine1 || 'Store Location',
+          streetLine1: customerAddress.streetLine1 || storeAddress,
           streetLine2: customerAddress.streetLine2 || '',
           city: customerAddress.city || 'Local City',
           postalCode: customerAddress.postalCode || '00100',
@@ -133,19 +140,48 @@ export class OrderAddressService {
 
   /**
    * Get default address for walk-in customers
+   * Uses the channel's store location (stock location description) as the address
    */
   private async getDefaultAddress(ctx: RequestContext): Promise<AddressInput> {
     const countries = await this.countryService.findAll(ctx);
     const defaultCountry = countries.items.length > 0 ? countries.items[0].code : 'KE';
 
+    // Get channel's store location
+    const storeLocation = await this.getChannelStoreLocation(ctx);
+    const storeAddress = storeLocation?.description || 'Store Location';
+
     return {
       fullName: 'Walk-in Customer',
-      streetLine1: 'Store Location',
+      streetLine1: storeAddress,
       streetLine2: '',
       city: 'Local City',
       postalCode: '00100',
       countryCode: defaultCountry,
       phoneNumber: '',
     };
+  }
+
+  /**
+   * Get the default stock location for the current channel
+   * Returns the first stock location assigned to the channel, which contains the store address in its description
+   */
+  private async getChannelStoreLocation(ctx: RequestContext): Promise<StockLocation | null> {
+    try {
+      // StockLocationService.findAll automatically filters by channel from RequestContext
+      const result = await this.stockLocationService.findAll(ctx, {
+        take: 1,
+      });
+
+      if (result.items && result.items.length > 0) {
+        return result.items[0];
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to fetch store location for channel: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return null;
+    }
   }
 }
