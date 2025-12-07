@@ -325,3 +325,6 @@ None. This refactoring maintains backward compatibility.
    - Track variance during cashier sessions
    - Display warnings when approaching threshold
 
+
+
+
