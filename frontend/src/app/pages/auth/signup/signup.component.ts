@@ -173,7 +173,7 @@ export class SignupComponent implements OnDestroy {
     // Update service with step 2 data
     this.registrationService.setStoreInfo({
       storeName: this.storeName.trim(),
-      storeAddress: this.storeAddress.trim() || undefined,
+      storeAddress: this.storeAddress.trim(),
     });
 
     // Validate
@@ -225,7 +225,7 @@ export class SignupComponent implements OnDestroy {
         adminPhoneNumber: formatPhoneNumber(registrationData.admin.phoneNumber),
         adminEmail: registrationData.admin.email?.trim() || undefined,
         storeName: registrationData.store.storeName.trim(),
-        storeAddress: registrationData.store.storeAddress?.trim() || undefined,
+        storeAddress: registrationData.store.storeAddress.trim(),
       };
 
       // NEW: Store registration data and request OTP
@@ -406,7 +406,7 @@ export class SignupComponent implements OnDestroy {
         adminPhoneNumber: formatPhoneNumber(registrationData.admin.phoneNumber),
         adminEmail: registrationData.admin.email?.trim() || undefined,
         storeName: registrationData.store.storeName.trim(),
-        storeAddress: registrationData.store.storeAddress?.trim() || undefined,
+        storeAddress: registrationData.store.storeAddress.trim(),
       };
 
       // Resend OTP with registration data (gets new sessionId)

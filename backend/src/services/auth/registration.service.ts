@@ -25,7 +25,7 @@ export interface RegistrationInput {
   adminPhoneNumber: string;
   adminEmail?: string;
   storeName: string;
-  storeAddress?: string;
+  storeAddress: string;
 }
 
 /**

@@ -270,7 +270,7 @@
           <!-- Store Address -->
           <div class="form-control">
             <label class="label">
-              <span class="label-text">Store Address (Optional)</span>
+              <span class="label-text">Store Address</span>
             </label>
             <textarea
               class="textarea textarea-bordered w-full"
@@ -278,6 +278,7 @@
               [(ngModel)]="storeAddress"
               name="storeAddress"
               rows="3"
+              required
               [disabled]="isLoadingAny()"
             ></textarea>
           </div>
