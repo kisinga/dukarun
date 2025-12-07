@@ -15,6 +15,7 @@ import { RedisCacheService } from '../../../src/infrastructure/storage/redis-cac
 import { PaystackService } from '../../../src/services/payments/paystack.service';
 import { SubscriptionService } from '../../../src/services/subscriptions/subscription.service';
 import { generatePaystackEmailFromPhone } from '../../../src/utils/email.utils';
+import { UpdateChannelCustomFieldsOptions } from '../../../src/services/channels/channel-update.helper';
 
 describe('Subscription Flow Integration', () => {
   const ctx = {} as RequestContext;
@@ -79,13 +80,15 @@ describe('Subscription Flow Integration', () => {
 
     // Mock ChannelUpdateHelper
     mockChannelUpdateHelper = {
-      updateChannelCustomFields: jest.fn(async (ctx, channelId, updates, options) => {
-        // If routeEvent is provided, route it through the event router
-        if (options?.routeEvent) {
-          await mockEventRouter.routeEvent(options.routeEvent);
+      updateChannelCustomFields: jest.fn(
+        async (ctx, channelId, updates, options?: UpdateChannelCustomFieldsOptions) => {
+          // If routeEvent is provided, route it through the event router
+          if (options?.routeEvent) {
+            await mockEventRouter.routeEvent(options.routeEvent);
+          }
+          return { id: '1' } as Channel;
         }
-        return { id: '1' } as Channel;
-      }),
+      ),
     };
 
     subscriptionService = new SubscriptionService(
@@ -128,8 +131,20 @@ describe('Subscription Flow Integration', () => {
 
       // Verify update was called
       expect(mockChannelUpdateHelper.updateChannelCustomFields).toHaveBeenCalled();
-      const updateCall = mockChannelUpdateHelper.updateChannelCustomFields.mock.calls[0][1]; // Second argument is the update data
-      const newExpiry = new Date(updateCall.subscriptionExpiresAt);
+      const updateCall = mockChannelUpdateHelper.updateChannelCustomFields.mock.calls[0][2]; // Third argument is the update data (ctx, channelId, updates, options)
+
+      // Debug: Check what we actually received
+      expect(updateCall).toBeDefined();
+      expect(updateCall.subscriptionExpiresAt).toBeDefined();
+
+      // subscriptionExpiresAt is a Date object, not a string
+      const newExpiry =
+        updateCall.subscriptionExpiresAt instanceof Date
+          ? updateCall.subscriptionExpiresAt
+          : new Date(updateCall.subscriptionExpiresAt);
+
+      // Verify the date is valid
+      expect(isNaN(newExpiry.getTime())).toBe(false);
 
       // Should extend from current expiry (Feb 15) + 1 month = March 15
       expect(newExpiry.getMonth()).toBe(2); // March (0-indexed)
@@ -168,8 +183,12 @@ describe('Subscription Flow Integration', () => {
 
       // Verify update was called
       expect(mockChannelUpdateHelper.updateChannelCustomFields).toHaveBeenCalled();
-      const updateCall = mockChannelUpdateHelper.updateChannelCustomFields.mock.calls[0][1]; // Second argument is the update data
-      const newExpiry = new Date(updateCall.subscriptionExpiresAt);
+      const updateCall = mockChannelUpdateHelper.updateChannelCustomFields.mock.calls[0][2]; // Third argument is the update data (ctx, channelId, updates, options)
+      // subscriptionExpiresAt is a Date object, not a string
+      const newExpiry =
+        updateCall.subscriptionExpiresAt instanceof Date
+          ? updateCall.subscriptionExpiresAt
+          : new Date(updateCall.subscriptionExpiresAt);
 
       // Should extend from now (Feb 15) + 1 month = March 15
       expect(newExpiry.getMonth()).toBe(2); // March
@@ -208,8 +227,12 @@ describe('Subscription Flow Integration', () => {
 
       // Verify update was called
       expect(mockChannelUpdateHelper.updateChannelCustomFields).toHaveBeenCalled();
-      const updateCall = mockChannelUpdateHelper.updateChannelCustomFields.mock.calls[0][1]; // Second argument is the update data
-      const newExpiry = new Date(updateCall.subscriptionExpiresAt);
+      const updateCall = mockChannelUpdateHelper.updateChannelCustomFields.mock.calls[0][2]; // Third argument is the update data (ctx, channelId, updates, options)
+      // subscriptionExpiresAt is a Date object, not a string
+      const newExpiry =
+        updateCall.subscriptionExpiresAt instanceof Date
+          ? updateCall.subscriptionExpiresAt
+          : new Date(updateCall.subscriptionExpiresAt);
 
       // Should extend from trial end (March 1) + 1 month = April 1
       expect(newExpiry.getMonth()).toBe(3); // April
@@ -418,8 +441,12 @@ describe('Subscription Flow Integration', () => {
 
       // Verify update was called
       expect(mockChannelUpdateHelper.updateChannelCustomFields).toHaveBeenCalled();
-      const updateCall = mockChannelUpdateHelper.updateChannelCustomFields.mock.calls[0][1];
-      const newExpiry = new Date(updateCall.subscriptionExpiresAt);
+      const updateCall = mockChannelUpdateHelper.updateChannelCustomFields.mock.calls[0][2]; // Third argument is the update data (ctx, channelId, updates, options)
+      // subscriptionExpiresAt is a Date object, not a string
+      const newExpiry =
+        updateCall.subscriptionExpiresAt instanceof Date
+          ? updateCall.subscriptionExpiresAt
+          : new Date(updateCall.subscriptionExpiresAt);
 
       // Should extend from now (Feb 15) + 1 month = March 15
       expect(newExpiry.getMonth()).toBe(2); // March
