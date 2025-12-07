@@ -103,8 +103,9 @@ export class ChannelUpdateHelper {
     };
 
     // Check if status changed for hook
+    // Only consider status changed if status field is explicitly in updates
     const newStatus = updates.status !== undefined ? updates.status : currentStatus;
-    const statusChanged = newStatus !== currentStatus;
+    const statusChanged = updates.status !== undefined && newStatus !== currentStatus;
 
     // Log status change for debugging
     if (statusChanged) {

@@ -384,8 +384,8 @@ export class ChannelSettingsService {
       const companyName = channel?.code || 'your organization';
 
       const message = isExistingUser
-        ? `Welcome! You've been added as an administrator to ${companyName}. You can now access the dashboard.`
-        : `Welcome to ${companyName}! You've been added as an administrator. You can now access the dashboard.`;
+        ? `Welcome! You've been added as an administrator to ${companyName}. You can now access the dashboard. Go to https://dukarun.com/login to get started.`
+        : `Welcome to ${companyName}! You've been added as an administrator. You can now access the dashboard. Go to https://dukarun.com/login to get started.`;
 
       const result = await this.smsService.sendSms(phoneNumber, message);
 
@@ -417,20 +417,45 @@ export class ChannelSettingsService {
       throw new BadRequestException('phoneNumber is required');
     }
 
+    // Normalize emailAddress: remove if it's null, undefined, empty string, or whitespace-only
+    // This prevents Vendure's email normalization from throwing errors
+    // CRITICAL: When spreading objects, undefined properties are included, so we must explicitly remove them
+    const normalizedInput: any = {};
+
+    // Copy all properties except emailAddress
+    Object.keys(input).forEach(key => {
+      if (key !== 'emailAddress') {
+        normalizedInput[key] = (input as any)[key];
+      }
+    });
+
+    // Only add emailAddress if it's a valid non-empty string
+    if ('emailAddress' in input) {
+      const email = (input as any).emailAddress;
+      if (email && typeof email === 'string' && email.trim().length > 0) {
+        normalizedInput.emailAddress = email.trim();
+      }
+    }
+    // If emailAddress was undefined/null/empty, it's now completely absent from normalizedInput
+
+    // Use normalized input for the rest of the method
+    const cleanInput = normalizedInput;
+
     // Check if user with this phone number already exists (phone is primary identifier)
-    const existingUser = await this.findExistingUserByPhone(ctx, input.phoneNumber);
+    const existingUser = await this.findExistingUserByPhone(ctx, cleanInput.phoneNumber);
 
     if (existingUser) {
       // User exists - check if they already belong to this channel
       if (this.userBelongsToChannel(existingUser, channelId.toString())) {
         throw new BadRequestException(
-          `Administrator with phone number ${input.phoneNumber} already belongs to this channel`
+          `Administrator with phone number ${cleanInput.phoneNumber} already belongs to this channel`
         );
       }
 
       // User exists but belongs to different channel(s) - add them to this channel
       // Determine role template
-      const roleTemplateCode = 'roleTemplateCode' in input ? input.roleTemplateCode : 'admin';
+      const roleTemplateCode =
+        'roleTemplateCode' in cleanInput ? cleanInput.roleTemplateCode : 'admin';
       const template = roleTemplateCode ? ROLE_TEMPLATES[roleTemplateCode] : undefined;
       if (!template) {
         throw new BadRequestException(`Invalid role template code: ${roleTemplateCode}`);
@@ -438,15 +463,15 @@ export class ChannelSettingsService {
 
       // Merge template permissions with overrides
       const finalPermissions =
-        'permissionOverrides' in input && input.permissionOverrides
-          ? input.permissionOverrides
+        'permissionOverrides' in cleanInput && cleanInput.permissionOverrides
+          ? cleanInput.permissionOverrides
           : template.permissions;
 
       // Create new channel-specific role
       const roleCode = `channel-${roleTemplateCode}-${channelId}-${Date.now()}`;
       const createRoleInput = {
         code: roleCode,
-        description: `${template.name} role for ${input.firstName} ${input.lastName}`,
+        description: `${template.name} role for ${cleanInput.firstName} ${cleanInput.lastName}`,
         permissions: finalPermissions,
         channelIds: [channelId],
       };
@@ -463,15 +488,15 @@ export class ChannelSettingsService {
 
       if (!administrator) {
         throw new BadRequestException(
-          `Administrator not found for user with phone number ${input.phoneNumber}`
+          `Administrator not found for user with phone number ${cleanInput.phoneNumber}`
         );
       }
 
       // Update email if provided and existing email is blank
-      await this.updateAdministratorEmailIfNeeded(ctx, administrator, input.emailAddress);
+      await this.updateAdministratorEmailIfNeeded(ctx, administrator, cleanInput.emailAddress);
 
       // Send welcome SMS
-      await this.sendWelcomeSms(ctx, input.phoneNumber, channelId.toString(), true);
+      await this.sendWelcomeSms(ctx, cleanInput.phoneNumber, channelId.toString(), true);
 
       // Track action and audit
       await this.actionTrackingService.trackAction(
@@ -491,10 +516,10 @@ export class ChannelSettingsService {
           entityType: 'Administrator',
           entityId: administrator.id.toString(),
           data: {
-            firstName: input.firstName,
-            lastName: input.lastName,
-            phoneNumber: input.phoneNumber,
-            emailAddress: 'emailAddress' in input ? input.emailAddress : undefined,
+            firstName: cleanInput.firstName,
+            lastName: cleanInput.lastName,
+            phoneNumber: cleanInput.phoneNumber,
+            emailAddress: 'emailAddress' in cleanInput ? cleanInput.emailAddress : undefined,
             roleId: role.id.toString(),
             roleTemplateCode,
             action: 'added_to_channel',
@@ -514,7 +539,8 @@ export class ChannelSettingsService {
     await this.checkAdminCountLimit(ctx);
 
     // Determine role template
-    const roleTemplateCode = 'roleTemplateCode' in input ? input.roleTemplateCode : 'admin';
+    const roleTemplateCode =
+      'roleTemplateCode' in cleanInput ? cleanInput.roleTemplateCode : 'admin';
     const template = roleTemplateCode ? ROLE_TEMPLATES[roleTemplateCode] : undefined;
     if (!template) {
       throw new BadRequestException(`Invalid role template code: ${roleTemplateCode}`);
@@ -522,15 +548,15 @@ export class ChannelSettingsService {
 
     // Merge template permissions with overrides
     const finalPermissions =
-      'permissionOverrides' in input && input.permissionOverrides
-        ? input.permissionOverrides
+      'permissionOverrides' in cleanInput && cleanInput.permissionOverrides
+        ? cleanInput.permissionOverrides
         : template.permissions;
 
     // Create or get role for this admin
     const roleCode = `channel-${roleTemplateCode}-${channelId}-${Date.now()}`;
     const createRoleInput = {
       code: roleCode,
-      description: `${template.name} role for ${input.firstName} ${input.lastName}`,
+      description: `${template.name} role for ${cleanInput.firstName} ${cleanInput.lastName}`,
       permissions: finalPermissions,
       channelIds: [channelId],
     };
@@ -538,28 +564,31 @@ export class ChannelSettingsService {
     const role = await this.roleService.create(ctx, createRoleInput);
 
     // Create administrator
+    // ROOT CAUSE: Vendure's AdministratorService.create() ALWAYS calls normalizeEmailAddress(input.emailAddress)
+    // even when emailAddress is not provided. When the property doesn't exist, input.emailAddress is undefined,
+    // and normalizeEmailAddress(undefined) fails because isEmailAddressLike() tries to read .length on undefined.
+    // SOLUTION: Always provide a valid email address. For phone-based auth, use phone number as email fallback.
+    const emailToUse =
+      'emailAddress' in cleanInput &&
+      cleanInput.emailAddress &&
+      typeof cleanInput.emailAddress === 'string' &&
+      cleanInput.emailAddress.trim().length > 0
+        ? cleanInput.emailAddress.trim()
+        : cleanInput.phoneNumber; // Use phone number as email fallback for phone-based auth
+
     const createAdminInput: any = {
-      firstName: input.firstName,
-      lastName: input.lastName,
+      firstName: cleanInput.firstName,
+      lastName: cleanInput.lastName,
       password: this.generateTemporaryPassword(),
       roleIds: [role.id],
+      identifier: cleanInput.phoneNumber, // Phone-based flow: create user with phone identifier
+      emailAddress: emailToUse, // Always provide emailAddress - use phone number as fallback
     };
-
-    // Phone-based flow: create user with phone identifier
-    createAdminInput.identifier = input.phoneNumber;
-    // Only set emailAddress if provided and non-empty string (prevents normalization error)
-    if (
-      input.emailAddress &&
-      typeof input.emailAddress === 'string' &&
-      input.emailAddress.trim().length > 0
-    ) {
-      createAdminInput.emailAddress = input.emailAddress.trim();
-    }
 
     const administrator = await this.administratorService.create(ctx, createAdminInput);
 
     // Send welcome SMS
-    await this.sendWelcomeSms(ctx, input.phoneNumber, channelId.toString(), false);
+    await this.sendWelcomeSms(ctx, cleanInput.phoneNumber, channelId.toString(), false);
 
     // Track action (using SMS as placeholder action type for counting)
     await this.actionTrackingService.trackAction(
@@ -580,10 +609,10 @@ export class ChannelSettingsService {
         entityType: 'Administrator',
         entityId: administrator.id.toString(),
         data: {
-          firstName: input.firstName,
-          lastName: input.lastName,
-          phoneNumber: 'phoneNumber' in input ? input.phoneNumber : undefined,
-          emailAddress: 'emailAddress' in input ? input.emailAddress : undefined,
+          firstName: cleanInput.firstName,
+          lastName: cleanInput.lastName,
+          phoneNumber: 'phoneNumber' in cleanInput ? cleanInput.phoneNumber : undefined,
+          emailAddress: 'emailAddress' in cleanInput ? cleanInput.emailAddress : undefined,
           roleId: role.id.toString(),
           roleTemplateCode,
         },

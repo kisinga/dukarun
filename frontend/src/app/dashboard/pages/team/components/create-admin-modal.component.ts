@@ -1,16 +1,20 @@
 import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   computed,
   ElementRef,
   EventEmitter,
   inject,
   Input,
+  OnInit,
+  OnDestroy,
   Output,
   signal,
   viewChild,
 } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TeamService, type RoleTemplate } from '../../../../core/services/team.service';
 
@@ -28,9 +32,10 @@ import { TeamService, type RoleTemplate } from '../../../../core/services/team.s
   styleUrl: './create-admin-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CreateAdminModalComponent {
+export class CreateAdminModalComponent implements OnInit, OnDestroy {
   private readonly teamService = inject(TeamService);
   private readonly fb = inject(FormBuilder);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   @Input() roleTemplates: RoleTemplate[] = [];
   @Output() memberCreated = new EventEmitter<void>();
@@ -42,6 +47,15 @@ export class CreateAdminModalComponent {
   readonly isSubmitting = signal(false);
 
   readonly form: FormGroup;
+
+  // Reactive validity signals
+  readonly isStep1Valid = signal(false);
+  readonly isStep2Valid = signal(false);
+
+  // Track selected permissions (Set for O(1) lookup)
+  readonly selectedPermissions = signal<Set<string>>(new Set());
+
+  private formSubscriptions = new Subscription();
 
   // Super-admin permissions to filter out
   private readonly superAdminPermissions = new Set([
@@ -67,12 +81,66 @@ export class CreateAdminModalComponent {
     });
   }
 
+  ngOnInit(): void {
+    // Subscribe to form value changes to update validity signals
+    this.formSubscriptions.add(
+      this.form.valueChanges.subscribe(() => {
+        this.updateStepValidity();
+      }),
+    );
+
+    this.formSubscriptions.add(
+      this.form.statusChanges.subscribe(() => {
+        this.updateStepValidity();
+      }),
+    );
+
+    // Watch for role template code changes to initialize permissions
+    this.formSubscriptions.add(
+      this.form.get('roleTemplateCode')?.valueChanges.subscribe(() => {
+        this.onTemplateSelected();
+      }) || new Subscription(),
+    );
+
+    // Initial validation check
+    this.updateStepValidity();
+  }
+
+  ngOnDestroy(): void {
+    this.formSubscriptions.unsubscribe();
+  }
+
+  private updateStepValidity(): void {
+    const firstName = this.form.get('firstName');
+    const lastName = this.form.get('lastName');
+    const phoneNumber = this.form.get('phoneNumber');
+    const phoneConfirm = this.form.get('phoneConfirm');
+
+    const step1Valid =
+      !!(firstName?.valid && lastName?.valid && phoneNumber?.valid && phoneConfirm?.valid) &&
+      phoneNumber?.value === phoneConfirm?.value;
+
+    this.isStep1Valid.set(step1Valid);
+
+    const roleTemplateCode = this.form.get('roleTemplateCode');
+    const step2Valid = !!roleTemplateCode?.valid && !!this.getSelectedTemplate();
+    this.isStep2Valid.set(step2Valid);
+
+    // Manually trigger change detection for OnPush strategy
+    this.cdr.markForCheck();
+  }
+
   open(): void {
     this.step.set(1);
     this.error.set(null);
     this.form.reset();
+    this.isStep1Valid.set(false);
+    this.isStep2Valid.set(false);
+    this.selectedPermissions.set(new Set());
     const modal = this.modalRef()?.nativeElement;
     modal?.showModal();
+    // Trigger validation after a brief delay to ensure form is reset
+    setTimeout(() => this.updateStepValidity(), 0);
   }
 
   close(): void {
@@ -118,6 +186,54 @@ export class CreateAdminModalComponent {
   getSelectedTemplate(): RoleTemplate | undefined {
     const code = this.form.get('roleTemplateCode')?.value;
     return this.roleTemplates.find((t) => t.code === code);
+  }
+
+  /**
+   * Initialize selected permissions from template when template is selected
+   */
+  onTemplateSelected(): void {
+    const template = this.getSelectedTemplate();
+    if (template) {
+      const filtered = this.filterSuperAdminPermissions(template.permissions);
+      this.selectedPermissions.set(new Set(filtered));
+      this.updatePermissionOverrides();
+    } else {
+      this.selectedPermissions.set(new Set());
+      this.updatePermissionOverrides();
+    }
+    this.updateStepValidity();
+  }
+
+  /**
+   * Toggle a permission's selection state
+   */
+  togglePermission(permission: string): void {
+    const current = this.selectedPermissions();
+    const newSet = new Set(current);
+
+    if (newSet.has(permission)) {
+      newSet.delete(permission);
+    } else {
+      newSet.add(permission);
+    }
+
+    this.selectedPermissions.set(newSet);
+    this.updatePermissionOverrides();
+  }
+
+  /**
+   * Check if a permission is selected
+   */
+  isPermissionSelected(permission: string): boolean {
+    return this.selectedPermissions().has(permission);
+  }
+
+  /**
+   * Update form's permissionOverrides with selected permissions
+   */
+  private updatePermissionOverrides(): void {
+    const selected = Array.from(this.selectedPermissions());
+    this.form.patchValue({ permissionOverrides: selected }, { emitEvent: false });
   }
 
   /**
@@ -205,31 +321,6 @@ export class CreateAdminModalComponent {
     return this.filterSuperAdminPermissions(template.permissions);
   });
 
-  /**
-   * Check if step 1 is valid
-   */
-  readonly isStep1Valid = computed(() => {
-    const firstName = this.form.get('firstName');
-    const lastName = this.form.get('lastName');
-    const phoneNumber = this.form.get('phoneNumber');
-    const phoneConfirm = this.form.get('phoneConfirm');
-
-    return (
-      firstName?.valid &&
-      lastName?.valid &&
-      phoneNumber?.valid &&
-      phoneConfirm?.valid &&
-      phoneNumber?.value === phoneConfirm?.value
-    );
-  });
-
-  /**
-   * Check if step 2 is valid
-   */
-  readonly isStep2Valid = computed(() => {
-    return this.form.get('roleTemplateCode')?.valid && !!this.getSelectedTemplate();
-  });
-
   async submit(): Promise<void> {
     // Validate all required fields
     if (this.form.invalid) {
@@ -262,15 +353,34 @@ export class CreateAdminModalComponent {
 
     try {
       const formValue = this.form.value;
-      await this.teamService.createMember({
+
+      // Fix email address: convert empty string to undefined and exclude from input if undefined
+      const emailAddress = formValue.emailAddress?.trim();
+      const hasEmail = emailAddress && emailAddress.length > 0;
+
+      // Get selected permissions
+      const selectedPerms = Array.from(this.selectedPermissions());
+      const permissionOverrides = selectedPerms.length > 0 ? selectedPerms : undefined;
+
+      // Build input object, conditionally including emailAddress
+      const input: any = {
         firstName: formValue.firstName,
         lastName: formValue.lastName,
         phoneNumber: formValue.phoneNumber,
-        emailAddress: formValue.emailAddress || undefined,
         roleTemplateCode: formValue.roleTemplateCode,
-        permissionOverrides:
-          formValue.permissionOverrides?.length > 0 ? formValue.permissionOverrides : undefined,
-      });
+      };
+
+      // Only include emailAddress if it has a value
+      if (hasEmail) {
+        input.emailAddress = emailAddress;
+      }
+
+      // Only include permissionOverrides if there are any
+      if (permissionOverrides) {
+        input.permissionOverrides = permissionOverrides;
+      }
+
+      await this.teamService.createMember(input);
 
       this.memberCreated.emit();
       this.close();

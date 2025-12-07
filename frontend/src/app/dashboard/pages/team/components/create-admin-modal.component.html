@@ -152,6 +152,7 @@
                 [class.select-error]="
                   form.get('roleTemplateCode')?.invalid && form.get('roleTemplateCode')?.touched
                 "
+                (change)="onTemplateSelected()"
               >
                 <option value="">Select a role template...</option>
                 @for (template of roleTemplates; track template.code) {
@@ -175,21 +176,13 @@
                 <div class="flex items-center justify-between">
                   <h4 class="text-sm font-semibold">Permissions</h4>
                   <span class="badge badge-sm badge-ghost"
-                    >{{ filteredPermissions().length }} permissions</span
+                    >{{ selectedPermissions().size }} of
+                    {{ filteredPermissions().length }} selected</span
                   >
                 </div>
 
-                <div class="text-xs text-base-content/60 mb-2 flex items-center gap-1">
-                  <svg
-                    class="w-3 h-3"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>Coming soon: Customize permissions</span>
+                <div class="text-xs text-base-content/60 mb-2">
+                  Select or deselect permissions to customize the role template.
                 </div>
 
                 <div class="max-h-[300px] overflow-y-auto space-y-3 pr-2">
@@ -202,17 +195,19 @@
                       </div>
                       <div class="space-y-1.5 pl-2">
                         @for (permission of groupedPermissions()[group]; track permission) {
-                          <div class="flex items-center gap-2 text-sm">
+                          <label
+                            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-base-200/50 rounded px-1 py-0.5 -mx-1 transition-colors"
+                          >
                             <input
                               type="checkbox"
-                              [checked]="true"
-                              [disabled]="true"
+                              [checked]="isPermissionSelected(permission)"
+                              (change)="togglePermission(permission)"
                               class="checkbox checkbox-sm checkbox-primary"
                             />
-                            <span class="text-base-content/80">{{
+                            <span class="text-base-content/80 flex-1">{{
                               formatPermissionName(permission)
                             }}</span>
-                          </div>
+                          </label>
                         }
                       </div>
                     </div>

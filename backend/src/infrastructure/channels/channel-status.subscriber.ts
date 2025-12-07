@@ -50,28 +50,15 @@ export class ChannelStatusSubscriber implements OnModuleInit {
 
   /**
    * Handle channel update event
-   * event.entity contains the channel entity (may be old or new state depending on when event fires)
-   * event.input contains the update input with new values
-   * We need to determine old and new status correctly
+   *
+   * CRITICAL: Only process if status VALUE actually changed, not just if status field exists.
+   * When customFields are merged, status is always included, so we must compare VALUES.
    */
   private async handleChannelUpdate(event: ChannelEvent): Promise<void> {
     const channelFromEvent = event.entity as Channel;
     const channelIdStr = channelFromEvent.id?.toString() || event.ctx.channelId?.toString();
     if (!channelIdStr) {
       this.logger.warn('ChannelEvent missing channel ID');
-      return;
-    }
-
-    // CRITICAL: Check if status field is in the update input
-    // If status is NOT being updated, we should exit early to avoid processing non-status updates
-    const inputCustomFields = (event.input as any)?.customFields;
-    const statusInInput = inputCustomFields && 'status' in inputCustomFields;
-
-    // Early exit: Only process if status field is explicitly being updated
-    if (!statusInInput) {
-      this.logger.debug(
-        `Channel ${channelIdStr} update does not include status field - skipping status change processing`
-      );
       return;
     }
 
@@ -88,10 +75,11 @@ export class ChannelStatusSubscriber implements OnModuleInit {
     this.processingChannels.add(channelIdStr);
 
     try {
-      // Get status from input (this is the NEW status being set)
-      const newStatusFromInput = inputCustomFields.status as ChannelStatus;
+      // Get status from event.entity - this represents the channel state at event time
+      // (may be before or after update depending on when Vendure fires the event)
+      const eventEntityStatus = getChannelStatus((channelFromEvent.customFields || {}) as any);
 
-      // Load channel from database to get current status after update
+      // Load channel from database to get current status AFTER update
       const updatedChannel = await this.connection.getRepository(event.ctx, Channel).findOne({
         where: { id: channelIdStr },
         select: ['id', 'customFields'],
@@ -103,40 +91,41 @@ export class ChannelStatusSubscriber implements OnModuleInit {
         return;
       }
 
-      // Get current status from database (this is the NEW state after update)
-      const currentDbStatus = getChannelStatus((updatedChannel.customFields || {}) as any);
+      // Get status from database (this is the state AFTER the update)
+      const dbStatus = getChannelStatus((updatedChannel.customFields || {}) as any);
 
-      // Get status from event entity (may be old or new state)
-      const eventEntityStatus = getChannelStatus((channelFromEvent.customFields || {}) as any);
-
-      // Determine old and new status
-      // The input status is what was SET, so that's the new status
-      const newStatus = newStatusFromInput;
-      let oldStatus: ChannelStatus;
-
-      // If input status matches current DB status, check if it's actually a change
-      if (newStatusFromInput === currentDbStatus) {
-        // Input status matches DB status - check if event entity has different status (old value)
-        if (eventEntityStatus !== newStatusFromInput) {
-          // Event entity has different status - that's the old status
-          oldStatus = eventEntityStatus;
-        } else {
-          // All statuses match - no actual change occurred (duplicate event or setting same status)
-          this.logger.debug(
-            `Channel ${channelIdStr} status update detected but no actual change (${newStatusFromInput}) - skipping`
-          );
-          return;
-        }
-      } else {
-        // Input status differs from DB status - real change occurred
-        // Current DB status is likely the old status before the update
-        oldStatus = currentDbStatus;
+      // CRITICAL: Only process if status VALUE actually changed
+      // Compare event entity status with database status - if they match, status didn't change
+      // This handles the case where logo is updated but status remains the same
+      if (eventEntityStatus === dbStatus) {
+        // Status values are the same - no status change occurred (e.g., logo update)
+        this.logger.debug(
+          `Channel ${channelIdStr} updated but status unchanged (${dbStatus}) - skipping status change processing`
+        );
+        return;
       }
 
-      // Final validation: Only process if status actually changed
+      // Status values differ - determine which is old and which is new
+      // The database status is definitely the NEW status after update
+      const newStatus = dbStatus;
+
+      // The event entity status differs from DB - if it's different, it might be the old status
+      // However, we need to be careful because event.entity might have new state in some cases
+      // For now, assume event entity status is the old status if it differs from DB
+      const oldStatus = eventEntityStatus;
+
+      // Final validation: Ensure we have valid status values
+      if (!oldStatus || !newStatus) {
+        this.logger.debug(
+          `Channel ${channelIdStr} status comparison invalid - skipping status change processing`
+        );
+        return;
+      }
+
+      // If old and new status are the same after comparison, skip
       if (oldStatus === newStatus) {
         this.logger.debug(
-          `Channel ${channelIdStr} status unchanged (${oldStatus}) - skipping processing`
+          `Channel ${channelIdStr} status unchanged after comparison (${oldStatus}) - skipping`
         );
         return;
       }
