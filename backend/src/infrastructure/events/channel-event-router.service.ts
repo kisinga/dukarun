@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Inject, forwardRef, Optional } from '@nestjs/common';
 import {
   ChannelService,
   EventBus,
@@ -24,6 +24,8 @@ import { ChannelEventType } from './types/event-type.enum';
 import { AuditService } from '../audit/audit.service';
 import { UserContextResolver } from '../audit/user-context.resolver';
 import { ChannelUserService } from '../../services/auth/channel-user.service';
+import { SubscriptionService } from '../../services/subscriptions/subscription.service';
+import { WorkerContextService } from '../utils/worker-context.service';
 
 /**
  * Channel Event Router Service
@@ -41,6 +43,7 @@ export class ChannelEventRouterService implements OnModuleInit {
     private readonly eventBus: EventBus,
     private readonly channelService: ChannelService,
     private readonly userService: UserService,
+    @Inject(forwardRef(() => ChannelActionTrackingService))
     private readonly actionTrackingService: ChannelActionTrackingService,
     private readonly notificationPreferenceService: NotificationPreferenceService,
     private readonly inAppHandler: InAppActionHandler,
@@ -49,7 +52,12 @@ export class ChannelEventRouterService implements OnModuleInit {
     private readonly auditService: AuditService,
     private readonly userContextResolver: UserContextResolver,
     private readonly connection: TransactionalConnection,
-    private readonly channelUserService: ChannelUserService
+    private readonly channelUserService: ChannelUserService,
+    @Optional()
+    @Inject(forwardRef(() => SubscriptionService))
+    private readonly subscriptionService?: SubscriptionService,
+    @Optional()
+    private readonly workerContext?: WorkerContextService
   ) {
     // Register handlers
     this.handlers.set(ChannelActionType.IN_APP_NOTIFICATION, inAppHandler);
@@ -169,6 +177,27 @@ export class ChannelEventRouterService implements OnModuleInit {
    */
   async routeEvent(event: ChannelEvent): Promise<void> {
     try {
+      // Check if this is a background-task-generated event that should only run in worker
+      const backgroundTaskEvents = [
+        ChannelEventType.SUBSCRIPTION_EXPIRED,
+        ChannelEventType.SUBSCRIPTION_EXPIRING_SOON,
+        ChannelEventType.ML_EXTRACTION_QUEUED,
+        ChannelEventType.ML_EXTRACTION_STARTED,
+        ChannelEventType.ML_EXTRACTION_COMPLETED,
+        ChannelEventType.ML_EXTRACTION_FAILED,
+      ];
+
+      if (backgroundTaskEvents.includes(event.type)) {
+        // Background-task events MUST only run in worker process
+        // If we can't determine context or we're not in worker, skip
+        if (!this.workerContext || !this.workerContext.isWorkerProcess()) {
+          this.logger.debug(
+            `Skipping ${event.type} event - background task events only process in worker process`
+          );
+          return;
+        }
+      }
+
       // Log to audit system before processing
       // Extract user context from event data or context
       // This captures both regular admins and superadmins
@@ -206,6 +235,20 @@ export class ChannelEventRouterService implements OnModuleInit {
           );
         });
 
+      // Check reminder state for SUBSCRIPTION_EXPIRED events
+      if (event.type === ChannelEventType.SUBSCRIPTION_EXPIRED && this.subscriptionService) {
+        const shouldSend = await this.subscriptionService.shouldSendExpiredReminder(
+          event.context,
+          event.channelId
+        );
+        if (!shouldSend) {
+          this.logger.debug(
+            `Skipping subscription expired reminder for channel ${event.channelId} - reminder sent recently`
+          );
+          return;
+        }
+      }
+
       // Get metadata FIRST to determine routing strategy
       const metadata = this.getEventMetadata(event.type);
       if (!metadata) {
@@ -220,7 +263,7 @@ export class ChannelEventRouterService implements OnModuleInit {
       let effectiveConfig: Record<string, ActionConfig>;
       if (isSystemEvent) {
         // System events use default config - no channel setup required
-        effectiveConfig = this.getDefaultSystemEventConfig();
+        effectiveConfig = this.getDefaultSystemEventConfig(event.type);
       } else {
         // Subscribable events require channel config
         const channelConfig = await this.getChannelConfig(event.channelId);
@@ -234,21 +277,29 @@ export class ChannelEventRouterService implements OnModuleInit {
       }
 
       // Determine target users
+      // Priority: explicit targetUserId > customer-facing event target > all channel admins (system events)
       let targetUserIds: string[] = [];
 
-      if (metadata.subscribable && metadata.customerFacing) {
-        // Customer-facing event: use target customer/user
-        if (event.targetUserId) {
-          targetUserIds = [event.targetUserId];
-        }
+      if (event.targetUserId) {
+        // Explicit target user provided (for both system and customer-facing events)
+        targetUserIds = [event.targetUserId];
+      } else if (metadata.subscribable && metadata.customerFacing) {
+        // Customer-facing event: targetUserId should be provided, but if not, we can't route
+        // (customer-facing events require explicit target)
+        this.logger.warn(
+          `Customer-facing event ${event.type} requires targetUserId but none provided`
+        );
+        return;
       } else {
-        // System event: get all channel admins
+        // System event: get all channel admins (only if no specific targetUserId provided)
         targetUserIds = await this.getChannelAdminUserIds(event.context, event.channelId);
       }
 
+      // Early validation: fail fast if no target users found
       if (targetUserIds.length === 0) {
-        this.logger.debug(
-          `No target users found for event ${event.type} in channel ${event.channelId}`
+        this.logger.warn(
+          `No target users found for event ${event.type} in channel ${event.channelId}. ` +
+            `System events require at least one channel admin.`
         );
         return;
       }
@@ -256,6 +307,17 @@ export class ChannelEventRouterService implements OnModuleInit {
       // For each target user, check preferences and route to handlers
       for (const userId of targetUserIds) {
         await this.routeEventForUser(event, userId, effectiveConfig, metadata);
+      }
+
+      // Mark reminder as sent for SUBSCRIPTION_EXPIRED events after routing
+      if (event.type === ChannelEventType.SUBSCRIPTION_EXPIRED && this.subscriptionService) {
+        await this.subscriptionService
+          .markExpiredReminderSent(event.context, event.channelId)
+          .catch(err => {
+            this.logger.warn(
+              `Failed to mark expired reminder as sent: ${err instanceof Error ? err.message : String(err)}`
+            );
+          });
       }
     } catch (error) {
       this.logger.error(
@@ -308,7 +370,15 @@ export class ChannelEventRouterService implements OnModuleInit {
 
       // Get handler
       const handler = this.handlers.get(actionType as ChannelActionType);
-      if (!handler || !handler.canHandle(userEvent)) {
+      if (!handler) {
+        this.logger.warn(`No handler found for action type ${actionType}`);
+        continue;
+      }
+
+      if (!handler.canHandle(userEvent)) {
+        this.logger.debug(
+          `Handler ${actionType} cannot handle event ${event.type} (missing phone number or customer ID)`
+        );
         continue;
       }
 
@@ -382,9 +452,12 @@ export class ChannelEventRouterService implements OnModuleInit {
    * Get default configuration for system events
    * System events always fire to channel admins with in-app notifications enabled
    */
-  private getDefaultSystemEventConfig(): Record<string, ActionConfig> {
-    return {
+  private getDefaultSystemEventConfig(eventType?: ChannelEventType): Record<string, ActionConfig> {
+    const config: Record<string, ActionConfig> = {
       [ChannelActionType.IN_APP_NOTIFICATION]: { enabled: true },
+      [ChannelActionType.SMS]: { enabled: true },
     };
+
+    return config;
   }
 }

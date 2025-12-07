@@ -18,7 +18,7 @@ import { ChangeDetectionStrategy, Component, input, model, output } from '@angul
           <span [class]="'badge badge-' + filterColor() + ' gap-2'">
             {{ getFilterLabel() }}
             <button
-              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0 touch-manipulation"
               (click)="onClearFilter()"
               type="button"
               aria-label="Clear filter"
@@ -34,14 +34,14 @@ import { ChangeDetectionStrategy, Component, input, model, output } from '@angul
           <input
             type="text"
             placeholder="Search payments..."
-            class="input input-bordered w-full input-sm sm:input-md"
+            class="input input-bordered w-full input-sm sm:input-md touch-manipulation"
             [value]="searchQuery()"
             (input)="onSearchChange($event)"
           />
         </div>
         <div class="flex gap-2">
           <select
-            class="select select-bordered select-sm sm:select-md flex-1 sm:flex-none sm:w-auto"
+            class="select select-bordered select-sm sm:select-md flex-1 sm:flex-none sm:w-auto touch-manipulation"
             [value]="stateFilter()"
             (change)="onStateFilterChange($event)"
           >

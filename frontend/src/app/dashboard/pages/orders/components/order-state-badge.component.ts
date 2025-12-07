@@ -27,8 +27,8 @@ export class OrderStateBadgeComponent {
     const statusMap: Record<string, string> = {
       Draft: 'Draft',
       ArrangingPayment: 'Unpaid',
-      PaymentSettled: 'Paid (Unshipped)',
-      Fulfilled: 'Paid (Shipped)',
+      PaymentSettled: 'Paid',
+      Fulfilled: 'Paid',
     };
     return statusMap[state] || state;
   });

@@ -239,7 +239,10 @@ export class Receipt52mmTemplate extends PrintTemplate {
                 }
                 .receipt-52mm .company-logo {
                     max-width: 40mm;
+                    max-height: 40mm;
+                    width: auto;
                     height: auto;
+                    object-fit: contain;
                     margin-bottom: 8px;
                 }
                 .receipt-52mm .company-name {
@@ -484,7 +487,10 @@ export class A4Template extends PrintTemplate {
                 }
                 .a4-invoice .company-logo {
                     max-width: 80mm;
+                    max-height: 80mm;
+                    width: auto;
                     height: auto;
+                    object-fit: contain;
                     margin-bottom: 12px;
                 }
                 .a4-invoice .invoice-header {
@@ -568,8 +574,8 @@ export class A4Template extends PrintTemplate {
     const statusMap: Record<string, string> = {
       Draft: 'Draft',
       ArrangingPayment: 'Unpaid',
-      PaymentSettled: 'Paid (Unshipped)',
-      Fulfilled: 'Paid (Shipped)',
+      PaymentSettled: 'Paid',
+      Fulfilled: 'Paid',
     };
     return statusMap[state] || state;
   }

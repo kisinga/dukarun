@@ -146,6 +146,12 @@ export const EVENT_METADATA: Record<ChannelEventType, EventMetadata> = {
     defaultEnabled: true,
     category: ActionCategory.SYSTEM_NOTIFICATIONS,
   },
+  [ChannelEventType.CHANNEL_APPROVED]: {
+    subscribable: false,
+    customerFacing: false,
+    defaultEnabled: true,
+    category: ActionCategory.SYSTEM_NOTIFICATIONS,
+  },
 };
 
 export const EVENT_METADATA_MAP = new Map<ChannelEventType, EventMetadata>(

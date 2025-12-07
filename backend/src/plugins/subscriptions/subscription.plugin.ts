@@ -1,5 +1,9 @@
+import { APP_GUARD } from '@nestjs/core';
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
+import { AuditDbConnection } from '../../infrastructure/audit/audit-db.connection';
+import { AuditService } from '../../infrastructure/audit/audit.service';
+import { UserContextResolver } from '../../infrastructure/audit/user-context.resolver';
 import { RedisCacheService } from '../../infrastructure/storage/redis-cache.service';
 import { SubscriptionResolver, SUBSCRIPTION_SCHEMA } from './subscription.resolver';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
@@ -10,6 +14,7 @@ import { SubscriptionGuard } from './subscription.guard';
 import { SubscriptionExpirySubscriber } from './subscription-expiry.subscriber';
 import { ChannelEventsPlugin } from '../channels/channel-events.plugin';
 import { PhoneAuthPlugin } from '../auth/phone-auth.plugin';
+import { WorkerContextService } from '../../infrastructure/utils/worker-context.service';
 
 /**
  * Subscription Plugin
@@ -25,12 +30,23 @@ import { PhoneAuthPlugin } from '../auth/phone-auth.plugin';
   imports: [PluginCommonModule, ChannelEventsPlugin, PhoneAuthPlugin],
   entities: [SubscriptionTier],
   providers: [
+    // Worker context service (required for background tasks)
+    WorkerContextService,
+    // Subscription services
     SubscriptionResolver,
     SubscriptionService,
     PaystackService,
     RedisCacheService,
     SubscriptionGuard,
     SubscriptionExpirySubscriber,
+    // Apply SubscriptionGuard globally to all admin API mutations
+    {
+      provide: APP_GUARD,
+      useClass: SubscriptionGuard,
+    },
+  ],
+  exports: [
+    SubscriptionService, // Export for use by ChannelEventRouterService
   ],
   controllers: [SubscriptionWebhookController],
   adminApiExtensions: {
@@ -38,9 +54,8 @@ import { PhoneAuthPlugin } from '../auth/phone-auth.plugin';
     resolvers: [SubscriptionResolver],
   },
   configuration: config => {
-    // Register subscription guard for admin API mutations
-    // Note: This is a simplified approach. In production, you might want
-    // to apply the guard more selectively via decorators or middleware.
+    // SubscriptionGuard is applied globally via APP_GUARD provider above
+    // It checks all mutations and blocks expired subscriptions from performing actions
     return config;
   },
   compatibility: VENDURE_COMPATIBILITY_VERSION,

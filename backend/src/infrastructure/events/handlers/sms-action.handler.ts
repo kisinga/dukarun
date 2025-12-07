@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { RequestContext } from '@vendure/core';
-import { Customer, CustomerService } from '@vendure/core';
 import { ChannelSmsService } from '../channel-sms.service';
+import { PhoneNumberResolver } from '../utils/phone-number-resolver';
 import { ActionCategory } from '../types/action-category.enum';
 import { ChannelActionType } from '../types/action-type.enum';
 import { ChannelEventType } from '../types/event-type.enum';
@@ -12,6 +12,7 @@ import { IChannelActionHandler } from './action-handler.interface';
  * SMS Action Handler
  *
  * Sends SMS notifications using the ChannelSmsService.
+ * Uses PhoneNumberResolver for consistent phone number resolution.
  */
 @Injectable()
 export class SmsActionHandler implements IChannelActionHandler {
@@ -20,8 +21,9 @@ export class SmsActionHandler implements IChannelActionHandler {
   private readonly logger = new Logger('SmsActionHandler');
 
   constructor(
+    @Inject(forwardRef(() => ChannelSmsService))
     private readonly channelSmsService: ChannelSmsService,
-    private readonly customerService: CustomerService
+    private readonly phoneNumberResolver: PhoneNumberResolver
   ) {}
 
   async execute(
@@ -30,20 +32,8 @@ export class SmsActionHandler implements IChannelActionHandler {
     config: ActionConfig
   ): Promise<ActionResult> {
     try {
-      // Get phone number from customer or event data
-      let phoneNumber: string | undefined;
-
-      if (event.targetCustomerId) {
-        const customer = await this.customerService.findOne(ctx, event.targetCustomerId);
-        if (customer) {
-          phoneNumber = customer.phoneNumber || undefined;
-        }
-      }
-
-      // Fallback to event data
-      if (!phoneNumber && event.data?.phoneNumber) {
-        phoneNumber = event.data.phoneNumber;
-      }
+      // Use centralized phone number resolver
+      const phoneNumber = await this.phoneNumberResolver.resolvePhoneNumber(ctx, event);
 
       if (!phoneNumber) {
         return {
@@ -86,8 +76,9 @@ export class SmsActionHandler implements IChannelActionHandler {
   }
 
   canHandle(event: ChannelEvent): boolean {
-    // Can handle if we have a customer ID or phone number in data
-    return !!(event.targetCustomerId || event.data?.phoneNumber);
+    // Use PhoneNumberResolver to check if phone number can be resolved
+    // This ensures canHandle and execute are aligned
+    return this.phoneNumberResolver.canResolve(event);
   }
 
   private getMessageForEvent(event: ChannelEvent): string {
@@ -102,6 +93,8 @@ export class SmsActionHandler implements IChannelActionHandler {
       order_payment_settled: data => `Order #${data.orderCode || 'N/A'} payment has been settled`,
       order_fulfilled: data => `Order #${data.orderCode || 'N/A'} has been fulfilled`,
       order_cancelled: data => `Order #${data.orderCode || 'N/A'} has been cancelled`,
+      channel_approved: data =>
+        `Hi ${data.adminName || 'there'}! ${data.companyName || 'Your company'} has been approved. Welcome to DukaRun!`,
     };
 
     const messageFn = messageMap[event.type];

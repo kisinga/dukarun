@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  OnDestroy,
   computed,
   inject,
   signal,
@@ -12,12 +13,15 @@ import { CartService } from '../../../core/services/cart.service';
 import { CustomerService } from '../../../core/services/customer.service';
 import { CompanyService } from '../../../core/services/company.service';
 import { OrderService } from '../../../core/services/order.service';
+import { ApolloService } from '../../../core/services/apollo.service';
+import { CurrencyService } from '../../../core/services/currency.service';
 import {
   ProductSearchResult,
   ProductSearchService,
   ProductVariant,
 } from '../../../core/services/product/product-search.service';
 import { StockLocationService } from '../../../core/services/stock-location.service';
+import { GET_PRODUCTS } from '../../../core/graphql/operations.graphql';
 import { CartComponent, CartItem } from './components/cart.component';
 import { CheckoutFabComponent } from './components/checkout-fab.component';
 import { CheckoutModalComponent } from './components/checkout-modal.component';
@@ -61,7 +65,7 @@ type PaymentMethodCode = string;
   styleUrl: './sell.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SellComponent implements OnInit {
+export class SellComponent implements OnInit, OnDestroy {
   private readonly productSearchService = inject(ProductSearchService);
   private readonly companyService = inject(CompanyService);
   private readonly stockLocationService = inject(StockLocationService);
@@ -69,6 +73,8 @@ export class SellComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly cartService = inject(CartService);
   private readonly customerService = inject(CustomerService);
+  private readonly apolloService = inject(ApolloService);
+  private readonly currencyService = inject(CurrencyService);
 
   // Configuration
   readonly channelId = computed(() => this.companyService.activeCompanyId() || 'T_1');
@@ -133,12 +139,102 @@ export class SellComponent implements OnInit {
   // Payment method state (for cash sales)
   readonly selectedPaymentMethod = signal<PaymentMethodCode | null>(null);
 
+  // Product list state (for quick selection)
+  readonly recentProducts = signal<ProductSearchResult[]>([]);
+  readonly isLoadingProducts = signal<boolean>(false);
+  readonly isQuickSelectExpanded = signal<boolean>(false); // Default collapsed
+  readonly isMobile = signal<boolean>(false);
+  private resizeListener?: () => void;
+
+  // Computed: Always expanded on desktop, use signal on mobile
+  readonly shouldExpandQuickSelect = computed(() => {
+    return !this.isMobile() || this.isQuickSelectExpanded();
+  });
+
   async ngOnInit(): Promise<void> {
+    // Check mobile status
+    this.checkMobile();
+    this.resizeListener = () => this.checkMobile();
+    window.addEventListener('resize', this.resizeListener);
+
     // Load cart from cache on initialization
     this.cartService.loadCartFromCache();
 
     // Sync with cart service state
     this.cartItems.set(this.cartService.cartItems());
+
+    // Load recent products for quick selection
+    await this.loadRecentProducts();
+  }
+
+  ngOnDestroy(): void {
+    if (this.resizeListener) {
+      window.removeEventListener('resize', this.resizeListener);
+    }
+  }
+
+  checkMobile(): void {
+    this.isMobile.set(window.innerWidth < 768);
+    // Auto-expand on desktop
+    if (!this.isMobile()) {
+      this.isQuickSelectExpanded.set(true);
+    }
+  }
+
+  // Load recent products for quick selection
+  async loadRecentProducts(): Promise<void> {
+    this.isLoadingProducts.set(true);
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.query<{
+        products: {
+          items: any[];
+        };
+      }>({
+        query: GET_PRODUCTS,
+        variables: {
+          options: {
+            take: 10,
+            skip: 0,
+          },
+        },
+        fetchPolicy: 'network-only',
+      });
+
+      const products = (result.data?.products?.items || []).map((product: any) => ({
+        id: product.id,
+        name: product.name,
+        featuredAsset: product.featuredAsset
+          ? { preview: product.featuredAsset.preview }
+          : undefined,
+        variants: product.variants.map((v: any) => ({
+          id: v.id,
+          name: v.name,
+          sku: v.sku,
+          priceWithTax: v.priceWithTax?.value || v.priceWithTax || 0,
+          stockLevel: v.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
+          productId: product.id,
+          productName: product.name,
+          trackInventory: v.trackInventory,
+          customFields: v.customFields
+            ? {
+                wholesalePrice: v.customFields.wholesalePrice,
+                allowFractionalQuantity: v.customFields.allowFractionalQuantity,
+              }
+            : undefined,
+          featuredAsset: product.featuredAsset
+            ? { preview: product.featuredAsset.preview }
+            : undefined,
+        })),
+      }));
+
+      this.recentProducts.set(products);
+    } catch (error) {
+      console.error('Failed to load recent products:', error);
+      this.recentProducts.set([]);
+    } finally {
+      this.isLoadingProducts.set(false);
+    }
   }
 
   // Product Search Handlers
@@ -167,12 +263,45 @@ export class SellComponent implements OnInit {
     this.searchTerm.set('');
     this.searchResults.set([]);
     // Camera will auto-mount via shouldShowCamera() computed
+    // Restart scanner if it's ready but not currently scanning
+    // This handles the case where user stopped scanner and wants to restart via camera button
+    if (this.scannerComponent && !this.isScannerActive() && this.canStartScanner()) {
+      this.scannerComponent.startScanner().catch((err) => {
+        console.warn('[SellComponent] Failed to restart scanner:', err);
+        // Non-fatal - scanner might not be ready yet, will retry on next interaction
+      });
+    }
   }
 
   handleProductSelected(product: ProductSearchResult): void {
     this.detectedProduct.set(product);
     this.showConfirmModal.set(true);
     this.handleClearSearch(); // Return to camera view
+  }
+
+  handleQuickAddProduct(product: ProductSearchResult): void {
+    if (!product.variants || product.variants.length === 0) {
+      this.showNotification('Product has no variants', 'error');
+      return;
+    }
+
+    // Single variant: direct add to cart
+    if (product.variants.length === 1) {
+      const variant = product.variants[0];
+      this.addToCart(variant, 1);
+      this.showNotification(`${product.name} added to cart`, 'success');
+    } else {
+      // Multiple variants: show modal for selection
+      this.handleProductSelected(product);
+    }
+  }
+
+  formatPrice(priceInCents: number): string {
+    return this.currencyService.format(priceInCents, true);
+  }
+
+  toggleQuickSelect(): void {
+    this.isQuickSelectExpanded.set(!this.isQuickSelectExpanded());
   }
 
   // Scanner Handlers
@@ -552,11 +681,16 @@ export class SellComponent implements OnInit {
 
       console.log('✅ Order sent to cashier:', order.code);
 
-      // Clear cart using CartService for persistence
-      this.cartService.clearCart();
-      this.cartItems.set([]);
-      this.showCheckoutModal.set(false);
+      // Show success animation first, then close modal after delay
       this.showNotification(`Order ${order.code} sent to cashier`, 'success');
+
+      // Delay closing modal to allow success animation to display (3 seconds - optimized timing)
+      setTimeout(() => {
+        // Clear cart using CartService for persistence
+        this.cartService.clearCart();
+        this.cartItems.set([]);
+        this.showCheckoutModal.set(false);
+      }, 3000);
     } catch (error) {
       console.error('❌ Cashier submission failed:', error);
       this.checkoutError.set('Failed to send to cashier. Please try again.');
@@ -636,14 +770,19 @@ export class SellComponent implements OnInit {
         // Continue even if refresh fails - order is still created
       }
 
-      // Clear cart using CartService for persistence
-      this.cartService.clearCart();
-      this.cartItems.set([]);
-      this.showCheckoutModal.set(false);
+      // Show success animation first, then close modal after delay
       this.showNotification(
         `Credit sale created for ${customerName} - Order ${order.code}`,
         'success',
       );
+
+      // Delay closing modal to allow success animation to display (3 seconds - optimized timing)
+      setTimeout(() => {
+        // Clear cart using CartService for persistence
+        this.cartService.clearCart();
+        this.cartItems.set([]);
+        this.showCheckoutModal.set(false);
+      }, 3000);
 
       // Don't clear selected customer - keep it visible so user can see updated credit amounts
     } catch (error) {
@@ -686,12 +825,17 @@ export class SellComponent implements OnInit {
 
       console.log('✅ Order created:', order.code);
 
-      // Clear cart using CartService for persistence
-      this.cartService.clearCart();
-      this.cartItems.set([]);
-      this.showCheckoutModal.set(false);
+      // Show success animation first, then close modal after delay
       const customerMsg = selectedCustomer ? ` for ${selectedCustomer.name}` : '';
-      this.showNotification(`Sale completed${customerMsg}! Order ${order.code}`, 'success');
+      this.showNotification(`Order ${order.code} created${customerMsg}`, 'success');
+
+      // Delay closing modal to allow success animation to display (3 seconds - optimized timing)
+      setTimeout(() => {
+        // Clear cart using CartService for persistence
+        this.cartService.clearCart();
+        this.cartItems.set([]);
+        this.showCheckoutModal.set(false);
+      }, 3000);
     } catch (error) {
       console.error('❌ Cash sale failed:', error);
       this.checkoutError.set('Failed to complete sale. Please try again.');

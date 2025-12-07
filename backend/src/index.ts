@@ -9,6 +9,9 @@ import { initializeVendureBootstrap } from './utils/bootstrap-init';
 import { ensureKenyaContext } from './utils/kenya-context.seed';
 import { ensureChannelFinancialDefaults } from './utils/financial-bootstrap';
 
+// Set process type for reliable worker context detection
+process.env.VENDURE_PROCESS_TYPE = 'server';
+
 // Initialize telemetry (must be done before any other application code)
 initializeTelemetry(`${BRAND_CONFIG.servicePrefix}-server`);
 

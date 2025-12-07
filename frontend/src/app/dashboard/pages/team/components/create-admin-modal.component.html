@@ -1,153 +1,283 @@
 <dialog #modal class="modal" (click)="onBackdropClick($event)">
-  <div class="modal-box max-w-2xl">
-    <h3 class="font-bold text-lg mb-4">Add Team Member</h3>
-
-    <!-- Progress Steps -->
-    <div class="steps mb-6">
-      <div class="step" [class.step-primary]="step() >= 1">Info</div>
-      <div class="step" [class.step-primary]="step() >= 2">Role</div>
-      <div class="step" [class.step-primary]="step() >= 3">Permissions</div>
-      <div class="step" [class.step-primary]="step() >= 4">Confirm</div>
+  <div class="modal-box max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col p-0">
+    <!-- Header -->
+    <div class="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-base-300">
+      <div
+        class="hidden sm:flex w-10 h-10 rounded-xl bg-primary/10 items-center justify-center flex-shrink-0"
+      >
+        <svg
+          class="w-5 h-5 text-primary"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <h3 class="text-base sm:text-lg font-semibold">Add Team Member</h3>
+        <p class="hidden sm:block text-xs text-base-content/50">
+          @if (step() === 1) {
+            Enter basic information
+          } @else {
+            Select role and permissions
+          }
+        </p>
+      </div>
     </div>
 
-    @if (error(); as errorMsg) {
-      <div class="alert alert-error mb-4">
-        <span>{{ errorMsg }}</span>
-      </div>
-    }
+    <!-- Scrollable Content -->
+    <div class="flex-1 overflow-y-auto px-4 py-4">
+      <!-- Progress Steps -->
+      <ul class="steps steps-horizontal w-full mb-4 sm:mb-6 text-xs overflow-x-auto">
+        <li
+          class="step cursor-pointer transition-all duration-200 flex-shrink-0"
+          [class.step-primary]="step() >= 1"
+          (click)="step() > 1 && prevStep()"
+        >
+          Info
+        </li>
+        <li
+          class="step transition-all duration-200 flex-shrink-0"
+          [class.step-primary]="step() >= 2"
+        >
+          Role & Permissions
+        </li>
+      </ul>
 
-    <form [formGroup]="form">
-      <!-- Step 1: Info -->
-      @if (step() === 1) {
-        <div class="space-y-4">
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">First Name *</span>
-            </label>
-            <input
-              type="text"
-              formControlName="firstName"
-              class="input input-bordered"
-              [class.input-error]="form.get('firstName')?.invalid && form.get('firstName')?.touched"
-            />
-          </div>
-
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Last Name *</span>
-            </label>
-            <input
-              type="text"
-              formControlName="lastName"
-              class="input input-bordered"
-              [class.input-error]="form.get('lastName')?.invalid && form.get('lastName')?.touched"
-            />
-          </div>
-
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Phone Number *</span>
-            </label>
-            <input
-              type="tel"
-              formControlName="phoneNumber"
-              class="input input-bordered"
-              placeholder="07XXXXXXXX"
-              [class.input-error]="form.get('phoneNumber')?.invalid && form.get('phoneNumber')?.touched"
-            />
-          </div>
-
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Email Address (Optional)</span>
-            </label>
-            <input
-              type="email"
-              formControlName="emailAddress"
-              class="input input-bordered"
-            />
-          </div>
+      @if (error(); as errorMsg) {
+        <div class="alert alert-error mb-4 py-2">
+          <svg
+            class="h-4 w-4 flex-shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="text-xs sm:text-sm">{{ errorMsg }}</span>
         </div>
       }
 
-      <!-- Step 2: Role -->
-      @if (step() === 2) {
-        <div class="space-y-4">
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Role Template *</span>
-            </label>
-            <select formControlName="roleTemplateCode" class="select select-bordered">
-              <option value="">Select a role...</option>
-              @for (template of roleTemplates; track template.code) {
-                <option [value]="template.code">{{ template.name }} - {{ template.description }}</option>
-              }
-            </select>
-          </div>
+      <form [formGroup]="form" class="space-y-3 sm:space-y-4">
+        <!-- Step 1: Basic Info & Confirmation -->
+        @if (step() === 1) {
+          <div class="space-y-3 sm:space-y-4">
+            <div class="form-control">
+              <label class="label py-1">
+                <span class="label-text text-sm font-medium">First Name *</span>
+              </label>
+              <input
+                type="text"
+                formControlName="firstName"
+                class="input input-bordered w-full min-h-[44px]"
+                [class.input-error]="
+                  form.get('firstName')?.invalid && form.get('firstName')?.touched
+                "
+                placeholder="John"
+              />
+            </div>
 
-          @if (getSelectedTemplate(); as template) {
-            <div class="alert alert-info">
-              <div>
-                <div class="font-semibold">{{ template.name }}</div>
-                <div class="text-sm mt-1">{{ template.description }}</div>
-                <div class="text-xs mt-2">
-                  <strong>Permissions:</strong> {{ template.permissions.length }} permissions included
+            <div class="form-control">
+              <label class="label py-1">
+                <span class="label-text text-sm font-medium">Last Name *</span>
+              </label>
+              <input
+                type="text"
+                formControlName="lastName"
+                class="input input-bordered w-full min-h-[44px]"
+                [class.input-error]="form.get('lastName')?.invalid && form.get('lastName')?.touched"
+                placeholder="Doe"
+              />
+            </div>
+
+            <div class="form-control">
+              <label class="label py-1">
+                <span class="label-text text-sm font-medium">Phone Number *</span>
+              </label>
+              <input
+                type="tel"
+                formControlName="phoneNumber"
+                class="input input-bordered w-full min-h-[44px]"
+                placeholder="07XXXXXXXX"
+                [class.input-error]="
+                  form.get('phoneNumber')?.invalid && form.get('phoneNumber')?.touched
+                "
+              />
+            </div>
+
+            <div class="form-control">
+              <label class="label py-1">
+                <span class="label-text text-sm font-medium">Confirm Phone Number *</span>
+              </label>
+              <input
+                type="tel"
+                formControlName="phoneConfirm"
+                class="input input-bordered w-full min-h-[44px]"
+                placeholder="07XXXXXXXX"
+                [class.input-error]="
+                  form.get('phoneConfirm')?.invalid && form.get('phoneConfirm')?.touched
+                "
+              />
+            </div>
+
+            <div class="form-control">
+              <label class="label py-1">
+                <span class="label-text text-sm font-medium"
+                  >Email Address <span class="text-base-content/50">(Optional)</span></span
+                >
+              </label>
+              <input
+                type="email"
+                formControlName="emailAddress"
+                class="input input-bordered w-full min-h-[44px]"
+                placeholder="john.doe@example.com"
+              />
+            </div>
+          </div>
+        }
+
+        <!-- Step 2: Role & Permissions -->
+        @if (step() === 2) {
+          <div class="space-y-3 sm:space-y-4">
+            <div class="form-control">
+              <label class="label py-1">
+                <span class="label-text text-sm font-medium">Role Template *</span>
+              </label>
+              <select
+                formControlName="roleTemplateCode"
+                class="select select-bordered w-full min-h-[44px]"
+                [class.select-error]="
+                  form.get('roleTemplateCode')?.invalid && form.get('roleTemplateCode')?.touched
+                "
+                (change)="onTemplateSelected()"
+              >
+                <option value="">Select a role template...</option>
+                @for (template of roleTemplates; track template.code) {
+                  <option [value]="template.code">
+                    {{ template.name }} - {{ template.description }}
+                  </option>
+                }
+              </select>
+            </div>
+
+            @if (getSelectedTemplate(); as template) {
+              <div class="alert alert-info py-3">
+                <div class="w-full">
+                  <div class="font-semibold text-sm">{{ template.name }}</div>
+                  <div class="text-xs mt-1 text-base-content/70">{{ template.description }}</div>
                 </div>
               </div>
-            </div>
-          }
-        </div>
-      }
 
-      <!-- Step 3: Permissions (simplified - can be enhanced later) -->
-      @if (step() === 3) {
-        <div class="space-y-4">
-          <p class="text-sm text-base-content/70">
-            Permissions are pre-filled from the selected role template. 
-            You can customize them in the next step after creation.
-          </p>
-        </div>
-      }
+              <!-- Permissions Display -->
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-sm font-semibold">Permissions</h4>
+                  <span class="badge badge-sm badge-ghost"
+                    >{{ selectedPermissions().size }} of
+                    {{ filteredPermissions().length }} selected</span
+                  >
+                </div>
 
-      <!-- Step 4: Confirm -->
-      @if (step() === 4) {
-        <div class="space-y-4">
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Re-enter Phone Number to Confirm *</span>
-            </label>
-            <input
-              type="tel"
-              formControlName="phoneConfirm"
-              class="input input-bordered"
-              placeholder="07XXXXXXXX"
-              [class.input-error]="form.get('phoneConfirm')?.invalid && form.get('phoneConfirm')?.touched"
-            />
+                <div class="text-xs text-base-content/60 mb-2">
+                  Select or deselect permissions to customize the role template.
+                </div>
+
+                <div class="max-h-[300px] overflow-y-auto space-y-3 pr-2">
+                  @for (group of Object.keys(groupedPermissions()); track group) {
+                    <div class="space-y-2">
+                      <div
+                        class="text-xs font-semibold text-base-content/70 uppercase tracking-wide"
+                      >
+                        {{ group }}
+                      </div>
+                      <div class="space-y-1.5 pl-2">
+                        @for (permission of groupedPermissions()[group]; track permission) {
+                          <label
+                            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-base-200/50 rounded px-1 py-0.5 -mx-1 transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              [checked]="isPermissionSelected(permission)"
+                              (change)="togglePermission(permission)"
+                              class="checkbox checkbox-sm checkbox-primary"
+                            />
+                            <span class="text-base-content/80 flex-1">{{
+                              formatPermissionName(permission)
+                            }}</span>
+                          </label>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            } @else {
+              <div class="alert alert-warning py-3">
+                <svg
+                  class="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="text-xs sm:text-sm"
+                  >Please select a role template to view permissions</span
+                >
+              </div>
+            }
           </div>
+        }
+      </form>
+    </div>
 
-          <div class="alert alert-warning">
-            <span>Please confirm the phone number is correct before creating the team member.</span>
-          </div>
-        </div>
-      }
-    </form>
-
-    <!-- Actions -->
-    <div class="modal-action">
+    <!-- Actions - Sticky on mobile -->
+    <div
+      class="modal-action border-t border-base-300 px-4 py-3 sm:py-4 flex-col sm:flex-row gap-2 sm:gap-3 sticky bottom-0 bg-base-100"
+    >
       @if (step() > 1) {
-        <button class="btn btn-ghost" (click)="prevStep()">Previous</button>
+        <button
+          class="btn btn-ghost w-full sm:w-auto min-h-[44px] order-2 sm:order-1"
+          (click)="prevStep()"
+        >
+          Previous
+        </button>
       }
-      <button class="btn btn-ghost" (click)="close()">Cancel</button>
-      @if (step() < 4) {
-        <button class="btn btn-primary" (click)="nextStep()">Next</button>
+      <button
+        class="btn btn-ghost w-full sm:w-auto min-h-[44px] order-3 sm:order-2"
+        (click)="close()"
+      >
+        Cancel
+      </button>
+      @if (step() < 2) {
+        <button
+          class="btn btn-primary w-full sm:w-auto min-h-[44px] order-1 sm:order-3 gap-2"
+          (click)="nextStep()"
+          [disabled]="!isStep1Valid()"
+        >
+          Continue
+          <svg
+            class="w-4 h-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </button>
       } @else {
         <button
-          class="btn btn-primary"
+          class="btn btn-primary w-full sm:w-auto min-h-[44px] order-1 sm:order-3 gap-2"
           (click)="submit()"
-          [disabled]="isSubmitting() || form.invalid"
+          [disabled]="isSubmitting() || !isStep2Valid()"
         >
           @if (isSubmitting()) {
-            <span class="loading loading-spinner"></span>
+            <span class="loading loading-spinner loading-sm"></span>
             Creating...
           } @else {
             Create Team Member
@@ -160,4 +290,3 @@
     <button>close</button>
   </form>
 </dialog>
-

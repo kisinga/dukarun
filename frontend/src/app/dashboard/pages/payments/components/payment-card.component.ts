@@ -15,56 +15,106 @@ export type PaymentAction = 'view' | 'viewOrder';
   imports: [CommonModule, PaymentStateBadgeComponent, OrderDetailComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div
-      class="card bg-base-100 shadow-sm border border-base-300/60 rounded-lg overflow-hidden active:scale-[0.98] transition-transform hover:shadow-md hover:border-base-300"
+    <details
+      class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-xl shadow-sm"
     >
-      <div class="card-body p-4 sm:p-5">
-        <!-- Header: Order Code & Status -->
-        <div class="flex items-start justify-between gap-3 mb-4 pb-4 border-b border-base-300/50">
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1.5">
-              <h3 class="font-bold text-base sm:text-lg truncate text-base-content">
-                Order {{ payment().order.code }}
-              </h3>
-              <app-payment-state-badge [state]="payment().state" />
-            </div>
-            <p class="text-xs text-base-content/50">{{ formatDate(payment().createdAt) }}</p>
-          </div>
-        </div>
-
-        <!-- Quick Info Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-          <!-- Customer -->
-          @if (payment().order.customer) {
-            <div class="flex items-start gap-2.5 min-w-0 p-2.5 rounded-lg bg-base-200/50">
+      <summary class="collapse-title p-4 min-h-0">
+        <div class="flex gap-3">
+          <!-- Payment Icon/Avatar -->
+          <div class="avatar shrink-0">
+            <div
+              class="w-16 h-16 rounded-lg ring-2 ring-base-300 ring-offset-1 bg-base-200 flex items-center justify-center"
+            >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4 text-base-content/50 shrink-0 mt-0.5"
+                class="h-8 w-8 text-primary"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                stroke-width="2"
               >
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
-                  stroke-width="2"
+                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Payment Summary -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between gap-2 mb-1">
+              <h3 class="text-sm line-clamp-1 leading-tight">
+                {{ payment().order.code }}
+              </h3>
+              <app-payment-state-badge [state]="payment().state" />
+            </div>
+
+            <!-- Key Metrics -->
+            <div class="flex items-center gap-2 mb-1 text-xs text-base-content/60">
+              <span>{{ formatDate(payment().createdAt) }}</span>
+              <span class="w-1 h-1 rounded-full bg-base-content/30"></span>
+              <span class="font-medium">{{ payment().method }}</span>
+            </div>
+
+            <!-- Amount -->
+            <div class="text-lg font-bold text-primary font-mono tracking-tight">
+              {{ formatCurrency(payment().amount) }}
+            </div>
+          </div>
+        </div>
+      </summary>
+
+      <!-- Expanded Content -->
+      <div class="collapse-content px-4 pb-4 pt-0">
+        <div class="divider my-2"></div>
+
+        <!-- Customer Info -->
+        @if (payment().order.customer) {
+          <div class="mb-3">
+            <h4 class="text-xs font-semibold mb-1.5">Customer</h4>
+            <div class="flex items-center gap-2 p-2.5 rounded-lg bg-base-200">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-4 w-4 text-base-content/50 shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                   d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                 />
               </svg>
-              <div class="min-w-0 flex-1">
-                <p class="text-xs text-base-content/50 leading-tight mb-0.5">Customer</p>
-                <p class="text-sm font-medium truncate text-base-content">
-                  {{ getCustomerName() }}
-                </p>
-              </div>
+              <p class="text-sm font-medium text-base-content">{{ getCustomerName() }}</p>
             </div>
-          }
+          </div>
+        }
 
-          <!-- Payment Method -->
-          <div class="flex items-start gap-2.5 min-w-0 p-2.5 rounded-lg bg-base-200/50">
+        <!-- Transaction ID -->
+        @if (payment().transactionId) {
+          <div class="mb-3">
+            <h4 class="text-xs font-semibold mb-1.5">Transaction ID</h4>
+            <div class="p-2.5 rounded-lg bg-base-200">
+              <p class="text-xs font-mono text-base-content/70 break-all">
+                {{ payment().transactionId }}
+              </p>
+            </div>
+          </div>
+        }
+
+        <!-- Action Buttons -->
+        <div class="flex gap-2">
+          <button
+            (click)="onAction('view')"
+            class="btn btn-primary btn-sm flex-1 gap-1.5 touch-manipulation"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4 text-base-content/50 shrink-0 mt-0.5"
+              class="h-4 w-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -73,49 +123,40 @@ export type PaymentAction = 'view' | 'viewOrder';
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 stroke-width="2"
-                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
               />
             </svg>
-            <div class="min-w-0 flex-1">
-              <p class="text-xs text-base-content/50 leading-tight mb-0.5">Method</p>
-              <p class="text-sm font-medium text-base-content">{{ payment().method }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Transaction ID -->
-        @if (payment().transactionId) {
-          <div class="mb-4 p-2.5 rounded-lg bg-base-200/30">
-            <p class="text-xs text-base-content/50 mb-0.5">Transaction ID</p>
-            <p class="text-xs font-mono text-base-content/70 break-all">
-              {{ payment().transactionId }}
-            </p>
-          </div>
-        }
-
-        <!-- Amount & Actions -->
-        <div class="flex items-center justify-between gap-3 pt-4 border-t border-base-300/50">
-          <div class="flex-1 min-w-0">
-            <p class="text-xs text-base-content/50 mb-1">Amount</p>
-            <p class="text-lg sm:text-xl font-bold text-primary">
-              {{ formatCurrency(payment().amount) }}
-            </p>
-          </div>
-          <div class="flex gap-2 shrink-0">
-            <button class="btn btn-sm btn-primary" (click)="onAction('view')" title="View payment">
-              View
-            </button>
-            <button
-              class="btn btn-sm btn-outline"
-              (click)="onAction('viewOrder')"
-              title="View order"
+            View
+          </button>
+          <button
+            (click)="onAction('viewOrder')"
+            class="btn btn-outline btn-sm flex-1 gap-1.5 touch-manipulation"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
             >
-              Order
-            </button>
-          </div>
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            Order
+          </button>
         </div>
       </div>
-    </div>
+    </details>
 
     <!-- Order Modal -->
     @if (selectedOrderId()) {

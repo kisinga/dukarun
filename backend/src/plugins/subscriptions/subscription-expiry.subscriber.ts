@@ -1,27 +1,31 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ChannelService, RequestContext } from '@vendure/core';
 import { ChannelEventRouterService } from '../../infrastructure/events/channel-event-router.service';
 import { ChannelEventType } from '../../infrastructure/events/types/event-type.enum';
 import { ActionCategory } from '../../infrastructure/events/types/action-category.enum';
+import { WorkerBackgroundTaskBase } from '../../infrastructure/utils/worker-background-task.base';
+import { WorkerContextService } from '../../infrastructure/utils/worker-context.service';
 
 /**
  * Subscription Expiry Subscriber
  *
  * Checks for expiring subscriptions daily and emits notification events.
- * Follows the same pattern as MlExtractionQueueSubscriber.
+ * Only runs in worker process to avoid duplicate execution.
  */
 @Injectable()
-export class SubscriptionExpirySubscriber implements OnApplicationBootstrap {
-  private readonly logger = new Logger(SubscriptionExpirySubscriber.name);
+export class SubscriptionExpirySubscriber extends WorkerBackgroundTaskBase {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private readonly CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // Daily
 
   constructor(
+    workerContext: WorkerContextService,
     private channelService: ChannelService,
     private eventRouter: ChannelEventRouterService
-  ) {}
+  ) {
+    super(workerContext, SubscriptionExpirySubscriber.name);
+  }
 
-  onApplicationBootstrap(): void {
+  protected initializeTask(): void {
     // Start daily checks
     this.intervalId = setInterval(() => this.checkExpiringSubscriptions(), this.CHECK_INTERVAL_MS);
     // Run once on startup after a short delay

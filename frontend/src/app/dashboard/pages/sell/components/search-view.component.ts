@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnDestroy,
+  computed,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ProductSearchResult } from '../../../../core/services/product/product-search.service';
 
@@ -38,8 +46,8 @@ import { ProductSearchResult } from '../../../../core/services/product/product-s
             (ngModelChange)="searchTermChange.emit($event)"
           />
 
-          <!-- Camera Toggle Button (when searching) -->
-          @if (showCameraButton()) {
+          <!-- Camera Toggle Button (when searching or on mobile) -->
+          @if (shouldShowCameraButton()) {
             <button
               class="btn btn-circle btn-sm btn-primary"
               (click)="cameraToggle.emit()"
@@ -155,7 +163,7 @@ import { ProductSearchResult } from '../../../../core/services/product/product-s
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SearchViewComponent {
+export class SearchViewComponent implements OnDestroy {
   // Inputs
   readonly searchResults = input.required<ProductSearchResult[]>();
   readonly isSearching = input<boolean>(false);
@@ -168,6 +176,35 @@ export class SearchViewComponent {
 
   // Local state
   searchTerm = '';
+  readonly isMobile = signal<boolean>(false);
+  private resizeListener?: () => void;
+
+  // Computed: show camera button on mobile always, or when searching on desktop
+  readonly shouldShowCameraButton = computed(() => {
+    return this.isMobile() || this.showCameraButton();
+  });
+
+  constructor() {
+    // Check if mobile on initialization and window resize
+    if (typeof window !== 'undefined') {
+      this.checkMobile();
+      this.resizeListener = () => this.checkMobile();
+      window.addEventListener('resize', this.resizeListener);
+    }
+  }
+
+  ngOnDestroy(): void {
+    // Clean up resize listener
+    if (typeof window !== 'undefined' && this.resizeListener) {
+      window.removeEventListener('resize', this.resizeListener);
+    }
+  }
+
+  private checkMobile(): void {
+    if (typeof window !== 'undefined') {
+      this.isMobile.set(window.innerWidth < 768);
+    }
+  }
 
   isService(product: ProductSearchResult): boolean {
     return product.variants?.some((v) => v.trackInventory === false) || false;

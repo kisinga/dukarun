@@ -67,6 +67,7 @@ export function createTestRegistrationInput(
     adminLastName: 'Doe',
     adminPhoneNumber: '0712345678',
     storeName: 'Main Store',
+    storeAddress: '123 Market Street',
     ...overrides,
   };
 }

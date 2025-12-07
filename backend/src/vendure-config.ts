@@ -564,6 +564,20 @@ export const config: VendureConfig = {
         ui: { tab: 'Subscription' },
       },
       {
+        name: 'subscriptionExpiredReminderSentAt',
+        type: 'datetime',
+        label: [{ languageCode: LanguageCode.en, value: 'Subscription Expired Reminder Sent At' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'Timestamp when the last subscription expired reminder was sent',
+          },
+        ],
+        public: false,
+        nullable: true,
+        ui: { tab: 'Subscription' },
+      },
+      {
         name: 'eventConfig',
         type: 'text',
         label: [{ languageCode: LanguageCode.en, value: 'Event Configuration' }],

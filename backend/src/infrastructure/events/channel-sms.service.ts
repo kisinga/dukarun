@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { RequestContext } from '@vendure/core';
 import { SmsService } from '../sms/sms.service';
 import { ChannelActionTrackingService } from './channel-action-tracking.service';
@@ -19,6 +19,7 @@ export class ChannelSmsService {
 
   constructor(
     private readonly smsService: SmsService,
+    @Inject(forwardRef(() => ChannelActionTrackingService))
     private readonly actionTrackingService: ChannelActionTrackingService
   ) {}
 

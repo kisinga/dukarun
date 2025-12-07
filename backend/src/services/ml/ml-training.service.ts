@@ -10,6 +10,7 @@ import { MlWebhookService } from './ml-webhook.service';
 import { ChannelEventRouterService } from '../../infrastructure/events/channel-event-router.service';
 import { ActionCategory } from '../../infrastructure/events/types/action-category.enum';
 import { ChannelEventType } from '../../infrastructure/events/types/event-type.enum';
+import { ChannelUpdateHelper } from '../channels/channel-update.helper';
 
 export interface ProductManifestEntry {
   productId: string;
@@ -46,6 +47,7 @@ export class MlTrainingService {
     private assetService: AssetService,
     private connection: TransactionalConnection,
     private webhookService: MlWebhookService,
+    private channelUpdateHelper: ChannelUpdateHelper,
     @Optional() private eventRouter?: ChannelEventRouterService // Optional to avoid circular dependency
   ) {}
 
@@ -108,13 +110,17 @@ export class MlTrainingService {
       };
 
       // Update channel with extracted stats
-      await this.channelService.update(ctx, {
-        id: channelId,
-        customFields: {
+      await this.channelUpdateHelper.updateChannelCustomFields(
+        ctx,
+        channelId,
+        {
           mlProductCount: manifestProducts.length,
           mlImageCount: totalImageCount,
-        },
-      });
+        } as any,
+        {
+          detectChanges: true,
+        }
+      );
 
       // Update status to ready
       await this.updateTrainingStatus(ctx, channelId, 'ready', 100);
@@ -182,29 +188,22 @@ export class MlTrainingService {
       updateData.mlTrainingError = error;
     }
 
-    await this.channelService.update(ctx, {
-      id: channelId,
-      customFields: updateData,
-    });
+    // Determine event type for routing
+    let eventType: ChannelEventType | null = null;
+    if (status === 'training' && progress === 0) {
+      eventType = ChannelEventType.ML_TRAINING_STARTED;
+    } else if (status === 'training' && progress > 0 && progress < 100) {
+      eventType = ChannelEventType.ML_TRAINING_PROGRESS;
+    } else if (status === 'ready' || status === 'active') {
+      eventType = ChannelEventType.ML_TRAINING_COMPLETED;
+    } else if (status === 'failed') {
+      eventType = ChannelEventType.ML_TRAINING_FAILED;
+    }
 
-    this.logger.log(`Updated channel ${channelId} status to ${status} (${progress}%)`);
-
-    // Emit event for channel events framework
-    if (this.eventRouter) {
-      let eventType: ChannelEventType | null = null;
-      if (status === 'training' && progress === 0) {
-        eventType = ChannelEventType.ML_TRAINING_STARTED;
-      } else if (status === 'training' && progress > 0 && progress < 100) {
-        eventType = ChannelEventType.ML_TRAINING_PROGRESS;
-      } else if (status === 'ready' || status === 'active') {
-        eventType = ChannelEventType.ML_TRAINING_COMPLETED;
-      } else if (status === 'failed') {
-        eventType = ChannelEventType.ML_TRAINING_FAILED;
-      }
-
-      if (eventType) {
-        await this.eventRouter
-          .routeEvent({
+    await this.channelUpdateHelper.updateChannelCustomFields(ctx, channelId, updateData as any, {
+      detectChanges: true,
+      routeEvent: eventType
+        ? {
             type: eventType,
             channelId,
             category: ActionCategory.SYSTEM_NOTIFICATIONS,
@@ -215,14 +214,11 @@ export class MlTrainingService {
               error,
               channelId,
             },
-          })
-          .catch(err => {
-            this.logger.warn(
-              `Failed to route ML training event: ${err instanceof Error ? err.message : String(err)}`
-            );
-          });
-      }
-    }
+          }
+        : undefined,
+    });
+
+    this.logger.log(`Updated channel ${channelId} status to ${status} (${progress}%)`);
   }
 
   /**

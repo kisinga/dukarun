@@ -16,7 +16,7 @@ export interface AdminInfo {
 
 export interface StoreInfo {
   storeName: string;
-  storeAddress?: string;
+  storeAddress: string;
 }
 
 export interface RegistrationData {
@@ -149,6 +149,10 @@ export class RegistrationService {
       errors.push('Store name is required');
     }
 
+    if (!info.storeAddress?.trim()) {
+      errors.push('Store address is required');
+    }
+
     return {
       valid: errors.length === 0,
       errors,
@@ -190,7 +194,7 @@ export class RegistrationService {
       },
       store: {
         storeName: store.storeName!,
-        storeAddress: store.storeAddress?.trim() || undefined,
+        storeAddress: store.storeAddress!.trim(),
       },
     };
   }

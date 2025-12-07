@@ -46,6 +46,9 @@ export enum ChannelEventType {
   SUBSCRIPTION_EXPIRING_SOON = 'subscription_expiring_soon',
   SUBSCRIPTION_EXPIRED = 'subscription_expired',
   SUBSCRIPTION_RENEWED = 'subscription_renewed',
+
+  // Channel Events (System, Not Subscribable)
+  CHANNEL_APPROVED = 'channel_approved',
 }
 
 /**

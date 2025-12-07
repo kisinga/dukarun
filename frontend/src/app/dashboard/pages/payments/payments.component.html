@@ -1,15 +1,15 @@
-<div class="space-y-5 lg:space-y-6">
+<div class="space-y-4 sm:space-y-5 lg:space-y-6">
   <!-- Header -->
-  <div class="flex items-start justify-between gap-4">
+  <div class="flex items-start justify-between gap-3 sm:gap-4">
     <div class="flex-1 min-w-0">
-      <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Payments</h1>
-      <p class="text-sm text-base-content/60 mt-1">View and manage all payments</p>
+      <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Payments</h1>
+      <p class="text-xs sm:text-sm text-base-content/60 mt-1">View and manage all payments</p>
     </div>
 
     <div class="flex gap-2 shrink-0">
       <button
         (click)="refreshPayments()"
-        class="btn btn-ghost btn-square btn-sm lg:btn-md"
+        class="btn btn-ghost btn-square btn-sm lg:btn-md touch-manipulation"
         [class.loading]="isLoading()"
         title="Refresh payments"
       >
@@ -20,11 +20,11 @@
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
+            stroke-width="2"
           >
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
-              stroke-width="2"
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
@@ -58,26 +58,26 @@
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
+        stroke-width="2"
       >
         <path
           stroke-linecap="round"
           stroke-linejoin="round"
-          stroke-width="2"
           d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
         />
       </svg>
-      <span class="flex-1">{{ error() }}</span>
-      <button (click)="clearError()" class="btn btn-sm">Dismiss</button>
+      <span class="flex-1 text-sm sm:text-base">{{ error() }}</span>
+      <button (click)="clearError()" class="btn btn-sm touch-manipulation">Dismiss</button>
     </div>
   }
 
   <!-- Loading State -->
   @if (isLoading()) {
     <div class="card bg-base-100 shadow">
-      <div class="card-body">
-        <div class="flex flex-col items-center justify-center py-12">
+      <div class="card-body p-6 sm:p-8">
+        <div class="flex flex-col items-center justify-center py-10 sm:py-12">
           <span class="loading loading-spinner loading-lg text-success"></span>
-          <p class="text-sm text-base-content/60 mt-4">Loading payments...</p>
+          <p class="text-sm sm:text-base text-base-content/60 mt-4">Loading payments...</p>
         </div>
       </div>
     </div>
@@ -86,39 +86,39 @@
   <!-- Empty State -->
   @else if (filteredPayments().length === 0 && !error()) {
     <div class="card bg-base-100 shadow">
-      <div class="card-body">
-        <div class="text-center py-12 lg:py-16 px-4">
+      <div class="card-body p-4 sm:p-6">
+        <div class="text-center py-10 sm:py-12 lg:py-16 px-4">
           <div
-            class="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
+            class="w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 mx-auto mb-3 sm:mb-4 rounded-full bg-base-200 flex items-center justify-center"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="h-8 w-8 lg:h-10 lg:w-10 text-base-content/30"
+              class="h-7 w-7 sm:h-8 sm:w-8 lg:h-10 lg:w-10 text-base-content/30"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              stroke-width="2"
             >
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                stroke-width="2"
                 d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
               />
             </svg>
           </div>
-          <h3 class="text-lg font-semibold">No payments found</h3>
+          <h3 class="text-base sm:text-lg font-semibold">No payments found</h3>
           @if (searchQuery() || stateFilter()) {
-            <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
+            <p class="text-xs sm:text-sm text-base-content/60 mt-2 max-w-md mx-auto">
               No payments match your filters. Try adjusting your search criteria.
             </p>
             <button
               (click)="searchQuery.set(''); stateFilter.set('')"
-              class="btn btn-outline btn-sm mt-6"
+              class="btn btn-outline btn-sm mt-4 sm:mt-6 touch-manipulation"
             >
               Clear Filters
             </button>
           } @else {
-            <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
+            <p class="text-xs sm:text-sm text-base-content/60 mt-2 max-w-md mx-auto">
               No payments have been recorded yet
             </p>
           }
@@ -130,16 +130,16 @@
   <!-- Payments List -->
   @else {
     <!-- List Controls -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-1">
-      <div class="text-xs text-base-content/60">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1">
+      <div class="text-sm text-base-content/60">
         Showing {{ (currentPage() - 1) * itemsPerPage() + 1 }} to {{ endItem() }} of
         {{ filteredPayments().length }} payments
       </div>
 
       <div class="flex items-center gap-2">
-        <span class="text-xs text-base-content/60 hidden sm:inline">Per page:</span>
+        <span class="text-sm text-base-content/60">Per page:</span>
         <select
-          class="select select-xs select-bordered"
+          class="select select-sm select-bordered"
           [value]="itemsPerPage()"
           (change)="changeItemsPerPage(+$any($event.target).value)"
         >
@@ -151,7 +151,7 @@
     </div>
 
     <!-- Mobile: Card View -->
-    <div class="lg:hidden space-y-3">
+    <div class="lg:hidden space-y-4">
       @for (payment of paginatedPayments(); track trackByPaymentId($index, payment)) {
         <app-payment-card [payment]="payment" (action)="onPaymentAction($event)" />
       }

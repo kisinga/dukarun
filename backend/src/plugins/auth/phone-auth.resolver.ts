@@ -45,7 +45,7 @@ export const phoneAuthSchema = gql`
     adminPhoneNumber: String!
     adminEmail: String
     storeName: String!
-    storeAddress: String
+    storeAddress: String!
   }
 
   extend type Mutation {
