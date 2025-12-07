@@ -266,24 +266,24 @@ export class CreateAdminModalComponent implements OnInit, OnDestroy {
       const permUpper = perm.toUpperCase();
 
       if (permUpper.includes('ASSET')) {
-        groups.Assets.push(perm);
+        groups['Assets'].push(perm);
       } else if (permUpper.includes('CATALOG')) {
-        groups.Catalog.push(perm);
+        groups['Catalog'].push(perm);
       } else if (permUpper.includes('CUSTOMER')) {
-        groups.Customers.push(perm);
+        groups['Customers'].push(perm);
       } else if (permUpper.includes('ORDER')) {
-        groups.Orders.push(perm);
+        groups['Orders'].push(perm);
       } else if (permUpper.includes('PRODUCT')) {
-        groups.Products.push(perm);
+        groups['Products'].push(perm);
       } else if (permUpper.includes('STOCKLOCATION') || permUpper.includes('STOCK')) {
-        groups.Stock.push(perm);
+        groups['Stock'].push(perm);
       } else if (permUpper.includes('ADMINISTRATOR') || permUpper.includes('ADMIN')) {
-        groups.Administration.push(perm);
+        groups['Administration'].push(perm);
       } else if (permUpper.includes('SETTINGS') || permUpper.includes('SETTING')) {
-        groups.Settings.push(perm);
+        groups['Settings'].push(perm);
       } else {
         // Custom permissions (OverridePrice, ApproveCustomerCredit, etc.)
-        groups.Custom.push(perm);
+        groups['Custom'].push(perm);
       }
     });
 
