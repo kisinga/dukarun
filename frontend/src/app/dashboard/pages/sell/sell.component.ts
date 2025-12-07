@@ -681,11 +681,16 @@ export class SellComponent implements OnInit, OnDestroy {
 
       console.log('✅ Order sent to cashier:', order.code);
 
-      // Clear cart using CartService for persistence
-      this.cartService.clearCart();
-      this.cartItems.set([]);
-      this.showCheckoutModal.set(false);
+      // Show success animation first, then close modal after delay
       this.showNotification(`Order ${order.code} sent to cashier`, 'success');
+
+      // Delay closing modal to allow success animation to display (3 seconds - optimized timing)
+      setTimeout(() => {
+        // Clear cart using CartService for persistence
+        this.cartService.clearCart();
+        this.cartItems.set([]);
+        this.showCheckoutModal.set(false);
+      }, 3000);
     } catch (error) {
       console.error('❌ Cashier submission failed:', error);
       this.checkoutError.set('Failed to send to cashier. Please try again.');
@@ -765,14 +770,19 @@ export class SellComponent implements OnInit, OnDestroy {
         // Continue even if refresh fails - order is still created
       }
 
-      // Clear cart using CartService for persistence
-      this.cartService.clearCart();
-      this.cartItems.set([]);
-      this.showCheckoutModal.set(false);
+      // Show success animation first, then close modal after delay
       this.showNotification(
         `Credit sale created for ${customerName} - Order ${order.code}`,
         'success',
       );
+
+      // Delay closing modal to allow success animation to display (3 seconds - optimized timing)
+      setTimeout(() => {
+        // Clear cart using CartService for persistence
+        this.cartService.clearCart();
+        this.cartItems.set([]);
+        this.showCheckoutModal.set(false);
+      }, 3000);
 
       // Don't clear selected customer - keep it visible so user can see updated credit amounts
     } catch (error) {
@@ -815,12 +825,17 @@ export class SellComponent implements OnInit, OnDestroy {
 
       console.log('✅ Order created:', order.code);
 
-      // Clear cart using CartService for persistence
-      this.cartService.clearCart();
-      this.cartItems.set([]);
-      this.showCheckoutModal.set(false);
+      // Show success animation first, then close modal after delay
       const customerMsg = selectedCustomer ? ` for ${selectedCustomer.name}` : '';
-      this.showNotification(`Sale completed${customerMsg}! Order ${order.code}`, 'success');
+      this.showNotification(`Order ${order.code} created${customerMsg}`, 'success');
+
+      // Delay closing modal to allow success animation to display (3 seconds - optimized timing)
+      setTimeout(() => {
+        // Clear cart using CartService for persistence
+        this.cartService.clearCart();
+        this.cartItems.set([]);
+        this.showCheckoutModal.set(false);
+      }, 3000);
     } catch (error) {
       console.error('❌ Cash sale failed:', error);
       this.checkoutError.set('Failed to complete sale. Please try again.');

@@ -1,3 +1,4 @@
+import { APP_GUARD } from '@nestjs/core';
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
 import { AuditDbConnection } from '../../infrastructure/audit/audit-db.connection';
@@ -13,7 +14,7 @@ import { SubscriptionGuard } from './subscription.guard';
 import { SubscriptionExpirySubscriber } from './subscription-expiry.subscriber';
 import { ChannelEventsPlugin } from '../channels/channel-events.plugin';
 import { PhoneAuthPlugin } from '../auth/phone-auth.plugin';
-import { ChannelUpdateHelper } from '../../services/channels/channel-update.helper';
+import { WorkerContextService } from '../../infrastructure/utils/worker-context.service';
 
 /**
  * Subscription Plugin
@@ -29,12 +30,8 @@ import { ChannelUpdateHelper } from '../../services/channels/channel-update.help
   imports: [PluginCommonModule, ChannelEventsPlugin, PhoneAuthPlugin],
   entities: [SubscriptionTier],
   providers: [
-    // Audit dependencies for ChannelUpdateHelper
-    AuditDbConnection,
-    UserContextResolver,
-    AuditService,
-    // Channel update helper
-    ChannelUpdateHelper,
+    // Worker context service (required for background tasks)
+    WorkerContextService,
     // Subscription services
     SubscriptionResolver,
     SubscriptionService,
@@ -42,6 +39,14 @@ import { ChannelUpdateHelper } from '../../services/channels/channel-update.help
     RedisCacheService,
     SubscriptionGuard,
     SubscriptionExpirySubscriber,
+    // Apply SubscriptionGuard globally to all admin API mutations
+    {
+      provide: APP_GUARD,
+      useClass: SubscriptionGuard,
+    },
+  ],
+  exports: [
+    SubscriptionService, // Export for use by ChannelEventRouterService
   ],
   controllers: [SubscriptionWebhookController],
   adminApiExtensions: {
@@ -49,9 +54,8 @@ import { ChannelUpdateHelper } from '../../services/channels/channel-update.help
     resolvers: [SubscriptionResolver],
   },
   configuration: config => {
-    // Register subscription guard for admin API mutations
-    // Note: This is a simplified approach. In production, you might want
-    // to apply the guard more selectively via decorators or middleware.
+    // SubscriptionGuard is applied globally via APP_GUARD provider above
+    // It checks all mutations and blocks expired subscriptions from performing actions
     return config;
   },
   compatibility: VENDURE_COMPATIBILITY_VERSION,

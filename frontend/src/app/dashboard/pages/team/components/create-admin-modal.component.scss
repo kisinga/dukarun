@@ -1,2 +1,230 @@
-// Create admin modal styles
+// Create admin modal styles - Mobile-first, optimized
 
+// Modal container
+.modal-box {
+  display: flex;
+  flex-direction: column;
+
+  // Mobile: full height with internal scroll
+  @media (max-width: 640px) {
+    max-height: 90vh;
+    margin: 1rem;
+  }
+}
+
+// Scrollable content area
+.overflow-y-auto {
+  // Smooth scrolling on mobile
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+// Steps indicator - horizontal scrollable on mobile
+.steps {
+  @media (max-width: 640px) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+
+    // Hide scrollbar but keep functionality
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+
+// Form controls - touch optimized
+.form-control {
+  .input,
+  .select {
+    // Ensure minimum touch target size
+    min-height: 44px;
+
+    // Better focus states for mobile
+    &:focus {
+      outline: 2px solid hsl(var(--p));
+      outline-offset: 2px;
+    }
+  }
+
+  .label {
+    // Tighter spacing on mobile
+    @media (max-width: 640px) {
+      padding-top: 0.25rem;
+      padding-bottom: 0.25rem;
+    }
+  }
+}
+
+// Permissions list - scrollable with max height
+.max-h-\[300px\] {
+  // Custom scrollbar styling
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: hsl(var(--b2));
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: hsl(var(--bc) / 0.2);
+    border-radius: 3px;
+
+    &:hover {
+      background: hsl(var(--bc) / 0.3);
+    }
+  }
+}
+
+// Checkbox styling for permissions
+.checkbox {
+  // Ensure touch-friendly size
+  min-width: 1.25rem;
+  min-height: 1.25rem;
+
+  // Disabled state styling
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+}
+
+// Alert styling
+.alert {
+  // Compact on mobile
+  @media (max-width: 640px) {
+    padding: 0.75rem;
+    font-size: 0.875rem;
+  }
+}
+
+// Modal actions - sticky on mobile
+.modal-action {
+  // Sticky positioning on mobile
+  @media (max-width: 640px) {
+    position: sticky;
+    bottom: 0;
+    background: hsl(var(--b1));
+    z-index: 10;
+    box-shadow: 0 -4px 6px -1px hsl(var(--bc) / 0.1);
+  }
+
+  // Button spacing
+  .btn {
+    // Full width on mobile, auto on desktop
+    @media (max-width: 640px) {
+      width: 100%;
+    }
+
+    // Ensure touch target size
+    min-height: 44px;
+  }
+}
+
+// Step transitions
+.step {
+  transition: all 0.2s ease-in-out;
+
+  &.step-primary {
+    color: hsl(var(--p));
+  }
+
+  // Clickable steps
+  &[class*='cursor-pointer'] {
+    &:hover {
+      opacity: 0.8;
+    }
+
+    &:active {
+      transform: scale(0.98);
+    }
+  }
+}
+
+// Animations for content
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Apply staggered animation to form sections
+.space-y-3 > *,
+.space-y-4 > * {
+  animation: slideUp 0.25s ease-out both;
+
+  @for $i from 1 through 8 {
+    &:nth-child(#{$i}) {
+      animation-delay: #{$i * 40}ms;
+    }
+  }
+}
+
+// Alert animations
+.alert {
+  animation: slideUp 0.2s ease-out;
+}
+
+// Permission groups - smooth appearance
+.space-y-3 > div {
+  animation: slideUp 0.2s ease-out both;
+}
+
+// Loading spinner
+.loading-spinner {
+  width: 1rem;
+  height: 1rem;
+}
+
+// Error states
+.input-error,
+.select-error {
+  border-color: hsl(var(--er));
+
+  &:focus {
+    outline-color: hsl(var(--er));
+  }
+}
+
+// Responsive typography
+@media (max-width: 640px) {
+  h3 {
+    font-size: 1rem;
+  }
+
+  .text-sm {
+    font-size: 0.8125rem;
+  }
+
+  .text-xs {
+    font-size: 0.75rem;
+  }
+}
+
+// Ensure modal doesn't overflow on small screens
+@media (max-width: 375px) {
+  .modal-box {
+    margin: 0.5rem;
+    max-height: 95vh;
+  }
+}
+
+// Desktop enhancements
+@media (min-width: 640px) {
+  .modal-box {
+    padding: 1.5rem;
+  }
+
+  .modal-action {
+    padding: 1rem 1.5rem;
+  }
+}

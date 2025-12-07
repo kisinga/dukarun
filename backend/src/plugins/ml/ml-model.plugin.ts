@@ -11,6 +11,7 @@ import { MlTrainingService } from '../../services/ml/ml-training.service';
 import { MlWebhookService } from '../../services/ml/ml-webhook.service';
 import { ChannelUpdateHelper } from '../../services/channels/channel-update.helper';
 import { ChannelEventsPlugin } from '../channels/channel-events.plugin';
+import { WorkerContextService } from '../../infrastructure/utils/worker-context.service';
 
 /**
  * ML Model Plugin
@@ -31,6 +32,8 @@ import { ChannelEventsPlugin } from '../channels/channel-events.plugin';
     AuditDbConnection,
     UserContextResolver,
     AuditService,
+    // Worker context service (required for background tasks)
+    WorkerContextService,
     // Channel update helper
     ChannelUpdateHelper,
     // ML services

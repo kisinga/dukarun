@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef, Optional } from '@nestjs/common';
 import { Channel, ChannelService, RequestContext, TransactionalConnection } from '@vendure/core';
 import { ChannelEventRouterService } from '../../infrastructure/events/channel-event-router.service';
 import { ActionCategory } from '../../infrastructure/events/types/action-category.enum';
@@ -7,6 +7,7 @@ import { RedisCacheService } from '../../infrastructure/storage/redis-cache.serv
 import { SubscriptionTier } from '../../plugins/subscriptions/subscription.entity';
 import { PaystackService } from '../payments/paystack.service';
 import { ChannelUpdateHelper } from '../channels/channel-update.helper';
+import { generatePaystackEmailFromPhone } from '../../utils/email.utils';
 
 export interface SubscriptionStatus {
   isValid: boolean;
@@ -36,14 +37,15 @@ export class SubscriptionService {
   private readonly trialDays = parseInt(process.env.SUBSCRIPTION_TRIAL_DAYS || '30', 10);
   private readonly CACHE_TTL_SECONDS = 10; // 10 seconds (for Redis SETEX)
   private readonly CACHE_NAMESPACE = 'payment:status';
-  private readonly SYSTEM_EMAIL = 'malipo@dukarun.com';
 
   constructor(
     private channelService: ChannelService,
     private connection: TransactionalConnection,
     private paystackService: PaystackService,
+    @Inject(forwardRef(() => ChannelEventRouterService))
     private eventRouter: ChannelEventRouterService,
     private redisCache: RedisCacheService,
+    @Inject(forwardRef(() => ChannelUpdateHelper))
     private channelUpdateHelper: ChannelUpdateHelper
   ) {}
 
@@ -176,7 +178,7 @@ export class SubscriptionService {
 
   /**
    * Initiate subscription purchase
-   * Note: email parameter is kept for API compatibility but always uses system email for Paystack
+   * Note: email parameter is kept for API compatibility but generates unique email from phone number for Paystack
    */
   async initiatePurchase(
     ctx: RequestContext,
@@ -226,9 +228,10 @@ export class SubscriptionService {
       let customerCode = (channel.customFields as any).paystackCustomerCode;
       if (!customerCode) {
         try {
-          // Always use system email for Paystack (email parameter kept for API compatibility only)
+          // Generate unique email from phone number for Paystack (email parameter kept for API compatibility only)
+          const paystackEmail = generatePaystackEmailFromPhone(phoneNumber);
           const customer = await this.paystackService.createCustomer(
-            this.SYSTEM_EMAIL,
+            paystackEmail,
             undefined,
             undefined,
             phoneNumber,
@@ -266,10 +269,11 @@ export class SubscriptionService {
       if (useCheckout) {
         // Redirect to Paystack checkout for card and other payment methods
         try {
-          // Always use system email for Paystack
+          // Generate unique email from phone number for Paystack
+          const paystackEmail = generatePaystackEmailFromPhone(phoneNumber);
           const transactionResponse = await this.paystackService.initializeTransaction(
             amountInKes,
-            this.SYSTEM_EMAIL,
+            paystackEmail,
             phoneNumber,
             {
               channelId,
@@ -299,11 +303,12 @@ export class SubscriptionService {
 
       // Use STK push for mobile money (default behavior)
       try {
-        // Always use system email for Paystack
+        // Generate unique email from phone number for Paystack
+        const paystackEmail = generatePaystackEmailFromPhone(phoneNumber);
         const chargeResponse = await this.paystackService.chargeMobile(
           amountInKes,
           phoneNumber,
-          this.SYSTEM_EMAIL,
+          paystackEmail,
           reference,
           {
             channelId,
@@ -353,10 +358,11 @@ export class SubscriptionService {
 
         // Attempt to generate payment link as fallback
         try {
-          // Always use system email for Paystack
+          // Generate unique email from phone number for Paystack
+          const paystackEmail = generatePaystackEmailFromPhone(phoneNumber);
           const transactionResponse = await this.paystackService.initializeTransaction(
             amountInKes,
-            this.SYSTEM_EMAIL,
+            paystackEmail,
             phoneNumber,
             {
               channelId,
@@ -652,6 +658,47 @@ export class SubscriptionService {
     );
 
     this.logger.log(`Subscription expired for channel ${channelId}`);
+  }
+
+  /**
+   * Check if expired reminder should be sent
+   * Returns false if reminder was sent within the last 7 days
+   */
+  async shouldSendExpiredReminder(ctx: RequestContext, channelId: string): Promise<boolean> {
+    const channel = await this.channelService.findOne(ctx, channelId);
+    if (!channel) {
+      return false;
+    }
+
+    const customFields = channel.customFields as any;
+    const lastSentAt = customFields.subscriptionExpiredReminderSentAt
+      ? new Date(customFields.subscriptionExpiredReminderSentAt)
+      : null;
+
+    // If never sent, allow sending
+    if (!lastSentAt) {
+      return true;
+    }
+
+    // Check if 7 days have passed since last reminder
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return lastSentAt < sevenDaysAgo;
+  }
+
+  /**
+   * Mark expired reminder as sent
+   */
+  async markExpiredReminderSent(ctx: RequestContext, channelId: string): Promise<void> {
+    await this.channelUpdateHelper.updateChannelCustomFields(
+      ctx,
+      channelId,
+      {
+        subscriptionExpiredReminderSentAt: new Date(),
+      } as any,
+      {
+        auditEvent: 'channel.subscription.expired_reminder_sent',
+      }
+    );
   }
 
   /**

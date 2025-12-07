@@ -6,6 +6,9 @@ import './infrastructure/config/environment.config';
 import { BRAND_CONFIG } from './constants/brand.constants';
 import { initializeTelemetry } from './infrastructure/observability/telemetry.init';
 
+// Set process type for reliable worker context detection
+process.env.VENDURE_PROCESS_TYPE = 'worker';
+
 // Initialize telemetry (must be done before any other application code)
 initializeTelemetry(`${BRAND_CONFIG.servicePrefix}-worker`);
 

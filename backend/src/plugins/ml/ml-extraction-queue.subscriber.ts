@@ -1,29 +1,34 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { RequestContext } from '@vendure/core';
 import pLimit from 'p-limit';
 import { MlExtractionQueueService } from '../../services/ml/ml-extraction-queue.service';
 import { MlTrainingService } from '../../services/ml/ml-training.service';
+import { WorkerBackgroundTaskBase } from '../../infrastructure/utils/worker-background-task.base';
+import { WorkerContextService } from '../../infrastructure/utils/worker-context.service';
 
 /**
  * ML Extraction Queue Subscriber
  *
  * Handles processing of due extractions from the queue.
  * Replaces the polling mechanism with event-driven processing.
+ * Only runs in worker process to avoid duplicate execution.
  */
 @Injectable()
-export class MlExtractionQueueSubscriber implements OnApplicationBootstrap {
-  private readonly logger = new Logger(MlExtractionQueueSubscriber.name);
+export class MlExtractionQueueSubscriber extends WorkerBackgroundTaskBase {
   private processingInterval: NodeJS.Timeout | null = null;
   // Limit concurrent extractions to avoid overwhelming the system
   // Process up to 4 channels concurrently, but each channel's extractions sequentially
   private readonly extractionLimit = pLimit(4);
 
   constructor(
+    workerContext: WorkerContextService,
     private extractionQueueService: MlExtractionQueueService,
     private mlTrainingService: MlTrainingService
-  ) {}
+  ) {
+    super(workerContext, MlExtractionQueueSubscriber.name);
+  }
 
-  onApplicationBootstrap(): void {
+  protected initializeTask(): void {
     // OnApplicationBootstrap runs after all modules are initialized AND migrations are complete
     // The ml_extraction_queue table is guaranteed to exist at this point
     // Start processing queue every 30 seconds

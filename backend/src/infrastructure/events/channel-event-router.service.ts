@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Inject, forwardRef, Optional } from '@nestjs/common';
 import {
   ChannelService,
   EventBus,
@@ -24,6 +24,8 @@ import { ChannelEventType } from './types/event-type.enum';
 import { AuditService } from '../audit/audit.service';
 import { UserContextResolver } from '../audit/user-context.resolver';
 import { ChannelUserService } from '../../services/auth/channel-user.service';
+import { SubscriptionService } from '../../services/subscriptions/subscription.service';
+import { WorkerContextService } from '../utils/worker-context.service';
 
 /**
  * Channel Event Router Service
@@ -50,7 +52,12 @@ export class ChannelEventRouterService implements OnModuleInit {
     private readonly auditService: AuditService,
     private readonly userContextResolver: UserContextResolver,
     private readonly connection: TransactionalConnection,
-    private readonly channelUserService: ChannelUserService
+    private readonly channelUserService: ChannelUserService,
+    @Optional()
+    @Inject(forwardRef(() => SubscriptionService))
+    private readonly subscriptionService?: SubscriptionService,
+    @Optional()
+    private readonly workerContext?: WorkerContextService
   ) {
     // Register handlers
     this.handlers.set(ChannelActionType.IN_APP_NOTIFICATION, inAppHandler);
@@ -170,6 +177,27 @@ export class ChannelEventRouterService implements OnModuleInit {
    */
   async routeEvent(event: ChannelEvent): Promise<void> {
     try {
+      // Check if this is a background-task-generated event that should only run in worker
+      const backgroundTaskEvents = [
+        ChannelEventType.SUBSCRIPTION_EXPIRED,
+        ChannelEventType.SUBSCRIPTION_EXPIRING_SOON,
+        ChannelEventType.ML_EXTRACTION_QUEUED,
+        ChannelEventType.ML_EXTRACTION_STARTED,
+        ChannelEventType.ML_EXTRACTION_COMPLETED,
+        ChannelEventType.ML_EXTRACTION_FAILED,
+      ];
+
+      if (backgroundTaskEvents.includes(event.type)) {
+        // Background-task events MUST only run in worker process
+        // If we can't determine context or we're not in worker, skip
+        if (!this.workerContext || !this.workerContext.isWorkerProcess()) {
+          this.logger.debug(
+            `Skipping ${event.type} event - background task events only process in worker process`
+          );
+          return;
+        }
+      }
+
       // Log to audit system before processing
       // Extract user context from event data or context
       // This captures both regular admins and superadmins
@@ -206,6 +234,20 @@ export class ChannelEventRouterService implements OnModuleInit {
             `Failed to log channel event to audit: ${err instanceof Error ? err.message : String(err)}`
           );
         });
+
+      // Check reminder state for SUBSCRIPTION_EXPIRED events
+      if (event.type === ChannelEventType.SUBSCRIPTION_EXPIRED && this.subscriptionService) {
+        const shouldSend = await this.subscriptionService.shouldSendExpiredReminder(
+          event.context,
+          event.channelId
+        );
+        if (!shouldSend) {
+          this.logger.debug(
+            `Skipping subscription expired reminder for channel ${event.channelId} - reminder sent recently`
+          );
+          return;
+        }
+      }
 
       // Get metadata FIRST to determine routing strategy
       const metadata = this.getEventMetadata(event.type);
@@ -265,6 +307,17 @@ export class ChannelEventRouterService implements OnModuleInit {
       // For each target user, check preferences and route to handlers
       for (const userId of targetUserIds) {
         await this.routeEventForUser(event, userId, effectiveConfig, metadata);
+      }
+
+      // Mark reminder as sent for SUBSCRIPTION_EXPIRED events after routing
+      if (event.type === ChannelEventType.SUBSCRIPTION_EXPIRED && this.subscriptionService) {
+        await this.subscriptionService
+          .markExpiredReminderSent(event.context, event.channelId)
+          .catch(err => {
+            this.logger.warn(
+              `Failed to mark expired reminder as sent: ${err instanceof Error ? err.message : String(err)}`
+            );
+          });
       }
     } catch (error) {
       this.logger.error(
@@ -398,19 +451,12 @@ export class ChannelEventRouterService implements OnModuleInit {
   /**
    * Get default configuration for system events
    * System events always fire to channel admins with in-app notifications enabled
-   *
-   * Note: SMS is disabled for subscription_expired events due to phone number validation issues.
-   * This will be re-enabled once subscription refinement is complete.
    */
   private getDefaultSystemEventConfig(eventType?: ChannelEventType): Record<string, ActionConfig> {
     const config: Record<string, ActionConfig> = {
       [ChannelActionType.IN_APP_NOTIFICATION]: { enabled: true },
+      [ChannelActionType.SMS]: { enabled: true },
     };
-
-    // Disable SMS for subscription_expired events (temporary - until subscription refinement)
-    if (eventType !== ChannelEventType.SUBSCRIPTION_EXPIRED) {
-      config[ChannelActionType.SMS] = { enabled: true };
-    }
 
     return config;
   }

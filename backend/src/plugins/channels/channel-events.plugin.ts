@@ -18,6 +18,7 @@ import { UserContextResolver } from '../../infrastructure/audit/user-context.res
 import { ChannelUserService } from '../../services/auth/channel-user.service';
 import { ChannelUpdateHelper } from '../../services/channels/channel-update.helper';
 import { PhoneNumberResolver } from '../../infrastructure/events/utils/phone-number-resolver';
+import { WorkerContextService } from '../../infrastructure/utils/worker-context.service';
 
 /**
  * Channel Events Plugin
@@ -29,6 +30,8 @@ import { PhoneNumberResolver } from '../../infrastructure/events/utils/phone-num
 @VendurePlugin({
   imports: [PluginCommonModule],
   providers: [
+    // Worker context service (required for background task event routing)
+    WorkerContextService,
     // Audit dependencies (must be available for ChannelEventRouterService and ChannelUpdateHelper)
     // AuditDbConnection uses singleton pattern to prevent duplicate initialization
     AuditDbConnection,
@@ -67,6 +70,7 @@ import { PhoneNumberResolver } from '../../infrastructure/events/utils/phone-num
     ChannelActionTrackingService,
     ChannelSmsService,
     NotificationPreferenceService,
+    ChannelUpdateHelper, // Export for use in other plugins
   ],
   compatibility: VENDURE_COMPATIBILITY_VERSION,
 })

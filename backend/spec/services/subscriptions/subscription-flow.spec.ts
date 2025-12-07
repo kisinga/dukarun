@@ -14,6 +14,7 @@ import { ChannelEventType } from '../../../src/infrastructure/events/types/event
 import { RedisCacheService } from '../../../src/infrastructure/storage/redis-cache.service';
 import { PaystackService } from '../../../src/services/payments/paystack.service';
 import { SubscriptionService } from '../../../src/services/subscriptions/subscription.service';
+import { generatePaystackEmailFromPhone } from '../../../src/utils/email.utils';
 
 describe('Subscription Flow Integration', () => {
   const ctx = {} as RequestContext;
@@ -250,8 +251,8 @@ describe('Subscription Flow Integration', () => {
     });
   });
 
-  describe('Email Fallback', () => {
-    it('should use system email when email is not provided', async () => {
+  describe('Email Generation', () => {
+    it('should generate unique email from phone number when email is not provided', async () => {
       // Clear all mocks to ensure clean state
       jest.clearAllMocks();
 
@@ -294,7 +295,7 @@ describe('Subscription Flow Integration', () => {
       );
     });
 
-    it('should use system email when email is undefined', async () => {
+    it('should generate unique email from phone number when email is undefined', async () => {
       // Clear all mocks to ensure clean state
       jest.clearAllMocks();
 
@@ -327,9 +328,10 @@ describe('Subscription Flow Integration', () => {
       // Verify the method completed successfully
       expect(result.success).toBe(true);
 
-      // Verify Paystack was called with system email (email parameter is kept for API compatibility only)
+      // Verify Paystack was called with generated email from phone number (email parameter is kept for API compatibility only)
+      const expectedEmail = generatePaystackEmailFromPhone(phoneNumber);
       expect(mockPaystackService.createCustomer).toHaveBeenCalledWith(
-        'malipo@dukarun.com',
+        expectedEmail,
         undefined,
         undefined,
         phoneNumber,

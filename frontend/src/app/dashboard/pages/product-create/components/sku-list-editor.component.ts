@@ -93,8 +93,26 @@ import { FormArray, ReactiveFormsModule } from '@angular/forms';
                   step="1"
                   min="0"
                   class="input input-sm input-bordered w-full"
+                  [class.input-warning]="isWholesalePriceHigher($index)"
                 />
-                <p class="text-xs opacity-60 mt-1">Discount limit guardrail</p>
+                @if (isWholesalePriceHigher($index)) {
+                  <div class="alert alert-warning py-1.5 px-2 mt-1.5">
+                    <svg
+                      class="h-3 w-3"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="text-xs"
+                      >Wholesale price should be lower than the regular price</span
+                    >
+                  </div>
+                } @else {
+                  <p class="text-xs opacity-60 mt-1">Discount limit guardrail</p>
+                }
               </div>
             </div>
           }
@@ -140,5 +158,24 @@ export class SkuListEditorComponent {
     if (errors['min']) return `Min value: ${errors['min'].min}`;
 
     return 'Invalid';
+  }
+
+  /**
+   * Check if wholesale price is higher than regular price
+   */
+  isWholesalePriceHigher(skuIndex: number): boolean {
+    const skuGroup = this.skus().at(skuIndex);
+    if (!skuGroup) return false;
+
+    const priceControl = skuGroup.get('price');
+    const wholesalePriceControl = skuGroup.get('wholesalePrice');
+
+    if (!priceControl || !wholesalePriceControl) return false;
+
+    const price = Number(priceControl.value) || 0;
+    const wholesalePrice = Number(wholesalePriceControl.value) || 0;
+
+    // Only show warning if wholesale price is greater than 0 and higher than regular price
+    return wholesalePrice > 0 && wholesalePrice > price;
   }
 }
