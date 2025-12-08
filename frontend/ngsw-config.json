@@ -15,11 +15,21 @@
       "installMode": "lazy",
       "updateMode": "prefetch",
       "resources": {
-        "files": ["/assets/**", "/*.(eot|svg|cur|jpg|png|webp|gif|otf|ttf|woff|woff2|ani)"]
+        "files": ["/assets/logo/**", "/*.(eot|svg|cur|jpg|gif|otf|ttf|woff|woff2|ani)"]
       }
     }
   ],
   "dataGroups": [
+    {
+      "name": "screenshots-freshness",
+      "urls": ["/assets/screenshots/**"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 500,
+        "maxAge": "1h",
+        "timeout": "10s"
+      }
+    },
     {
       "name": "api-freshness",
       "urls": ["/admin-api/**", "/shop-api/**"],
