@@ -199,13 +199,8 @@
       class="container-app grid gap-6 sm:gap-8 md:gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:items-center w-full"
     >
       <div class="home-hero-intro flex flex-col gap-4 sm:gap-6 md:gap-7 w-full min-w-0">
-        <span
-          class="badge badge-primary badge-soft w-fit transition-transform duration-200 hover:-translate-y-0.5"
-        >
-          Join {{ socialProof.customerCount }}+ Kenyan businesses
-        </span>
         <h1 class="w-full text-3xl font-bold leading-tight sm:text-4xl md:text-5xl lg:text-6xl">
-          Point and Sell
+          DUKARUN - Point and Sell
         </h1>
         <p class="w-full text-base md:text-lg text-base-content/70">
           Your phone is a powerful computer. Dukarun makes it a fast and efficient point of sale.
@@ -240,50 +235,27 @@
         </div>
       </div>
       <div class="home-hero-intro-delay flex justify-center w-full min-w-0">
-        <div
-          class="carousel carousel-center w-full max-w-full sm:max-w-lg rounded-2xl border border-base-300 bg-base-200 shadow-md overflow-hidden"
+        <figure
+          class="w-full max-w-full sm:max-w-lg lg:max-w-xl xl:max-w-2xl rounded-2xl border border-base-300 bg-base-200 shadow-md overflow-hidden"
         >
-          @for (screenshot of heroScreenshots; track $index) {
-            <div class="carousel-item w-full">
-              @if (screenshot.placeholder) {
-                <div
-                  class="aspect-video w-full flex items-center justify-center bg-gradient-to-br from-base-200 to-base-300"
-                  [attr.aria-label]="screenshot.alt"
-                >
-                  <div class="flex flex-col items-center gap-3 text-base-content/70">
-                    <div
-                      class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20"
-                      aria-hidden="true"
-                    >
-                      <svg
-                        class="h-8 w-8 text-primary"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                    </div>
-                    <p class="text-base md:text-sm font-medium text-center px-4">
-                      {{ screenshot.alt }}
-                    </p>
-                  </div>
-                </div>
-              } @else {
-                <img
-                  [src]="screenshot.src"
-                  [alt]="screenshot.alt"
-                  class="w-full aspect-video object-cover"
-                />
-              }
-            </div>
-          }
-        </div>
+          <!-- Mobile: Show mobile dashboard -->
+          <img
+            src="/assets/screenshots/dashboard_mobile.png"
+            alt="Dukarun mobile dashboard showing business analytics and insights"
+            class="w-full h-auto object-contain lg:hidden"
+            loading="eager"
+          />
+          <!-- Desktop: Show smaller desktop dashboard -->
+          <img
+            src="/assets/screenshots/dashboard_720p.png"
+            alt="Dukarun desktop dashboard showing business analytics and insights"
+            class="hidden lg:block w-full h-auto object-contain"
+            loading="eager"
+          />
+          <figcaption class="sr-only">
+            Dukarun dashboard with business intelligence and analytics
+          </figcaption>
+        </figure>
       </div>
     </div>
   </section>
@@ -338,45 +310,22 @@
     </div>
     <div class="container-app mt-10 flex justify-center">
       <figure
-        class="group relative w-full max-w-xs overflow-hidden rounded-2xl border border-base-300 bg-base-200 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+        class="group relative w-full max-w-xs rounded-2xl border border-base-300 bg-base-200 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
       >
-        <div
-          class="aspect-[9/16] flex items-center justify-center bg-gradient-to-br from-base-200 to-base-300"
+        <video
+          class="w-full h-auto object-contain"
+          controls
+          preload="metadata"
+          playsinline
           aria-label="Real-world Dukarun usage screen recording from a Kenyan shop"
         >
-          <div class="flex flex-col items-center gap-3 text-base-content/70">
-            <div
-              class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20 transition-transform duration-200 group-hover:scale-110"
-              aria-hidden="true"
-            >
-              <span class="text-3xl text-primary">▶</span>
-            </div>
-            <p class="text-base md:text-sm font-medium text-center px-4">
-              Real-world usage<br />screen recording
-            </p>
-          </div>
-        </div>
+          <source src="/assets/screenshots/screen-20251208-130405.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
         <figcaption class="sr-only">
           Screen recording showing Dukarun POS in action at a Kenyan retail shop
         </figcaption>
       </figure>
-    </div>
-    <div class="container-app mt-10 grid gap-6 md:grid-cols-3">
-      @for (testimonial of testimonials; track $index) {
-        <figure
-          class="group rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl"
-        >
-          <span class="text-4xl text-primary/40 leading-none">"</span>
-          <blockquote class="mt-2 text-base-content/70">{{ testimonial.quote }}</blockquote>
-          @if (testimonial.metric) {
-            <span class="badge badge-success badge-sm mt-2 w-fit">{{ testimonial.metric }}</span>
-          }
-          <figcaption class="mt-4 flex flex-col gap-1 text-base md:text-sm text-base-content/70">
-            <strong class="text-base text-base-content">{{ testimonial.author }}</strong>
-            <span>{{ testimonial.title }}</span>
-          </figcaption>
-        </figure>
-      }
     </div>
   </section>
 
@@ -467,40 +416,34 @@
               </ul>
             </div>
           </article>
-          @if (pillar.screenshot) {
-            <figure
-              class="group relative w-full overflow-hidden rounded-xl border border-base-300 bg-base-200 shadow-sm transition-transform transition-shadow duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-primary/30"
-            >
-              @if (pillar.screenshot.placeholder) {
-                <div
-                  class="aspect-video flex items-center justify-center bg-gradient-to-br from-base-200 to-base-300"
-                  [attr.aria-label]="pillar.screenshot.alt"
-                >
-                  <div class="flex flex-col items-center gap-2 text-base-content/60">
-                    <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <p class="text-sm md:text-xs font-medium">{{ pillar.screenshot.alt }}</p>
-                  </div>
-                </div>
-              } @else {
-                <img
-                  [src]="pillar.screenshot.src"
-                  [alt]="pillar.screenshot.alt"
-                  loading="lazy"
-                  class="w-full aspect-video object-cover"
-                />
-              }
-              <figcaption class="sr-only">{{ pillar.screenshot.alt }}</figcaption>
-            </figure>
-          }
         </div>
       }
+    </div>
+    <div class="container-app mt-12 flex justify-center">
+      <figure
+        class="group relative w-full max-w-xs rounded-2xl border border-base-300 bg-base-200 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+      >
+        <div
+          id="feature-carousel"
+          class="carousel carousel-center w-full overflow-x-auto snap-x snap-mandatory"
+        >
+          @for (screenshot of allFeatureScreenshots; track screenshot.src) {
+            <div
+              class="carousel-item w-full flex-shrink-0 snap-center flex items-center justify-center"
+            >
+              <img
+                [src]="screenshot.src"
+                [alt]="screenshot.alt"
+                loading="lazy"
+                class="w-full h-auto object-contain"
+              />
+            </div>
+          }
+        </div>
+        <figcaption class="sr-only">
+          Dukarun feature screenshots showing all key functionality
+        </figcaption>
+      </figure>
     </div>
   </section>
 
@@ -973,6 +916,38 @@
           Start free 30-day trial
         </a>
       </div>
+    </div>
+  </section>
+
+  <div class="divider opacity-10 my-0"></div>
+
+  <section class="section scroll-mt-28 bg-base-200 py-16" id="testimonials">
+    <div class="container-app space-y-4 text-center">
+      <span
+        class="inline-flex items-center gap-2 text-sm md:text-xs font-semibold uppercase tracking-[0.18em] text-primary/80"
+      >
+        What our customers say
+      </span>
+      <h2 class="text-2xl font-bold sm:text-3xl md:text-4xl lg:text-5xl">
+        Trusted by shopkeepers across Kenya
+      </h2>
+    </div>
+    <div class="container-app mt-10 grid gap-6 md:grid-cols-3">
+      @for (testimonial of testimonials; track $index) {
+        <figure
+          class="group rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl"
+        >
+          <span class="text-4xl text-primary/40 leading-none">"</span>
+          <blockquote class="mt-2 text-base-content/70">{{ testimonial.quote }}</blockquote>
+          @if (testimonial.metric) {
+            <span class="badge badge-success badge-sm mt-2 w-fit">{{ testimonial.metric }}</span>
+          }
+          <figcaption class="mt-4 flex flex-col gap-1 text-base md:text-sm text-base-content/70">
+            <strong class="text-base text-base-content">{{ testimonial.author }}</strong>
+            <span>{{ testimonial.title }}</span>
+          </figcaption>
+        </figure>
+      }
     </div>
   </section>
 </main>
