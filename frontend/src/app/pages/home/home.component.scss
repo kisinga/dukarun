@@ -257,6 +257,17 @@
   scroll-snap-stop: always;
 }
 
+// Hide scrollbar for carousels
+#barcode-carousel,
+#feature-carousel {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+
+  &::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+}
+
 // ============================================
 // DIVIDERS - Minimal
 // ============================================

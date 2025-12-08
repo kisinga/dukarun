@@ -92,6 +92,26 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   private observers: IntersectionObserver[] = [];
   private isUpdatingHash = false;
 
+  // Single source of truth for carousel timing
+  private readonly CAROUSEL_CONFIG = {
+    scrollInterval: 3500, // 3.5 seconds between scrolls
+    scrollDuration: 800, // Smooth scroll duration in ms
+    initDelay: 300, // Delay before initializing carousels
+    visibilityThreshold: 0.1, // IntersectionObserver threshold
+  };
+
+  // Carousel state management
+  private carousels = new Map<
+    string,
+    {
+      interval?: number;
+      currentIndex: number;
+      observer: IntersectionObserver | undefined;
+      isVisible: boolean;
+      isPaused: boolean;
+    }
+  >();
+
   protected readonly isYearly = signal(false);
 
   protected readonly socialProof: SocialProof = {
@@ -107,6 +127,40 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     { icon: '🤝', text: 'Trust in every sale' },
   ];
 
+  protected readonly barcodeImages = [
+    {
+      src: '/assets/screenshots/barcode_scanning_mobile.png',
+      alt: 'Barcode scanning interface showing product recognition',
+    },
+    {
+      src: '/assets/screenshots/barcode_found_mobile.png',
+      alt: 'Product found after barcode scan with details and add to cart',
+    },
+  ];
+
+  protected readonly allFeatureScreenshots = [
+    {
+      src: '/assets/screenshots/barcode_scanning_mobile.png',
+      alt: 'Barcode scanning interface showing product recognition',
+    },
+    {
+      src: '/assets/screenshots/barcode_found_mobile.png',
+      alt: 'Product found after barcode scan with details and add to cart',
+    },
+    {
+      src: '/assets/screenshots/inventory_mobile.png',
+      alt: 'Inventory management dashboard',
+    },
+    {
+      src: '/assets/screenshots/credit_management_mobile.png',
+      alt: 'Cash flow and credit management',
+    },
+    {
+      src: '/assets/screenshots/dashboard_mobile.png',
+      alt: 'Business intelligence dashboard',
+    },
+  ];
+
   protected readonly corePillars: CorePillar[] = [
     {
       icon: 'camera',
@@ -120,27 +174,34 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       title: 'Clear inventory',
       description: 'Always know what is in stock across every shelf, stall, or warehouse.',
       bullets: ['Real-time counts', 'Multi-location tracking', 'Low-stock nudges'],
-      screenshot: { src: '', alt: 'Inventory management dashboard', placeholder: true },
+      screenshot: {
+        src: '/assets/screenshots/inventory_mobile.png',
+        alt: 'Inventory management dashboard',
+        placeholder: false,
+      },
     },
     {
       icon: 'currency',
       title: 'Healthy cash flow',
       description: 'Stay on top of customer and supplier balances without extra spreadsheets.',
       bullets: ['Credit limits & approvals', 'Automatic reminders', 'Ledger built in'],
-      screenshot: { src: '', alt: 'Cash flow and credit management', placeholder: true },
+      screenshot: {
+        src: '/assets/screenshots/credit_management_mobile.png',
+        alt: 'Cash flow and credit management',
+        placeholder: false,
+      },
     },
     {
       icon: 'chart',
       title: 'Decisions with data',
       description:
-        'Pro-level business intelligence at your fingertips. See daily trends, best sellers, and make data-driven decisions to grow.',
-      bullets: [
-        'Dashboards & reports',
-        'Top product insights',
-        'Performance alerts',
-        'Data-driven growth decisions',
-      ],
-      screenshot: { src: '', alt: 'Business intelligence dashboard', placeholder: true },
+        'Pro-level business intelligence at your fingertips. Make data-driven decisions to grow.',
+      bullets: ['Dashboards & reports', 'Top product insights', 'Performance alerts'],
+      screenshot: {
+        src: '/assets/screenshots/dashboard_mobile.png',
+        alt: 'Business intelligence dashboard',
+        placeholder: false,
+      },
     },
   ];
 
@@ -329,13 +390,6 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected readonly stars = [1, 2, 3, 4, 5];
 
-  // Screenshot/carousel data
-  protected readonly heroScreenshots = [
-    { src: '', alt: 'Dukarun point and sell interface', placeholder: true },
-    { src: '', alt: 'Dukarun inventory management', placeholder: true },
-    { src: '', alt: 'Dukarun sales dashboard', placeholder: true },
-  ];
-
   protected readonly easeOfUseBenefits: EaseOfUseBenefit[] = [
     {
       icon: 'phone',
@@ -381,7 +435,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       title:
         'Dukarun - Point and Sell POS System for Kenyan Businesses | Fast, Offline, M-Pesa Ready',
       description:
-        'Point your phone at products and sell in seconds. Join 500+ Kenyan businesses using Dukarun - the fastest POS system for shops, dukas, and retail. Works offline, accepts M-Pesa, requires no training. Start your free 30-day trial today.',
+        'Point your phone at products and sell in seconds. Join Dukarun the fastest POS system for shops, dukas, and retail. Works offline, accepts M-Pesa, requires no training. Start your free 30-day trial today.',
       keywords:
         'POS system Kenya, point of sale Kenya, retail software Kenya, duka management system, M-Pesa POS, offline POS Kenya, shop management Kenya, inventory management Kenya, barcode scanner Kenya, retail POS Nairobi, agrovet software Kenya, salon management Kenya, hardware store POS Kenya',
       url: 'https://dukarun.com',
@@ -391,11 +445,197 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     this.setupScrollSpy();
     this.handleInitialHash();
+    this.setupBarcodeCarousel();
+    this.setupFeatureCarousel();
   }
 
   ngOnDestroy(): void {
     this.observers.forEach((observer) => observer.disconnect());
     this.observers = [];
+
+    // Clean up all carousels
+    this.carousels.forEach((carousel, id) => {
+      if (carousel.interval) {
+        clearInterval(carousel.interval);
+      }
+      if (carousel.observer) {
+        carousel.observer.disconnect();
+      }
+    });
+    this.carousels.clear();
+  }
+
+  private setupBarcodeCarousel(): void {
+    this.setupCarousel('barcode-carousel');
+  }
+
+  private setupFeatureCarousel(): void {
+    this.setupCarousel('feature-carousel');
+  }
+
+  // Unified carousel setup - single source of truth
+  private setupCarousel(carouselId: string): void {
+    setTimeout(() => {
+      const carouselElement = document.getElementById(carouselId);
+      if (!carouselElement) {
+        console.warn(`Carousel element not found: ${carouselId}`);
+        return;
+      }
+
+      const items = carouselElement.querySelectorAll('.carousel-item');
+      if (items.length <= 1) {
+        console.warn(`Carousel ${carouselId} has ${items.length} items, need at least 2`);
+        return;
+      }
+
+      // Clean up existing state if any
+      const existingState = this.carousels.get(carouselId);
+      if (existingState?.interval) {
+        clearInterval(existingState.interval);
+      }
+      if (existingState?.observer) {
+        existingState.observer.disconnect();
+      }
+
+      // Initialize carousel state
+      const carouselState: {
+        interval?: number;
+        currentIndex: number;
+        observer: IntersectionObserver | undefined;
+        isVisible: boolean;
+        isPaused: boolean;
+      } = {
+        interval: undefined,
+        currentIndex: 0,
+        observer: undefined,
+        isVisible: false,
+        isPaused: false,
+      };
+      this.carousels.set(carouselId, carouselState);
+
+      // Check if carousel is already visible
+      const checkInitialVisibility = (): boolean => {
+        const rect = carouselElement.getBoundingClientRect();
+        const isVisible =
+          rect.top < window.innerHeight &&
+          rect.bottom > 0 &&
+          rect.left < window.innerWidth &&
+          rect.right > 0;
+        return isVisible;
+      };
+
+      // IntersectionObserver for visibility detection
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            const state = this.carousels.get(carouselId);
+            if (!state) return;
+
+            state.isVisible = entry.isIntersecting;
+            if (state.isVisible && !state.isPaused) {
+              if (!state.interval) {
+                this.startCarouselAutoscroll(carouselId, carouselElement, items);
+              }
+            } else {
+              if (state.interval) {
+                clearInterval(state.interval);
+                state.interval = undefined;
+              }
+            }
+          });
+        },
+        {
+          root: null,
+          rootMargin: '0px',
+          threshold: [0, 0.1, 0.5],
+        },
+      );
+
+      carouselState.observer = observer;
+      observer.observe(carouselElement);
+
+      // Start immediately if already visible
+      if (checkInitialVisibility()) {
+        setTimeout(() => {
+          const state = this.carousels.get(carouselId);
+          if (state && !state.interval && !state.isPaused) {
+            this.startCarouselAutoscroll(carouselId, carouselElement, items);
+          }
+        }, this.CAROUSEL_CONFIG.initDelay + 100);
+      }
+
+      // Pause on hover
+      const pauseOnHover = () => {
+        const state = this.carousels.get(carouselId);
+        if (!state) return;
+        state.isPaused = true;
+        if (state.interval) {
+          clearInterval(state.interval);
+          state.interval = undefined;
+        }
+      };
+
+      const resumeOnLeave = () => {
+        const state = this.carousels.get(carouselId);
+        if (!state) return;
+        state.isPaused = false;
+        if (state.isVisible && !state.interval) {
+          this.startCarouselAutoscroll(carouselId, carouselElement, items);
+        }
+      };
+
+      carouselElement.addEventListener('mouseenter', pauseOnHover);
+      carouselElement.addEventListener('mouseleave', resumeOnLeave);
+    }, this.CAROUSEL_CONFIG.initDelay);
+  }
+
+  // Unified autoscroll function - single source of truth for timing
+  private startCarouselAutoscroll(
+    carouselId: string,
+    carouselElement: HTMLElement,
+    items: NodeListOf<Element>,
+  ): void {
+    const state = this.carousels.get(carouselId);
+    if (!state) {
+      console.warn(`State not found for carousel: ${carouselId}`);
+      return;
+    }
+
+    // Clear any existing interval
+    if (state.interval) {
+      clearInterval(state.interval);
+      state.interval = undefined;
+    }
+
+    // Use CSS for smooth scrolling
+    carouselElement.style.scrollBehavior = 'smooth';
+
+    // Start autoscroll with consistent timing
+    state.interval = window.setInterval(() => {
+      const currentState = this.carousels.get(carouselId);
+      if (!currentState || currentState.isPaused || !currentState.isVisible) {
+        return;
+      }
+
+      // Move to next item
+      currentState.currentIndex = (currentState.currentIndex + 1) % items.length;
+      const targetItem = items[currentState.currentIndex] as HTMLElement;
+
+      if (targetItem && carouselElement) {
+        // Calculate precise scroll position - each item is full width
+        const carouselWidth = carouselElement.clientWidth;
+        const scrollPosition = currentState.currentIndex * carouselWidth;
+
+        // Smooth scroll
+        carouselElement.scrollTo({
+          left: scrollPosition,
+          behavior: 'smooth',
+        });
+      }
+    }, this.CAROUSEL_CONFIG.scrollInterval);
+
+    // Update state in map
+    this.carousels.set(carouselId, state);
   }
 
   private setupScrollSpy(): void {
@@ -407,6 +647,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       'journey',
       'pricing-preview',
       'faq',
+      'testimonials',
       'cta',
     ];
 
