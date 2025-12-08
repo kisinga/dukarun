@@ -62,11 +62,19 @@ RUN echo "✅ Verifying copied build output..." && \
       ls -la /usr/share/nginx/html/ && \
       exit 1; \
     fi && \
+    if [ ! -f /usr/share/nginx/html/assets/screenshots/dashboard_mobile.png ]; then \
+      echo "❌ ERROR: assets/screenshots/dashboard_mobile.png not found after copy" && \
+      echo "Contents of /usr/share/nginx/html/assets:" && \
+      ls -la /usr/share/nginx/html/assets/ 2>/dev/null || echo "assets directory not found" && \
+      exit 1; \
+    fi && \
     echo "✅ Build output copied successfully:" && \
     echo "  - Total files: $(find /usr/share/nginx/html -type f | wc -l)" && \
     echo "  - JS files: $(find /usr/share/nginx/html -name "*.js" | wc -l)" && \
     echo "  - CSS files: $(find /usr/share/nginx/html -name "*.css" | wc -l)" && \
-    echo "  - HTML files: $(find /usr/share/nginx/html -name "*.html" | wc -l)"
+    echo "  - HTML files: $(find /usr/share/nginx/html -name "*.html" | wc -l)" && \
+    echo "  - Screenshot files: $(find /usr/share/nginx/html/assets/screenshots -type f 2>/dev/null | wc -l)" && \
+    echo "  - Logo files: $(find /usr/share/nginx/html/assets/logo -type f 2>/dev/null | wc -l)"
 
 # Copy nginx configuration as template (will be processed at runtime)
 COPY nginx.conf /etc/nginx/conf.d/default.conf.template
