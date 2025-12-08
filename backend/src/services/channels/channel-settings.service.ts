@@ -28,6 +28,7 @@ import { ROLE_TEMPLATES, RoleTemplate } from '../auth/provisioning/role-provisio
 import { SmsService } from '../../infrastructure/sms/sms.service';
 import { ChannelUpdateHelper } from './channel-update.helper';
 import { getChannelStatus } from '../../domain/channel-custom-fields';
+import { formatPhoneNumber } from '../../utils/phone.utils';
 
 export interface ChannelSettings {
   cashierFlowEnabled: boolean;
@@ -293,8 +294,10 @@ export class ChannelSettingsService {
     phoneNumber: string
   ): Promise<User | null> {
     try {
+      // Normalize phone number to ensure consistent lookup
+      const normalizedPhone = formatPhoneNumber(phoneNumber);
       const user = await this.connection.getRepository(ctx, User).findOne({
-        where: { identifier: phoneNumber },
+        where: { identifier: normalizedPhone },
         relations: ['roles', 'roles.channels'],
       });
       return user || null;
@@ -441,14 +444,17 @@ export class ChannelSettingsService {
     // Use normalized input for the rest of the method
     const cleanInput = normalizedInput;
 
+    // Normalize phone number for consistent storage and lookup
+    const normalizedPhoneNumber = formatPhoneNumber(cleanInput.phoneNumber);
+
     // Check if user with this phone number already exists (phone is primary identifier)
-    const existingUser = await this.findExistingUserByPhone(ctx, cleanInput.phoneNumber);
+    const existingUser = await this.findExistingUserByPhone(ctx, normalizedPhoneNumber);
 
     if (existingUser) {
       // User exists - check if they already belong to this channel
       if (this.userBelongsToChannel(existingUser, channelId.toString())) {
         throw new BadRequestException(
-          `Administrator with phone number ${cleanInput.phoneNumber} already belongs to this channel`
+          `Administrator with phone number ${normalizedPhoneNumber} already belongs to this channel`
         );
       }
 
@@ -488,7 +494,7 @@ export class ChannelSettingsService {
 
       if (!administrator) {
         throw new BadRequestException(
-          `Administrator not found for user with phone number ${cleanInput.phoneNumber}`
+          `Administrator not found for user with phone number ${normalizedPhoneNumber}`
         );
       }
 
@@ -496,7 +502,7 @@ export class ChannelSettingsService {
       await this.updateAdministratorEmailIfNeeded(ctx, administrator, cleanInput.emailAddress);
 
       // Send welcome SMS
-      await this.sendWelcomeSms(ctx, cleanInput.phoneNumber, channelId.toString(), true);
+      await this.sendWelcomeSms(ctx, normalizedPhoneNumber, channelId.toString(), true);
 
       // Track action and audit
       await this.actionTrackingService.trackAction(
@@ -518,7 +524,7 @@ export class ChannelSettingsService {
           data: {
             firstName: cleanInput.firstName,
             lastName: cleanInput.lastName,
-            phoneNumber: cleanInput.phoneNumber,
+            phoneNumber: normalizedPhoneNumber,
             emailAddress: 'emailAddress' in cleanInput ? cleanInput.emailAddress : undefined,
             roleId: role.id.toString(),
             roleTemplateCode,
@@ -574,21 +580,21 @@ export class ChannelSettingsService {
       typeof cleanInput.emailAddress === 'string' &&
       cleanInput.emailAddress.trim().length > 0
         ? cleanInput.emailAddress.trim()
-        : cleanInput.phoneNumber; // Use phone number as email fallback for phone-based auth
+        : normalizedPhoneNumber; // Use normalized phone number as email fallback for phone-based auth
 
     const createAdminInput: any = {
       firstName: cleanInput.firstName,
       lastName: cleanInput.lastName,
       password: this.generateTemporaryPassword(),
       roleIds: [role.id],
-      identifier: cleanInput.phoneNumber, // Phone-based flow: create user with phone identifier
-      emailAddress: emailToUse, // Always provide emailAddress - use phone number as fallback
+      identifier: normalizedPhoneNumber, // Phone-based flow: create user with normalized phone identifier
+      emailAddress: emailToUse, // Always provide emailAddress - use normalized phone number as fallback
     };
 
     const administrator = await this.administratorService.create(ctx, createAdminInput);
 
     // Send welcome SMS
-    await this.sendWelcomeSms(ctx, cleanInput.phoneNumber, channelId.toString(), false);
+    await this.sendWelcomeSms(ctx, normalizedPhoneNumber, channelId.toString(), false);
 
     // Track action (using SMS as placeholder action type for counting)
     await this.actionTrackingService.trackAction(
@@ -611,7 +617,7 @@ export class ChannelSettingsService {
         data: {
           firstName: cleanInput.firstName,
           lastName: cleanInput.lastName,
-          phoneNumber: 'phoneNumber' in cleanInput ? cleanInput.phoneNumber : undefined,
+          phoneNumber: normalizedPhoneNumber,
           emailAddress: 'emailAddress' in cleanInput ? cleanInput.emailAddress : undefined,
           roleId: role.id.toString(),
           roleTemplateCode,

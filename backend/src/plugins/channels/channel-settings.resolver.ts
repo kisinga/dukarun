@@ -140,7 +140,7 @@ export class ChannelSettingsResolver {
   }
 
   @Mutation()
-  @Allow(Permission.DeleteAdministrator)
+  @Allow(Permission.UpdateAdministrator)
   async disableChannelAdmin(@Ctx() ctx: RequestContext, @Args('id') id: string) {
     return this.channelSettingsService.disableChannelAdministrator(ctx, id);
   }
