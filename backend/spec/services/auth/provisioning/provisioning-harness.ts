@@ -28,8 +28,7 @@ import {
   StockLocationService,
   TransactionalConnection,
 } from '@vendure/core';
-import { RegistrationInput } from '../../../../src/services/auth/registration.service';
-import { RegistrationService } from '../../../../src/services/auth/registration.service';
+import { RegistrationInput, RegistrationService } from '../../../../src/services/auth/registration.service';
 
 /**
  * Expected provisioning result structure
@@ -67,7 +66,6 @@ export function createTestRegistrationInput(
     adminLastName: 'Doe',
     adminPhoneNumber: '0712345678',
     storeName: 'Main Store',
-    storeAddress: '123 Market Street',
     ...overrides,
   };
 }
@@ -165,7 +163,7 @@ export async function assertProvisioningComplete(
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
-  
+
   // Channel code should start with the sanitized company name (may have random suffix)
   if (!channel.code.startsWith(expectedCodeBase) && channel.code !== expectedCodeBase) {
     throw new Error(

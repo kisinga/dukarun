@@ -93,8 +93,8 @@ services:
       - backend_uploads:/app/static/uploads
       # Note: .env file mount removed - env vars are passed directly via environment section
       # In platforms like Coolify/Kubernetes, env vars are passed directly, so file mount is not needed
-    ports:
-      - '${BACKEND_PORT:-3000}:3000'
+    # ports:
+    #   - '${BACKEND_PORT:-3000}:3000'
     # Note: depends_on removed for external services (postgres_db, redis, timescaledb_audit)
     # Backend will retry connections gracefully if services are not yet ready
     healthcheck:
@@ -121,8 +121,8 @@ services:
       # Additional frontend configuration
       NODE_ENV: ${NODE_ENV:-production}
 
-    ports:
-      - '${FRONTEND_PORT:-4200}:4200'
+    # ports:
+    #   - '${FRONTEND_PORT:-4200}:4200'
     depends_on:
       backend:
         condition: service_healthy
