@@ -193,6 +193,7 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
   readonly error = input<string | null>(null);
   readonly isProcessing = input<boolean>(false);
   readonly cashierFlowEnabled = input<boolean>(false);
+  readonly triggerSuccess = input<{ amount: number; method: string } | null>(null);
 
   readonly enablePrinter = input<boolean>(true);
 
@@ -233,12 +234,21 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
   readonly showSuccessAnimation = signal<boolean>(false);
   readonly confirmedAmount = signal<number | null>(null);
   readonly confirmedPaymentMethod = signal<string | null>(null);
+  private successAnimationTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     // Reset success animation state when modal closes
     effect(() => {
       if (!this.isOpen()) {
         this.resetSuccessState();
+      }
+    });
+
+    // Trigger success animation when parent requests it
+    effect(() => {
+      const successData = this.triggerSuccess();
+      if (successData) {
+        this.triggerSuccessAnimation(successData.amount, successData.method);
       }
     });
   }
@@ -259,9 +269,17 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.resetSuccessState();
+    if (this.successAnimationTimer) {
+      clearTimeout(this.successAnimationTimer);
+      this.successAnimationTimer = null;
+    }
   }
 
   private resetSuccessState(): void {
+    if (this.successAnimationTimer) {
+      clearTimeout(this.successAnimationTimer);
+      this.successAnimationTimer = null;
+    }
     this.showSuccessAnimation.set(false);
     this.confirmedAmount.set(null);
     this.confirmedPaymentMethod.set(null);
@@ -280,33 +298,35 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
   }
 
   onCompleteCash(): void {
-    this.triggerSuccessAnimation(this.total(), this.getSelectedPaymentMethodName());
     this.completeCash.emit();
   }
 
   onCompleteCashAndPrint(): void {
-    this.triggerSuccessAnimation(this.total(), this.getSelectedPaymentMethodName());
     this.completeCashAndPrint.emit();
   }
 
   onCompleteCredit(): void {
-    this.triggerSuccessAnimation(this.total(), 'Credit Sale');
     this.completeCredit.emit();
   }
 
   onCompleteCreditAndPrint(): void {
-    this.triggerSuccessAnimation(this.total(), 'Credit Sale');
     this.completeCreditAndPrint.emit();
   }
 
   onCompleteCashier(): void {
-    this.triggerSuccessAnimation(this.total(), 'Cashier');
     this.completeCashier.emit();
   }
 
   private triggerSuccessAnimation(amount: number, method: string): void {
+    // Clear any existing timer
+    if (this.successAnimationTimer) {
+      clearTimeout(this.successAnimationTimer);
+      this.successAnimationTimer = null;
+    }
+
     this.confirmedAmount.set(amount);
     this.confirmedPaymentMethod.set(method);
     this.showSuccessAnimation.set(true);
+    // Note: Animation will be dismissed when modal closes (via resetSuccessState)
   }
 }
