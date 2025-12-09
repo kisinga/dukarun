@@ -6,6 +6,7 @@ import { env } from '../../infrastructure/config/environment.config';
 import { ChannelSmsService } from '../../infrastructure/events/channel-sms.service';
 import { SmsService } from '../../infrastructure/sms/sms.service';
 import { formatPhoneNumber } from '../../utils/phone.utils';
+import { maskEmail } from '../../utils/email.utils';
 import { OtpEmailEvent } from '../../events/otp-email.event';
 
 /**
@@ -215,10 +216,19 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      this.logger.error(
+        `Invalid email address provided: ${typeof email === 'string' ? maskEmail(email) : typeof email}`
+      );
+      return;
+    }
+
     try {
+      this.logger.log(`Publishing OTP email event for: ${maskEmail(email)}`);
       this.eventBus.publish(new OtpEmailEvent(ctx, email, otp));
+      this.logger.log(`OTP email event published successfully for: ${maskEmail(email)}`);
     } catch (error) {
-      this.logger.error('Email sending error:', error);
+      this.logger.error(`Email sending error for ${maskEmail(email)}:`, error);
     }
   }
 
@@ -275,8 +285,14 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
 
     // Send Email (Secondary Channel) if provided OR if identifier is email
     const targetEmail = email || (isEmailIdentifier ? identifier : undefined);
-    if (targetEmail) {
+    if (targetEmail && typeof targetEmail === 'string' && targetEmail.trim().length > 0) {
+      this.logger.log(`Attempting to send OTP email to: ${maskEmail(targetEmail)}`);
       await this.sendEmail(targetEmail, otpCode, ctx);
+    } else if (email !== undefined) {
+      // Email was explicitly passed but is invalid
+      this.logger.warn(
+        `Invalid email parameter: ${typeof email === 'string' ? maskEmail(email) : typeof email}`
+      );
     }
 
     return {

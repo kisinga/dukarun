@@ -71,12 +71,13 @@ export class PhoneAuthService {
     // Normalize phone number to 07XXXXXXXX format
     const formattedPhone = formatPhoneNumber(phoneNumber);
 
+    // Create context for DB access and email sending
+    // This is needed for email validation and for EventBus operations
+    const ctx = RequestContext.empty();
+
     // Validate email uniqueness if provided
     // This check happens BEFORE OTP to improve UX (fail fast)
     if (registrationData.adminEmail) {
-      // We create a system context because requestRegistrationOTP is public/unauthenticated
-      // and doesn't have a full RequestContext. The validator needs context for DB access.
-      const ctx = RequestContext.empty();
       await this.registrationValidator.validateAdminEmailUniqueness(
         ctx,
         registrationData.adminEmail,
@@ -91,12 +92,12 @@ export class PhoneAuthService {
       registrationData
     );
 
-    // Step 2: Request OTP
+    // Step 2: Request OTP - pass context for email sending
     // Note: No channel context during registration, so OTP won't be tracked
     const otpResult = await this.otpService.requestOTP(
       formattedPhone,
       'registration',
-      undefined,
+      ctx, // Pass context so emails can be sent
       undefined,
       registrationData.adminEmail // Pass email for dual channel sending
     );
@@ -121,8 +122,15 @@ export class PhoneAuthService {
     sessionId?: string;
     expiresAt?: number;
   }> {
-    // Validate email uniqueness
+    // Validate email parameter
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      throw new Error('Invalid email address provided');
+    }
+
+    // Create a system context for DB access and EventBus operations
+    // RequestContext.empty() is the standard pattern used throughout the codebase
     const ctx = RequestContext.empty();
+
     await this.registrationValidator.validateAdminEmailUniqueness(
       ctx,
       email,
@@ -136,13 +144,13 @@ export class PhoneAuthService {
       registrationData
     );
 
-    // Request OTP via Email
+    // Request OTP via Email - ensure email is passed correctly
     const otpResult = await this.otpService.requestOTP(
       email,
       'registration',
       ctx,
       undefined,
-      email // Pass the actual email address, not the string 'email'
+      email // Pass the actual email address
     );
 
     return {
