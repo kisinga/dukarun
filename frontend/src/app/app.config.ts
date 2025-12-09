@@ -54,8 +54,3 @@ export const appConfig: ApplicationConfig = {
     },
   ],
 };
-
-
-
-sudo ufw deny 3000
-sudo ufw allow from 197.248.147.97 to any port 3000

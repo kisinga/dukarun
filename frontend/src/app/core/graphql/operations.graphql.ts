@@ -192,6 +192,7 @@ export const GET_ACTIVE_CHANNEL = graphql(`
         }
         cashierFlowEnabled
         cashierOpen
+        enablePrinter
         subscriptionStatus
         trialEndsAt
         subscriptionExpiresAt
@@ -1912,6 +1913,7 @@ export const UPDATE_CHANNEL_SETTINGS = graphql(`
     updateChannelSettings(input: $input) {
       cashierFlowEnabled
       cashierOpen
+      enablePrinter
       companyLogoAsset {
         id
         source

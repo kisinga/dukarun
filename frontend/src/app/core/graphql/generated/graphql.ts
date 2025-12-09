@@ -613,6 +613,7 @@ export type ChannelCustomFields = {
   cashierFlowEnabled?: Maybe<Scalars['Boolean']['output']>;
   cashierOpen?: Maybe<Scalars['Boolean']['output']>;
   companyLogoAsset?: Maybe<Asset>;
+  enablePrinter?: Maybe<Scalars['Boolean']['output']>;
   eventConfig?: Maybe<Scalars['String']['output']>;
   lastPaymentAmount?: Maybe<Scalars['Int']['output']>;
   lastPaymentDate?: Maybe<Scalars['DateTime']['output']>;
@@ -630,6 +631,7 @@ export type ChannelCustomFields = {
   paystackSubscriptionCode?: Maybe<Scalars['String']['output']>;
   requireOpeningCount?: Maybe<Scalars['Boolean']['output']>;
   status?: Maybe<Scalars['String']['output']>;
+  subscriptionExpiredReminderSentAt?: Maybe<Scalars['DateTime']['output']>;
   subscriptionExpiresAt?: Maybe<Scalars['DateTime']['output']>;
   subscriptionStartedAt?: Maybe<Scalars['DateTime']['output']>;
   subscriptionStatus?: Maybe<Scalars['String']['output']>;
@@ -686,6 +688,7 @@ export type ChannelFilterParameter = {
   currencyCode?: InputMaybe<StringOperators>;
   defaultCurrencyCode?: InputMaybe<StringOperators>;
   defaultLanguageCode?: InputMaybe<StringOperators>;
+  enablePrinter?: InputMaybe<BooleanOperators>;
   eventConfig?: InputMaybe<StringOperators>;
   id?: InputMaybe<IdOperators>;
   lastPaymentAmount?: InputMaybe<NumberOperators>;
@@ -703,6 +706,7 @@ export type ChannelFilterParameter = {
   pricesIncludeTax?: InputMaybe<BooleanOperators>;
   requireOpeningCount?: InputMaybe<BooleanOperators>;
   status?: InputMaybe<StringOperators>;
+  subscriptionExpiredReminderSentAt?: InputMaybe<DateOperators>;
   subscriptionExpiresAt?: InputMaybe<DateOperators>;
   subscriptionStartedAt?: InputMaybe<DateOperators>;
   subscriptionStatus?: InputMaybe<StringOperators>;
@@ -737,6 +741,7 @@ export type ChannelSettings = {
   cashierFlowEnabled: Scalars['Boolean']['output'];
   cashierOpen: Scalars['Boolean']['output'];
   companyLogoAsset?: Maybe<Asset>;
+  enablePrinter: Scalars['Boolean']['output'];
 };
 
 export type ChannelSortParameter = {
@@ -771,6 +776,7 @@ export type ChannelSortParameter = {
   code?: InputMaybe<SortOrder>;
   companyLogoAsset?: InputMaybe<SortOrder>;
   createdAt?: InputMaybe<SortOrder>;
+  enablePrinter?: InputMaybe<SortOrder>;
   eventConfig?: InputMaybe<SortOrder>;
   id?: InputMaybe<SortOrder>;
   lastPaymentAmount?: InputMaybe<SortOrder>;
@@ -790,6 +796,7 @@ export type ChannelSortParameter = {
   paystackSubscriptionCode?: InputMaybe<SortOrder>;
   requireOpeningCount?: InputMaybe<SortOrder>;
   status?: InputMaybe<SortOrder>;
+  subscriptionExpiredReminderSentAt?: InputMaybe<SortOrder>;
   subscriptionExpiresAt?: InputMaybe<SortOrder>;
   subscriptionStartedAt?: InputMaybe<SortOrder>;
   subscriptionStatus?: InputMaybe<SortOrder>;
@@ -1150,6 +1157,7 @@ export type CreateChannelCustomFieldsInput = {
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
   companyLogoAssetId?: InputMaybe<Scalars['ID']['input']>;
+  enablePrinter?: InputMaybe<Scalars['Boolean']['input']>;
   eventConfig?: InputMaybe<Scalars['String']['input']>;
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
@@ -1167,6 +1175,7 @@ export type CreateChannelCustomFieldsInput = {
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
+  subscriptionExpiredReminderSentAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionExpiresAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionStartedAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionStatus?: InputMaybe<Scalars['String']['input']>;
@@ -3816,6 +3825,7 @@ export type Mutation = {
   removeShippingMethodsFromChannel: Array<ShippingMethod>;
   /** Removes StockLocations from the specified Channel */
   removeStockLocationsFromChannel: Array<StockLocation>;
+  requestEmailRegistrationOTP: OtpResponse;
   requestLoginOTP: OtpResponse;
   requestRegistrationOTP: OtpResponse;
   reviewCashCount: CashDrawerCount;
@@ -3862,6 +3872,7 @@ export type Mutation = {
   updateChannelAdmin: Administrator;
   updateChannelPaymentMethod: PaymentMethod;
   updateChannelSettings: ChannelSettings;
+  updateChannelStatus: Channel;
   /** Update an existing Collection */
   updateCollection: Collection;
   /** Update an existing Country */
@@ -3921,6 +3932,7 @@ export type Mutation = {
   updateTrainingStatus: Scalars['Boolean']['output'];
   /** Update an existing Zone */
   updateZone: Zone;
+  verifyEmailRegistrationOTP: RegistrationResult;
   verifyLoginOTP: LoginResult;
   verifyMpesaTransactions: MpesaVerification;
   verifyReconciliation: Reconciliation;
@@ -4556,6 +4568,11 @@ export type MutationRemoveStockLocationsFromChannelArgs = {
   input: RemoveStockLocationsFromChannelInput;
 };
 
+export type MutationRequestEmailRegistrationOtpArgs = {
+  email: Scalars['String']['input'];
+  registrationData: RegistrationInput;
+};
+
 export type MutationRequestLoginOtpArgs = {
   phoneNumber: Scalars['String']['input'];
 };
@@ -4687,6 +4704,11 @@ export type MutationUpdateChannelPaymentMethodArgs = {
 
 export type MutationUpdateChannelSettingsArgs = {
   input: UpdateChannelSettingsInput;
+};
+
+export type MutationUpdateChannelStatusArgs = {
+  channelId: Scalars['ID']['input'];
+  status: Scalars['String']['input'];
 };
 
 export type MutationUpdateCollectionArgs = {
@@ -4831,6 +4853,12 @@ export type MutationUpdateTrainingStatusArgs = {
 
 export type MutationUpdateZoneArgs = {
   input: UpdateZoneInput;
+};
+
+export type MutationVerifyEmailRegistrationOtpArgs = {
+  email: Scalars['String']['input'];
+  otp: Scalars['String']['input'];
+  sessionId: Scalars['String']['input'];
 };
 
 export type MutationVerifyLoginOtpArgs = {
@@ -7004,7 +7032,7 @@ export type RegistrationInput = {
   adminPhoneNumber: Scalars['String']['input'];
   companyName: Scalars['String']['input'];
   currency: Scalars['String']['input'];
-  storeAddress?: InputMaybe<Scalars['String']['input']>;
+  storeAddress: Scalars['String']['input'];
   storeName: Scalars['String']['input'];
 };
 
@@ -8135,6 +8163,7 @@ export type UpdateChannelCustomFieldsInput = {
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
   companyLogoAssetId?: InputMaybe<Scalars['ID']['input']>;
+  enablePrinter?: InputMaybe<Scalars['Boolean']['input']>;
   eventConfig?: InputMaybe<Scalars['String']['input']>;
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
@@ -8152,6 +8181,7 @@ export type UpdateChannelCustomFieldsInput = {
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
+  subscriptionExpiredReminderSentAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionExpiresAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionStartedAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionStatus?: InputMaybe<Scalars['String']['input']>;
@@ -8183,6 +8213,7 @@ export type UpdateChannelSettingsInput = {
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
   companyLogoAssetId?: InputMaybe<Scalars['ID']['input']>;
+  enablePrinter?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export type UpdateCollectionInput = {
@@ -8813,6 +8844,7 @@ export type GetActiveChannelQuery = {
       __typename?: 'ChannelCustomFields';
       cashierFlowEnabled?: boolean | null;
       cashierOpen?: boolean | null;
+      enablePrinter?: boolean | null;
       subscriptionStatus?: string | null;
       trialEndsAt?: any | null;
       subscriptionExpiresAt?: any | null;
@@ -10642,6 +10674,7 @@ export type UpdateChannelSettingsMutation = {
     __typename?: 'ChannelSettings';
     cashierFlowEnabled: boolean;
     cashierOpen: boolean;
+    enablePrinter: boolean;
     companyLogoAsset?: { __typename?: 'Asset'; id: string; source: string; preview: string } | null;
   };
 };
@@ -12307,6 +12340,7 @@ export const GetActiveChannelDocument = {
                       },
                       { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'cashierOpen' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'subscriptionStatus' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'trialEndsAt' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'subscriptionExpiresAt' } },
@@ -17979,6 +18013,7 @@ export const UpdateChannelSettingsDocument = {
               selections: [
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierOpen' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'companyLogoAsset' },

@@ -13,8 +13,10 @@ import { CartService } from '../../../core/services/cart.service';
 import { CustomerService } from '../../../core/services/customer.service';
 import { CompanyService } from '../../../core/services/company.service';
 import { OrderService } from '../../../core/services/order.service';
+import { OrdersService } from '../../../core/services/orders.service';
 import { ApolloService } from '../../../core/services/apollo.service';
 import { CurrencyService } from '../../../core/services/currency.service';
+import { PrintService } from '../../../core/services/print.service';
 import {
   ProductSearchResult,
   ProductSearchService,
@@ -70,15 +72,18 @@ export class SellComponent implements OnInit, OnDestroy {
   private readonly companyService = inject(CompanyService);
   private readonly stockLocationService = inject(StockLocationService);
   private readonly orderService = inject(OrderService);
+  private readonly ordersService = inject(OrdersService);
   private readonly authService = inject(AuthService);
   private readonly cartService = inject(CartService);
   private readonly customerService = inject(CustomerService);
   private readonly apolloService = inject(ApolloService);
   private readonly currencyService = inject(CurrencyService);
+  private readonly printService = inject(PrintService);
 
   // Configuration
   readonly channelId = computed(() => this.companyService.activeCompanyId() || 'T_1');
-  readonly cashierFlowEnabled = this.stockLocationService.cashierFlowEnabled;
+  readonly cashierFlowEnabled = computed(() => this.stockLocationService.cashierFlowEnabled());
+  readonly enablePrinter = computed(() => this.companyService.enablePrinter());
 
   // Search state
   readonly searchTerm = signal<string>('');
@@ -700,6 +705,14 @@ export class SellComponent implements OnInit, OnDestroy {
   }
 
   async handleCompleteCredit(): Promise<void> {
+    await this.processCreditSale(false);
+  }
+
+  async handleCompleteCreditAndPrint(): Promise<void> {
+    await this.processCreditSale(true);
+  }
+
+  private async processCreditSale(shouldPrint: boolean): Promise<void> {
     if (!this.selectedCustomer()) {
       this.checkoutError.set('Please select or create a customer');
       return;
@@ -776,7 +789,24 @@ export class SellComponent implements OnInit, OnDestroy {
         'success',
       );
 
+      // Handle printing if requested
+      if (shouldPrint) {
+        try {
+          // Fetch full order data for printing
+          const fullOrder = await this.ordersService.fetchOrderById(order.id);
+          if (fullOrder) {
+            await this.printService.printOrder(fullOrder);
+          } else {
+            this.showNotification('Order created but printing failed', 'warning');
+          }
+        } catch (printError) {
+          console.error('Failed to print order:', printError);
+          this.showNotification('Order created but printing failed', 'warning');
+        }
+      }
+
       // Delay closing modal to allow success animation to display (3 seconds - optimized timing)
+      // Start timeout AFTER print completes (if printing) to ensure user can interact with print dialog
       setTimeout(() => {
         // Clear cart using CartService for persistence
         this.cartService.clearCart();
@@ -794,6 +824,14 @@ export class SellComponent implements OnInit, OnDestroy {
   }
 
   async handleCompleteCash(): Promise<void> {
+    await this.processCashSale(false);
+  }
+
+  async handleCompleteCashAndPrint(): Promise<void> {
+    await this.processCashSale(true);
+  }
+
+  private async processCashSale(shouldPrint: boolean): Promise<void> {
     if (!this.selectedPaymentMethod()) {
       this.checkoutError.set('Please select a payment method');
       return;
@@ -829,7 +867,24 @@ export class SellComponent implements OnInit, OnDestroy {
       const customerMsg = selectedCustomer ? ` for ${selectedCustomer.name}` : '';
       this.showNotification(`Order ${order.code} created${customerMsg}`, 'success');
 
+      // Handle printing if requested
+      if (shouldPrint) {
+        try {
+          // Fetch full order data for printing
+          const fullOrder = await this.ordersService.fetchOrderById(order.id);
+          if (fullOrder) {
+            await this.printService.printOrder(fullOrder);
+          } else {
+            this.showNotification('Order created but printing failed', 'warning');
+          }
+        } catch (printError) {
+          console.error('Failed to print order:', printError);
+          this.showNotification('Order created but printing failed', 'warning');
+        }
+      }
+
       // Delay closing modal to allow success animation to display (3 seconds - optimized timing)
+      // Start timeout AFTER print completes (if printing) to ensure user can interact with print dialog
       setTimeout(() => {
         // Clear cart using CartService for persistence
         this.cartService.clearCart();

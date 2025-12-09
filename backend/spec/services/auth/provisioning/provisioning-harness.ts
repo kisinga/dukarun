@@ -28,7 +28,10 @@ import {
   StockLocationService,
   TransactionalConnection,
 } from '@vendure/core';
-import { RegistrationInput, RegistrationService } from '../../../../src/services/auth/registration.service';
+import {
+  RegistrationInput,
+  RegistrationService,
+} from '../../../../src/services/auth/registration.service';
 
 /**
  * Expected provisioning result structure
@@ -66,6 +69,7 @@ export function createTestRegistrationInput(
     adminLastName: 'Doe',
     adminPhoneNumber: '0712345678',
     storeName: 'Main Store',
+    storeAddress: 'Test Address',
     ...overrides,
   };
 }

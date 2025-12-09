@@ -17,6 +17,7 @@ import { CompanyService } from './company.service';
 export interface ChannelSettings {
   cashierFlowEnabled: boolean;
   cashierOpen: boolean;
+  enablePrinter: boolean;
   companyLogoAsset?: {
     id: string;
     source: string;
@@ -59,6 +60,7 @@ export interface PaymentMethod {
 export interface UpdateChannelSettingsInput {
   cashierFlowEnabled?: boolean;
   cashierOpen?: boolean;
+  enablePrinter?: boolean;
   companyLogoAssetId?: string | null;
 }
 
@@ -136,12 +138,14 @@ export class SettingsService {
     return {
       cashierFlowEnabled: customFields.cashierFlowEnabled ?? false,
       cashierOpen: customFields.cashierOpen ?? false,
+      enablePrinter: customFields.enablePrinter ?? true,
       companyLogoAsset: customFields.companyLogoAsset ?? null,
     };
   });
 
   readonly cashierFlowEnabled = this.companyService.cashierFlowEnabled;
   readonly cashierOpen = this.companyService.cashierOpen;
+  readonly enablePrinter = this.companyService.enablePrinter;
   readonly companyLogoAsset = this.companyService.companyLogoAsset;
 
   readonly loading = signal(false);

@@ -129,6 +129,15 @@ export class CompanyService {
   });
 
   /**
+   * Printer enabled for the active channel
+   * Controls whether "Complete & Print" button is shown at checkout
+   */
+  readonly enablePrinter = computed(() => {
+    const channelData = this.activeChannelDataSignal();
+    return channelData?.customFields?.enablePrinter ?? true;
+  });
+
+  /**
    * Company display name (truncated to max 10 characters)
    * Used in navbar to show active shop name
    */

@@ -1,11 +1,12 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
-import { RequestContext } from '@vendure/core';
+import { RequestContext, EventBus } from '@vendure/core';
 import Redis from 'ioredis';
 import { BRAND_CONFIG } from '../../constants/brand.constants';
 import { env } from '../../infrastructure/config/environment.config';
 import { ChannelSmsService } from '../../infrastructure/events/channel-sms.service';
 import { SmsService } from '../../infrastructure/sms/sms.service';
 import { formatPhoneNumber } from '../../utils/phone.utils';
+import { OtpEmailEvent } from '../../events/otp-email.event';
 
 /**
  * OTP Service
@@ -28,6 +29,7 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly smsService: SmsService,
+    private readonly eventBus: EventBus,
     @Optional() private readonly channelSmsService?: ChannelSmsService // Optional to avoid circular dependency
   ) {
     // Initialize production mode check using EnvironmentConfig
@@ -205,30 +207,55 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Send OTP via Email
+   */
+  private async sendEmail(email: string, otp: string, ctx?: RequestContext): Promise<void> {
+    if (!ctx) {
+      this.logger.error('Cannot send OTP email without RequestContext');
+      return;
+    }
+
+    try {
+      this.eventBus.publish(new OtpEmailEvent(ctx, email, otp));
+    } catch (error) {
+      this.logger.error('Email sending error:', error);
+    }
+  }
+
+  /**
    * Request OTP for phone number
+   * Request OTP for phone number (and optionally email)
    */
   async requestOTP(
-    phoneNumber: string,
+    identifier: string,
     purpose: 'registration' | 'login' = 'login',
     ctx?: RequestContext,
-    channelId?: string
+    channelId?: string,
+    email?: string
   ): Promise<{
     success: boolean;
     message: string;
     expiresAt?: number;
   }> {
-    const normalizedPhone = formatPhoneNumber(phoneNumber);
-    phoneNumber = normalizedPhone;
+    // Determine if identifier is email or phone
+    const isEmailIdentifier = identifier.includes('@');
+    let storageKey: string;
 
-    await this.isRateLimited(phoneNumber);
+    if (isEmailIdentifier) {
+      storageKey = identifier;
+    } else {
+      storageKey = formatPhoneNumber(identifier);
+    }
+
+    await this.isRateLimited(storageKey);
 
     const otpCode = this.generateOTP();
     const expiresAt = Date.now() + this.OTP_EXPIRY_SECONDS * 1000;
 
     if (this.redis) {
       try {
-        const otpKey = this.getOTPKey(phoneNumber);
-        const attemptsKey = this.getAttemptsKey(phoneNumber);
+        const otpKey = this.getOTPKey(storageKey);
+        const attemptsKey = this.getAttemptsKey(storageKey);
 
         await this.redis.setex(otpKey, this.OTP_EXPIRY_SECONDS, otpCode);
         await this.redis.setex(attemptsKey, this.OTP_EXPIRY_SECONDS, '0');
@@ -238,10 +265,19 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    await this.updateRateLimit(phoneNumber);
+    await this.updateRateLimit(storageKey);
 
-    const message = `Your ${BRAND_CONFIG.name} verification code is: ${otpCode} Valid for 5 minutes.`;
-    await this.sendSMS(phoneNumber, message, ctx, channelId);
+    // Send SMS (Primary Channel) - Only if it's a phone number
+    if (!isEmailIdentifier) {
+      const message = `Your ${BRAND_CONFIG.name} verification code is: ${otpCode} Valid for 5 minutes.`;
+      await this.sendSMS(storageKey, message, ctx, channelId);
+    }
+
+    // Send Email (Secondary Channel) if provided OR if identifier is email
+    const targetEmail = email || (isEmailIdentifier ? identifier : undefined);
+    if (targetEmail) {
+      await this.sendEmail(targetEmail, otpCode, ctx);
+    }
 
     return {
       success: true,
@@ -254,15 +290,22 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
    * Verify OTP code
    */
   async verifyOTP(
-    phoneNumber: string,
+    identifier: string,
     otp: string
   ): Promise<{
     valid: boolean;
     message: string;
   }> {
-    // Normalize phone number to 07XXXXXXXX format
-    const normalizedPhone = formatPhoneNumber(phoneNumber);
-    phoneNumber = normalizedPhone;
+    // Determine if identifier is email or phone
+    const isEmailIdentifier = identifier.includes('@');
+    let storageKey: string;
+
+    if (isEmailIdentifier) {
+      storageKey = identifier;
+    } else {
+      // Normalize phone number to 07XXXXXXXX format
+      storageKey = formatPhoneNumber(identifier);
+    }
 
     if (!this.redis) {
       return {
@@ -272,8 +315,8 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      const otpKey = this.getOTPKey(phoneNumber);
-      const attemptsKey = this.getAttemptsKey(phoneNumber);
+      const otpKey = this.getOTPKey(storageKey);
+      const attemptsKey = this.getAttemptsKey(storageKey);
 
       // Get stored OTP
       const storedOTP = await this.redis.get(otpKey);
@@ -340,11 +383,11 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
   /**
    * Get remaining time until rate limit resets (in seconds)
    */
-  async getRateLimitRemaining(phoneNumber: string): Promise<number> {
+  async getRateLimitRemaining(identifier: string): Promise<number> {
     if (!this.redis) return 0;
 
     try {
-      const key = this.getRateLimitKey(phoneNumber);
+      const key = this.getRateLimitKey(identifier);
       const ttl = await this.redis.ttl(key);
       return Math.max(0, ttl);
     } catch (error) {
@@ -356,11 +399,11 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
   /**
    * Get OTP expiry time remaining (in seconds)
    */
-  async getOTPExpiryRemaining(phoneNumber: string): Promise<number> {
+  async getOTPExpiryRemaining(identifier: string): Promise<number> {
     if (!this.redis) return 0;
 
     try {
-      const key = this.getOTPKey(phoneNumber);
+      const key = this.getOTPKey(identifier);
       const ttl = await this.redis.ttl(key);
       return Math.max(0, ttl);
     } catch (error) {

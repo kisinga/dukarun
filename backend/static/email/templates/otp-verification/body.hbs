@@ -1,0 +1,17 @@
+{{> header title="Verify Your Email" }}
+
+<mj-text font-size="16px" color="#333" font-family="Arial, sans-serif">
+    <h3>Hello,</h3>
+    <p>Thank you for registering with DukaRun. To complete your registration, please verify your email address using the code below:</p>
+</mj-text>
+
+<mj-text font-size="32px" font-weight="bold" align="center" color="#007bff" letter-spacing="5px" padding="20px 0">
+    {{ otp }}
+</mj-text>
+
+<mj-text font-size="16px" color="#555" font-family="Arial, sans-serif">
+    <p>This code will expire in 5 minutes.</p>
+    <p>If you did not request this code, please ignore this email.</p>
+</mj-text>
+
+{{> footer }}
