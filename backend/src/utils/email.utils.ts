@@ -35,3 +35,23 @@ export function generatePaystackEmailFromPhone(phoneNumber: string): string {
 
   return `${emailLocalPart}@dukahub.com`;
 }
+
+/**
+ * Mask an email address for secure logging
+ *
+ * Shows only the first 3 characters of the local part and the full domain
+ * Example: john.doe@example.com -> joh***@example.com
+ *
+ * @param email - Email address to mask
+ * @returns Masked email address
+ */
+export function maskEmail(email: string): string {
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return '***';
+  }
+
+  const [localPart, domain] = email.split('@');
+  const maskedLocal = localPart.length > 3 ? `${localPart.substring(0, 3)}***` : '***';
+
+  return `${maskedLocal}@${domain}`;
+}
