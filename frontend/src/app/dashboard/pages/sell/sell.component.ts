@@ -130,6 +130,7 @@ export class SellComponent implements OnInit, OnDestroy {
   readonly checkoutType = signal<CheckoutType>(null);
   readonly isProcessingCheckout = signal<boolean>(false);
   readonly checkoutError = signal<string | null>(null);
+  readonly successTrigger = signal<{ amount: number; method: string } | null>(null);
 
   // Customer state (for credit sales)
   readonly selectedCustomer = signal<Customer | null>(null);
@@ -783,6 +784,9 @@ export class SellComponent implements OnInit, OnDestroy {
         // Continue even if refresh fails - order is still created
       }
 
+      // Trigger success animation
+      this.successTrigger.set({ amount: this.cartTotal(), method: 'Credit Sale' });
+
       // Show success animation first, then close modal after delay
       this.showNotification(
         `Credit sale created for ${customerName} - Order ${order.code}`,
@@ -805,14 +809,15 @@ export class SellComponent implements OnInit, OnDestroy {
         }
       }
 
-      // Delay closing modal to allow success animation to display (3 seconds - optimized timing)
+      // Delay closing modal to allow success animation to display (2 seconds)
       // Start timeout AFTER print completes (if printing) to ensure user can interact with print dialog
       setTimeout(() => {
         // Clear cart using CartService for persistence
         this.cartService.clearCart();
         this.cartItems.set([]);
         this.showCheckoutModal.set(false);
-      }, 3000);
+        this.successTrigger.set(null); // Reset trigger
+      }, 2000);
 
       // Don't clear selected customer - keep it visible so user can see updated credit amounts
     } catch (error) {
@@ -863,6 +868,11 @@ export class SellComponent implements OnInit, OnDestroy {
 
       console.log('✅ Order created:', order.code);
 
+      // Trigger success animation
+      // We don't have easy access to payment method name here, so just use the code
+      const methodName = this.selectedPaymentMethod() || 'Cash';
+      this.successTrigger.set({ amount: this.cartTotal(), method: methodName });
+
       // Show success animation first, then close modal after delay
       const customerMsg = selectedCustomer ? ` for ${selectedCustomer.name}` : '';
       this.showNotification(`Order ${order.code} created${customerMsg}`, 'success');
@@ -883,14 +893,15 @@ export class SellComponent implements OnInit, OnDestroy {
         }
       }
 
-      // Delay closing modal to allow success animation to display (3 seconds - optimized timing)
+      // Delay closing modal to allow success animation to display (2 seconds)
       // Start timeout AFTER print completes (if printing) to ensure user can interact with print dialog
       setTimeout(() => {
         // Clear cart using CartService for persistence
         this.cartService.clearCart();
         this.cartItems.set([]);
         this.showCheckoutModal.set(false);
-      }, 3000);
+        this.successTrigger.set(null); // Reset trigger
+      }, 2000);
     } catch (error) {
       console.error('❌ Cash sale failed:', error);
       this.checkoutError.set('Failed to complete sale. Please try again.');

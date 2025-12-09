@@ -1460,7 +1460,7 @@ export const config: VendureConfig = {
       },
     }),
     AdminUiPlugin.init({
-      route: 'admin',
+      route: '',
       port: serverPort + 2,
       adminUiConfig: {
         apiPort: serverPort,
