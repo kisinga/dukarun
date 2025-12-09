@@ -6,6 +6,7 @@ import {
   TransactionalConnection,
   User,
   UserService,
+  Administrator,
 } from '@vendure/core';
 import { IsNull } from 'typeorm';
 import { ChannelStatus, getChannelStatus } from '../../domain/channel-custom-fields';
@@ -46,7 +47,7 @@ export class PhoneAuthService {
     private readonly registrationValidator: RegistrationValidatorService,
     private readonly registrationStorageService: RegistrationStorageService,
     private readonly connection: TransactionalConnection
-  ) { }
+  ) {}
 
   /**
    * Store registration data and request OTP
@@ -92,7 +93,57 @@ export class PhoneAuthService {
 
     // Step 2: Request OTP
     // Note: No channel context during registration, so OTP won't be tracked
-    const otpResult = await this.otpService.requestOTP(formattedPhone, 'registration');
+    const otpResult = await this.otpService.requestOTP(
+      formattedPhone,
+      'registration',
+      undefined,
+      undefined,
+      registrationData.adminEmail // Pass email for dual channel sending
+    );
+
+    return {
+      success: otpResult.success,
+      message: otpResult.message,
+      sessionId,
+      expiresAt: expiresAt || otpResult.expiresAt,
+    };
+  }
+
+  /**
+   * Store registration data and request Email OTP
+   */
+  async requestEmailRegistrationOTP(
+    email: string,
+    registrationData: RegistrationInput
+  ): Promise<{
+    success: boolean;
+    message: string;
+    sessionId?: string;
+    expiresAt?: number;
+  }> {
+    // Validate email uniqueness
+    const ctx = RequestContext.empty();
+    await this.registrationValidator.validateAdminEmailUniqueness(
+      ctx,
+      email,
+      undefined,
+      undefined // No phone number check for email registration
+    );
+
+    // Store registration data
+    const { sessionId, expiresAt } = await this.registrationStorageService.storeRegistrationData(
+      email,
+      registrationData
+    );
+
+    // Request OTP via Email
+    const otpResult = await this.otpService.requestOTP(
+      email,
+      'registration',
+      ctx,
+      undefined,
+      email // Pass the actual email address, not the string 'email'
+    );
 
     return {
       success: otpResult.success,
@@ -128,11 +179,18 @@ export class PhoneAuthService {
 
       // Account exists - proceed with sending OTP
       // Pass context and channelId for tracking if available
+      // Check if user has an associated administrator to get email
+      const administrator = await this.connection.getRepository(ctx, Administrator).findOne({
+        where: { user: { id: existingUser.id } },
+      });
+
+      // Pass context and channelId for tracking if available
       return await this.otpService.requestOTP(
         formattedPhone,
         'login',
         ctx,
-        ctx.channelId?.toString()
+        ctx.channelId?.toString(),
+        administrator?.emailAddress // Pass email for dual channel sending
       );
     } catch (error: any) {
       throw new Error(error?.message || 'Failed to request OTP');
@@ -229,6 +287,74 @@ export class PhoneAuthService {
   }
 
   /**
+   * Verify email registration OTP and create account
+   */
+  async verifyEmailRegistrationOTP(
+    ctx: RequestContext,
+    email: string,
+    otp: string,
+    sessionId: string
+  ): Promise<{
+    success: boolean;
+    userId?: string;
+    message: string;
+  }> {
+    // Step 1: Verify OTP
+    const verification = await this.otpService.verifyOTP(email, otp);
+    if (!verification.valid) {
+      throw new Error(verification.message);
+    }
+
+    // Step 2: Retrieve registration data
+    const registrationData =
+      await this.registrationStorageService.retrieveRegistrationData(sessionId);
+    if (!registrationData) {
+      throw new Error('Registration data not found or expired. Please start registration again.');
+    }
+
+    // Step 3: Load existing user if any
+    const existingUser = await this.userService.getUserByEmailAddress(ctx, email);
+
+    // Step 4: Create entities in transaction
+    const provisionResult = await this.connection.withTransaction(ctx, async transactionCtx => {
+      return await withSuperadminUser(
+        transactionCtx,
+        this.userService,
+        this.connection,
+        async adminCtx => {
+          return await this.registrationService.provisionCustomer(
+            adminCtx,
+            registrationData,
+            existingUser
+          );
+        }
+      );
+    });
+
+    const userRepo = this.connection.getRepository(ctx, User);
+
+    if (!existingUser) {
+      const createdUser = await userRepo.findOne({ where: { id: provisionResult.userId } });
+      if (createdUser) {
+        const updatedCustomFields = {
+          ...(createdUser.customFields as Record<string, unknown> | undefined),
+          authorizationStatus: AuthorizationStatus.PENDING,
+        };
+        (createdUser as any).customFields = updatedCustomFields;
+        createdUser.identifier = email;
+        await userRepo.save(createdUser);
+      }
+    }
+
+    return {
+      success: true,
+      userId: provisionResult.userId,
+      message:
+        'Registration successful. Your account is pending admin approval. Please login to continue.',
+    };
+  }
+
+  /**
    * Verify login OTP
    *
    * Two-tier authorization:
@@ -266,7 +392,7 @@ export class PhoneAuthService {
     const user = await this.connection.getRepository(ctx, User).findOne({
       where: {
         identifier: formattedPhone,
-        deletedAt: IsNull() // Exclude soft-deleted users
+        deletedAt: IsNull(), // Exclude soft-deleted users
       },
       relations: ['roles', 'roles.channels'],
     });
@@ -398,10 +524,7 @@ export class PhoneAuthService {
    * Check if company code is available (for frontend validation)
    * Returns true if available, false if taken
    */
-  async checkCompanyCodeAvailability(
-    ctx: RequestContext,
-    companyCode: string
-  ): Promise<boolean> {
+  async checkCompanyCodeAvailability(ctx: RequestContext, companyCode: string): Promise<boolean> {
     return this.registrationValidator.checkCompanyCodeAvailability(ctx, companyCode);
   }
 

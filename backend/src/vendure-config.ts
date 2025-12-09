@@ -12,6 +12,7 @@ import {
   VendureConfig,
 } from '@vendure/core';
 import { defaultEmailHandlers, EmailPlugin, FileBasedTemplateLoader } from '@vendure/email-plugin';
+import { otpEmailHandler } from './config/email/otp-email-handler';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
 import { Request, Response } from 'express';
 import path from 'path';
@@ -335,6 +336,21 @@ export const config: VendureConfig = {
         ],
         defaultValue: 100,
         public: false,
+        nullable: false,
+        ui: { tab: 'Settings' },
+      },
+      {
+        name: 'enablePrinter',
+        type: 'boolean',
+        label: [{ languageCode: LanguageCode.en, value: 'Enable Printer' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'When enabled, shows "Complete & Print" button at checkout',
+          },
+        ],
+        defaultValue: true,
+        public: true,
         nullable: false,
         ui: { tab: 'Settings' },
       },
@@ -1411,17 +1427,33 @@ export const config: VendureConfig = {
     DefaultJobQueuePlugin.init({ useDatabaseForBuffer: true }),
     DefaultSearchPlugin.init({ bufferUpdates: false, indexStockStatus: true }),
     EmailPlugin.init({
-      devMode: true,
+      devMode: (!IS_PRODUCTION && env.email.transport !== 'smtp') as any,
       outputPath: path.join(process.cwd(), 'static/email/test-emails'),
       route: 'mailbox',
-      handlers: defaultEmailHandlers,
+      handlers: [...defaultEmailHandlers, otpEmailHandler],
       templateLoader: new FileBasedTemplateLoader(
         path.join(process.cwd(), 'static/email/templates')
       ),
+      transport:
+        IS_PRODUCTION || env.email.transport === 'smtp'
+          ? {
+              type: 'smtp',
+              host: env.email.smtpHost,
+              port: env.email.smtpPort,
+              secure: env.email.smtpPort === 465,
+              auth: {
+                user: env.email.smtpUser,
+                pass: env.email.smtpPass,
+              },
+            }
+          : {
+              type: 'file',
+              outputPath: path.join(process.cwd(), 'static/email/test-emails'),
+            },
       globalTemplateVars: {
         // The following variables will change depending on your storefront implementation.
         // Here we are assuming a storefront running at http://localhost:8080.
-        fromAddress: '"example" <noreply@example.com>',
+        fromAddress: '"DukaRun" <hello@dukarun.com>',
         verifyEmailAddressUrl: 'http://localhost:8080/verify',
         passwordResetUrl: 'http://localhost:8080/password-reset',
         changeEmailAddressUrl: 'http://localhost:8080/verify-email-address-change',

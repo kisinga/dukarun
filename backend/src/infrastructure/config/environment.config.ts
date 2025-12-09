@@ -49,6 +49,15 @@ export class EnvironmentConfig implements OnModuleInit {
     assetUrlPrefix: '',
   };
 
+  // Email configuration
+  readonly email = {
+    transport: 'file',
+    smtpHost: '',
+    smtpPort: 587,
+    smtpUser: '',
+    smtpPass: '',
+  };
+
   // Redis configuration
   readonly redis = {
     host: '',
@@ -194,6 +203,13 @@ export class EnvironmentConfig implements OnModuleInit {
     this.app.cookieSecure = process.env.COOKIE_SECURE === 'true';
     this.app.frontendUrl = process.env.FRONTEND_URL || '';
     this.app.assetUrlPrefix = process.env.ASSET_URL_PREFIX || '';
+
+    // Load Email configuration
+    this.email.transport = process.env.MAIL_TRANSPORT || 'file';
+    this.email.smtpHost = process.env.SMTP_HOST || '';
+    this.email.smtpPort = +(process.env.SMTP_PORT || 587);
+    this.email.smtpUser = process.env.SMTP_USER || '';
+    this.email.smtpPass = process.env.SMTP_PASS || '';
 
     // Load Redis configuration
     this.redis.host = process.env.REDIS_HOST || 'localhost';

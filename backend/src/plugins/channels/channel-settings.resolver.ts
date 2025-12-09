@@ -28,6 +28,7 @@ export const channelSettingsSchema = gql`
   type ChannelSettings {
     cashierFlowEnabled: Boolean!
     cashierOpen: Boolean!
+    enablePrinter: Boolean!
     companyLogoAsset: Asset
   }
 
@@ -46,6 +47,7 @@ export const channelSettingsSchema = gql`
   input UpdateChannelSettingsInput {
     cashierFlowEnabled: Boolean
     cashierOpen: Boolean
+    enablePrinter: Boolean
     companyLogoAssetId: ID
   }
 

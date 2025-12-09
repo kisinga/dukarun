@@ -32,12 +32,14 @@ import { getChannelStatus } from '../../domain/channel-custom-fields';
 export interface ChannelSettings {
   cashierFlowEnabled: boolean;
   cashierOpen: boolean;
+  enablePrinter: boolean;
   companyLogoAsset?: Asset | null;
 }
 
 export interface UpdateChannelSettingsInput {
   cashierFlowEnabled?: boolean | null;
   cashierOpen?: boolean | null;
+  enablePrinter?: boolean | null;
   companyLogoAssetId?: string | null;
 }
 
@@ -94,6 +96,7 @@ export class ChannelSettingsService {
       cashierFlowEnabled?: boolean;
       cashierOpen?: boolean;
       cashControlEnabled?: boolean;
+      enablePrinter?: boolean;
       companyLogoAsset?: Asset | null;
     };
 
@@ -136,6 +139,10 @@ export class ChannelSettingsService {
       current.cashierOpen !== false
     ) {
       customFieldsUpdate.cashierOpen = false;
+    }
+
+    if (input.enablePrinter !== undefined && input.enablePrinter !== current.enablePrinter) {
+      customFieldsUpdate.enablePrinter = input.enablePrinter;
     }
 
     if (input.companyLogoAssetId !== undefined) {
@@ -854,12 +861,14 @@ export class ChannelSettingsService {
     const customFields = (channel.customFields ?? {}) as {
       cashierFlowEnabled?: boolean;
       cashierOpen?: boolean;
+      enablePrinter?: boolean;
       companyLogoAsset?: Asset | null;
     };
 
     return {
       cashierFlowEnabled: customFields.cashierFlowEnabled ?? false,
       cashierOpen: customFields.cashierOpen ?? false,
+      enablePrinter: customFields.enablePrinter ?? true,
       companyLogoAsset: customFields.companyLogoAsset ?? null,
     };
   }

@@ -52,9 +52,15 @@ export const phoneAuthSchema = gql`
     # NEW: Store registration data and request OTP
     # Returns sessionId that must be used during verification
     requestRegistrationOTP(phoneNumber: String!, registrationData: RegistrationInput!): OTPResponse!
+    requestEmailRegistrationOTP(email: String!, registrationData: RegistrationInput!): OTPResponse!
     # UPDATED: Now uses sessionId instead of registrationData
     verifyRegistrationOTP(
       phoneNumber: String!
+      otp: String!
+      sessionId: String!
+    ): RegistrationResult!
+    verifyEmailRegistrationOTP(
+      email: String!
       otp: String!
       sessionId: String!
     ): RegistrationResult!
@@ -70,7 +76,7 @@ export const phoneAuthSchema = gql`
 
 @Resolver()
 export class PhoneAuthResolver {
-  constructor(private phoneAuthService: PhoneAuthService) { }
+  constructor(private phoneAuthService: PhoneAuthService) {}
 
   // Helper to get Request/Response from context
   private getRequestFromContext(ctx: RequestContext): { req: Request; res: Response } | null {
@@ -92,6 +98,16 @@ export class PhoneAuthResolver {
 
   @Mutation()
   @Allow(Permission.Public)
+  async requestEmailRegistrationOTP(
+    @Ctx() ctx: RequestContext,
+    @Args('email') email: string,
+    @Args('registrationData') registrationData: RegistrationInput
+  ) {
+    return this.phoneAuthService.requestEmailRegistrationOTP(email, registrationData);
+  }
+
+  @Mutation()
+  @Allow(Permission.Public)
   async verifyRegistrationOTP(
     @Ctx() ctx: RequestContext,
     @Args('phoneNumber') phoneNumber: string,
@@ -99,6 +115,17 @@ export class PhoneAuthResolver {
     @Args('sessionId') sessionId: string
   ) {
     return this.phoneAuthService.verifyRegistrationOTP(ctx, phoneNumber, otp, sessionId);
+  }
+
+  @Mutation()
+  @Allow(Permission.Public)
+  async verifyEmailRegistrationOTP(
+    @Ctx() ctx: RequestContext,
+    @Args('email') email: string,
+    @Args('otp') otp: string,
+    @Args('sessionId') sessionId: string
+  ) {
+    return this.phoneAuthService.verifyEmailRegistrationOTP(ctx, email, otp, sessionId);
   }
 
   @Mutation()

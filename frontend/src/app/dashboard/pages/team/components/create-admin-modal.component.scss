@@ -115,13 +115,13 @@
 
   // Button spacing
   .btn {
+    // Ensure touch target size
+    min-height: 44px;
+
     // Full width on mobile, auto on desktop
     @media (max-width: 640px) {
       width: 100%;
     }
-
-    // Ensure touch target size
-    min-height: 44px;
   }
 }
 

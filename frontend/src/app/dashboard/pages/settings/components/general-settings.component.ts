@@ -33,9 +33,7 @@ import {
               </div>
               <div class="flex flex-col gap-2">
                 <span class="text-sm text-primary font-medium">New logo selected</span>
-                <button class="btn btn-xs btn-error" (click)="removeSelectedLogo()">
-                  Remove
-                </button>
+                <button class="btn btn-xs btn-error" (click)="removeSelectedLogo()">Remove</button>
               </div>
             } @else if (companyLogoAsset(); as logoAsset) {
               <!-- WORKAROUND: Use CompanyService logo due to SettingsService custom field relation loading issues -->
@@ -47,9 +45,7 @@ import {
               <div class="flex flex-col gap-2">
                 <span class="text-sm text-success">Current logo</span>
                 <div class="flex gap-1">
-                  <button class="btn btn-xs btn-outline" (click)="selectLogoFile()">
-                    Change
-                  </button>
+                  <button class="btn btn-xs btn-outline" (click)="selectLogoFile()">Change</button>
                   <button class="btn btn-xs btn-error" (click)="removeExistingLogo()">
                     Remove
                   </button>
@@ -75,9 +71,7 @@ import {
               </div>
               <div class="flex flex-col gap-2">
                 <span class="text-sm text-base-content/60">No logo set</span>
-                <button class="btn btn-xs btn-primary" (click)="selectLogoFile()">
-                  Add Logo
-                </button>
+                <button class="btn btn-xs btn-primary" (click)="selectLogoFile()">Add Logo</button>
               </div>
             }
           </div>
@@ -120,6 +114,22 @@ import {
             </label>
           </div>
         }
+
+        <!-- Printer Toggle -->
+        <div class="form-control">
+          <label class="label cursor-pointer">
+            <span class="label-text">
+              <div class="font-semibold">Enable Printer</div>
+              <div class="text-xs opacity-70">Show "Complete & Print" button at checkout</div>
+            </span>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary"
+              [checked]="settings()?.enablePrinter"
+              (change)="togglePrinter($event)"
+            />
+          </label>
+        </div>
 
         <!-- Save Button -->
         <div class="card-actions justify-end">
@@ -209,6 +219,7 @@ export class GeneralSettingsComponent {
     return (
       a.cashierFlowEnabled === b.cashierFlowEnabled &&
       a.cashierOpen === b.cashierOpen &&
+      a.enablePrinter === b.enablePrinter &&
       (a.companyLogoAsset?.id ?? null) === (b.companyLogoAsset?.id ?? null)
     );
   }
@@ -258,6 +269,22 @@ export class GeneralSettingsComponent {
       return {
         ...settings,
         cashierOpen: target.checked,
+      };
+    });
+
+    this.evaluateChanges(this.settingsState());
+  }
+
+  togglePrinter(event: Event): void {
+    const target = event.target as HTMLInputElement;
+
+    this.settingsState.update((settings) => {
+      if (!settings) {
+        return settings;
+      }
+      return {
+        ...settings,
+        enablePrinter: target.checked,
       };
     });
 
@@ -363,6 +390,7 @@ export class GeneralSettingsComponent {
     const updateInput: UpdateChannelSettingsInput = {
       cashierFlowEnabled: currentSettings.cashierFlowEnabled,
       cashierOpen: currentSettings.cashierOpen,
+      enablePrinter: currentSettings.enablePrinter,
       companyLogoAssetId: logoAssetId,
     };
 
