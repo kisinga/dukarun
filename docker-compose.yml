@@ -45,7 +45,6 @@ services:
 
       # Application configuration
       NODE_ENV: ${NODE_ENV:-production}
-      PORT: 3000, 3002
 
       # Admin credentials
       SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-superadmin}
