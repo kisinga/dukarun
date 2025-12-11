@@ -1,9 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Customer, CustomerService, RequestContext } from '@vendure/core';
-import { ChannelEventRouterService } from '../../infrastructure/events/channel-event-router.service';
-import { ActionCategory } from '../../infrastructure/events/types/action-category.enum';
-import { ChannelEvent } from '../../infrastructure/events/types/channel-event.interface';
-import { ChannelEventType } from '../../infrastructure/events/types/event-type.enum';
+import { Customer, CustomerService, EventBus, RequestContext } from '@vendure/core';
+import { CustomerNotificationEvent } from '../../infrastructure/events/custom-events';
 
 /**
  * Channel Communication Service
@@ -17,7 +14,7 @@ export class ChannelCommunicationService {
 
   constructor(
     private readonly customerService: CustomerService,
-    private readonly eventRouter: ChannelEventRouterService
+    private readonly eventBus: EventBus
   ) {}
 
   /**
@@ -37,18 +34,12 @@ export class ChannelCommunicationService {
         return;
       }
 
-      await this.eventRouter.routeEvent({
-        type: ChannelEventType.CUSTOMER_CREATED,
-        channelId,
-        category: ActionCategory.CUSTOMER_COMMUNICATION,
-        context: ctx,
-        data: {
-          customerId,
+      this.eventBus.publish(
+        new CustomerNotificationEvent(ctx, channelId, 'created', customerId, {
           customerName: customer.firstName + ' ' + customer.lastName,
-        },
-        targetCustomerId: customerId,
-        targetUserId: customer.user?.id?.toString(),
-      });
+          targetUserId: customer.user?.id?.toString(),
+        })
+      );
 
       this.logger.log(`Sent account created notification for customer ${customerId}`);
     } catch (error) {
@@ -84,19 +75,13 @@ export class ChannelCommunicationService {
       const customFields = (customer.customFields as any) || {};
       const finalCreditLimit = creditLimit ?? customFields.creditLimit ?? 0;
 
-      await this.eventRouter.routeEvent({
-        type: ChannelEventType.CUSTOMER_CREDIT_APPROVED,
-        channelId,
-        category: ActionCategory.CUSTOMER_COMMUNICATION,
-        context: ctx,
-        data: {
-          customerId,
+      this.eventBus.publish(
+        new CustomerNotificationEvent(ctx, channelId, 'credit_approved', customerId, {
           creditLimit: finalCreditLimit,
           creditDuration: creditDuration ?? customFields.creditDuration ?? 30,
-        },
-        targetCustomerId: customerId,
-        targetUserId: customer.user?.id?.toString(),
-      });
+          targetUserId: customer.user?.id?.toString(),
+        })
+      );
 
       this.logger.log(`Sent account approved notification for customer ${customerId}`);
     } catch (error) {
@@ -129,19 +114,13 @@ export class ChannelCommunicationService {
         return;
       }
 
-      await this.eventRouter.routeEvent({
-        type: ChannelEventType.CUSTOMER_BALANCE_CHANGED,
-        channelId,
-        category: ActionCategory.CUSTOMER_COMMUNICATION,
-        context: ctx,
-        data: {
-          customerId,
+      this.eventBus.publish(
+        new CustomerNotificationEvent(ctx, channelId, 'balance_changed', customerId, {
           outstandingAmount,
           isStartingBalance: true,
-        },
-        targetCustomerId: customerId,
-        targetUserId: customer.user?.id?.toString(),
-      });
+          targetUserId: customer.user?.id?.toString(),
+        })
+      );
 
       this.logger.log(`Sent starting balance notification for customer ${customerId}`);
     } catch (error) {
@@ -177,20 +156,14 @@ export class ChannelCommunicationService {
         return;
       }
 
-      await this.eventRouter.routeEvent({
-        type: ChannelEventType.CUSTOMER_BALANCE_CHANGED,
-        channelId,
-        category: ActionCategory.CUSTOMER_COMMUNICATION,
-        context: ctx,
-        data: {
-          customerId,
+      this.eventBus.publish(
+        new CustomerNotificationEvent(ctx, channelId, 'balance_changed', customerId, {
           outstandingAmount: newBalance,
           oldBalance,
           change: newBalance - oldBalance,
-        },
-        targetCustomerId: customerId,
-        targetUserId: customer.user?.id?.toString(),
-      });
+          targetUserId: customer.user?.id?.toString(),
+        })
+      );
 
       this.logger.log(
         `Sent balance change notification for customer ${customerId}: ${oldBalance} -> ${newBalance}`
@@ -247,23 +220,17 @@ export class ChannelCommunicationService {
           return;
         }
 
-        await this.eventRouter.routeEvent({
-          type: ChannelEventType.CUSTOMER_REPAYMENT_DEADLINE,
-          channelId,
-          category: ActionCategory.CUSTOMER_COMMUNICATION,
-          context: ctx,
-          data: {
-            customerId,
+        this.eventBus.publish(
+          new CustomerNotificationEvent(ctx, channelId, 'repayment_deadline', customerId, {
             outstandingAmount,
             creditLimit,
             creditDuration,
             lastRepaymentDate: lastRepaymentDate?.toISOString(),
             exceedsThreshold,
             deadlineApproaching,
-          },
-          targetCustomerId: customerId,
-          targetUserId: customer.user?.id?.toString(),
-        });
+            targetUserId: customer.user?.id?.toString(),
+          })
+        );
 
         this.logger.log(`Sent repayment deadline notification for customer ${customerId}`);
       }

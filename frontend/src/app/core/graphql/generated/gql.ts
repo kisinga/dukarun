@@ -34,6 +34,7 @@ type Documents = {
   '\n  mutation CreateProductVariants($input: [CreateProductVariantInput!]!) {\n    createProductVariants(input: $input) {\n      id\n      name\n      sku\n      price\n      priceWithTax\n      stockOnHand\n      product {\n        id\n        name\n      }\n    }\n  }\n': typeof types.CreateProductVariantsDocument;
   '\n  mutation CreateAssets($input: [CreateAssetInput!]!) {\n    createAssets(input: $input) {\n      ... on Asset {\n        id\n        name\n        preview\n        source\n      }\n    }\n  }\n': typeof types.CreateAssetsDocument;
   '\n  mutation AssignAssetsToProduct($productId: ID!, $assetIds: [ID!]!, $featuredAssetId: ID) {\n    updateProduct(\n      input: { id: $productId, assetIds: $assetIds, featuredAssetId: $featuredAssetId }\n    ) {\n      id\n      assets {\n        id\n        name\n        preview\n      }\n      featuredAsset {\n        id\n        preview\n      }\n    }\n  }\n': typeof types.AssignAssetsToProductDocument;
+  '\n  mutation AssignAssetsToChannel($assetIds: [ID!]!, $channelId: ID!) {\n    assignAssetsToChannel(input: { assetIds: $assetIds, channelId: $channelId }) {\n      id\n      name\n    }\n  }\n': typeof types.AssignAssetsToChannelDocument;
   '\n  mutation DeleteAsset($input: DeleteAssetInput!) {\n    deleteAsset(input: $input) {\n      result\n      message\n    }\n  }\n': typeof types.DeleteAssetDocument;
   '\n  mutation UpdateProductAssets($productId: ID!, $assetIds: [ID!]!, $featuredAssetId: ID) {\n    updateProduct(\n      input: { id: $productId, assetIds: $assetIds, featuredAssetId: $featuredAssetId }\n    ) {\n      id\n      assets {\n        id\n        name\n        preview\n        source\n      }\n      featuredAsset {\n        id\n        preview\n      }\n    }\n  }\n': typeof types.UpdateProductAssetsDocument;
   '\n  query GetProductDetail($id: ID!) {\n    product(id: $id) {\n      id\n      name\n      slug\n      description\n      enabled\n      customFields {\n        barcode\n      }\n      assets {\n        id\n        name\n        preview\n        source\n      }\n      featuredAsset {\n        id\n        preview\n      }\n      variants {\n        id\n        name\n        sku\n        price\n        priceWithTax\n        stockOnHand\n        trackInventory\n        customFields {\n          wholesalePrice\n          allowFractionalQuantity\n        }\n        prices {\n          price\n          currencyCode\n        }\n        stockLevels {\n          id\n          stockOnHand\n          stockLocation {\n            id\n            name\n          }\n        }\n      }\n    }\n  }\n': typeof types.GetProductDetailDocument;
@@ -97,7 +98,9 @@ type Documents = {
   '\n  mutation CreateSupplier($input: CreateCustomerInput!) {\n    createCustomer(input: $input) {\n      ... on Customer {\n        id\n        firstName\n        lastName\n        emailAddress\n        phoneNumber\n        createdAt\n        customFields {\n          isSupplier\n          supplierType\n          contactPerson\n          taxId\n          paymentTerms\n          notes\n          isCreditApproved\n          creditLimit\n        }\n      }\n      ... on EmailAddressConflictError {\n        errorCode\n        message\n      }\n    }\n  }\n': typeof types.CreateSupplierDocument;
   '\n  mutation UpdateSupplier($input: UpdateCustomerInput!) {\n    updateCustomer(input: $input) {\n      ... on Customer {\n        id\n        firstName\n        lastName\n        emailAddress\n        phoneNumber\n        updatedAt\n        customFields {\n          isSupplier\n          supplierType\n          contactPerson\n          taxId\n          paymentTerms\n          notes\n        }\n      }\n      ... on EmailAddressConflictError {\n        errorCode\n        message\n      }\n    }\n  }\n': typeof types.UpdateSupplierDocument;
   '\n  mutation DeleteSupplier($id: ID!) {\n    deleteCustomer(id: $id) {\n      result\n      message\n    }\n  }\n': typeof types.DeleteSupplierDocument;
-  '\n  mutation UpdateChannelSettings($input: UpdateChannelSettingsInput!) {\n    updateChannelSettings(input: $input) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        source\n        preview\n      }\n    }\n  }\n': typeof types.UpdateChannelSettingsDocument;
+  '\n  mutation UpdateChannelLogo($logoAssetId: ID) {\n    updateChannelLogo(logoAssetId: $logoAssetId) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        preview\n        source\n      }\n    }\n  }\n': typeof types.UpdateChannelLogoDocument;
+  '\n  mutation UpdateCashierSettings($cashierFlowEnabled: Boolean, $cashierOpen: Boolean) {\n    updateCashierSettings(cashierFlowEnabled: $cashierFlowEnabled, cashierOpen: $cashierOpen) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        preview\n        source\n      }\n    }\n  }\n': typeof types.UpdateCashierSettingsDocument;
+  '\n  mutation UpdatePrinterSettings($enablePrinter: Boolean!) {\n    updatePrinterSettings(enablePrinter: $enablePrinter) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        preview\n        source\n      }\n    }\n  }\n': typeof types.UpdatePrinterSettingsDocument;
   '\n  mutation InviteChannelAdministrator($input: InviteAdministratorInput!) {\n    inviteChannelAdministrator(input: $input) {\n      id\n      firstName\n      lastName\n      emailAddress\n      user {\n        id\n        identifier\n        roles {\n          id\n          code\n          permissions\n        }\n      }\n    }\n  }\n': typeof types.InviteChannelAdministratorDocument;
   '\n  query GetRoleTemplates {\n    roleTemplates {\n      code\n      name\n      description\n      permissions\n    }\n  }\n': typeof types.GetRoleTemplatesDocument;
   '\n  mutation CreateChannelAdmin($input: CreateChannelAdminInput!) {\n    createChannelAdmin(input: $input) {\n      id\n      firstName\n      lastName\n      emailAddress\n      user {\n        id\n        identifier\n        roles {\n          id\n          code\n          permissions\n        }\n      }\n    }\n  }\n': typeof types.CreateChannelAdminDocument;
@@ -182,6 +185,8 @@ const documents: Documents = {
     types.CreateAssetsDocument,
   '\n  mutation AssignAssetsToProduct($productId: ID!, $assetIds: [ID!]!, $featuredAssetId: ID) {\n    updateProduct(\n      input: { id: $productId, assetIds: $assetIds, featuredAssetId: $featuredAssetId }\n    ) {\n      id\n      assets {\n        id\n        name\n        preview\n      }\n      featuredAsset {\n        id\n        preview\n      }\n    }\n  }\n':
     types.AssignAssetsToProductDocument,
+  '\n  mutation AssignAssetsToChannel($assetIds: [ID!]!, $channelId: ID!) {\n    assignAssetsToChannel(input: { assetIds: $assetIds, channelId: $channelId }) {\n      id\n      name\n    }\n  }\n':
+    types.AssignAssetsToChannelDocument,
   '\n  mutation DeleteAsset($input: DeleteAssetInput!) {\n    deleteAsset(input: $input) {\n      result\n      message\n    }\n  }\n':
     types.DeleteAssetDocument,
   '\n  mutation UpdateProductAssets($productId: ID!, $assetIds: [ID!]!, $featuredAssetId: ID) {\n    updateProduct(\n      input: { id: $productId, assetIds: $assetIds, featuredAssetId: $featuredAssetId }\n    ) {\n      id\n      assets {\n        id\n        name\n        preview\n        source\n      }\n      featuredAsset {\n        id\n        preview\n      }\n    }\n  }\n':
@@ -308,8 +313,12 @@ const documents: Documents = {
     types.UpdateSupplierDocument,
   '\n  mutation DeleteSupplier($id: ID!) {\n    deleteCustomer(id: $id) {\n      result\n      message\n    }\n  }\n':
     types.DeleteSupplierDocument,
-  '\n  mutation UpdateChannelSettings($input: UpdateChannelSettingsInput!) {\n    updateChannelSettings(input: $input) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        source\n        preview\n      }\n    }\n  }\n':
-    types.UpdateChannelSettingsDocument,
+  '\n  mutation UpdateChannelLogo($logoAssetId: ID) {\n    updateChannelLogo(logoAssetId: $logoAssetId) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        preview\n        source\n      }\n    }\n  }\n':
+    types.UpdateChannelLogoDocument,
+  '\n  mutation UpdateCashierSettings($cashierFlowEnabled: Boolean, $cashierOpen: Boolean) {\n    updateCashierSettings(cashierFlowEnabled: $cashierFlowEnabled, cashierOpen: $cashierOpen) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        preview\n        source\n      }\n    }\n  }\n':
+    types.UpdateCashierSettingsDocument,
+  '\n  mutation UpdatePrinterSettings($enablePrinter: Boolean!) {\n    updatePrinterSettings(enablePrinter: $enablePrinter) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        preview\n        source\n      }\n    }\n  }\n':
+    types.UpdatePrinterSettingsDocument,
   '\n  mutation InviteChannelAdministrator($input: InviteAdministratorInput!) {\n    inviteChannelAdministrator(input: $input) {\n      id\n      firstName\n      lastName\n      emailAddress\n      user {\n        id\n        identifier\n        roles {\n          id\n          code\n          permissions\n        }\n      }\n    }\n  }\n':
     types.InviteChannelAdministratorDocument,
   '\n  query GetRoleTemplates {\n    roleTemplates {\n      code\n      name\n      description\n      permissions\n    }\n  }\n':
@@ -529,6 +538,12 @@ export function graphql(
 export function graphql(
   source: '\n  mutation AssignAssetsToProduct($productId: ID!, $assetIds: [ID!]!, $featuredAssetId: ID) {\n    updateProduct(\n      input: { id: $productId, assetIds: $assetIds, featuredAssetId: $featuredAssetId }\n    ) {\n      id\n      assets {\n        id\n        name\n        preview\n      }\n      featuredAsset {\n        id\n        preview\n      }\n    }\n  }\n',
 ): (typeof documents)['\n  mutation AssignAssetsToProduct($productId: ID!, $assetIds: [ID!]!, $featuredAssetId: ID) {\n    updateProduct(\n      input: { id: $productId, assetIds: $assetIds, featuredAssetId: $featuredAssetId }\n    ) {\n      id\n      assets {\n        id\n        name\n        preview\n      }\n      featuredAsset {\n        id\n        preview\n      }\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation AssignAssetsToChannel($assetIds: [ID!]!, $channelId: ID!) {\n    assignAssetsToChannel(input: { assetIds: $assetIds, channelId: $channelId }) {\n      id\n      name\n    }\n  }\n',
+): (typeof documents)['\n  mutation AssignAssetsToChannel($assetIds: [ID!]!, $channelId: ID!) {\n    assignAssetsToChannel(input: { assetIds: $assetIds, channelId: $channelId }) {\n      id\n      name\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -911,8 +926,20 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
-  source: '\n  mutation UpdateChannelSettings($input: UpdateChannelSettingsInput!) {\n    updateChannelSettings(input: $input) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        source\n        preview\n      }\n    }\n  }\n',
-): (typeof documents)['\n  mutation UpdateChannelSettings($input: UpdateChannelSettingsInput!) {\n    updateChannelSettings(input: $input) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        source\n        preview\n      }\n    }\n  }\n'];
+  source: '\n  mutation UpdateChannelLogo($logoAssetId: ID) {\n    updateChannelLogo(logoAssetId: $logoAssetId) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        preview\n        source\n      }\n    }\n  }\n',
+): (typeof documents)['\n  mutation UpdateChannelLogo($logoAssetId: ID) {\n    updateChannelLogo(logoAssetId: $logoAssetId) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        preview\n        source\n      }\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation UpdateCashierSettings($cashierFlowEnabled: Boolean, $cashierOpen: Boolean) {\n    updateCashierSettings(cashierFlowEnabled: $cashierFlowEnabled, cashierOpen: $cashierOpen) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        preview\n        source\n      }\n    }\n  }\n',
+): (typeof documents)['\n  mutation UpdateCashierSettings($cashierFlowEnabled: Boolean, $cashierOpen: Boolean) {\n    updateCashierSettings(cashierFlowEnabled: $cashierFlowEnabled, cashierOpen: $cashierOpen) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        preview\n        source\n      }\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation UpdatePrinterSettings($enablePrinter: Boolean!) {\n    updatePrinterSettings(enablePrinter: $enablePrinter) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        preview\n        source\n      }\n    }\n  }\n',
+): (typeof documents)['\n  mutation UpdatePrinterSettings($enablePrinter: Boolean!) {\n    updatePrinterSettings(enablePrinter: $enablePrinter) {\n      cashierFlowEnabled\n      cashierOpen\n      enablePrinter\n      companyLogoAsset {\n        id\n        preview\n        source\n      }\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

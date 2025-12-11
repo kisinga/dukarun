@@ -5,11 +5,14 @@ import { environment } from '../../../environments/environment';
 import type { GetAuditLogsQuery, GetAuditLogsQueryVariables } from '../graphql/generated/graphql';
 import { LanguageCode } from '../graphql/generated/graphql';
 import {
+  ASSIGN_ASSETS_TO_CHANNEL,
   CREATE_CHANNEL_PAYMENT_METHOD,
   GET_AUDIT_LOGS,
   INVITE_CHANNEL_ADMINISTRATOR,
+  UPDATE_CHANNEL_LOGO,
+  UPDATE_CASHIER_SETTINGS,
+  UPDATE_PRINTER_SETTINGS,
   UPDATE_CHANNEL_PAYMENT_METHOD,
-  UPDATE_CHANNEL_SETTINGS,
 } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
 import { CompanyService } from './company.service';
@@ -55,13 +58,6 @@ export interface PaymentMethod {
     } | null;
     isActive?: boolean | null;
   } | null;
-}
-
-export interface UpdateChannelSettingsInput {
-  cashierFlowEnabled?: boolean;
-  cashierOpen?: boolean;
-  enablePrinter?: boolean;
-  companyLogoAssetId?: string | null;
 }
 
 export interface InviteAdministratorInput {
@@ -152,25 +148,75 @@ export class SettingsService {
   readonly error = signal<string | null>(null);
 
   /**
-   * Update channel settings
+   * Update channel logo
    */
-  async updateChannelSettings(input: UpdateChannelSettingsInput): Promise<void> {
+  async updateChannelLogo(logoAssetId?: string | null): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
 
     try {
       const client = this.apolloService.getClient();
       const result = await client.mutate({
-        mutation: UPDATE_CHANNEL_SETTINGS,
-        variables: { input },
+        mutation: UPDATE_CHANNEL_LOGO as any,
+        variables: { logoAssetId },
       });
 
-      if (result.data?.updateChannelSettings) {
+      if ((result.data as any)?.updateChannelLogo) {
         await this.companyService.fetchActiveChannel();
       }
     } catch (err) {
-      console.error('Failed to update channel settings:', err);
-      this.error.set('Failed to update channel settings');
+      console.error('Failed to update channel logo:', err);
+      this.error.set('Failed to update channel logo');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  /**
+   * Update cashier settings
+   */
+  async updateCashierSettings(cashierFlowEnabled?: boolean, cashierOpen?: boolean): Promise<void> {
+    this.loading.set(true);
+    this.error.set(null);
+
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.mutate({
+        mutation: UPDATE_CASHIER_SETTINGS as any,
+        variables: { cashierFlowEnabled, cashierOpen },
+      });
+
+      if ((result.data as any)?.updateCashierSettings) {
+        await this.companyService.fetchActiveChannel();
+      }
+    } catch (err) {
+      console.error('Failed to update cashier settings:', err);
+      this.error.set('Failed to update cashier settings');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  /**
+   * Update printer settings
+   */
+  async updatePrinterSettings(enablePrinter: boolean): Promise<void> {
+    this.loading.set(true);
+    this.error.set(null);
+
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.mutate({
+        mutation: UPDATE_PRINTER_SETTINGS as any,
+        variables: { enablePrinter },
+      });
+
+      if ((result.data as any)?.updatePrinterSettings) {
+        await this.companyService.fetchActiveChannel();
+      }
+    } catch (err) {
+      console.error('Failed to update printer settings:', err);
+      this.error.set('Failed to update printer settings');
     } finally {
       this.loading.set(false);
     }
@@ -380,14 +426,46 @@ export class SettingsService {
       }
 
       const asset = createdAssets[0];
-      if (asset.id) {
-        console.log('✅ Upload successful, asset ID:', asset.id);
-        return asset.id;
+      if (!asset.id) {
+        console.error('❌ No valid asset ID returned');
+        this.error.set('Upload failed: No valid asset ID returned');
+        return null;
       }
 
-      console.error('❌ No valid asset ID returned');
-      this.error.set('Upload failed: No valid asset ID returned');
-      return null;
+      console.log('✅ Upload successful, asset ID:', asset.id);
+
+      // Step 2: Assign asset to current channel
+      const channel = this.companyService.activeChannel();
+      if (!channel?.id) {
+        console.error('❌ No active channel found');
+        this.error.set('Upload failed: No active channel');
+        return null;
+      }
+
+      console.log('🔗 Assigning asset to channel:', channel.id);
+      const client = this.apolloService.getClient();
+      const assignResult = await client.mutate({
+        mutation: ASSIGN_ASSETS_TO_CHANNEL as any,
+        variables: {
+          assetIds: [asset.id],
+          channelId: channel.id,
+        },
+      });
+
+      if (assignResult.error || !assignResult.data) {
+        console.error('❌ Failed to assign asset to channel:', assignResult.error);
+        this.error.set('Upload failed: Could not assign asset to channel');
+        return null;
+      }
+
+      console.log('✅ Asset assigned to channel successfully');
+
+      // Refresh channel data to update UI immediately
+      console.log('🔄 Refreshing channel data...');
+      await this.companyService.fetchActiveChannel();
+      console.log('✅ Channel data refreshed');
+
+      return asset.id;
     } catch (err) {
       console.error('❌ Upload error:', err);
       this.error.set(

@@ -325,6 +325,15 @@ export const ASSIGN_ASSETS_TO_PRODUCT = graphql(`
   }
 `);
 
+export const ASSIGN_ASSETS_TO_CHANNEL = graphql(`
+  mutation AssignAssetsToChannel($assetIds: [ID!]!, $channelId: ID!) {
+    assignAssetsToChannel(input: { assetIds: $assetIds, channelId: $channelId }) {
+      id
+      name
+    }
+  }
+`);
+
 export const DELETE_ASSET = graphql(`
   mutation DeleteAsset($input: DeleteAssetInput!) {
     deleteAsset(input: $input) {
@@ -1908,16 +1917,46 @@ export const DELETE_SUPPLIER = graphql(`
   }
 `);
 
-export const UPDATE_CHANNEL_SETTINGS = graphql(`
-  mutation UpdateChannelSettings($input: UpdateChannelSettingsInput!) {
-    updateChannelSettings(input: $input) {
+export const UPDATE_CHANNEL_LOGO = graphql(`
+  mutation UpdateChannelLogo($logoAssetId: ID) {
+    updateChannelLogo(logoAssetId: $logoAssetId) {
       cashierFlowEnabled
       cashierOpen
       enablePrinter
       companyLogoAsset {
         id
-        source
         preview
+        source
+      }
+    }
+  }
+`);
+
+export const UPDATE_CASHIER_SETTINGS = graphql(`
+  mutation UpdateCashierSettings($cashierFlowEnabled: Boolean, $cashierOpen: Boolean) {
+    updateCashierSettings(cashierFlowEnabled: $cashierFlowEnabled, cashierOpen: $cashierOpen) {
+      cashierFlowEnabled
+      cashierOpen
+      enablePrinter
+      companyLogoAsset {
+        id
+        preview
+        source
+      }
+    }
+  }
+`);
+
+export const UPDATE_PRINTER_SETTINGS = graphql(`
+  mutation UpdatePrinterSettings($enablePrinter: Boolean!) {
+    updatePrinterSettings(enablePrinter: $enablePrinter) {
+      cashierFlowEnabled
+      cashierOpen
+      enablePrinter
+      companyLogoAsset {
+        id
+        preview
+        source
       }
     }
   }

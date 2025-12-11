@@ -1,9 +1,8 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { RequestContext, EventBus } from '@vendure/core';
 import Redis from 'ioredis';
 import { BRAND_CONFIG } from '../../constants/brand.constants';
 import { env } from '../../infrastructure/config/environment.config';
-import { ChannelSmsService } from '../../infrastructure/events/channel-sms.service';
 import { SmsService } from '../../infrastructure/sms/sms.service';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 import { maskEmail } from '../../utils/email.utils';
@@ -30,8 +29,7 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly smsService: SmsService,
-    private readonly eventBus: EventBus,
-    @Optional() private readonly channelSmsService?: ChannelSmsService // Optional to avoid circular dependency
+    private readonly eventBus: EventBus
   ) {
     // Initialize production mode check using EnvironmentConfig
     this.IS_PRODUCTION = env.isProduction();
@@ -171,28 +169,14 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Send SMS via configured SMS provider
-   * Uses ChannelSmsService if available (for tracking), otherwise falls back to SmsService
    */
-  private async sendSMS(
-    phoneNumber: string,
-    message: string,
-    ctx?: RequestContext,
-    channelId?: string
-  ): Promise<void> {
+  private async sendSMS(phoneNumber: string, message: string): Promise<void> {
     try {
-      let result;
-
-      // Use ChannelSmsService if available and channel ID is provided (for tracking)
-      if (this.channelSmsService && ctx && channelId) {
-        result = await this.channelSmsService.sendOtpSms(ctx, phoneNumber, message, channelId);
-      } else {
-        // Fall back to regular SmsService
-        result = await this.smsService.sendSms(phoneNumber, message);
-      }
+      // Use SmsService directly with isOtp flag for OTP routing
+      const result = await this.smsService.sendSms(phoneNumber, message, true);
 
       if (!result.success) {
         // Log error but don't throw - OTP is still generated, just SMS failed
-        // This allows OTP generation to continue even if SMS provider is unavailable
         this.logger.error(`Failed to send SMS: ${result.error}`);
 
         // Log OTP in development for testing purposes
@@ -203,7 +187,6 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error('SMS sending error:', error);
       // Don't throw - OTP is still generated, just log the error
-      // In production, you might want to throw here or use a fallback method
     }
   }
 
@@ -280,7 +263,7 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
     // Send SMS (Primary Channel) - Only if it's a phone number
     if (!isEmailIdentifier) {
       const message = `Your ${BRAND_CONFIG.name} verification code is: ${otpCode} Valid for 5 minutes.`;
-      await this.sendSMS(storageKey, message, ctx, channelId);
+      await this.sendSMS(storageKey, message);
     }
 
     // Send Email (Secondary Channel) if provided OR if identifier is email

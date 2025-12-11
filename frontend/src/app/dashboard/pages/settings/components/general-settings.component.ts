@@ -2,11 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { CompanyService } from '../../../../core/services/company.service';
-import {
-  ChannelSettings,
-  SettingsService,
-  UpdateChannelSettingsInput,
-} from '../../../../core/services/settings.service';
+import { ChannelSettings, SettingsService } from '../../../../core/services/settings.service';
 
 @Component({
   selector: 'app-general-settings',
@@ -366,7 +362,10 @@ export class GeneralSettingsComponent {
     const currentSettings = this.settings();
     if (!currentSettings) return;
 
-    let logoAssetId: string | null | undefined = currentSettings.companyLogoAsset?.id ?? undefined;
+    // Determine strict logo state
+    let logoAssetId: string | null | undefined = undefined;
+    const currentLogo = currentSettings.companyLogoAsset;
+    const originalLogo = this.originalSettings?.companyLogoAsset;
 
     // Upload logo if a new file was selected
     const selectedFile = this.selectedLogoFile();
@@ -378,24 +377,49 @@ export class GeneralSettingsComponent {
         console.error('❌ Failed to upload logo');
         return;
       }
-
       logoAssetId = uploadedAssetId;
-      console.log('✅ Logo uploaded successfully');
-    } else if (!this.logoPreview() && currentSettings.companyLogoAsset) {
-      // Logo was removed (preview cleared but no new file selected)
-      logoAssetId = null;
-      console.log('🗑️ Logo marked for removal');
+      console.log('✅ Logo uploaded successfully:', logoAssetId);
+    } else {
+      // No new file. Check if we removed the existing logo or kept it.
+      if (currentLogo === null && originalLogo) {
+        // Explicit removal: user clicked "Remove" and cleared the logo in state
+        logoAssetId = null;
+        console.log('🗑️ Logo marked for removal');
+      } else if (currentLogo?.id !== originalLogo?.id) {
+        // Different logo ID (rare case, maybe swapped from another source)
+        logoAssetId = currentLogo?.id;
+      } else {
+        // No change (undefined)
+        logoAssetId = undefined;
+      }
     }
 
-    const updateInput: UpdateChannelSettingsInput = {
-      cashierFlowEnabled: currentSettings.cashierFlowEnabled,
-      cashierOpen: currentSettings.cashierOpen,
-      enablePrinter: currentSettings.enablePrinter,
-      companyLogoAssetId: logoAssetId,
-    };
+    // 1. Update Logo if needed (undefined means no change)
+    if (logoAssetId !== undefined) {
+      console.log('💾 Updating channel logo:', logoAssetId);
+      await this.settingsService.updateChannelLogo(logoAssetId);
+    }
 
-    console.log('💾 Updating channel settings with logo asset ID:', logoAssetId);
-    await this.settingsService.updateChannelSettings(updateInput);
+    // 2. Update Cashier Settings if needed
+    if (
+      currentSettings.cashierFlowEnabled !== this.originalSettings?.cashierFlowEnabled ||
+      currentSettings.cashierOpen !== this.originalSettings?.cashierOpen
+    ) {
+      console.log('💾 Updating cashier settings:', {
+        flow: currentSettings.cashierFlowEnabled,
+        open: currentSettings.cashierOpen,
+      });
+      await this.settingsService.updateCashierSettings(
+        currentSettings.cashierFlowEnabled,
+        currentSettings.cashierOpen,
+      );
+    }
+
+    // 3. Update Printer Settings if needed
+    if (currentSettings.enablePrinter !== this.originalSettings?.enablePrinter) {
+      console.log('💾 Updating printer settings:', currentSettings.enablePrinter);
+      await this.settingsService.updatePrinterSettings(currentSettings.enablePrinter);
+    }
 
     if (!this.settingsService.error()) {
       // Clear selected file but keep preview (it will be updated with the new logo)

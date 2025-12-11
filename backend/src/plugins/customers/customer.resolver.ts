@@ -10,6 +10,7 @@ import {
   UserInputError,
 } from '@vendure/core';
 import { formatPhoneNumber } from '../../utils/phone.utils';
+import { generateSentinelEmailFromPhone, getWalkInEmail } from '../../utils/email.utils';
 import { CustomerLookupService } from '../../services/customers/customer-lookup.service';
 
 /**
@@ -61,6 +62,17 @@ export class CustomerResolver {
           `Invalid phone number format: ${error instanceof Error ? error.message : String(error)}`
         );
       }
+    }
+
+    // Handle Walk-in logic (Backend Control)
+    if (input.customFields?.isWalkIn) {
+      this.logger.log('Creating Walk-in customer - generating sentinel email');
+      input.emailAddress = getWalkInEmail();
+    }
+    // Handle Regular/Supplier missing email -> generate from phone
+    else if ((!input.emailAddress || input.emailAddress.trim() === '') && normalizedPhone) {
+      this.logger.log(`Generating sentinel email for customer with phone: ${normalizedPhone}`);
+      input.emailAddress = generateSentinelEmailFromPhone(normalizedPhone, 'customer');
     }
 
     // Check for existing customer by phone number

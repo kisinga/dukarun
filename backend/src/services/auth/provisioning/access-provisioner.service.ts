@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   Administrator,
   AdministratorEvent,
@@ -11,12 +11,11 @@ import {
   TransactionalConnection,
   User,
 } from '@vendure/core';
-import { ChannelEventRouterService } from '../../../infrastructure/events/channel-event-router.service';
-import { ActionCategory } from '../../../infrastructure/events/types/action-category.enum';
-import { ChannelEventType } from '../../../infrastructure/events/types/event-type.enum';
+import { AdminActionEvent } from '../../../infrastructure/events/custom-events';
 import { RegistrationInput } from '../registration.service';
 import { RegistrationAuditorService } from './registration-auditor.service';
 import { RegistrationErrorService } from './registration-error.service';
+import { generateSentinelEmailFromPhone } from '../../../utils/email.utils';
 
 /**
  * Access Provisioner Service
@@ -33,8 +32,7 @@ export class AccessProvisionerService {
     private readonly passwordCipher: PasswordCipher,
     private readonly eventBus: EventBus,
     private readonly auditor: RegistrationAuditorService,
-    private readonly errorService: RegistrationErrorService,
-    @Optional() private readonly eventRouter?: ChannelEventRouterService
+    private readonly errorService: RegistrationErrorService
   ) {}
 
   /**
@@ -93,7 +91,8 @@ export class AccessProvisionerService {
     registrationData: RegistrationInput
   ): Promise<User> {
     const password = this.generateSecurePassword();
-    const emailToUse = registrationData.adminEmail || phoneNumber;
+    const emailToUse =
+      registrationData.adminEmail || generateSentinelEmailFromPhone(phoneNumber, 'admin');
 
     // Create User entity
     const user = new User({
@@ -183,7 +182,8 @@ export class AccessProvisionerService {
     phoneNumber: string,
     user: User
   ): Promise<{ administrator: Administrator; created: boolean }> {
-    const emailToUse = registrationData.adminEmail || phoneNumber;
+    const emailToUse =
+      registrationData.adminEmail || generateSentinelEmailFromPhone(phoneNumber, 'admin');
     const adminRepo = this.connection.getRepository(ctx, Administrator);
 
     let administrator = await adminRepo.findOne({
@@ -272,49 +272,27 @@ export class AccessProvisionerService {
       );
     }
 
-    // Emit events
-    if (this.eventRouter) {
-      const emptyCtx = RequestContext.empty();
+    // Emit events using new event classes
+    const emptyCtx = RequestContext.empty();
 
-      if (options.adminCreated) {
-        await this.eventRouter
-          .routeEvent({
-            type: ChannelEventType.ADMIN_CREATED,
-            channelId,
-            category: ActionCategory.SYSTEM_NOTIFICATIONS,
-            context: emptyCtx,
-            data: {
-              adminId: administrator.id.toString(),
-              userId: user.id.toString(),
-              firstName: registrationData.adminFirstName,
-              lastName: registrationData.adminLastName,
-            },
-          })
-          .catch(err => {
-            this.logger.warn(
-              `Failed to route admin created event: ${err instanceof Error ? err.message : String(err)}`
-            );
-          });
-      }
+    if (options.adminCreated) {
+      this.eventBus.publish(
+        new AdminActionEvent(emptyCtx, channelId, 'admin', 'created', {
+          adminId: administrator.id.toString(),
+          userId: user.id.toString(),
+          firstName: registrationData.adminFirstName,
+          lastName: registrationData.adminLastName,
+        })
+      );
+    }
 
-      if (options.userCreated) {
-        await this.eventRouter
-          .routeEvent({
-            type: ChannelEventType.USER_CREATED,
-            channelId,
-            category: ActionCategory.SYSTEM_NOTIFICATIONS,
-            context: emptyCtx,
-            data: {
-              userId: user.id.toString(),
-              adminId: administrator.id.toString(),
-            },
-          })
-          .catch(err => {
-            this.logger.warn(
-              `Failed to route user created event: ${err instanceof Error ? err.message : String(err)}`
-            );
-          });
-      }
+    if (options.userCreated) {
+      this.eventBus.publish(
+        new AdminActionEvent(emptyCtx, channelId, 'user', 'created', {
+          userId: user.id.toString(),
+          adminId: administrator.id.toString(),
+        })
+      );
     }
   }
 

@@ -3867,11 +3867,12 @@ export type Mutation = {
   updateAdministrator: Administrator;
   /** Update an existing Asset */
   updateAsset: Asset;
+  updateCashierSettings: ChannelSettings;
   /** Update an existing Channel */
   updateChannel: UpdateChannelResult;
   updateChannelAdmin: Administrator;
+  updateChannelLogo: ChannelSettings;
   updateChannelPaymentMethod: PaymentMethod;
-  updateChannelSettings: ChannelSettings;
   updateChannelStatus: Channel;
   /** Update an existing Collection */
   updateCollection: Collection;
@@ -3897,6 +3898,7 @@ export type Mutation = {
   updateOrderNote: HistoryEntry;
   /** Update an existing PaymentMethod */
   updatePaymentMethod: PaymentMethod;
+  updatePrinterSettings: ChannelSettings;
   /** Update an existing Product */
   updateProduct: Product;
   /** Create a new ProductOption within a ProductOptionGroup */
@@ -4689,6 +4691,11 @@ export type MutationUpdateAssetArgs = {
   input: UpdateAssetInput;
 };
 
+export type MutationUpdateCashierSettingsArgs = {
+  cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
 export type MutationUpdateChannelArgs = {
   input: UpdateChannelInput;
 };
@@ -4698,12 +4705,12 @@ export type MutationUpdateChannelAdminArgs = {
   permissions: Array<Scalars['String']['input']>;
 };
 
-export type MutationUpdateChannelPaymentMethodArgs = {
-  input: UpdatePaymentMethodInput;
+export type MutationUpdateChannelLogoArgs = {
+  logoAssetId?: InputMaybe<Scalars['ID']['input']>;
 };
 
-export type MutationUpdateChannelSettingsArgs = {
-  input: UpdateChannelSettingsInput;
+export type MutationUpdateChannelPaymentMethodArgs = {
+  input: UpdatePaymentMethodInput;
 };
 
 export type MutationUpdateChannelStatusArgs = {
@@ -4770,6 +4777,10 @@ export type MutationUpdateOrderNoteArgs = {
 
 export type MutationUpdatePaymentMethodArgs = {
   input: UpdatePaymentMethodInput;
+};
+
+export type MutationUpdatePrinterSettingsArgs = {
+  enablePrinter: Scalars['Boolean']['input'];
 };
 
 export type MutationUpdateProductArgs = {
@@ -8209,13 +8220,6 @@ export type UpdateChannelInput = {
 
 export type UpdateChannelResult = Channel | LanguageNotAvailableError;
 
-export type UpdateChannelSettingsInput = {
-  cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
-  cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
-  companyLogoAssetId?: InputMaybe<Scalars['ID']['input']>;
-  enablePrinter?: InputMaybe<Scalars['Boolean']['input']>;
-};
-
 export type UpdateCollectionInput = {
   assetIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   customFields?: InputMaybe<Scalars['JSON']['input']>;
@@ -8981,6 +8985,16 @@ export type AssignAssetsToProductMutation = {
     assets: Array<{ __typename?: 'Asset'; id: string; name: string; preview: string }>;
     featuredAsset?: { __typename?: 'Asset'; id: string; preview: string } | null;
   };
+};
+
+export type AssignAssetsToChannelMutationVariables = Exact<{
+  assetIds: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
+  channelId: Scalars['ID']['input'];
+}>;
+
+export type AssignAssetsToChannelMutation = {
+  __typename?: 'Mutation';
+  assignAssetsToChannel: Array<{ __typename?: 'Asset'; id: string; name: string }>;
 };
 
 export type DeleteAssetMutationVariables = Exact<{
@@ -10664,18 +10678,49 @@ export type DeleteSupplierMutation = {
   };
 };
 
-export type UpdateChannelSettingsMutationVariables = Exact<{
-  input: UpdateChannelSettingsInput;
+export type UpdateChannelLogoMutationVariables = Exact<{
+  logoAssetId?: InputMaybe<Scalars['ID']['input']>;
 }>;
 
-export type UpdateChannelSettingsMutation = {
+export type UpdateChannelLogoMutation = {
   __typename?: 'Mutation';
-  updateChannelSettings: {
+  updateChannelLogo: {
     __typename?: 'ChannelSettings';
     cashierFlowEnabled: boolean;
     cashierOpen: boolean;
     enablePrinter: boolean;
-    companyLogoAsset?: { __typename?: 'Asset'; id: string; source: string; preview: string } | null;
+    companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
+  };
+};
+
+export type UpdateCashierSettingsMutationVariables = Exact<{
+  cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
+
+export type UpdateCashierSettingsMutation = {
+  __typename?: 'Mutation';
+  updateCashierSettings: {
+    __typename?: 'ChannelSettings';
+    cashierFlowEnabled: boolean;
+    cashierOpen: boolean;
+    enablePrinter: boolean;
+    companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
+  };
+};
+
+export type UpdatePrinterSettingsMutationVariables = Exact<{
+  enablePrinter: Scalars['Boolean']['input'];
+}>;
+
+export type UpdatePrinterSettingsMutation = {
+  __typename?: 'Mutation';
+  updatePrinterSettings: {
+    __typename?: 'ChannelSettings';
+    cashierFlowEnabled: boolean;
+    cashierOpen: boolean;
+    enablePrinter: boolean;
+    companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
   };
 };
 
@@ -12917,6 +12962,77 @@ export const AssignAssetsToProductDocument = {
     },
   ],
 } as unknown as DocumentNode<AssignAssetsToProductMutation, AssignAssetsToProductMutationVariables>;
+export const AssignAssetsToChannelDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'AssignAssetsToChannel' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'assetIds' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'ListType',
+              type: {
+                kind: 'NonNullType',
+                type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+              },
+            },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'assignAssetsToChannel' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: {
+                  kind: 'ObjectValue',
+                  fields: [
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'assetIds' },
+                      value: { kind: 'Variable', name: { kind: 'Name', value: 'assetIds' } },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'channelId' },
+                      value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+                    },
+                  ],
+                },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<AssignAssetsToChannelMutation, AssignAssetsToChannelMutationVariables>;
 export const DeleteAssetDocument = {
   kind: 'Document',
   definitions: [
@@ -17975,24 +18091,18 @@ export const DeleteSupplierDocument = {
     },
   ],
 } as unknown as DocumentNode<DeleteSupplierMutation, DeleteSupplierMutationVariables>;
-export const UpdateChannelSettingsDocument = {
+export const UpdateChannelLogoDocument = {
   kind: 'Document',
   definitions: [
     {
       kind: 'OperationDefinition',
       operation: 'mutation',
-      name: { kind: 'Name', value: 'UpdateChannelSettings' },
+      name: { kind: 'Name', value: 'UpdateChannelLogo' },
       variableDefinitions: [
         {
           kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
-          type: {
-            kind: 'NonNullType',
-            type: {
-              kind: 'NamedType',
-              name: { kind: 'Name', value: 'UpdateChannelSettingsInput' },
-            },
-          },
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'logoAssetId' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
         },
       ],
       selectionSet: {
@@ -18000,12 +18110,12 @@ export const UpdateChannelSettingsDocument = {
         selections: [
           {
             kind: 'Field',
-            name: { kind: 'Name', value: 'updateChannelSettings' },
+            name: { kind: 'Name', value: 'updateChannelLogo' },
             arguments: [
               {
                 kind: 'Argument',
-                name: { kind: 'Name', value: 'input' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+                name: { kind: 'Name', value: 'logoAssetId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'logoAssetId' } },
               },
             ],
             selectionSet: {
@@ -18021,8 +18131,8 @@ export const UpdateChannelSettingsDocument = {
                     kind: 'SelectionSet',
                     selections: [
                       { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'source' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'preview' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'source' } },
                     ],
                   },
                 },
@@ -18033,7 +18143,126 @@ export const UpdateChannelSettingsDocument = {
       },
     },
   ],
-} as unknown as DocumentNode<UpdateChannelSettingsMutation, UpdateChannelSettingsMutationVariables>;
+} as unknown as DocumentNode<UpdateChannelLogoMutation, UpdateChannelLogoMutationVariables>;
+export const UpdateCashierSettingsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateCashierSettings' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Boolean' } },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'cashierOpen' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Boolean' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateCashierSettings' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'cashierFlowEnabled' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'cashierOpen' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'cashierOpen' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'cashierOpen' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'companyLogoAsset' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'preview' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'source' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UpdateCashierSettingsMutation, UpdateCashierSettingsMutationVariables>;
+export const UpdatePrinterSettingsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdatePrinterSettings' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'enablePrinter' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'Boolean' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updatePrinterSettings' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'enablePrinter' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'enablePrinter' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'cashierOpen' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'companyLogoAsset' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'preview' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'source' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UpdatePrinterSettingsMutation, UpdatePrinterSettingsMutationVariables>;
 export const InviteChannelAdministratorDocument = {
   kind: 'Document',
   definitions: [

@@ -1,4 +1,4 @@
-import { RequestContext } from '@vendure/core';
+import { EventBus, RequestContext } from '@vendure/core';
 import { MockDb, MlExtractionQueueRow } from '../../support/mock-db';
 import { MlExtractionQueueService } from '../../../src/services/ml/ml-extraction-queue.service';
 
@@ -8,10 +8,12 @@ describe('MlExtractionQueueService', () => {
 
   let db: MockDb;
   let service: MlExtractionQueueService;
+  let mockEventBus: jest.Mocked<EventBus>;
 
   beforeEach(() => {
     db = new MockDb({ now: () => new Date(fixedNow) });
-    service = new MlExtractionQueueService(db.connection);
+    mockEventBus = { publish: jest.fn() } as any;
+    service = new MlExtractionQueueService(db.connection, mockEventBus);
   });
 
   describe('Given a fresh install without ml_extraction_queue', () => {
