@@ -1394,6 +1394,27 @@ export const config: VendureConfig = {
         ui: { tab: 'Notifications' },
       },
     ],
+    Administrator: [
+      {
+        name: 'profilePicture',
+        type: 'relation',
+        entity: Asset,
+        label: [{ languageCode: LanguageCode.en, value: 'Profile Picture' }],
+        description: [
+          { languageCode: LanguageCode.en, value: 'Profile picture for the administrator' },
+        ],
+        public: true,
+        nullable: true,
+        ui: {
+          tab: 'Profile',
+          component: 'asset-selector',
+          props: {
+            acceptedFileTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+            multiple: false,
+          },
+        },
+      },
+    ],
   },
   orderOptions: {
     process: [customOrderProcess],

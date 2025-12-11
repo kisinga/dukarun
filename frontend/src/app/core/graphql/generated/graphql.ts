@@ -124,13 +124,18 @@ export enum AdjustmentType {
 export type Administrator = Node & {
   __typename?: 'Administrator';
   createdAt: Scalars['DateTime']['output'];
-  customFields?: Maybe<Scalars['JSON']['output']>;
+  customFields?: Maybe<AdministratorCustomFields>;
   emailAddress: Scalars['String']['output'];
   firstName: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   lastName: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   user: User;
+};
+
+export type AdministratorCustomFields = {
+  __typename?: 'AdministratorCustomFields';
+  profilePicture?: Maybe<Asset>;
 };
 
 export type AdministratorFilterParameter = {
@@ -185,6 +190,7 @@ export type AdministratorSortParameter = {
   firstName?: InputMaybe<SortOrder>;
   id?: InputMaybe<SortOrder>;
   lastName?: InputMaybe<SortOrder>;
+  profilePicture?: InputMaybe<SortOrder>;
   updatedAt?: InputMaybe<SortOrder>;
 };
 
@@ -1101,8 +1107,12 @@ export type CreateAddressInput = {
   streetLine2?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type CreateAdministratorCustomFieldsInput = {
+  profilePictureId?: InputMaybe<Scalars['ID']['input']>;
+};
+
 export type CreateAdministratorInput = {
-  customFields?: InputMaybe<Scalars['JSON']['input']>;
+  customFields?: InputMaybe<CreateAdministratorCustomFieldsInput>;
   emailAddress: Scalars['String']['input'];
   firstName: Scalars['String']['input'];
   lastName: Scalars['String']['input'];
@@ -3828,6 +3838,7 @@ export type Mutation = {
   requestEmailRegistrationOTP: OtpResponse;
   requestLoginOTP: OtpResponse;
   requestRegistrationOTP: OtpResponse;
+  requestUpdateOTP: OtpResponse;
   reviewCashCount: CashDrawerCount;
   runPendingSearchIndexUpdates: Success;
   runScheduledTask: Success;
@@ -4583,6 +4594,10 @@ export type MutationRequestLoginOtpArgs = {
 export type MutationRequestRegistrationOtpArgs = {
   phoneNumber: Scalars['String']['input'];
   registrationData: RegistrationInput;
+};
+
+export type MutationRequestUpdateOtpArgs = {
+  identifier: Scalars['String']['input'];
 };
 
 export type MutationReviewCashCountArgs = {
@@ -6369,6 +6384,7 @@ export type Query = {
   channels: ChannelList;
   checkAuthorizationStatus: AuthorizationStatus;
   checkCompanyCodeAvailability: Scalars['Boolean']['output'];
+  checkIdentifierAvailable: Scalars['Boolean']['output'];
   /** Quick subscription status check */
   checkSubscriptionStatus: SubscriptionStatus;
   closedPeriods: Array<AccountingPeriod>;
@@ -6536,6 +6552,10 @@ export type QueryCheckAuthorizationStatusArgs = {
 
 export type QueryCheckCompanyCodeAvailabilityArgs = {
   companyCode: Scalars['String']['input'];
+};
+
+export type QueryCheckIdentifierAvailableArgs = {
+  identifier: Scalars['String']['input'];
 };
 
 export type QueryCheckSubscriptionStatusArgs = {
@@ -8097,7 +8117,7 @@ export type TransitionOrderToStateResult = Order | OrderStateTransitionError;
 export type TransitionPaymentToStateResult = Payment | PaymentStateTransitionError;
 
 export type UpdateActiveAdministratorInput = {
-  customFields?: InputMaybe<Scalars['JSON']['input']>;
+  customFields?: InputMaybe<UpdateAdministratorCustomFieldsInput>;
   emailAddress?: InputMaybe<Scalars['String']['input']>;
   firstName?: InputMaybe<Scalars['String']['input']>;
   lastName?: InputMaybe<Scalars['String']['input']>;
@@ -8127,8 +8147,12 @@ export type UpdateAddressInput = {
   streetLine2?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateAdministratorCustomFieldsInput = {
+  profilePictureId?: InputMaybe<Scalars['ID']['input']>;
+};
+
 export type UpdateAdministratorInput = {
-  customFields?: InputMaybe<Scalars['JSON']['input']>;
+  customFields?: InputMaybe<UpdateAdministratorCustomFieldsInput>;
   emailAddress?: InputMaybe<Scalars['String']['input']>;
   firstName?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
@@ -8694,6 +8718,10 @@ export type GetActiveAdministratorQuery = {
         permissions: Array<Permission>;
       }>;
     };
+    customFields?: {
+      __typename?: 'AdministratorCustomFields';
+      profilePicture?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
+    } | null;
   } | null;
 };
 
@@ -8820,6 +8848,10 @@ export type UpdateAdministratorMutation = {
     firstName: string;
     lastName: string;
     emailAddress: string;
+    customFields?: {
+      __typename?: 'AdministratorCustomFields';
+      profilePicture?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
+    } | null;
   };
 };
 
@@ -11751,6 +11783,27 @@ export const GetActiveAdministratorDocument = {
                     ],
                   },
                 },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'customFields' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'profilePicture' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'preview' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'source' } },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
               ],
             },
           },
@@ -12265,6 +12318,27 @@ export const UpdateAdministratorDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'customFields' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'profilePicture' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'preview' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'source' } },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
               ],
             },
           },

@@ -18,6 +18,7 @@ import { PayOrderModalComponent, PayOrderModalData } from './components/pay-orde
 import { OrderSearchBarComponent } from './components/order-search-bar.component';
 import { OrderStats, OrderStatsComponent } from './components/order-stats.component';
 import { OrderTableRowComponent } from './components/order-table-row.component';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
 /**
  * Orders list page - refactored with composable components
@@ -38,6 +39,7 @@ import { OrderTableRowComponent } from './components/order-table-row.component';
     OrderTableRowComponent,
     PaginationComponent,
     PayOrderModalComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './orders.component.html',
   styleUrl: './orders.component.scss',

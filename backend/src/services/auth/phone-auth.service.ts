@@ -592,4 +592,64 @@ export class PhoneAuthService {
       };
     }
   }
+
+  /**
+   * Request OTP for updating email or phone number
+   *
+   * Flow:
+   * 1. Check if identifier is already taken by another user
+   * 2. If taken -> Return error
+   * 3. If unique -> Send OTP
+   */
+  async requestUpdateOTP(
+    ctx: RequestContext,
+    identifier: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    expiresAt?: number;
+  }> {
+    // Determine if identifier is email or phone
+    const isEmail = identifier.includes('@');
+    const normalizedIdentifier = isEmail ? identifier : formatPhoneNumber(identifier);
+
+    // Check if identifier is already taken by another user
+    const existingUser = await this.userService.getUserByEmailAddress(ctx, normalizedIdentifier);
+
+    if (existingUser) {
+      // Identifier is already in use
+      return {
+        success: false,
+        message: isEmail
+          ? 'This email address is already in use by another account.'
+          : 'This phone number is already in use by another account.',
+      };
+    }
+
+    // Identifier is unique, send OTP
+    // For email updates, send via email; for phone updates, send via SMS
+    return await this.otpService.requestOTP(
+      normalizedIdentifier,
+      'login', // Using 'login' purpose since it's for account update
+      ctx,
+      ctx.channelId?.toString(),
+      isEmail ? normalizedIdentifier : undefined
+    );
+  }
+
+  /**
+   * Check if an identifier (email or phone) is available
+   * Returns true if identifier is NOT in use (available), false if taken
+   */
+  async checkIdentifierAvailable(ctx: RequestContext, identifier: string): Promise<boolean> {
+    // Determine if identifier is email or phone
+    const isEmail = identifier.includes('@');
+    const normalizedIdentifier = isEmail ? identifier : formatPhoneNumber(identifier);
+
+    // Check if identifier is already taken by another user
+    const existingUser = await this.userService.getUserByEmailAddress(ctx, normalizedIdentifier);
+
+    // Return true if available (no user found), false if taken
+    return !existingUser;
+  }
 }

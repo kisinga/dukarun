@@ -550,7 +550,7 @@ Run frontend and backend manually on your machine for fastest iteration.
 
 ```bash
 # 1. Start dependencies only
-docker compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml up -d
 
 # 2. Configure environment
 cp .env.example .env

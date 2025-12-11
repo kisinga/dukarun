@@ -38,6 +38,13 @@ export const GET_ACTIVE_ADMIN = graphql(`
           permissions
         }
       }
+      customFields {
+        profilePicture {
+          id
+          preview
+          source
+        }
+      }
     }
   }
 `);
@@ -143,6 +150,13 @@ export const UPDATE_ADMINISTRATOR = graphql(`
       firstName
       lastName
       emailAddress
+      customFields {
+        profilePicture {
+          id
+          preview
+          source
+        }
+      }
     }
   }
 `);

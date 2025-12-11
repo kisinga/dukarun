@@ -15,7 +15,7 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
  */
 type Documents = {
   '\n  mutation UpdateOrderLineQuantity($orderLineId: ID!, $quantity: Float!) {\n    updateOrderLineQuantity(orderLineId: $orderLineId, quantity: $quantity) {\n      ... on Order {\n        id\n        lines {\n          id\n          quantity\n          productVariant {\n            id\n            name\n            customFields {\n              allowFractionalQuantity\n            }\n          }\n        }\n      }\n      ... on ErrorResult {\n        errorCode\n        message\n      }\n    }\n  }\n': typeof types.UpdateOrderLineQuantityDocument;
-  '\n  query GetActiveAdministrator {\n    activeAdministrator {\n      id\n      firstName\n      lastName\n      emailAddress\n      user {\n        id\n        identifier\n        roles {\n          id\n          code\n          permissions\n        }\n      }\n    }\n  }\n': typeof types.GetActiveAdministratorDocument;
+  '\n  query GetActiveAdministrator {\n    activeAdministrator {\n      id\n      firstName\n      lastName\n      emailAddress\n      user {\n        id\n        identifier\n        roles {\n          id\n          code\n          permissions\n        }\n      }\n      customFields {\n        profilePicture {\n          id\n          preview\n          source\n        }\n      }\n    }\n  }\n': typeof types.GetActiveAdministratorDocument;
   '\n  mutation Login($username: String!, $password: String!, $rememberMe: Boolean) {\n    login(username: $username, password: $password, rememberMe: $rememberMe) {\n      ... on CurrentUser {\n        id\n        identifier\n        channels {\n          id\n          code\n          token\n        }\n      }\n      ... on InvalidCredentialsError {\n        errorCode\n        message\n      }\n      ... on NativeAuthStrategyError {\n        errorCode\n        message\n      }\n    }\n  }\n': typeof types.LoginDocument;
   '\n  mutation RequestRegistrationOTP($phoneNumber: String!, $registrationData: RegistrationInput!) {\n    requestRegistrationOTP(phoneNumber: $phoneNumber, registrationData: $registrationData) {\n      success\n      message\n      sessionId\n      expiresAt\n    }\n  }\n': typeof types.RequestRegistrationOtpDocument;
   '\n  mutation VerifyRegistrationOTP($phoneNumber: String!, $otp: String!, $sessionId: String!) {\n    verifyRegistrationOTP(phoneNumber: $phoneNumber, otp: $otp, sessionId: $sessionId) {\n      success\n      userId\n      message\n    }\n  }\n': typeof types.VerifyRegistrationOtpDocument;
@@ -24,7 +24,7 @@ type Documents = {
   '\n  query CheckAuthorizationStatus($identifier: String!) {\n    checkAuthorizationStatus(identifier: $identifier) {\n      status\n      message\n    }\n  }\n': typeof types.CheckAuthorizationStatusDocument;
   '\n  query CheckCompanyCodeAvailability($companyCode: String!) {\n    checkCompanyCodeAvailability(companyCode: $companyCode)\n  }\n': typeof types.CheckCompanyCodeAvailabilityDocument;
   '\n  mutation Logout {\n    logout {\n      success\n    }\n  }\n': typeof types.LogoutDocument;
-  '\n  mutation UpdateAdministrator($input: UpdateActiveAdministratorInput!) {\n    updateActiveAdministrator(input: $input) {\n      id\n      firstName\n      lastName\n      emailAddress\n    }\n  }\n': typeof types.UpdateAdministratorDocument;
+  '\n  mutation UpdateAdministrator($input: UpdateActiveAdministratorInput!) {\n    updateActiveAdministrator(input: $input) {\n      id\n      firstName\n      lastName\n      emailAddress\n      customFields {\n        profilePicture {\n          id\n          preview\n          source\n        }\n      }\n    }\n  }\n': typeof types.UpdateAdministratorDocument;
   '\n  query GetUserChannels {\n    me {\n      id\n      identifier\n      channels {\n        id\n        code\n        token\n      }\n    }\n  }\n': typeof types.GetUserChannelsDocument;
   '\n  query GetActiveChannel {\n    activeChannel {\n      id\n      code\n      token\n      defaultCurrencyCode\n      customFields {\n        mlModelJsonAsset {\n          id\n          source\n          name\n        }\n        mlModelBinAsset {\n          id\n          source\n          name\n        }\n        mlMetadataAsset {\n          id\n          source\n          name\n        }\n        companyLogoAsset {\n          id\n          source\n          name\n          preview\n        }\n        cashierFlowEnabled\n        cashierOpen\n        enablePrinter\n        subscriptionStatus\n        trialEndsAt\n        subscriptionExpiresAt\n      }\n    }\n  }\n': typeof types.GetActiveChannelDocument;
   '\n  query GetStockLocations {\n    stockLocations(options: { take: 100 }) {\n      items {\n        id\n        name\n        description\n      }\n    }\n  }\n': typeof types.GetStockLocationsDocument;
@@ -148,7 +148,7 @@ type Documents = {
 const documents: Documents = {
   '\n  mutation UpdateOrderLineQuantity($orderLineId: ID!, $quantity: Float!) {\n    updateOrderLineQuantity(orderLineId: $orderLineId, quantity: $quantity) {\n      ... on Order {\n        id\n        lines {\n          id\n          quantity\n          productVariant {\n            id\n            name\n            customFields {\n              allowFractionalQuantity\n            }\n          }\n        }\n      }\n      ... on ErrorResult {\n        errorCode\n        message\n      }\n    }\n  }\n':
     types.UpdateOrderLineQuantityDocument,
-  '\n  query GetActiveAdministrator {\n    activeAdministrator {\n      id\n      firstName\n      lastName\n      emailAddress\n      user {\n        id\n        identifier\n        roles {\n          id\n          code\n          permissions\n        }\n      }\n    }\n  }\n':
+  '\n  query GetActiveAdministrator {\n    activeAdministrator {\n      id\n      firstName\n      lastName\n      emailAddress\n      user {\n        id\n        identifier\n        roles {\n          id\n          code\n          permissions\n        }\n      }\n      customFields {\n        profilePicture {\n          id\n          preview\n          source\n        }\n      }\n    }\n  }\n':
     types.GetActiveAdministratorDocument,
   '\n  mutation Login($username: String!, $password: String!, $rememberMe: Boolean) {\n    login(username: $username, password: $password, rememberMe: $rememberMe) {\n      ... on CurrentUser {\n        id\n        identifier\n        channels {\n          id\n          code\n          token\n        }\n      }\n      ... on InvalidCredentialsError {\n        errorCode\n        message\n      }\n      ... on NativeAuthStrategyError {\n        errorCode\n        message\n      }\n    }\n  }\n':
     types.LoginDocument,
@@ -165,7 +165,7 @@ const documents: Documents = {
   '\n  query CheckCompanyCodeAvailability($companyCode: String!) {\n    checkCompanyCodeAvailability(companyCode: $companyCode)\n  }\n':
     types.CheckCompanyCodeAvailabilityDocument,
   '\n  mutation Logout {\n    logout {\n      success\n    }\n  }\n': types.LogoutDocument,
-  '\n  mutation UpdateAdministrator($input: UpdateActiveAdministratorInput!) {\n    updateActiveAdministrator(input: $input) {\n      id\n      firstName\n      lastName\n      emailAddress\n    }\n  }\n':
+  '\n  mutation UpdateAdministrator($input: UpdateActiveAdministratorInput!) {\n    updateActiveAdministrator(input: $input) {\n      id\n      firstName\n      lastName\n      emailAddress\n      customFields {\n        profilePicture {\n          id\n          preview\n          source\n        }\n      }\n    }\n  }\n':
     types.UpdateAdministratorDocument,
   '\n  query GetUserChannels {\n    me {\n      id\n      identifier\n      channels {\n        id\n        code\n        token\n      }\n    }\n  }\n':
     types.GetUserChannelsDocument,
@@ -428,8 +428,8 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
-  source: '\n  query GetActiveAdministrator {\n    activeAdministrator {\n      id\n      firstName\n      lastName\n      emailAddress\n      user {\n        id\n        identifier\n        roles {\n          id\n          code\n          permissions\n        }\n      }\n    }\n  }\n',
-): (typeof documents)['\n  query GetActiveAdministrator {\n    activeAdministrator {\n      id\n      firstName\n      lastName\n      emailAddress\n      user {\n        id\n        identifier\n        roles {\n          id\n          code\n          permissions\n        }\n      }\n    }\n  }\n'];
+  source: '\n  query GetActiveAdministrator {\n    activeAdministrator {\n      id\n      firstName\n      lastName\n      emailAddress\n      user {\n        id\n        identifier\n        roles {\n          id\n          code\n          permissions\n        }\n      }\n      customFields {\n        profilePicture {\n          id\n          preview\n          source\n        }\n      }\n    }\n  }\n',
+): (typeof documents)['\n  query GetActiveAdministrator {\n    activeAdministrator {\n      id\n      firstName\n      lastName\n      emailAddress\n      user {\n        id\n        identifier\n        roles {\n          id\n          code\n          permissions\n        }\n      }\n      customFields {\n        profilePicture {\n          id\n          preview\n          source\n        }\n      }\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -482,8 +482,8 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
-  source: '\n  mutation UpdateAdministrator($input: UpdateActiveAdministratorInput!) {\n    updateActiveAdministrator(input: $input) {\n      id\n      firstName\n      lastName\n      emailAddress\n    }\n  }\n',
-): (typeof documents)['\n  mutation UpdateAdministrator($input: UpdateActiveAdministratorInput!) {\n    updateActiveAdministrator(input: $input) {\n      id\n      firstName\n      lastName\n      emailAddress\n    }\n  }\n'];
+  source: '\n  mutation UpdateAdministrator($input: UpdateActiveAdministratorInput!) {\n    updateActiveAdministrator(input: $input) {\n      id\n      firstName\n      lastName\n      emailAddress\n      customFields {\n        profilePicture {\n          id\n          preview\n          source\n        }\n      }\n    }\n  }\n',
+): (typeof documents)['\n  mutation UpdateAdministrator($input: UpdateActiveAdministratorInput!) {\n    updateActiveAdministrator(input: $input) {\n      id\n      firstName\n      lastName\n      emailAddress\n      customFields {\n        profilePicture {\n          id\n          preview\n          source\n        }\n      }\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
