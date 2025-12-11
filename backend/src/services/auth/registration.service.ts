@@ -1,7 +1,8 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { RequestContext, User } from '@vendure/core';
+import { EventBus, RequestContext, User } from '@vendure/core';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 import { TracingService } from '../../infrastructure/observability/tracing.service';
+import { CompanyRegisteredEvent } from '../../infrastructure/events/custom-events';
 import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import { AccessProvisionerService } from './provisioning/access-provisioner.service';
 import { ChannelProvisionerService } from './provisioning/channel-provisioner.service';
@@ -77,6 +78,7 @@ export class RegistrationService {
     private readonly accessProvisioner: AccessProvisionerService,
     private readonly errorService: RegistrationErrorService,
     private readonly chartOfAccountsService: ChartOfAccountsService,
+    private readonly eventBus: EventBus,
     @Optional() private readonly tracingService?: TracingService
   ) {}
 
@@ -251,6 +253,20 @@ export class RegistrationService {
       });
 
       this.logger.log(`Provisioning complete: ${JSON.stringify(result)}`);
+
+      // Notify platform admins about new registration
+      this.eventBus.publish(
+        new CompanyRegisteredEvent(ctx, {
+          companyName: registrationData.companyName,
+          companyCode: channel.code,
+          channelId: channel.id.toString(),
+          adminName: `${registrationData.adminFirstName} ${registrationData.adminLastName}`,
+          adminPhone: formattedPhone,
+          adminEmail: registrationData.adminEmail,
+          storeName: registrationData.storeName,
+        })
+      );
+
       this.tracingService?.endSpan(span!, true);
       return result;
     } catch (error: any) {

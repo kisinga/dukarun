@@ -5,9 +5,11 @@ import {
   NotificationService,
   NotificationType,
 } from '../../services/notifications/notification.service';
+import { AdminNotificationService } from '../../services/notifications/admin-notification.service';
 import {
   AdminActionEvent,
   ChannelStatusEvent,
+  CompanyRegisteredEvent,
   CustomerNotificationEvent,
   DukaHubEvent,
   MLStatusEvent,
@@ -29,7 +31,8 @@ export class NotificationSubscriber implements OnModuleInit {
   constructor(
     private readonly eventBus: EventBus,
     private readonly notificationService: NotificationService,
-    private readonly channelUserService: ChannelUserService
+    private readonly channelUserService: ChannelUserService,
+    private readonly adminNotificationService: AdminNotificationService
   ) {}
 
   onModuleInit(): void {
@@ -43,6 +46,7 @@ export class NotificationSubscriber implements OnModuleInit {
     this.eventBus.ofType(CustomerNotificationEvent).subscribe(e => this.handleCustomer(e));
     this.eventBus.ofType(ChannelStatusEvent).subscribe(e => this.handleChannelStatus(e));
     this.eventBus.ofType(StockAlertEvent).subscribe(e => this.handleStockAlert(e));
+    this.eventBus.ofType(CompanyRegisteredEvent).subscribe(e => this.handleCompanyRegistered(e));
 
     this.logger.log('NotificationSubscriber initialized');
   }
@@ -221,6 +225,23 @@ export class NotificationSubscriber implements OnModuleInit {
       }
     } catch (error) {
       this.logError('StockAlertEvent', error);
+    }
+  }
+
+  // ============================================================================
+  // PLATFORM-LEVEL EVENT HANDLERS
+  // These events notify platform admins (not channel-scoped)
+  // ============================================================================
+
+  private async handleCompanyRegistered(event: CompanyRegisteredEvent): Promise<void> {
+    try {
+      this.logger.log(`New company registered: ${event.companyDetails.companyName}`);
+      await this.adminNotificationService.sendCompanyRegisteredNotification(
+        event.ctx,
+        event.companyDetails
+      );
+    } catch (error) {
+      this.logError('CompanyRegisteredEvent', error);
     }
   }
 

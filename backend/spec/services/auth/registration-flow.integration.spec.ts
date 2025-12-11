@@ -184,6 +184,11 @@ describe('Registration Flow Integration', () => {
       verifyChannelAccounts: jest.fn(async () => undefined),
     };
 
+    // Mock EventBus for CompanyRegisteredEvent
+    const eventBus = {
+      publish: jest.fn(),
+    };
+
     // Build registration service with mocked provisioners
     const registrationService = new RegistrationService(
       validator as any,
@@ -195,6 +200,7 @@ describe('Registration Flow Integration', () => {
       accessProvisioner as any,
       errorService as any,
       chartOfAccountsService as any,
+      eventBus as any,
       undefined // tracingService
     );
 

@@ -136,3 +136,25 @@ export class StockAlertEvent extends DukaHubEvent {
     super(ctx, channelId, { productId, alertType, ...data });
   }
 }
+
+/**
+ * Company registration event
+ * Fired when a new company completes registration
+ * Used to notify platform admins for approval
+ */
+export class CompanyRegisteredEvent extends VendureEvent {
+  constructor(
+    public readonly ctx: RequestContext,
+    public readonly companyDetails: {
+      companyName: string;
+      companyCode: string;
+      channelId: string;
+      adminName: string;
+      adminPhone: string;
+      adminEmail?: string;
+      storeName: string;
+    }
+  ) {
+    super();
+  }
+}

@@ -8,6 +8,7 @@ import {
 } from '../../services/notifications/notification.service';
 import { NotificationTestController } from './notification-test.controller';
 import { PushNotificationService } from '../../services/notifications/push-notification.service';
+import { AdminNotificationService } from '../../services/notifications/admin-notification.service';
 import { ChannelUserService } from '../../services/auth/channel-user.service';
 
 @VendurePlugin({
@@ -16,6 +17,7 @@ import { ChannelUserService } from '../../services/auth/channel-user.service';
     NotificationResolver,
     NotificationService,
     PushNotificationService,
+    AdminNotificationService,
     ChannelUserService,
   ],
   controllers: [NotificationTestController],

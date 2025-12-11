@@ -120,6 +120,13 @@ export class EnvironmentConfig implements OnModuleInit {
     otlpHttpEndpoint: '',
   };
 
+  // Admin notification configuration (for platform-level alerts like new registrations)
+  readonly adminNotifications = {
+    email: '', // ADMIN_NOTIFICATION_EMAIL - receives registration alerts
+    phone: '', // ADMIN_NOTIFICATION_PHONE - receives SMS alerts
+    channels: 'email', // ADMIN_NOTIFICATION_CHANNELS - comma-separated: email,sms
+  };
+
   /**
    * Get singleton instance (for use before DI container is ready)
    */
@@ -269,6 +276,11 @@ export class EnvironmentConfig implements OnModuleInit {
     // Legacy endpoint support (for backward compatibility)
     this.observability.endpoint =
       process.env.SIGNOZ_ENDPOINT || this.observability.otlpGrpcEndpoint;
+
+    // Load Admin Notification configuration
+    this.adminNotifications.email = process.env.ADMIN_NOTIFICATION_EMAIL || '';
+    this.adminNotifications.phone = process.env.ADMIN_NOTIFICATION_PHONE || '';
+    this.adminNotifications.channels = process.env.ADMIN_NOTIFICATION_CHANNELS || 'email';
 
     this.validate();
   }
