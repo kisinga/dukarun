@@ -7,7 +7,6 @@ import {
   GET_CUSTOMERS,
 } from '../../graphql/operations.graphql';
 import { formatPhoneNumber } from '../../utils/phone.utils';
-import { generateEmailFromPhone } from '../../utils/email.utils';
 import { mergeCustomerFields } from '../../utils/customer-merge.utils';
 import { ApolloService } from '../apollo.service';
 import { CustomerInput } from '../customer.service';
@@ -88,8 +87,8 @@ export class CustomerApiService {
           // Generate email from phone if missing
           let emailAddress = input.emailAddress?.trim();
           if (!emailAddress && normalizedPhone) {
-            emailAddress = generateEmailFromPhone(normalizedPhone);
-            console.log('📧 Generated email from phone:', emailAddress);
+            // Backend handles sentinel email generation
+            console.log('📧 No email provided, backend will generate sentinel email');
           }
 
           // Merge customer fields while preserving supplier capability and fields
@@ -124,17 +123,14 @@ export class CustomerApiService {
       // Generate email from phone if missing or empty
       let emailAddress = input.emailAddress?.trim();
       if (!emailAddress && normalizedPhone) {
-        emailAddress = generateEmailFromPhone(normalizedPhone);
-        console.log('📧 Generated email from phone:', emailAddress);
+        // Backend handles sentinel email generation
+        console.log('📧 No email provided, backend will generate sentinel email');
       }
 
-      // Ensure email is always present (required by Vendure)
-      if (!emailAddress) {
-        this.stateService.setError(
-          'Email address is required. Please provide an email or phone number.',
-        );
-        return null;
-      }
+      // Ensure email structure for API (can be empty string if backend handles it)
+      // We send explicit empty string so that the backend interceptor can see it's missing
+      // and generate the sentinel email if needed.
+      const emailToSend = emailAddress || '';
 
       // Build customFields if credit fields are provided
       const customFields: any = {};
@@ -152,7 +148,7 @@ export class CustomerApiService {
         firstName: input.firstName,
         lastName: input.lastName,
         phoneNumber: normalizedPhone,
-        emailAddress,
+        emailAddress: emailToSend,
       };
 
       // Only include customFields if there are any credit fields

@@ -10,6 +10,7 @@ import {
   UserInputError,
 } from '@vendure/core';
 import { formatPhoneNumber } from '../../utils/phone.utils';
+import { generateSentinelEmailFromPhone, getWalkInEmail } from '../../utils/email.utils';
 import { CustomerLookupService } from '../../services/customers/customer-lookup.service';
 
 /**
@@ -49,11 +50,12 @@ export class CustomerResolver {
   @Allow(Permission.CreateCustomer)
   async createCustomerSafe(
     @Ctx() ctx: RequestContext,
-    @Args('input') input: CreateCustomerInput
+    @Args('input') input: CreateCustomerInput,
+    @Args('isWalkIn', { nullable: true }) isWalkIn?: boolean
   ): Promise<Customer> {
     // Normalize phone number if provided
     let normalizedPhone: string | undefined;
-    if (input.phoneNumber) {
+    if (input.phoneNumber && input.phoneNumber !== '0000000000') {
       try {
         normalizedPhone = formatPhoneNumber(input.phoneNumber);
       } catch (error) {
@@ -61,6 +63,17 @@ export class CustomerResolver {
           `Invalid phone number format: ${error instanceof Error ? error.message : String(error)}`
         );
       }
+    }
+
+    // Handle Walk-in logic (Backend Control)
+    if (isWalkIn) {
+      this.logger.log('Creating Walk-in customer - generating sentinel email');
+      input.emailAddress = getWalkInEmail();
+    }
+    // Handle Regular/Supplier missing email -> generate from phone
+    else if ((!input.emailAddress || input.emailAddress.trim() === '') && normalizedPhone) {
+      this.logger.log(`Generating sentinel email for customer with phone: ${normalizedPhone}`);
+      input.emailAddress = generateSentinelEmailFromPhone(normalizedPhone, 'customer');
     }
 
     // Check for existing customer by phone number

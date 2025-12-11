@@ -12,7 +12,6 @@ import {
 } from '@vendure/core';
 import gql from 'graphql-tag';
 import { MlTrainingService, TrainingManifest } from '../../services/ml/ml-training.service';
-import { ChannelUpdateHelper } from '../../services/channels/channel-update.helper';
 
 /**
  * GraphQL schema extension for ML model management
@@ -122,8 +121,7 @@ export class MlModelResolver {
   constructor(
     private channelService: ChannelService,
     private assetService: AssetService,
-    private mlTrainingService: MlTrainingService,
-    private channelUpdateHelper: ChannelUpdateHelper
+    private mlTrainingService: MlTrainingService
   ) {}
 
   @Query()
@@ -179,20 +177,16 @@ export class MlModelResolver {
 
     const version = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
 
-    await this.channelUpdateHelper.updateChannelCustomFields(
-      ctx,
-      args.channelId.toString(),
-      {
+    await this.channelService.update(ctx, {
+      id: args.channelId.toString(),
+      customFields: {
         mlModelJsonId: args.modelJsonId,
         mlModelBinId: args.modelBinId,
         mlMetadataId: args.metadataId,
         mlModelVersion: version,
         mlModelStatus: 'active',
-      } as any,
-      {
-        auditEvent: 'channel.ml_model.linked',
-      }
-    );
+      },
+    });
 
     this.logger.log('Assets linked and assigned to channel successfully');
     return true;
@@ -215,17 +209,12 @@ export class MlModelResolver {
       throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
     }
 
-    await this.channelUpdateHelper.updateChannelCustomFields(
-      ctx,
-      args.channelId.toString(),
-      {
+    await this.channelService.update(ctx, {
+      id: args.channelId.toString(),
+      customFields: {
         mlModelStatus: args.status,
-      } as any,
-      {
-        detectChanges: true,
-        auditEvent: 'channel.ml_model.status_updated',
-      }
-    );
+      },
+    });
 
     return true;
   }
@@ -242,20 +231,16 @@ export class MlModelResolver {
       throw new Error('Channel not found');
     }
 
-    await this.channelUpdateHelper.updateChannelCustomFields(
-      ctx,
-      args.channelId.toString(),
-      {
+    await this.channelService.update(ctx, {
+      id: args.channelId.toString(),
+      customFields: {
         mlModelJsonId: null,
         mlModelBinId: null,
         mlMetadataId: null,
         mlModelVersion: null,
         mlModelStatus: 'inactive',
-      } as any,
-      {
-        auditEvent: 'channel.ml_model.cleared',
-      }
-    );
+      },
+    });
 
     return true;
   }
@@ -379,10 +364,10 @@ export class MlModelResolver {
       }
 
       // Update channel with new model assets and stats
-      await this.channelUpdateHelper.updateChannelCustomFields(
-        ctx,
-        args.channelId.toString(),
-        {
+      // Update channel with new model assets and stats
+      await this.channelService.update(ctx, {
+        id: args.channelId.toString(),
+        customFields: {
           mlModelJsonId: modelJsonResult.id.toString(),
           mlModelBinId: weightsResult.id.toString(),
           mlMetadataId: metadataResult.id.toString(),
@@ -392,11 +377,8 @@ export class MlModelResolver {
           mlTrainingProgress: 100,
           mlProductCount: productCount,
           mlImageCount: imageCount,
-        } as any,
-        {
-          auditEvent: 'channel.ml_model.deployed',
-        }
-      );
+        },
+      });
 
       this.logger.log('Training completed successfully');
       return true;

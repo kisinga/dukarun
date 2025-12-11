@@ -17,148 +17,73 @@ export interface OrderStats {
   selector: 'app-order-stats',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+    <!-- Stats - Label-first design for mobile readability -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
       <!-- Total Orders -->
-      <div
-        class="card bg-gradient-to-br from-secondary/10 to-secondary/5 border border-secondary/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
-      >
-        <div class="card-body p-3 lg:p-4">
-          <div class="flex items-center gap-3">
-            <div
-              class="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 text-secondary"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs text-base-content/60 truncate">Total Orders</p>
-              <p class="text-xl lg:text-2xl font-bold text-secondary tracking-tight">
-                {{ stats().totalOrders }}
-              </p>
-            </div>
-          </div>
-        </div>
+      <div class="rounded-xl p-2.5 sm:p-3 bg-base-200/60 border border-base-300/20 shadow-sm">
+        <span
+          class="text-[9px] sm:text-[10px] text-secondary font-bold uppercase tracking-wide text-base-content/50 block mb-1"
+        >
+          Total
+        </span>
+        <p class="text-xl sm:text-2xl font-extrabold text-secondary tabular-nums leading-none">
+          {{ stats().totalOrders }}
+        </p>
       </div>
 
       <!-- Draft Orders -->
-      <div
-        class="card bg-gradient-to-br from-neutral/10 to-neutral/5 border border-neutral/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+      <button
+        type="button"
+        class="rounded-xl p-2.5 sm:p-3 text-left bg-base-200/60 border border-base-300/20 shadow-sm active:scale-[0.97] transition-transform touch-manipulation"
         [class.ring-2]="activeStateFilter() === 'Draft'"
-        [class.ring-primary]="activeStateFilter() === 'Draft'"
-        [class.bg-primary/20]="activeStateFilter() === 'Draft'"
+        [class.ring-info]="activeStateFilter() === 'Draft'"
         (click)="onFilterClick('Draft')"
       >
-        <div class="card-body p-3 lg:p-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-neutral/10 flex items-center justify-center shrink-0">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 text-neutral"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                />
-              </svg>
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs text-base-content/60 truncate">Draft</p>
-              <p class="text-xl lg:text-2xl font-bold text-neutral tracking-tight">
-                {{ stats().draftOrders }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+        <span
+          class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-info block mb-1"
+        >
+          Draft
+        </span>
+        <p class="text-xl sm:text-2xl font-extrabold text-info tabular-nums leading-none">
+          {{ stats().draftOrders }}
+        </p>
+      </button>
 
       <!-- Unpaid Orders -->
-      <div
-        class="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+      <button
+        type="button"
+        class="rounded-xl p-2.5 sm:p-3 text-left bg-warning/10 border border-warning/20 shadow-sm active:scale-[0.97] transition-transform touch-manipulation"
         [class.ring-2]="activeStateFilter() === 'ArrangingPayment'"
-        [class.ring-primary]="activeStateFilter() === 'ArrangingPayment'"
-        [class.bg-primary/20]="activeStateFilter() === 'ArrangingPayment'"
+        [class.ring-warning]="activeStateFilter() === 'ArrangingPayment'"
         (click)="onFilterClick('ArrangingPayment')"
       >
-        <div class="card-body p-3 lg:p-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 text-warning"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs text-base-content/60 truncate">Unpaid</p>
-              <p class="text-xl lg:text-2xl font-bold text-warning tracking-tight">
-                {{ stats().unpaidOrders }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+        <span
+          class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-warning block mb-1"
+        >
+          Unpaid
+        </span>
+        <p class="text-xl sm:text-2xl font-extrabold text-warning tabular-nums leading-none">
+          {{ stats().unpaidOrders }}
+        </p>
+      </button>
 
       <!-- Paid Orders -->
-      <div
-        class="card bg-gradient-to-br from-success/10 to-success/5 border border-success/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+      <button
+        type="button"
+        class="rounded-xl p-2.5 sm:p-3 text-left bg-success/10 border border-success/20 shadow-sm active:scale-[0.97] transition-transform touch-manipulation"
         [class.ring-2]="activeStateFilter() === 'PaymentSettled'"
-        [class.ring-primary]="activeStateFilter() === 'PaymentSettled'"
-        [class.bg-primary/20]="activeStateFilter() === 'PaymentSettled'"
+        [class.ring-success]="activeStateFilter() === 'PaymentSettled'"
         (click)="onFilterClick('PaymentSettled')"
       >
-        <div class="card-body p-3 lg:p-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 text-success"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs text-base-content/60 truncate">Paid</p>
-              <p class="text-xl lg:text-2xl font-bold text-success tracking-tight">
-                {{ stats().paidOrders }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+        <span
+          class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-success block mb-1"
+        >
+          Paid
+        </span>
+        <p class="text-xl sm:text-2xl font-extrabold text-success tabular-nums leading-none">
+          {{ stats().paidOrders }}
+        </p>
+      </button>
     </div>
   `,
 })

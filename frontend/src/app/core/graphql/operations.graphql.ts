@@ -38,6 +38,13 @@ export const GET_ACTIVE_ADMIN = graphql(`
           permissions
         }
       }
+      customFields {
+        profilePicture {
+          id
+          preview
+          source
+        }
+      }
     }
   }
 `);
@@ -143,6 +150,13 @@ export const UPDATE_ADMINISTRATOR = graphql(`
       firstName
       lastName
       emailAddress
+      customFields {
+        profilePicture {
+          id
+          preview
+          source
+        }
+      }
     }
   }
 `);
@@ -321,6 +335,15 @@ export const ASSIGN_ASSETS_TO_PRODUCT = graphql(`
         id
         preview
       }
+    }
+  }
+`);
+
+export const ASSIGN_ASSETS_TO_CHANNEL = graphql(`
+  mutation AssignAssetsToChannel($assetIds: [ID!]!, $channelId: ID!) {
+    assignAssetsToChannel(input: { assetIds: $assetIds, channelId: $channelId }) {
+      id
+      name
     }
   }
 `);
@@ -1496,29 +1519,23 @@ export const GET_CUSTOMER = graphql(`
 `);
 
 export const CREATE_CUSTOMER = graphql(`
-  mutation CreateCustomer($input: CreateCustomerInput!) {
-    createCustomer(input: $input) {
-      ... on Customer {
-        id
-        firstName
-        lastName
-        emailAddress
-        phoneNumber
-        createdAt
-        customFields {
-          isSupplier
-          supplierType
-          contactPerson
-          taxId
-          paymentTerms
-          notes
-          isCreditApproved
-          creditLimit
-        }
-      }
-      ... on EmailAddressConflictError {
-        errorCode
-        message
+  mutation CreateCustomer($input: CreateCustomerInput!, $isWalkIn: Boolean) {
+    createCustomerSafe(input: $input, isWalkIn: $isWalkIn) {
+      id
+      firstName
+      lastName
+      emailAddress
+      phoneNumber
+      createdAt
+      customFields {
+        isSupplier
+        supplierType
+        contactPerson
+        taxId
+        paymentTerms
+        notes
+        isCreditApproved
+        creditLimit
       }
     }
   }
@@ -1844,29 +1861,24 @@ export const GET_SUPPLIER = graphql(`
 `);
 
 export const CREATE_SUPPLIER = graphql(`
-  mutation CreateSupplier($input: CreateCustomerInput!) {
-    createCustomer(input: $input) {
-      ... on Customer {
-        id
-        firstName
-        lastName
-        emailAddress
-        phoneNumber
-        createdAt
-        customFields {
-          isSupplier
-          supplierType
-          contactPerson
-          taxId
-          paymentTerms
-          notes
-          isCreditApproved
-          creditLimit
-        }
-      }
-      ... on EmailAddressConflictError {
-        errorCode
-        message
+  mutation CreateSupplier($input: CreateCustomerInput!, $isWalkIn: Boolean) {
+    createCustomerSafe(input: $input, isWalkIn: $isWalkIn) {
+      id
+      firstName
+      lastName
+      emailAddress
+      phoneNumber
+      createdAt
+      customFields {
+        isSupplier
+        supplierType
+        contactPerson
+        taxId
+        paymentTerms
+        notes
+        isCreditApproved
+        creditLimit
+        creditDuration
       }
     }
   }
@@ -1889,6 +1901,9 @@ export const UPDATE_SUPPLIER = graphql(`
           taxId
           paymentTerms
           notes
+          isCreditApproved
+          creditLimit
+          creditDuration
         }
       }
       ... on EmailAddressConflictError {
@@ -1908,16 +1923,46 @@ export const DELETE_SUPPLIER = graphql(`
   }
 `);
 
-export const UPDATE_CHANNEL_SETTINGS = graphql(`
-  mutation UpdateChannelSettings($input: UpdateChannelSettingsInput!) {
-    updateChannelSettings(input: $input) {
+export const UPDATE_CHANNEL_LOGO = graphql(`
+  mutation UpdateChannelLogo($logoAssetId: ID) {
+    updateChannelLogo(logoAssetId: $logoAssetId) {
       cashierFlowEnabled
       cashierOpen
       enablePrinter
       companyLogoAsset {
         id
-        source
         preview
+        source
+      }
+    }
+  }
+`);
+
+export const UPDATE_CASHIER_SETTINGS = graphql(`
+  mutation UpdateCashierSettings($cashierFlowEnabled: Boolean, $cashierOpen: Boolean) {
+    updateCashierSettings(cashierFlowEnabled: $cashierFlowEnabled, cashierOpen: $cashierOpen) {
+      cashierFlowEnabled
+      cashierOpen
+      enablePrinter
+      companyLogoAsset {
+        id
+        preview
+        source
+      }
+    }
+  }
+`);
+
+export const UPDATE_PRINTER_SETTINGS = graphql(`
+  mutation UpdatePrinterSettings($enablePrinter: Boolean!) {
+    updatePrinterSettings(enablePrinter: $enablePrinter) {
+      cashierFlowEnabled
+      cashierOpen
+      enablePrinter
+      companyLogoAsset {
+        id
+        preview
+        source
       }
     }
   }

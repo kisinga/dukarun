@@ -1,16 +1,14 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   AssetService,
   ChannelService,
+  EventBus,
   ProductService,
   RequestContext,
   TransactionalConnection,
 } from '@vendure/core';
 import { MlWebhookService } from './ml-webhook.service';
-import { ChannelEventRouterService } from '../../infrastructure/events/channel-event-router.service';
-import { ActionCategory } from '../../infrastructure/events/types/action-category.enum';
-import { ChannelEventType } from '../../infrastructure/events/types/event-type.enum';
-import { ChannelUpdateHelper } from '../channels/channel-update.helper';
+import { MLStatusEvent } from '../../infrastructure/events/custom-events';
 
 export interface ProductManifestEntry {
   productId: string;
@@ -47,8 +45,7 @@ export class MlTrainingService {
     private assetService: AssetService,
     private connection: TransactionalConnection,
     private webhookService: MlWebhookService,
-    private channelUpdateHelper: ChannelUpdateHelper,
-    @Optional() private eventRouter?: ChannelEventRouterService // Optional to avoid circular dependency
+    private eventBus: EventBus
   ) {}
 
   /**
@@ -110,17 +107,13 @@ export class MlTrainingService {
       };
 
       // Update channel with extracted stats
-      await this.channelUpdateHelper.updateChannelCustomFields(
-        ctx,
-        channelId,
-        {
+      await this.channelService.update(ctx, {
+        id: channelId,
+        customFields: {
           mlProductCount: manifestProducts.length,
           mlImageCount: totalImageCount,
-        } as any,
-        {
-          detectChanges: true,
-        }
-      );
+        },
+      });
 
       // Update status to ready
       await this.updateTrainingStatus(ctx, channelId, 'ready', 100);
@@ -188,35 +181,27 @@ export class MlTrainingService {
       updateData.mlTrainingError = error;
     }
 
-    // Determine event type for routing
-    let eventType: ChannelEventType | null = null;
-    if (status === 'training' && progress === 0) {
-      eventType = ChannelEventType.ML_TRAINING_STARTED;
-    } else if (status === 'training' && progress > 0 && progress < 100) {
-      eventType = ChannelEventType.ML_TRAINING_PROGRESS;
-    } else if (status === 'ready' || status === 'active') {
-      eventType = ChannelEventType.ML_TRAINING_COMPLETED;
-    } else if (status === 'failed') {
-      eventType = ChannelEventType.ML_TRAINING_FAILED;
-    }
-
-    await this.channelUpdateHelper.updateChannelCustomFields(ctx, channelId, updateData as any, {
-      detectChanges: true,
-      routeEvent: eventType
-        ? {
-            type: eventType,
-            channelId,
-            category: ActionCategory.SYSTEM_NOTIFICATIONS,
-            context: ctx,
-            data: {
-              status,
-              progress,
-              error,
-              channelId,
-            },
-          }
-        : undefined,
+    // Update channel custom fields
+    // Update channel custom fields
+    await this.channelService.update(ctx, {
+      id: channelId,
+      customFields: updateData,
     });
+
+    // Publish appropriate ML status event
+    if (status === 'training' && progress === 0) {
+      this.eventBus.publish(new MLStatusEvent(ctx, channelId, 'training', 'started', { progress }));
+    } else if (status === 'training' && progress > 0 && progress < 100) {
+      this.eventBus.publish(
+        new MLStatusEvent(ctx, channelId, 'training', 'progress', { progress })
+      );
+    } else if (status === 'ready' || status === 'active') {
+      this.eventBus.publish(
+        new MLStatusEvent(ctx, channelId, 'training', 'completed', { progress })
+      );
+    } else if (status === 'failed') {
+      this.eventBus.publish(new MLStatusEvent(ctx, channelId, 'training', 'failed', { error }));
+    }
 
     this.logger.log(`Updated channel ${channelId} status to ${status} (${progress}%)`);
   }

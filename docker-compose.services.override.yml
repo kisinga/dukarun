@@ -1,0 +1,25 @@
+# =====================================
+# Local Development Override
+# =====================================
+#
+# This file automatically extends docker-compose.services.yml when running locally.
+# It exposes ports to localhost for running the backend with `npm run dev`.
+#
+# Docker Compose automatically loads this file when you run:
+#   docker compose -f docker-compose.services.yml up -d
+#
+# For production, rename or delete this file.
+#
+
+services:
+  postgres_db:
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+
+  timescaledb_audit:
+    ports:
+      - '${AUDIT_DB_PORT:-5433}:5432'
+
+  redis:
+    ports:
+      - '${REDIS_PORT:-6379}:6379'

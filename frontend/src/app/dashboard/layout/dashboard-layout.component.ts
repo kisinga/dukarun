@@ -121,9 +121,15 @@ export class DashboardLayoutComponent implements OnInit {
   // Network status
   protected readonly isOnline = this.networkService.isOnline;
 
-  protected readonly userAvatar = computed(() =>
-    this.user()?.emailAddress ? 'default_avatar.png' : 'default_avatar.png',
-  );
+  protected readonly userAvatar = computed(() => {
+    const user = this.user();
+    // Check for profile picture in customFields first
+    const profilePicture = (user as any)?.customFields?.profilePicture;
+    if (profilePicture?.preview || profilePicture?.source) {
+      return profilePicture.preview || profilePicture.source;
+    }
+    return 'default_avatar.png';
+  });
 
   protected readonly logoUrl = computed(() => {
     // Use the new proxy-compatible logo URL directly

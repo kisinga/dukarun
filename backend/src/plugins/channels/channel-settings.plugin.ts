@@ -4,26 +4,28 @@ import { AuditDbConnection } from '../../infrastructure/audit/audit-db.connectio
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { UserContextResolver } from '../../infrastructure/audit/user-context.resolver';
 import { ChannelSettingsService } from '../../services/channels/channel-settings.service';
-import { ChannelUpdateHelper } from '../../services/channels/channel-update.helper';
-import { ChannelStatusSubscriber } from '../../infrastructure/channels/channel-status.subscriber';
+
 import { ChannelSettingsResolver, channelSettingsSchema } from './channel-settings.resolver';
 import { ChannelEventsPlugin } from './channel-events.plugin';
+import { ChannelAdminService } from '../../services/channels/channel-admin.service';
+import { ChannelPaymentService } from '../../services/channels/channel-payment.service';
+import { SmsService } from '../../infrastructure/sms/sms.service';
 
 @VendurePlugin({
   imports: [PluginCommonModule, ChannelEventsPlugin],
   providers: [
-    // Audit dependencies (must be available for ChannelSettingsService)
-    // AuditDbConnection uses singleton pattern to prevent duplicate initialization
+    // Audit dependencies
     AuditDbConnection,
     UserContextResolver,
     AuditService,
-    // Channel status subscriber (listens to Vendure ChannelEvent)
-    ChannelStatusSubscriber,
-    // Channel update helper (must be before ChannelSettingsService)
-    ChannelUpdateHelper,
+    // Channel update helper
+
     // Channel settings
     ChannelSettingsResolver,
     ChannelSettingsService,
+    ChannelAdminService,
+    ChannelPaymentService,
+    SmsService,
   ],
   adminApiExtensions: {
     resolvers: [ChannelSettingsResolver],

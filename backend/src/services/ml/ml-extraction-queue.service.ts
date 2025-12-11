@@ -1,8 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { RequestContext, TransactionalConnection } from '@vendure/core';
-import { ChannelEventRouterService } from '../../infrastructure/events/channel-event-router.service';
-import { ActionCategory } from '../../infrastructure/events/types/action-category.enum';
-import { ChannelEventType } from '../../infrastructure/events/types/event-type.enum';
+import { EventBus, RequestContext, TransactionalConnection } from '@vendure/core';
+import { MLStatusEvent } from '../../infrastructure/events/custom-events';
 import { TracingService } from '../../infrastructure/observability/tracing.service';
 import { MetricsService } from '../../infrastructure/observability/metrics.service';
 
@@ -30,7 +28,7 @@ export class MlExtractionQueueService {
 
   constructor(
     private connection: TransactionalConnection,
-    @Optional() private eventRouter?: ChannelEventRouterService, // Optional to avoid circular dependency
+    private eventBus: EventBus,
     @Optional() private tracingService?: TracingService,
     @Optional() private metricsService?: MetricsService
   ) {}
@@ -159,25 +157,12 @@ export class MlExtractionQueueService {
       );
 
       // Emit extraction queued event
-      if (this.eventRouter) {
-        await this.eventRouter
-          .routeEvent({
-            type: ChannelEventType.ML_EXTRACTION_QUEUED,
-            channelId,
-            category: ActionCategory.SYSTEM_NOTIFICATIONS,
-            context: ctx,
-            data: {
-              extractionId,
-              channelId,
-              scheduledAt: scheduledAt.toISOString(),
-            },
-          })
-          .catch(err => {
-            this.logger.warn(
-              `Failed to route ML extraction queued event: ${err instanceof Error ? err.message : String(err)}`
-            );
-          });
-      }
+      this.eventBus.publish(
+        new MLStatusEvent(ctx, channelId, 'extraction', 'queued', {
+          extractionId,
+          scheduledAt: scheduledAt.toISOString(),
+        })
+      );
 
       this.tracingService?.endSpan(span!, true);
       return extractionId;
@@ -317,24 +302,11 @@ export class MlExtractionQueueService {
       this.logger.log(`Marked extraction ${extractionId} as processing`);
 
       // Emit extraction started event
-      if (this.eventRouter) {
-        await this.eventRouter
-          .routeEvent({
-            type: ChannelEventType.ML_EXTRACTION_STARTED,
-            channelId,
-            category: ActionCategory.SYSTEM_NOTIFICATIONS,
-            context: ctx,
-            data: {
-              extractionId,
-              channelId,
-            },
-          })
-          .catch(err => {
-            this.logger.warn(
-              `Failed to route ML extraction started event: ${err instanceof Error ? err.message : String(err)}`
-            );
-          });
-      }
+      this.eventBus.publish(
+        new MLStatusEvent(ctx, channelId, 'extraction', 'started', {
+          extractionId,
+        })
+      );
     } catch (error) {
       if (this.handleMissingTable(error)) {
         this.logger.debug('ml_extraction_queue table missing while marking as processing');
@@ -381,24 +353,11 @@ export class MlExtractionQueueService {
       this.logger.log(`Marked extraction ${extractionId} as completed`);
 
       // Emit extraction completed event
-      if (this.eventRouter) {
-        await this.eventRouter
-          .routeEvent({
-            type: ChannelEventType.ML_EXTRACTION_COMPLETED,
-            channelId,
-            category: ActionCategory.SYSTEM_NOTIFICATIONS,
-            context: ctx,
-            data: {
-              extractionId,
-              channelId,
-            },
-          })
-          .catch(err => {
-            this.logger.warn(
-              `Failed to route ML extraction completed event: ${err instanceof Error ? err.message : String(err)}`
-            );
-          });
-      }
+      this.eventBus.publish(
+        new MLStatusEvent(ctx, channelId, 'extraction', 'completed', {
+          extractionId,
+        })
+      );
     } catch (error) {
       if (this.handleMissingTable(error)) {
         this.logger.debug('ml_extraction_queue table missing while marking as completed');
@@ -445,25 +404,12 @@ export class MlExtractionQueueService {
       this.logger.log(`Marked extraction ${extractionId} as failed: ${error}`);
 
       // Emit extraction failed event
-      if (this.eventRouter) {
-        await this.eventRouter
-          .routeEvent({
-            type: ChannelEventType.ML_EXTRACTION_FAILED,
-            channelId,
-            category: ActionCategory.SYSTEM_NOTIFICATIONS,
-            context: ctx,
-            data: {
-              extractionId,
-              channelId,
-              error,
-            },
-          })
-          .catch(err => {
-            this.logger.warn(
-              `Failed to route ML extraction failed event: ${err instanceof Error ? err.message : String(err)}`
-            );
-          });
-      }
+      this.eventBus.publish(
+        new MLStatusEvent(ctx, channelId, 'extraction', 'failed', {
+          extractionId,
+          error,
+        })
+      );
     } catch (err) {
       if (this.handleMissingTable(err)) {
         this.logger.debug('ml_extraction_queue table missing while marking as failed');

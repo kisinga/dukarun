@@ -91,6 +91,10 @@ describe('RegistrationService.provisionCustomer', () => {
       verifyChannelAccounts: jest.fn(async () => undefined),
     };
 
+    const eventBus = {
+      publish: jest.fn(),
+    };
+
     const service = new RegistrationService(
       validator as any,
       sellerProvisioner as any,
@@ -101,6 +105,7 @@ describe('RegistrationService.provisionCustomer', () => {
       accessProvisioner as any,
       errorService as any,
       chartOfAccountsService as any,
+      eventBus as any,
       undefined // tracingService
     );
 

@@ -70,6 +70,14 @@ export class AuthService {
   }
 
   /**
+   * Refetch the active administrator data from the server
+   * Use this after making changes to the user profile
+   */
+  async refetchUser(): Promise<void> {
+    return this.sessionService.fetchActiveAdministrator();
+  }
+
+  /**
    * Login with phone number and OTP (passwordless)
    * This is the new primary login method
    */

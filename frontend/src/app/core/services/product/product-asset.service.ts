@@ -1,10 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import {
+  ASSIGN_ASSETS_TO_CHANNEL,
   ASSIGN_ASSETS_TO_PRODUCT,
   DELETE_ASSET,
   UPDATE_PRODUCT_ASSETS,
 } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
+import { CompanyService } from '../company.service';
 import { ProductApiService } from './product-api.service';
 import { ProductStateService } from './product-state.service';
 
@@ -19,6 +21,7 @@ import { ProductStateService } from './product-state.service';
 })
 export class ProductAssetService {
   private readonly apolloService = inject(ApolloService);
+  private readonly companyService = inject(CompanyService);
   private readonly stateService = inject(ProductStateService);
   private readonly apiService = inject(ProductApiService);
 
@@ -159,9 +162,32 @@ export class ProductAssetService {
 
       console.log(`✅ Created ${assetIds.length} assets`);
 
-      // Step 2: Assign assets to product using Apollo Client
-      console.log('📸 Assigning assets to product...');
+      // Step 2: Assign assets to channel
+      console.log('🔗 Assigning assets to channel...');
+      const channel = this.companyService.activeChannel();
+      if (!channel?.id) {
+        console.error('❌ No active channel found');
+        return null;
+      }
+
       const client = this.apolloService.getClient();
+      const assignResult = await client.mutate({
+        mutation: ASSIGN_ASSETS_TO_CHANNEL as any,
+        variables: {
+          assetIds,
+          channelId: channel.id,
+        },
+      });
+
+      if (assignResult.error || !assignResult.data) {
+        console.error('❌ Failed to assign assets to channel:', assignResult.error);
+        return null;
+      }
+
+      console.log('✅ Assets assigned to channel successfully');
+
+      // Step 3: Assign assets to product using Apollo Client
+      console.log('📸 Assigning assets to product...');
       const updateResult = await client.mutate<any>({
         mutation: ASSIGN_ASSETS_TO_PRODUCT as any,
         variables: {

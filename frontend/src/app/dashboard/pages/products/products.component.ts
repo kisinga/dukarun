@@ -20,6 +20,7 @@ import { ProductAction, ProductCardComponent } from './components/product-card.c
 import { ProductSearchBarComponent } from './components/product-search-bar.component';
 import { ProductStats, ProductStatsComponent } from './components/product-stats.component';
 import { ProductTableRowComponent } from './components/product-table-row.component';
+import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
 /**
  * Products list page - refactored with composable components
@@ -41,6 +42,7 @@ import { ProductTableRowComponent } from './components/product-table-row.compone
     ProductTableRowComponent,
     PaginationComponent,
     DeleteConfirmationModalComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './products.component.html',
   styleUrl: './products.component.scss',

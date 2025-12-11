@@ -8,33 +8,6 @@
 import { formatPhoneNumber } from './phone.utils';
 
 /**
- * Generate a deterministic email address from a phone number
- *
- * Format: customer.{normalizedPhone}@pos.local
- * Example: customer.0712345678@pos.local
- *
- * This ensures the same phone number always generates the same email,
- * preventing duplicate customer creation.
- *
- * @param phoneNumber - Phone number in any format (will be normalized)
- * @returns Generated email address
- */
-export function generateEmailFromPhone(phoneNumber: string): string {
-  if (!phoneNumber || typeof phoneNumber !== 'string') {
-    throw new Error('Phone number is required to generate email');
-  }
-
-  // Normalize phone number to ensure consistency
-  const normalizedPhone = formatPhoneNumber(phoneNumber);
-
-  // Remove leading 0 and any special characters for email compatibility
-  // Use the full normalized phone (07XXXXXXXX) as it's already clean
-  const emailLocalPart = `customer.${normalizedPhone}`;
-
-  return `${emailLocalPart}@pos.local`;
-}
-
-/**
  * Check if an email address appears to be auto-generated
  *
  * @param email - Email address to check

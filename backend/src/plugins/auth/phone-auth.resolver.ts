@@ -66,11 +66,15 @@ export const phoneAuthSchema = gql`
     ): RegistrationResult!
     requestLoginOTP(phoneNumber: String!): OTPResponse!
     verifyLoginOTP(phoneNumber: String!, otp: String!): LoginResult!
+    # Request OTP for updating email or phone number (requires authenticated user)
+    requestUpdateOTP(identifier: String!): OTPResponse!
   }
 
   extend type Query {
     checkAuthorizationStatus(identifier: String!): AuthorizationStatus!
     checkCompanyCodeAvailability(companyCode: String!): Boolean!
+    # Check if email or phone is available (not already used by another user)
+    checkIdentifierAvailable(identifier: String!): Boolean!
   }
 `;
 
@@ -144,6 +148,12 @@ export class PhoneAuthResolver {
     return this.phoneAuthService.verifyLoginOTP(ctx, phoneNumber, otp.trim());
   }
 
+  @Mutation()
+  @Allow(Permission.Authenticated)
+  async requestUpdateOTP(@Ctx() ctx: RequestContext, @Args('identifier') identifier: string) {
+    return this.phoneAuthService.requestUpdateOTP(ctx, identifier);
+  }
+
   @Query()
   @Allow(Permission.Public)
   async checkAuthorizationStatus(
@@ -160,5 +170,14 @@ export class PhoneAuthResolver {
     @Args('companyCode') companyCode: string
   ): Promise<boolean> {
     return this.phoneAuthService.checkCompanyCodeAvailability(ctx, companyCode);
+  }
+
+  @Query()
+  @Allow(Permission.Authenticated)
+  async checkIdentifierAvailable(
+    @Ctx() ctx: RequestContext,
+    @Args('identifier') identifier: string
+  ): Promise<boolean> {
+    return this.phoneAuthService.checkIdentifierAvailable(ctx, identifier);
   }
 }
