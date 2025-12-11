@@ -12,7 +12,7 @@ const CUSTOMER_SCHEMA = gql`
     If a customer with the same phone number exists, returns the existing customer.
     This is a safety net - the frontend should also check for duplicates.
     """
-    createCustomerSafe(input: CreateCustomerInput!): Customer!
+    createCustomerSafe(input: CreateCustomerInput!, isWalkIn: Boolean): Customer!
   }
 `;
 

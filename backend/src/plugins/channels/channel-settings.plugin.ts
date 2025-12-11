@@ -7,6 +7,9 @@ import { ChannelSettingsService } from '../../services/channels/channel-settings
 
 import { ChannelSettingsResolver, channelSettingsSchema } from './channel-settings.resolver';
 import { ChannelEventsPlugin } from './channel-events.plugin';
+import { ChannelAdminService } from '../../services/channels/channel-admin.service';
+import { ChannelPaymentService } from '../../services/channels/channel-payment.service';
+import { SmsService } from '../../infrastructure/sms/sms.service';
 
 @VendurePlugin({
   imports: [PluginCommonModule, ChannelEventsPlugin],
@@ -20,6 +23,9 @@ import { ChannelEventsPlugin } from './channel-events.plugin';
     // Channel settings
     ChannelSettingsResolver,
     ChannelSettingsService,
+    ChannelAdminService,
+    ChannelPaymentService,
+    SmsService,
   ],
   adminApiExtensions: {
     resolvers: [ChannelSettingsResolver],

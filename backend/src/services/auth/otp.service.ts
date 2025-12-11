@@ -5,7 +5,7 @@ import { BRAND_CONFIG } from '../../constants/brand.constants';
 import { env } from '../../infrastructure/config/environment.config';
 import { SmsService } from '../../infrastructure/sms/sms.service';
 import { formatPhoneNumber } from '../../utils/phone.utils';
-import { maskEmail } from '../../utils/email.utils';
+import { maskEmail, isSentinelEmail } from '../../utils/email.utils';
 import { OtpEmailEvent } from '../../events/otp-email.event';
 
 /**
@@ -203,6 +203,11 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(
         `Invalid email address provided: ${typeof email === 'string' ? maskEmail(email) : typeof email}`
       );
+      return;
+    }
+
+    if (isSentinelEmail(email)) {
+      this.logger.log(`Skipping OTP email for sentinel address: ${maskEmail(email)}`);
       return;
     }
 

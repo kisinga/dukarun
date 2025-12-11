@@ -1505,29 +1505,23 @@ export const GET_CUSTOMER = graphql(`
 `);
 
 export const CREATE_CUSTOMER = graphql(`
-  mutation CreateCustomer($input: CreateCustomerInput!) {
-    createCustomer(input: $input) {
-      ... on Customer {
-        id
-        firstName
-        lastName
-        emailAddress
-        phoneNumber
-        createdAt
-        customFields {
-          isSupplier
-          supplierType
-          contactPerson
-          taxId
-          paymentTerms
-          notes
-          isCreditApproved
-          creditLimit
-        }
-      }
-      ... on EmailAddressConflictError {
-        errorCode
-        message
+  mutation CreateCustomer($input: CreateCustomerInput!, $isWalkIn: Boolean) {
+    createCustomerSafe(input: $input, isWalkIn: $isWalkIn) {
+      id
+      firstName
+      lastName
+      emailAddress
+      phoneNumber
+      createdAt
+      customFields {
+        isSupplier
+        supplierType
+        contactPerson
+        taxId
+        paymentTerms
+        notes
+        isCreditApproved
+        creditLimit
       }
     }
   }
@@ -1853,29 +1847,24 @@ export const GET_SUPPLIER = graphql(`
 `);
 
 export const CREATE_SUPPLIER = graphql(`
-  mutation CreateSupplier($input: CreateCustomerInput!) {
-    createCustomer(input: $input) {
-      ... on Customer {
-        id
-        firstName
-        lastName
-        emailAddress
-        phoneNumber
-        createdAt
-        customFields {
-          isSupplier
-          supplierType
-          contactPerson
-          taxId
-          paymentTerms
-          notes
-          isCreditApproved
-          creditLimit
-        }
-      }
-      ... on EmailAddressConflictError {
-        errorCode
-        message
+  mutation CreateSupplier($input: CreateCustomerInput!, $isWalkIn: Boolean) {
+    createCustomerSafe(input: $input, isWalkIn: $isWalkIn) {
+      id
+      firstName
+      lastName
+      emailAddress
+      phoneNumber
+      createdAt
+      customFields {
+        isSupplier
+        supplierType
+        contactPerson
+        taxId
+        paymentTerms
+        notes
+        isCreditApproved
+        creditLimit
+        creditDuration
       }
     }
   }
@@ -1898,6 +1887,9 @@ export const UPDATE_SUPPLIER = graphql(`
           taxId
           paymentTerms
           notes
+          isCreditApproved
+          creditLimit
+          creditDuration
         }
       }
       ... on EmailAddressConflictError {

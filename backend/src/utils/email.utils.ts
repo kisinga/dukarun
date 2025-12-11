@@ -40,12 +40,18 @@ export function shouldSendEmail(email: string | null | undefined): boolean {
  * @param entity - Entity type ('customer' | 'supplier' | 'admin')
  * @returns {entity}.{phone}@pos.local
  */
+/**
+ * Generate sentinel email from phone number
+ *
+ * @param phoneNumber - Phone number (required for customers/suppliers)
+ * @param entity - Entity type ('customer' | 'supplier' | 'admin')
+ * @returns {entity}.{phone}@pos.local
+ */
 export function generateSentinelEmailFromPhone(
   phoneNumber: string,
   entity: 'customer' | 'supplier' | 'admin' = 'customer'
 ): string {
-  const normalized = formatPhoneNumber(phoneNumber);
-  return `${entity}.${normalized}@${SENTINEL_DOMAIN}`;
+  return `${formatEmailUser(phoneNumber, entity)}@${SENTINEL_DOMAIN}`;
 }
 
 /**
@@ -82,15 +88,16 @@ export function generatePaystackEmailFromPhone(phoneNumber: string): string {
   if (!phoneNumber || typeof phoneNumber !== 'string') {
     throw new Error('Phone number is required to generate Paystack email');
   }
+  // Keeps backward compatibility with existing behavior (using 'customer' prefix)
+  return `${formatEmailUser(phoneNumber, 'customer')}@dukahub.com`;
+}
 
-  // Normalize phone number to ensure consistency (format: 07XXXXXXXX)
-  const normalizedPhone = formatPhoneNumber(phoneNumber);
-
-  // Generate email: customer.{normalizedPhone}@dukahub.com
-  // The normalized phone already includes the leading 0 (e.g., 0712345678)
-  const emailLocalPart = `customer.${normalizedPhone}`;
-
-  return `${emailLocalPart}@dukahub.com`;
+/**
+ * Internal helper to format the local part of the email (entity.phone)
+ */
+function formatEmailUser(phoneNumber: string, entity: string): string {
+  const normalized = formatPhoneNumber(phoneNumber);
+  return `${entity}.${normalized}`;
 }
 
 /**

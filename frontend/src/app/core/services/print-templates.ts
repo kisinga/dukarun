@@ -238,12 +238,15 @@ export class Receipt52mmTemplate extends PrintTemplate {
                     line-height: 1.4;
                 }
                 .receipt-52mm .company-logo {
-                    max-width: 40mm;
+                    max-width: 100%;
                     max-height: 40mm;
                     width: auto;
                     height: auto;
                     object-fit: contain;
                     margin-bottom: 8px;
+                    display: block;
+                    margin-left: auto;
+                    margin-right: auto;
                 }
                 .receipt-52mm .company-name {
                     font-size: 14px;
@@ -487,11 +490,12 @@ export class A4Template extends PrintTemplate {
                 }
                 .a4-invoice .company-logo {
                     max-width: 80mm;
-                    max-height: 80mm;
+                    max-height: 40mm;
                     width: auto;
                     height: auto;
                     object-fit: contain;
                     margin-bottom: 12px;
+                    display: block;
                 }
                 .a4-invoice .invoice-header {
                     display: flex;

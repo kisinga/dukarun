@@ -5,7 +5,6 @@ import { CustomerInput } from '../customer.service';
 import { CustomerApiService } from './customer-api.service';
 import { CustomerStateService } from './customer-state.service';
 import { formatPhoneNumber } from '../../utils/phone.utils';
-import { generateEmailFromPhone } from '../../utils/email.utils';
 
 /**
  * Customer Search Service
@@ -152,8 +151,8 @@ export class CustomerSearchService {
       return existingCustomer.id;
     }
 
-    // Generate email from phone if not provided
-    const emailAddress = input.email?.trim() || generateEmailFromPhone(normalizedPhone);
+    // Use provided email or empty string (let backend generate sentinel)
+    const emailAddress = input.email?.trim() || '';
 
     const { firstName, lastName } = this.splitName(input.name);
     return this.apiService.createCustomer({

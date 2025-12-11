@@ -137,9 +137,10 @@ export class OrderSetupService {
           input: {
             firstName: 'Walk-in',
             lastName: 'Customer',
-            emailAddress: 'walkin@pos.local',
+            emailAddress: '',
             phoneNumber: '+1234567890',
           },
+          isWalkIn: true,
         },
       });
 
@@ -148,7 +149,7 @@ export class OrderSetupService {
         throw new Error(`GraphQL error creating customer: ${customerResult.error.message}`);
       }
 
-      const customerData = customerResult.data?.createCustomer;
+      const customerData = customerResult.data?.createCustomerSafe;
       if (!customerData || customerData.__typename !== 'Customer') {
         throw new Error('Failed to create default customer');
       }

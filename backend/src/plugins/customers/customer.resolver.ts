@@ -50,11 +50,12 @@ export class CustomerResolver {
   @Allow(Permission.CreateCustomer)
   async createCustomerSafe(
     @Ctx() ctx: RequestContext,
-    @Args('input') input: CreateCustomerInput
+    @Args('input') input: CreateCustomerInput,
+    @Args('isWalkIn', { nullable: true }) isWalkIn?: boolean
   ): Promise<Customer> {
     // Normalize phone number if provided
     let normalizedPhone: string | undefined;
-    if (input.phoneNumber) {
+    if (input.phoneNumber && input.phoneNumber !== '0000000000') {
       try {
         normalizedPhone = formatPhoneNumber(input.phoneNumber);
       } catch (error) {
@@ -65,7 +66,7 @@ export class CustomerResolver {
     }
 
     // Handle Walk-in logic (Backend Control)
-    if (input.customFields?.isWalkIn) {
+    if (isWalkIn) {
       this.logger.log('Creating Walk-in customer - generating sentinel email');
       input.emailAddress = getWalkInEmail();
     }

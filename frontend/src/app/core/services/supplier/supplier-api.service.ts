@@ -9,7 +9,6 @@ import {
   GET_CUSTOMER,
 } from '../../graphql/operations.graphql';
 import { formatPhoneNumber } from '../../utils/phone.utils';
-import { generateEmailFromPhone } from '../../utils/email.utils';
 import { mergeSupplierCapability } from '../../utils/customer-merge.utils';
 import { ApolloService } from '../apollo.service';
 import { SupplierInput } from '../supplier.service';
@@ -91,8 +90,8 @@ export class SupplierApiService {
           // Generate email from phone if missing
           let emailAddress = input.emailAddress?.trim();
           if (!emailAddress && normalizedPhone) {
-            emailAddress = generateEmailFromPhone(normalizedPhone);
-            console.log('📧 Generated email from phone:', emailAddress);
+            // Backend will generate sentinel email
+            console.log('📧 No email provided, backend will generate sentinel email');
           }
 
           // Merge supplier capability with existing customer data
@@ -138,17 +137,20 @@ export class SupplierApiService {
       // Generate email from phone if missing or empty
       let emailAddress = input.emailAddress?.trim();
       if (!emailAddress && normalizedPhone) {
-        emailAddress = generateEmailFromPhone(normalizedPhone);
-        console.log('📧 Generated email from phone:', emailAddress);
+        // Backend will generate sentinel email
+        console.log('📧 No email provided, backend will generate sentinel email');
       }
 
-      // Ensure email is always present (required by Vendure)
-      if (!emailAddress) {
-        this.stateService.setError(
-          'Email address is required. Please provide an email or phone number.',
-        );
-        return null;
-      }
+      // Ensure email structure for API (can be empty string if backend handles it?
+      // Actually Vendure createCustomer might require it if not intercepted or if schema demands it.
+      // But we are using createCustomerSafe which modifies it.
+      // The API input expects emailAddress! (Non-nullable) usually.
+      // Let's check CreateCustomerInput.
+      // If it is mandatory in schema, we might need to send "" or null?
+      // In TS interface usually string.
+      // If I send "", backend intercepts it.
+
+      const emailToSend = emailAddress || '';
 
       // Build customFields with supplier and credit fields
       const customFields: any = {
@@ -175,7 +177,7 @@ export class SupplierApiService {
       const supplierInput = {
         firstName: input.firstName,
         lastName: input.lastName,
-        emailAddress,
+        emailAddress: emailToSend,
         phoneNumber: normalizedPhone,
         customFields,
       };

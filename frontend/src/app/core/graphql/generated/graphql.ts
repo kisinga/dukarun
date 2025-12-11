@@ -4136,6 +4136,7 @@ export type MutationCreateCustomerGroupArgs = {
 
 export type MutationCreateCustomerSafeArgs = {
   input: CreateCustomerInput;
+  isWalkIn?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export type MutationCreateFacetArgs = {
@@ -10224,32 +10225,31 @@ export type GetCustomerQuery = {
 
 export type CreateCustomerMutationVariables = Exact<{
   input: CreateCustomerInput;
+  isWalkIn?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type CreateCustomerMutation = {
   __typename?: 'Mutation';
-  createCustomer:
-    | {
-        __typename?: 'Customer';
-        id: string;
-        firstName: string;
-        lastName: string;
-        emailAddress: string;
-        phoneNumber?: string | null;
-        createdAt: any;
-        customFields?: {
-          __typename?: 'CustomerCustomFields';
-          isSupplier?: boolean | null;
-          supplierType?: string | null;
-          contactPerson?: string | null;
-          taxId?: string | null;
-          paymentTerms?: string | null;
-          notes?: string | null;
-          isCreditApproved?: boolean | null;
-          creditLimit?: number | null;
-        } | null;
-      }
-    | { __typename?: 'EmailAddressConflictError'; errorCode: ErrorCode; message: string };
+  createCustomerSafe: {
+    __typename?: 'Customer';
+    id: string;
+    firstName: string;
+    lastName: string;
+    emailAddress: string;
+    phoneNumber?: string | null;
+    createdAt: any;
+    customFields?: {
+      __typename?: 'CustomerCustomFields';
+      isSupplier?: boolean | null;
+      supplierType?: string | null;
+      contactPerson?: string | null;
+      taxId?: string | null;
+      paymentTerms?: string | null;
+      notes?: string | null;
+      isCreditApproved?: boolean | null;
+      creditLimit?: number | null;
+    } | null;
+  };
 };
 
 export type UpdateCustomerMutationVariables = Exact<{
@@ -10609,32 +10609,32 @@ export type GetSupplierQuery = {
 
 export type CreateSupplierMutationVariables = Exact<{
   input: CreateCustomerInput;
+  isWalkIn?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type CreateSupplierMutation = {
   __typename?: 'Mutation';
-  createCustomer:
-    | {
-        __typename?: 'Customer';
-        id: string;
-        firstName: string;
-        lastName: string;
-        emailAddress: string;
-        phoneNumber?: string | null;
-        createdAt: any;
-        customFields?: {
-          __typename?: 'CustomerCustomFields';
-          isSupplier?: boolean | null;
-          supplierType?: string | null;
-          contactPerson?: string | null;
-          taxId?: string | null;
-          paymentTerms?: string | null;
-          notes?: string | null;
-          isCreditApproved?: boolean | null;
-          creditLimit?: number | null;
-        } | null;
-      }
-    | { __typename?: 'EmailAddressConflictError'; errorCode: ErrorCode; message: string };
+  createCustomerSafe: {
+    __typename?: 'Customer';
+    id: string;
+    firstName: string;
+    lastName: string;
+    emailAddress: string;
+    phoneNumber?: string | null;
+    createdAt: any;
+    customFields?: {
+      __typename?: 'CustomerCustomFields';
+      isSupplier?: boolean | null;
+      supplierType?: string | null;
+      contactPerson?: string | null;
+      taxId?: string | null;
+      paymentTerms?: string | null;
+      notes?: string | null;
+      isCreditApproved?: boolean | null;
+      creditLimit?: number | null;
+      creditDuration?: number | null;
+    } | null;
+  };
 };
 
 export type UpdateSupplierMutationVariables = Exact<{
@@ -10660,6 +10660,9 @@ export type UpdateSupplierMutation = {
           taxId?: string | null;
           paymentTerms?: string | null;
           notes?: string | null;
+          isCreditApproved?: boolean | null;
+          creditLimit?: number | null;
+          creditDuration?: number | null;
         } | null;
       }
     | { __typename?: 'EmailAddressConflictError'; errorCode: ErrorCode; message: string };
@@ -16792,66 +16795,53 @@ export const CreateCustomerDocument = {
             type: { kind: 'NamedType', name: { kind: 'Name', value: 'CreateCustomerInput' } },
           },
         },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'isWalkIn' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Boolean' } },
+        },
       ],
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
           {
             kind: 'Field',
-            name: { kind: 'Name', value: 'createCustomer' },
+            name: { kind: 'Name', value: 'createCustomerSafe' },
             arguments: [
               {
                 kind: 'Argument',
                 name: { kind: 'Name', value: 'input' },
                 value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
               },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'isWalkIn' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'isWalkIn' } },
+              },
             ],
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'phoneNumber' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
                 {
-                  kind: 'InlineFragment',
-                  typeCondition: { kind: 'NamedType', name: { kind: 'Name', value: 'Customer' } },
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'customFields' },
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'phoneNumber' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
-                      {
-                        kind: 'Field',
-                        name: { kind: 'Name', value: 'customFields' },
-                        selectionSet: {
-                          kind: 'SelectionSet',
-                          selections: [
-                            { kind: 'Field', name: { kind: 'Name', value: 'isSupplier' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'supplierType' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'contactPerson' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'taxId' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'paymentTerms' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'isCreditApproved' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'creditLimit' } },
-                          ],
-                        },
-                      },
-                    ],
-                  },
-                },
-                {
-                  kind: 'InlineFragment',
-                  typeCondition: {
-                    kind: 'NamedType',
-                    name: { kind: 'Name', value: 'EmailAddressConflictError' },
-                  },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: 'errorCode' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'message' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isSupplier' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'supplierType' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'contactPerson' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'taxId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'paymentTerms' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isCreditApproved' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'creditLimit' } },
                     ],
                   },
                 },
@@ -17892,66 +17882,54 @@ export const CreateSupplierDocument = {
             type: { kind: 'NamedType', name: { kind: 'Name', value: 'CreateCustomerInput' } },
           },
         },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'isWalkIn' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Boolean' } },
+        },
       ],
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
           {
             kind: 'Field',
-            name: { kind: 'Name', value: 'createCustomer' },
+            name: { kind: 'Name', value: 'createCustomerSafe' },
             arguments: [
               {
                 kind: 'Argument',
                 name: { kind: 'Name', value: 'input' },
                 value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
               },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'isWalkIn' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'isWalkIn' } },
+              },
             ],
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'phoneNumber' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
                 {
-                  kind: 'InlineFragment',
-                  typeCondition: { kind: 'NamedType', name: { kind: 'Name', value: 'Customer' } },
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'customFields' },
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'phoneNumber' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
-                      {
-                        kind: 'Field',
-                        name: { kind: 'Name', value: 'customFields' },
-                        selectionSet: {
-                          kind: 'SelectionSet',
-                          selections: [
-                            { kind: 'Field', name: { kind: 'Name', value: 'isSupplier' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'supplierType' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'contactPerson' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'taxId' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'paymentTerms' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'isCreditApproved' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'creditLimit' } },
-                          ],
-                        },
-                      },
-                    ],
-                  },
-                },
-                {
-                  kind: 'InlineFragment',
-                  typeCondition: {
-                    kind: 'NamedType',
-                    name: { kind: 'Name', value: 'EmailAddressConflictError' },
-                  },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: 'errorCode' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'message' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isSupplier' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'supplierType' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'contactPerson' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'taxId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'paymentTerms' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isCreditApproved' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'creditLimit' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'creditDuration' } },
                     ],
                   },
                 },
@@ -18020,6 +17998,9 @@ export const UpdateSupplierDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'taxId' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'paymentTerms' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'isCreditApproved' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'creditLimit' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'creditDuration' } },
                           ],
                         },
                       },

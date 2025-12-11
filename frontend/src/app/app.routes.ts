@@ -189,6 +189,11 @@ export const routes: Routes = [
           import('./dashboard/pages/settings/settings.component').then((m) => m.SettingsComponent),
       },
       {
+        path: 'profile',
+        loadChildren: () =>
+          import('./dashboard/pages/profile/profile.routes').then((m) => m.PROFILE_ROUTES),
+      },
+      {
         path: 'accounting',
         loadComponent: () =>
           import('./dashboard/pages/accounting/accounting.component').then(
