@@ -226,7 +226,11 @@ export class GeneralSettingsComponent {
       return;
     }
 
-    this.hasChanges.set(!this.areSettingsEqual(next, this.originalSettings));
+    // Check if there's a pending logo file upload (new logo selected but not saved)
+    const hasNewLogoFile = this.selectedLogoFile() !== null;
+
+    // Has changes if either: settings differ from original, OR a new logo file is pending
+    this.hasChanges.set(hasNewLogoFile || !this.areSettingsEqual(next, this.originalSettings));
   }
 
   toggleCashierFlow(event: Event): void {
