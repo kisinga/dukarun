@@ -184,7 +184,7 @@ import { MlTrainingService } from '../../../../core/services/ml-training.service
             <div><strong>Status Guide:</strong></div>
             <div>• <span class="text-gray-500">Idle</span> - Ready to extract photos</div>
             <div>• <span class="text-blue-500">Extracting</span> - Processing product images</div>
-            <div>• <span class="text-green-500">Ready</span> - Training data prepared</div>
+            <div>• <span class="text-green-500">Ready</span> - Queued for auto-training</div>
             <div>• <span class="text-blue-500">Training</span> - Model training in progress</div>
             <div>• <span class="text-green-500">Active</span> - Model ready for use</div>
             <div>• <span class="text-red-500">Failed</span> - Training encountered an error</div>

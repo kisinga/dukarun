@@ -116,6 +116,22 @@ export class MlExtractionQueueSubscriber extends WorkerBackgroundTaskBase {
               RequestContext.empty(),
               extraction.id
             );
+
+            // Trigger training automatically
+            this.logger.log(
+              `Extraction completed for channel ${extraction.channelId}, triggering training...`
+            );
+            try {
+              await this.mlTrainingService.startTraining(
+                RequestContext.empty(),
+                extraction.channelId
+              );
+            } catch (trainingError) {
+              // We log but don't fail the extraction job itself, as extraction was successful
+              this.logger.warn(
+                `Auto-training fail: ${trainingError instanceof Error ? trainingError.message : trainingError}`
+              );
+            }
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.logger.error(`Error processing extraction ${extraction.id}:`, error);

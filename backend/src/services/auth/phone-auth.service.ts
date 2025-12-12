@@ -652,4 +652,52 @@ export class PhoneAuthService {
     // Return true if available (no user found), false if taken
     return !existingUser;
   }
+  /**
+   * Update administrator profile (frontend safe version)
+   * Updates Administrator entity WITHOUT changing User identifier
+   */
+  async updateAdminProfile(
+    ctx: RequestContext,
+    input: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      profilePictureId?: string;
+    }
+  ): Promise<Administrator> {
+    const administrator = await this.connection.getRepository(ctx, Administrator).findOne({
+      where: { user: { id: ctx.activeUserId } },
+      relations: ['user'],
+    });
+
+    if (!administrator) {
+      throw new Error('Administrator not found');
+    }
+
+    // Check if email is being changed and if it's available
+    if (input.email !== administrator.emailAddress) {
+      const isAvailable = await this.checkIdentifierAvailable(ctx, input.email);
+      if (!isAvailable) {
+        throw new Error('Email address is already in use by another account');
+      }
+    }
+
+    administrator.firstName = input.firstName;
+    administrator.lastName = input.lastName;
+    administrator.emailAddress = input.email;
+
+    if (input.profilePictureId) {
+      // Need to cast to any for custom fields
+      (administrator as any).customFields = {
+        profilePictureId: input.profilePictureId,
+      };
+    } else if (input.profilePictureId === null) {
+      // Explicit removal
+      (administrator as any).customFields = {
+        profilePictureId: null,
+      };
+    }
+
+    return await this.connection.getRepository(ctx, Administrator).save(administrator);
+  }
 }

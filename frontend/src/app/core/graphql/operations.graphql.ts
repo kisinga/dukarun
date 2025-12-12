@@ -161,6 +161,24 @@ export const UPDATE_ADMINISTRATOR = graphql(`
   }
 `);
 
+export const UPDATE_ADMIN_PROFILE = graphql(`
+  mutation UpdateAdminProfile($input: UpdateAdminProfileInput!) {
+    updateAdminProfile(input: $input) {
+      id
+      firstName
+      lastName
+      emailAddress
+      customFields {
+        profilePicture {
+          id
+          preview
+          source
+        }
+      }
+    }
+  }
+`);
+
 export const GET_USER_CHANNELS = graphql(`
   query GetUserChannels {
     me {
@@ -1386,6 +1404,12 @@ export const EXTRACT_PHOTOS_FOR_TRAINING = graphql(`
 export const UPDATE_TRAINING_STATUS = graphql(`
   mutation UpdateTrainingStatus($channelId: ID!, $status: String!, $progress: Int, $error: String) {
     updateTrainingStatus(channelId: $channelId, status: $status, progress: $progress, error: $error)
+  }
+`);
+
+export const START_TRAINING = graphql(`
+  mutation StartTraining($channelId: ID!) {
+    startTraining(channelId: $channelId)
   }
 `);
 

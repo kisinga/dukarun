@@ -137,6 +137,27 @@ services:
       retries: 3
       start_period: 30s
 
+  # ========================================
+  # ML Trainer Microservice
+  # ========================================
+  ml-trainer:
+    build:
+      context: ./ml-trainer
+      dockerfile: Dockerfile
+    image: ghcr.io/kisinga/dukarun/ml-trainer:latest
+    restart: unless-stopped
+    networks:
+      - dukarun_services_network
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
 # ========================================
 # Networks
 # ========================================

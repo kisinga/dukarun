@@ -122,6 +122,7 @@ From `ML_TRAINING_SETUP.md`:
   - Listens for product and asset changes.
   - Automatically extracts photos tagged for training.
   - Debounces extraction jobs to avoid thrashing.
+  - Uses a **dedicated microservice** (`ml-trainer`) to perform the actual model training, ensuring the main application remains responsive.
 
 ---
 
@@ -189,9 +190,9 @@ Over time, as ML training is run, these photos become the base for your recognit
 
 **Who:** Dukarun operator, external ML provider.
 
-1. Use the **ML Training Status** component in the dashboard (for high-level control) or the GraphQL APIs (for automation) to:
-   - Prepare training data (photo extraction).
-   - Generate a manifest.
+1. Use the **ML Training Status** component to monitor progress.
+   - Training triggers **automatically** when photo extraction completes (if data is sufficient).
+2. Monitor status:
 2. Run training externally:
    - Use the manifest to download data.
    - Train a TensorFlow.js-compatible model.

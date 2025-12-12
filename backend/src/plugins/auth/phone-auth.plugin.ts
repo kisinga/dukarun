@@ -8,7 +8,12 @@ import { OtpService } from '../../services/auth/otp.service';
 import { PhoneAuthService } from '../../services/auth/phone-auth.service';
 import { RegistrationService } from '../../services/auth/registration.service';
 import { OtpTokenAuthStrategy } from './otp-token-auth.strategy';
-import { PhoneAuthResolver, phoneAuthSchema } from './phone-auth.resolver';
+import {
+  PhoneAuthAdminResolver,
+  PhoneAuthCommonResolver,
+  phoneAuthAdminSchema,
+  phoneAuthShopSchema,
+} from './phone-auth.resolvers';
 // Registration Provisioning Services
 import { AccessProvisionerService } from '../../services/auth/provisioning/access-provisioner.service';
 import { ChannelAssignmentService } from '../../services/auth/provisioning/channel-assignment.service';
@@ -47,7 +52,8 @@ import { ProvisioningContextAdapter } from '../../services/provisioning/context-
     AccessProvisionerService,
     ChartOfAccountsService,
     // Phone Auth Infrastructure
-    PhoneAuthResolver,
+    PhoneAuthCommonResolver,
+    // PhoneAuthAdminResolver, // Commented out to prevent global scanning
     PhoneAuthService,
     ChannelAccessGuardService,
     OtpService,
@@ -91,12 +97,12 @@ import { ProvisioningContextAdapter } from '../../services/provisioning/context-
     return config;
   },
   adminApiExtensions: {
-    resolvers: [PhoneAuthResolver],
-    schema: phoneAuthSchema,
+    resolvers: [PhoneAuthCommonResolver, PhoneAuthAdminResolver],
+    schema: phoneAuthAdminSchema,
   },
   shopApiExtensions: {
-    resolvers: [PhoneAuthResolver],
-    schema: phoneAuthSchema,
+    resolvers: [PhoneAuthCommonResolver],
+    schema: phoneAuthShopSchema,
   },
   compatibility: VENDURE_COMPATIBILITY_VERSION,
 })

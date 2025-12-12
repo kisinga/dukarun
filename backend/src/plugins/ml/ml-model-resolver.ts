@@ -108,6 +108,12 @@ export const ML_MODEL_SCHEMA = gql`
       weightsFile: Upload!
       metadata: Upload!
     ): Boolean!
+
+    """
+    Start in-process model training for a channel.
+    Requires 'ready' status (photos extracted) or will trigger extraction.
+    """
+    startTraining(channelId: ID!): Boolean!
   }
 `;
 
@@ -394,5 +400,15 @@ export class MlModelResolver {
       );
       throw error;
     }
+  }
+  @Transaction()
+  @Mutation()
+  @Allow(Permission.UpdateCatalog)
+  async startTraining(
+    @Ctx() ctx: RequestContext,
+    @Args() args: { channelId: ID }
+  ): Promise<boolean> {
+    this.logger.debug('startTraining called', args);
+    return this.mlTrainingService.startTraining(ctx, args.channelId.toString());
   }
 }

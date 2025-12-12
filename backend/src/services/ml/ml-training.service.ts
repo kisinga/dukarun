@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import axios from 'axios';
 import {
   AssetService,
   ChannelService,
@@ -270,5 +271,59 @@ export class MlTrainingService {
       hasActiveModel: !!(customFields.mlModelJsonId && customFields.mlMetadataId),
       lastTrainedAt: customFields.mlTrainingStartedAt, // Could be improved with separate field
     };
+  }
+
+  /**
+   * Start training for a channel
+   * Invokes the ml-trainer microservice
+   */
+  async startTraining(ctx: RequestContext, channelId: string): Promise<boolean> {
+    this.logger.log(`Starting training for channel ${channelId}`);
+
+    // Check if channel has training data
+    const manifest = await this.getTrainingManifest(ctx, channelId);
+    if (!manifest.products || manifest.products.length < 2) {
+      throw new Error('Insufficient training data. Need at least 2 products with images.');
+    }
+
+    // Update status to training (starting)
+    // We don't set progress to 0 yet, as that's done by the webhook when it actually starts
+    await this.updateTrainingStatus(ctx, channelId, 'training', 0);
+
+    try {
+      // In a real app, generate a secure verification token using AuthService
+      // For MVP internal communication, we'll use a static secret or similar mechanism
+      // This token allows the microservice to call back the webhook
+      const authToken = 'internal-service-token';
+
+      const trainerUrl = process.env.ML_TRAINER_URL || 'http://ml-trainer:3000';
+      const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:3000';
+
+      // The manifest URL needs to be accessible by ml-trainer
+      // We use the admin-api with a query to get it
+      const manifestUrl = `${backendUrl}/admin-api?query=query{mlTrainingManifest(channelId:"${channelId}"){channelId,version,extractedAt,products{productId,productName,images{assetId,url,filename}}}}`;
+
+      this.logger.log(`Invoking ML trainer at ${trainerUrl}/v1/train`);
+
+      await axios.post(`${trainerUrl}/v1/train`, {
+        channelId,
+        manifestUrl,
+        webhookUrl: `${backendUrl}/admin-api`, // The GraphQL endpoint for callbacks
+        authToken,
+      });
+
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to start training: ${errorMessage}`);
+      await this.updateTrainingStatus(
+        ctx,
+        channelId,
+        'failed',
+        0,
+        `Failed to start training: ${errorMessage}`
+      );
+      throw error;
+    }
   }
 }

@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../../environments/environment';
-import { UPDATE_ADMINISTRATOR } from '../../../core/graphql/operations.graphql';
+import { UPDATE_ADMIN_PROFILE } from '../../../core/graphql/operations.graphql';
 import { ApolloService } from '../../../core/services/apollo.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -525,7 +525,7 @@ export class ProfileComponent {
       const input: any = {
         firstName: this.firstName.trim(),
         lastName: this.lastName.trim(),
-        emailAddress: this.email.trim(),
+        email: this.email.trim(),
       };
 
       // Handle photo upload
@@ -536,14 +536,14 @@ export class ProfileComponent {
           this.isSaving.set(false);
           return;
         }
-        input.customFields = { profilePictureId: assetId };
+        input.profilePictureId = assetId;
       } else if (this.photoMarkedForRemoval && this.originalPhotoId) {
-        input.customFields = { profilePictureId: null };
+        input.profilePictureId = null;
       }
 
       const client = this.apolloService.getClient();
       await client.mutate({
-        mutation: UPDATE_ADMINISTRATOR as any,
+        mutation: UPDATE_ADMIN_PROFILE as any,
         variables: { input },
       });
 
