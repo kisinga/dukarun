@@ -1,6 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Apollo } from 'apollo-angular';
-import { Observable, map, tap } from 'rxjs';
+import { Observable, from, map, tap, catchError, of } from 'rxjs';
 import {
   GET_ML_TRAINING_INFO,
   GET_ML_TRAINING_MANIFEST,
@@ -8,6 +7,7 @@ import {
   UPDATE_TRAINING_STATUS,
   COMPLETE_TRAINING,
 } from '../graphql/operations.graphql';
+import { ApolloService } from './apollo.service';
 
 export interface MlTrainingInfo {
   status: string;
@@ -39,8 +39,6 @@ export interface ImageManifestEntry {
   filename: string;
 }
 
-// GraphQL operations are now imported from operations.graphql.ts
-
 /**
  * ML Training Service
  *
@@ -51,12 +49,12 @@ export interface ImageManifestEntry {
   providedIn: 'root',
 })
 export class MlTrainingService {
-  private apollo = inject(Apollo);
+  private readonly apolloService = inject(ApolloService);
 
   // Reactive state
-  private trainingInfoSignal = signal<MlTrainingInfo | null>(null);
-  private loadingSignal = signal(false);
-  private errorSignal = signal<string | null>(null);
+  private readonly trainingInfoSignal = signal<MlTrainingInfo | null>(null);
+  private readonly loadingSignal = signal(false);
+  private readonly errorSignal = signal<string | null>(null);
 
   // Computed values
   readonly trainingInfo = computed(() => this.trainingInfoSignal());
@@ -96,96 +94,74 @@ export class MlTrainingService {
    * Get training info for a channel
    */
   getTrainingInfo(channelId: string): Observable<MlTrainingInfo> {
+    console.log('[MlTrainingService] getTrainingInfo called with channelId:', channelId);
     this.loadingSignal.set(true);
     this.errorSignal.set(null);
 
-    return this.apollo
-      .query<{ mlTrainingInfo: MlTrainingInfo }>({
-        query: GET_ML_TRAINING_INFO,
-        variables: { channelId },
-        fetchPolicy: 'cache-and-network' as any,
-        errorPolicy: 'all',
-      })
-      .pipe(
-        map((result: any) => {
-          if (result.errors && result.errors.length > 0) {
-            // Check if it's a schema error (GraphQL queries not available yet)
-            const schemaError = result.errors.some(
-              (err: any) =>
-                err.message.includes('Cannot query field') ||
-                err.message.includes('mlTrainingInfo'),
-            );
-
-            if (schemaError) {
-              // Return default info when schema is not available
-              return {
-                status: 'idle',
-                progress: 0,
-                productCount: 0,
-                imageCount: 0,
-                hasActiveModel: false,
-              } as MlTrainingInfo;
-            }
-          }
-          return result.data.mlTrainingInfo;
-        }),
-        tap((info) => {
-          this.trainingInfoSignal.set(info);
+    return from(
+      this.apolloService.query<{ mlTrainingInfo: MlTrainingInfo }>(GET_ML_TRAINING_INFO, {
+        channelId,
+      }),
+    ).pipe(
+      tap((result) => console.log('[MlTrainingService] Raw query result:', result)),
+      map((result) => {
+        return result.data.mlTrainingInfo;
+      }),
+      tap((info) => {
+        console.log('[MlTrainingService] Parsed training info:', info);
+        this.trainingInfoSignal.set(info);
+        this.loadingSignal.set(false);
+      }),
+      catchError((error) => {
+        console.error('[MlTrainingService] Query error:', error);
+        // If it's a GraphQL schema error, provide default info
+        if (
+          error.message?.includes('Cannot query field') ||
+          error.message?.includes('mlTrainingInfo')
+        ) {
+          const defaultInfo: MlTrainingInfo = {
+            status: 'idle',
+            progress: 0,
+            productCount: 0,
+            imageCount: 0,
+            hasActiveModel: false,
+          };
+          this.trainingInfoSignal.set(defaultInfo);
           this.loadingSignal.set(false);
-        }),
-        tap({
-          error: (error) => {
-            // If it's a GraphQL schema error, provide default info
-            if (
-              error.message.includes('Cannot query field') ||
-              error.message.includes('mlTrainingInfo')
-            ) {
-              const defaultInfo: MlTrainingInfo = {
-                status: 'idle',
-                progress: 0,
-                productCount: 0,
-                imageCount: 0,
-                hasActiveModel: false,
-              };
-              this.trainingInfoSignal.set(defaultInfo);
-              this.loadingSignal.set(false);
-            } else {
-              this.errorSignal.set(error.message);
-              this.loadingSignal.set(false);
-            }
-          },
-        }),
-      );
+          return of(defaultInfo);
+        }
+        this.errorSignal.set(error.message);
+        this.loadingSignal.set(false);
+        throw error;
+      }),
+    );
   }
 
   /**
    * Get training manifest for a channel
    */
   getTrainingManifest(channelId: string): Observable<MlTrainingManifest> {
-    return this.apollo
-      .query<{ mlTrainingManifest: MlTrainingManifest }>({
-        query: GET_ML_TRAINING_MANIFEST,
-        variables: { channelId },
-        errorPolicy: 'all',
-      })
-      .pipe(
-        map((result: any) => {
-          if (result.errors && result.errors.length > 0) {
-            const schemaError = result.errors.some(
-              (err: any) =>
-                err.message.includes('Cannot query field') ||
-                err.message.includes('mlTrainingManifest'),
-            );
-
-            if (schemaError) {
-              throw new Error(
-                'ML Training features not available. Please restart the backend to enable new schema.',
-              );
-            }
-          }
-          return result.data.mlTrainingManifest;
-        }),
-      );
+    return from(
+      this.apolloService.query<{ mlTrainingManifest: MlTrainingManifest }>(
+        GET_ML_TRAINING_MANIFEST,
+        { channelId },
+      ),
+    ).pipe(
+      map((result) => {
+        return result.data.mlTrainingManifest;
+      }),
+      catchError((error) => {
+        if (
+          error.message?.includes('Cannot query field') ||
+          error.message?.includes('mlTrainingManifest')
+        ) {
+          throw new Error(
+            'ML Training features not available. Please restart the backend to enable new schema.',
+          );
+        }
+        throw error;
+      }),
+    );
   }
 
   /**
@@ -219,41 +195,37 @@ export class MlTrainingService {
     this.loadingSignal.set(true);
     this.errorSignal.set(null);
 
-    return this.apollo
-      .mutate<{ extractPhotosForTraining: boolean }>({
-        mutation: EXTRACT_PHOTOS_FOR_TRAINING,
-        variables: { channelId },
-        errorPolicy: 'all',
-      })
-      .pipe(
-        map((result: any) => {
-          if (result.errors && result.errors.length > 0) {
-            const schemaError = result.errors.some(
-              (err: any) =>
-                err.message.includes('Cannot query field') ||
-                err.message.includes('extractPhotosForTraining'),
-            );
-
-            if (schemaError) {
-              throw new Error(
-                'ML Training features not available. Please restart the backend to enable new schema.',
-              );
-            }
-          }
-          return result.data?.extractPhotosForTraining ?? false;
-        }),
-        tap(() => {
-          this.loadingSignal.set(false);
-          // Refresh training info after extraction
-          this.getTrainingInfo(channelId).subscribe();
-        }),
-        tap({
-          error: (error) => {
-            this.errorSignal.set(error.message);
-            this.loadingSignal.set(false);
-          },
-        }),
-      );
+    return from(
+      this.apolloService.mutate<{ extractPhotosForTraining: boolean }>(
+        EXTRACT_PHOTOS_FOR_TRAINING,
+        {
+          channelId,
+        },
+      ),
+    ).pipe(
+      map((result) => {
+        return result.data?.extractPhotosForTraining ?? false;
+      }),
+      tap(() => {
+        this.loadingSignal.set(false);
+        // Refresh training info after extraction
+        this.getTrainingInfo(channelId).subscribe();
+      }),
+      catchError((error) => {
+        if (
+          error.message?.includes('Cannot query field') ||
+          error.message?.includes('extractPhotosForTraining')
+        ) {
+          this.errorSignal.set(
+            'ML Training features not available. Please restart the backend to enable new schema.',
+          );
+        } else {
+          this.errorSignal.set(error.message);
+        }
+        this.loadingSignal.set(false);
+        throw error;
+      }),
+    );
   }
 
   /**
@@ -265,18 +237,20 @@ export class MlTrainingService {
     progress?: number,
     error?: string,
   ): Observable<boolean> {
-    return this.apollo
-      .mutate<{ updateTrainingStatus: boolean }>({
-        mutation: UPDATE_TRAINING_STATUS,
-        variables: { channelId, status, progress, error },
-      })
-      .pipe(
-        map((result: any) => result.data?.updateTrainingStatus ?? false),
-        tap(() => {
-          // Refresh training info after status update
-          this.getTrainingInfo(channelId).subscribe();
-        }),
-      );
+    return from(
+      this.apolloService.mutate<{ updateTrainingStatus: boolean }>(UPDATE_TRAINING_STATUS, {
+        channelId,
+        status,
+        progress,
+        error,
+      }),
+    ).pipe(
+      map((result) => result.data?.updateTrainingStatus ?? false),
+      tap(() => {
+        // Refresh training info after status update
+        this.getTrainingInfo(channelId).subscribe();
+      }),
+    );
   }
 
   /**
@@ -291,30 +265,26 @@ export class MlTrainingService {
     this.loadingSignal.set(true);
     this.errorSignal.set(null);
 
-    return this.apollo
-      .mutate<{ completeTraining: boolean }>({
-        mutation: COMPLETE_TRAINING,
-        variables: {
-          channelId,
-          modelJson,
-          weightsFile,
-          metadata,
-        },
-      })
-      .pipe(
-        map((result: any) => result.data?.completeTraining ?? false),
-        tap(() => {
-          this.loadingSignal.set(false);
-          // Refresh training info after completion
-          this.getTrainingInfo(channelId).subscribe();
-        }),
-        tap({
-          error: (error) => {
-            this.errorSignal.set(error.message);
-            this.loadingSignal.set(false);
-          },
-        }),
-      );
+    return from(
+      this.apolloService.mutate<{ completeTraining: boolean }>(COMPLETE_TRAINING, {
+        channelId,
+        modelJson,
+        weightsFile,
+        metadata,
+      }),
+    ).pipe(
+      map((result) => result.data?.completeTraining ?? false),
+      tap(() => {
+        this.loadingSignal.set(false);
+        // Refresh training info after completion
+        this.getTrainingInfo(channelId).subscribe();
+      }),
+      catchError((error) => {
+        this.errorSignal.set(error.message);
+        this.loadingSignal.set(false);
+        throw error;
+      }),
+    );
   }
 
   /**

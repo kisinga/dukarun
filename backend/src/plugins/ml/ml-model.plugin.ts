@@ -7,6 +7,8 @@ import { MlAutoExtractService } from '../../services/ml/ml-auto-extract.service'
 import { MlExtractionQueueService } from '../../services/ml/ml-extraction-queue.service';
 import { MlExtractionQueueSubscriber } from './ml-extraction-queue.subscriber';
 import { ML_MODEL_SCHEMA, MlModelResolver } from './ml-model-resolver';
+import { MlServiceAuthGuard } from './ml-service-auth.guard';
+import { MlTrainingScheduler } from './ml-training-scheduler';
 import { MlTrainingService } from '../../services/ml/ml-training.service';
 import { MlWebhookService } from '../../services/ml/ml-webhook.service';
 
@@ -37,7 +39,9 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
 
     // ML services
     MlModelResolver,
+    MlServiceAuthGuard,
     MlTrainingService,
+    MlTrainingScheduler,
     MlAutoExtractService,
     MlWebhookService,
     MlExtractionQueueService,

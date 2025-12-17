@@ -81,6 +81,11 @@ export class EnvironmentConfig implements OnModuleInit {
   // ML/Webhook configuration
   readonly ml = {
     webhookSecret: '',
+    serviceToken: '', // Shared secret for service-to-service auth
+    trainerUrl: 'http://ml-trainer:3005', // ML trainer service URL (uses Docker service name)
+    backendInternalUrl: 'http://backend:3000', // Backend internal URL (uses Docker service name)
+    trainingIntervalMinutes: 60,
+    trainingCooldownHours: 4,
   };
 
   // Push notification configuration
@@ -236,6 +241,12 @@ export class EnvironmentConfig implements OnModuleInit {
 
     // Load ML/Webhook configuration
     this.ml.webhookSecret = process.env.ML_WEBHOOK_SECRET || '';
+    this.ml.serviceToken = process.env.ML_SERVICE_TOKEN || '';
+    // Use Docker service names for internal networking (can be overridden via env vars if needed)
+    this.ml.trainerUrl = process.env.ML_TRAINER_URL || 'http://ml-trainer:3005';
+    this.ml.backendInternalUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:3000';
+    this.ml.trainingIntervalMinutes = +(process.env.ML_TRAINING_INTERVAL_MINUTES || 60);
+    this.ml.trainingCooldownHours = +(process.env.ML_TRAINING_COOLDOWN_HOURS || 4);
 
     // Load Push notification configuration
     this.push.vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';

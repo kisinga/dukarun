@@ -87,14 +87,19 @@ services:
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-info}
 
+      # ML Training configuration
+      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:-}
+      ML_TRAINING_INTERVAL_MINUTES: ${ML_TRAINING_INTERVAL_MINUTES:-60}
+      ML_TRAINING_COOLDOWN_HOURS: ${ML_TRAINING_COOLDOWN_HOURS:-4}
+
     volumes:
       - backend_assets:/app/static/assets
       - backend_uploads:/app/static/uploads
       # Note: .env file mount removed - env vars are passed directly via environment section
       # In platforms like Coolify/Kubernetes, env vars are passed directly, so file mount is not needed
     #ports:
-     # - '${BACKEND_PORT:-3000}:3000'
-      #- '3002:3002' # Admin UI
+    # - '${BACKEND_PORT:-3000}:3000'
+    #- '3002:3002' # Admin UI
     # Note: depends_on removed for external services (postgres_db, redis, timescaledb_audit)
     # Backend will retry connections gracefully if services are not yet ready
     healthcheck:
@@ -136,6 +141,27 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  # ========================================
+  # ML Trainer Microservice
+  # ========================================
+  ml-trainer:
+    build:
+      context: ./ml-trainer
+      dockerfile: Dockerfile
+    image: ghcr.io/kisinga/dukarun/ml-trainer:latest
+    restart: unless-stopped
+    networks:
+      - dukarun_services_network
+    environment:
+      ML_PORT: ${ML_PORT:-3005}
+      NODE_ENV: production
+      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:-}
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3005/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 # ========================================
 # Networks

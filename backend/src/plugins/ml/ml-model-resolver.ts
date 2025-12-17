@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
   Allow,
@@ -12,6 +12,8 @@ import {
 } from '@vendure/core';
 import gql from 'graphql-tag';
 import { MlTrainingService, TrainingManifest } from '../../services/ml/ml-training.service';
+import { MlServiceAuthGuard } from './ml-service-auth.guard';
+import { env } from '../../infrastructure/config/environment.config';
 
 /**
  * GraphQL schema extension for ML model management
@@ -108,6 +110,12 @@ export const ML_MODEL_SCHEMA = gql`
       weightsFile: Upload!
       metadata: Upload!
     ): Boolean!
+
+    """
+    Start in-process model training for a channel.
+    Requires 'ready' status (photos extracted) or will trigger extraction.
+    """
+    startTraining(channelId: ID!): Boolean!
   }
 `;
 
@@ -251,13 +259,50 @@ export class MlModelResolver {
     return this.mlTrainingService.getTrainingInfo(ctx, args.channelId.toString());
   }
 
+  /**
+   * Get training manifest for ml-trainer service
+   *
+   * This endpoint is designed for service-to-service calls from ml-trainer.
+   * Authentication is handled via ML_SERVICE_TOKEN in the Authorization header.
+   * We don't use @Allow decorator because it conflicts with service token auth.
+   */
   @Query()
-  @Allow(Permission.ReadCatalog)
   async mlTrainingManifest(
     @Ctx() ctx: RequestContext,
     @Args() args: { channelId: ID }
   ): Promise<TrainingManifest> {
-    return this.mlTrainingService.getTrainingManifest(ctx, args.channelId.toString());
+    // Verify service token authentication
+    // The token should be in the Authorization header as "Bearer <token>"
+    const req = (ctx as any).req;
+    const authHeader = req?.headers?.authorization || req?.headers?.Authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new Error('Authorization required: Bearer token expected');
+    }
+
+    const token = authHeader.substring(7);
+    const expectedToken = env.ml.serviceToken;
+
+    if (!expectedToken || token !== expectedToken) {
+      throw new Error('Invalid service token');
+    }
+
+    // Create a RequestContext for the specific channel
+    // This ensures product queries use the correct channel filter
+    const channel = await this.channelService.findOne(ctx, args.channelId);
+    if (!channel) {
+      throw new Error(`Channel ${args.channelId} not found`);
+    }
+
+    const channelCtx = new RequestContext({
+      apiType: ctx.apiType,
+      channel,
+      languageCode: ctx.languageCode,
+      isAuthorized: true,
+      authorizedAsOwnerOnly: false,
+    });
+
+    return this.mlTrainingService.getTrainingManifest(channelCtx, args.channelId.toString());
   }
 
   @Transaction()
@@ -275,6 +320,7 @@ export class MlModelResolver {
 
   @Transaction()
   @Mutation()
+  @UseGuards(MlServiceAuthGuard)
   @Allow(Permission.UpdateCatalog)
   async updateTrainingStatus(
     @Ctx() ctx: RequestContext,
@@ -294,6 +340,7 @@ export class MlModelResolver {
 
   @Transaction()
   @Mutation()
+  @UseGuards(MlServiceAuthGuard)
   @Allow(Permission.UpdateCatalog)
   async completeTraining(
     @Ctx() ctx: RequestContext,
@@ -364,7 +411,6 @@ export class MlModelResolver {
       }
 
       // Update channel with new model assets and stats
-      // Update channel with new model assets and stats
       await this.channelService.update(ctx, {
         id: args.channelId.toString(),
         customFields: {
@@ -377,6 +423,8 @@ export class MlModelResolver {
           mlTrainingProgress: 100,
           mlProductCount: productCount,
           mlImageCount: imageCount,
+          mlLastTrainedAt: new Date(), // Set rate limit marker
+          mlTrainingQueuedAt: null, // Clear queue marker
         },
       });
 
@@ -394,5 +442,15 @@ export class MlModelResolver {
       );
       throw error;
     }
+  }
+  @Transaction()
+  @Mutation()
+  @Allow(Permission.UpdateCatalog)
+  async startTraining(
+    @Ctx() ctx: RequestContext,
+    @Args() args: { channelId: ID }
+  ): Promise<boolean> {
+    this.logger.debug('startTraining called', args);
+    return this.mlTrainingService.startTraining(ctx, args.channelId.toString());
   }
 }

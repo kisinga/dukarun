@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TeamComponent } from '../team/team.component';
 import { AuditTrailComponent } from './components/audit-trail.component';
 import { GeneralSettingsComponent } from './components/general-settings.component';
-import { MlModelStatusComponent } from './components/ml-model-status.component';
+import { MlModelStatusComponent } from './components/ml-model-status/ml-model-status.component';
 import { NotificationSettingsComponent } from './components/notification-settings.component';
 import { NotificationTestComponent } from './components/notification-test.component';
 import { PaymentMethodsComponent } from './components/payment-methods.component';

@@ -431,6 +431,34 @@ export const config: VendureConfig = {
         ui: { tab: 'ML Model' },
       },
       {
+        name: 'mlTrainingQueuedAt',
+        type: 'datetime',
+        label: [{ languageCode: LanguageCode.en, value: 'Training Queued At' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'Timestamp when training was queued (set after photo extraction)',
+          },
+        ],
+        public: true,
+        nullable: true,
+        ui: { tab: 'ML Model' },
+      },
+      {
+        name: 'mlLastTrainedAt',
+        type: 'datetime',
+        label: [{ languageCode: LanguageCode.en, value: 'Last Training Completed At' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'Timestamp when training last completed successfully (used for rate limiting)',
+          },
+        ],
+        public: true,
+        nullable: true,
+        ui: { tab: 'ML Model' },
+      },
+      {
         name: 'mlProductCount',
         type: 'int',
         label: [{ languageCode: LanguageCode.en, value: 'Product Count in Model' }],
@@ -1482,7 +1510,7 @@ export const config: VendureConfig = {
     }),
     AdminUiPlugin.init({
       route: 'admin',
-      port: serverPort + 2,
+      port: serverPort,
       adminUiConfig: {
         apiPort: serverPort,
       },

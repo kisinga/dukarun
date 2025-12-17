@@ -161,6 +161,12 @@ export const UPDATE_ADMINISTRATOR = graphql(`
   }
 `);
 
+export const UPDATE_ADMIN_PROFILE = graphql(`
+  mutation UpdateAdminProfile($input: UpdateAdminProfileInput!) {
+    updateAdminProfile(input: $input)
+  }
+`);
+
 export const GET_USER_CHANNELS = graphql(`
   query GetUserChannels {
     me {

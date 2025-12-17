@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RequestContext } from '@vendure/core';
+import { ChannelService, RequestContext } from '@vendure/core';
 import pLimit from 'p-limit';
 import { MlExtractionQueueService } from '../../services/ml/ml-extraction-queue.service';
 import { MlTrainingService } from '../../services/ml/ml-training.service';
@@ -23,7 +23,8 @@ export class MlExtractionQueueSubscriber extends WorkerBackgroundTaskBase {
   constructor(
     workerContext: WorkerContextService,
     private extractionQueueService: MlExtractionQueueService,
-    private mlTrainingService: MlTrainingService
+    private mlTrainingService: MlTrainingService,
+    private channelService: ChannelService
   ) {
     super(workerContext, MlExtractionQueueSubscriber.name);
   }
@@ -116,6 +117,20 @@ export class MlExtractionQueueSubscriber extends WorkerBackgroundTaskBase {
               RequestContext.empty(),
               extraction.id
             );
+
+            // Queue training instead of starting immediately
+            // The MlTrainingScheduler will process the queue on its interval
+            this.logger.log(
+              `Extraction completed for channel ${extraction.channelId}, queuing training...`
+            );
+            try {
+              await this.queueTrainingForChannel(extraction.channelId);
+            } catch (queueError) {
+              // We log but don't fail the extraction job itself, as extraction was successful
+              this.logger.warn(
+                `Failed to queue training: ${queueError instanceof Error ? queueError.message : queueError}`
+              );
+            }
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.logger.error(`Error processing extraction ${extraction.id}:`, error);
@@ -138,6 +153,26 @@ export class MlExtractionQueueSubscriber extends WorkerBackgroundTaskBase {
       await Promise.all(channelPromises);
     } catch (error) {
       this.logger.error('Error getting due extractions:', error);
+    }
+  }
+
+  /**
+   * Queue training for a channel by setting mlTrainingQueuedAt
+   * The MlTrainingScheduler will pick this up on its next run
+   */
+  private async queueTrainingForChannel(channelId: string): Promise<void> {
+    try {
+      await this.channelService.update(RequestContext.empty(), {
+        id: channelId,
+        customFields: {
+          mlTrainingQueuedAt: new Date(),
+        },
+      });
+      this.logger.log(`Queued training for channel ${channelId}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error queuing training for channel ${channelId}: ${errorMessage}`);
+      throw error;
     }
   }
 
