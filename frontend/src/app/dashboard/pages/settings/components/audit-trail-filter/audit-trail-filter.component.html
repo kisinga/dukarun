@@ -1,0 +1,42 @@
+<div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
+  <div class="flex-1">
+    <input
+      type="text"
+      placeholder="Search by event type, entity type, or user ID..."
+      class="input input-bordered w-full input-sm sm:input-md"
+      [value]="searchQuery()"
+      (input)="onSearchChange($event)"
+    />
+  </div>
+  <div class="flex gap-2 flex-wrap">
+    <select
+      class="select select-bordered select-sm sm:select-md flex-1 sm:flex-none sm:w-auto min-w-[120px]"
+      [value]="eventTypeFilter()"
+      (change)="onEventTypeFilterChange($event)"
+    >
+      <option value="">All Events</option>
+      @for (eventType of eventTypes(); track eventType) {
+        <option [value]="eventType">{{ eventType }}</option>
+      }
+    </select>
+    <select
+      class="select select-bordered select-sm sm:select-md flex-1 sm:flex-none sm:w-auto min-w-[120px]"
+      [value]="entityTypeFilter()"
+      (change)="onEntityTypeFilterChange($event)"
+    >
+      <option value="">All Entities</option>
+      @for (entityType of entityTypes(); track entityType) {
+        <option [value]="entityType">{{ entityType }}</option>
+      }
+    </select>
+    <select
+      class="select select-bordered select-sm sm:select-md flex-1 sm:flex-none sm:w-auto min-w-[110px]"
+      [value]="sourceFilter()"
+      (change)="onSourceFilterChange($event)"
+    >
+      <option value="">All Sources</option>
+      <option value="user_action">User</option>
+      <option value="system_event">System</option>
+    </select>
+  </div>
+</div>

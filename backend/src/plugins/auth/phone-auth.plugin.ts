@@ -53,7 +53,7 @@ import { ProvisioningContextAdapter } from '../../services/provisioning/context-
     ChartOfAccountsService,
     // Phone Auth Infrastructure
     PhoneAuthCommonResolver,
-    // PhoneAuthAdminResolver, // Commented out to prevent global scanning
+    PhoneAuthAdminResolver,
     PhoneAuthService,
     ChannelAccessGuardService,
     OtpService,

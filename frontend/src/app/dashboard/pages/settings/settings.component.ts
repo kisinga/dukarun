@@ -2,14 +2,14 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TeamComponent } from '../team/team.component';
-import { AuditTrailComponent } from './components/audit-trail.component';
-import { GeneralSettingsComponent } from './components/general-settings.component';
+import { AuditTrailComponent } from './components/audit-trail/audit-trail.component';
+import { GeneralSettingsComponent } from './components/general-settings/general-settings.component';
 import { MlModelStatusComponent } from './components/ml-model-status/ml-model-status.component';
-import { NotificationSettingsComponent } from './components/notification-settings.component';
-import { NotificationTestComponent } from './components/notification-test.component';
-import { PaymentMethodsComponent } from './components/payment-methods.component';
-import { SubscriptionStatusComponent } from './components/subscription-status.component';
-import { SubscriptionTiersComponent } from './components/subscription-tiers.component';
+import { NotificationSettingsComponent } from './components/notification-settings/notification-settings.component';
+import { NotificationTestComponent } from './components/notification-test/notification-test.component';
+import { PaymentMethodsComponent } from './components/payment-methods/payment-methods.component';
+import { SubscriptionStatusComponent } from './components/subscription-status/subscription-status.component';
+import { SubscriptionTiersComponent } from './components/subscription-tiers/subscription-tiers.component';
 
 @Component({
   selector: 'app-settings',

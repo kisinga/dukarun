@@ -1,0 +1,115 @@
+<div class="card bg-base-100 shadow-lg">
+  <div class="card-body p-4 sm:p-6">
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5 text-primary"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+          />
+        </svg>
+      </div>
+      <div>
+        <h2 class="text-lg sm:text-xl font-bold">Choose Your Plan</h2>
+        <p class="text-sm opacity-60">Select a subscription tier</p>
+      </div>
+    </div>
+
+    @if (subscriptionService.isLoading()) {
+      <div class="flex justify-center items-center py-12">
+        <span class="loading loading-spinner loading-lg"></span>
+      </div>
+    } @else if (subscriptionService.error()) {
+      <div class="alert alert-error py-2 text-sm">
+        <span>{{ subscriptionService.error() }}</span>
+      </div>
+    } @else if (tiers().length === 0) {
+      <div class="text-center py-8 opacity-60">
+        <p class="text-sm">No plans available</p>
+      </div>
+    } @else {
+      <!-- Tiers Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        @for (tier of validTiers(); track tier.id) {
+          <div
+            class="bg-base-200 rounded-lg p-4 border-2 transition-all cursor-pointer"
+            [class.border-primary]="isSelectedTier(tier.id)"
+            [class.border-transparent]="!isSelectedTier(tier.id)"
+            (click)="selectTier(tier)"
+          >
+            <h3 class="font-bold text-base">{{ tier.name }}</h3>
+            @if (tier.description) {
+              <p class="text-xs opacity-60 mt-1 line-clamp-2">{{ tier.description }}</p>
+            }
+
+            <!-- Pricing -->
+            <div class="mt-3">
+              <div class="flex items-baseline gap-1">
+                <span class="text-2xl font-bold"
+                  >KES {{ tier.priceMonthly / 100 | number: '1.0-0' }}</span
+                >
+                <span class="text-xs opacity-60">/mo</span>
+              </div>
+              <div class="text-xs opacity-50">
+                or KES {{ tier.priceYearly / 100 | number: '1.0-0' }}/yr
+              </div>
+            </div>
+
+            <!-- Features (Collapsible on mobile) -->
+            @if (getFeaturesList(tier).length > 0) {
+              <div class="mt-3">
+                <ul class="space-y-1">
+                  @for (feature of getFeaturesList(tier).slice(0, 3); track feature) {
+                    <li class="text-xs flex items-start gap-1">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-3 w-3 text-success mt-0.5 shrink-0"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                      <span>{{ feature }}</span>
+                    </li>
+                  }
+                  @if (getFeaturesList(tier).length > 3) {
+                    <li class="text-xs opacity-60">+{{ getFeaturesList(tier).length - 3 }} more</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            <!-- Select Button -->
+            <button
+              class="btn btn-primary btn-sm w-full mt-4"
+              [disabled]="subscriptionService.isProcessingPayment()"
+              (click)="selectTier(tier); $event.stopPropagation()"
+            >
+              @if (subscriptionService.isProcessingPayment() && selectedTierId() === tier.id) {
+                <span class="loading loading-spinner loading-xs"></span>
+              }
+              Select
+            </button>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Payment Modal -->
+<app-payment-modal
+  [isOpen]="isPaymentModalOpen()"
+  [tier]="selectedTier()"
+  (closed)="closePaymentModal()"
+  (paymentInitiated)="onPaymentInitiated($event)"
+/>

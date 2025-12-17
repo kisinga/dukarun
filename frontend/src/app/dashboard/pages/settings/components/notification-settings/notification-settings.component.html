@@ -1,0 +1,220 @@
+<div class="space-y-4">
+  <!-- Push Notifications Card -->
+  <div class="card bg-base-100 shadow-lg">
+    <div class="card-body p-4 sm:p-6">
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-lg sm:text-xl font-bold">Push Notifications</h2>
+          <p class="text-sm opacity-60">Manage notification preferences</p>
+        </div>
+      </div>
+
+      <!-- Status Card -->
+      <div
+        class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-base-200 rounded-lg p-4"
+      >
+        <div class="flex items-center gap-3">
+          <div
+            class="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+            [class.bg-success]="isPushEnabled()"
+            [class.bg-warning]="permission() === 'default'"
+            [class.bg-error]="!isPushEnabled() && permission() !== 'default'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5 text-base-100"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              @if (isPushEnabled()) {
+                <path
+                  d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
+                />
+              } @else if (permission() === 'denied') {
+                <path
+                  fill-rule="evenodd"
+                  d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z"
+                  clip-rule="evenodd"
+                />
+              } @else {
+                <path
+                  fill-rule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
+                  clip-rule="evenodd"
+                />
+              }
+            </svg>
+          </div>
+          <div>
+            <h3 class="font-medium text-sm sm:text-base">{{ getStatusMessage() }}</h3>
+            @if (permission() === 'denied') {
+              <p class="text-xs text-error">Enable in browser settings</p>
+            } @else if (permission() === 'default') {
+              <p class="text-xs text-warning">Click to request permission</p>
+            }
+          </div>
+        </div>
+        <button
+          class="btn btn-sm w-full sm:w-auto"
+          [class.btn-success]="isPushEnabled()"
+          [class.btn-warning]="permission() === 'default'"
+          [class.btn-outline]="!isPushEnabled() && permission() !== 'default'"
+          [disabled]="isLoading() || permission() === 'denied'"
+          (click)="togglePushNotifications()"
+        >
+          @if (isLoading()) {
+            <span class="loading loading-spinner loading-xs"></span>
+          }
+          {{ getButtonText() }}
+        </button>
+      </div>
+
+      <!-- Notification Types (Collapsible) -->
+      <div class="collapse collapse-arrow bg-base-200 mt-4">
+        <input type="checkbox" />
+        <div class="collapse-title font-medium py-3 min-h-0">Notification Types</div>
+        <div class="collapse-content">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+            @for (type of notificationTypes; track type.key) {
+              <div class="flex items-center justify-between p-2 bg-base-100 rounded-lg">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">{{ type.icon }}</span>
+                  <div>
+                    <div class="text-sm font-medium">{{ type.label }}</div>
+                    <div class="text-xs opacity-60 hidden sm:block">{{ type.description }}</div>
+                  </div>
+                </div>
+                <span class="badge badge-xs badge-success">On</span>
+              </div>
+            }
+          </div>
+          <p class="text-xs opacity-50 mt-3">Per-type filtering coming soon</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification History -->
+  <div class="card bg-base-100 shadow-lg">
+    <div class="card-body p-4 sm:p-6">
+      <!-- Header with Filters -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <h2 class="text-lg font-bold">History</h2>
+        <div class="flex gap-2">
+          <select
+            class="select select-bordered select-xs sm:select-sm flex-1 sm:flex-none"
+            [value]="selectedType()"
+            (change)="onTypeFilterChange($event)"
+          >
+            <option value="">All</option>
+            @for (type of notificationTypes; track type.key) {
+              <option [value]="type.key">{{ type.label }}</option>
+            }
+          </select>
+          <button class="btn btn-xs sm:btn-sm btn-outline" (click)="markAllAsRead()">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <span class="hidden sm:inline">Mark All</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Notification List -->
+      <div class="space-y-2 max-h-80 overflow-y-auto">
+        @for (notification of filteredNotifications(); track notification.id) {
+          <div
+            class="flex items-start gap-3 p-3 rounded-lg border border-base-300 transition-colors"
+            [class.bg-base-200]="!notification.read"
+          >
+            <div
+              class="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm"
+              [class.bg-warning]="getNotificationTypeClass(notification.type) === 'warning'"
+              [class.bg-success]="getNotificationTypeClass(notification.type) === 'success'"
+              [class.bg-info]="getNotificationTypeClass(notification.type) === 'info'"
+            >
+              {{ getNotificationIcon(notification.type) }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-start justify-between gap-2">
+                <h4 class="text-sm truncate" [class.font-semibold]="!notification.read">
+                  {{ notification.title }}
+                </h4>
+                @if (!notification.read) {
+                  <div class="w-2 h-2 bg-primary rounded-full shrink-0 mt-1"></div>
+                }
+              </div>
+              <p class="text-xs opacity-70 mt-0.5 line-clamp-2">{{ notification.message }}</p>
+              <p class="text-xs opacity-50 mt-1">
+                {{ formatNotificationTime(notification.createdAt) }}
+              </p>
+            </div>
+            <button
+              class="btn btn-ghost btn-xs shrink-0"
+              (click)="markAsRead(notification.id)"
+              [disabled]="notification.read"
+            >
+              @if (notification.read) {
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4 opacity-50"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              } @else {
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                  <path
+                    fill-rule="evenodd"
+                    d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              }
+            </button>
+          </div>
+        } @empty {
+          <div class="text-center py-8">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-12 w-12 mx-auto opacity-30 mb-2"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+              />
+            </svg>
+            <p class="font-medium text-sm">No notifications</p>
+            <p class="text-xs opacity-60">They'll appear here when they arrive</p>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>

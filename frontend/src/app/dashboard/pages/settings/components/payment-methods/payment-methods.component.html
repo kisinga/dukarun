@@ -1,0 +1,224 @@
+<div class="card bg-base-100 shadow-lg">
+  <div class="card-body p-4 sm:p-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+      <div>
+        <h2 class="text-lg sm:text-xl font-bold">Payment Methods</h2>
+        <p class="text-sm opacity-60">Manage accepted payment options</p>
+      </div>
+      <button class="btn btn-primary btn-sm w-full sm:w-auto" (click)="openCreateModal()">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fill-rule="evenodd"
+            d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+            clip-rule="evenodd"
+          />
+        </svg>
+        Add Method
+      </button>
+    </div>
+
+    <!-- Error Alert -->
+    @if (settingsService.error(); as error) {
+      <div class="alert alert-error py-2 text-sm mb-4">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fill-rule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+            clip-rule="evenodd"
+          />
+        </svg>
+        <span>{{ error }}</span>
+      </div>
+    }
+
+    <!-- Payment Methods List -->
+    <div class="space-y-2">
+      @for (method of paymentMethods(); track method.id) {
+        <div class="flex items-center justify-between bg-base-200 rounded-lg p-3">
+          <div class="flex items-center gap-3 min-w-0">
+            @if (method.customFields?.imageAsset; as icon) {
+              <img
+                [src]="icon.preview"
+                class="w-10 h-10 object-contain rounded"
+                [alt]="method.name"
+              />
+            } @else {
+              <div
+                class="w-10 h-10 bg-primary/10 rounded flex items-center justify-center shrink-0"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-5 w-5 text-primary"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+                  <path
+                    fill-rule="evenodd"
+                    d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </div>
+            }
+            <div class="min-w-0">
+              <div class="font-medium text-sm truncate">{{ method.name }}</div>
+              <div class="text-xs opacity-60">{{ method.code }}</div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0">
+            @if (!isDefaultMethod(method.code)) {
+              <button
+                class="btn btn-ghost btn-xs"
+                (click)="editMethod(method)"
+                [disabled]="settingsService.loading()"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"
+                  />
+                </svg>
+              </button>
+            }
+            <input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              [checked]="method.customFields?.isActive"
+              [disabled]="isDefaultMethod(method.code) || settingsService.loading()"
+              (change)="toggleMethodStatus(method, $event)"
+            />
+          </div>
+        </div>
+      } @empty {
+        <div class="text-center py-8 text-sm opacity-60">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-12 w-12 mx-auto opacity-30 mb-2"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+            />
+          </svg>
+          No payment methods found
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+<!-- Create/Edit Modal -->
+@if (showModal()) {
+  <dialog class="modal modal-open">
+    <div class="modal-box max-w-sm">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-lg">{{ isEditing() ? 'Edit' : 'Add' }} Payment Method</h3>
+        <button class="btn btn-ghost btn-sm btn-circle" (click)="closeModal()">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <form [formGroup]="paymentMethodForm" (ngSubmit)="submitForm()" class="space-y-3">
+        <div>
+          <label class="text-sm opacity-70">Name *</label>
+          <input
+            type="text"
+            placeholder="e.g., Credit Card"
+            class="input input-bordered input-sm w-full mt-1"
+            formControlName="name"
+          />
+          @if (paymentMethodForm.get('name')?.invalid && paymentMethodForm.get('name')?.touched) {
+            <p class="text-xs text-error mt-1">Name is required</p>
+          }
+        </div>
+
+        <div>
+          <label class="text-sm opacity-70">Code *</label>
+          <input
+            type="text"
+            placeholder="e.g., credit-card"
+            class="input input-bordered input-sm w-full mt-1"
+            formControlName="code"
+            [readonly]="isEditing()"
+          />
+          @if (paymentMethodForm.get('code')?.invalid && paymentMethodForm.get('code')?.touched) {
+            <p class="text-xs text-error mt-1">Code is required</p>
+          }
+        </div>
+
+        <div>
+          <label class="text-sm opacity-70">Description</label>
+          <textarea
+            placeholder="Optional description"
+            class="textarea textarea-bordered textarea-sm w-full mt-1"
+            formControlName="description"
+            rows="2"
+          ></textarea>
+        </div>
+
+        <label class="flex items-center justify-between bg-base-200 rounded-lg p-3 cursor-pointer">
+          <span class="text-sm">Active</span>
+          <input
+            type="checkbox"
+            class="toggle toggle-sm toggle-primary"
+            formControlName="isActive"
+          />
+        </label>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" class="btn btn-ghost btn-sm flex-1" (click)="closeModal()">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="btn btn-primary btn-sm flex-1"
+            [disabled]="paymentMethodForm.invalid || settingsService.loading()"
+          >
+            @if (settingsService.loading()) {
+              <span class="loading loading-spinner loading-xs"></span>
+            }
+            {{ isEditing() ? 'Update' : 'Create' }}
+          </button>
+        </div>
+      </form>
+    </div>
+    <form method="dialog" class="modal-backdrop" (click)="closeModal()">
+      <button>close</button>
+    </form>
+  </dialog>
+}

@@ -1,0 +1,181 @@
+<dialog #modal class="modal modal-bottom sm:modal-middle">
+  <div class="modal-box max-w-md">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold text-lg flex items-center gap-2">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fill-rule="evenodd"
+            d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+            clip-rule="evenodd"
+          />
+        </svg>
+        User Details
+      </h3>
+      <button class="btn btn-ghost btn-sm btn-circle" (click)="close()" aria-label="Close">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+    </div>
+
+    @if (currentUserId()) {
+      <!-- Loading State -->
+      @if (isLoading() && !user()) {
+        <div class="flex flex-col items-center justify-center py-8">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+          <p class="text-sm text-base-content/60 mt-4">Loading user details...</p>
+        </div>
+      }
+
+      <!-- Error State -->
+      @if (error() && !user()) {
+        <div role="alert" class="alert alert-error py-2 mb-4">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          <span class="flex-1 text-sm">{{ error() }}</span>
+          <button (click)="usersService.clearError()" class="btn btn-xs">Dismiss</button>
+        </div>
+      }
+
+      <!-- User Details -->
+      @if (user()) {
+        <div class="space-y-3">
+          <!-- User Header Card -->
+          <div class="bg-base-200 rounded-lg p-4">
+            <div class="flex items-center gap-3">
+              <div class="avatar placeholder">
+                <div class="bg-primary text-primary-content rounded-full w-14">
+                  <span class="text-xl font-bold">{{ initials() }}</span>
+                </div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-bold truncate">{{ fullName() }}</div>
+                <div class="text-sm opacity-60 truncate">{{ user()!.emailAddress }}</div>
+                @if (user()!.user?.verified) {
+                  <span class="badge badge-xs badge-success mt-1">Verified</span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- Basic Information -->
+          <div class="bg-base-200 rounded-lg p-4 space-y-2 text-sm">
+            <div class="flex justify-between gap-2">
+              <span class="opacity-60 shrink-0">ID</span>
+              <span class="font-mono text-xs truncate">{{ user()!.id }}</span>
+            </div>
+            @if (user()!.user?.identifier) {
+              <div class="flex justify-between gap-2">
+                <span class="opacity-60 shrink-0">Identifier</span>
+                <span class="font-mono text-xs truncate">{{ user()!.user!.identifier }}</span>
+              </div>
+            }
+            @if (user()!.user?.lastLogin) {
+              <div class="flex justify-between gap-2">
+                <span class="opacity-60 shrink-0">Last Login</span>
+                <span class="text-xs">{{ formatDate(user()!.user!.lastLogin!) }}</span>
+              </div>
+            }
+            <div class="flex justify-between gap-2">
+              <span class="opacity-60 shrink-0">Created</span>
+              <span class="text-xs">{{ formatDate(user()!.createdAt) }}</span>
+            </div>
+            <div class="flex justify-between gap-2">
+              <span class="opacity-60 shrink-0">Source</span>
+              <span class="badge badge-xs">{{
+                currentSource() === 'user_action' ? 'User' : 'System'
+              }}</span>
+            </div>
+          </div>
+
+          <!-- Roles (Collapsible) -->
+          @if (user()!.user?.roles && (user()!.user?.roles?.length ?? 0) > 0) {
+            <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+              <input type="checkbox" />
+              <div class="collapse-title font-medium py-3 min-h-0">
+                Roles ({{ user()!.user!.roles.length }})
+              </div>
+              <div class="collapse-content">
+                <div class="space-y-2 pt-2">
+                  @for (role of user()!.user!.roles; track role.id) {
+                    <div class="border-l-2 border-primary pl-3 py-1">
+                      <div class="font-medium text-sm">{{ role.code }}</div>
+                      @if (role.description) {
+                        <div class="text-xs opacity-60">{{ role.description }}</div>
+                      }
+                      @if (role.permissions && role.permissions.length > 0) {
+                        <div class="flex flex-wrap gap-1 mt-1">
+                          @for (permission of role.permissions.slice(0, 5); track permission) {
+                            <span class="badge badge-xs badge-ghost">{{ permission }}</span>
+                          }
+                          @if (role.permissions.length > 5) {
+                            <span class="badge badge-xs">+{{ role.permissions.length - 5 }}</span>
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      } @else if (!isLoading() && !error()) {
+        <!-- Fallback: Show user ID only -->
+        <div class="bg-base-200 rounded-lg p-4">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="avatar placeholder">
+              <div class="bg-primary text-primary-content rounded-full w-12">
+                <span class="text-lg font-bold">{{ getInitials() }}</span>
+              </div>
+            </div>
+            <div>
+              <div class="font-bold text-sm">User</div>
+              <div class="text-xs opacity-60 font-mono">{{ currentUserId() }}</div>
+            </div>
+          </div>
+          <div class="text-sm flex justify-between">
+            <span class="opacity-60">Source</span>
+            <span class="badge badge-xs">{{
+              currentSource() === 'user_action' ? 'User' : 'System'
+            }}</span>
+          </div>
+        </div>
+      }
+    }
+
+    <div class="modal-action">
+      <button class="btn btn-sm" (click)="close()">Close</button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>

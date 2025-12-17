@@ -169,7 +169,7 @@ export const phoneAuthAdminSchema = gql`
     # Request OTP for updating email or phone number (requires authenticated user)
     requestUpdateOTP(identifier: String!): OTPResponse!
     # Update admin profile without changing user identifier
-    updateAdminProfile(input: UpdateAdminProfileInput!): Boolean!
+    updateAdminProfile(input: UpdateAdminProfileInput!): Administrator!
   }
 
   extend type Query {
@@ -295,7 +295,6 @@ export class PhoneAuthAdminResolver {
     @Args('input')
     input: { firstName: string; lastName: string; email: string; profilePictureId?: string }
   ) {
-    await this.phoneAuthService.updateAdminProfile(ctx, input);
-    return true;
+    return this.phoneAuthService.updateAdminProfile(ctx, input);
   }
 }

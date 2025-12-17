@@ -163,7 +163,12 @@ export const UPDATE_ADMINISTRATOR = graphql(`
 
 export const UPDATE_ADMIN_PROFILE = graphql(`
   mutation UpdateAdminProfile($input: UpdateAdminProfileInput!) {
-    updateAdminProfile(input: $input)
+    updateAdminProfile(input: $input) {
+      id
+      firstName
+      lastName
+      emailAddress
+    }
   }
 `);
 

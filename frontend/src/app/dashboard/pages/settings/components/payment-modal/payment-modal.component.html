@@ -1,0 +1,160 @@
+<dialog #paymentModal class="modal" [class.modal-open]="isOpen()">
+  <div class="modal-box max-w-lg p-4 sm:p-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold text-lg">Subscribe to {{ selectedTier()?.name || 'Plan' }}</h3>
+      <button
+        class="btn btn-ghost btn-sm btn-circle"
+        (click)="close()"
+        [disabled]="isProcessingPayment()"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Billing Cycle Toggle -->
+    <div class="mb-4">
+      <label class="text-sm opacity-70 mb-2 block">Billing Cycle</label>
+      <div class="join w-full">
+        <button
+          class="join-item btn btn-sm flex-1"
+          [class.btn-active]="billingCycle() === 'monthly'"
+          (click)="billingCycle.set('monthly')"
+        >
+          Monthly
+        </button>
+        <button
+          class="join-item btn btn-sm flex-1"
+          [class.btn-active]="billingCycle() === 'yearly'"
+          (click)="billingCycle.set('yearly')"
+        >
+          Yearly
+          @if (selectedTier() && yearlyDiscount() > 0) {
+            <span class="badge badge-success badge-xs ml-1">-{{ yearlyDiscount() }}%</span>
+          }
+        </button>
+      </div>
+    </div>
+
+    <!-- Price Display -->
+    @if (selectedTier()) {
+      <div class="bg-base-200 rounded-lg p-4 mb-4">
+        <div class="flex justify-between items-center">
+          <span class="text-sm opacity-70">Total</span>
+          <div class="text-right">
+            <span class="text-2xl font-bold">KES {{ price() | number: '1.0-0' }}</span>
+            <div class="text-xs opacity-60">
+              {{ billingCycle() === 'monthly' ? 'per month' : 'per year' }}
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Phone Number Input -->
+    <div class="mb-4">
+      <label class="text-sm opacity-70 mb-1 block">Phone Number</label>
+      <input
+        type="tel"
+        class="input input-bordered input-sm w-full"
+        [ngModel]="phoneNumber()"
+        (ngModelChange)="phoneNumber.set($event)"
+        placeholder="+254712345678"
+      />
+      <p class="text-xs opacity-50 mt-1">For mobile money payment request</p>
+    </div>
+
+    <!-- Error Message -->
+    @if (error()) {
+      <div class="alert alert-error py-2 mb-4 text-sm">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fill-rule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+            clip-rule="evenodd"
+          />
+        </svg>
+        <span>{{ error() }}</span>
+      </div>
+    }
+
+    <!-- Loading State -->
+    @if (isProcessingPayment()) {
+      <div class="flex items-center justify-center py-6 gap-3">
+        <span class="loading loading-spinner loading-md"></span>
+        <span class="text-sm">{{ loadingMessage() || 'Processing...' }}</span>
+      </div>
+    }
+
+    <!-- Actions -->
+    <div class="space-y-2 mt-4">
+      <div class="flex flex-col sm:flex-row gap-2">
+        <button
+          class="btn btn-primary btn-sm flex-1"
+          [disabled]="!phoneNumber() || isProcessingPayment()"
+          (click)="initiateExpressPayment()"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"
+            />
+          </svg>
+          Mobile Money
+        </button>
+        <button
+          class="btn btn-outline btn-sm flex-1"
+          [disabled]="isProcessingPayment()"
+          (click)="initiateCheckoutPayment()"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+            <path
+              fill-rule="evenodd"
+              d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          Card / Other
+        </button>
+      </div>
+      <button
+        class="btn btn-ghost btn-sm w-full"
+        [disabled]="isProcessingPayment()"
+        (click)="close()"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop" (click)="close()">
+    <button>close</button>
+  </form>
+</dialog>
