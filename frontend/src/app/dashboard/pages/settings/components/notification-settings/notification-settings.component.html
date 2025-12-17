@@ -99,11 +99,11 @@
   <div class="card bg-base-100 shadow-lg">
     <div class="card-body p-4 sm:p-6">
       <!-- Header with Filters -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <h2 class="text-lg font-bold">History</h2>
-        <div class="flex gap-2">
+      <div class="flex items-center justify-between gap-2 mb-4">
+        <h2 class="text-lg font-bold shrink-0">History</h2>
+        <div class="flex items-center gap-2">
           <select
-            class="select select-bordered select-xs sm:select-sm flex-1 sm:flex-none"
+            class="select select-bordered select-xs min-w-0 max-w-24 sm:max-w-none"
             [value]="selectedType()"
             (change)="onTypeFilterChange($event)"
           >
@@ -112,7 +112,7 @@
               <option [value]="type.key">{{ type.label }}</option>
             }
           </select>
-          <button class="btn btn-xs sm:btn-sm btn-outline" (click)="markAllAsRead()">
+          <button class="btn btn-xs btn-outline shrink-0" (click)="markAllAsRead()">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-4 w-4"

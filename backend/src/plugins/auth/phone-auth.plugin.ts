@@ -53,7 +53,8 @@ import { ProvisioningContextAdapter } from '../../services/provisioning/context-
     ChartOfAccountsService,
     // Phone Auth Infrastructure
     PhoneAuthCommonResolver,
-    PhoneAuthAdminResolver,
+    // Note: PhoneAuthAdminResolver is NOT in providers - only in adminApiExtensions.resolvers
+    // to prevent NestJS from discovering its mutations globally (shop API doesn't have updateAdminProfile)
     PhoneAuthService,
     ChannelAccessGuardService,
     OtpService,

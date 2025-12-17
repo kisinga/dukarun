@@ -219,7 +219,7 @@ export class MlTrainingService {
 
     const customFields = channel.customFields as any;
     return !!(
-      customFields.mlModelJsonId ||
+      customFields.mlModelJsonAsset?.id ||
       customFields.mlTrainingStatus === 'training' ||
       customFields.mlTrainingStatus === 'ready' ||
       customFields.mlTrainingStatus === 'active'
@@ -263,6 +263,15 @@ export class MlTrainingService {
 
     const customFields = channel.customFields as any;
 
+    // Handle both loaded Asset objects and raw IDs
+    const getAssetId = (field: any) => {
+      if (!field) return null;
+      return typeof field === 'object' ? field.id : field;
+    };
+
+    const modelJsonId = getAssetId(customFields.mlModelJsonAsset);
+    const metadataId = getAssetId(customFields.mlMetadataAsset);
+
     return {
       status: customFields.mlTrainingStatus || 'idle',
       progress: customFields.mlTrainingProgress || 0,
@@ -270,7 +279,7 @@ export class MlTrainingService {
       error: customFields.mlTrainingError,
       productCount: customFields.mlProductCount || 0,
       imageCount: customFields.mlImageCount || 0,
-      hasActiveModel: !!(customFields.mlModelJsonId && customFields.mlMetadataId),
+      hasActiveModel: !!(modelJsonId && metadataId),
       lastTrainedAt: customFields.mlTrainingStartedAt, // Could be improved with separate field
     };
   }

@@ -87,6 +87,7 @@ export async function startTraining(config: TrainingConfig): Promise<void> {
           Authorization: `Bearer ${authToken || env.ml.serviceToken}`,
           'Content-Type': 'application/json',
         },
+        timeout: 30000, // 30 second timeout
       }
     );
 
@@ -128,8 +129,10 @@ export async function startTraining(config: TrainingConfig): Promise<void> {
     let totalImages = 0;
 
     for (const product of manifest.products) {
+      logger.info(`Downloading ${product.images.length} images for product ${product.productId}`);
       for (const image of product.images) {
         const imagePath = path.join(jobDir, `${product.productId}_${image.assetId}.jpg`);
+        logger.debug(`Downloading: ${image.url}`);
         await downloadImage(image.url, imagePath);
         dataset.push({
           path: imagePath,
@@ -138,12 +141,13 @@ export async function startTraining(config: TrainingConfig): Promise<void> {
         totalImages++;
       }
     }
+    logger.info(`Downloaded ${totalImages} images successfully`);
 
     if (totalImages === 0) throw new Error('No images found in manifest');
 
-    // 4. Load MobileNet
+    // 4. Load MobileNet with retry logic
     logger.info('Loading MobileNet base model...');
-    const mobilenet = await tf.loadLayersModel(MOBILENET_URL);
+    const mobilenet = await loadMobileNetWithRetry();
 
     // Get output from internal layer (transfer learning)
     const layer = mobilenet.getLayer('conv_pw_13_relu');
@@ -202,12 +206,14 @@ export async function startTraining(config: TrainingConfig): Promise<void> {
     // Save model.json and weights
     await model.save(`file://${artifactsDir}`);
 
-    // Create metadata.json
+    // Create metadata.json with stats for backend
     const metadata = {
       modelName: `dukarun-channel-${channelId}`,
       labels: classes,
       imageSize: IMAGE_SIZE,
       trainedAt: new Date().toISOString(),
+      productCount: manifest.products.length,
+      imageCount: totalImages,
     };
     fs.writeFileSync(path.join(artifactsDir, 'metadata.json'), JSON.stringify(metadata));
 
@@ -243,17 +249,39 @@ export async function startTraining(config: TrainingConfig): Promise<void> {
   }
 }
 
+async function loadMobileNetWithRetry(): Promise<tf.LayersModel> {
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const model = await tf.loadLayersModel(MOBILENET_URL);
+      logger.info('MobileNet loaded successfully');
+      return model;
+    } catch (loadError) {
+      const errMsg = loadError instanceof Error ? loadError.message : String(loadError);
+      logger.warn(`MobileNet load attempt ${attempt}/${maxRetries} failed: ${errMsg}`);
+      if (attempt === maxRetries) {
+        throw new Error(`Failed to load MobileNet after ${maxRetries} attempts: ${errMsg}`);
+      }
+      // Wait before retry
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+    }
+  }
+  throw new Error('Failed to load MobileNet');
+}
+
 async function downloadImage(url: string, destPath: string): Promise<void> {
   try {
     const response = await axios({
       url,
       method: 'GET',
       responseType: 'stream',
+      timeout: 30000, // 30 second timeout
     });
     await pipeline(response.data, fs.createWriteStream(destPath));
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     logger.warn(`Failed to download image ${url}: ${errorMessage}`);
+    throw err; // Re-throw so we know about failures
   }
 }
 
@@ -399,10 +427,26 @@ async function uploadResults(
 
   logger.info(`Uploading to ${graphqlUrl}`);
 
-  await axios.post(graphqlUrl, form, {
+  const response = await axios.post(graphqlUrl, form, {
     headers: {
       Authorization: `Bearer ${authToken}`,
       ...form.getHeaders(),
     },
   });
+
+  // Check for GraphQL errors in response
+  if (response.data?.errors) {
+    const errorMessages = response.data.errors.map((e: any) => e.message).join(', ');
+    logger.error(`GraphQL upload errors: ${errorMessages}`);
+    throw new Error(`Failed to complete training upload: ${errorMessages}`);
+  }
+
+  if (!response.data?.data?.completeTraining) {
+    logger.error(
+      `Upload response missing completeTraining result: ${JSON.stringify(response.data)}`
+    );
+    throw new Error('Upload completed but completeTraining mutation returned false or null');
+  }
+
+  logger.info('Model files uploaded successfully');
 }

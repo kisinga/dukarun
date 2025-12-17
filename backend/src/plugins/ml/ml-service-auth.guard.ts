@@ -22,15 +22,23 @@ export class MlServiceAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const gqlContext = GqlExecutionContext.create(context);
-    const ctx = gqlContext.getContext();
-    const req = ctx.req || ctx.request;
+    // In Vendure, gqlContext.getContext().req IS the RequestContext
+    const requestContext = gqlContext.getContext().req as RequestContext;
 
-    if (!req) {
+    if (!requestContext) {
+      this.logger.warn('No RequestContext found in GraphQL context');
       return false;
     }
 
-    // Extract Authorization header
-    const authHeader = req.headers?.authorization || req.headers?.Authorization;
+    // Access the underlying HTTP request from RequestContext
+    const httpReq = (requestContext as any).req;
+    if (!httpReq) {
+      this.logger.debug('No HTTP request found on RequestContext');
+      return true; // Let other guards handle
+    }
+
+    // Extract Authorization header from HTTP request
+    const authHeader = httpReq.headers?.authorization || httpReq.headers?.Authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       // No auth header - let other guards handle it (normal user auth)
       return true;
@@ -46,21 +54,21 @@ export class MlServiceAuthGuard implements CanActivate {
 
     if (token !== expectedToken) {
       // Token doesn't match - let other guards handle it
+      this.logger.debug('Token does not match ML_SERVICE_TOKEN, passing to other guards');
       return true;
     }
 
     // Valid service token - modify RequestContext to have superadmin permissions
     try {
-      const requestContext = ctx.req as RequestContext;
       const superAdmin = await this.findSuperAdmin(requestContext);
 
       if (superAdmin && superAdmin.user) {
         // Modify the existing RequestContext to use superadmin user
-        // RequestContext properties can be modified to grant permissions
-        (requestContext as any).activeUserId = superAdmin.user.id;
-        (requestContext as any).user = superAdmin.user;
-        (requestContext as any).isAuthorized = true;
-        (requestContext as any).authorizedAsOwnerOnly = false;
+        // RequestContext uses underscore-prefixed private properties
+        (requestContext as any)._activeUserId = superAdmin.user.id;
+        (requestContext as any)._user = superAdmin.user;
+        (requestContext as any)._isAuthorized = true;
+        (requestContext as any)._authorizedAsOwnerOnly = false;
 
         this.logger.debug('Service token authenticated - using superadmin context');
         return true;

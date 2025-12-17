@@ -3887,7 +3887,7 @@ export type Mutation = {
   unsubscribeToPush: Scalars['Boolean']['output'];
   /** Update the active (currently logged-in) Administrator */
   updateActiveAdministrator: Administrator;
-  updateAdminProfile: Scalars['Boolean']['output'];
+  updateAdminProfile: Administrator;
   /** Update an existing Administrator */
   updateAdministrator: Administrator;
   /** Update an existing Asset */
@@ -8890,7 +8890,16 @@ export type UpdateAdminProfileMutationVariables = Exact<{
   input: UpdateAdminProfileInput;
 }>;
 
-export type UpdateAdminProfileMutation = { __typename?: 'Mutation'; updateAdminProfile: boolean };
+export type UpdateAdminProfileMutation = {
+  __typename?: 'Mutation';
+  updateAdminProfile: {
+    __typename?: 'Administrator';
+    id: string;
+    firstName: string;
+    lastName: string;
+    emailAddress: string;
+  };
+};
 
 export type GetUserChannelsQueryVariables = Exact<{ [key: string]: never }>;
 
@@ -12414,6 +12423,15 @@ export const UpdateAdminProfileDocument = {
                 value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
               },
             ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
+              ],
+            },
           },
         ],
       },
