@@ -9,11 +9,22 @@ import {
   signal,
 } from '@angular/core';
 import { CompanyService } from '../../../../../core/services/company.service';
+import { ModelSourceResolverService } from '../../../../../core/services/ml-model/model-source-resolver.service';
 import {
   MlTrainingInfo,
   MlTrainingService,
 } from '../../../../../core/services/ml-training.service';
 import { NotificationStateService } from '../../../../../core/services/notification/notification-state.service';
+
+interface LoadedModelMetadata {
+  trainingId?: string;
+  modelName?: string;
+  trainedAt?: string;
+  productCount?: number;
+  imageCount?: number;
+  labels?: string[];
+  version?: string;
+}
 
 @Component({
   selector: 'app-ml-model-status',
@@ -25,11 +36,13 @@ export class MlModelStatusComponent implements OnInit {
   private readonly companyService = inject(CompanyService);
   private readonly notificationStateService = inject(NotificationStateService);
   private readonly trainingService = inject(MlTrainingService);
+  private readonly sourceResolver = inject(ModelSourceResolverService);
 
   readonly mlModelAssets = this.companyService.mlModelAssets;
 
   // Local signals for template binding (more reliable with OnPush)
   readonly trainingInfo = signal<MlTrainingInfo | null>(null);
+  readonly loadedModelMetadata = signal<LoadedModelMetadata | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
@@ -83,7 +96,7 @@ export class MlModelStatusComponent implements OnInit {
     this.loadData();
   }
 
-  private loadData(): void {
+  private async loadData(): Promise<void> {
     const channelId = this.companyService.activeCompanyId();
     console.log('[MlModelStatus] loadData called, channelId:', channelId);
 
@@ -94,6 +107,7 @@ export class MlModelStatusComponent implements OnInit {
 
     this.loading.set(true);
 
+    // Load training info
     this.trainingService.getTrainingInfo(channelId).subscribe({
       next: (info) => {
         console.log('[MlModelStatus] Training info received:', info);
@@ -108,7 +122,48 @@ export class MlModelStatusComponent implements OnInit {
       },
     });
 
+    // Load model metadata if model files exist
+    await this.loadModelMetadata(channelId);
+
     this.companyService.fetchActiveChannel();
+  }
+
+  /**
+   * Load model metadata from the metadata file
+   */
+  private async loadModelMetadata(channelId: string): Promise<void> {
+    try {
+      const sources = await this.sourceResolver.getModelSources(channelId);
+      if (!sources) {
+        this.loadedModelMetadata.set(null);
+        return;
+      }
+
+      const metadataResponse = await fetch(sources.metadataUrl, {
+        credentials: 'include',
+      });
+
+      if (!metadataResponse.ok) {
+        this.loadedModelMetadata.set(null);
+        return;
+      }
+
+      const metadata = await metadataResponse.json();
+      console.log('[MlModelStatus] Loaded model metadata:', metadata);
+
+      this.loadedModelMetadata.set({
+        trainingId: metadata.trainingId,
+        modelName: metadata.modelName,
+        trainedAt: metadata.trainedAt,
+        productCount: metadata.productCount,
+        imageCount: metadata.imageCount,
+        labels: metadata.labels,
+        version: metadata.version,
+      });
+    } catch (error) {
+      console.warn('[MlModelStatus] Failed to load model metadata:', error);
+      this.loadedModelMetadata.set(null);
+    }
   }
 
   extractPhotos(): void {

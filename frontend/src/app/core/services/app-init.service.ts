@@ -1,8 +1,8 @@
 import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import { CompanyService } from './company.service';
 import { loadMlModelService } from './ml-model.loader';
-import type { MlModelService } from './ml-model.service';
-import { ModelErrorType } from './ml-model.service';
+import type { MlModelService } from './ml-model/ml-model.service';
+import { ModelErrorType } from './ml-model/model-error.util';
 import { NotificationService } from './notification.service';
 import { ProductCacheService } from './product/product-cache.service';
 import { StockLocationService } from './stock-location.service';
@@ -93,9 +93,9 @@ export class AppInitService {
           notificationsSuccess.status === 'fulfilled' && notificationsSuccess.value,
         error:
           productsSuccess.status === 'rejected' ||
-            modelSuccess.status === 'rejected' ||
-            locationsSuccess.status === 'rejected' ||
-            notificationsSuccess.status === 'rejected'
+          modelSuccess.status === 'rejected' ||
+          locationsSuccess.status === 'rejected' ||
+          notificationsSuccess.status === 'rejected'
             ? 'Some features failed to initialize'
             : null,
       }));
@@ -144,7 +144,7 @@ export class AppInitService {
       }
 
       const loaded = await mlModelService.loadModel(channelId);
-      
+
       // If loadModel returned false, check if it's a NOT_FOUND error (expected) or unexpected
       if (!loaded) {
         const error = mlModelService.error();
@@ -156,7 +156,7 @@ export class AppInitService {
           console.error('❌ Failed to load ML model:', error.message);
         }
       }
-      
+
       return loaded;
     } catch (error: any) {
       // Only unexpected errors reach here (e.g., service initialization failures)

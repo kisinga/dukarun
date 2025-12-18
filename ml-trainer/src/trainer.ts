@@ -12,8 +12,7 @@ import { TrainingConfig } from './types';
 import { TEMP_DIR, EPOCHS, BATCH_SIZE, logger } from './constants';
 import {
   loadMobileNet,
-  createFeatureExtractor,
-  createClassificationHead,
+  createCombinedModel,
   processImagesToTensors,
 } from './model';
 import { fetchManifest, sendStatusWebhook, uploadArtifacts } from './api';
@@ -39,18 +38,19 @@ export async function startTraining(config: TrainingConfig): Promise<void> {
     if (!fs.existsSync(jobDir)) fs.mkdirSync(jobDir, { recursive: true });
     const { dataset, totalImages } = await downloadDataset(manifest.products, jobDir);
 
-    // 4. Load base model and create feature extractor
+    // 4. Load base model and create combined model
     logger.info('Loading MobileNet base model...');
     const mobilenet = await loadMobileNet();
-    const featureExtractor = createFeatureExtractor(mobilenet);
 
-    // 5. Create classification head
-    const featureShape = featureExtractor.outputs[0].shape.slice(1) as number[];
-    const model = createClassificationHead(featureShape, classes.length);
+    // 5. Create combined model (MobileNet + classification head)
+    // This matches Teachable Machine architecture: accepts raw images [224,224,3]
+    logger.info('Creating combined model (MobileNet + GlobalAveragePooling2D + Dense layers)...');
+    const model = createCombinedModel(mobilenet, classes.length);
 
-    // 6. Process images to tensors
+    // 6. Process images to raw image tensors for training
+    // Combined model accepts raw images, so we preprocess images directly
     logger.info('Processing images to tensors...');
-    const { xs, ys } = await processImagesToTensors(dataset, classes.length, featureExtractor);
+    const { xs, ys } = await processImagesToTensors(dataset, classes.length);
 
     // 7. Train
     logger.info('Starting training...');

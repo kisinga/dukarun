@@ -47,7 +47,7 @@
         </div>
 
         <!-- Stats Row -->
-        <div class="flex gap-6 text-sm">
+        <div class="grid grid-cols-2 sm:flex sm:gap-6 gap-3 text-sm">
           <div>
             <span class="text-base-content/60">Products</span>
             <span class="font-semibold ml-2">{{ info.productCount }}</span>
@@ -57,12 +57,55 @@
             <span class="font-semibold ml-2">{{ info.imageCount }}</span>
           </div>
           @if (info.lastTrainedAt) {
-            <div class="hidden sm:block">
-              <span class="text-base-content/60">Last trained</span>
+            <div>
+              <span class="text-base-content/60">Trained</span>
               <span class="font-semibold ml-2">{{ info.lastTrainedAt | date: 'short' }}</span>
             </div>
           }
         </div>
+
+        <!-- Model Info (Training ID, etc.) -->
+        @if (loadedModelMetadata(); as modelMeta) {
+          <div class="text-xs text-base-content/50 space-y-1 pt-2 border-t border-base-300">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+              @if (modelMeta.trainingId) {
+                <div>
+                  <span class="text-base-content/60">Training ID:</span>
+                  <span class="font-mono ml-1">{{ modelMeta.trainingId }}</span>
+                </div>
+              }
+              @if (modelMeta.modelName) {
+                <div>
+                  <span class="text-base-content/60">Model:</span>
+                  <span class="font-mono ml-1">{{ modelMeta.modelName }}</span>
+                </div>
+              }
+              @if (modelMeta.version) {
+                <div>
+                  <span class="text-base-content/60">Version:</span>
+                  <span class="font-mono ml-1">{{ modelMeta.version }}</span>
+                </div>
+              }
+              @if (mlModelAssets()?.mlModelJsonAsset?.id) {
+                <div>
+                  <span class="text-base-content/60">Asset ID:</span>
+                  <span class="font-mono ml-1">{{ mlModelAssets()?.mlModelJsonAsset?.id }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        } @else if (mlModelAssets()?.mlMetadataAsset) {
+          <div class="text-xs text-base-content/50 space-y-1 pt-2 border-t border-base-300">
+            <div class="flex flex-wrap gap-x-4 gap-y-1">
+              @if (mlModelAssets()?.mlModelJsonAsset?.id) {
+                <div>
+                  <span class="text-base-content/60">Model Asset ID:</span>
+                  <span class="font-mono ml-1">{{ mlModelAssets()?.mlModelJsonAsset?.id }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
 
         <!-- Error Alert -->
         @if (info.error) {

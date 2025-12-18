@@ -76,9 +76,10 @@ export function generateTrainingId(): string {
 
 /**
  * Save model with unique filenames to prevent Vendure naming conflicts
+ * Accepts both Sequential and LayersModel (for combined models with MobileNet)
  */
 export async function saveModelArtifacts(
-  model: tf.Sequential,
+  model: tf.LayersModel,
   channelId: string,
   artifactsDir: string,
   classes: string[],
@@ -92,8 +93,71 @@ export async function saveModelArtifacts(
   const trainingId = generateTrainingId();
   logger.info(`Training ID: ${trainingId}`);
 
+  // Log model structure before saving to verify it's correct
+  logger.info(`Saving model with ${model.layers.length} layers`);
+  logger.info(`Model input shape: ${JSON.stringify(model.inputs[0]?.shape)}`);
+  logger.info(`Model output shape: ${JSON.stringify(model.outputs[0]?.shape)}`);
+  
+  // Verify model expects raw images [224, 224, 3]
+  const inputShape = model.inputs[0]?.shape;
+  if (inputShape && inputShape.length === 4 && inputShape[1] === 224 && inputShape[2] === 224 && inputShape[3] === 3) {
+    logger.info('✓ Model correctly expects raw images [224, 224, 3]');
+  } else {
+    logger.error(`✗ Model input shape is incorrect: ${JSON.stringify(inputShape)}. Expected [null, 224, 224, 3]`);
+    throw new Error(`Model input shape mismatch. Got ${JSON.stringify(inputShape)}, expected [null, 224, 224, 3]`);
+  }
+
   // Save model with TensorFlow's default names
-  await model.save(`file://${artifactsDir}`);
+  // includeOptimizer: false to reduce file size (we don't need optimizer state for inference)
+  await model.save(`file://${artifactsDir}`, { includeOptimizer: false });
+  
+  logger.info('Model saved successfully');
+  
+  // Verify the saved model.json to ensure it has the correct structure
+  const modelJsonPath = path.join(artifactsDir, 'model.json');
+  if (fs.existsSync(modelJsonPath)) {
+    const savedModelJson = JSON.parse(fs.readFileSync(modelJsonPath, 'utf-8'));
+    const savedLayersCount = savedModelJson.modelTopology?.layers?.length || 0;
+    logger.info(`Saved model has ${savedLayersCount} layers in topology`);
+    
+    // Check weights manifest to see how many weight groups are included
+    const weightsManifest = savedModelJson.weightsManifest?.[0];
+    if (weightsManifest) {
+      const weightsCount = weightsManifest.weights?.length || 0;
+      logger.info(`Saved model has ${weightsCount} weight tensors in manifest`);
+      
+      // Calculate total weight size
+      const totalWeightSize = weightsManifest.weights?.reduce((sum: number, w: any) => sum + (w.shape?.reduce((a: number, b: number) => a * b, 1) || 0), 0) || 0;
+      logger.info(`Total weight elements: ${totalWeightSize.toLocaleString()}`);
+    }
+    
+    // Check if the first layer is the input layer with correct shape
+    const firstLayer = savedModelJson.modelTopology?.layers?.[0];
+    if (firstLayer) {
+      logger.info(`First layer in saved model: ${firstLayer.name}, config: ${JSON.stringify(firstLayer.config?.batchInputShape || firstLayer.config?.inputShape)}`);
+    }
+    
+    // Verify we have enough layers (should match the model we created)
+    if (savedLayersCount < model.layers.length) {
+      logger.warn(`Warning: Saved model has ${savedLayersCount} layers but original model has ${model.layers.length} layers`);
+    }
+  }
+  
+  // Check the actual weights.bin file size
+  const weightsPath = path.join(artifactsDir, 'weights.bin');
+  if (fs.existsSync(weightsPath)) {
+    const stats = fs.statSync(weightsPath);
+    const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+    logger.info(`Weights file size: ${fileSizeMB} MB (${stats.size.toLocaleString()} bytes)`);
+    
+    // MobileNet + classification head should be ~4-5 MB
+    // If it's only ~900KB, only the classification head is saved
+    if (stats.size < 2000000) {
+      logger.error(`ERROR: Weights file is too small (${fileSizeMB} MB). Expected ~4-5 MB for MobileNet + classification head.`);
+      logger.error('This indicates MobileNet weights are NOT being saved!');
+      throw new Error(`Weights file too small: ${fileSizeMB} MB. Expected ~4-5 MB. MobileNet weights may not be included.`);
+    }
+  }
 
   // Generate unique filenames
   const fileNames: ArtifactFileNames = {
@@ -103,7 +167,7 @@ export async function saveModelArtifacts(
   };
 
   // Update model.json to reference unique weights filename
-  const modelJsonPath = path.join(artifactsDir, 'model.json');
+  // Reuse modelJsonPath that was already declared above
   const modelJson = JSON.parse(fs.readFileSync(modelJsonPath, 'utf-8'));
   if (modelJson.weightsManifest?.[0]?.paths) {
     modelJson.weightsManifest[0].paths = [fileNames.weights];
