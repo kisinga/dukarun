@@ -1400,6 +1400,12 @@ export const UPDATE_TRAINING_STATUS = graphql(`
   }
 `);
 
+export const START_TRAINING = graphql(`
+  mutation StartTraining($channelId: ID!) {
+    startTraining(channelId: $channelId)
+  }
+`);
+
 export const COMPLETE_TRAINING = graphql(`
   mutation CompleteTraining(
     $channelId: ID!

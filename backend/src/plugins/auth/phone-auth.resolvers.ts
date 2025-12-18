@@ -49,6 +49,13 @@ const commonSchemaDefs = `
     storeAddress: String!
   }
 
+  input UpdateAdminProfileInput {
+    firstName: String!
+    lastName: String!
+    email: String!
+    profilePictureId: ID
+  }
+
   extend type Mutation {
     # NEW: Store registration data and request OTP
     # Returns sessionId that must be used during verification
@@ -69,6 +76,8 @@ const commonSchemaDefs = `
     verifyLoginOTP(phoneNumber: String!, otp: String!): LoginResult!
     # Request OTP for updating email or phone number (requires authenticated user)
     requestUpdateOTP(identifier: String!): OTPResponse!
+    # Update admin profile without changing user identifier
+    updateAdminProfile(input: UpdateAdminProfileInput!): Administrator!
   }
 
   extend type Query {
@@ -254,6 +263,16 @@ export class PhoneAuthCommonResolver {
   @Allow(Permission.Authenticated)
   async requestUpdateOTP(@Ctx() ctx: RequestContext, @Args('identifier') identifier: string) {
     return this.phoneAuthService.requestUpdateOTP(ctx, identifier);
+  }
+
+  @Mutation()
+  @Allow(Permission.Authenticated)
+  async updateAdminProfile(
+    @Ctx() ctx: RequestContext,
+    @Args('input')
+    input: { firstName: string; lastName: string; email: string; profilePictureId?: string }
+  ) {
+    return this.phoneAuthService.updateAdminProfile(ctx, input);
   }
 
   @Query()

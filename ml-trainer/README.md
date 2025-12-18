@@ -16,7 +16,6 @@ Dedicated TypeScript/Node.js microservice for training TensorFlow.js models usin
 Triggers a training job. The service processes this asynchronously.
 
 **Request Body:**
-
 ```json
 {
   "channelId": "123",
@@ -27,7 +26,6 @@ Triggers a training job. The service processes this asynchronously.
 ```
 
 **Response:**
-
 ```json
 {
   "message": "Training job accepted",
