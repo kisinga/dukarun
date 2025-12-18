@@ -90,10 +90,31 @@ export class CompanyService {
   /**
    * Company logo URL for the active channel (proxy-compatible)
    * Helper method to get the logo URL directly
+   * Uses preview URL first (public, no auth needed), falls back to source URL
+   * Matches the pattern used for user profile photos
    */
   readonly companyLogoUrl = computed(() => {
     const logoAsset = this.companyLogoAsset();
-    if (!logoAsset?.source) return null;
+    if (!logoAsset) return null;
+
+    // Prefer preview URL (public, works without authentication)
+    // This matches the pattern used for user profile photos
+    if (logoAsset.preview) {
+      // Preview URLs are already full URLs or relative paths from Vendure
+      // Handle proxy-compatible URLs
+      if (logoAsset.preview.startsWith('http://') || logoAsset.preview.startsWith('https://')) {
+        const url = new URL(logoAsset.preview);
+        return url.pathname; // Extract path for proxy compatibility
+      }
+      // Handle relative paths
+      if (logoAsset.preview.startsWith('/')) {
+        return logoAsset.preview;
+      }
+      return logoAsset.preview;
+    }
+
+    // Fallback to source URL if preview not available
+    if (!logoAsset.source) return null;
 
     // Handle proxy-compatible URLs
     if (logoAsset.source.startsWith('http://') || logoAsset.source.startsWith('https://')) {

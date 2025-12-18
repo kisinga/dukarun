@@ -464,8 +464,6 @@ export class MlModelResolver {
         throw new Error('Failed to create assets');
       }
       this.logger.log('completeTraining: Asset error check passed');
-      // Note: Assets are automatically assigned to the channel when created with internalCtx
-      // which is already scoped to the target channel. No separate assignToChannel needed.
 
       // Parse metadata to get stats
       let productCount = 0;

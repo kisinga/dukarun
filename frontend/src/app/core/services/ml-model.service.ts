@@ -238,7 +238,10 @@ export class MlModelService {
       // Initialize TensorFlow backend
       await tf.setBackend('webgl');
       await tf.ready();
-      const metadataResponse = await fetch(sources.metadataUrl);
+      // Include credentials to send session cookies for authenticated asset access
+      const metadataResponse = await fetch(sources.metadataUrl, {
+        credentials: 'include',
+      });
       if (!metadataResponse.ok) {
         // Handle 404 as "model not available" (expected scenario)
         if (metadataResponse.status === 404) {
@@ -271,13 +274,18 @@ export class MlModelService {
         // This is necessary because Vendure assigns each asset a unique URL,
         // and TensorFlow.js tries to resolve weights relative to model.json URL.
         // We load model.json and weights separately from their correct URLs.
-        const modelJsonResponse = await fetch(sources.modelUrl);
+        // Include credentials to send session cookies for authenticated asset access
+        const modelJsonResponse = await fetch(sources.modelUrl, {
+          credentials: 'include',
+        });
         if (!modelJsonResponse.ok) {
           throw new Error(`Failed to fetch model.json: HTTP ${modelJsonResponse.status}`);
         }
         const modelJson = await modelJsonResponse.json();
 
-        const weightsResponse = await fetch(sources.weightsUrl);
+        const weightsResponse = await fetch(sources.weightsUrl, {
+          credentials: 'include',
+        });
         if (!weightsResponse.ok) {
           throw new Error(`Failed to fetch weights: HTTP ${weightsResponse.status}`);
         }
@@ -445,7 +453,10 @@ export class MlModelService {
       const sources = await this.getModelSources(channelId);
       if (!sources) return false;
 
-      const metadataResponse = await fetch(sources.metadataUrl);
+      // Include credentials to send session cookies for authenticated asset access
+      const metadataResponse = await fetch(sources.metadataUrl, {
+        credentials: 'include',
+      });
       if (!metadataResponse.ok) return false;
 
       const remoteMetadata = await metadataResponse.json();

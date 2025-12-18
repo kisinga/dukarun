@@ -177,9 +177,10 @@ export const config: VendureConfig = {
         name: 'mlModelJsonAsset',
         type: 'relation',
         entity: Asset,
+        eager: true, // Auto-load relation to avoid resolver permission issues
         label: [{ languageCode: LanguageCode.en, value: 'ML Model JSON Asset' }],
         description: [{ languageCode: LanguageCode.en, value: 'Asset for model.json file' }],
-        public: false,
+        public: true, // Accessible to Shop API for frontend ML predictions
         nullable: true,
         ui: {
           tab: 'ML Model',
@@ -194,9 +195,10 @@ export const config: VendureConfig = {
         name: 'mlModelBinAsset',
         type: 'relation',
         entity: Asset,
+        eager: true, // Auto-load relation to avoid resolver permission issues
         label: [{ languageCode: LanguageCode.en, value: 'ML Model Weights Asset' }],
         description: [{ languageCode: LanguageCode.en, value: 'Asset for weights.bin file' }],
-        public: false,
+        public: true, // Accessible to Shop API for frontend ML predictions
         nullable: true,
         ui: {
           tab: 'ML Model',
@@ -211,9 +213,10 @@ export const config: VendureConfig = {
         name: 'mlMetadataAsset',
         type: 'relation',
         entity: Asset,
+        eager: true, // Auto-load relation to avoid resolver permission issues
         label: [{ languageCode: LanguageCode.en, value: 'ML Metadata Asset' }],
         description: [{ languageCode: LanguageCode.en, value: 'Asset for metadata.json file' }],
-        public: false,
+        public: true, // Accessible to Shop API for frontend ML predictions
         nullable: true,
         ui: {
           tab: 'ML Model',
