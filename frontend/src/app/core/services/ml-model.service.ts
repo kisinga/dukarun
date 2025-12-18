@@ -267,8 +267,36 @@ export class MlModelService {
       try {
         this.model = await tf.loadLayersModel(cacheKey);
       } catch {
-        // Cache miss - load from network
-        this.model = await tf.loadLayersModel(sources.modelUrl);
+        // Cache miss - load from network using custom IOHandler
+        // This is necessary because Vendure assigns each asset a unique URL,
+        // and TensorFlow.js tries to resolve weights relative to model.json URL.
+        // We load model.json and weights separately from their correct URLs.
+        const modelJsonResponse = await fetch(sources.modelUrl);
+        if (!modelJsonResponse.ok) {
+          throw new Error(`Failed to fetch model.json: HTTP ${modelJsonResponse.status}`);
+        }
+        const modelJson = await modelJsonResponse.json();
+
+        const weightsResponse = await fetch(sources.weightsUrl);
+        if (!weightsResponse.ok) {
+          throw new Error(`Failed to fetch weights: HTTP ${weightsResponse.status}`);
+        }
+        const weightsData = await weightsResponse.arrayBuffer();
+
+        // Custom IOHandler that provides model topology and weights from our fetched data
+        // Type is inferred from tf.loadLayersModel parameter type
+        const customHandler: Parameters<typeof tf.loadLayersModel>[0] = {
+          load: async () => ({
+            modelTopology: modelJson.modelTopology,
+            weightSpecs: modelJson.weightsManifest?.[0]?.weights || [],
+            weightData: weightsData,
+            format: modelJson.format,
+            generatedBy: modelJson.generatedBy,
+            convertedBy: modelJson.convertedBy,
+          }),
+        };
+
+        this.model = await tf.loadLayersModel(customHandler);
         await this.model.save(cacheKey);
       }
 
