@@ -102,7 +102,7 @@ export class ModelPredictorService {
     const topResults = results.slice(0, topK);
 
     // Log predictions with >75% confidence
-    const highConfidenceResults = topResults.filter((r) => r.probability > 0.25);
+    const highConfidenceResults = topResults.filter((r) => r.probability > 0.3);
     if (highConfidenceResults.length > 0) {
       console.log('[ModelPredictor] High confidence prediction:', {
         topPrediction: topResults[0],

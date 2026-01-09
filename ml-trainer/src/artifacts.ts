@@ -1,213 +1,273 @@
 /**
- * Model artifact file management
+ * Artifact Management
+ *
+ * Handles downloading training images, saving model artifacts,
+ * and cleanup of temporary files.
  */
 import * as tf from '@tensorflow/tfjs-node';
-import axios from 'axios';
-import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { promisify } from 'util';
-import { pipeline as streamPipeline } from 'stream';
+import axios from 'axios';
 import { DatasetItem, ProductManifestEntry, ModelMetadata, ArtifactFileNames } from './types';
 import { IMAGE_SIZE, logger } from './constants';
 
-const pipeline = promisify(streamPipeline);
+// =============================================================================
+// Dataset Download
+// =============================================================================
 
 /**
- * Download image from URL to local path
- */
-export async function downloadImage(url: string, destPath: string): Promise<void> {
-  try {
-    const response = await axios({
-      url,
-      method: 'GET',
-      responseType: 'stream',
-      timeout: 30000,
-    });
-    await pipeline(response.data, fs.createWriteStream(destPath));
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    logger.warn(`Failed to download image ${url}: ${errorMessage}`);
-    throw err;
-  }
-}
-
-/**
- * Download all images for products and build dataset
+ * Download all images from the training manifest to local disk.
+ *
+ * Creates a directory structure:
+ * jobDir/
+ *   images/
+ *     0/  (first product)
+ *       image1.jpg
+ *       image2.jpg
+ *     1/  (second product)
+ *       ...
+ *
+ * @param products - Array of products with image URLs from manifest
+ * @param jobDir - Directory to store downloaded images
+ * @returns Dataset items (paths + label indices) and total image count
  */
 export async function downloadDataset(
   products: ProductManifestEntry[],
   jobDir: string
 ): Promise<{ dataset: DatasetItem[]; totalImages: number }> {
-  const classes = products.map(p => p.productId);
-  const dataset: DatasetItem[] = [];
-  let totalImages = 0;
-
   logger.info(`Downloading images for ${products.length} products...`);
 
-  for (const product of products) {
-    logger.info(`Downloading ${product.images.length} images for product ${product.productId}`);
-    for (const image of product.images) {
-      const imagePath = path.join(jobDir, `${product.productId}_${image.assetId}.jpg`);
-      await downloadImage(image.url, imagePath);
-      dataset.push({
-        path: imagePath,
-        labelIndex: classes.indexOf(product.productId),
-      });
-      totalImages++;
+  const imagesDir = path.join(jobDir, 'images');
+  if (!fs.existsSync(imagesDir)) {
+    fs.mkdirSync(imagesDir, { recursive: true });
+  }
+
+  const dataset: DatasetItem[] = [];
+  let totalImages = 0;
+  let failedDownloads = 0;
+
+  for (let productIndex = 0; productIndex < products.length; productIndex++) {
+    const product = products[productIndex];
+    const productDir = path.join(imagesDir, productIndex.toString());
+
+    if (!fs.existsSync(productDir)) {
+      fs.mkdirSync(productDir, { recursive: true });
+    }
+
+    logger.info(`  Downloading images for product ${productIndex + 1}/${products.length}: ${product.productName}`);
+
+    for (let imageIndex = 0; imageIndex < product.images.length; imageIndex++) {
+      const image = product.images[imageIndex];
+
+      try {
+        // Determine file extension from URL or filename
+        const ext = getFileExtension(image.url, image.filename);
+        const filename = `${imageIndex}${ext}`;
+        const imagePath = path.join(productDir, filename);
+
+        // Download image
+        await downloadImage(image.url, imagePath);
+
+        // Add to dataset
+        dataset.push({
+          path: imagePath,
+          labelIndex: productIndex,
+        });
+
+        totalImages++;
+      } catch (error) {
+        failedDownloads++;
+        logger.warn(
+          `    Failed to download image ${image.filename}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
     }
   }
 
-  logger.info(`Downloaded ${totalImages} images successfully`);
+  logger.info(`Download complete: ${totalImages} images downloaded, ${failedDownloads} failed`);
 
   if (totalImages === 0) {
-    throw new Error('No images found in manifest');
+    throw new Error('No images could be downloaded from the manifest');
+  }
+
+  // Warn if we have very few images per class
+  const avgImagesPerClass = totalImages / products.length;
+  if (avgImagesPerClass < 3) {
+    logger.warn(
+      `Low image count: average ${avgImagesPerClass.toFixed(1)} images per product. ` +
+        `Consider adding more images for better accuracy.`
+    );
   }
 
   return { dataset, totalImages };
 }
 
 /**
- * Generate unique training ID
+ * Download a single image from URL to local path.
  */
-export function generateTrainingId(): string {
-  return crypto.randomUUID().slice(0, 8);
+async function downloadImage(url: string, destPath: string): Promise<void> {
+  const response = await axios.get(url, {
+    responseType: 'arraybuffer',
+    timeout: 30000, // 30 second timeout
+    headers: {
+      'User-Agent': 'DukarunMLTrainer/1.0',
+    },
+  });
+
+  fs.writeFileSync(destPath, Buffer.from(response.data));
 }
 
 /**
- * Save model with unique filenames to prevent Vendure naming conflicts
- * Accepts both Sequential and LayersModel (for combined models with MobileNet)
+ * Get file extension from URL or filename.
+ */
+function getFileExtension(url: string, filename: string): string {
+  // Try to get extension from filename first
+  const filenameExt = path.extname(filename).toLowerCase();
+  if (filenameExt && ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].includes(filenameExt)) {
+    return filenameExt;
+  }
+
+  // Try to get extension from URL
+  try {
+    const urlPath = new URL(url).pathname;
+    const urlExt = path.extname(urlPath).toLowerCase();
+    if (urlExt && ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].includes(urlExt)) {
+      return urlExt;
+    }
+  } catch {
+    // Invalid URL, continue with default
+  }
+
+  // Default to .jpg
+  return '.jpg';
+}
+
+// =============================================================================
+// Model Artifact Saving
+// =============================================================================
+
+/**
+ * Save trained model and metadata to disk.
+ *
+ * Creates three files:
+ * - model.json: Model architecture and weight manifest
+ * - weights.bin: Model weights (binary)
+ * - metadata.json: Training metadata (labels, stats, etc.)
+ *
+ * @param model - Trained TensorFlow.js model
+ * @param channelId - Channel ID for naming
+ * @param artifactsDir - Directory to save artifacts
+ * @param labels - Array of product IDs (class labels)
+ * @param productCount - Number of products trained on
+ * @param imageCount - Total number of training images
+ * @returns File names of saved artifacts
  */
 export async function saveModelArtifacts(
   model: tf.LayersModel,
   channelId: string,
   artifactsDir: string,
-  classes: string[],
+  labels: string[],
   productCount: number,
   imageCount: number
-): Promise<{ metadata: ModelMetadata; fileNames: ArtifactFileNames }> {
+): Promise<{ fileNames: ArtifactFileNames }> {
+  logger.info(`Saving model artifacts to ${artifactsDir}...`);
+
   if (!fs.existsSync(artifactsDir)) {
     fs.mkdirSync(artifactsDir, { recursive: true });
   }
 
-  const trainingId = generateTrainingId();
-  logger.info(`Training ID: ${trainingId}`);
+  // Save model to file system
+  const modelPath = `file://${artifactsDir}`;
+  await model.save(modelPath);
 
-  // Log model structure before saving to verify it's correct
-  logger.info(`Saving model with ${model.layers.length} layers`);
-  logger.info(`Model input shape: ${JSON.stringify(model.inputs[0]?.shape)}`);
-  logger.info(`Model output shape: ${JSON.stringify(model.outputs[0]?.shape)}`);
-  
-  // Verify model expects raw images [224, 224, 3]
-  const inputShape = model.inputs[0]?.shape;
-  if (inputShape && inputShape.length === 4 && inputShape[1] === 224 && inputShape[2] === 224 && inputShape[3] === 3) {
-    logger.info('✓ Model correctly expects raw images [224, 224, 3]');
-  } else {
-    logger.error(`✗ Model input shape is incorrect: ${JSON.stringify(inputShape)}. Expected [null, 224, 224, 3]`);
-    throw new Error(`Model input shape mismatch. Got ${JSON.stringify(inputShape)}, expected [null, 224, 224, 3]`);
-  }
-
-  // Save model with TensorFlow's default names
-  // includeOptimizer: false to reduce file size (we don't need optimizer state for inference)
-  await model.save(`file://${artifactsDir}`, { includeOptimizer: false });
-  
-  logger.info('Model saved successfully');
-  
-  // Verify the saved model.json to ensure it has the correct structure
+  // The model.save creates model.json and group1-shardXofY.bin files
+  // Rename the weights file to weights.bin for consistency
   const modelJsonPath = path.join(artifactsDir, 'model.json');
-  if (fs.existsSync(modelJsonPath)) {
-    const savedModelJson = JSON.parse(fs.readFileSync(modelJsonPath, 'utf-8'));
-    const savedLayersCount = savedModelJson.modelTopology?.layers?.length || 0;
-    logger.info(`Saved model has ${savedLayersCount} layers in topology`);
-    
-    // Check weights manifest to see how many weight groups are included
-    const weightsManifest = savedModelJson.weightsManifest?.[0];
-    if (weightsManifest) {
-      const weightsCount = weightsManifest.weights?.length || 0;
-      logger.info(`Saved model has ${weightsCount} weight tensors in manifest`);
-      
-      // Calculate total weight size
-      const totalWeightSize = weightsManifest.weights?.reduce((sum: number, w: any) => sum + (w.shape?.reduce((a: number, b: number) => a * b, 1) || 0), 0) || 0;
-      logger.info(`Total weight elements: ${totalWeightSize.toLocaleString()}`);
-    }
-    
-    // Check if the first layer is the input layer with correct shape
-    const firstLayer = savedModelJson.modelTopology?.layers?.[0];
-    if (firstLayer) {
-      logger.info(`First layer in saved model: ${firstLayer.name}, config: ${JSON.stringify(firstLayer.config?.batchInputShape || firstLayer.config?.inputShape)}`);
-    }
-    
-    // Verify we have enough layers (should match the model we created)
-    if (savedLayersCount < model.layers.length) {
-      logger.warn(`Warning: Saved model has ${savedLayersCount} layers but original model has ${model.layers.length} layers`);
-    }
-  }
-  
-  // Check the actual weights.bin file size
   const weightsPath = path.join(artifactsDir, 'weights.bin');
-  if (fs.existsSync(weightsPath)) {
-    const stats = fs.statSync(weightsPath);
-    const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
-    logger.info(`Weights file size: ${fileSizeMB} MB (${stats.size.toLocaleString()} bytes)`);
-    
-    // MobileNet + classification head should be ~4-5 MB
-    // If it's only ~900KB, only the classification head is saved
-    if (stats.size < 2000000) {
-      logger.error(`ERROR: Weights file is too small (${fileSizeMB} MB). Expected ~4-5 MB for MobileNet + classification head.`);
-      logger.error('This indicates MobileNet weights are NOT being saved!');
-      throw new Error(`Weights file too small: ${fileSizeMB} MB. Expected ~4-5 MB. MobileNet weights may not be included.`);
+
+  // Find and rename the weights file(s)
+  const files = fs.readdirSync(artifactsDir);
+  const weightFiles = files.filter(f => f.endsWith('.bin') && f !== 'weights.bin');
+
+  if (weightFiles.length === 1) {
+    // Single weights file - rename it
+    fs.renameSync(path.join(artifactsDir, weightFiles[0]), weightsPath);
+
+    // Update model.json to reference the renamed weights file
+    const modelJson = JSON.parse(fs.readFileSync(modelJsonPath, 'utf8'));
+    if (modelJson.weightsManifest && modelJson.weightsManifest[0]) {
+      modelJson.weightsManifest[0].paths = ['weights.bin'];
     }
+    fs.writeFileSync(modelJsonPath, JSON.stringify(modelJson));
+  } else if (weightFiles.length > 1) {
+    // Multiple weight shards - combine them
+    const weightBuffers: Buffer[] = [];
+    for (const wf of weightFiles.sort()) {
+      weightBuffers.push(fs.readFileSync(path.join(artifactsDir, wf)));
+      fs.unlinkSync(path.join(artifactsDir, wf)); // Remove original
+    }
+    fs.writeFileSync(weightsPath, Buffer.concat(weightBuffers));
+
+    // Update model.json
+    const modelJson = JSON.parse(fs.readFileSync(modelJsonPath, 'utf8'));
+    if (modelJson.weightsManifest && modelJson.weightsManifest[0]) {
+      modelJson.weightsManifest[0].paths = ['weights.bin'];
+    }
+    fs.writeFileSync(modelJsonPath, JSON.stringify(modelJson));
   }
 
-  // Generate unique filenames
-  const fileNames: ArtifactFileNames = {
-    modelJson: `model-${channelId}-${trainingId}.json`,
-    weights: `model-${channelId}-${trainingId}.weights.bin`,
-    metadata: `metadata-${channelId}-${trainingId}.json`,
-  };
-
-  // Update model.json to reference unique weights filename
-  // Reuse modelJsonPath that was already declared above
-  const modelJson = JSON.parse(fs.readFileSync(modelJsonPath, 'utf-8'));
-  if (modelJson.weightsManifest?.[0]?.paths) {
-    modelJson.weightsManifest[0].paths = [fileNames.weights];
-  }
-
-  // Write updated model.json with new name
-  fs.writeFileSync(path.join(artifactsDir, fileNames.modelJson), JSON.stringify(modelJson));
-  fs.unlinkSync(modelJsonPath);
-
-  // Rename weights.bin
-  fs.renameSync(
-    path.join(artifactsDir, 'weights.bin'),
-    path.join(artifactsDir, fileNames.weights)
-  );
-
-  // Create metadata
+  // Create metadata file
+  const trainingId = `${channelId}-${Date.now()}`;
   const metadata: ModelMetadata = {
-    modelName: `dukarun-channel-${channelId}`,
+    modelName: `product-classifier-${channelId}`,
     trainingId,
-    labels: classes,
+    labels,
     imageSize: IMAGE_SIZE,
     trainedAt: new Date().toISOString(),
     productCount,
     imageCount,
-    files: fileNames,
+    files: {
+      modelJson: 'model.json',
+      weights: 'weights.bin',
+      metadata: 'metadata.json',
+    },
   };
 
-  fs.writeFileSync(path.join(artifactsDir, fileNames.metadata), JSON.stringify(metadata));
+  const metadataPath = path.join(artifactsDir, 'metadata.json');
+  fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
 
-  return { metadata, fileNames };
+  logger.info('Model artifacts saved:');
+  logger.info(`  model.json: ${fs.statSync(modelJsonPath).size} bytes`);
+  logger.info(`  weights.bin: ${fs.statSync(weightsPath).size} bytes`);
+  logger.info(`  metadata.json: ${fs.statSync(metadataPath).size} bytes`);
+
+  return {
+    fileNames: {
+      modelJson: 'model.json',
+      weights: 'weights.bin',
+      metadata: 'metadata.json',
+    },
+  };
 }
+
+// =============================================================================
+// Cleanup
+// =============================================================================
 
 /**
- * Cleanup temporary job directory
+ * Clean up temporary job directory after training completes.
+ *
+ * @param jobDir - Directory to remove
  */
-export function cleanupJobDir(jobDir: string, keepForDebug = true): void {
-  if (fs.existsSync(jobDir) && !keepForDebug) {
-    fs.rmSync(jobDir, { recursive: true, force: true });
-    logger.info(`Cleaned up job directory: ${jobDir}`);
+export function cleanupJobDir(jobDir: string): void {
+  try {
+    if (fs.existsSync(jobDir)) {
+      fs.rmSync(jobDir, { recursive: true, force: true });
+      logger.info(`Cleaned up job directory: ${jobDir}`);
+    }
+  } catch (error) {
+    logger.warn(
+      `Failed to cleanup job directory ${jobDir}: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 }
-
-

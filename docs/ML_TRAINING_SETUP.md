@@ -45,6 +45,7 @@ The frontend implementation is complete and includes:
 The new `ml-trainer` service runs independently:
 
 1. **Install dependencies**:
+
    ```bash
    cd ml-trainer
    npm install
@@ -65,6 +66,7 @@ The new `ml-trainer` service runs independently:
 After restarting the backend, you can verify the integration by:
 
 1. **Check GraphQL Schema**: Visit `/admin-api/graphiql` and verify these queries are available:
+
    - `mlTrainingInfo(channelId: ID!)`
    - `mlTrainingManifest(channelId: ID!)`
    - `extractPhotosForTraining(channelId: ID!)`
@@ -96,6 +98,12 @@ After restarting the backend, you can verify the integration by:
 ## External Service Integration
 
 The system supports complete external training workflows:
+
+```gql
+mutation StartTraining {
+  startTraining(channelId: "2")
+}
+```
 
 ```bash
 # 1. Trigger extraction
