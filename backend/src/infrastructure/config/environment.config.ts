@@ -251,7 +251,7 @@ export class EnvironmentConfig implements OnModuleInit {
     // Load Push notification configuration
     this.push.vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
     this.push.vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
-    this.push.vapidSubject = process.env.VAPID_SUBJECT || '';
+    this.push.vapidSubject = process.env.VAPID_EMAIL || '';
 
     // Load Paystack configuration
     this.paystack.secretKey = process.env.PAYSTACK_SECRET_KEY || '';

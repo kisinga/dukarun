@@ -28,7 +28,7 @@ services:
       DB_HOST: ${DB_HOST:-postgres_db}
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-vendure}
-      DB_USERNAME: ${DB_USER:-vendure}
+      DB_USERNAME: ${DB_USERNAME:-vendure}
       DB_PASSWORD: ${DB_PASSWORD:-vendure}
       DB_SCHEMA: ${DB_SCHEMA:-public}
 
@@ -36,7 +36,7 @@ services:
       AUDIT_DB_HOST: ${AUDIT_DB_HOST:-timescaledb_audit}
       AUDIT_DB_PORT: 5432
       AUDIT_DB_NAME: ${AUDIT_DB_NAME:-audit_logs}
-      AUDIT_DB_USERNAME: ${AUDIT_DB_USER:-audit_user}
+      AUDIT_DB_USERNAME: ${AUDIT_DB_USERNAME:-audit_user}
       AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:-audit_password}
 
       # Redis configuration - uses service name

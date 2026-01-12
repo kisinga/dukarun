@@ -9,6 +9,21 @@ Dukarun helps shopkeepers ditch manual data entry and expensive barcode scanners
 [![Backend Coverage](https://codecov.io/gh/kisinga/Dukarun/branch/main/graph/badge.svg?flag=backend)](https://codecov.io/gh/kisinga/Dukarun)
 [![Frontend Coverage](https://codecov.io/gh/kisinga/Dukarun/branch/main/graph/badge.svg?flag=frontend)](https://codecov.io/gh/kisinga/Dukarun)
 
+## Quick Start
+
+> **First time?** Run `npm i` at the project root first.
+
+```bash
+# 1. Install dependencies (required first time)
+npm i
+
+# 2. Start development (docker + all services)
+npm run dev
+
+# Troubleshooting?
+npm run setup
+```
+
 ## Quick Links
 
 - 🚀 **[Setup & Deployment](./docs/INFRASTRUCTURE.md)** - Get started, deploy anywhere

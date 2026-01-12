@@ -150,8 +150,7 @@ All configuration is managed via environment variables. See `.env.example` in th
 | Variable              | Example           | Default     | Notes                                             |
 | --------------------- | ----------------- | ----------- | ------------------------------------------------- |
 | `DB_NAME`             | `vendure`         | `vendure`   | Database name                                     |
-| `DB_USER`             | `vendure`         | `vendure`   | Database user (used in Docker Compose)            |
-| `DB_USERNAME`         | `vendure`         | `vendure`   | Database username (used by backend)               |
+| `DB_USERNAME`         | `vendure`         | `vendure`   | Database username                                 |
 | `DB_PASSWORD`         | `secure-password` | `vendure`   | Database password **[CHANGE IN PRODUCTION]**      |
 | `DB_SCHEMA`           | `public`          | `public`    | PostgreSQL schema                                 |
 | `DB_HOST`             | `postgres_db`     | `localhost` | Database hostname (use service name in Docker)    |
@@ -170,8 +169,7 @@ All configuration is managed via environment variables. See `.env.example` in th
 | Variable               | Example             | Default             | Notes                                 |
 | ---------------------- | ------------------- | ------------------- | ------------------------------------- |
 | `AUDIT_DB_NAME`        | `audit_logs`        | `audit_logs`        | Audit database name                   |
-| `AUDIT_DB_USER`        | `audit_user`        | `audit_user`        | Audit database user (Docker Compose)  |
-| `AUDIT_DB_USERNAME`    | `audit_user`        | `audit_user`        | Audit database username (backend)     |
+| `AUDIT_DB_USERNAME`    | `audit_user`        | `audit_user`        | Audit database username               |
 | `AUDIT_DB_PASSWORD`    | `secure-password`   | `audit_password`    | Audit database password **[CHANGE]**  |
 | `AUDIT_DB_HOST`        | `timescaledb_audit` | `timescaledb_audit` | Audit DB hostname (service name)      |
 | `AUDIT_DB_PORT`        | `5432`              | `5432`              | Audit database port                   |
@@ -244,8 +242,7 @@ The nginx configuration supports both Docker internal DNS and public DNS resolut
 | ------------------- | -------------------------- | -------------------------- | ------------------------------------------ |
 | `VAPID_PUBLIC_KEY`  | `your-public-key`          | —                          | VAPID public key (generate with web-push)  |
 | `VAPID_PRIVATE_KEY` | `your-private-key`         | —                          | VAPID private key (generate with web-push) |
-| `VAPID_EMAIL`       | `mailto:admin@dukarun.com` | `mailto:admin@dukarun.com` | VAPID subject/email                        |
-| `VAPID_SUBJECT`     | `mailto:admin@dukarun.com` | —                          | VAPID subject (alternative)                |
+| `VAPID_EMAIL`       | `mailto:admin@dukarun.com` | `mailto:admin@dukarun.com` | VAPID subject email for push notifications |
 
 ### Payment Provider Configuration (Paystack)
 

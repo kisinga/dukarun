@@ -27,8 +27,8 @@ COPY . .
 # Build TypeScript
 RUN npm run build
 
-# Expose port
-EXPOSE 3000
+# Expose port (ML_PORT default is 3005)
+EXPOSE 3005
 
 # Start command
 CMD ["npm", "start"]
