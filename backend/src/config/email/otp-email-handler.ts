@@ -1,5 +1,5 @@
 import { EmailEventListener } from '@vendure/email-plugin';
-import { OtpEmailEvent } from '../../events/otp-email.event';
+import { OtpEmailEvent } from '../../infrastructure/events/otp-email.event';
 import { isSentinelEmail } from '../../utils/email.utils';
 
 export const otpEmailHandler = new EmailEventListener('otp-verification')

@@ -132,6 +132,12 @@ export class EnvironmentConfig implements OnModuleInit {
     channels: 'email', // ADMIN_NOTIFICATION_CHANNELS - comma-separated: email,sms
   };
 
+  // Communication/delivery configuration (single gating for SMS, email, OTP delivery)
+  readonly communication = {
+    devMode: false, // COMMUNICATION_DEV_MODE or isDevelopment() - when true, log payload and skip real send
+    channels: { sms: true, email: true }, // COMMUNICATION_CHANNELS - comma-separated sms,email to enable
+  };
+
   /**
    * Get singleton instance (for use before DI container is ready)
    */
@@ -292,6 +298,15 @@ export class EnvironmentConfig implements OnModuleInit {
     this.adminNotifications.email = process.env.ADMIN_NOTIFICATION_EMAIL || '';
     this.adminNotifications.phone = process.env.ADMIN_NOTIFICATION_PHONE || '';
     this.adminNotifications.channels = process.env.ADMIN_NOTIFICATION_CHANNELS || 'email';
+
+    // Load Communication configuration (single gating for delivery)
+    const commDevMode = process.env.COMMUNICATION_DEV_MODE === 'true';
+    const commChannels = (process.env.COMMUNICATION_CHANNELS || 'sms,email').toLowerCase();
+    this.communication.devMode = commDevMode || this.isDevelopment();
+    this.communication.channels = {
+      sms: commChannels.includes('sms'),
+      email: commChannels.includes('email'),
+    };
 
     this.validate();
   }

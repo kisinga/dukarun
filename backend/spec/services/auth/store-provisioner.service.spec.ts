@@ -106,7 +106,7 @@ describe('StoreProvisionerService', () => {
       const result = await harness.service.createAndAssignStore(ctx, registrationData as any, '2');
 
       // 1. Verify service creation (Hybrid Strategy step 1)
-      expect(harness.stockLocationService.create).toHaveBeenCalledWith(
+      expect(harness.stockLocationService.create as jest.Mock<any>).toHaveBeenCalledWith(
         ctx,
         expect.objectContaining({
           name: 'Primary Store',
@@ -138,7 +138,7 @@ describe('StoreProvisionerService', () => {
       expect(publishedEvent.channelIds).toEqual(['2']);
 
       // 4. Verify audit logging
-      expect(harness.auditor.logEntityCreated).toHaveBeenCalledWith(
+      expect(harness.auditor.logEntityCreated as jest.Mock<any>).toHaveBeenCalledWith(
         ctx,
         'StockLocation',
         '5',
@@ -186,7 +186,7 @@ describe('StoreProvisionerService', () => {
         '2'
       );
 
-      expect(harness.stockLocationService.create).toHaveBeenCalledWith(
+      expect(harness.stockLocationService.create as jest.Mock<any>).toHaveBeenCalledWith(
         ctx,
         expect.objectContaining({
           name: 'Primary Store',

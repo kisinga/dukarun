@@ -9,23 +9,20 @@ import { ChannelSettingsResolver, channelSettingsSchema } from './channel-settin
 import { ChannelEventsPlugin } from './channel-events.plugin';
 import { ChannelAdminService } from '../../services/channels/channel-admin.service';
 import { ChannelPaymentService } from '../../services/channels/channel-payment.service';
-import { SmsService } from '../../infrastructure/sms/sms.service';
+import { CommunicationPlugin } from '../communication/communication.plugin';
 
 @VendurePlugin({
-  imports: [PluginCommonModule, ChannelEventsPlugin],
+  imports: [PluginCommonModule, ChannelEventsPlugin, CommunicationPlugin],
   providers: [
     // Audit dependencies
     AuditDbConnection,
     UserContextResolver,
     AuditService,
-    // Channel update helper
-
     // Channel settings
     ChannelSettingsResolver,
     ChannelSettingsService,
     ChannelAdminService,
     ChannelPaymentService,
-    SmsService,
   ],
   adminApiExtensions: {
     resolvers: [ChannelSettingsResolver],

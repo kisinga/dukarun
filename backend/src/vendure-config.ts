@@ -1479,7 +1479,8 @@ export const config: VendureConfig = {
     DefaultJobQueuePlugin.init({ useDatabaseForBuffer: true }),
     DefaultSearchPlugin.init({ bufferUpdates: false, indexStockStatus: true }),
     EmailPlugin.init({
-      devMode: (!IS_PRODUCTION && env.email.transport !== 'smtp') as any,
+      devMode: (env.communication.devMode ||
+        (!IS_PRODUCTION && env.email.transport !== 'smtp')) as any,
       outputPath: path.join(process.cwd(), 'static/email/test-emails'),
       route: 'mailbox',
       handlers: [...defaultEmailHandlers, otpEmailHandler],

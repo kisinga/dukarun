@@ -137,17 +137,16 @@ describe('RegistrationService.provisionCustomer', () => {
     });
 
     expect(harness.validator.validateInput).toHaveBeenCalled();
-    expect(harness.storeProvisioner.createAndAssignStore).toHaveBeenCalledWith(
+    expect(harness.storeProvisioner.createAndAssignStore as jest.Mock<any>).toHaveBeenCalledWith(
       ctx,
       expect.objectContaining({ storeName: '  Test Store  ' }),
       harness.channel.id
     );
 
     // Verify chart of accounts initialization
-    expect(harness.chartOfAccountsService.initializeForChannel).toHaveBeenCalledWith(
-      ctx,
-      harness.channel.id
-    );
+    expect(
+      harness.chartOfAccountsService.initializeForChannel as jest.Mock<any>
+    ).toHaveBeenCalledWith(ctx, harness.channel.id);
     // Note: verifyChannelAccounts is no longer called directly - verification
     // is done using the return value from initializeForChannel
 
@@ -167,7 +166,7 @@ describe('RegistrationService.provisionCustomer', () => {
 
     await harness.service.provisionCustomer(ctx, registrationData, existingUser);
 
-    expect(harness.accessProvisioner.createAdministrator).toHaveBeenCalledWith(
+    expect(harness.accessProvisioner.createAdministrator as jest.Mock<any>).toHaveBeenCalledWith(
       ctx,
       registrationData,
       harness.role,
