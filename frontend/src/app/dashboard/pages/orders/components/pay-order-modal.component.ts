@@ -84,7 +84,7 @@ export interface PayOrderModalData {
             <div class="flex-1">
               <div class="font-semibold">Payment recorded successfully!</div>
               <div class="text-xs mt-1">
-                Total allocated: {{ formatCurrency(successResult()!.totalAllocated * 100) }}
+                Total allocated: {{ formatCurrency(successResult()!.totalAllocated) }}
               </div>
             </div>
           </div>
@@ -415,12 +415,9 @@ export class PayOrderModalComponent {
     this.error.set(null);
 
     try {
-      // Convert amount from cents to shillings for backend
-      const paymentAmount = data.totalAmount / 100;
-
       const result = await this.paymentService.paySingleOrder(
         data.orderId,
-        paymentAmount,
+        data.totalAmount, // Pass cents
         paymentMethodCode,
         refCode,
       );

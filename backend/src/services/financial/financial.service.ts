@@ -39,31 +39,23 @@ export class FinancialService {
 
   /**
    * Get customer balance (amount customer owes)
-   * Returns amount in base currency units (not cents)
+   * Returns amount in smallest currency unit (cents)
    */
   async getCustomerBalance(ctx: RequestContext, customerId: string): Promise<number> {
-    const balanceInCents = await this.queryService.getCustomerBalance(
-      ctx.channelId as number,
-      customerId
-    );
-    return balanceInCents / 100;
+    return this.queryService.getCustomerBalance(ctx.channelId as number, customerId);
   }
 
   /**
    * Get supplier balance (amount we owe supplier)
-   * Returns amount in base currency units (not cents)
+   * Returns amount in smallest currency unit (cents)
    */
   async getSupplierBalance(ctx: RequestContext, supplierId: string): Promise<number> {
-    const balanceInCents = await this.queryService.getSupplierBalance(
-      ctx.channelId as number,
-      supplierId
-    );
-    return balanceInCents / 100;
+    return this.queryService.getSupplierBalance(ctx.channelId as number, supplierId);
   }
 
   /**
    * Get order payment status from ledger
-   * Returns amount still owed in base currency units
+   * Returns amounts in smallest currency unit (cents)
    */
   async getOrderPaymentStatus(
     ctx: RequestContext,
@@ -84,54 +76,51 @@ export class FinancialService {
     const amountOwingInCents = Math.max(balance.balance, 0); // AR should not go negative
 
     return {
-      totalOwed: totalOwedInCents / 100,
-      amountPaid: amountPaidInCents / 100,
-      amountOwing: amountOwingInCents / 100,
+      totalOwed: totalOwedInCents,
+      amountPaid: amountPaidInCents,
+      amountOwing: amountOwingInCents,
     };
   }
 
   /**
    * Get sales total for a period
-   * Returns amount in base currency units
+   * Returns amount in smallest currency unit (cents)
    */
   async getSalesTotal(ctx: RequestContext, startDate?: Date, endDate?: Date): Promise<number> {
-    const totalInCents = await this.queryService.getSalesTotal(
+    return this.queryService.getSalesTotal(
       ctx.channelId as number,
       startDate?.toISOString().slice(0, 10),
       endDate?.toISOString().slice(0, 10)
     );
-    return totalInCents / 100;
   }
 
   /**
    * Get purchases total for a period
-   * Returns amount in base currency units
+   * Returns amount in smallest currency unit (cents)
    */
   async getPurchaseTotal(ctx: RequestContext, startDate?: Date, endDate?: Date): Promise<number> {
-    const totalInCents = await this.queryService.getPurchaseTotal(
+    return this.queryService.getPurchaseTotal(
       ctx.channelId as number,
       startDate?.toISOString().slice(0, 10),
       endDate?.toISOString().slice(0, 10)
     );
-    return totalInCents / 100;
   }
 
   /**
    * Get expenses total for a period
-   * Returns amount in base currency units
+   * Returns amount in smallest currency unit (cents)
    */
   async getExpenseTotal(ctx: RequestContext, startDate?: Date, endDate?: Date): Promise<number> {
-    const totalInCents = await this.queryService.getExpenseTotal(
+    return this.queryService.getExpenseTotal(
       ctx.channelId as number,
       startDate?.toISOString().slice(0, 10),
       endDate?.toISOString().slice(0, 10)
     );
-    return totalInCents / 100;
   }
 
   /**
    * Get account balance (generic)
-   * Returns amount in base currency units
+   * Returns amount in smallest currency unit (cents)
    */
   async getAccountBalance(
     ctx: RequestContext,
@@ -145,7 +134,7 @@ export class FinancialService {
       startDate: startDate?.toISOString().slice(0, 10),
       endDate: endDate?.toISOString().slice(0, 10),
     });
-    return balance.balance / 100;
+    return balance.balance;
   }
 
   // ==================== WRITE OPERATIONS ====================

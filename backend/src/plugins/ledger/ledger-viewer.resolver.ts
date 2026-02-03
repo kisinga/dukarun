@@ -46,7 +46,7 @@ export class LedgerViewerResolver {
           name: account.name,
           type: account.type,
           isActive: account.isActive,
-          balance: balance.balance / 100, // Convert from cents to base currency
+          balance: balance.balance, // In smallest currency unit (cents)
           parentAccountId: account.parentAccountId || null,
           isParent: account.isParent,
         };
@@ -136,8 +136,8 @@ export class LedgerViewerResolver {
             id: line.id,
             accountCode: line.account.code,
             accountName: line.account.name,
-            debit: parseInt(line.debit, 10) / 100, // Convert from cents
-            credit: parseInt(line.credit, 10) / 100, // Convert from cents
+            debit: parseInt(line.debit, 10), // In smallest currency unit (cents)
+            credit: parseInt(line.credit, 10), // In smallest currency unit (cents)
             meta: line.meta,
           })),
         };
@@ -182,8 +182,8 @@ export class LedgerViewerResolver {
         id: line.id,
         accountCode: line.account.code,
         accountName: line.account.name,
-        debit: parseInt(line.debit, 10) / 100,
-        credit: parseInt(line.credit, 10) / 100,
+        debit: parseInt(line.debit, 10), // In smallest currency unit (cents)
+        credit: parseInt(line.credit, 10), // In smallest currency unit (cents)
         meta: line.meta,
       })),
     };

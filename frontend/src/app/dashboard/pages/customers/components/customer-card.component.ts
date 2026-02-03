@@ -56,7 +56,7 @@ export class CustomerCardComponent {
     return Math.abs(this.getOutstandingAmount());
   }
 
-  formatCurrency(amount: number): string {
-    return this.currencyService.format(amount * 100);
+  formatCurrency(amountInCents: number): string {
+    return this.currencyService.format(amountInCents);
   }
 }

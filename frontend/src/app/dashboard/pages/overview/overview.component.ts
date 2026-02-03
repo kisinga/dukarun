@@ -237,12 +237,9 @@ export class OverviewComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Format currency for display
-   * Note: PeriodStats values are in currency units (not cents), so we convert to cents for CurrencyService
+   * Format currency for display (amount in cents)
    */
-  private formatCurrency(amount: number): string {
-    // Convert currency units to cents for CurrencyService
-    const amountInCents = Math.round(amount * 100);
+  private formatCurrency(amountInCents: number): string {
     return this.currencyService.format(amountInCents);
   }
 

@@ -102,10 +102,12 @@ Each Vendure channel (business) has its own:
 
 ### FinancialService (Facade)
 
-The main facade that abstracts all ledger interactions. Provides a clean API without accounting terminology:
+The main facade that abstracts all ledger interactions. Provides a clean API without accounting terminology.
+
+**All amounts returned are in smallest currency unit (cents).** See [CURRENCY_CONVENTION.md](CURRENCY_CONVENTION.md).
 
 ```typescript
-// Customer operations
+// Customer operations - amounts in cents
 getCustomerBalance(customerId: string, channelId: string): Promise<number>
 recordPayment(paymentId: string, channelId: string): Promise<void>
 recordPaymentAllocation(input: PaymentAllocationInput): Promise<PaymentAllocationResult>

@@ -193,10 +193,10 @@ export class CustomerViewModalComponent {
   }
 
   /**
-   * Format currency
+   * Format currency (amount in cents)
    */
-  formatCurrency(amount: number): string {
-    return this.currencyService.format(amount * 100);
+  formatCurrency(amountInCents: number): string {
+    return this.currencyService.format(amountInCents);
   }
 
   /**

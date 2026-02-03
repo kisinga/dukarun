@@ -21,7 +21,7 @@ import {
 
 export interface PaymentAllocationInput {
   customerId: string;
-  paymentAmount: number; // In base currency units (will be converted to cents)
+  paymentAmount: number; // In smallest currency unit (cents)
   orderIds?: string[]; // Optional - if not provided, auto-select oldest
 }
 
@@ -29,11 +29,11 @@ export interface PaymentAllocationResult {
   ordersPaid: Array<{
     orderId: string;
     orderCode: string;
-    amountPaid: number; // In base currency units
+    amountPaid: number; // In smallest currency unit (cents)
   }>;
-  remainingBalance: number; // In base currency units
-  totalAllocated: number; // In base currency units
-  excessPayment: number; // In base currency units - amount paid beyond what's owed
+  remainingBalance: number; // In smallest currency unit (cents)
+  totalAllocated: number; // In smallest currency unit (cents)
+  excessPayment: number; // In smallest currency unit (cents) - amount paid beyond what's owed
 }
 
 @Injectable()
@@ -100,8 +100,8 @@ export class PaymentAllocationService {
           throw new UserInputError('No unpaid orders found for this customer.');
         }
 
-        // 3. Convert payment amount from base currency to cents for internal calculations
-        const paymentAmountInCents = Math.round(input.paymentAmount * 100);
+        // 3. Payment amount is already in cents
+        const paymentAmountInCents = input.paymentAmount;
 
         // 4. Convert orders to PaymentAllocationItem format
         const allocationItems: PaymentAllocationItem[] = unpaidOrders.map(order => {
@@ -188,7 +188,7 @@ export class PaymentAllocationService {
           ordersPaid.push({
             orderId: order.id.toString(),
             orderCode: order.code,
-            amountPaid: amountToAllocate / 100, // Convert back to base currency
+            amountPaid: amountToAllocate,
           });
         }
 
@@ -215,19 +215,16 @@ export class PaymentAllocationService {
             createdAt: order.createdAt,
           };
         });
-        const remainingBalanceInCents = calculateRemainingBalance(remainingItems);
-
-        // 8. Convert to base currency units
-        const totalAllocated = calculation.totalAllocated / 100;
-        const excessPayment = calculation.excessPayment / 100;
-        const remainingBalance = remainingBalanceInCents / 100;
+        const remainingBalance = calculateRemainingBalance(remainingItems);
+        const totalAllocated = calculation.totalAllocated;
+        const excessPayment = calculation.excessPayment;
 
         // 9. Record repayment tracking if any payment was made
         if (calculation.totalAllocated > 0) {
           await this.creditService.releaseCreditCharge(
             transactionCtx,
             input.customerId,
-            totalAllocated // Amount in base currency units (shillings)
+            totalAllocated // Amount in cents
           );
         }
 
@@ -277,7 +274,7 @@ export class PaymentAllocationService {
   async paySingleOrder(
     ctx: RequestContext,
     orderId: string,
-    paymentAmount?: number, // In base currency units (shillings), optional - defaults to outstanding amount
+    paymentAmount?: number, // In smallest currency unit (cents), optional - defaults to outstanding amount
     paymentMethodCode?: string, // Payment method code (optional, defaults to credit)
     referenceNumber?: string // Payment reference number (optional)
   ): Promise<PaymentAllocationResult> {
@@ -306,18 +303,17 @@ export class PaymentAllocationService {
     // Use totalWithTax for tax-inclusive pricing
     const orderTotal = order.totalWithTax || order.total;
     const outstandingAmount = orderTotal - settledPayments;
-    const outstandingAmountInShillings = outstandingAmount / 100;
 
     if (outstandingAmount <= 0) {
       throw new UserInputError(`Order ${order.code} has no outstanding payment.`);
     }
 
     // Use the outstanding amount as payment amount if not specified, or validate payment amount
-    const actualPaymentAmount = paymentAmount ?? outstandingAmountInShillings;
+    const actualPaymentAmount = paymentAmount ?? outstandingAmount;
 
-    if (actualPaymentAmount > outstandingAmountInShillings) {
+    if (actualPaymentAmount > outstandingAmount) {
       throw new UserInputError(
-        `Payment amount (${actualPaymentAmount}) cannot exceed outstanding amount (${outstandingAmountInShillings})`
+        `Payment amount (${actualPaymentAmount}) cannot exceed outstanding amount (${outstandingAmount})`
       );
     }
 
@@ -331,7 +327,7 @@ export class PaymentAllocationService {
     const metadata: Record<string, any> = {
       paymentType: 'credit',
       customerId: customerId,
-      allocatedAmount: actualPaymentAmount * 100, // Convert back to cents for internal use
+      allocatedAmount: actualPaymentAmount,
     };
     if (referenceNumber) {
       metadata.referenceNumber = referenceNumber;
@@ -340,7 +336,7 @@ export class PaymentAllocationService {
     // Use the existing bulk payment method with single order, but we need to pass payment method
     // Since allocatePaymentToOrders doesn't accept payment method, we'll handle it directly here
     return this.connection.withTransaction(ctx, async transactionCtx => {
-      const paymentAmountInCents = Math.round(actualPaymentAmount * 100);
+      const paymentAmountInCents = actualPaymentAmount;
 
       // Add payment to order using OrderService.addManualPaymentToOrder
       const paymentResult = await this.orderService.addManualPaymentToOrder(transactionCtx, {
@@ -476,7 +472,7 @@ export class PaymentAllocationService {
         };
       });
 
-      const remainingBalance = calculateRemainingBalance(remainingItems) / 100;
+      const remainingBalance = calculateRemainingBalance(remainingItems);
 
       // Log audit event
       if (this.auditService) {
@@ -484,15 +480,15 @@ export class PaymentAllocationService {
           entityType: 'Customer',
           entityId: customerId,
           data: {
-            paymentAmount: actualPaymentAmount,
-            totalAllocated: actualPaymentAmount,
+            paymentAmount: paymentAmountInCents,
+            totalAllocated: paymentAmountInCents,
             remainingBalance,
             excessPayment: 0,
             ordersPaid: [
               {
                 orderId: order.id.toString(),
                 orderCode: order.code,
-                amountPaid: actualPaymentAmount,
+                amountPaid: paymentAmountInCents,
               },
             ],
             paymentMethodCode: actualPaymentMethodCode,
@@ -502,7 +498,7 @@ export class PaymentAllocationService {
       }
 
       this.logger.log(
-        `Single order payment allocated: ${actualPaymentAmount} for order ${order.code} (${orderId}) using method ${actualPaymentMethodCode}. Remaining balance: ${remainingBalance}`
+        `Single order payment allocated: ${paymentAmountInCents} for order ${order.code} (${orderId}) using method ${actualPaymentMethodCode}. Remaining balance: ${remainingBalance}`
       );
 
       return {
@@ -510,11 +506,11 @@ export class PaymentAllocationService {
           {
             orderId: order.id.toString(),
             orderCode: order.code,
-            amountPaid: actualPaymentAmount,
+            amountPaid: paymentAmountInCents,
           },
         ],
         remainingBalance,
-        totalAllocated: actualPaymentAmount,
+        totalAllocated: paymentAmountInCents,
         excessPayment: 0,
       };
     });

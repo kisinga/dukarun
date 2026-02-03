@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import { CurrencyService } from '../../../../../core/services/currency.service';
 import { Customer, CustomerSelectorComponent } from '../customer-selector.component';
 import { CheckoutSummaryComponent } from './checkout-summary.component';
 
@@ -50,19 +51,19 @@ import { CheckoutSummaryComponent } from './checkout-summary.component';
             <div class="bg-base-200 rounded-xl p-3 text-center">
               <div class="text-xs text-base-content/60 uppercase tracking-wide">Limit</div>
               <div class="text-base sm:text-lg font-bold text-base-content">
-                {{ selectedCustomer()!.creditLimit | number: '1.0-0' }}
+                {{ currencyService.format(selectedCustomer()!.creditLimit) }}
               </div>
             </div>
             <div class="bg-base-200 rounded-xl p-3 text-center">
               <div class="text-xs text-base-content/60 uppercase tracking-wide">Outstanding</div>
               <div class="text-base sm:text-lg font-bold text-base-content">
-                {{ selectedCustomer()!.outstandingAmount | number: '1.0-0' }}
+                {{ currencyService.format(selectedCustomer()!.outstandingAmount) }}
               </div>
             </div>
             <div class="bg-base-300 rounded-xl p-3 text-center">
               <div class="text-xs text-base-content/60 uppercase tracking-wide">Available</div>
               <div class="text-base sm:text-lg font-bold text-success">
-                {{ selectedCustomer()!.availableCredit | number: '1.0-0' }}
+                {{ currencyService.format(selectedCustomer()!.availableCredit) }}
               </div>
             </div>
           </div>
@@ -179,6 +180,7 @@ import { CheckoutSummaryComponent } from './checkout-summary.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CheckoutCreditComponent {
+  readonly currencyService = inject(CurrencyService);
   readonly itemCount = input.required<number>();
   readonly total = input.required<number>();
   readonly isProcessing = input<boolean>(false);
