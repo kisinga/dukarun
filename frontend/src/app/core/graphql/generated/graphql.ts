@@ -9336,6 +9336,7 @@ export type GetProductQuery = {
       sku: string;
       price: number;
       priceWithTax: number;
+      trackInventory: GlobalFlag;
       prices: Array<{
         __typename?: 'ProductVariantPrice';
         price: number;
@@ -9346,6 +9347,11 @@ export type GetProductQuery = {
         stockLocationId: string;
         stockOnHand: number;
       }>;
+      customFields?: {
+        __typename?: 'ProductVariantCustomFields';
+        wholesalePrice?: number | null;
+        allowFractionalQuantity?: boolean | null;
+      } | null;
     }>;
   } | null;
 };
@@ -10178,6 +10184,12 @@ export type UpdateTrainingStatusMutation = {
   __typename?: 'Mutation';
   updateTrainingStatus: boolean;
 };
+
+export type StartTrainingMutationVariables = Exact<{
+  channelId: Scalars['ID']['input'];
+}>;
+
+export type StartTrainingMutation = { __typename?: 'Mutation'; startTraining: boolean };
 
 export type CompleteTrainingMutationVariables = Exact<{
   channelId: Scalars['ID']['input'];
@@ -14091,6 +14103,7 @@ export const GetProductDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'sku' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'price' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'priceWithTax' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'trackInventory' } },
                       {
                         kind: 'Field',
                         name: { kind: 'Name', value: 'prices' },
@@ -14110,6 +14123,20 @@ export const GetProductDocument = {
                           selections: [
                             { kind: 'Field', name: { kind: 'Name', value: 'stockLocationId' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'stockOnHand' } },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'customFields' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'wholesalePrice' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'allowFractionalQuantity' },
+                            },
                           ],
                         },
                       },
@@ -16594,6 +16621,42 @@ export const UpdateTrainingStatusDocument = {
     },
   ],
 } as unknown as DocumentNode<UpdateTrainingStatusMutation, UpdateTrainingStatusMutationVariables>;
+export const StartTrainingDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'StartTraining' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'startTraining' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'channelId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<StartTrainingMutation, StartTrainingMutationVariables>;
 export const CompleteTrainingDocument = {
   kind: 'Document',
   definitions: [

@@ -1,6 +1,8 @@
 import { inject, Injectable } from '@angular/core';
+import { extractCents } from '../../utils/data-extractors';
 import { GET_PRODUCTS } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
+import { ProductMapperService } from './product-mapper.service';
 import { ProductStateService } from './product-state.service';
 
 /**
@@ -14,6 +16,7 @@ import { ProductStateService } from './product-state.service';
 })
 export class ProductListingService {
   private readonly apolloService = inject(ApolloService);
+  private readonly mapper = inject(ProductMapperService);
   private readonly stateService = inject(ProductStateService);
 
   /**
@@ -40,30 +43,25 @@ export class ProductListingService {
       const items = result.data?.products?.items || [];
       const total = result.data?.products?.totalItems || 0;
 
-      // Process products to ensure prices are displayed correctly
-      const processedItems = items.map((product: any) => ({
-        ...product,
-        variants:
-          product.variants?.map((variant: any) => {
-            // Find the KES price from the prices array
-            const kesPrice = variant.prices?.find((p: any) => p.currencyCode === 'KES');
-            const displayPrice = kesPrice?.price || variant.priceWithTax || variant.price || 0;
-
-            return {
-              ...variant,
-              // Use the KES price from prices array as the display price
-              displayPrice: displayPrice,
-              // Keep both price and priceWithTax for compatibility
-              price: variant.price,
-              priceWithTax: variant.priceWithTax,
-              // Extract currency from prices array if available
-              currencyCode: kesPrice?.currencyCode || 'KES',
-              // Add the KES price for easy access
-              kesPrice: displayPrice,
-            };
-          }) || [],
-      }));
-      console.log('fetchProducts', result.data?.products?.items);
+      const processedItems = items.map((product: any) => {
+        const base = this.mapper.toProductSearchResult(product);
+        return {
+          ...product,
+          ...base,
+          variants:
+            base.variants.map((v, i) => {
+              const raw = product.variants?.[i];
+              const kesPrice = raw?.prices?.find((p: any) => p.currencyCode === 'KES');
+              const displayPrice = kesPrice ? extractCents(kesPrice.price) : v.priceWithTax;
+              return {
+                ...v,
+                displayPrice,
+                kesPrice: displayPrice,
+                currencyCode: kesPrice?.currencyCode || 'KES',
+              };
+            }) || [],
+        };
+      });
       this.stateService.setProducts(processedItems);
       this.stateService.setTotalItems(total);
     } catch (error: any) {

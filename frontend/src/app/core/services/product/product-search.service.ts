@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { GET_PRODUCT, SEARCH_BY_BARCODE, SEARCH_PRODUCTS } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { ProductCacheService } from './product-cache.service';
+import { ProductMapperService } from './product-mapper.service';
 
 /**
  * Product variant for POS
@@ -12,6 +13,7 @@ export interface ProductVariant {
   sku: string;
   priceWithTax: number; // Tax-inclusive price
   stockLevel: string;
+  stockOnHand?: number; // Preserved when available (product listing, stats)
   productId: string;
   productName: string;
   trackInventory?: boolean;
@@ -45,6 +47,7 @@ export interface ProductSearchResult {
 export class ProductSearchService {
   private readonly apolloService = inject(ApolloService);
   private readonly cacheService = inject(ProductCacheService);
+  private readonly mapper = inject(ProductMapperService);
 
   /**
    * Search products by name, SKU, or barcode (cache-first for offline support)
@@ -66,7 +69,6 @@ export class ProductSearchService {
       if (isLikelyBarcode) {
         const barcodeVariant = await this.searchByBarcode(searchTerm.trim());
         if (barcodeVariant) {
-          // Return as ProductSearchResult format
           return [
             {
               id: barcodeVariant.productId,
@@ -91,29 +93,7 @@ export class ProductSearchService {
       });
 
       return (
-        result.data?.products?.items.map((product: any) => ({
-          id: product.id,
-          name: product.name,
-          featuredAsset: product.featuredAsset
-            ? { preview: product.featuredAsset.preview }
-            : undefined,
-          variants: product.variants.map((v: any) => ({
-            id: v.id,
-            name: v.name,
-            sku: v.sku,
-            priceWithTax: v.priceWithTax?.value || v.priceWithTax || 0, // Handle Money object or direct value
-            stockLevel: v.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
-            productId: product.id,
-            productName: product.name,
-            trackInventory: v.trackInventory,
-            customFields: v.customFields
-              ? {
-                  wholesalePrice: v.customFields.wholesalePrice,
-                  allowFractionalQuantity: v.customFields.allowFractionalQuantity,
-                }
-              : undefined,
-          })),
-        })) || []
+        result.data?.products?.items.map((p: any) => this.mapper.toProductSearchResult(p)) || []
       );
     } catch (error) {
       console.error('Product search failed:', error);
@@ -148,29 +128,7 @@ export class ProductSearchService {
         return null;
       }
 
-      const product = result.data.product;
-      return {
-        id: product.id,
-        name: product.name,
-        featuredAsset: product.featuredAsset
-          ? { preview: product.featuredAsset.preview }
-          : undefined,
-        variants: product.variants.map((v: any) => ({
-          id: v.id,
-          name: v.name,
-          sku: v.sku,
-          priceWithTax: v.priceWithTax?.value || v.priceWithTax || 0, // Handle Money object or direct value
-          stockLevel: v.stockLevels?.[0]?.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
-          productId: product.id,
-          productName: product.name,
-          customFields: v.customFields
-            ? {
-                wholesalePrice: v.customFields.wholesalePrice,
-                allowFractionalQuantity: v.customFields.allowFractionalQuantity,
-              }
-            : undefined,
-        })),
-      };
+      return this.mapper.toProductSearchResult(result.data.product);
     } catch (error) {
       console.error('Failed to fetch product:', error);
       return null;
@@ -203,26 +161,7 @@ export class ProductSearchService {
         return null;
       }
 
-      const variant = product.variants[0];
-      return {
-        id: variant.id,
-        name: variant.name,
-        sku: variant.sku,
-        priceWithTax: variant.priceWithTax?.value || variant.priceWithTax || 0, // Keep raw cents for currency service
-        stockLevel: variant.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
-        productId: product.id,
-        productName: product.name,
-        trackInventory: variant.trackInventory,
-        featuredAsset: product.featuredAsset
-          ? { preview: product.featuredAsset.preview }
-          : undefined,
-        customFields: variant.customFields
-          ? {
-              wholesalePrice: variant.customFields.wholesalePrice,
-              allowFractionalQuantity: variant.customFields.allowFractionalQuantity,
-            }
-          : undefined,
-      };
+      return this.mapper.toProductVariant(product.variants[0], product);
     } catch (error) {
       console.error('Barcode search failed:', error);
       return null;
@@ -267,29 +206,10 @@ export class ProductSearchService {
         return null;
       }
 
-      // Search through all products for the variant
       for (const product of result.data.products.items) {
-        for (const variant of product.variants || []) {
-          if (variant.id === variantId) {
-            return {
-              id: variant.id,
-              name: variant.name,
-              sku: variant.sku,
-              priceWithTax: variant.priceWithTax?.value || variant.priceWithTax || 0,
-              stockLevel: variant.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
-              productId: product.id,
-              productName: product.name,
-              featuredAsset: product.featuredAsset
-                ? { preview: product.featuredAsset.preview }
-                : undefined,
-              customFields: variant.customFields
-                ? {
-                    wholesalePrice: variant.customFields.wholesalePrice,
-                    allowFractionalQuantity: variant.customFields.allowFractionalQuantity,
-                  }
-                : undefined,
-            };
-          }
+        const variant = (product.variants || []).find((v: any) => v.id === variantId);
+        if (variant) {
+          return this.mapper.toProductVariant(variant, product);
         }
       }
 

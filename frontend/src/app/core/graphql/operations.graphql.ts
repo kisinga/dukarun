@@ -597,6 +597,7 @@ export const GET_PRODUCT = graphql(`
         sku
         price
         priceWithTax
+        trackInventory
         prices {
           price
           currencyCode
@@ -604,6 +605,10 @@ export const GET_PRODUCT = graphql(`
         stockLevels {
           stockLocationId
           stockOnHand
+        }
+        customFields {
+          wholesalePrice
+          allowFractionalQuantity
         }
       }
     }
