@@ -9,6 +9,7 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { SwPush } from '@angular/service-worker';
+import { provideTestApolloClient } from '../mocks/apollo-testing';
 import { ApolloService } from '../../services/apollo.service';
 import { AuthService } from '../../services/auth.service';
 import { CompanyService } from '../../services/company.service';
@@ -31,6 +32,7 @@ describe('Critical Integration Points', () => {
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
+        provideTestApolloClient(),
         AuthService,
         CompanyService,
         ApolloService,

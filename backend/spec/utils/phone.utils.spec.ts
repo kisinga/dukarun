@@ -19,19 +19,19 @@ describe('phone.utils', () => {
     });
 
     it('should reject numbers with invalid prefix', () => {
-      expect(() => formatPhoneNumber('0812345678')).toThrowError(
+      expect(() => formatPhoneNumber('0812345678')).toThrow(
         'Phone number must start with 07. Received: 0812345678'
       );
     });
 
     it('should reject numbers with invalid length', () => {
-      expect(() => formatPhoneNumber('07123456789')).toThrowError(
+      expect(() => formatPhoneNumber('07123456789')).toThrow(
         'Invalid phone number format. Expected 07XXXXXXXX (10 digits). Received: 07123456789'
       );
     });
 
     it('should reject empty phone numbers', () => {
-      expect(() => formatPhoneNumber('')).toThrowError('Phone number is required');
+      expect(() => formatPhoneNumber('')).toThrow('Phone number is required');
     });
   });
 

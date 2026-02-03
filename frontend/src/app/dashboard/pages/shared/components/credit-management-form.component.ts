@@ -85,14 +85,14 @@ import { CurrencyService } from '../../../../core/services/currency.service';
                 step="0.01"
                 class="input input-bordered w-full"
                 [class.input-disabled]="!hasPermission() || isReadonly()"
-                [value]="creditLimit()"
+                [value]="creditLimitInDisplayUnits()"
                 (input)="onCreditLimitChange($any($event.target).valueAsNumber || 0)"
                 [disabled]="!hasPermission() || isReadonly()"
                 placeholder="Enter credit limit"
               />
               @if (creditLimit() > 0 && hasPermission()) {
                 <div class="text-xs text-base-content/60 mt-1">
-                  {{ currencyService.format(creditLimit() * 100) }}
+                  {{ currencyService.format(creditLimit()) }}
                 </div>
               }
             </div>
@@ -131,7 +131,7 @@ import { CurrencyService } from '../../../../core/services/currency.service';
               <div class="stat bg-base-200 rounded-lg p-3">
                 <div class="stat-title text-xs">Available</div>
                 <div class="stat-value text-base text-success">
-                  {{ currencyService.format((isCreditApproved() ? creditLimit() : 0) * 100) }}
+                  {{ currencyService.format(isCreditApproved() ? creditLimit() : 0) }}
                 </div>
               </div>
             </div>
@@ -154,11 +154,14 @@ export class CreditManagementFormComponent {
   readonly showSummary = input<boolean>(true);
   readonly defaultExpanded = input<boolean>(false);
 
-  // Internal state
+  // Internal state - creditLimit stored in cents
   readonly isExpanded = signal(this.defaultExpanded());
   readonly creditLimit = signal(this.initialCreditLimit());
   readonly creditDuration = signal(this.initialCreditDuration());
   readonly isCreditApproved = signal(this.initialIsCreditApproved());
+
+  /** Credit limit in display units (sh) for input field */
+  readonly creditLimitInDisplayUnits = computed(() => this.creditLimit() / 100);
 
   // Outputs
   readonly creditChange = output<{
@@ -177,8 +180,9 @@ export class CreditManagementFormComponent {
     this.emitChange();
   }
 
-  onCreditLimitChange(limit: number): void {
-    this.creditLimit.set(Math.max(0, limit));
+  onCreditLimitChange(limitInDisplayUnits: number): void {
+    const cents = Math.round(Math.max(0, limitInDisplayUnits) * 100);
+    this.creditLimit.set(cents);
     this.emitChange();
   }
 
@@ -189,7 +193,7 @@ export class CreditManagementFormComponent {
 
   private emitChange(): void {
     this.creditChange.emit({
-      creditLimit: this.creditLimit(),
+      creditLimit: this.creditLimit(), // Emit cents
       creditDuration: this.creditDuration(),
       isCreditApproved: this.isCreditApproved(),
     });

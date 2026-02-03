@@ -127,8 +127,8 @@ export function createCreditPaymentHandler(creditService: CreditService): Paymen
         throw new UserInputError('Customer is not approved for credit purchases.');
       }
 
-      if (summary.availableCredit * 100 < order.total) {
-        // summary.availableCredit is in base units; order.total is cents
+      if (summary.availableCredit < order.total) {
+        // Both availableCredit and order.total are in cents
         throw new UserInputError('Customer credit limit exceeded.');
       }
 

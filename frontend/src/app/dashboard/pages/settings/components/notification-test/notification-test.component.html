@@ -1,0 +1,145 @@
+<div class="card bg-base-100 shadow-lg">
+  <div class="card-body p-4 sm:p-6">
+    <!-- Header -->
+    <div class="mb-4">
+      <h2 class="text-lg sm:text-xl font-bold">Notification Testing</h2>
+      <p class="text-sm opacity-60">Monitor and test notification system</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-3 gap-2 sm:gap-4 mb-4">
+      <div class="bg-base-200 rounded-lg p-3 text-center">
+        <div class="text-xl sm:text-2xl font-bold text-primary">{{ totalNotifications() }}</div>
+        <div class="text-xs opacity-60">Total</div>
+        <div class="text-xs opacity-50">{{ unreadNotifications() }} unread</div>
+      </div>
+      <div class="bg-base-200 rounded-lg p-3 text-center">
+        <div class="text-xl sm:text-2xl">
+          @if (isPushEnabled()) {
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-6 w-6 sm:h-8 sm:w-8 mx-auto text-success"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
+              />
+            </svg>
+          } @else {
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-6 w-6 sm:h-8 sm:w-8 mx-auto opacity-50"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
+              />
+            </svg>
+          }
+        </div>
+        <div class="text-xs opacity-60">Push</div>
+        <div class="text-xs opacity-50">{{ isPushEnabled() ? 'On' : 'Off' }}</div>
+      </div>
+      <div class="bg-base-200 rounded-lg p-3 text-center">
+        <div class="text-xl sm:text-2xl">
+          @if (swStatus()) {
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-6 w-6 sm:h-8 sm:w-8 mx-auto text-success"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          } @else {
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-6 w-6 sm:h-8 sm:w-8 mx-auto text-error"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          }
+        </div>
+        <div class="text-xs opacity-60">Worker</div>
+        <div class="text-xs opacity-50">{{ swStatus() ? 'Active' : 'Off' }}</div>
+      </div>
+    </div>
+
+    <!-- Test Buttons -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+      @for (test of testScenarios; track test.type) {
+        <button
+          class="btn btn-sm"
+          [class.btn-primary]="test.type === 'ORDER'"
+          [class.btn-warning]="test.type === 'STOCK'"
+          [class.btn-info]="test.type === 'ML_TRAINING'"
+          [class.btn-success]="test.type === 'PAYMENT'"
+          [disabled]="isLoading()"
+          (click)="triggerServerNotification(test.type)"
+        >
+          @if (isLoading()) {
+            <span class="loading loading-spinner loading-xs"></span>
+          } @else {
+            <span class="hidden sm:inline">{{ test.icon }}</span>
+            {{ test.label }}
+          }
+        </button>
+      }
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="flex flex-wrap gap-2 mb-4">
+      <button
+        class="btn btn-outline btn-xs"
+        [disabled]="isLoading()"
+        (click)="triggerAllServerNotifications()"
+      >
+        @if (isLoading()) {
+          <span class="loading loading-spinner loading-xs"></span>
+        }
+        Trigger All
+      </button>
+      <button class="btn btn-outline btn-xs" (click)="testPushSubscription()">Toggle Push</button>
+      <button class="btn btn-outline btn-xs" (click)="refreshNotifications()">Refresh</button>
+    </div>
+
+    <!-- Activity Log (Collapsible) -->
+    <div class="collapse collapse-arrow bg-base-200">
+      <input type="checkbox" />
+      <div class="collapse-title font-medium py-3 min-h-0">
+        Activity Log ({{ activityLog().length }})
+      </div>
+      <div class="collapse-content">
+        <div class="max-h-48 overflow-y-auto space-y-1 pt-2">
+          @for (log of activityLog(); track log.id) {
+            <div
+              class="flex items-center gap-2 p-2 rounded text-xs"
+              [class.bg-success/20]="log.type === 'success'"
+              [class.bg-warning/20]="log.type === 'warning'"
+              [class.bg-error/20]="log.type === 'error'"
+              [class.bg-info/20]="log.type === 'info'"
+            >
+              <span>{{ log.icon }}</span>
+              <span class="flex-1 truncate">{{ log.message }}</span>
+              <span class="opacity-50 shrink-0">{{ log.timestamp }}</span>
+            </div>
+          } @empty {
+            <div class="text-center py-4 text-xs opacity-60">No activity yet</div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

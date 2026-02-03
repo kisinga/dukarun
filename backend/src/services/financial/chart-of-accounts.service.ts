@@ -318,4 +318,56 @@ export class ChartOfAccountsService {
       );
     }
   }
+
+  /**
+   * Account codes that cannot be used as payment source (debit account).
+   * AR = customer debt; INVENTORY = stock; neither is a source of cash.
+   */
+  private static readonly PAYMENT_SOURCE_EXCLUDED_CODES: readonly string[] = [
+    ACCOUNT_CODES.ACCOUNTS_RECEIVABLE,
+    ACCOUNT_CODES.INVENTORY,
+  ];
+
+  /**
+   * Validate that a debit account code is allowed as a payment source for the channel.
+   * Rule: exists, active, type === asset, non-parent (leaf only), not in exclusion list.
+   *
+   * @param ctx Request context (for channelId)
+   * @param debitAccountCode Account code to validate
+   * @throws Error if account does not exist or is not an allowed payment source
+   */
+  async validatePaymentSourceAccount(ctx: RequestContext, debitAccountCode: string): Promise<void> {
+    if (!debitAccountCode || typeof debitAccountCode !== 'string') {
+      throw new Error('debitAccountCode is required');
+    }
+    const code = debitAccountCode.trim();
+    if (!code) {
+      throw new Error('debitAccountCode is required');
+    }
+    const accountRepo = this.connection.getRepository(ctx, Account);
+    const account = await accountRepo.findOne({
+      where: {
+        channelId: ctx.channelId as number,
+        code,
+      },
+    });
+    if (!account) {
+      throw new Error(
+        `Account ${code} does not exist for this channel. ` +
+          `Initialize Chart of Accounts for this channel.`
+      );
+    }
+    if (!account.isActive) {
+      throw new Error(`Account ${code} is not active for this channel.`);
+    }
+    if (account.type !== 'asset') {
+      throw new Error('Only asset accounts can be used as payment source.');
+    }
+    if (account.isParent) {
+      throw new Error('Cannot use a parent (summary) account as payment source.');
+    }
+    if (ChartOfAccountsService.PAYMENT_SOURCE_EXCLUDED_CODES.includes(code)) {
+      throw new Error(`Account ${code} is not an allowed payment source.`);
+    }
+  }
 }

@@ -10,7 +10,7 @@ import {
   Permission,
 } from '@vendure/core';
 import { AuditService } from '../../infrastructure/audit/audit.service';
-import { SmsService } from '../../infrastructure/sms/sms.service';
+import { CommunicationService } from '../../infrastructure/communication/communication.service';
 import { ROLE_TEMPLATES, RoleTemplate } from '../auth/provisioning/role-provisioner.service';
 import { ChannelService } from '@vendure/core';
 
@@ -46,7 +46,7 @@ export class ChannelAdminService {
     private readonly roleService: RoleService,
     private readonly connection: TransactionalConnection,
     private readonly auditService: AuditService,
-    private readonly smsService: SmsService,
+    private readonly communicationService: CommunicationService,
     private readonly channelService: ChannelService
   ) {}
 
@@ -475,7 +475,12 @@ export class ChannelAdminService {
         ? `Welcome! You've been added as an administrator to ${companyName}. You can now access the dashboard. Go to https://dukarun.com/login to get started.`
         : `Welcome to ${companyName}! You've been added as an administrator. You can now access the dashboard. Go to https://dukarun.com/login to get started.`;
 
-      const result = await this.smsService.sendSms(phoneNumber, message);
+      const result = await this.communicationService.send({
+        channel: 'sms',
+        recipient: phoneNumber,
+        body: message,
+        metadata: { purpose: 'welcome_sms' },
+      });
 
       if (!result.success) {
         this.logger.warn(`Failed to send welcome SMS to ${phoneNumber}: ${result.error}`);

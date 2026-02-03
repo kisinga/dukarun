@@ -28,7 +28,7 @@ services:
       DB_HOST: ${DB_HOST:-postgres_db}
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-vendure}
-      DB_USERNAME: ${DB_USER:-vendure}
+      DB_USERNAME: ${DB_USERNAME:-vendure}
       DB_PASSWORD: ${DB_PASSWORD:-vendure}
       DB_SCHEMA: ${DB_SCHEMA:-public}
 
@@ -36,7 +36,7 @@ services:
       AUDIT_DB_HOST: ${AUDIT_DB_HOST:-timescaledb_audit}
       AUDIT_DB_PORT: 5432
       AUDIT_DB_NAME: ${AUDIT_DB_NAME:-audit_logs}
-      AUDIT_DB_USERNAME: ${AUDIT_DB_USER:-audit_user}
+      AUDIT_DB_USERNAME: ${AUDIT_DB_USERNAME:-audit_user}
       AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:-audit_password}
 
       # Redis configuration - uses service name
@@ -87,6 +87,11 @@ services:
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-info}
 
+      # ML Training configuration
+      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:-}
+      ML_TRAINING_INTERVAL_MINUTES: ${ML_TRAINING_INTERVAL_MINUTES:-60}
+      ML_TRAINING_COOLDOWN_HOURS: ${ML_TRAINING_COOLDOWN_HOURS:-4}
+
     volumes:
       - backend_assets:/app/static/assets
       - backend_uploads:/app/static/uploads
@@ -136,6 +141,27 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  # ========================================
+  # ML Trainer Microservice
+  # ========================================
+  ml-trainer:
+    build:
+      context: ./ml-trainer
+      dockerfile: Dockerfile
+    image: ghcr.io/kisinga/dukarun/ml-trainer:latest
+    restart: unless-stopped
+    networks:
+      - dukarun_services_network
+    environment:
+      ML_PORT: ${ML_PORT:-3005}
+      NODE_ENV: production
+      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:-}
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3005/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 # ========================================
 # Networks

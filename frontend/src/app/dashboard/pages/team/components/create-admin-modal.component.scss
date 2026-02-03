@@ -200,30 +200,23 @@
   h3 {
     font-size: 1rem;
   }
-
   .text-sm {
     font-size: 0.8125rem;
   }
-
   .text-xs {
     font-size: 0.75rem;
   }
-}
-
-// Ensure modal doesn't overflow on small screens
+} // Ensure modal doesn't overflow on small screens
 @media (max-width: 375px) {
   .modal-box {
     margin: 0.5rem;
     max-height: 95vh;
   }
-}
-
-// Desktop enhancements
+} // Desktop enhancements
 @media (min-width: 640px) {
   .modal-box {
     padding: 1.5rem;
   }
-
   .modal-action {
     padding: 1rem 1.5rem;
   }

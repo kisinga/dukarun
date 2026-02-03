@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 import { ISmsProvider, SmsResult } from './interfaces/sms-provider.interface';
 import { SmsProviderFactory } from './sms-provider.factory';
-import { env } from '../config/environment.config';
 
 /**
  * SMS Service
@@ -30,23 +29,7 @@ export class SmsService {
    */
   async sendSms(phoneNumber: string, message: string, isOtp?: boolean): Promise<SmsResult> {
     try {
-      // In development mode, print SMS to console instead of sending
-      if (env.isDevelopment()) {
-        const normalizedPhone = formatPhoneNumber(phoneNumber);
-        this.logger.log('📱 [DEV MODE] SMS would be sent:');
-        this.logger.log(`   To: ${normalizedPhone}`);
-        this.logger.log(`   Message: ${message}`);
-        return {
-          success: true,
-          messageId: 'dev-mode-mock',
-          metadata: {
-            devMode: true,
-            phoneNumber: normalizedPhone,
-            message,
-          },
-        };
-      }
-
+      // Dev gating (log, mock, skip) is handled by CommunicationService; SmsService only performs real send.
       // Normalize phone number to standard format (07XXXXXXXX)
       const normalizedPhone = formatPhoneNumber(phoneNumber);
 

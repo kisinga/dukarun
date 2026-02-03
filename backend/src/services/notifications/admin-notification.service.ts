@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventBus, RequestContext } from '@vendure/core';
 import { env } from '../../infrastructure/config/environment.config';
-import { SmsProviderFactory } from '../../infrastructure/sms/sms-provider.factory';
+import { CommunicationService } from '../../infrastructure/communication/communication.service';
 
 /**
  * Company registration details for admin notification
@@ -30,9 +30,11 @@ export interface CompanyRegistrationDetails {
 @Injectable()
 export class AdminNotificationService {
   private readonly logger = new Logger(AdminNotificationService.name);
-  private readonly smsProviderFactory = new SmsProviderFactory();
 
-  constructor(private readonly eventBus: EventBus) {}
+  constructor(
+    private readonly eventBus: EventBus,
+    private readonly communicationService: CommunicationService
+  ) {}
 
   /**
    * Get configured notification channels
@@ -107,7 +109,7 @@ export class AdminNotificationService {
   }
 
   /**
-   * Send SMS notification to admin
+   * Send SMS notification to admin via CommunicationService (single facade, dev gating in one place).
    */
   private async sendSmsNotification(
     details: CompanyRegistrationDetails,
@@ -118,20 +120,17 @@ export class AdminNotificationService {
 
     this.logger.log(`📱 Sending registration notification SMS to: ${adminPhone}`);
 
-    try {
-      const provider = this.smsProviderFactory.getProvider();
-      const result = await provider.sendSms(adminPhone, message);
+    const result = await this.communicationService.send({
+      channel: 'sms',
+      recipient: adminPhone,
+      body: message,
+      metadata: { purpose: 'admin_notification' },
+    });
 
-      if (result.success) {
-        this.logger.log(`✅ SMS notification sent for: ${details.companyName}`);
-      } else {
-        this.logger.warn(`⚠️ SMS notification failed: ${result.error}`);
-      }
-    } catch (error) {
-      this.logger.error(
-        `Failed to send SMS notification: ${error instanceof Error ? error.message : String(error)}`,
-        error
-      );
+    if (result.success) {
+      this.logger.log(`✅ SMS notification sent for: ${details.companyName}`);
+    } else {
+      this.logger.warn(`⚠️ SMS notification failed: ${result.error}`);
     }
   }
 

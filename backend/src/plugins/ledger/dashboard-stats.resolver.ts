@@ -68,42 +68,42 @@ export class DashboardStatsResolver {
       this.ledgerQueryService.getExpenseTotal(channelId, periods.startOfMonth, endDateStr),
     ]);
 
-    // Convert from cents to currency units and build response
+    // All values in smallest currency unit (cents) - UI layer handles display conversion
     const sales: PeriodStats = {
-      today: salesToday / 100,
-      week: salesWeek / 100,
-      month: salesMonth / 100,
+      today: salesToday,
+      week: salesWeek,
+      month: salesMonth,
       accounts: [
         {
           label: 'Cash Sales',
-          value: salesBreakdownMonth.cashSales / 100,
+          value: salesBreakdownMonth.cashSales,
           icon: '💵',
         },
         {
           label: 'Credit',
-          value: salesBreakdownMonth.creditSales / 100,
+          value: salesBreakdownMonth.creditSales,
           icon: '🏦',
         },
       ],
     };
 
     const purchases: PeriodStats = {
-      today: purchasesToday / 100,
-      week: purchasesWeek / 100,
-      month: purchasesMonth / 100,
+      today: purchasesToday,
+      week: purchasesWeek,
+      month: purchasesMonth,
       accounts: [
         {
           label: 'Inventory',
-          value: purchasesMonth / 100,
+          value: purchasesMonth,
           icon: '📦',
         },
       ],
     };
 
     const expenses: PeriodStats = {
-      today: expensesToday / 100,
-      week: expensesWeek / 100,
-      month: expensesMonth / 100,
+      today: expensesToday,
+      week: expensesWeek,
+      month: expensesMonth,
       accounts: [
         {
           label: 'Rent',
@@ -117,7 +117,7 @@ export class DashboardStatsResolver {
         },
         {
           label: 'Other',
-          value: expensesMonth / 100,
+          value: expensesMonth,
           icon: '📋',
         },
       ],

@@ -204,20 +204,22 @@ export class CartService {
    */
   addItemLocal(variant: ProductVariant, quantity: number): void {
     const items = this.cartItemsSignal();
-    const existingItem = items.find((item) => item.variant.id === variant.id);
+    const existingIndex = items.findIndex((item) => item.variant.id === variant.id);
 
-    if (existingItem) {
-      existingItem.quantity += quantity;
-      existingItem.subtotal = existingItem.quantity * variant.priceWithTax;
-    } else {
-      items.push({
-        variant,
-        quantity,
-        subtotal: quantity * variant.priceWithTax,
-      });
-    }
+    const newItems =
+      existingIndex >= 0
+        ? items.map((item, i) =>
+            i === existingIndex
+              ? {
+                  ...item,
+                  quantity: item.quantity + quantity,
+                  subtotal: (item.quantity + quantity) * variant.priceWithTax,
+                }
+              : item,
+          )
+        : [...items, { variant, quantity, subtotal: quantity * variant.priceWithTax }];
 
-    this.cartItemsSignal.set([...items]);
+    this.cartItemsSignal.set(newItems);
     this.persistCart();
   }
 
@@ -227,17 +229,18 @@ export class CartService {
   updateItemQuantityLocal(variantId: string, quantity: number): void {
     const items = this.cartItemsSignal();
     const item = items.find((i) => i.variant.id === variantId);
-
-    if (item) {
-      if (quantity <= 0) {
-        this.removeItemLocal(variantId);
-      } else {
-        item.quantity = quantity;
-        item.subtotal = quantity * item.variant.priceWithTax;
-        this.cartItemsSignal.set([...items]);
-        this.persistCart();
-      }
+    if (!item) return;
+    if (quantity <= 0) {
+      this.removeItemLocal(variantId);
+      return;
     }
+    const newItems = items.map((i) =>
+      i.variant.id === variantId
+        ? { ...i, quantity, subtotal: quantity * i.variant.priceWithTax }
+        : i,
+    );
+    this.cartItemsSignal.set(newItems);
+    this.persistCart();
   }
 
   /**

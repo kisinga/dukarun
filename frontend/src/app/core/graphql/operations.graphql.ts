@@ -161,6 +161,17 @@ export const UPDATE_ADMINISTRATOR = graphql(`
   }
 `);
 
+export const UPDATE_ADMIN_PROFILE = graphql(`
+  mutation UpdateAdminProfile($input: UpdateAdminProfileInput!) {
+    updateAdminProfile(input: $input) {
+      id
+      firstName
+      lastName
+      emailAddress
+    }
+  }
+`);
+
 export const GET_USER_CHANNELS = graphql(`
   query GetUserChannels {
     me {
@@ -586,6 +597,7 @@ export const GET_PRODUCT = graphql(`
         sku
         price
         priceWithTax
+        trackInventory
         prices {
           price
           currencyCode
@@ -593,6 +605,10 @@ export const GET_PRODUCT = graphql(`
         stockLevels {
           stockLocationId
           stockOnHand
+        }
+        customFields {
+          wholesalePrice
+          allowFractionalQuantity
         }
       }
     }
@@ -1386,6 +1402,12 @@ export const EXTRACT_PHOTOS_FOR_TRAINING = graphql(`
 export const UPDATE_TRAINING_STATUS = graphql(`
   mutation UpdateTrainingStatus($channelId: ID!, $status: String!, $progress: Int, $error: String) {
     updateTrainingStatus(channelId: $channelId, status: $status, progress: $progress, error: $error)
+  }
+`);
+
+export const START_TRAINING = graphql(`
+  mutation StartTraining($channelId: ID!) {
+    startTraining(channelId: $channelId)
   }
 `);
 
@@ -2416,6 +2438,23 @@ export const GET_STOCK_ADJUSTMENTS = graphql(`
 export const GET_LEDGER_ACCOUNTS = graphql(`
   query GetLedgerAccounts {
     ledgerAccounts {
+      items {
+        id
+        code
+        name
+        type
+        isActive
+        balance
+        parentAccountId
+        isParent
+      }
+    }
+  }
+`);
+
+export const GET_PAYMENT_SOURCE_ACCOUNTS = graphql(`
+  query GetPaymentSourceAccounts {
+    paymentSourceAccounts {
       items {
         id
         code

@@ -181,7 +181,7 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
                   <div class="flex-1 min-w-0">
                     <p class="text-xs text-base-content/60 truncate">Outstanding</p>
                     <p class="text-lg lg:text-xl font-bold text-error tracking-tight">
-                      {{ currencyService.format(statsData.totalOutstanding * 100) }}
+                      {{ currencyService.format(statsData.totalOutstanding) }}
                     </p>
                   </div>
                 </div>
@@ -215,7 +215,7 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
                   <div class="flex-1 min-w-0">
                     <p class="text-xs text-base-content/60 truncate">Total Limit</p>
                     <p class="text-lg lg:text-xl font-bold text-primary tracking-tight">
-                      {{ currencyService.format(statsData.totalLimit * 100) }}
+                      {{ currencyService.format(statsData.totalLimit) }}
                     </p>
                   </div>
                 </div>
@@ -357,19 +357,19 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
                     <div>
                       <p class="text-xs text-base-content/60">Outstanding</p>
                       <p class="text-sm font-semibold text-error">
-                        {{ currencyService.format(customer.outstandingAmount * 100) }}
+                        {{ currencyService.format(customer.outstandingAmount) }}
                       </p>
                     </div>
                     <div>
                       <p class="text-xs text-base-content/60">Limit</p>
                       <p class="text-sm font-semibold">
-                        {{ currencyService.format(customer.creditLimit * 100) }}
+                        {{ currencyService.format(customer.creditLimit) }}
                       </p>
                     </div>
                     <div>
                       <p class="text-xs text-base-content/60">Available</p>
                       <p class="text-sm font-semibold text-success">
-                        {{ currencyService.format(customer.availableCredit * 100) }}
+                        {{ currencyService.format(customer.availableCredit) }}
                       </p>
                     </div>
                   </div>
@@ -442,7 +442,7 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
                       </td>
                       <td class="text-right">
                         <span class="text-error font-medium">{{
-                          currencyService.format(customer.outstandingAmount * 100)
+                          currencyService.format(customer.outstandingAmount)
                         }}</span>
                       </td>
                       <td class="text-right">
@@ -475,7 +475,7 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
                           </div>
                         } @else {
                           <div class="flex items-center justify-end gap-2">
-                            <span>{{ currencyService.format(customer.creditLimit * 100) }}</span>
+                            <span>{{ currencyService.format(customer.creditLimit) }}</span>
                             <button
                               class="btn btn-ghost btn-xs"
                               (click)="startEditingLimit(customer)"
@@ -487,7 +487,7 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
                       </td>
                       <td class="text-right">
                         <span class="text-success font-medium">{{
-                          currencyService.format(customer.availableCredit * 100)
+                          currencyService.format(customer.availableCredit)
                         }}</span>
                       </td>
                       <td>
@@ -654,7 +654,7 @@ export class CreditComponent implements OnInit {
 
   startEditingLimit(customer: CreditCustomerSummary): void {
     this.editingLimitCustomerId.set(customer.id);
-    this.editLimitValue.set(customer.creditLimit);
+    this.editLimitValue.set(customer.creditLimit / 100); // Display units for input
     this.stopEditingDuration();
   }
 
@@ -733,7 +733,7 @@ export class CreditComponent implements OnInit {
   }
 
   async saveLimit(customer: CreditCustomerSummary): Promise<void> {
-    const newLimit = Math.max(this.editLimitValue(), 0);
+    const newLimit = Math.round(Math.max(this.editLimitValue(), 0) * 100); // Convert to cents
     this.actionInProgress.set(customer.id);
     try {
       const updated = await this.customerService.updateCustomerCreditLimit(

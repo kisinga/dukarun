@@ -17,6 +17,7 @@ export const PAYMENT_ALLOCATION_SCHEMA = gql`
     customerId: ID!
     paymentAmount: Float!
     orderIds: [ID!]
+    debitAccountCode: String
   }
 
   extend type Query {

@@ -90,10 +90,31 @@ export class CompanyService {
   /**
    * Company logo URL for the active channel (proxy-compatible)
    * Helper method to get the logo URL directly
+   * Uses preview URL first (public, no auth needed), falls back to source URL
+   * Matches the pattern used for user profile photos
    */
   readonly companyLogoUrl = computed(() => {
     const logoAsset = this.companyLogoAsset();
-    if (!logoAsset?.source) return null;
+    if (!logoAsset) return null;
+
+    // Prefer preview URL (public, works without authentication)
+    // This matches the pattern used for user profile photos
+    if (logoAsset.preview) {
+      // Preview URLs are already full URLs or relative paths from Vendure
+      // Handle proxy-compatible URLs
+      if (logoAsset.preview.startsWith('http://') || logoAsset.preview.startsWith('https://')) {
+        const url = new URL(logoAsset.preview);
+        return url.pathname; // Extract path for proxy compatibility
+      }
+      // Handle relative paths
+      if (logoAsset.preview.startsWith('/')) {
+        return logoAsset.preview;
+      }
+      return logoAsset.preview;
+    }
+
+    // Fallback to source URL if preview not available
+    if (!logoAsset.source) return null;
 
     // Handle proxy-compatible URLs
     if (logoAsset.source.startsWith('http://') || logoAsset.source.startsWith('https://')) {
@@ -224,16 +245,20 @@ export class CompanyService {
         fetchPolicy: 'network-only',
       });
 
-      console.log('📦 Active channel data:', result.data);
+      if (typeof ngDevMode !== 'undefined' && ngDevMode) {
+        console.log('📦 Active channel data:', result.data);
+      }
 
       if (result.data?.activeChannel) {
         this.activeChannelDataSignal.set(result.data.activeChannel);
         this.persistSession();
 
-        console.log('✅ Channel data cached:', {
-          mlModelConfigured: !!result.data.activeChannel.customFields?.mlModelJsonAsset,
-          companyLogoConfigured: !!result.data.activeChannel.customFields?.companyLogoAsset,
-        });
+        if (typeof ngDevMode !== 'undefined' && ngDevMode) {
+          console.log('✅ Channel data cached:', {
+            mlModelConfigured: !!result.data.activeChannel.customFields?.mlModelJsonAsset,
+            companyLogoConfigured: !!result.data.activeChannel.customFields?.companyLogoAsset,
+          });
+        }
       }
     } catch (error: any) {
       console.error('❌ Failed to fetch active channel:', error);
@@ -247,7 +272,9 @@ export class CompanyService {
    */
   async fetchUserChannels(): Promise<void> {
     this.isLoadingSignal.set(true);
-    console.log('📦 Fetching user channels...');
+    if (typeof ngDevMode !== 'undefined' && ngDevMode) {
+      console.log('📦 Fetching user channels...');
+    }
 
     try {
       const client = this.apolloService.getClient();
@@ -257,9 +284,11 @@ export class CompanyService {
         context: { skipChannelToken: true },
       });
 
-      console.log('📦 Full result:', result);
-      console.log('📦 Channel fetch data:', result.data);
-      console.log('📦 Channel fetch error:', result.error);
+      if (typeof ngDevMode !== 'undefined' && ngDevMode) {
+        console.log('📦 Full result:', result);
+        console.log('📦 Channel fetch data:', result.data);
+        console.log('📦 Channel fetch error:', result.error);
+      }
 
       if (result.data?.me?.channels) {
         this.setCompaniesFromChannels(result.data.me.channels);

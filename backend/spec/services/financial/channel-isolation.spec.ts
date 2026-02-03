@@ -1,182 +1,208 @@
-import { describe, expect, it, beforeEach } from '@jest/globals';
+/**
+ * Channel Isolation Tests
+ *
+ * Verifies that ledger and session operations are isolated by channel:
+ * - PostingService loads accounts by payload.channelId and rejects when accounts missing for that channel
+ * - Sessions and currentCashierSession are keyed by channelId
+ * - paymentSourceAccounts uses ctx.channelId so each channel sees only its accounts
+ *
+ * Implemented with mocks (no DB) to assert channelId is always used and never mixed.
+ */
+
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { RequestContext, TransactionalConnection } from '@vendure/core';
 import { Account } from '../../../src/ledger/account.entity';
 import { JournalEntry } from '../../../src/ledger/journal-entry.entity';
 import { JournalLine } from '../../../src/ledger/journal-line.entity';
+import { PeriodLock } from '../../../src/domain/period/period-lock.entity';
 import { PostingService, PostingPayload } from '../../../src/ledger/posting.service';
 import { ACCOUNT_CODES } from '../../../src/ledger/account-codes.constants';
+import { CashierSessionService } from '../../../src/services/financial/cashier-session.service';
+import { CashierSession } from '../../../src/domain/cashier/cashier-session.entity';
+import { LedgerViewerResolver } from '../../../src/plugins/ledger/ledger-viewer.resolver';
 
-/**
- * Channel Isolation Tests
- *
- * These tests verify that ledger operations are properly isolated by channel:
- * - Accounts cannot be queried across channels
- * - Journal entries are channel-scoped
- * - Posting operations validate channel boundaries
- *
- * Note: These tests require a database connection and should be run as integration tests.
- * Currently these are placeholder tests that need proper test harness setup.
- */
-describe.skip('Ledger Channel Isolation', () => {
-  let connection!: TransactionalConnection;
-  let postingService!: PostingService;
-  let ctx!: RequestContext;
+describe('Ledger Channel Isolation', () => {
+  const channel1Id = 1;
+  const channel2Id = 2;
 
-  beforeEach(async () => {
-    // TODO: Set up proper test harness with database connection
-    // Example setup:
-    // const module = await Test.createTestingModule({
-    //   providers: [
-    //     PostingService,
-    //     TransactionalConnection,
-    //     // ... other dependencies
-    //   ],
-    // }).compile();
-    //
-    // postingService = module.get<PostingService>(PostingService);
-    // connection = module.get<TransactionalConnection>(TransactionalConnection);
-    // ctx = await createTestRequestContext(module);
-  });
+  describe('PostingService: accounts and payload channelId', () => {
+    let postingService: PostingService;
+    let mockConnection: any;
+    let mockAccountRepo: any;
+    let mockJournalEntryRepo: any;
+    let mockJournalLineRepo: any;
+    let mockPeriodLockRepo: any;
 
-  describe('Account Isolation', () => {
-    it('should not allow querying accounts from different channel', async () => {
-      const channel1Id = 993;
-      const channel2Id = 992;
-
-      const accountRepo = connection.getRepository(ctx, Account);
-
-      // Create accounts for both channels (would need ChartOfAccountsService)
-      // For this test, assume accounts exist
-
-      // Query channel1 accounts
-      const channel1Accounts = await accountRepo.find({
-        where: { channelId: channel1Id },
+    beforeEach(() => {
+      mockAccountRepo = {
+        createQueryBuilder: jest.fn(),
+      };
+      mockJournalEntryRepo = {
+        findOne: jest.fn().mockImplementation(() => Promise.resolve(null)),
+        create: jest.fn(),
+        save: jest.fn(),
+      } as any;
+      mockJournalLineRepo = {
+        create: jest.fn(),
+        save: jest.fn(),
+      } as any;
+      mockPeriodLockRepo = {
+        findOne: jest.fn().mockImplementation(() => Promise.resolve(null)),
+      } as any;
+      const mockGetMany = jest.fn();
+      const mockWhere = jest.fn().mockReturnThis();
+      const mockAndWhere = jest.fn().mockReturnThis();
+      mockAccountRepo.createQueryBuilder.mockReturnValue({
+        where: mockWhere,
+        andWhere: mockAndWhere,
+        getMany: mockGetMany,
       });
-
-      // Query channel2 accounts
-      const channel2Accounts = await accountRepo.find({
-        where: { channelId: channel2Id },
-      });
-
-      // Verify isolation - no cross-channel accounts
-      const channel1Ids = new Set(channel1Accounts.map(a => a.id));
-      const channel2Ids = new Set(channel2Accounts.map(a => a.id));
-
-      const intersection = [...channel1Ids].filter(id => channel2Ids.has(id));
-      expect(intersection.length).toBe(0);
+      mockConnection = {
+        withTransaction: jest.fn((_ctx: any, fn: (t: any) => Promise<any>) => fn(_ctx)),
+        getRepository: jest.fn((_ctx: any, entity: any) => {
+          if (entity === Account) return mockAccountRepo;
+          if (entity === JournalEntry) return mockJournalEntryRepo;
+          if (entity === JournalLine) return mockJournalLineRepo;
+          if (entity === PeriodLock) return mockPeriodLockRepo;
+          return {};
+        }),
+      };
+      postingService = new PostingService(mockConnection);
     });
 
-    it('should reject account queries without channelId filter', async () => {
-      // This test verifies that queries always include channelId
-      // In practice, this is enforced by:
-      // 1. Service layer always requiring channelId
-      // 2. Database constraints
-      // 3. Query builder patterns
-
-      const accountRepo = connection.getRepository(ctx, Account);
-
-      // Attempting to query without channelId should either:
-      // - Require explicit channelId (service layer)
-      // - Return empty/error (if enforced)
-
-      // Note: TypeORM allows queries without where clauses, but our services
-      // should always require channelId. This test documents that expectation.
-    });
-  });
-
-  describe('Journal Entry Isolation', () => {
-    it('should isolate journal entries by channel', async () => {
-      const channel1Id = 991;
-      const channel2Id = 990;
-
-      const entryRepo = connection.getRepository(ctx, JournalEntry);
-
-      // Create entries for both channels (would need PostingService)
-      // For this test, assume entries exist
-
-      // Query channel1 entries
-      const channel1Entries = await entryRepo.find({
-        where: { channelId: channel1Id },
-      });
-
-      // Query channel2 entries
-      const channel2Entries = await entryRepo.find({
-        where: { channelId: channel2Id },
-      });
-
-      // Verify isolation
-      const channel1Ids = new Set(channel1Entries.map(e => e.id));
-      const channel2Ids = new Set(channel2Entries.map(e => e.id));
-
-      const intersection = [...channel1Ids].filter(id => channel2Ids.has(id));
-      expect(intersection.length).toBe(0);
-    });
-
-    it('should reject posting with wrong channelId', async () => {
-      const channel1Id = 989;
-      const channel2Id = 988;
-
-      // Create account for channel1
-      // Attempt to post with channel2 context but channel1 account
-
+    it('should load accounts by payload.channelId and reject when accounts missing for that channel', async () => {
+      const ctx = { channelId: channel1Id } as RequestContext;
       const payload: PostingPayload = {
-        channelId: channel2Id, // Wrong channel
+        channelId: channel2Id,
         entryDate: new Date().toISOString().slice(0, 10),
         lines: [
-          {
-            accountCode: ACCOUNT_CODES.CASH_ON_HAND, // Account from channel1
-            debit: 1000,
-          },
-          {
-            accountCode: ACCOUNT_CODES.SALES,
-            credit: 1000,
-          },
+          { accountCode: ACCOUNT_CODES.CASH_ON_HAND, debit: 1000 },
+          { accountCode: ACCOUNT_CODES.SALES, credit: 1000 },
         ],
       };
+      const getMany = mockAccountRepo.createQueryBuilder().getMany;
+      getMany.mockResolvedValue([]);
 
-      // This should fail because account doesn't exist for channel2
       await expect(postingService.post(ctx, 'Test', 'test-1', payload)).rejects.toThrow(
         /Missing accounts/
+      );
+
+      const whereCall = mockAccountRepo.createQueryBuilder().where.mock.calls[0];
+      expect(whereCall[0]).toContain('channelId');
+      expect(whereCall[1]).toEqual({ channelId: channel2Id });
+    });
+
+    it('should use payload.channelId for idempotency lookup', async () => {
+      const ctx = { channelId: channel1Id } as RequestContext;
+      const payload: PostingPayload = {
+        channelId: channel1Id,
+        entryDate: new Date().toISOString().slice(0, 10),
+        lines: [
+          { accountCode: ACCOUNT_CODES.CASH_ON_HAND, debit: 1000 },
+          { accountCode: ACCOUNT_CODES.SALES, credit: 1000 },
+        ],
+      };
+      const getMany = mockAccountRepo.createQueryBuilder().getMany;
+      getMany.mockResolvedValue([
+        { id: 'a1', code: ACCOUNT_CODES.CASH_ON_HAND, isParent: false },
+        { id: 'a2', code: ACCOUNT_CODES.SALES, isParent: false },
+      ]);
+      mockJournalEntryRepo.create.mockImplementation((o: any) => ({ ...o }));
+      mockJournalLineRepo.create.mockImplementation((o: any) => ({ ...o }));
+      mockJournalEntryRepo.save.mockImplementation((e: any) =>
+        Promise.resolve({ ...e, id: 'je-1' })
+      );
+      mockJournalLineRepo.save.mockImplementation((l: any) => Promise.resolve(l));
+
+      await postingService.post(ctx, 'Test', 'test-1', payload);
+
+      expect(mockJournalEntryRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            channelId: channel1Id,
+          }),
+        })
       );
     });
   });
 
-  describe('Journal Line Isolation', () => {
-    it('should isolate journal lines by channel', async () => {
-      const channel1Id = 987;
-      const channel2Id = 986;
+  describe('Session isolation by channelId', () => {
+    it('getCurrentSession returns session for requested channel only', async () => {
+      const session1 = {
+        id: 's1',
+        channelId: channel1Id,
+        status: 'open',
+      } as CashierSession;
+      const session2 = {
+        id: 's2',
+        channelId: channel2Id,
+        status: 'open',
+      } as CashierSession;
+      const mockSessionRepo = {
+        findOne: jest.fn().mockImplementation((opts: any) => {
+          const ch = opts?.where?.channelId;
+          if (ch === channel1Id) return Promise.resolve(session1);
+          if (ch === channel2Id) return Promise.resolve(session2);
+          return Promise.resolve(null);
+        }),
+      };
+      const mockConnection = {
+        getRepository: jest.fn(() => mockSessionRepo),
+      } as any;
+      const mockLedgerQueryService = { getCashierSessionTotals: jest.fn() } as any;
+      const mockReconciliationService = { createReconciliation: jest.fn() } as any;
+      const service = new CashierSessionService(
+        mockConnection,
+        mockLedgerQueryService,
+        mockReconciliationService
+      );
+      const ctx1 = { channelId: channel1Id } as RequestContext;
+      const ctx2 = { channelId: channel2Id } as RequestContext;
 
-      const lineRepo = connection.getRepository(ctx, JournalLine);
+      const current1 = await service.getCurrentSession(ctx1, channel1Id);
+      const current2 = await service.getCurrentSession(ctx2, channel2Id);
 
-      // Query lines for each channel
-      const channel1Lines = await lineRepo.find({
-        where: { channelId: channel1Id },
-      });
-
-      const channel2Lines = await lineRepo.find({
-        where: { channelId: channel2Id },
-      });
-
-      // Verify isolation
-      const channel1Ids = new Set(channel1Lines.map(l => l.id));
-      const channel2Ids = new Set(channel2Lines.map(l => l.id));
-
-      const intersection = [...channel1Ids].filter(id => channel2Ids.has(id));
-      expect(intersection.length).toBe(0);
+      expect(current1?.id).toBe('s1');
+      expect(current2?.id).toBe('s2');
+      expect(current1?.channelId).toBe(channel1Id);
+      expect(current2?.channelId).toBe(channel2Id);
     });
   });
 
-  describe('Balance Query Isolation', () => {
-    it('should return balances only for specified channel', async () => {
-      // This test would verify that balance queries are channel-scoped
-      // Would need LedgerQueryService or AccountBalanceService
+  describe('paymentSourceAccounts uses ctx.channelId', () => {
+    it('resolver queries accounts with channelId from context', async () => {
+      const mockAccountRepo = {
+        find: jest.fn().mockImplementation((opts: any) => {
+          expect(opts.where.channelId).toBeDefined();
+          return Promise.resolve([
+            {
+              id: '1',
+              code: ACCOUNT_CODES.CASH_ON_HAND,
+              name: 'Cash',
+              type: 'asset',
+              isActive: true,
+              isParent: false,
+              channelId: opts.where.channelId,
+            },
+          ]);
+        }),
+      };
+      const mockDataSource = { getRepository: jest.fn(() => mockAccountRepo) } as any;
+      const mockLedgerQueryService = {
+        getAccountBalance: jest.fn().mockImplementation(() => Promise.resolve({ balance: 0 })),
+      } as any;
+      const resolver = new LedgerViewerResolver(mockDataSource, mockLedgerQueryService);
+      const ctx = { channelId: channel1Id } as RequestContext;
 
-      const channel1Id = 985;
-      const channel2Id = 984;
+      await resolver.paymentSourceAccounts(ctx);
 
-      // Create entries for both channels with different amounts
-      // Query balances for each channel
-      // Verify balances are independent
+      expect(mockAccountRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            channelId: channel1Id,
+          }),
+        })
+      );
     });
   });
 });

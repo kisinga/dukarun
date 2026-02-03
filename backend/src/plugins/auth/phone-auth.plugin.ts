@@ -1,14 +1,18 @@
 import { NativeAuthenticationStrategy, PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
-import { SmsProviderFactory } from '../../infrastructure/sms/sms-provider.factory';
-import { SmsService } from '../../infrastructure/sms/sms.service';
+import { CommunicationPlugin } from '../communication/communication.plugin';
 import { RegistrationStorageService } from '../../infrastructure/storage/registration-storage.service';
 import { ChannelAccessGuardService } from '../../services/auth/channel-access-guard.service';
 import { OtpService } from '../../services/auth/otp.service';
 import { PhoneAuthService } from '../../services/auth/phone-auth.service';
 import { RegistrationService } from '../../services/auth/registration.service';
 import { OtpTokenAuthStrategy } from './otp-token-auth.strategy';
-import { PhoneAuthResolver, phoneAuthSchema } from './phone-auth.resolver';
+import {
+  PhoneAuthAdminResolver,
+  PhoneAuthCommonResolver,
+  phoneAuthAdminSchema,
+  phoneAuthShopSchema,
+} from './phone-auth.resolvers';
 // Registration Provisioning Services
 import { AccessProvisionerService } from '../../services/auth/provisioning/access-provisioner.service';
 import { ChannelAssignmentService } from '../../services/auth/provisioning/channel-assignment.service';
@@ -24,11 +28,8 @@ import { ChartOfAccountsService } from '../../services/financial/chart-of-accoun
 import { ProvisioningContextAdapter } from '../../services/provisioning/context-adapter.service';
 
 @VendurePlugin({
-  imports: [PluginCommonModule],
+  imports: [PluginCommonModule, CommunicationPlugin],
   providers: [
-    // SMS Provider Infrastructure
-    SmsProviderFactory,
-    SmsService,
     // Registration Infrastructure
     RegistrationService,
     RegistrationStorageService,
@@ -47,7 +48,9 @@ import { ProvisioningContextAdapter } from '../../services/provisioning/context-
     AccessProvisionerService,
     ChartOfAccountsService,
     // Phone Auth Infrastructure
-    PhoneAuthResolver,
+    PhoneAuthCommonResolver,
+    // Note: PhoneAuthAdminResolver is NOT in providers - only in adminApiExtensions.resolvers
+    // to prevent NestJS from discovering its mutations globally (shop API doesn't have updateAdminProfile)
     PhoneAuthService,
     ChannelAccessGuardService,
     OtpService,
@@ -91,12 +94,12 @@ import { ProvisioningContextAdapter } from '../../services/provisioning/context-
     return config;
   },
   adminApiExtensions: {
-    resolvers: [PhoneAuthResolver],
-    schema: phoneAuthSchema,
+    resolvers: [PhoneAuthCommonResolver, PhoneAuthAdminResolver],
+    schema: phoneAuthAdminSchema,
   },
   shopApiExtensions: {
-    resolvers: [PhoneAuthResolver],
-    schema: phoneAuthSchema,
+    resolvers: [PhoneAuthCommonResolver],
+    schema: phoneAuthShopSchema,
   },
   compatibility: VENDURE_COMPATIBILITY_VERSION,
 })

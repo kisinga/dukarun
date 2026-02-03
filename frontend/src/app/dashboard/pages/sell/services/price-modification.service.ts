@@ -5,94 +5,96 @@ export interface PriceModificationResult {
   reason: string;
 }
 
+const MAX_STACK_SIZE = 10;
+const INCREASE_FACTOR = 1.03;
+const DECREASE_FACTOR = 0.97;
+
 /**
- * Service for managing price modifications with stack-based undo/redo behavior.
- * 
- * Stack behavior:
- * - Increase: Always pushes current price to undo stack, then calculates new increased price
- * - Decrease: If undo stack has items, pops from undo stack (goes back). Otherwise, pushes current to undo stack and calculates new decreased price
- * 
+ * Compute next increased price (3% up, rounded). Input and output in cents.
+ */
+export function computeNextIncrease(current: number): number {
+  return Math.round(current * INCREASE_FACTOR);
+}
+
+/**
+ * Compute next decreased price (3% down, rounded), floored at floorCents. Input and output in cents.
+ */
+export function computeNextDecrease(current: number, floorCents: number): number {
+  const next = Math.round(current * DECREASE_FACTOR);
+  return next < floorCents ? floorCents : next;
+}
+
+/**
+ * Service for managing price modifications with a single LIFO stack.
+ *
+ * Invariant: stack[0] is always the reference/base value. Direction (above/below base)
+ * is inferred from latest vs base. UP/DOWN map to extend (push) or backtrack (pop).
+ *
+ * - At base (len === 1): UP extends with +3%, DOWN extends with -3% (floored at wholesale)
+ * - Above base (latest > base): UP extends, DOWN backtracks (pop)
+ * - Below base (latest < base): UP backtracks (pop), DOWN extends (with floor)
+ *
  * Context types:
- * - 'unit': For unit price modifications (modal)
- * - 'line': For line price modifications (cart)
+ * - 'unit': For unit price modifications (modal), quantity = 1
+ * - 'line': For line price modifications (cart), floor = wholesale * quantity
  */
 @Injectable({
   providedIn: 'root',
 })
 export class PriceModificationService {
-  // Price modification undo/redo buffers (per variant and context)
-  private priceUndoStacks = new Map<string, number[]>();
-  private priceRedoStacks = new Map<string, number[]>();
+  private readonly stacks = new Map<string, number[]>();
 
-  /**
-   * Get stack key for a variant and context
-   */
   private getStackKey(variantId: string, context: 'unit' | 'line' = 'line'): string {
     return `${variantId}:${context}`;
   }
 
-  /**
-   * Increase price by 3%
-   * If undo stack has items, pops from undo stack (goes back in history).
-   * Otherwise, pushes current to undo stack and calculates new increased price.
-   * Limited to 10 steps maximum. Shares the same stack with decrease.
-   */
+  private getOrInitStack(stackKey: string, currentPriceCents: number): number[] {
+    let stack = this.stacks.get(stackKey);
+    if (!stack) {
+      stack = [currentPriceCents];
+      this.stacks.set(stackKey, stack);
+    }
+    return stack;
+  }
+
   increasePrice(
     variantId: string,
     currentPriceCents: number,
     context: 'unit' | 'line' = 'line',
   ): PriceModificationResult | null {
     const stackKey = this.getStackKey(variantId, context);
+    const stack = this.getOrInitStack(stackKey, currentPriceCents);
 
-    // Initialize stacks if needed
-    if (!this.priceUndoStacks.has(stackKey)) {
-      this.priceUndoStacks.set(stackKey, []);
-    }
-    if (!this.priceRedoStacks.has(stackKey)) {
-      this.priceRedoStacks.set(stackKey, []);
-    }
+    const base = stack[0];
+    const latest = stack[stack.length - 1];
+    const atBase = stack.length === 1;
+    const aboveBase = latest > base;
 
-    const undoStack = this.priceUndoStacks.get(stackKey)!;
-    const redoStack = this.priceRedoStacks.get(stackKey)!;
-
-    // If there's something in undo stack, pop from undo stack (go back in history)
-    if (undoStack.length > 0) {
-      // Move current price to redo stack
-      redoStack.push(currentPriceCents);
-      // Pop previous price from undo stack and restore
-      const previousPrice = undoStack.pop()!;
-      return {
-        newPrice: previousPrice,
-        reason: 'Price restored',
-      };
+    if (atBase || aboveBase) {
+      if (stack.length >= MAX_STACK_SIZE) return null;
+      const next = computeNextIncrease(latest);
+      stack.push(next);
+      return { newPrice: next, reason: '3% increase' };
     } else {
-      // No undo available, apply increase
-      // Check if stack is at maximum (10 steps)
-      if (undoStack.length >= 10) {
-        // At maximum, decline the action
-        return null;
-      }
-
-      // Store current price in undo stack before increasing
-      undoStack.push(currentPriceCents);
-      // Clear redo stack (new action invalidates redo)
-      redoStack.length = 0;
-      // Apply 3% increase, then round to nearest whole number (no cents)
-      const newPriceCents = Math.round(currentPriceCents * 1.03);
-
-      return {
-        newPrice: newPriceCents,
-        reason: '3% increase',
-      };
+      stack.pop();
+      const newTop = stack[stack.length - 1];
+      return { newPrice: newTop, reason: 'Price restored' };
     }
   }
 
   /**
-   * Decrease price by 3%
-   * If undo stack has items, pops from undo stack (goes back in history).
-   * Otherwise, pushes current to undo stack and calculates new decreased price.
-   * Respects wholesale price limit (per-item comparison) and stack size limit (10 steps).
+   * Current displayed price for a variant/context. Returns stack top if stack exists, else basePriceCents.
    */
+  getCurrentPrice(
+    variantId: string,
+    context: 'unit' | 'line' = 'line',
+    basePriceCents: number,
+  ): number {
+    const stack = this.stacks.get(this.getStackKey(variantId, context));
+    if (!stack || stack.length === 0) return basePriceCents;
+    return stack[stack.length - 1];
+  }
+
   decreasePrice(
     variantId: string,
     currentPriceCents: number,
@@ -101,94 +103,52 @@ export class PriceModificationService {
     context: 'unit' | 'line' = 'line',
   ): PriceModificationResult | null {
     const stackKey = this.getStackKey(variantId, context);
+    const stack = this.getOrInitStack(stackKey, currentPriceCents);
 
-    // Initialize stacks if needed
-    if (!this.priceUndoStacks.has(stackKey)) {
-      this.priceUndoStacks.set(stackKey, []);
-    }
-    if (!this.priceRedoStacks.has(stackKey)) {
-      this.priceRedoStacks.set(stackKey, []);
-    }
+    const base = stack[0];
+    const latest = stack[stack.length - 1];
+    const atBase = stack.length === 1;
+    const aboveBase = latest > base;
 
-    const undoStack = this.priceUndoStacks.get(stackKey)!;
-    const redoStack = this.priceRedoStacks.get(stackKey)!;
+    const floor = wholesalePriceCents != null ? wholesalePriceCents * quantity : -Infinity;
 
-    // If there's something in undo stack, pop from undo stack (go back in history)
-    if (undoStack.length > 0) {
-      // Move current price to redo stack
-      redoStack.push(currentPriceCents);
-      // Pop previous price from undo stack and restore
-      const previousPrice = undoStack.pop()!;
-      return {
-        newPrice: previousPrice,
-        reason: 'Price restored',
-      };
+    if (atBase || !aboveBase) {
+      if (latest <= floor) return null;
+      if (stack.length >= MAX_STACK_SIZE) return null;
+      const next = computeNextDecrease(latest, floor);
+      stack.push(next);
+      return { newPrice: next, reason: '3% decrease' };
     } else {
-      // No undo available, apply decrease
-      // Check if stack is at maximum (10 steps)
-      if (undoStack.length >= 10) {
-        // At maximum, decline the action
-        return null;
-      }
-
-      // Calculate new decreased price (3% decrease)
-      let newPriceCents = Math.round(currentPriceCents * 0.97);
-
-      // Calculate price per item to compare with wholesale price (which is per-item)
-      const pricePerItem = newPriceCents / quantity;
-
-      // Check if price per item would be at or below wholesale price (per-item)
-      if (wholesalePriceCents && pricePerItem <= wholesalePriceCents) {
-        // Set price to wholesale price * quantity (rounded to whole number)
-        newPriceCents = Math.round(wholesalePriceCents * quantity);
-      }
-
-      // Store current price in undo stack before decreasing
-      undoStack.push(currentPriceCents);
-      // Clear redo stack (new action invalidates redo)
-      redoStack.length = 0;
-
-      // Return new price (already rounded to whole number)
-      return {
-        newPrice: newPriceCents,
-        reason: '3% decrease',
-      };
+      stack.pop();
+      const newTop = stack[stack.length - 1];
+      return { newPrice: newTop, reason: 'Price restored' };
     }
   }
 
-  /**
-   * Clear undo/redo stacks for a variant (e.g., when quantity changes)
-   * Clears both unit and line price stacks for the variant
-   */
   clearStacks(variantId: string): void {
-    const unitKey = this.getStackKey(variantId, 'unit');
-    const lineKey = this.getStackKey(variantId, 'line');
-    this.priceUndoStacks.delete(unitKey);
-    this.priceRedoStacks.delete(unitKey);
-    this.priceUndoStacks.delete(lineKey);
-    this.priceRedoStacks.delete(lineKey);
+    this.stacks.delete(this.getStackKey(variantId, 'unit'));
+    this.stacks.delete(this.getStackKey(variantId, 'line'));
   }
 
-  /**
-   * Check if price is at lowest (wholesale price)
-   * Compares price per item against wholesale price (which is per-item)
-   */
   isAtLowestPrice(
     currentPriceCents: number,
     quantity: number,
     wholesalePriceCents?: number,
   ): boolean {
-    if (!wholesalePriceCents) return false;
-    // Calculate price per item and compare with wholesale price (per-item)
+    if (wholesalePriceCents == null) return false;
     const pricePerItem = currentPriceCents / quantity;
     return pricePerItem <= wholesalePriceCents;
   }
 
-  /**
-   * Get current undo stack length for a variant (useful for UI state)
-   */
   getUndoStackLength(variantId: string, context: 'unit' | 'line' = 'line'): number {
-    const stackKey = this.getStackKey(variantId, context);
-    return this.priceUndoStacks.get(stackKey)?.length ?? 0;
+    const stack = this.stacks.get(this.getStackKey(variantId, context));
+    if (!stack || stack.length <= 1) return 0;
+    return stack.length - 1;
   }
+}
+
+export interface PriceOverrideData {
+  variantId: string;
+  customLinePrice?: number;
+  reason?: string;
 }

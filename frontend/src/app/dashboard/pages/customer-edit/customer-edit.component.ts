@@ -129,7 +129,7 @@ import { PersonEditFormComponent } from '../shared/components/person-edit-form.c
                           <span class="label-text font-semibold text-sm">Credit Limit</span>
                           @if (!isEditingCreditLimit()) {
                             <span class="label-text-alt text-xs">{{
-                              currencyService.format((creditSummary()?.creditLimit ?? 0) * 100)
+                              currencyService.format(creditSummary()?.creditLimit ?? 0)
                             }}</span>
                           }
                         </label>
@@ -170,7 +170,7 @@ import { PersonEditFormComponent } from '../shared/components/person-edit-form.c
                         } @else {
                           <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
                             <span class="text-base font-semibold">{{
-                              currencyService.format((creditSummary()?.creditLimit ?? 0) * 100)
+                              currencyService.format(creditSummary()?.creditLimit ?? 0)
                             }}</span>
                             <button
                               class="btn btn-sm btn-ghost"
@@ -248,19 +248,13 @@ import { PersonEditFormComponent } from '../shared/components/person-edit-form.c
                         <div class="stat bg-base-200 rounded-lg p-3">
                           <div class="stat-title text-xs">Outstanding</div>
                           <div class="stat-value text-base text-warning">
-                            {{
-                              currencyService.format(
-                                (creditSummary()?.outstandingAmount ?? 0) * 100
-                              )
-                            }}
+                            {{ currencyService.format(creditSummary()?.outstandingAmount ?? 0) }}
                           </div>
                         </div>
                         <div class="stat bg-base-200 rounded-lg p-3">
                           <div class="stat-title text-xs">Available</div>
                           <div class="stat-value text-base text-success">
-                            {{
-                              currencyService.format((creditSummary()?.availableCredit ?? 0) * 100)
-                            }}
+                            {{ currencyService.format(creditSummary()?.availableCredit ?? 0) }}
                           </div>
                         </div>
                       </div>
@@ -287,9 +281,7 @@ import { PersonEditFormComponent } from '../shared/components/person-edit-form.c
                             <div>
                               {{ formatDate(creditSummary()?.lastRepaymentDate) }} -
                               {{
-                                currencyService.format(
-                                  (creditSummary()?.lastRepaymentAmount ?? 0) * 100
-                                )
+                                currencyService.format(creditSummary()?.lastRepaymentAmount ?? 0)
                               }}
                             </div>
                           </div>
@@ -500,7 +492,7 @@ export class CustomerEditComponent {
     const summary = this.creditSummary();
     if (summary) {
       this.editingCreditLimit.set(true);
-      this.editCreditLimitValue.set(summary.creditLimit);
+      this.editCreditLimitValue.set(summary.creditLimit / 100); // Display units for input
       this.stopEditingCreditDuration();
     }
   }
@@ -565,7 +557,7 @@ export class CustomerEditComponent {
     const customerId = this.route.snapshot.paramMap.get('id');
     if (!customerId) return;
 
-    const newLimit = Math.max(this.editCreditLimitValue(), 0);
+    const newLimit = Math.round(Math.max(this.editCreditLimitValue(), 0) * 100); // Convert to cents
     this.isUpdatingCredit.set(true);
     try {
       const summary = this.creditSummary();

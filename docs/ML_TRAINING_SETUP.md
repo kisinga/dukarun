@@ -13,6 +13,7 @@ The backend implementation is complete and includes:
 - ✅ 6 new Channel custom fields for training status tracking
 - ✅ Database migration for new fields
 - ✅ ML Training Service with photo extraction
+- ✅ **New `ml-trainer` Microservice** for dedicated training
 - ✅ Extended GraphQL API with new queries and mutations
 - ✅ Auto-extraction service with event listeners
 - ✅ Complete training endpoint with file upload handling
@@ -39,13 +40,33 @@ The frontend implementation is complete and includes:
 - ✅ Admin UI component with status display and controls
 - ✅ Graceful error handling for schema availability
 
-**The frontend will automatically work once the backend is restarted.**
+### 3. ML Trainer Microservice Setup
 
-### 3. Verification
+The new `ml-trainer` service runs independently:
+
+1. **Install dependencies**:
+
+   ```bash
+   cd ml-trainer
+   npm install
+   ```
+
+2. **Start the service**:
+   ```bash
+   npm start
+   ```
+   (Runs on port 3000 by default)
+
+**Note:** The main backend expects this service to be available at `http://ml-trainer:3000` (in Docker) or `http://localhost:3000` (locally).
+
+### 4. Application Verification
+
+**The frontend will automatically work once the backend is restarted.**
 
 After restarting the backend, you can verify the integration by:
 
 1. **Check GraphQL Schema**: Visit `/admin-api/graphiql` and verify these queries are available:
+
    - `mlTrainingInfo(channelId: ID!)`
    - `mlTrainingManifest(channelId: ID!)`
    - `extractPhotosForTraining(channelId: ID!)`
@@ -60,6 +81,7 @@ After restarting the backend, you can verify the integration by:
 
 - **Automated Photo Extraction**: Triggers on product create/update with 5-minute debouncing
 - **Training Status Tracking**: 6 status levels (idle, extracting, ready, training, active, failed)
+- **Dedicated Microservice**: Offloads heavy training tasks from the main backend
 - **Manifest Generation**: JSON with product IDs and public image URLs
 - **External Service Integration**: Complete GraphQL API for external training services
 - **File Upload Handling**: Multipart upload for model files with proper tagging
@@ -76,6 +98,12 @@ After restarting the backend, you can verify the integration by:
 ## External Service Integration
 
 The system supports complete external training workflows:
+
+```gql
+mutation StartTraining {
+  startTraining(channelId: "2")
+}
+```
 
 ```bash
 # 1. Trigger extraction
@@ -111,13 +139,21 @@ frontend/src/app/
 ├── core/services/ml-training.service.ts
 └── dashboard/pages/channel-settings/components/
     └── ml-training-status.component.ts
+
+ml-trainer/
+├── src/
+│   ├── trainer.js (Training logic)
+│   └── server.js (API endpoints)
+├── Dockerfile
+└── package.json
+
 ```
 
 ## Status Flow
 
 1. **idle** → User clicks "Prepare Training Data" → **extracting**
 2. **extracting** → Photo extraction complete → **ready**
-3. **ready** → External service downloads manifest → **training**
+3. **ready** → System automatically triggers training → **training**
 4. **training** → Model upload complete → **active**
 5. **active** → Model ready for use in POS
 

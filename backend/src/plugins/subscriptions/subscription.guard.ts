@@ -37,11 +37,15 @@ export class SubscriptionGuard implements CanActivate {
     const mutationName = info.fieldName;
 
     // Allow subscription-related mutations even if expired
+    // Also allow ML service mutations (they use service token auth, not user sessions)
     const subscriptionMutations = [
       'initiateSubscriptionPurchase',
       'verifySubscriptionPayment',
       'cancelSubscription',
       'updateChannelSettings', // Allow updating subscription settings
+      'completeTraining', // ML service - uses service token auth
+      'linkMlModelAssets', // ML service - uses service token auth
+      'setMlModelStatus', // ML service - uses service token auth
     ];
 
     if (subscriptionMutations.includes(mutationName)) {

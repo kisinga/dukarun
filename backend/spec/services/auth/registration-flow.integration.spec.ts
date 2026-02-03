@@ -359,7 +359,7 @@ describe('Registration Flow Integration', () => {
       expect(kenyaZoneParam.id).toBe(10); // Kenya zone ID
 
       // Verify zone lookup was called
-      expect(harness.mocks.validator.getKenyaZone).toHaveBeenCalledWith(ctx);
+      expect(harness.mocks.validator.getKenyaZone as jest.Mock<any>).toHaveBeenCalledWith(ctx);
     });
 
     it('creates channel with pricesIncludeTax set to true', async () => {
@@ -401,7 +401,9 @@ describe('Registration Flow Integration', () => {
       await harness.registrationService.provisionCustomer(ctx, registrationData);
 
       // Verify stock location created and assigned via store provisioner
-      expect(harness.mocks.storeProvisioner.createAndAssignStore).toHaveBeenCalledWith(
+      expect(
+        harness.mocks.storeProvisioner.createAndAssignStore as jest.Mock<any>
+      ).toHaveBeenCalledWith(
         ctx,
         expect.objectContaining({
           storeName: 'Main Store',
@@ -418,7 +420,9 @@ describe('Registration Flow Integration', () => {
 
       // Verify store provisioner called with channel ID
       // The assignment happens inside store provisioner
-      expect(harness.mocks.storeProvisioner.createAndAssignStore).toHaveBeenCalledWith(
+      expect(
+        harness.mocks.storeProvisioner.createAndAssignStore as jest.Mock<any>
+      ).toHaveBeenCalledWith(
         ctx,
         expect.any(Object),
         2 // channel ID (normalized to number)
@@ -447,10 +451,10 @@ describe('Registration Flow Integration', () => {
       await harness.registrationService.provisionCustomer(ctx, registrationData);
 
       // Verify zone lookup was called
-      expect(harness.mocks.validator.getKenyaZone).toHaveBeenCalledWith(ctx);
+      expect(harness.mocks.validator.getKenyaZone as jest.Mock<any>).toHaveBeenCalledWith(ctx);
 
       // Verify zone lookup was called
-      expect(harness.mocks.validator.getKenyaZone).toHaveBeenCalledWith(ctx);
+      expect(harness.mocks.validator.getKenyaZone as jest.Mock<any>).toHaveBeenCalledWith(ctx);
 
       // Verify Kenya zone passed to channel provisioner
       const channelCall = harness.mocks.channelProvisioner.createChannel.mock.calls[0];

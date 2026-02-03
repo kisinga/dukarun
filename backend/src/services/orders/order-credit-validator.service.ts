@@ -51,6 +51,7 @@ export class OrderCreditValidatorService {
   /**
    * Validate credit limit with actual order total
    * This is the final validation after order is fully calculated
+   * All amounts in smallest currency unit (cents)
    */
   async validateCreditLimitWithOrder(
     ctx: RequestContext,
@@ -59,23 +60,19 @@ export class OrderCreditValidatorService {
   ): Promise<void> {
     const summary = await this.creditService.getCreditSummary(ctx, customerId);
     const availableCredit = summary.creditLimit - summary.outstandingAmount;
-
-    // Convert order total from cents to base currency units (divide by 100)
-    // This matches the unit used for creditLimit and outstandingAmount (base currency units)
     const orderTotalInCents = order.totalWithTax || order.total;
-    const orderTotalInBaseCurrency = orderTotalInCents / 100;
 
-    if (orderTotalInBaseCurrency > availableCredit) {
+    if (orderTotalInCents > availableCredit) {
       throw new UserInputError(
-        `Credit limit exceeded. Available: ${availableCredit}, Required: ${orderTotalInBaseCurrency}. ` +
-          `Order would exceed credit limit by ${orderTotalInBaseCurrency - availableCredit}.`
+        `Credit limit exceeded. Available: ${availableCredit}, Required: ${orderTotalInCents}. ` +
+          `Order would exceed credit limit by ${orderTotalInCents - availableCredit}.`
       );
     }
 
     this.logger.log(
       `Credit validation passed for customer ${customerId}: ` +
-        `Available: ${availableCredit}, Order Total: ${orderTotalInBaseCurrency}, ` +
-        `Remaining: ${availableCredit - orderTotalInBaseCurrency}`
+        `Available: ${availableCredit}, Order Total: ${orderTotalInCents}, ` +
+        `Remaining: ${availableCredit - orderTotalInCents}`
     );
   }
 }

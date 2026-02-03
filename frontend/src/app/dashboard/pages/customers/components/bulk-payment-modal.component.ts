@@ -100,9 +100,10 @@ export class BulkPaymentModalComponent {
     }
 
     const outstanding = this.outstandingAmount();
-    if (outstanding > 0 && amount > Math.abs(outstanding)) {
+    const amountInCents = Math.round(amount * 100);
+    if (outstanding > 0 && amountInCents > Math.abs(outstanding)) {
       this.error.set(
-        `Payment amount cannot exceed outstanding balance of ${this.currencyService.format(Math.abs(outstanding) * 100)}`,
+        `Payment amount cannot exceed outstanding balance of ${this.currencyService.format(Math.abs(outstanding))}`,
       );
       return;
     }
@@ -113,7 +114,7 @@ export class BulkPaymentModalComponent {
     try {
       const result = await this.customerService.recordBulkPayment(
         this.customerId(),
-        amount,
+        amountInCents,
         refNumber.trim(),
       );
 
@@ -168,10 +169,10 @@ export class BulkPaymentModalComponent {
   }
 
   /**
-   * Format currency for display
+   * Format currency for display (amount in cents)
    */
-  formatCurrency(amount: number): string {
-    return this.currencyService.format(amount * 100);
+  formatCurrency(amountInCents: number): string {
+    return this.currencyService.format(amountInCents);
   }
 
   /**

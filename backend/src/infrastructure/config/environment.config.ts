@@ -81,6 +81,11 @@ export class EnvironmentConfig implements OnModuleInit {
   // ML/Webhook configuration
   readonly ml = {
     webhookSecret: '',
+    serviceToken: '', // Shared secret for service-to-service auth
+    trainerUrl: 'http://ml-trainer:3005', // ML trainer service URL (uses Docker service name)
+    backendInternalUrl: 'http://backend:3000', // Backend internal URL (uses Docker service name)
+    trainingIntervalMinutes: 60,
+    trainingCooldownHours: 4,
   };
 
   // Push notification configuration
@@ -125,6 +130,12 @@ export class EnvironmentConfig implements OnModuleInit {
     email: '', // ADMIN_NOTIFICATION_EMAIL - receives registration alerts
     phone: '', // ADMIN_NOTIFICATION_PHONE - receives SMS alerts
     channels: 'email', // ADMIN_NOTIFICATION_CHANNELS - comma-separated: email,sms
+  };
+
+  // Communication/delivery configuration (single gating for SMS, email, OTP delivery)
+  readonly communication = {
+    devMode: false, // COMMUNICATION_DEV_MODE or isDevelopment() - when true, log payload and skip real send
+    channels: { sms: true, email: true }, // COMMUNICATION_CHANNELS - comma-separated sms,email to enable
   };
 
   /**
@@ -236,11 +247,17 @@ export class EnvironmentConfig implements OnModuleInit {
 
     // Load ML/Webhook configuration
     this.ml.webhookSecret = process.env.ML_WEBHOOK_SECRET || '';
+    this.ml.serviceToken = process.env.ML_SERVICE_TOKEN || '';
+    // Use Docker service names for internal networking (can be overridden via env vars if needed)
+    this.ml.trainerUrl = process.env.ML_TRAINER_URL || 'http://ml-trainer:3005';
+    this.ml.backendInternalUrl = process.env.BACKEND_INTERNAL_URL || 'http://backend:3000';
+    this.ml.trainingIntervalMinutes = +(process.env.ML_TRAINING_INTERVAL_MINUTES || 60);
+    this.ml.trainingCooldownHours = +(process.env.ML_TRAINING_COOLDOWN_HOURS || 4);
 
     // Load Push notification configuration
     this.push.vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
     this.push.vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
-    this.push.vapidSubject = process.env.VAPID_SUBJECT || '';
+    this.push.vapidSubject = process.env.VAPID_EMAIL || '';
 
     // Load Paystack configuration
     this.paystack.secretKey = process.env.PAYSTACK_SECRET_KEY || '';
@@ -281,6 +298,15 @@ export class EnvironmentConfig implements OnModuleInit {
     this.adminNotifications.email = process.env.ADMIN_NOTIFICATION_EMAIL || '';
     this.adminNotifications.phone = process.env.ADMIN_NOTIFICATION_PHONE || '';
     this.adminNotifications.channels = process.env.ADMIN_NOTIFICATION_CHANNELS || 'email';
+
+    // Load Communication configuration (single gating for delivery)
+    const commDevMode = process.env.COMMUNICATION_DEV_MODE === 'true';
+    const commChannels = (process.env.COMMUNICATION_CHANNELS || 'sms,email').toLowerCase();
+    this.communication.devMode = commDevMode || this.isDevelopment();
+    this.communication.channels = {
+      sms: commChannels.includes('sms'),
+      email: commChannels.includes('email'),
+    };
 
     this.validate();
   }

@@ -166,7 +166,7 @@
                 } @else {
                   💳 Pay Order
                   @if (outstandingAmount() > 0) {
-                    ({{ currencyService.format(outstandingAmount() * 100) }})
+                    ({{ currencyService.format(outstandingAmount()) }})
                   }
                 }
               </button>

@@ -228,6 +228,8 @@ export class Receipt52mmTemplate extends PrintTemplate {
 
   getStyles(): string {
     return `
+            /* Request receipt roll size; driver support varies. 297mm is a typical roll length. */
+            @page { size: 52mm 297mm; margin: 0; }
             @media print {
                 .print-template.receipt-52mm {
                     width: 52mm;
@@ -479,6 +481,7 @@ export class A4Template extends PrintTemplate {
 
   getStyles(): string {
     return `
+            @page { size: 210mm 297mm; margin: 0; }
             @media print {
                 .print-template.a4-invoice {
                     width: 210mm;

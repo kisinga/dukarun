@@ -5,7 +5,7 @@ import { CashierSession } from '../../domain/cashier/cashier-session.entity';
 import { MpesaVerification } from '../../domain/cashier/mpesa-verification.entity';
 import { AccountingPeriod } from '../../domain/period/accounting-period.entity';
 import { Reconciliation } from '../../domain/recon/reconciliation.entity';
-import { Account } from '../../ledger/account.entity';
+import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import { JournalEntry } from '../../ledger/journal-entry.entity';
 import { PostingService } from '../../ledger/posting.service';
 import {
@@ -14,6 +14,7 @@ import {
   CashierSessionSummary,
   SessionReconciliationRequirements,
 } from '../../services/financial/cashier-session.service';
+import { ChartOfAccountsService } from '../../services/financial/chart-of-accounts.service';
 import { InventoryReconciliationService } from '../../services/financial/inventory-reconciliation.service';
 import { PeriodEndClosingService } from '../../services/financial/period-end-closing.service';
 import { PeriodLockService } from '../../services/financial/period-lock.service';
@@ -34,8 +35,9 @@ export class PeriodManagementResolver {
     private readonly postingService: PostingService,
     private readonly connection: TransactionalConnection,
     private readonly periodLockService: PeriodLockService,
-    private readonly reconciliationValidatorService: ReconciliationValidatorService
-  ) { }
+    private readonly reconciliationValidatorService: ReconciliationValidatorService,
+    private readonly chartOfAccountsService: ChartOfAccountsService
+  ) {}
 
   @Query()
   @Allow(Permission.ReadOrder) // TODO: Use custom permission
@@ -144,65 +146,62 @@ export class PeriodManagementResolver {
     @Ctx() ctx: RequestContext,
     @Args('input') input: any
   ): Promise<JournalEntry> {
-    const accountRepo = this.connection.getRepository(ctx, Account);
+    if (!input.transferId || typeof input.transferId !== 'string' || !input.transferId.trim()) {
+      throw new Error('transferId is required for idempotent inter-account transfer.');
+    }
+    const sourceId = input.transferId.trim();
 
-    // Validate period is open
     await this.periodLockService.validatePeriodIsOpen(ctx, input.channelId, input.entryDate);
 
-    // Validate both accounts exist and are sub-accounts (have parentAccountId)
-    const [fromAccount, toAccount] = await Promise.all([
-      accountRepo.findOne({
-        where: {
-          channelId: input.channelId,
-          code: input.fromAccountCode,
-        },
-      }),
-      accountRepo.findOne({
-        where: {
-          channelId: input.channelId,
-          code: input.toAccountCode,
-        },
-      }),
-    ]);
+    await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, input.fromAccountCode);
+    await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, input.toAccountCode);
 
-    if (!fromAccount || !toAccount) {
-      throw new Error(
-        `One or both accounts not found: ${input.fromAccountCode}, ${input.toAccountCode}`
+    const principal = Number(BigInt(input.amount));
+    if (principal <= 0) {
+      throw new Error('Transfer amount must be greater than zero.');
+    }
+    const feeAmount =
+      input.feeAmount != null && input.feeAmount !== '' ? Number(BigInt(input.feeAmount)) : 0;
+    if (feeAmount < 0) {
+      throw new Error('Transfer fee amount cannot be negative.');
+    }
+    const expenseTag =
+      input.expenseTag && typeof input.expenseTag === 'string'
+        ? input.expenseTag.trim()
+        : 'transaction_fee';
+
+    const lines: Array<{
+      accountCode: string;
+      debit?: number;
+      credit?: number;
+      meta?: Record<string, unknown>;
+    }> = [];
+
+    if (feeAmount > 0) {
+      // Credit from (principal + fee), Debit to (principal), Debit expense (fee with tag)
+      const fromCredit = principal + feeAmount;
+      lines.push(
+        { accountCode: input.fromAccountCode, debit: 0, credit: fromCredit },
+        { accountCode: input.toAccountCode, debit: principal, credit: 0 },
+        {
+          accountCode: ACCOUNT_CODES.PROCESSOR_FEES,
+          debit: feeAmount,
+          credit: 0,
+          meta: { expenseTag },
+        }
+      );
+    } else {
+      lines.push(
+        { accountCode: input.fromAccountCode, debit: 0, credit: principal },
+        { accountCode: input.toAccountCode, debit: principal, credit: 0 }
       );
     }
 
-    if (!fromAccount.parentAccountId || !toAccount.parentAccountId) {
-      throw new Error(
-        `Both accounts must be sub-accounts (have parentAccountId). ` +
-        `Inter-account transfers only allowed between payment method sub-accounts.`
-      );
-    }
-
-    // Validate both accounts are under the same parent (CASH)
-    if (fromAccount.parentAccountId !== toAccount.parentAccountId) {
-      throw new Error(
-        `Inter-account transfers only allowed between sub-accounts under the same parent account.`
-      );
-    }
-
-    // Create adjusting journal entry
-    const amount = BigInt(input.amount);
-    return this.postingService.post(ctx, 'inter-account-transfer', `transfer-${Date.now()}`, {
+    return this.postingService.post(ctx, 'inter-account-transfer', sourceId, {
       channelId: input.channelId,
       entryDate: input.entryDate,
       memo: input.memo || 'Inter-account transfer for reconciliation',
-      lines: [
-        {
-          accountCode: input.fromAccountCode,
-          debit: 0,
-          credit: Number(amount),
-        },
-        {
-          accountCode: input.toAccountCode,
-          debit: Number(amount),
-          credit: 0,
-        },
-      ],
+      lines,
     });
   }
 
@@ -221,10 +220,7 @@ export class PeriodManagementResolver {
 
   @Query()
   @Allow(Permission.ReadOrder)
-  async cashierSession(
-    @Ctx() ctx: RequestContext,
-    @Args('sessionId') sessionId: string
-  ) {
+  async cashierSession(@Ctx() ctx: RequestContext, @Args('sessionId') sessionId: string) {
     const summary = await this.cashierSessionService.getSessionSummary(ctx, sessionId);
     return this.formatSessionSummaryForGraphQL(summary);
   }
@@ -263,10 +259,7 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(ManageReconciliationPermission.Permission)
-  async closeCashierSession(
-    @Ctx() ctx: RequestContext,
-    @Args('input') input: any
-  ) {
+  async closeCashierSession(@Ctx() ctx: RequestContext, @Args('input') input: any) {
     const summary = await this.cashierSessionService.closeSession(ctx, {
       sessionId: input.sessionId,
       closingDeclared: parseInt(input.closingDeclared, 10),

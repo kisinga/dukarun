@@ -10,6 +10,7 @@ import { CompanyService } from './company.service';
 import { CurrencyService } from './currency.service';
 import { PurchaseMetricsService } from './dashboard/purchase-metrics.service';
 import { SalesMetricsService } from './dashboard/sales-metrics.service';
+import { OrderMapperService } from './order-mapper.service';
 
 /**
  * Dashboard statistics aggregated from Vendure data
@@ -78,6 +79,7 @@ export class DashboardService {
   private readonly apolloService = inject(ApolloService);
   private readonly companyService = inject(CompanyService);
   private readonly currencyService = inject(CurrencyService);
+  private readonly orderMapper = inject(OrderMapperService);
   private readonly salesMetricsService = inject(SalesMetricsService);
   private readonly purchaseMetricsService = inject(PurchaseMetricsService);
 
@@ -138,7 +140,13 @@ export class DashboardService {
       };
 
       this.statsSignal.set(stats);
-      this.recentActivitySignal.set(this.transformRecentOrders(recentOrders));
+      this.recentActivitySignal.set(
+        this.orderMapper.toRecentActivities(
+          recentOrders,
+          (c) => this.currencyService.format(c),
+          (d) => this.getTimeDifference(d),
+        ),
+      );
       this.lowStockCountSignal.set(lowStockCount);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
@@ -222,39 +230,6 @@ export class DashboardService {
       console.error('Failed to fetch recent orders:', error);
       return [];
     }
-  }
-
-  /**
-   * Transform Vendure orders into recent activity items
-   * For sales, we reference the ORDER CODE, not product details
-   */
-  private transformRecentOrders(orders: any[]): RecentActivity[] {
-    return orders.map((order) => {
-      const timeDiff = this.getTimeDifference(new Date(order.createdAt));
-
-      // For sales, show ORDER CODE as the main identifier
-      // Optionally include customer name if available
-      let description = `Order ${order.code}`;
-      if (order.customer) {
-        const customerName = [order.customer.firstName, order.customer.lastName]
-          .filter(Boolean)
-          .join(' ')
-          .trim();
-        if (customerName) {
-          description = `Order ${order.code} • ${customerName}`;
-        }
-      }
-
-      // Vendure stores prices in cents, CurrencyService handles conversion
-      const amountCents = order.totalWithTax || order.total;
-      return {
-        id: order.id, // Use order ID for uniqueness
-        type: 'Sale' as const,
-        description: description,
-        amount: this.currencyService.format(amountCents),
-        time: timeDiff,
-      };
-    });
   }
 
   /**

@@ -1,5 +1,27 @@
 // Karma configuration file for Angular testing
 // Standard Angular CI testing setup using ChromeHeadlessNoSandbox
+
+// Use Chromium for headless tests when Chrome is not installed (e.g. Linux with chromium only).
+// ChromeHeadless launcher looks for CHROME_BIN or google-chrome; it does not look for chromium.
+// Setting CHROME_BIN to the Chromium binary makes ChromeHeadless use it.
+function resolveChromeBin() {
+  if (process.env.CHROME_BIN) return;
+  if (process.platform !== 'linux') return;
+  const { execSync } = require('child_process');
+  for (const name of ['chromium-browser', 'chromium']) {
+    try {
+      const bin = execSync(`command -v ${name} 2>/dev/null`, { encoding: 'utf8' }).trim();
+      if (bin) {
+        process.env.CHROME_BIN = bin;
+        return;
+      }
+    } catch (_) {
+      // command not found
+    }
+  }
+}
+resolveChromeBin();
+
 module.exports = function (config) {
   // Simplified headless detection:
   // 1. Explicit USE_HEADLESS flag

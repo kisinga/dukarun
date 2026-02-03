@@ -177,9 +177,10 @@ export const config: VendureConfig = {
         name: 'mlModelJsonAsset',
         type: 'relation',
         entity: Asset,
+        eager: true, // Auto-load relation to avoid resolver permission issues
         label: [{ languageCode: LanguageCode.en, value: 'ML Model JSON Asset' }],
         description: [{ languageCode: LanguageCode.en, value: 'Asset for model.json file' }],
-        public: false,
+        public: true, // Accessible to Shop API for frontend ML predictions
         nullable: true,
         ui: {
           tab: 'ML Model',
@@ -194,9 +195,10 @@ export const config: VendureConfig = {
         name: 'mlModelBinAsset',
         type: 'relation',
         entity: Asset,
+        eager: true, // Auto-load relation to avoid resolver permission issues
         label: [{ languageCode: LanguageCode.en, value: 'ML Model Weights Asset' }],
         description: [{ languageCode: LanguageCode.en, value: 'Asset for weights.bin file' }],
-        public: false,
+        public: true, // Accessible to Shop API for frontend ML predictions
         nullable: true,
         ui: {
           tab: 'ML Model',
@@ -211,9 +213,10 @@ export const config: VendureConfig = {
         name: 'mlMetadataAsset',
         type: 'relation',
         entity: Asset,
+        eager: true, // Auto-load relation to avoid resolver permission issues
         label: [{ languageCode: LanguageCode.en, value: 'ML Metadata Asset' }],
         description: [{ languageCode: LanguageCode.en, value: 'Asset for metadata.json file' }],
-        public: false,
+        public: true, // Accessible to Shop API for frontend ML predictions
         nullable: true,
         ui: {
           tab: 'ML Model',
@@ -427,6 +430,34 @@ export const config: VendureConfig = {
         type: 'text',
         label: [{ languageCode: LanguageCode.en, value: 'Last Training Error' }],
         public: false,
+        nullable: true,
+        ui: { tab: 'ML Model' },
+      },
+      {
+        name: 'mlTrainingQueuedAt',
+        type: 'datetime',
+        label: [{ languageCode: LanguageCode.en, value: 'Training Queued At' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'Timestamp when training was queued (set after photo extraction)',
+          },
+        ],
+        public: true,
+        nullable: true,
+        ui: { tab: 'ML Model' },
+      },
+      {
+        name: 'mlLastTrainedAt',
+        type: 'datetime',
+        label: [{ languageCode: LanguageCode.en, value: 'Last Training Completed At' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'Timestamp when training last completed successfully (used for rate limiting)',
+          },
+        ],
+        public: true,
         nullable: true,
         ui: { tab: 'ML Model' },
       },
@@ -1448,7 +1479,8 @@ export const config: VendureConfig = {
     DefaultJobQueuePlugin.init({ useDatabaseForBuffer: true }),
     DefaultSearchPlugin.init({ bufferUpdates: false, indexStockStatus: true }),
     EmailPlugin.init({
-      devMode: (!IS_PRODUCTION && env.email.transport !== 'smtp') as any,
+      devMode: (env.communication.devMode ||
+        (!IS_PRODUCTION && env.email.transport !== 'smtp')) as any,
       outputPath: path.join(process.cwd(), 'static/email/test-emails'),
       route: 'mailbox',
       handlers: [...defaultEmailHandlers, otpEmailHandler],

@@ -44,7 +44,7 @@ export class CustomerFinancialDisplayComponent {
     return '';
   });
 
-  formatCurrency(amount: number): string {
-    return this.currencyService.format(amount * 100);
+  formatCurrency(amountInCents: number): string {
+    return this.currencyService.format(amountInCents);
   }
 }

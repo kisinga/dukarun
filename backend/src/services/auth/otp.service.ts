@@ -1,17 +1,15 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { RequestContext, EventBus } from '@vendure/core';
+import { RequestContext } from '@vendure/core';
 import Redis from 'ioredis';
 import { BRAND_CONFIG } from '../../constants/brand.constants';
 import { env } from '../../infrastructure/config/environment.config';
-import { SmsService } from '../../infrastructure/sms/sms.service';
+import { CommunicationService } from '../../infrastructure/communication/communication.service';
 import { formatPhoneNumber } from '../../utils/phone.utils';
-import { maskEmail, isSentinelEmail } from '../../utils/email.utils';
-import { OtpEmailEvent } from '../../events/otp-email.event';
 
 /**
  * OTP Service
- * Generates, stores, validates, and sends OTP codes via SMS
- * Uses Redis for fast, short-lived OTP storage
+ * Generates, stores, validates OTP codes. Delivery (SMS, email) is delegated to CommunicationService
+ * so dev gating and channel selection happen in one place.
  */
 @Injectable()
 export class OtpService implements OnModuleInit, OnModuleDestroy {
@@ -27,10 +25,7 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
   private readonly RATE_LIMIT_COUNT: number;
   private readonly RATE_LIMIT_WINDOW_SECONDS: number;
 
-  constructor(
-    private readonly smsService: SmsService,
-    private readonly eventBus: EventBus
-  ) {
+  constructor(private readonly communicationService: CommunicationService) {
     // Initialize production mode check using EnvironmentConfig
     this.IS_PRODUCTION = env.isProduction();
     this.RATE_LIMIT_COUNT = this.IS_PRODUCTION ? 10 : 30;
@@ -168,59 +163,6 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Send SMS via configured SMS provider
-   */
-  private async sendSMS(phoneNumber: string, message: string): Promise<void> {
-    try {
-      // Use SmsService directly with isOtp flag for OTP routing
-      const result = await this.smsService.sendSms(phoneNumber, message, true);
-
-      if (!result.success) {
-        // Log error but don't throw - OTP is still generated, just SMS failed
-        this.logger.error(`Failed to send SMS: ${result.error}`);
-
-        // Log OTP in development for testing purposes
-        if (!this.IS_PRODUCTION) {
-          this.logger.warn(`SMS not sent. OTP code: ${message.match(/\d{6}/)?.[0] || 'N/A'}`);
-        }
-      }
-    } catch (error) {
-      this.logger.error('SMS sending error:', error);
-      // Don't throw - OTP is still generated, just log the error
-    }
-  }
-
-  /**
-   * Send OTP via Email
-   */
-  private async sendEmail(email: string, otp: string, ctx?: RequestContext): Promise<void> {
-    if (!ctx) {
-      this.logger.error('Cannot send OTP email without RequestContext');
-      return;
-    }
-
-    if (!email || typeof email !== 'string' || !email.includes('@')) {
-      this.logger.error(
-        `Invalid email address provided: ${typeof email === 'string' ? maskEmail(email) : typeof email}`
-      );
-      return;
-    }
-
-    if (isSentinelEmail(email)) {
-      this.logger.log(`Skipping OTP email for sentinel address: ${maskEmail(email)}`);
-      return;
-    }
-
-    try {
-      this.logger.log(`Publishing OTP email event for: ${maskEmail(email)}`);
-      this.eventBus.publish(new OtpEmailEvent(ctx, email, otp));
-      this.logger.log(`OTP email event published successfully for: ${maskEmail(email)}`);
-    } catch (error) {
-      this.logger.error(`Email sending error for ${maskEmail(email)}:`, error);
-    }
-  }
-
-  /**
    * Request OTP for phone number
    * Request OTP for phone number (and optionally email)
    */
@@ -265,22 +207,31 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
 
     await this.updateRateLimit(storageKey);
 
+    // Delivery via CommunicationService (single dev gate and channel routing)
+    const metadata = { purpose: 'otp' };
+
     // Send SMS (Primary Channel) - Only if it's a phone number
     if (!isEmailIdentifier) {
       const message = `Your ${BRAND_CONFIG.name} verification code is: ${otpCode} Valid for 5 minutes.`;
-      await this.sendSMS(storageKey, message);
+      await this.communicationService.send({
+        channel: 'sms',
+        recipient: storageKey,
+        body: message,
+        metadata,
+      });
     }
 
     // Send Email (Secondary Channel) if provided OR if identifier is email
     const targetEmail = email || (isEmailIdentifier ? identifier : undefined);
-    if (targetEmail && typeof targetEmail === 'string' && targetEmail.trim().length > 0) {
-      this.logger.log(`Attempting to send OTP email to: ${maskEmail(targetEmail)}`);
-      await this.sendEmail(targetEmail, otpCode, ctx);
-    } else if (email !== undefined) {
-      // Email was explicitly passed but is invalid
-      this.logger.warn(
-        `Invalid email parameter: ${typeof email === 'string' ? maskEmail(email) : typeof email}`
-      );
+    if (targetEmail && typeof targetEmail === 'string' && targetEmail.trim().length > 0 && ctx) {
+      await this.communicationService.send({
+        channel: 'email',
+        recipient: targetEmail,
+        body: otpCode,
+        template: 'otp',
+        ctx,
+        metadata,
+      });
     }
 
     return {

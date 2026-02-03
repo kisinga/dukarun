@@ -1,5 +1,6 @@
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
+import { CommunicationPlugin } from '../communication/communication.plugin';
 import { NotificationResolver, notificationSchema } from './notification.resolver';
 import {
   NotificationService,
@@ -12,7 +13,7 @@ import { AdminNotificationService } from '../../services/notifications/admin-not
 import { ChannelUserService } from '../../services/auth/channel-user.service';
 
 @VendurePlugin({
-  imports: [PluginCommonModule],
+  imports: [PluginCommonModule, CommunicationPlugin],
   providers: [
     NotificationResolver,
     NotificationService,

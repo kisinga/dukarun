@@ -1,6 +1,6 @@
 import { Injector } from '@angular/core';
 import { loadMlModelService } from '../../../../../core/services/ml-model.loader';
-import type { MlModelService } from '../../../../../core/services/ml-model.service';
+import type { MlModelService } from '../../../../../core/services/ml-model/ml-model.service';
 import { ProductSearchService } from '../../../../../core/services/product/product-search.service';
 import { ScannerBeepService } from '../../../../../core/services/scanner-beep.service';
 import { Detector, DetectionResult } from './detection.types';
@@ -134,4 +134,3 @@ export class MLDetector implements Detector {
     console.log('[MLDetector] Cleaned up');
   }
 }
-

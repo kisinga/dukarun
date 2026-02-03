@@ -9,6 +9,7 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { SwPush } from '@angular/service-worker';
+import { provideTestApolloClient } from '../../testing/mocks/apollo-testing';
 import { ApolloService } from '../apollo.service';
 import { AuthService } from '../auth.service';
 import { CompanyService } from '../company.service';
@@ -31,6 +32,7 @@ describe('Service Behavior Tests', () => {
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
+        provideTestApolloClient(),
         AuthService,
         CompanyService,
         ApolloService,

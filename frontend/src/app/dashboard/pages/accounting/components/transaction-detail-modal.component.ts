@@ -51,12 +51,12 @@ export class TransactionDetailModalComponent {
     this.closed.emit();
   }
 
-  formatCurrency(amount: number): string {
+  formatCurrency(amountInCents: number): string {
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
       currency: 'KES',
       minimumFractionDigits: 2,
-    }).format(amount);
+    }).format(amountInCents / 100);
   }
 
   formatDate(date: string): string {

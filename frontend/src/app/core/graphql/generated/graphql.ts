@@ -625,12 +625,14 @@ export type ChannelCustomFields = {
   lastPaymentDate?: Maybe<Scalars['DateTime']['output']>;
   maxAdminCount?: Maybe<Scalars['Int']['output']>;
   mlImageCount?: Maybe<Scalars['Int']['output']>;
+  mlLastTrainedAt?: Maybe<Scalars['DateTime']['output']>;
   mlMetadataAsset?: Maybe<Asset>;
   mlModelBinAsset?: Maybe<Asset>;
   mlModelJsonAsset?: Maybe<Asset>;
   mlProductCount?: Maybe<Scalars['Int']['output']>;
   mlTrainingError?: Maybe<Scalars['String']['output']>;
   mlTrainingProgress?: Maybe<Scalars['Int']['output']>;
+  mlTrainingQueuedAt?: Maybe<Scalars['DateTime']['output']>;
   mlTrainingStartedAt?: Maybe<Scalars['DateTime']['output']>;
   mlTrainingStatus?: Maybe<Scalars['String']['output']>;
   paystackCustomerCode?: Maybe<Scalars['String']['output']>;
@@ -701,9 +703,11 @@ export type ChannelFilterParameter = {
   lastPaymentDate?: InputMaybe<DateOperators>;
   maxAdminCount?: InputMaybe<NumberOperators>;
   mlImageCount?: InputMaybe<NumberOperators>;
+  mlLastTrainedAt?: InputMaybe<DateOperators>;
   mlProductCount?: InputMaybe<NumberOperators>;
   mlTrainingError?: InputMaybe<StringOperators>;
   mlTrainingProgress?: InputMaybe<NumberOperators>;
+  mlTrainingQueuedAt?: InputMaybe<DateOperators>;
   mlTrainingStartedAt?: InputMaybe<DateOperators>;
   mlTrainingStatus?: InputMaybe<StringOperators>;
   outOfStockThreshold?: InputMaybe<NumberOperators>;
@@ -789,12 +793,14 @@ export type ChannelSortParameter = {
   lastPaymentDate?: InputMaybe<SortOrder>;
   maxAdminCount?: InputMaybe<SortOrder>;
   mlImageCount?: InputMaybe<SortOrder>;
+  mlLastTrainedAt?: InputMaybe<SortOrder>;
   mlMetadataAsset?: InputMaybe<SortOrder>;
   mlModelBinAsset?: InputMaybe<SortOrder>;
   mlModelJsonAsset?: InputMaybe<SortOrder>;
   mlProductCount?: InputMaybe<SortOrder>;
   mlTrainingError?: InputMaybe<SortOrder>;
   mlTrainingProgress?: InputMaybe<SortOrder>;
+  mlTrainingQueuedAt?: InputMaybe<SortOrder>;
   mlTrainingStartedAt?: InputMaybe<SortOrder>;
   mlTrainingStatus?: InputMaybe<SortOrder>;
   outOfStockThreshold?: InputMaybe<SortOrder>;
@@ -1173,12 +1179,14 @@ export type CreateChannelCustomFieldsInput = {
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
   maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
   mlImageCount?: InputMaybe<Scalars['Int']['input']>;
+  mlLastTrainedAt?: InputMaybe<Scalars['DateTime']['input']>;
   mlMetadataAssetId?: InputMaybe<Scalars['ID']['input']>;
   mlModelBinAssetId?: InputMaybe<Scalars['ID']['input']>;
   mlModelJsonAssetId?: InputMaybe<Scalars['ID']['input']>;
   mlProductCount?: InputMaybe<Scalars['Int']['input']>;
   mlTrainingError?: InputMaybe<Scalars['String']['input']>;
   mlTrainingProgress?: InputMaybe<Scalars['Int']['input']>;
+  mlTrainingQueuedAt?: InputMaybe<Scalars['DateTime']['input']>;
   mlTrainingStartedAt?: InputMaybe<Scalars['DateTime']['input']>;
   mlTrainingStatus?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
@@ -3863,6 +3871,11 @@ export type Mutation = {
   setSettingsStoreValues: Array<SetSettingsStoreValueResult>;
   settlePayment: SettlePaymentResult;
   settleRefund: SettleRefundResult;
+  /**
+   * Start in-process model training for a channel.
+   * Requires 'ready' status (photos extracted) or will trigger extraction.
+   */
+  startTraining: Scalars['Boolean']['output'];
   subscribeToPush: Scalars['Boolean']['output'];
   transitionFulfillmentToState: TransitionFulfillmentToStateResult;
   transitionOrderToState?: Maybe<TransitionOrderToStateResult>;
@@ -3874,6 +3887,7 @@ export type Mutation = {
   unsubscribeToPush: Scalars['Boolean']['output'];
   /** Update the active (currently logged-in) Administrator */
   updateActiveAdministrator: Administrator;
+  updateAdminProfile: Administrator;
   /** Update an existing Administrator */
   updateAdministrator: Administrator;
   /** Update an existing Asset */
@@ -4668,6 +4682,10 @@ export type MutationSettleRefundArgs = {
   input: SettleRefundInput;
 };
 
+export type MutationStartTrainingArgs = {
+  channelId: Scalars['ID']['input'];
+};
+
 export type MutationSubscribeToPushArgs = {
   subscription: PushSubscriptionInput;
 };
@@ -4697,6 +4715,10 @@ export type MutationUnsetDraftOrderShippingAddressArgs = {
 
 export type MutationUpdateActiveAdministratorArgs = {
   input: UpdateActiveAdministratorInput;
+};
+
+export type MutationUpdateAdminProfileArgs = {
+  input: UpdateAdminProfileInput;
 };
 
 export type MutationUpdateAdministratorArgs = {
@@ -8147,6 +8169,13 @@ export type UpdateAddressInput = {
   streetLine2?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateAdminProfileInput = {
+  email: Scalars['String']['input'];
+  firstName: Scalars['String']['input'];
+  lastName: Scalars['String']['input'];
+  profilePictureId?: InputMaybe<Scalars['ID']['input']>;
+};
+
 export type UpdateAdministratorCustomFieldsInput = {
   profilePictureId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -8205,12 +8234,14 @@ export type UpdateChannelCustomFieldsInput = {
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
   maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
   mlImageCount?: InputMaybe<Scalars['Int']['input']>;
+  mlLastTrainedAt?: InputMaybe<Scalars['DateTime']['input']>;
   mlMetadataAssetId?: InputMaybe<Scalars['ID']['input']>;
   mlModelBinAssetId?: InputMaybe<Scalars['ID']['input']>;
   mlModelJsonAssetId?: InputMaybe<Scalars['ID']['input']>;
   mlProductCount?: InputMaybe<Scalars['Int']['input']>;
   mlTrainingError?: InputMaybe<Scalars['String']['input']>;
   mlTrainingProgress?: InputMaybe<Scalars['Int']['input']>;
+  mlTrainingQueuedAt?: InputMaybe<Scalars['DateTime']['input']>;
   mlTrainingStartedAt?: InputMaybe<Scalars['DateTime']['input']>;
   mlTrainingStatus?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
@@ -8855,6 +8886,21 @@ export type UpdateAdministratorMutation = {
   };
 };
 
+export type UpdateAdminProfileMutationVariables = Exact<{
+  input: UpdateAdminProfileInput;
+}>;
+
+export type UpdateAdminProfileMutation = {
+  __typename?: 'Mutation';
+  updateAdminProfile: {
+    __typename?: 'Administrator';
+    id: string;
+    firstName: string;
+    lastName: string;
+    emailAddress: string;
+  };
+};
+
 export type GetUserChannelsQueryVariables = Exact<{ [key: string]: never }>;
 
 export type GetUserChannelsQuery = {
@@ -9290,6 +9336,7 @@ export type GetProductQuery = {
       sku: string;
       price: number;
       priceWithTax: number;
+      trackInventory: GlobalFlag;
       prices: Array<{
         __typename?: 'ProductVariantPrice';
         price: number;
@@ -9300,6 +9347,11 @@ export type GetProductQuery = {
         stockLocationId: string;
         stockOnHand: number;
       }>;
+      customFields?: {
+        __typename?: 'ProductVariantCustomFields';
+        wholesalePrice?: number | null;
+        allowFractionalQuantity?: boolean | null;
+      } | null;
     }>;
   } | null;
 };
@@ -10132,6 +10184,12 @@ export type UpdateTrainingStatusMutation = {
   __typename?: 'Mutation';
   updateTrainingStatus: boolean;
 };
+
+export type StartTrainingMutationVariables = Exact<{
+  channelId: Scalars['ID']['input'];
+}>;
+
+export type StartTrainingMutation = { __typename?: 'Mutation'; startTraining: boolean };
 
 export type CompleteTrainingMutationVariables = Exact<{
   channelId: Scalars['ID']['input'];
@@ -12347,6 +12405,51 @@ export const UpdateAdministratorDocument = {
     },
   ],
 } as unknown as DocumentNode<UpdateAdministratorMutation, UpdateAdministratorMutationVariables>;
+export const UpdateAdminProfileDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateAdminProfile' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'UpdateAdminProfileInput' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateAdminProfile' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UpdateAdminProfileMutation, UpdateAdminProfileMutationVariables>;
 export const GetUserChannelsDocument = {
   kind: 'Document',
   definitions: [
@@ -14000,6 +14103,7 @@ export const GetProductDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'sku' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'price' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'priceWithTax' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'trackInventory' } },
                       {
                         kind: 'Field',
                         name: { kind: 'Name', value: 'prices' },
@@ -14019,6 +14123,20 @@ export const GetProductDocument = {
                           selections: [
                             { kind: 'Field', name: { kind: 'Name', value: 'stockLocationId' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'stockOnHand' } },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'customFields' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'wholesalePrice' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'allowFractionalQuantity' },
+                            },
                           ],
                         },
                       },
@@ -16503,6 +16621,42 @@ export const UpdateTrainingStatusDocument = {
     },
   ],
 } as unknown as DocumentNode<UpdateTrainingStatusMutation, UpdateTrainingStatusMutationVariables>;
+export const StartTrainingDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'StartTraining' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'startTraining' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'channelId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<StartTrainingMutation, StartTrainingMutationVariables>;
 export const CompleteTrainingDocument = {
   kind: 'Document',
   definitions: [

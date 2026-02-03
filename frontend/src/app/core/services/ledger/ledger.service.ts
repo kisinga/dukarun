@@ -1,11 +1,29 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { ApolloService } from '../apollo.service';
 import { map, catchError, of, from } from 'rxjs';
+import { gql } from '@apollo/client/core';
 import {
   GetLedgerAccountsDocument,
   GetJournalEntriesDocument,
   GetJournalEntryDocument,
 } from '../../graphql/generated/graphql';
+
+const GetPaymentSourceAccountsDocument = gql`
+  query GetPaymentSourceAccounts {
+    paymentSourceAccounts {
+      items {
+        id
+        code
+        name
+        type
+        isActive
+        balance
+        parentAccountId
+        isParent
+      }
+    }
+  }
+`;
 
 export interface LedgerAccount {
   id: string;
@@ -53,10 +71,35 @@ export class LedgerService {
   private readonly apolloService = inject(ApolloService);
 
   readonly accounts = signal<LedgerAccount[]>([]);
+  readonly paymentSourceAccountsList = signal<LedgerAccount[]>([]);
   readonly entries = signal<JournalEntry[]>([]);
   readonly totalEntries = signal(0);
   readonly isLoading = signal(false);
   readonly error = signal<string | null>(null);
+
+  loadPaymentSourceAccounts() {
+    this.error.set(null);
+    const client = this.apolloService.getClient();
+    const queryPromise = client.query<{ paymentSourceAccounts: { items: LedgerAccount[] } }>({
+      query: GetPaymentSourceAccountsDocument,
+      fetchPolicy: 'network-only',
+    });
+    return from(queryPromise).pipe(
+      map((result) => {
+        if (result.data?.paymentSourceAccounts?.items) {
+          this.paymentSourceAccountsList.set(result.data.paymentSourceAccounts.items);
+          return result.data.paymentSourceAccounts.items;
+        }
+        this.paymentSourceAccountsList.set([]);
+        return [];
+      }),
+      catchError((err) => {
+        this.error.set(err.message || 'Failed to load payment source accounts');
+        this.paymentSourceAccountsList.set([]);
+        return of([]);
+      }),
+    );
+  }
 
   loadAccounts() {
     this.error.set(null);

@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
   Allow,
@@ -8,10 +8,13 @@ import {
   ID,
   Permission,
   RequestContext,
+  RequestContextService,
   Transaction,
 } from '@vendure/core';
 import gql from 'graphql-tag';
 import { MlTrainingService, TrainingManifest } from '../../services/ml/ml-training.service';
+import { MlServiceAuthGuard } from './ml-service-auth.guard';
+import { env } from '../../infrastructure/config/environment.config';
 
 /**
  * GraphQL schema extension for ML model management
@@ -108,6 +111,12 @@ export const ML_MODEL_SCHEMA = gql`
       weightsFile: Upload!
       metadata: Upload!
     ): Boolean!
+
+    """
+    Start in-process model training for a channel.
+    Requires 'ready' status (photos extracted) or will trigger extraction.
+    """
+    startTraining(channelId: ID!): Boolean!
   }
 `;
 
@@ -121,7 +130,8 @@ export class MlModelResolver {
   constructor(
     private channelService: ChannelService,
     private assetService: AssetService,
-    private mlTrainingService: MlTrainingService
+    private mlTrainingService: MlTrainingService,
+    private requestContextService: RequestContextService
   ) {}
 
   @Query()
@@ -134,13 +144,23 @@ export class MlModelResolver {
 
     const customFields = channel.customFields as any;
 
+    // Handle both loaded Asset objects and raw IDs
+    const getAssetId = (field: any) => {
+      if (!field) return null;
+      return typeof field === 'object' ? field.id : field;
+    };
+
+    const modelJsonId = getAssetId(customFields.mlModelJsonAsset);
+    const modelBinId = getAssetId(customFields.mlModelBinAsset);
+    const metadataId = getAssetId(customFields.mlMetadataAsset);
+
     return {
-      hasModel: !!(customFields.mlModelJsonId && customFields.mlMetadataId),
+      hasModel: !!(modelJsonId && metadataId),
       version: customFields.mlModelVersion || null,
       status: customFields.mlModelStatus || 'inactive',
-      modelJsonId: customFields.mlModelJsonId || null,
-      modelBinId: customFields.mlModelBinId || null,
-      metadataId: customFields.mlMetadataId || null,
+      modelJsonId,
+      modelBinId,
+      metadataId,
     };
   }
 
@@ -180,9 +200,9 @@ export class MlModelResolver {
     await this.channelService.update(ctx, {
       id: args.channelId.toString(),
       customFields: {
-        mlModelJsonId: args.modelJsonId,
-        mlModelBinId: args.modelBinId,
-        mlMetadataId: args.metadataId,
+        mlModelJsonAssetId: args.modelJsonId,
+        mlModelBinAssetId: args.modelBinId,
+        mlMetadataAssetId: args.metadataId,
         mlModelVersion: version,
         mlModelStatus: 'active',
       },
@@ -234,9 +254,9 @@ export class MlModelResolver {
     await this.channelService.update(ctx, {
       id: args.channelId.toString(),
       customFields: {
-        mlModelJsonId: null,
-        mlModelBinId: null,
-        mlMetadataId: null,
+        mlModelJsonAssetId: null,
+        mlModelBinAssetId: null,
+        mlMetadataAssetId: null,
         mlModelVersion: null,
         mlModelStatus: 'inactive',
       },
@@ -251,13 +271,50 @@ export class MlModelResolver {
     return this.mlTrainingService.getTrainingInfo(ctx, args.channelId.toString());
   }
 
+  /**
+   * Get training manifest for ml-trainer service
+   *
+   * This endpoint is designed for service-to-service calls from ml-trainer.
+   * Authentication is handled via ML_SERVICE_TOKEN in the Authorization header.
+   * We don't use @Allow decorator because it conflicts with service token auth.
+   */
   @Query()
-  @Allow(Permission.ReadCatalog)
   async mlTrainingManifest(
     @Ctx() ctx: RequestContext,
     @Args() args: { channelId: ID }
   ): Promise<TrainingManifest> {
-    return this.mlTrainingService.getTrainingManifest(ctx, args.channelId.toString());
+    // Verify service token authentication
+    // The token should be in the Authorization header as "Bearer <token>"
+    const req = (ctx as any).req;
+    const authHeader = req?.headers?.authorization || req?.headers?.Authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new Error('Authorization required: Bearer token expected');
+    }
+
+    const token = authHeader.substring(7);
+    const expectedToken = env.ml.serviceToken;
+
+    if (!expectedToken || token !== expectedToken) {
+      throw new Error('Invalid service token');
+    }
+
+    // Create a RequestContext for the specific channel
+    // This ensures product queries use the correct channel filter
+    const channel = await this.channelService.findOne(ctx, args.channelId);
+    if (!channel) {
+      throw new Error(`Channel ${args.channelId} not found`);
+    }
+
+    const channelCtx = new RequestContext({
+      apiType: ctx.apiType,
+      channel,
+      languageCode: ctx.languageCode,
+      isAuthorized: true,
+      authorizedAsOwnerOnly: false,
+    });
+
+    return this.mlTrainingService.getTrainingManifest(channelCtx, args.channelId.toString());
   }
 
   @Transaction()
@@ -275,6 +332,7 @@ export class MlModelResolver {
 
   @Transaction()
   @Mutation()
+  @UseGuards(MlServiceAuthGuard)
   @Allow(Permission.UpdateCatalog)
   async updateTrainingStatus(
     @Ctx() ctx: RequestContext,
@@ -292,9 +350,19 @@ export class MlModelResolver {
     return true;
   }
 
+  /**
+   * Complete training and upload model files (multipart)
+   *
+   * This mutation handles file uploads from ml-trainer service.
+   * Authentication is handled manually via ML_SERVICE_TOKEN because
+   * NestJS guards don't work properly with GraphQL multipart uploads.
+   *
+   * @Allow(Permission.Public) allows the mutation to be called without Vendure session auth.
+   * We validate the service token manually inside the resolver.
+   */
   @Transaction()
   @Mutation()
-  @Allow(Permission.UpdateCatalog)
+  @Allow(Permission.Public)
   async completeTraining(
     @Ctx() ctx: RequestContext,
     @Args()
@@ -307,6 +375,51 @@ export class MlModelResolver {
   ): Promise<boolean> {
     this.logger.debug('completeTraining called', { channelId: args.channelId });
 
+    // Manual service token authentication (guards don't work for multipart uploads)
+    const req = (ctx as any).req;
+    const authHeader = req?.headers?.authorization || req?.headers?.Authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      this.logger.warn('completeTraining: No Bearer token provided');
+      throw new Error('Authorization required: Bearer token expected');
+    }
+
+    const token = authHeader.substring(7);
+    const expectedToken = env.ml.serviceToken;
+
+    if (!expectedToken || token !== expectedToken) {
+      this.logger.warn('completeTraining: Invalid service token');
+      throw new Error('Invalid service token');
+    }
+
+    this.logger.log('completeTraining: Service token validated');
+
+    // Create internal context with admin permissions
+    // First create with default channel, then we'll use it to fetch target channel
+    this.logger.log('completeTraining: Creating default admin context...');
+    const defaultCtx = await this.requestContextService.create({
+      apiType: 'admin',
+    });
+    this.logger.log('completeTraining: Default context created');
+
+    // Now fetch the target channel using the default context (which has permissions)
+    this.logger.log(`completeTraining: Fetching channel ${args.channelId}...`);
+    const channel = await this.channelService.findOne(defaultCtx, args.channelId);
+    if (!channel) {
+      throw new Error(`Channel ${args.channelId} not found`);
+    }
+    this.logger.log(`completeTraining: Channel found: ${channel.code}`);
+
+    // Create the final context scoped to the target channel
+    this.logger.log('completeTraining: Creating channel-scoped context...');
+    const internalCtx = await this.requestContextService.create({
+      apiType: 'admin',
+      channelOrToken: channel,
+    });
+    this.logger.log('completeTraining: Internal context created for channel', {
+      channelId: args.channelId,
+    });
+
     try {
       // Upload the three files as assets with proper tags
       const trainingDate = new Date().toISOString().split('T')[0];
@@ -318,23 +431,29 @@ export class MlModelResolver {
         `trained-${trainingDate}`,
       ];
 
-      // Upload model.json
-      const modelJsonResult = await this.assetService.create(ctx, {
+      // Upload model.json (using internalCtx for proper permissions)
+      this.logger.log('completeTraining: Uploading model.json...');
+      const modelJsonResult = await this.assetService.create(internalCtx, {
         file: args.modelJson,
         tags,
       });
+      this.logger.log('completeTraining: model.json uploaded');
 
       // Upload weights.bin
-      const weightsResult = await this.assetService.create(ctx, {
+      this.logger.log('completeTraining: Uploading weights.bin...');
+      const weightsResult = await this.assetService.create(internalCtx, {
         file: args.weightsFile,
         tags,
       });
+      this.logger.log('completeTraining: weights.bin uploaded');
 
       // Upload metadata.json
-      const metadataResult = await this.assetService.create(ctx, {
+      this.logger.log('completeTraining: Uploading metadata.json...');
+      const metadataResult = await this.assetService.create(internalCtx, {
         file: args.metadata,
         tags,
       });
+      this.logger.log('completeTraining: metadata.json uploaded');
 
       // Check for errors in asset creation
       if (
@@ -344,12 +463,7 @@ export class MlModelResolver {
       ) {
         throw new Error('Failed to create assets');
       }
-
-      // Assign assets to channel (CRITICAL: assets must be channel-aware for queries)
-      await this.assetService.assignToChannel(ctx, {
-        assetIds: [modelJsonResult.id, weightsResult.id, metadataResult.id],
-        channelId: args.channelId.toString(),
-      });
+      this.logger.log('completeTraining: Asset error check passed');
 
       // Parse metadata to get stats
       let productCount = 0;
@@ -362,31 +476,41 @@ export class MlModelResolver {
       } catch (e) {
         this.logger.warn('Could not parse metadata.json for stats');
       }
+      this.logger.log(
+        `completeTraining: Metadata parsed - products: ${productCount}, images: ${imageCount}`
+      );
 
       // Update channel with new model assets and stats
-      // Update channel with new model assets and stats
-      await this.channelService.update(ctx, {
+      // For relation custom fields, use *Id suffix (Vendure input convention)
+      this.logger.log('completeTraining: Updating channel with model assets...');
+      this.logger.log(
+        `Asset IDs - model: ${modelJsonResult.id}, weights: ${weightsResult.id}, metadata: ${metadataResult.id}`
+      );
+      await this.channelService.update(internalCtx, {
         id: args.channelId.toString(),
         customFields: {
-          mlModelJsonId: modelJsonResult.id.toString(),
-          mlModelBinId: weightsResult.id.toString(),
-          mlMetadataId: metadataResult.id.toString(),
+          mlModelJsonAssetId: modelJsonResult.id,
+          mlModelBinAssetId: weightsResult.id,
+          mlMetadataAssetId: metadataResult.id,
           mlModelVersion: version,
           mlModelStatus: 'active',
           mlTrainingStatus: 'active',
           mlTrainingProgress: 100,
+          mlTrainingError: null, // Clear any previous error
           mlProductCount: productCount,
           mlImageCount: imageCount,
+          mlLastTrainedAt: new Date(), // Set rate limit marker
+          mlTrainingQueuedAt: null, // Clear queue marker
         },
       });
 
-      this.logger.log('Training completed successfully');
+      this.logger.log('completeTraining: Training completed successfully!');
       return true;
     } catch (error) {
       this.logger.error('Error completing training:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       await this.mlTrainingService.updateTrainingStatus(
-        ctx,
+        internalCtx,
         args.channelId.toString(),
         'failed',
         0,
@@ -394,5 +518,15 @@ export class MlModelResolver {
       );
       throw error;
     }
+  }
+  @Transaction()
+  @Mutation()
+  @Allow(Permission.UpdateCatalog)
+  async startTraining(
+    @Ctx() ctx: RequestContext,
+    @Args() args: { channelId: ID }
+  ): Promise<boolean> {
+    this.logger.debug('startTraining called', args);
+    return this.mlTrainingService.startTraining(ctx, args.channelId.toString());
   }
 }

@@ -291,12 +291,12 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
     try {
       const result = await this.paymentService.paySingleOrder(
         order.id,
-        this.outstandingAmount() / 100, // Convert cents to shillings for backend
+        this.outstandingAmount(), // Pass cents
       );
 
       if (result) {
         this.paymentSuccess.set(
-          `Payment recorded: ${result.totalAllocated > 0 ? this.currencyService.format(result.totalAllocated * 100) : 'Payment recorded'}`,
+          `Payment recorded: ${result.totalAllocated > 0 ? this.currencyService.format(result.totalAllocated) : 'Payment recorded'}`,
         );
         // Refresh order data
         await this.ordersService.fetchOrderById(order.id);

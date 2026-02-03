@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { RequestContext, TransactionalConnection, UserInputError } from '@vendure/core';
 import { In } from 'typeorm';
 import { AuditService } from '../../infrastructure/audit/audit.service';
+import { ChartOfAccountsService } from '../financial/chart-of-accounts.service';
 import { SupplierCreditService } from '../credit/supplier-credit.service';
 import { FinancialService } from '../financial/financial.service';
 import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
@@ -14,19 +15,20 @@ import {
 
 export interface SupplierPaymentAllocationInput {
   supplierId: string;
-  paymentAmount: number; // In base currency units (will be converted to cents)
+  paymentAmount: number; // In smallest currency unit (cents)
   purchaseIds?: string[]; // Optional - if not provided, auto-select oldest
+  debitAccountCode?: string; // Optional - overrides method-based debit account
 }
 
 export interface SupplierPaymentAllocationResult {
   purchasesPaid: Array<{
     purchaseId: string;
     purchaseReference: string;
-    amountPaid: number; // In base currency units
+    amountPaid: number; // In smallest currency unit (cents)
   }>;
-  remainingBalance: number; // In base currency units
-  totalAllocated: number; // In base currency units
-  excessPayment: number; // In base currency units - amount paid beyond what's owed
+  remainingBalance: number; // In smallest currency unit (cents)
+  totalAllocated: number; // In smallest currency unit (cents)
+  excessPayment: number; // In smallest currency unit (cents) - amount paid beyond what's owed
 }
 
 @Injectable()
@@ -37,6 +39,7 @@ export class SupplierPaymentAllocationService {
     private readonly connection: TransactionalConnection,
     private readonly supplierCreditService: SupplierCreditService,
     private readonly financialService: FinancialService,
+    private readonly chartOfAccountsService: ChartOfAccountsService,
     @Optional() private readonly auditService?: AuditService
   ) {}
 
@@ -80,6 +83,12 @@ export class SupplierPaymentAllocationService {
     ctx: RequestContext,
     input: SupplierPaymentAllocationInput
   ): Promise<SupplierPaymentAllocationResult> {
+    if (input.debitAccountCode?.trim()) {
+      await this.chartOfAccountsService.validatePaymentSourceAccount(
+        ctx,
+        input.debitAccountCode.trim()
+      );
+    }
     return this.connection.withTransaction(ctx, async transactionCtx => {
       try {
         // 1. Get unpaid purchases
@@ -92,8 +101,8 @@ export class SupplierPaymentAllocationService {
           throw new UserInputError('No unpaid credit purchases found for this supplier.');
         }
 
-        // 2. Convert payment amount from base currency to cents for internal calculations
-        const paymentAmountInCents = Math.round(input.paymentAmount * 100);
+        // 2. Payment amount is already in cents
+        const paymentAmountInCents = input.paymentAmount;
 
         // 3. Convert purchases to PaymentAllocationItem format
         const allocationItems: PaymentAllocationItem[] = unpaidPurchases.map(purchase => {
@@ -167,13 +176,14 @@ export class SupplierPaymentAllocationService {
             purchase.referenceNumber || purchase.id,
             input.supplierId,
             allocation.amountToAllocate,
-            PAYMENT_METHOD_CODES.CASH // Default to cash, can be made configurable
+            PAYMENT_METHOD_CODES.CASH, // Default to cash, can be made configurable
+            input.debitAccountCode?.trim()
           );
 
           purchasesPaid.push({
             purchaseId: purchase.id,
             purchaseReference: purchase.referenceNumber || purchase.id,
-            amountPaid: allocation.amountToAllocate / 100, // Convert back to base currency
+            amountPaid: allocation.amountToAllocate,
           });
         }
 
@@ -182,7 +192,7 @@ export class SupplierPaymentAllocationService {
           await this.supplierCreditService.recordSupplierRepayment(
             transactionCtx,
             input.supplierId,
-            calculation.totalAllocated / 100 // Convert to base currency
+            calculation.totalAllocated // Amount in cents
           );
         }
 
@@ -206,12 +216,9 @@ export class SupplierPaymentAllocationService {
             createdAt: purchase.createdAt,
           };
         });
-        const remainingBalanceInCents = calculateRemainingBalance(remainingItems);
-
-        // 8. Convert excess payment to base currency
-        const excessPayment = calculation.excessPayment / 100;
-        const totalAllocated = calculation.totalAllocated / 100;
-        const remainingBalance = remainingBalanceInCents / 100;
+        const remainingBalance = calculateRemainingBalance(remainingItems);
+        const excessPayment = calculation.excessPayment;
+        const totalAllocated = calculation.totalAllocated;
 
         // 9. Log audit event
         if (this.auditService) {

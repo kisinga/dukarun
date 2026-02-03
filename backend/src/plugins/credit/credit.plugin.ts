@@ -40,6 +40,9 @@ import { SupplierPaymentAllocationResolver } from './supplier-payment-allocation
 
 // Merge all schemas into a single DocumentNode
 const COMBINED_SCHEMA = gql`
+  """
+  All monetary amounts in CreditSummary are in smallest currency unit (cents)
+  """
   type CreditSummary {
     customerId: ID!
     isCreditApproved: Boolean!
@@ -85,6 +88,9 @@ const COMBINED_SCHEMA = gql`
     isCashierFlow: Boolean
   }
 
+  """
+  All monetary amounts in PaymentAllocationResult are in smallest currency unit (cents)
+  """
   type PaymentAllocationResult {
     ordersPaid: [OrderPayment!]!
     remainingBalance: Float!
@@ -98,17 +104,24 @@ const COMBINED_SCHEMA = gql`
     amountPaid: Float!
   }
 
+  """
+  paymentAmount in smallest currency unit (cents)
+  """
   input PaymentAllocationInput {
     customerId: ID!
     paymentAmount: Float!
     orderIds: [ID!]
   }
 
+  """
+  paymentAmount in smallest currency unit (cents)
+  """
   input PaySingleOrderInput {
     orderId: ID!
     paymentAmount: Float
     paymentMethodCode: String
     referenceNumber: String
+    debitAccountCode: String
   }
 
   type CreditValidationResult {
@@ -143,6 +156,9 @@ const COMBINED_SCHEMA = gql`
     paySingleOrder(input: PaySingleOrderInput!): PaymentAllocationResult!
   }
 
+  """
+  All monetary amounts in SupplierCreditSummary are in smallest currency unit (cents)
+  """
   type SupplierCreditSummary {
     supplierId: ID!
     isSupplierCreditApproved: Boolean!
@@ -172,6 +188,9 @@ const COMBINED_SCHEMA = gql`
     supplierCreditDuration: Int!
   }
 
+  """
+  All monetary amounts in SupplierPaymentAllocationResult are in smallest currency unit (cents)
+  """
   type SupplierPaymentAllocationResult {
     purchasesPaid: [SupplierPurchasePayment!]!
     remainingBalance: Float!
@@ -185,6 +204,9 @@ const COMBINED_SCHEMA = gql`
     amountPaid: Float!
   }
 
+  """
+  paymentAmount in smallest currency unit (cents)
+  """
   input SupplierPaymentAllocationInput {
     supplierId: ID!
     paymentAmount: Float!

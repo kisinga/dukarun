@@ -75,6 +75,8 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
       Permission.CreateStockLocation,
       Permission.ReadStockLocation,
       Permission.UpdateStockLocation,
+      // Channel permissions (required for asset access)
+      Permission.ReadChannel,
       // Settings permissions
       Permission.ReadSettings,
       Permission.UpdateSettings,
@@ -96,6 +98,8 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
     name: 'Cashier',
     description: 'Payment processing and credit approval',
     permissions: [
+      Permission.ReadAsset, // Required for ML model access and product images
+      Permission.ReadChannel, // Required for asset access via AssetServerPlugin
       Permission.ReadOrder,
       Permission.UpdateOrder,
       Permission.ReadCustomer,
@@ -109,6 +113,8 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
     name: 'Accountant',
     description: 'Financial oversight and reconciliation',
     permissions: [
+      Permission.ReadAsset, // Required for ML model access and product images
+      Permission.ReadChannel, // Required for asset access via AssetServerPlugin
       Permission.ReadOrder,
       Permission.ReadCustomer,
       Permission.ReadProduct,
@@ -123,6 +129,8 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
     name: 'Salesperson',
     description: 'Sales operations and customer management',
     permissions: [
+      Permission.ReadAsset, // Required for ML model access and product images
+      Permission.ReadChannel, // Required for asset access via AssetServerPlugin
       Permission.CreateOrder,
       Permission.ReadOrder,
       Permission.CreateCustomer,
@@ -136,6 +144,9 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
     name: 'Stockkeeper',
     description: 'Inventory management',
     permissions: [
+      Permission.ReadAsset, // Required for product images
+      Permission.ReadChannel, // Required for asset access via AssetServerPlugin
+      Permission.CreateAsset, // Required for uploading product images
       Permission.CreateProduct,
       Permission.ReadProduct,
       Permission.UpdateProduct,
@@ -189,6 +200,8 @@ export class RoleProvisionerService {
     Permission.CreateStockLocation,
     Permission.ReadStockLocation,
     Permission.UpdateStockLocation,
+    // Channel permissions (required for asset access)
+    Permission.ReadChannel,
     // Settings permissions
     Permission.ReadSettings,
     Permission.UpdateSettings,

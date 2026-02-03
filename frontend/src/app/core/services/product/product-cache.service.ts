@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { PREFETCH_PRODUCTS } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
+import { ProductMapperService } from './product-mapper.service';
 import { ProductSearchResult, ProductVariant } from './product-search.service';
 
 /**
@@ -23,6 +24,7 @@ export interface CacheStatus {
 })
 export class ProductCacheService {
   private readonly apolloService = inject(ApolloService);
+  private readonly mapper = inject(ProductMapperService);
 
   // Signals for cache status
   private readonly statusSignal = signal<CacheStatus>({
@@ -67,22 +69,9 @@ export class ProductCacheService {
         throw new Error('No products returned from server');
       }
 
-      // Transform and cache products
-      const products = result.data.products.items.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        featuredAsset: p.featuredAsset ? { preview: p.featuredAsset.preview } : undefined,
-        variants: p.variants.map((v: any) => ({
-          id: v.id,
-          name: v.name,
-          sku: v.sku,
-          priceWithTax: v.priceWithTax?.value || v.priceWithTax || 0, // Handle Money object or direct value
-          stockLevel: v.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
-          productId: p.id,
-          productName: p.name,
-          featuredAsset: p.featuredAsset ? { preview: p.featuredAsset.preview } : undefined,
-        })),
-      }));
+      const products = result.data.products.items.map((p: any) =>
+        this.mapper.toProductSearchResult(p),
+      );
 
       // Build in-memory indexes
       this.productsById.clear();

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Order, Payment, RequestContext } from '@vendure/core';
 import { ACCOUNT_CODES } from '../../../ledger/account-codes.constants';
 import { BaseTransactionStrategy } from '../base-transaction-strategy';
+import { ChartOfAccountsService } from '../chart-of-accounts.service';
 import { LedgerPostingService } from '../ledger-posting.service';
 import { LedgerQueryService } from '../ledger-query.service';
 import {
@@ -45,7 +46,11 @@ export type SaleTransactionData = CreditSaleTransactionData | CashSaleTransactio
  */
 @Injectable()
 export class SalePostingStrategy extends BaseTransactionStrategy {
-  constructor(postingService: LedgerPostingService, queryService: LedgerQueryService) {
+  constructor(
+    postingService: LedgerPostingService,
+    queryService: LedgerQueryService,
+    private readonly chartOfAccountsService: ChartOfAccountsService
+  ) {
     super(postingService, queryService, 'SalePostingStrategy');
   }
 
@@ -122,6 +127,10 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
   private async postCashSale(data: CashSaleTransactionData): Promise<PostingResult> {
     const payment = data.payment;
     const order = data.order;
+    const debitAccountCode = (payment.metadata?.debitAccountCode as string)?.trim();
+    if (debitAccountCode) {
+      await this.chartOfAccountsService.validatePaymentSourceAccount(data.ctx, debitAccountCode);
+    }
 
     if (payment.amount <= 0) {
       throw new Error(
@@ -140,12 +149,14 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
       };
     }
 
+    const resolvedAccountCode = (payment.metadata?.debitAccountCode as string)?.trim() || undefined;
     const context: PaymentPostingContext = {
       amount: payment.amount,
       method: payment.method,
       orderId: order.id.toString(),
       orderCode: order.code,
       customerId: order.customer?.id?.toString(),
+      resolvedAccountCode,
     };
 
     await this.postingService.postPayment(data.ctx, payment.id.toString(), context);
@@ -165,7 +176,9 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
       accounts.push(ACCOUNT_CODES.ACCOUNTS_RECEIVABLE);
     } else {
       const cashSaleData = saleData as CashSaleTransactionData;
-      const clearingAccount = mapPaymentMethodToAccount(cashSaleData.payment.method);
+      const clearingAccount =
+        (cashSaleData.payment.metadata?.debitAccountCode as string)?.trim() ||
+        mapPaymentMethodToAccount(cashSaleData.payment.method);
       accounts.push(clearingAccount);
     }
 

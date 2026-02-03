@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import { CurrencyService } from '../../../../core/services/currency.service';
 
 export interface Customer {
   id: string;
@@ -67,7 +68,7 @@ export interface Customer {
                         <div class="badge badge-outline badge-success justify-start gap-1">
                           <span>Available</span>
                           <span class="font-semibold">{{
-                            customer.availableCredit | number: '1.0-0'
+                            currencyService.format(customer.availableCredit)
                           }}</span>
                         </div>
                         <div
@@ -76,7 +77,7 @@ export interface Customer {
                         >
                           <span>Owing</span>
                           <span class="font-semibold">{{
-                            customer.outstandingAmount | number: '1.0-0'
+                            currencyService.format(customer.outstandingAmount)
                           }}</span>
                         </div>
                       </div>
@@ -233,19 +234,19 @@ export interface Customer {
                   <div class="bg-base-100/60 rounded-lg p-2 text-center">
                     <div class="font-semibold text-base-content/70">Limit</div>
                     <div class="font-bold text-base-content">
-                      {{ selectedCustomer()!.creditLimit | number: '1.0-0' }}
+                      {{ currencyService.format(selectedCustomer()!.creditLimit) }}
                     </div>
                   </div>
                   <div class="bg-base-100/60 rounded-lg p-2 text-center">
                     <div class="font-semibold text-base-content/70">Outstanding</div>
                     <div class="font-bold text-base-content">
-                      {{ selectedCustomer()!.outstandingAmount | number: '1.0-0' }}
+                      {{ currencyService.format(selectedCustomer()!.outstandingAmount) }}
                     </div>
                   </div>
                   <div class="bg-base-100 rounded-lg p-2 text-center">
                     <div class="font-semibold text-base-content/70">Available</div>
                     <div class="font-bold text-success">
-                      {{ selectedCustomer()!.availableCredit | number: '1.0-0' }}
+                      {{ currencyService.format(selectedCustomer()!.availableCredit) }}
                     </div>
                   </div>
                 </div>
@@ -298,6 +299,7 @@ export interface Customer {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomerSelectorComponent {
+  readonly currencyService = inject(CurrencyService);
   readonly selectedCustomer = input.required<Customer | null>();
   readonly searchResults = input.required<Customer[]>();
   readonly isSearching = input<boolean>(false);

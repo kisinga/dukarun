@@ -14,6 +14,7 @@ import { JournalLine } from '../../ledger/journal-line.entity';
 import { PostingService } from '../../ledger/posting.service';
 import { AccountBalanceService } from '../../services/financial/account-balance.service';
 import { CashierSessionService } from '../../services/financial/cashier-session.service';
+import { ChartOfAccountsService } from '../../services/financial/chart-of-accounts.service';
 import { InventoryReconciliationService } from '../../services/financial/inventory-reconciliation.service';
 import { LedgerQueryService } from '../../services/financial/ledger-query.service';
 import { PeriodEndClosingService } from '../../services/financial/period-end-closing.service';
@@ -53,6 +54,7 @@ const COMBINED_SCHEMA = gql`
   ],
   providers: [
     PostingService,
+    ChartOfAccountsService,
     DashboardStatsResolver,
     LedgerViewerResolver,
     PeriodManagementResolver,
@@ -85,4 +87,4 @@ const COMBINED_SCHEMA = gql`
   },
   compatibility: VENDURE_COMPATIBILITY_VERSION,
 })
-export class LedgerPlugin { }
+export class LedgerPlugin {}

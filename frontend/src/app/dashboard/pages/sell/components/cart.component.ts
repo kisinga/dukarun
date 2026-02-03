@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { ProductVariant } from '../../../../core/services/product/product-search.service';
 import { CartItemComponent } from './cart-item.component';
-import { PriceOverrideData } from './price-override.component';
+import { PriceOverrideData } from '../services/price-modification.service';
 
 export interface CartItem {
   variant: ProductVariant;

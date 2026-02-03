@@ -1,10 +1,11 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, Optional, Inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ApolloClient, HttpLink, InMemoryCache, from } from '@apollo/client';
 import { SetContextLink } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import { propagation, context as otelContext } from '@opentelemetry/api';
 import { environment } from '../../../environments/environment';
+import { APOLLO_TEST_CLIENT } from './apollo-test-client.token';
 
 /**
  * Service for managing Apollo GraphQL client
@@ -23,8 +24,8 @@ export class ApolloService {
   private apolloClient: ApolloClient;
   private sessionExpiredCallback?: () => void;
 
-  constructor() {
-    this.apolloClient = this.createApolloClient();
+  constructor(@Optional() @Inject(APOLLO_TEST_CLIENT) testClient?: ApolloClient) {
+    this.apolloClient = testClient ?? this.createApolloClient();
   }
 
   /**

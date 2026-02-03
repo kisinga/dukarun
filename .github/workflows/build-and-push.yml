@@ -6,7 +6,7 @@ on:
   workflow_run:
     workflows: ["Test Suite"]
     types: [completed]
-    branches: [main, master]
+    branches: [main]
 
 env:
   REGISTRY: ghcr.io

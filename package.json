@@ -2,11 +2,32 @@
   "name": "dukarun",
   "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "backend",
+    "frontend",
+    "ml-trainer"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "prepare": "husky install"
+    "setup": "ts-node scripts/setup.ts",
+    "predev": "npm run setup -- --quick --fix",
+    "dev": "npm run services:up && npm run dev:all",
+    "dev:all": "concurrently -k -n BE,FE,ML -c blue,green,red npm:dev:backend npm:dev:frontend npm:dev:ml",
+    "dev:backend": "npm run dev -w @dukarun/backend",
+    "dev:frontend": "npm start -w @dukarun/frontend",
+    "dev:ml": "npm run dev -w @dukarun/ml-trainer",
+    "services:up": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml up -d",
+    "services:down": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml down",
+    "prepare": "node -e \"if (process.env.CI === 'true' || process.env.HUSKY === '0') process.exit(0); require('child_process').execSync('npx husky install', {stdio:'inherit'})\""
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
+    "concurrently": "^9.1.0",
     "husky": "^9.1.7",
-    "lint-staged": "^15.5.2"
+    "lint-staged": "^15.5.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
   }
 }

@@ -1,10 +1,9 @@
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
+import { CommunicationPlugin } from '../communication/communication.plugin';
 import { NotificationService } from '../../services/notifications/notification.service';
 import { PushNotificationService } from '../../services/notifications/push-notification.service';
 import { AdminNotificationService } from '../../services/notifications/admin-notification.service';
-import { SmsProviderFactory } from '../../infrastructure/sms/sms-provider.factory';
-import { SmsService } from '../../infrastructure/sms/sms.service';
 import { ChannelCommunicationService } from '../../services/channels/channel-communication.service';
 import { NotificationSubscriber } from '../../infrastructure/events/notification.subscriber';
 import { AuditService } from '../../infrastructure/audit/audit.service';
@@ -26,7 +25,7 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
  * - NotificationService handles user preferences
  */
 @VendurePlugin({
-  imports: [PluginCommonModule],
+  imports: [PluginCommonModule, CommunicationPlugin],
   providers: [
     // Worker context service (required for background tasks)
     WorkerContextService,
@@ -36,27 +35,20 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
     UserContextResolver,
     AuditService,
 
-    // Channel update helper
-
     // Core services
     ChannelUserService,
-
-    // SMS infrastructure
-    SmsProviderFactory,
-    SmsService,
 
     // Notification services
     NotificationService,
     PushNotificationService,
     AdminNotificationService,
 
-    // Communication services
+    // Channel communication (publishes events; NotificationSubscriber handles delivery)
     ChannelCommunicationService,
 
     // Event subscriber (listens to typed DukaHub events)
     NotificationSubscriber,
   ],
-  exports: [SmsService],
   compatibility: VENDURE_COMPATIBILITY_VERSION,
 })
 export class ChannelEventsPlugin {}

@@ -53,6 +53,7 @@ export const LEDGER_VIEWER_SCHEMA = gql`
 
   extend type Query {
     ledgerAccounts: LedgerAccountsResult!
+    paymentSourceAccounts: LedgerAccountsResult!
     journalEntries(options: JournalEntriesOptions): JournalEntriesResult!
     journalEntry(id: ID!): JournalEntry
   }

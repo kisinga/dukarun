@@ -1,0 +1,280 @@
+<div class="card bg-base-100 shadow-lg">
+  <div class="card-body p-4 sm:p-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+      <div>
+        <h2 class="text-lg sm:text-xl font-bold flex items-center gap-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          Audit Trail
+        </h2>
+        <p class="text-sm opacity-60">View system events and user actions</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" (click)="loadAuditLogs()" [disabled]="isLoading()">
+        @if (isLoading()) {
+          <span class="loading loading-spinner loading-xs"></span>
+        } @else {
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        }
+        Refresh
+      </button>
+    </div>
+
+    <!-- Loading State -->
+    @if (isLoading() && auditLogs().length === 0) {
+      <div class="flex justify-center items-center py-12">
+        <span class="loading loading-spinner loading-lg"></span>
+      </div>
+    }
+
+    <!-- Error State -->
+    @if (error()) {
+      <div class="alert alert-error py-2 text-sm mb-4">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fill-rule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+            clip-rule="evenodd"
+          />
+        </svg>
+        <span>{{ error() }}</span>
+      </div>
+    }
+
+    <!-- Filter Bar -->
+    @if (!isLoading() || auditLogs().length > 0) {
+      <div class="mb-4">
+        <app-audit-trail-filter
+          [(searchQuery)]="searchQuery"
+          [(eventTypeFilter)]="eventTypeFilter"
+          [(entityTypeFilter)]="entityTypeFilter"
+          [(sourceFilter)]="sourceFilter"
+          [eventTypes]="availableEventTypes()"
+          [entityTypes]="availableEntityTypes()"
+        />
+      </div>
+    }
+
+    <!-- Empty State (With Filters) -->
+    @if (
+      !isLoading() && filteredLogs().length === 0 && auditLogs().length > 0 && hasActiveFilters()
+    ) {
+      <div class="alert alert-info py-2 text-sm">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fill-rule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+            clip-rule="evenodd"
+          />
+        </svg>
+        <span>No logs match filters</span>
+        <button class="btn btn-xs btn-ghost" (click)="clearFilters()">Clear</button>
+      </div>
+    }
+
+    <!-- Desktop Table View -->
+    @if (!isLoading() || auditLogs().length > 0) {
+      <div class="hidden md:block">
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead>
+              <tr class="text-xs">
+                <th>Time</th>
+                <th>Event</th>
+                <th>Entity</th>
+                <th>User</th>
+                <th>Source</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (log of paginatedLogs(); track log.id) {
+                <tr class="hover">
+                  <td class="text-xs">
+                    <div>{{ formatTimestamp(log.timestamp) }}</div>
+                    <div class="opacity-50">{{ formatRelativeTime(log.timestamp) }}</div>
+                  </td>
+                  <td>
+                    <span class="badge badge-xs" [class]="getEventTypeBadgeClass(log.eventType)">
+                      {{ formatEventType(log.eventType) }}
+                    </span>
+                  </td>
+                  <td>
+                    @if (log.entityType && log.entityId) {
+                      <button
+                        class="badge badge-xs badge-outline hover:badge-primary cursor-pointer"
+                        (click)="navigateToEntity(log.entityType!, log.entityId!)"
+                      >
+                        {{ log.entityType }} {{ truncateId(log.entityId) }}
+                      </button>
+                    } @else {
+                      <span class="opacity-30 text-xs">—</span>
+                    }
+                  </td>
+                  <td>
+                    @if (log.userId && log.userId !== 'null' && log.userId !== '') {
+                      <button
+                        class="badge badge-xs badge-info cursor-pointer"
+                        (click)="showUserDetails(log.userId!, log.source)"
+                      >
+                        {{ truncateId(log.userId) }}
+                      </button>
+                    } @else {
+                      <span class="badge badge-xs badge-neutral opacity-60">System</span>
+                    }
+                  </td>
+                  <td>
+                    <span
+                      class="badge badge-xs"
+                      [class.badge-info]="log.source === 'user_action'"
+                      [class.badge-neutral]="log.source === 'system_event'"
+                    >
+                      {{ log.source === 'user_action' ? 'User' : 'Sys' }}
+                    </span>
+                  </td>
+                  <td>
+                    <button class="btn btn-ghost btn-xs" (click)="toggleExpanded(log.id)">
+                      {{ expandedLogs().has(log.id) ? '▼' : '▶' }}
+                    </button>
+                  </td>
+                </tr>
+                @if (expandedLogs().has(log.id)) {
+                  <tr>
+                    <td colspan="6" class="bg-base-200 p-0">
+                      <pre class="text-xs overflow-x-auto font-mono p-3 m-0">{{
+                        formatData(log.data)
+                      }}</pre>
+                    </td>
+                  </tr>
+                }
+              } @empty {
+                <tr>
+                  <td colspan="6" class="text-center py-8 opacity-60 text-sm">
+                    {{ hasActiveFilters() ? 'No logs match filters' : 'No audit logs found' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Mobile Card View -->
+      <div class="md:hidden space-y-2">
+        @for (log of paginatedLogs(); track log.id) {
+          <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+            <input type="checkbox" />
+            <div class="collapse-title p-3 min-h-0 text-sm">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="badge badge-xs" [class]="getEventTypeBadgeClass(log.eventType)">
+                  {{ formatEventType(log.eventType) }}
+                </span>
+                <span class="text-xs opacity-60">{{ formatRelativeTime(log.timestamp) }}</span>
+              </div>
+            </div>
+            <div class="collapse-content px-3 pb-3 text-xs space-y-2">
+              <div class="flex justify-between">
+                <span class="opacity-60">Time</span>
+                <span>{{ formatTimestamp(log.timestamp) }}</span>
+              </div>
+              @if (log.entityType && log.entityId) {
+                <div class="flex justify-between items-center">
+                  <span class="opacity-60">Entity</span>
+                  <button
+                    class="badge badge-xs badge-outline"
+                    (click)="navigateToEntity(log.entityType!, log.entityId!)"
+                  >
+                    {{ log.entityType }} {{ truncateId(log.entityId) }}
+                  </button>
+                </div>
+              }
+              <div class="flex justify-between items-center">
+                <span class="opacity-60">User</span>
+                @if (log.userId && log.userId !== 'null') {
+                  <button
+                    class="badge badge-xs badge-info"
+                    (click)="showUserDetails(log.userId!, log.source)"
+                  >
+                    {{ truncateId(log.userId) }}
+                  </button>
+                } @else {
+                  <span class="badge badge-xs badge-neutral">System</span>
+                }
+              </div>
+              <div class="pt-2 border-t border-base-300">
+                <pre class="text-xs overflow-x-auto font-mono bg-base-300 p-2 rounded">{{
+                  formatData(log.data)
+                }}</pre>
+              </div>
+            </div>
+          </div>
+        } @empty {
+          <div class="text-center py-8 opacity-60 text-sm">
+            {{ hasActiveFilters() ? 'No logs match filters' : 'No audit logs found' }}
+          </div>
+        }
+      </div>
+
+      <!-- Pagination -->
+      @if (totalPages() > 1 && filteredLogs().length > 0) {
+        <div class="mt-4 pt-4 border-t border-base-300">
+          <div class="text-xs opacity-60 mb-2">
+            {{ (currentPage() - 1) * itemsPerPage() + 1 }}-{{ endItem() }} of {{ totalItems() }}
+            @if (hasActiveFilters()) {
+              <span>(filtered)</span>
+            }
+          </div>
+          <app-pagination
+            [currentPage]="currentPage()"
+            [totalPages]="totalPages()"
+            [itemsPerPage]="itemsPerPage()"
+            [pageOptions]="pageOptions"
+            [totalItems]="totalItems()"
+            [showItemsPerPage]="true"
+            itemLabel="logs"
+            (pageChange)="onPageChange($event)"
+            (itemsPerPageChange)="onItemsPerPageChange($event)"
+          />
+        </div>
+      }
+    }
+  </div>
+</div>
+
+<!-- User Details Modal -->
+<app-user-details-modal
+  [userId]="selectedUserId()"
+  [source]="selectedUserSource()"
+  (closed)="closeUserModal()"
+/>

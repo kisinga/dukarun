@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import axios from 'axios';
 import {
   AssetService,
   ChannelService,
@@ -7,6 +8,7 @@ import {
   RequestContext,
   TransactionalConnection,
 } from '@vendure/core';
+import { env } from '../../infrastructure/config/environment.config';
 import { MlWebhookService } from './ml-webhook.service';
 import { MLStatusEvent } from '../../infrastructure/events/custom-events';
 
@@ -139,6 +141,14 @@ export class MlTrainingService {
 
   /**
    * Get training manifest for a channel
+   *
+   * Note: This method extracts photos to generate the manifest.
+   * The extraction is idempotent - it updates channel custom fields with counts
+   * but doesn't change the underlying product/asset data.
+   *
+   * If mlProductCount > 0, extraction was done recently, but we still need to
+   * extract again to get the actual manifest data (product IDs, image URLs).
+   * This is expected behavior since we don't store the full manifest.
    */
   async getTrainingManifest(ctx: RequestContext, channelId: string): Promise<TrainingManifest> {
     const channel = await this.channelService.findOne(ctx, channelId);
@@ -146,15 +156,8 @@ export class MlTrainingService {
       throw new Error('Channel not found');
     }
 
-    const customFields = channel.customFields as any;
-
-    // Check if we have recent extraction data
-    if (customFields.mlProductCount > 0) {
-      // Return cached manifest (in a real implementation, you might store this)
-      return this.extractPhotosForChannel(ctx, channelId);
-    }
-
-    // No cached data, extract now
+    // Always extract to get fresh manifest data
+    // This is necessary since we don't store the full manifest, only counts
     return this.extractPhotosForChannel(ctx, channelId);
   }
 
@@ -216,7 +219,7 @@ export class MlTrainingService {
 
     const customFields = channel.customFields as any;
     return !!(
-      customFields.mlModelJsonId ||
+      customFields.mlModelJsonAsset?.id ||
       customFields.mlTrainingStatus === 'training' ||
       customFields.mlTrainingStatus === 'ready' ||
       customFields.mlTrainingStatus === 'active'
@@ -260,6 +263,15 @@ export class MlTrainingService {
 
     const customFields = channel.customFields as any;
 
+    // Handle both loaded Asset objects and raw IDs
+    const getAssetId = (field: any) => {
+      if (!field) return null;
+      return typeof field === 'object' ? field.id : field;
+    };
+
+    const modelJsonId = getAssetId(customFields.mlModelJsonAsset);
+    const metadataId = getAssetId(customFields.mlMetadataAsset);
+
     return {
       status: customFields.mlTrainingStatus || 'idle',
       progress: customFields.mlTrainingProgress || 0,
@@ -267,8 +279,64 @@ export class MlTrainingService {
       error: customFields.mlTrainingError,
       productCount: customFields.mlProductCount || 0,
       imageCount: customFields.mlImageCount || 0,
-      hasActiveModel: !!(customFields.mlModelJsonId && customFields.mlMetadataId),
+      hasActiveModel: !!(modelJsonId && metadataId),
       lastTrainedAt: customFields.mlTrainingStartedAt, // Could be improved with separate field
     };
+  }
+
+  /**
+   * Start training for a channel
+   * Invokes the ml-trainer microservice
+   */
+  async startTraining(ctx: RequestContext, channelId: string): Promise<boolean> {
+    this.logger.log(`Starting training for channel ${channelId}`);
+
+    // Check if channel has training data
+    const manifest = await this.getTrainingManifest(ctx, channelId);
+    if (!manifest.products || manifest.products.length < 2) {
+      throw new Error('Insufficient training data. Need at least 2 products with images.');
+    }
+
+    // Update status to training (starting)
+    // We don't set progress to 0 yet, as that's done by the webhook when it actually starts
+    await this.updateTrainingStatus(ctx, channelId, 'training', 0);
+
+    try {
+      // Get service token from environment config
+      const authToken = env.ml.serviceToken;
+      if (!authToken) {
+        throw new Error('ML_SERVICE_TOKEN not configured. Cannot start training.');
+      }
+
+      // Use URLs from environment config (defaults to Docker service names)
+      const trainerUrl = env.ml.trainerUrl;
+      const backendUrl = env.ml.backendInternalUrl;
+
+      // The manifest URL needs to be accessible by ml-trainer
+      // We use the admin-api with a query to get it
+      const manifestUrl = `${backendUrl}/admin-api?query=query{mlTrainingManifest(channelId:"${channelId}"){channelId,version,extractedAt,products{productId,productName,images{assetId,url,filename}}}}`;
+
+      this.logger.log(`Invoking ML trainer at ${trainerUrl}/v1/train`);
+
+      await axios.post(`${trainerUrl}/v1/train`, {
+        channelId,
+        manifestUrl,
+        webhookUrl: `${backendUrl}/admin-api`, // The GraphQL endpoint for callbacks
+        authToken,
+      });
+
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to start training: ${errorMessage}`);
+      await this.updateTrainingStatus(
+        ctx,
+        channelId,
+        'failed',
+        0,
+        `Failed to start training: ${errorMessage}`
+      );
+      throw error;
+    }
   }
 }

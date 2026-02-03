@@ -9,6 +9,7 @@ import {
 } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { CreditCustomerSummary, CustomerRecord } from '../customer.service';
+import { CustomerMapperService } from './customer-mapper.service';
 
 /**
  * Customer Credit Service
@@ -27,6 +28,7 @@ import { CreditCustomerSummary, CustomerRecord } from '../customer.service';
 })
 export class CustomerCreditService {
   private readonly apolloService = inject(ApolloService);
+  private readonly mapper = inject(CustomerMapperService);
 
   /**
    * Search for customers eligible for credit sales.
@@ -55,7 +57,7 @@ export class CustomerCreditService {
     const items = result.data?.customers?.items ?? [];
     return items
       .filter((customer) => Boolean(customer.customFields?.isCreditApproved))
-      .map((customer) => this.mapToCreditSummary(customer))
+      .map((customer) => this.mapper.toCreditSummary(customer))
       .filter((customer) => {
         const phone = customer.phone?.toLowerCase() ?? '';
         return (
@@ -198,7 +200,7 @@ export class CustomerCreditService {
     });
 
     const items = result.data?.customers?.items ?? [];
-    return items.map((customer) => this.mapToCreditSummary(customer));
+    return items.map((customer) => this.mapper.toCreditSummary(customer));
   }
 
   async approveCustomerCredit(
@@ -374,37 +376,5 @@ export class CustomerCreditService {
       lastRepaymentAmount: summary.lastRepaymentAmount,
       creditDuration: summary.creditDuration,
     };
-  }
-
-  private mapToCreditSummary(customer: CustomerRecord): CreditCustomerSummary {
-    const creditLimit = Number(customer.customFields?.creditLimit ?? 0);
-    // outstandingAmount is computed from ledger (AR account) by backend
-    // This is a snapshot - for accurate data, use getCreditSummary() which queries ledger
-    const outstandingAmount = Number(customer.outstandingAmount ?? 0);
-    // Calculate available credit locally for display purposes only
-    // For validation, always use getCreditSummary() which queries ledger
-    const availableCredit = Math.max(creditLimit - Math.abs(outstandingAmount), 0);
-    const lastRepaymentDate = customer.customFields?.lastRepaymentDate ?? null;
-    const lastRepaymentAmount = Number(customer.customFields?.lastRepaymentAmount ?? 0);
-    const creditDuration = Number(customer.customFields?.creditDuration ?? 30);
-
-    return {
-      id: customer.id,
-      name: this.buildDisplayName(customer),
-      phone: customer.phoneNumber ?? undefined,
-      email: customer.emailAddress ?? undefined,
-      isCreditApproved: Boolean(customer.customFields?.isCreditApproved),
-      creditLimit,
-      outstandingAmount, // From ledger (may be stale in list views)
-      availableCredit, // Calculated locally for display (use getCreditSummary for accuracy)
-      lastRepaymentDate,
-      lastRepaymentAmount,
-      creditDuration,
-    };
-  }
-
-  private buildDisplayName(customer: CustomerRecord): string {
-    const parts = [customer.firstName, customer.lastName].filter(Boolean);
-    return parts.join(' ').trim();
   }
 }

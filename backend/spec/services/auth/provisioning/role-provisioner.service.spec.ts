@@ -246,7 +246,12 @@ describe('RoleProvisionerService', () => {
     it('should create role using repository directly (Repository Bootstrap pattern)', async () => {
       const harness = buildService();
 
-      const result = await harness.service.createAdminRole(publicCtx, registrationData, 2, 'test-company');
+      const result = await harness.service.createAdminRole(
+        publicCtx,
+        registrationData,
+        2,
+        'test-company'
+      );
 
       // Verify repository.save was called (Repository Bootstrap pattern)
       expect(harness.roleRepository.save).toHaveBeenCalled();
@@ -267,7 +272,12 @@ describe('RoleProvisionerService', () => {
     it('should create role with all admin permissions', async () => {
       const harness = buildService();
 
-      const result = await harness.service.createAdminRole(publicCtx, registrationData, 2, 'test-company');
+      const result = await harness.service.createAdminRole(
+        publicCtx,
+        registrationData,
+        2,
+        'test-company'
+      );
 
       // Verify repository.save was called
       expect(harness.roleRepository.save).toHaveBeenCalled();
@@ -287,7 +297,12 @@ describe('RoleProvisionerService', () => {
     it('should assign role to channel via channels array', async () => {
       const harness = buildService();
 
-      const result = await harness.service.createAdminRole(publicCtx, registrationData, 2, 'test-company');
+      const result = await harness.service.createAdminRole(
+        publicCtx,
+        registrationData,
+        2,
+        'test-company'
+      );
 
       // Verify role has channel assigned
       expect(result.channels).toBeDefined();
@@ -337,9 +352,14 @@ describe('RoleProvisionerService', () => {
     it('should audit log role creation', async () => {
       const harness = buildService();
 
-      const result = await harness.service.createAdminRole(publicCtx, registrationData, 2, 'test-company');
+      const result = await harness.service.createAdminRole(
+        publicCtx,
+        registrationData,
+        2,
+        'test-company'
+      );
 
-      expect(harness.auditor.logEntityCreated).toHaveBeenCalledWith(
+      expect(harness.auditor.logEntityCreated as jest.Mock<any>).toHaveBeenCalledWith(
         publicCtx,
         'Role',
         '6',
