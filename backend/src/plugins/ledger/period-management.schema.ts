@@ -65,6 +65,11 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     totalItems: Int!
   }
 
+  type ClosedSessionMissingReconciliation {
+    sessionId: ID!
+    closedAt: DateTime!
+  }
+
   input AccountAmountInput {
     accountCode: String!
     amountCents: Int!
@@ -206,6 +211,20 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     totalItems: Int!
   }
 
+  type ReconciliationAccountDetail {
+    accountId: ID!
+    accountCode: String!
+    accountName: String!
+    declaredAmountCents: String
+    expectedBalanceCents: String
+    varianceCents: String
+  }
+
+  input AccountDeclaredAmountInput {
+    accountId: ID!
+    amountCents: String!
+  }
+
   input CreateReconciliationInput {
     channelId: Int!
     scope: String!
@@ -215,6 +234,8 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     expectedBalance: String
     actualBalance: String!
     notes: String
+    accountIds: [ID!]
+    accountDeclaredAmounts: [AccountDeclaredAmountInput!]
   }
 
   input CreateInventoryReconciliationInput {
@@ -257,6 +278,15 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     sessionReconciliationRequirements(sessionId: ID!): SessionReconciliationRequirements!
     channelReconciliationConfig(channelId: Int!): [PaymentMethodReconciliationConfig!]!
     reconciliations(channelId: Int!, options: ReconciliationListOptions): ReconciliationList!
+    reconciliationDetails(reconciliationId: ID!): [ReconciliationAccountDetail!]!
+    sessionReconciliationDetails(sessionId: ID!, kind: String): [ReconciliationAccountDetail!]!
+    closedSessionsMissingReconciliation(
+      channelId: Int!
+      startDate: DateTime
+      endDate: DateTime
+      take: Int
+      skip: Int
+    ): [ClosedSessionMissingReconciliation!]!
   }
 
   extend type Mutation {

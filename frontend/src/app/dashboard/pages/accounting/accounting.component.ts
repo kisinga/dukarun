@@ -8,6 +8,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import {
   CashierSessionService,
@@ -53,6 +54,8 @@ export class AccountingComponent implements OnInit {
   private readonly ledgerService = inject(LedgerService);
   private readonly cashierSessionService = inject(CashierSessionService);
   private readonly companyService = inject(CompanyService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly transactionModal = viewChild<TransactionDetailModalComponent>('transactionModal');
 
@@ -316,37 +319,60 @@ export class AccountingComponent implements OnInit {
 
   ngOnInit() {
     this.loadData();
+    const syncTab = (params: Record<string, string>) => {
+      const tab = params['tab'] as TabType | undefined;
+      const valid: TabType[] = ['overview', 'accounts', 'transactions', 'reconciliation'];
+      const next = tab && valid.includes(tab) ? tab : 'overview';
+      this.activeTab.set(next);
+      this.currentPage.set(1);
+      if (next === 'reconciliation') {
+        this.reconciliationPage.set(1);
+        this.loadReconciliations();
+      }
+    };
+    syncTab(this.route.snapshot.queryParams);
+    this.route.queryParams.subscribe(syncTab);
   }
 
-  setActiveTab(tab: TabType) {
-    this.activeTab.set(tab);
-    this.currentPage.set(1);
-    if (tab === 'reconciliation') {
-      this.reconciliationPage.set(1);
-      this.loadReconciliations();
-    }
+  goToTransactionsTab(account: LedgerAccount) {
+    this.selectAccount(account);
+    this.router.navigate(['/dashboard/admin/accounting'], {
+      queryParams: { tab: 'transactions' },
+      queryParamsHandling: 'merge',
+    });
   }
 
   loadReconciliations() {
     const channelId = this.channelId;
-    if (!channelId) return;
+    if (!channelId || Number.isNaN(channelId)) {
+      this.reconciliations.set([]);
+      this.reconciliationsTotal.set(0);
+      this.reconciliationsLoading.set(false);
+      return;
+    }
     this.reconciliationsLoading.set(true);
     const page = this.reconciliationPage();
     const take = this.reconciliationPageSize;
     const skip = (page - 1) * take;
     this.cashierSessionService.getReconciliations(channelId, { take, skip }).subscribe({
       next: (res) => {
-        this.reconciliations.set(res.items);
-        this.reconciliationsTotal.set(res.totalItems);
+        this.reconciliations.set(res.items ?? []);
+        this.reconciliationsTotal.set(res.totalItems ?? 0);
         this.reconciliationsLoading.set(false);
       },
-      error: () => this.reconciliationsLoading.set(false),
+      error: () => {
+        this.reconciliations.set([]);
+        this.reconciliationsTotal.set(0);
+        this.reconciliationsLoading.set(false);
+      },
     });
   }
 
   get channelId(): number {
     const id = this.companyService.activeCompanyId();
-    return id ? parseInt(id, 10) : 0;
+    if (!id) return 0;
+    const num = parseInt(id, 10);
+    return Number.isNaN(num) ? 0 : num;
   }
 
   loadData() {

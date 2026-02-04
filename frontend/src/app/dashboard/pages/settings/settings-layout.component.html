@@ -1,0 +1,26 @@
+<div class="space-y-5 lg:space-y-6">
+  <div class="flex items-start justify-between gap-4">
+    <div class="flex-1 min-w-0">
+      <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Settings</h1>
+      <p class="text-sm text-base-content/60 mt-1">Configure your channel preferences</p>
+    </div>
+  </div>
+
+  <div role="tablist" class="tabs tabs-box overflow-x-auto">
+    @for (tab of tabs; track tab.path) {
+      <a
+        [routerLink]="['/dashboard/settings', tab.path]"
+        routerLinkActive="tab-active"
+        [routerLinkActiveOptions]="{ exact: false }"
+        class="tab"
+        [attr.aria-label]="tab.label"
+      >
+        {{ tab.label }}
+      </a>
+    }
+  </div>
+
+  <div class="mt-3">
+    <router-outlet />
+  </div>
+</div>

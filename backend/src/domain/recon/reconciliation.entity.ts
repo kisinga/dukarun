@@ -1,6 +1,6 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-export type ReconciliationScope = 'cash-session' | 'method' | 'bank' | 'inventory';
+export type ReconciliationScope = 'cash-session' | 'method' | 'bank' | 'inventory' | 'manual';
 export type ReconciliationStatus = 'draft' | 'verified';
 
 @Entity('reconciliation')

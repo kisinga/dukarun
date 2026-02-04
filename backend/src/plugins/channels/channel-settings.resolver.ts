@@ -77,12 +77,12 @@ export class ChannelSettingsResolver {
   @Query()
   @Allow(Permission.ReadSettings)
   async roleTemplates(@Ctx() ctx: RequestContext) {
-    const templates = this.channelAdminService.getRoleTemplates();
+    const templates = await this.channelAdminService.getRoleTemplates(ctx);
     return templates.map(template => ({
       code: template.code,
       name: template.name,
-      description: template.description,
-      permissions: template.permissions,
+      description: template.description ?? '',
+      permissions: template.permissions ?? [],
     }));
   }
 
@@ -132,13 +132,13 @@ export class ChannelSettingsResolver {
   }
 
   @Mutation()
-  @Allow(Permission.CreateAdministrator)
+  @Allow(Permission.UpdateSettings)
   async inviteChannelAdministrator(@Ctx() ctx: RequestContext, @Args('input') input: any) {
     return this.channelAdminService.inviteChannelAdministrator(ctx, input);
   }
 
   @Mutation()
-  @Allow(Permission.CreateAdministrator)
+  @Allow(Permission.UpdateSettings)
   async createChannelAdmin(
     @Ctx() ctx: RequestContext,
     @Args('input') input: CreateChannelAdminInput
@@ -147,7 +147,7 @@ export class ChannelSettingsResolver {
   }
 
   @Mutation()
-  @Allow(Permission.UpdateAdministrator)
+  @Allow(Permission.UpdateSettings)
   async updateChannelAdmin(
     @Ctx() ctx: RequestContext,
     @Args('id') id: string,
@@ -160,7 +160,7 @@ export class ChannelSettingsResolver {
   }
 
   @Mutation()
-  @Allow(Permission.UpdateAdministrator)
+  @Allow(Permission.UpdateSettings)
   async disableChannelAdmin(@Ctx() ctx: RequestContext, @Args('id') id: string) {
     return this.channelAdminService.disableChannelAdministrator(ctx, id);
   }

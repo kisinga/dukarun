@@ -114,8 +114,10 @@ export class TeamService {
             return false;
           }
 
-          // Include only admins that belong to the current channel
-          return roles.some((role) => role.channels?.some((ch) => ch.id === channelId));
+          // Include only admins that belong to the current channel (coerce ID for type-safe comparison)
+          return roles.some((role) =>
+            role.channels?.some((ch) => String(ch.id) === String(channelId)),
+          );
         })
         .map((admin) => ({
           ...admin,

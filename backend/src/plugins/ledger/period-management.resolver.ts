@@ -116,7 +116,19 @@ export class PeriodManagementResolver {
     @Ctx() ctx: RequestContext,
     @Args('input') input: any
   ): Promise<Reconciliation> {
-    return this.reconciliationService.createReconciliation(ctx, input);
+    const accountDeclaredAmounts: Record<string, string> | undefined =
+      Array.isArray(input.accountDeclaredAmounts) && input.accountDeclaredAmounts.length > 0
+        ? Object.fromEntries(
+            input.accountDeclaredAmounts.map((a: { accountId: string; amountCents: string }) => [
+              a.accountId,
+              a.amountCents,
+            ])
+          )
+        : undefined;
+    return this.reconciliationService.createReconciliation(ctx, {
+      ...input,
+      accountDeclaredAmounts: accountDeclaredAmounts ?? input.accountDeclaredAmounts,
+    });
   }
 
   @Mutation()
@@ -403,6 +415,44 @@ export class PeriodManagementResolver {
     }
   ) {
     return this.reconciliationService.getReconciliations(ctx, channelId, options);
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async reconciliationDetails(
+    @Ctx() ctx: RequestContext,
+    @Args('reconciliationId') reconciliationId: string
+  ) {
+    return this.reconciliationService.getReconciliationDetails(ctx, reconciliationId);
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async sessionReconciliationDetails(
+    @Ctx() ctx: RequestContext,
+    @Args('sessionId') sessionId: string,
+    @Args('kind', { nullable: true }) kind?: string
+  ) {
+    const reconKind = kind === 'opening' ? 'opening' : 'closing';
+    return this.reconciliationService.getSessionReconciliationDetails(ctx, sessionId, reconKind);
+  }
+
+  @Query()
+  @Allow(ManageReconciliationPermission.Permission)
+  async closedSessionsMissingReconciliation(
+    @Ctx() ctx: RequestContext,
+    @Args('channelId') channelId: number,
+    @Args('startDate', { nullable: true }) startDate?: string,
+    @Args('endDate', { nullable: true }) endDate?: string,
+    @Args('take', { nullable: true }) take?: number,
+    @Args('skip', { nullable: true }) skip?: number
+  ): Promise<Array<{ sessionId: string; closedAt: Date }>> {
+    return this.cashierSessionService.getClosedSessionsMissingReconciliation(ctx, channelId, {
+      startDate,
+      endDate,
+      take,
+      skip,
+    });
   }
 
   // ============================================================================

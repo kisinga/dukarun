@@ -2629,6 +2629,25 @@ export const CREATE_CASHIER_SESSION_RECONCILIATION = graphql(`
   }
 `);
 
+export const CREATE_RECONCILIATION = graphql(`
+  mutation CreateReconciliation($input: CreateReconciliationInput!) {
+    createReconciliation(input: $input) {
+      id
+      channelId
+      scope
+      scopeRefId
+      rangeStart
+      rangeEnd
+      status
+      expectedBalance
+      actualBalance
+      varianceAmount
+      notes
+      createdBy
+    }
+  }
+`);
+
 export const GET_RECONCILIATIONS = graphql(`
   query GetReconciliations($channelId: Int!, $options: ReconciliationListOptions) {
     reconciliations(channelId: $channelId, options: $options) {
@@ -2647,6 +2666,32 @@ export const GET_RECONCILIATIONS = graphql(`
         createdBy
       }
       totalItems
+    }
+  }
+`);
+
+export const GET_RECONCILIATION_DETAILS = graphql(`
+  query GetReconciliationDetails($reconciliationId: ID!) {
+    reconciliationDetails(reconciliationId: $reconciliationId) {
+      accountId
+      accountCode
+      accountName
+      declaredAmountCents
+      expectedBalanceCents
+      varianceCents
+    }
+  }
+`);
+
+export const GET_SESSION_RECONCILIATION_DETAILS = graphql(`
+  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String) {
+    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind) {
+      accountId
+      accountCode
+      accountName
+      declaredAmountCents
+      expectedBalanceCents
+      varianceCents
     }
   }
 `);

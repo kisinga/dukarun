@@ -1,9 +1,104 @@
 <div class="space-y-4">
+  <!-- Create manual reconciliation -->
+  @if (leafAccounts().length > 0) {
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="card-title">Create manual reconciliation</h2>
+        <p class="text-base-content/70">
+          Record actual account values for all accounts as of a date range. This creates a
+          reconciliation event that appears in history below.
+        </p>
+        @if (manualError(); as err) {
+          <div role="alert" class="alert alert-error mt-2">
+            <span>{{ err }}</span>
+            <button type="button" class="btn btn-sm" (click)="manualError.set(null)">
+              Dismiss
+            </button>
+          </div>
+        }
+        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+          <label class="form-control w-full max-w-xs">
+            <span class="label">From date</span>
+            <input
+              type="date"
+              class="input input-bordered w-full"
+              [value]="manualRangeStart()"
+              (input)="manualRangeStart.set($any($event.target).value)"
+            />
+          </label>
+          <label class="form-control w-full max-w-xs">
+            <span class="label">To date</span>
+            <input
+              type="date"
+              class="input input-bordered w-full"
+              [value]="manualRangeEnd()"
+              (input)="manualRangeEnd.set($any($event.target).value)"
+            />
+          </label>
+        </div>
+        <label class="form-control mt-2 w-full max-w-md">
+          <span class="label">Notes (optional)</span>
+          <input
+            type="text"
+            class="input input-bordered w-full"
+            placeholder="e.g. Month-end snapshot"
+            [value]="manualNotes()"
+            (input)="manualNotes.set($any($event.target).value)"
+          />
+        </label>
+        <p class="label mt-4">Declared amount per account (cents)</p>
+        <div class="overflow-x-auto max-h-60 overflow-y-auto border border-base-300 rounded-lg">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Code</th>
+                <th>Declared (cents)</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (acc of leafAccounts(); track acc.id) {
+                <tr>
+                  <td>{{ acc.name }}</td>
+                  <td class="font-mono text-sm">{{ acc.code }}</td>
+                  <td>
+                    <input
+                      type="number"
+                      class="input input-bordered input-sm w-28"
+                      min="0"
+                      step="1"
+                      [value]="getManualDeclared(acc.id)"
+                      (input)="setManualDeclared(acc.id, +$any($event.target).value || 0)"
+                    />
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="card-actions mt-4">
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="manualSubmitting()"
+            (click)="submitManualReconciliation()"
+          >
+            @if (manualSubmitting()) {
+              <span class="loading loading-spinner loading-sm"></span>
+            }
+            Create reconciliation
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
   <div class="card bg-base-100 shadow">
     <div class="card-body">
-      <h2 class="card-title">Reconciliation History</h2>
+      <h2 class="card-title">Reconciliation history</h2>
       <p class="text-base-content/70">
-        List of reconciliation events with expected vs actual balances and variance.
+        All reconciliation events: opening shift, closing shift, and manual reconciliations. Each
+        row shows expected vs actual balances and variance.
       </p>
 
       @if (isLoading()) {
@@ -19,6 +114,7 @@
           <table class="table table-zebra">
             <thead>
               <tr>
+                <th class="w-12" scope="col"></th>
                 <th>Date range</th>
                 <th>Scope</th>
                 <th>Scope ref</th>
@@ -32,6 +128,22 @@
             <tbody>
               @for (r of reconciliations(); track r.id) {
                 <tr [class.bg-warning/10]="hasVariance(r)">
+                  <td class="align-middle">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-square btn-outline btn-neutral min-w-8"
+                      (click)="toggleExpand(r)"
+                      [attr.aria-expanded]="isExpanded(r)"
+                      [attr.aria-label]="isExpanded(r) ? 'Collapse details' : 'Expand details'"
+                      [title]="isExpanded(r) ? 'Collapse details' : 'Expand details'"
+                    >
+                      @if (isExpanded(r)) {
+                        <span aria-hidden="true">▼</span>
+                      } @else {
+                        <span aria-hidden="true">▶</span>
+                      }
+                    </button>
+                  </td>
                   <td class="whitespace-nowrap">
                     {{ formatDate()(r.rangeStart) }} – {{ formatDate()(r.rangeEnd) }}
                   </td>
@@ -61,6 +173,78 @@
                   </td>
                   <td class="max-w-32 truncate" [title]="r.notes ?? ''">{{ r.notes ?? '–' }}</td>
                 </tr>
+                @if (isExpanded(r)) {
+                  <tr class="bg-base-200/50">
+                    <td colspan="9" class="p-0">
+                      <div class="px-4 py-3 pl-12">
+                        @if (loadingDetailsId() === r.id) {
+                          <div class="flex items-center gap-2 text-base-content/70">
+                            <span class="loading loading-spinner loading-sm"></span>
+                            Loading accounts…
+                          </div>
+                        } @else {
+                          @let details = getDetails(r);
+                          @if (details.length === 0) {
+                            <p class="text-base-content/70 text-sm">
+                              No per-account data for this reconciliation.
+                            </p>
+                          } @else {
+                            <table class="table table-sm table-zebra">
+                              <thead>
+                                <tr>
+                                  <th>Account</th>
+                                  <th>Code</th>
+                                  <th>Expected</th>
+                                  <th>Declared</th>
+                                  <th>Variance</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                @for (d of details; track d.accountId) {
+                                  <tr
+                                    [class.bg-warning/10]="
+                                      d.varianceCents && d.varianceCents !== '0'
+                                    "
+                                  >
+                                    <td>{{ d.accountName }}</td>
+                                    <td class="font-mono text-sm">{{ d.accountCode }}</td>
+                                    <td>
+                                      {{
+                                        d.expectedBalanceCents != null
+                                          ? formatCurrency()(d.expectedBalanceCents)
+                                          : '–'
+                                      }}
+                                    </td>
+                                    <td>
+                                      {{
+                                        d.declaredAmountCents != null
+                                          ? formatCurrency()(d.declaredAmountCents)
+                                          : '–'
+                                      }}
+                                    </td>
+                                    <td>
+                                      @if (d.varianceCents && d.varianceCents !== '0') {
+                                        <span class="font-semibold text-warning">{{
+                                          formatCurrency()(d.varianceCents)
+                                        }}</span>
+                                      } @else {
+                                        {{
+                                          d.varianceCents != null
+                                            ? formatCurrency()(d.varianceCents)
+                                            : '–'
+                                        }}
+                                      }
+                                    </td>
+                                  </tr>
+                                }
+                              </tbody>
+                            </table>
+                          }
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
               }
             </tbody>
           </table>

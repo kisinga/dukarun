@@ -9,6 +9,8 @@ import {
   RoleEvent,
   TransactionalConnection,
 } from '@vendure/core';
+import { RoleTemplate as RoleTemplateEntity } from '../../../domain/role-template/role-template.entity';
+import { RoleTemplateAssignment } from '../../../domain/role-template/role-template-assignment.entity';
 import { ProvisioningContextAdapter } from '../../provisioning/context-adapter.service';
 import { RegistrationInput } from '../registration.service';
 import { RegistrationAuditorService } from './registration-auditor.service';
@@ -83,6 +85,7 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
       // Administrator permissions (channel-scoped)
       Permission.CreateAdministrator,
       Permission.UpdateAdministrator,
+      Permission.ReadAdministrator,
       // Custom permissions
       OverridePricePermission.Permission as Permission,
       ApproveCustomerCreditPermission.Permission as Permission,
@@ -167,6 +170,17 @@ export class RoleProvisionerService {
   private readonly logger = new Logger(RoleProvisionerService.name);
 
   /**
+   * Permissions that the store-owner role must always have (team list + add/update admin).
+   * Ensures newly created accounts can use the Team UI and pass Vendure's administrators query (ReadAdministrator).
+   */
+  private static readonly REQUIRED_STORE_OWNER_PERMISSIONS: Permission[] = [
+    Permission.ReadAdministrator,
+    Permission.UpdateSettings,
+    Permission.CreateAdministrator,
+    Permission.UpdateAdministrator,
+  ];
+
+  /**
    * All required admin permissions as per CUSTOMER_PROVISIONING.md Step 5
    * Factored into constant for maintainability
    */
@@ -208,6 +222,7 @@ export class RoleProvisionerService {
     // Administrator permissions (channel-scoped)
     Permission.CreateAdministrator,
     Permission.UpdateAdministrator,
+    Permission.ReadAdministrator,
     // Custom permissions for channel admin
     OverridePricePermission.Permission as Permission,
     ApproveCustomerCreditPermission.Permission as Permission,
@@ -247,7 +262,6 @@ export class RoleProvisionerService {
     try {
       const roleCode = `${companyCode}-admin`;
 
-      // Load the new channel for assignment
       const channel = await this.connection.getRepository(ctx, Channel).findOne({
         where: { id: channelId },
       });
@@ -256,19 +270,39 @@ export class RoleProvisionerService {
         throw this.errorService.createError('ROLE_CREATE_FAILED', `Channel ${channelId} not found`);
       }
 
-      // Manually construct Role entity (Repository Bootstrap)
-      // Role is scoped to only the new channel - maintains channel isolation
+      const template = await this.connection
+        .getRepository(ctx, RoleTemplateEntity)
+        .findOne({ where: { code: 'admin' } });
+
+      const basePermissions =
+        (template?.permissions as Permission[] | undefined) ??
+        RoleProvisionerService.ALL_ADMIN_PERMISSIONS;
+      // Ensure store owner always has ReadAdministrator (and team-management) so Team UI and Vendure administrators query work
+      const permissions = [
+        ...new Set([
+          ...basePermissions,
+          ...RoleProvisionerService.REQUIRED_STORE_OWNER_PERMISSIONS,
+        ]),
+      ] as Permission[];
+      const description = template
+        ? `Full admin access for ${registrationData.companyName}`
+        : `Full admin access for ${registrationData.companyName}`;
+
       const role = new Role({
         code: roleCode,
-        description: `Full admin access for ${registrationData.companyName}`,
-        permissions: RoleProvisionerService.ALL_ADMIN_PERMISSIONS,
+        description,
+        permissions,
         channels: [channel],
       });
 
-      // Save directly to repository
       const savedRole = await this.connection.getRepository(ctx, Role).save(role);
 
-      // Publish event to ensure system consistency
+      if (template) {
+        await this.connection
+          .getRepository(ctx, RoleTemplateAssignment)
+          .save({ roleId: savedRole.id as number, templateId: template.id });
+      }
+
       await this.eventBus.publish(
         new RoleEvent(ctx, savedRole, 'created', {
           code: roleCode,
@@ -282,10 +316,8 @@ export class RoleProvisionerService {
         `Role created via Repository Bootstrap: ${savedRole.id} Code: ${savedRole.code}`
       );
 
-      // Verify role-channel linkage
       await this.verifyRoleChannelLinkage(ctx, savedRole.id, channelId);
 
-      // Audit log
       await this.auditor.logEntityCreated(ctx, 'Role', savedRole.id.toString(), savedRole, {
         channelId: channelId.toString(),
         companyCode: companyCode,

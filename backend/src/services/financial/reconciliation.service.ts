@@ -191,6 +191,114 @@ export class ReconciliationService {
   }
 
   /**
+   * Get per-account details for a reconciliation (accounts reconciled and variance per account).
+   * Executed lazily when the user expands a row. Returns empty array if no reconciliation_account rows.
+   */
+  async getReconciliationDetails(
+    ctx: RequestContext,
+    reconciliationId: string
+  ): Promise<
+    Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      declaredAmountCents: string | null;
+      expectedBalanceCents: string | null;
+      varianceCents: string | null;
+    }>
+  > {
+    const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
+    const reconciliation = await reconciliationRepo.findOne({
+      where: { id: reconciliationId },
+    });
+    if (!reconciliation) {
+      return [];
+    }
+
+    const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
+    const rows = await junctionRepo.find({
+      where: { reconciliationId },
+      relations: ['account'],
+    });
+
+    const result: Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      declaredAmountCents: string | null;
+      expectedBalanceCents: string | null;
+      varianceCents: string | null;
+    }> = [];
+
+    for (const row of rows) {
+      const account = row.account;
+      if (!account) continue;
+      const declaredStr = row.declaredAmountCents ?? null;
+      let expectedStr: string | null = null;
+      let varianceStr: string | null = null;
+      try {
+        const balance = await this.accountBalanceService.getAccountBalance(
+          ctx,
+          account.code,
+          reconciliation.channelId,
+          reconciliation.rangeEnd
+        );
+        expectedStr = String(balance.balance);
+        const expected = BigInt(expectedStr);
+        const declared = declaredStr !== null ? BigInt(declaredStr) : BigInt(0);
+        varianceStr = (expected - declared).toString();
+      } catch {
+        // Account may be deleted or balance unavailable
+      }
+      result.push({
+        accountId: account.id,
+        accountCode: account.code,
+        accountName: account.name,
+        declaredAmountCents: declaredStr,
+        expectedBalanceCents: expectedStr,
+        varianceCents: varianceStr,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Get per-account reconciliation details for a cashier session.
+   * @param kind - 'opening' = reconciliation at session open (first by rangeStart); 'closing' = at close (first by rangeEnd DESC). Default 'closing'.
+   * Returns [] if no matching reconciliation exists.
+   */
+  async getSessionReconciliationDetails(
+    ctx: RequestContext,
+    sessionId: string,
+    kind: 'opening' | 'closing' = 'closing'
+  ): Promise<
+    Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      declaredAmountCents: string | null;
+      expectedBalanceCents: string | null;
+      varianceCents: string | null;
+    }>
+  > {
+    const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
+    const qb = reconciliationRepo
+      .createQueryBuilder('r')
+      .where('r.scope = :scope', { scope: 'cash-session' })
+      .andWhere('r.scopeRefId = :sessionId', { sessionId });
+    if (kind === 'opening') {
+      qb.orderBy('r.rangeStart', 'ASC').addOrderBy('r.rangeEnd', 'ASC');
+    } else {
+      qb.orderBy('r.rangeEnd', 'DESC').addOrderBy('r.rangeStart', 'DESC');
+    }
+    const list = await qb.take(1).getMany();
+    const reconciliation = list[0];
+    if (!reconciliation) return [];
+    return this.getReconciliationDetails(ctx, reconciliation.id);
+  }
+
+  /**
    * Calculate account balance for a period
    */
   async calculateAccountBalanceForPeriod(

@@ -54,8 +54,10 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       findOne: jest.fn(),
     };
 
-    // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
-    const mockReconRepo: any = { find: jest.fn().mockResolvedValue([]) };
+    const mockReconRepo = {
+      find: jest.fn<() => Promise<Reconciliation[]>>().mockResolvedValue([]),
+      findOne: jest.fn<() => Promise<Reconciliation | null>>().mockResolvedValue(null),
+    } as any;
     // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
     const mockReconAccountRepo: any = { find: jest.fn().mockResolvedValue([]) };
 
@@ -74,6 +76,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
           return { create: jest.fn(), save: jest.fn(), findOne: jest.fn() };
         return {};
       }),
+      withTransaction: jest.fn((ctx: any, callback: (txCtx: any) => Promise<any>) => callback(ctx)),
     } as any;
 
     mockLedgerQueryService = {

@@ -10,6 +10,7 @@ export * from './status-badge.component';
 
 // Navbar Components
 export * from './menu-toggle-button.component';
+export * from './nav-icon.component';
 export * from './user-avatar-button.component';
 
 // Notification Components (composable)
@@ -20,4 +21,3 @@ export * from './notification-dropdown.component';
 // Shared UI Components
 export * from './delete-confirmation-modal.component';
 export * from './pagination.component';
-

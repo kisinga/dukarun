@@ -17,16 +17,11 @@ import { SubscriptionService } from '../../core/services/subscription.service';
 import type { Notification } from '../../core/graphql/notification.types';
 import {
   MenuToggleButtonComponent,
+  NavIconComponent,
   NotificationDropdownComponent,
   UserAvatarButtonComponent,
 } from '../components/shared';
-
-interface NavItem {
-  label: string;
-  icon: string;
-  route: string | string[];
-  queryParams?: Record<string, string>;
-}
+import type { NavItem, NavSection } from './nav.types';
 
 @Component({
   selector: 'app-dashboard-layout',
@@ -35,6 +30,7 @@ interface NavItem {
     RouterLink,
     RouterLinkActive,
     MenuToggleButtonComponent,
+    NavIconComponent,
     NotificationDropdownComponent,
     UserAvatarButtonComponent,
   ],
@@ -53,48 +49,78 @@ export class DashboardLayoutComponent implements OnInit {
   private readonly networkService = inject(NetworkService);
   private lastCompanyId: string | null = null;
 
-  protected readonly navItems = computed(() => {
-    const baseItems: NavItem[] = [
-      { label: 'Overview', icon: '📊', route: '/dashboard' },
-      { label: 'Sell', icon: '💰', route: '/dashboard/sell' },
-      { label: 'Orders', icon: '📝', route: '/dashboard/orders' },
-      { label: 'Payments', icon: '💳', route: '/dashboard/payments' },
-      { label: 'Products', icon: '📦', route: '/dashboard/products' },
-      { label: 'Customers', icon: '👥', route: '/dashboard/customers' },
-      { label: 'Suppliers', icon: '🏢', route: '/dashboard/suppliers' },
-      { label: 'Purchases', icon: '🛒', route: '/dashboard/purchases' },
-      { label: 'Accounting', icon: '📋', route: '/dashboard/accounting' },
+  /** Standalone overview link (always first). */
+  protected readonly overviewItem: NavItem = {
+    label: 'Overview',
+    icon: 'overview',
+    route: '/dashboard',
+  };
+
+  protected readonly navSections = computed((): NavSection[] => {
+    const auth = this.authService;
+    const hasCredit = auth.hasCreditManagementPermission();
+    const hasStockAdj = auth.hasManageStockAdjustmentsPermission();
+    const hasSettings = auth.hasUpdateSettingsPermission();
+    const trial = this.isTrialActive();
+
+    const sections: NavSection[] = [
+      {
+        label: 'Operations',
+        items: [
+          { label: 'Sell', icon: 'sell', route: '/dashboard/sell' },
+          { label: 'Products', icon: 'products', route: '/dashboard/products' },
+          { label: 'Orders', icon: 'orders', route: '/dashboard/orders' },
+          { label: 'Purchases', icon: 'purchases', route: '/dashboard/purchases' },
+          {
+            label: 'Stock Adjustments',
+            icon: 'stock-adjustments',
+            route: '/dashboard/stock-adjustments',
+            visible: () => hasStockAdj,
+          },
+        ],
+      },
+      {
+        label: 'Finance',
+        items: [
+          { label: 'Payments', icon: 'payments', route: '/dashboard/payments' },
+          {
+            label: 'Credit',
+            icon: 'credit',
+            route: '/dashboard/credit',
+            visible: () => hasCredit,
+          },
+          {
+            label: 'Accounting',
+            icon: 'accounting',
+            route: '/dashboard/admin/accounting',
+            visible: () => hasSettings,
+          },
+        ],
+      },
+      {
+        label: 'People',
+        items: [
+          { label: 'Customers', icon: 'customers', route: '/dashboard/customers' },
+          { label: 'Suppliers', icon: 'suppliers', route: '/dashboard/suppliers' },
+        ],
+      },
     ];
 
-    if (this.authService.hasCreditManagementPermission()) {
-      baseItems.splice(4, 0, { label: 'Credit', icon: '💳', route: '/dashboard/credit' });
-    }
-
-    // Only add Stock Adjustments if user has ManageStockAdjustmentsPermission
-    if (this.authService.hasManageStockAdjustmentsPermission()) {
-      baseItems.push({
-        label: 'Stock Adjustments',
-        icon: '🔧',
-        route: '/dashboard/stock-adjustments',
+    if (hasSettings) {
+      sections.push({
+        items: [
+          { label: 'Admin', icon: 'admin', route: '/dashboard/admin' },
+          {
+            label: 'Upgrade',
+            icon: 'upgrade',
+            route: '/dashboard/admin/subscription',
+            visible: () => trial,
+          },
+        ],
       });
     }
 
-    // Only add Settings if user has UpdateSettings permission
-    if (this.authService.hasUpdateSettingsPermission()) {
-      baseItems.push({ label: 'Settings', icon: '⚙️', route: '/dashboard/settings' });
-    }
-
-    // Add Upgrade button if in trial
-    if (this.isTrialActive()) {
-      baseItems.push({
-        label: 'Upgrade',
-        icon: '⭐',
-        route: '/dashboard/settings',
-        queryParams: { tab: 'subscription' },
-      });
-    }
-
-    return baseItems;
+    return sections;
   });
 
   // Use notification service
@@ -117,6 +143,11 @@ export class DashboardLayoutComponent implements OnInit {
 
   // Subscription status
   protected readonly isTrialActive = this.subscriptionService.isTrialActive;
+
+  /** Whether to show Settings link in footer (requires UpdateSettings permission). */
+  protected hasSettingsForFooter(): boolean {
+    return this.authService.hasUpdateSettingsPermission();
+  }
 
   // Network status
   protected readonly isOnline = this.networkService.isOnline;
@@ -205,10 +236,7 @@ export class DashboardLayoutComponent implements OnInit {
         await this.notificationService.markAsRead(notificationId);
       }
 
-      // Navigate to subscription settings
-      await this.router.navigate(['/dashboard/settings'], {
-        queryParams: { tab: 'subscription' },
-      });
+      await this.router.navigate(['/dashboard/admin/subscription']);
       return;
     }
 

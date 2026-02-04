@@ -9,7 +9,8 @@ export type ReconciliationScopeRef =
   | { scope: 'cash-session'; sessionId: string }
   | { scope: 'method'; methodCode: string }
   | { scope: 'bank'; payoutId: string }
-  | { scope: 'inventory'; stockLocationId: number | 'ALL' };
+  | { scope: 'inventory'; stockLocationId: number | 'ALL' }
+  | { scope: 'manual'; refId: string };
 
 export function toScopeRefId(ref: ReconciliationScopeRef): string {
   switch (ref.scope) {
@@ -21,6 +22,8 @@ export function toScopeRefId(ref: ReconciliationScopeRef): string {
       return ref.payoutId;
     case 'inventory':
       return ref.stockLocationId === 'ALL' ? 'ALL' : String(ref.stockLocationId);
+    case 'manual':
+      return ref.refId;
     default:
       return assertNever(ref);
   }
@@ -46,6 +49,8 @@ export function fromScopeRefId(
         scope: 'inventory',
         stockLocationId: scopeRefId === 'ALL' ? 'ALL' : parseInt(scopeRefId, 10),
       };
+    case 'manual':
+      return { scope: 'manual', refId: scopeRefId };
     default:
       return assertNeverScope(scope);
   }

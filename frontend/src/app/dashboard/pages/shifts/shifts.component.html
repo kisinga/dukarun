@@ -1,0 +1,308 @@
+<div class="space-y-6">
+  <div class="flex items-start justify-between gap-4">
+    <div class="flex-1 min-w-0">
+      <h2 class="text-lg font-semibold">Shifts</h2>
+      <p class="text-sm text-base-content/60 mt-0.5">Monitor cashier sessions</p>
+    </div>
+    <button
+      type="button"
+      class="btn btn-ghost btn-sm btn-square"
+      (click)="load()"
+      [class.loading]="isLoading()"
+      title="Refresh"
+    >
+      @if (!isLoading()) {
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+          />
+        </svg>
+      }
+    </button>
+  </div>
+
+  @if (error(); as err) {
+    <div role="alert" class="alert alert-error">
+      <span class="flex-1">{{ err }}</span>
+      <button type="button" class="btn btn-sm" (click)="load()">Retry</button>
+    </div>
+  }
+
+  <!-- Current session status -->
+  <div class="card card-border bg-base-200/50">
+    <div class="card-body">
+      <h3 class="card-title text-base">Current shift</h3>
+      @if (hasActiveSession()) {
+        <p class="text-sm text-success font-medium">Open</p>
+        @if (currentSession(); as session) {
+          <p class="text-sm text-base-content/70">Opened {{ formatDateTime(session.openedAt) }}</p>
+          <div class="mt-4">
+            <p class="text-sm font-medium text-base-content/80 mb-2">
+              Opening reconciliation (variances at open)
+            </p>
+            @if (loadingCurrentOpeningDetails()) {
+              <div class="flex items-center gap-2 text-base-content/70">
+                <span class="loading loading-spinner loading-sm"></span>
+                Loading…
+              </div>
+            } @else if (currentSessionOpeningDetails() !== null) {
+              @let details = currentSessionOpeningDetails();
+              @if (details && details.length > 0) {
+                <div class="overflow-x-auto">
+                  <table class="table table-sm table-zebra">
+                    <thead>
+                      <tr>
+                        <th>Account</th>
+                        <th>Code</th>
+                        <th>Expected</th>
+                        <th>Declared</th>
+                        <th>Variance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (d of details; track d.accountId) {
+                        <tr [class.bg-warning/10]="d.varianceCents && d.varianceCents !== '0'">
+                          <td>{{ d.accountName }}</td>
+                          <td class="font-mono text-sm">{{ d.accountCode }}</td>
+                          <td>{{ formatCents(d.expectedBalanceCents) }}</td>
+                          <td>{{ formatCents(d.declaredAmountCents) }}</td>
+                          <td>
+                            @if (d.varianceCents && d.varianceCents !== '0') {
+                              <span class="font-semibold text-warning">{{
+                                formatCents(d.varianceCents)
+                              }}</span>
+                            } @else {
+                              {{ formatCents(d.varianceCents) }}
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="text-sm text-base-content/60">No opening reconciliation data.</p>
+              }
+            }
+          </div>
+        }
+      } @else {
+        <p class="text-sm text-base-content/60">
+          No open shift. Open a shift from the dashboard overview.
+        </p>
+      }
+    </div>
+  </div>
+
+  <!-- Recent sessions -->
+  <div class="card card-border">
+    <div class="card-body">
+      <h3 class="card-title text-base">Recent sessions</h3>
+      @if (isLoading() && sessions().length === 0) {
+        <div class="flex justify-center py-8">
+          <span class="loading loading-spinner loading-lg"></span>
+        </div>
+      } @else if (sessions().length === 0) {
+        <p class="text-sm text-base-content/60 py-4">No sessions yet.</p>
+      } @else {
+        <div class="flex flex-col gap-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm text-base-content/70">
+              Showing {{ rangeStart() }}–{{ rangeEnd() }} of {{ totalSessions() }}
+            </p>
+            <label class="flex items-center gap-2 text-sm">
+              <span class="text-base-content/70">Per page</span>
+              <select
+                class="select select-bordered select-sm w-20"
+                [value]="pageSize()"
+                (change)="onPageSizeChange(+$any($event.target).value)"
+              >
+                @for (opt of pageSizeOptions; track opt) {
+                  <option [value]="opt">{{ opt }}</option>
+                }
+              </select>
+            </label>
+          </div>
+          <div class="overflow-x-auto rounded-lg border border-base-300">
+            <table class="table table-zebra table-sm">
+              <thead>
+                <tr class="bg-base-200">
+                  <th class="w-12" scope="col"></th>
+                  <th scope="col">Opened</th>
+                  <th scope="col">Closed</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of sessions(); track s.id) {
+                  <tr>
+                    <td class="align-middle">
+                      @if (s.closedAt) {
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-square btn-outline btn-neutral min-w-8"
+                          (click)="toggleExpand(s)"
+                          [attr.aria-expanded]="isExpanded(s)"
+                          aria-label="{{
+                            isExpanded(s)
+                              ? 'Collapse reconciliation details'
+                              : 'Expand reconciliation details'
+                          }}"
+                          [title]="
+                            isExpanded(s) ? 'Collapse details' : 'Expand reconciliation details'
+                          "
+                        >
+                          @if (isExpanded(s)) {
+                            <span aria-hidden="true">▼</span>
+                          } @else {
+                            <span aria-hidden="true">▶</span>
+                          }
+                        </button>
+                      } @else {
+                        <span class="text-base-content/40">—</span>
+                      }
+                    </td>
+                    <td class="whitespace-nowrap">{{ formatDateTime(s.openedAt) }}</td>
+                    <td class="whitespace-nowrap">
+                      {{ s.closedAt ? formatDateTime(s.closedAt) : '—' }}
+                    </td>
+                    <td>
+                      <span
+                        [class]="
+                          s.closedAt
+                            ? 'badge badge-ghost badge-sm'
+                            : 'badge badge-success badge-soft badge-sm'
+                        "
+                      >
+                        {{ sessionStatus(s) }}
+                      </span>
+                    </td>
+                  </tr>
+                  @if (isExpanded(s)) {
+                    <tr class="bg-base-200/50">
+                      <td colspan="4" class="p-0">
+                        <div class="px-4 py-3 pl-12">
+                          @if (loadingDetailsSessionId() === s.id) {
+                            <div class="flex items-center gap-2 text-base-content/70">
+                              <span class="loading loading-spinner loading-sm"></span>
+                              Loading reconciliation details…
+                            </div>
+                          } @else {
+                            @let details = getSessionDetails(s);
+                            @if (details.length === 0) {
+                              <p class="text-base-content/70 text-sm">
+                                No reconciliation data for this session.
+                              </p>
+                            } @else {
+                              <p class="text-sm font-medium text-base-content/80 mb-2">
+                                Accounts reconciled
+                              </p>
+                              <table class="table table-sm table-zebra">
+                                <thead>
+                                  <tr>
+                                    <th>Account</th>
+                                    <th>Code</th>
+                                    <th>Expected</th>
+                                    <th>Declared</th>
+                                    <th>Variance</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  @for (d of details; track d.accountId) {
+                                    <tr
+                                      [class.bg-warning/10]="
+                                        d.varianceCents && d.varianceCents !== '0'
+                                      "
+                                    >
+                                      <td>{{ d.accountName }}</td>
+                                      <td class="font-mono text-sm">{{ d.accountCode }}</td>
+                                      <td>{{ formatCents(d.expectedBalanceCents) }}</td>
+                                      <td>{{ formatCents(d.declaredAmountCents) }}</td>
+                                      <td>
+                                        @if (d.varianceCents && d.varianceCents !== '0') {
+                                          <span class="font-semibold text-warning">{{
+                                            formatCents(d.varianceCents)
+                                          }}</span>
+                                        } @else {
+                                          {{ formatCents(d.varianceCents) }}
+                                        }
+                                      </td>
+                                    </tr>
+                                  }
+                                </tbody>
+                              </table>
+                            }
+                          }
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (totalPages() > 1) {
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-sm text-base-content/70">
+                Page {{ sessionsPage() }} of {{ totalPages() }}
+              </p>
+              <div class="join">
+                <button
+                  type="button"
+                  class="join-item btn btn-sm"
+                  [disabled]="sessionsPage() === 1"
+                  (click)="onSessionsPageChange(sessionsPage() - 1)"
+                  aria-label="Previous page"
+                >
+                  «
+                </button>
+                @for (page of pageNumbers(); track $index) {
+                  @if (page === -1) {
+                    <span class="join-item btn btn-sm btn-disabled">…</span>
+                  } @else {
+                    <button
+                      type="button"
+                      class="join-item btn btn-sm"
+                      [class.btn-active]="sessionsPage() === page"
+                      (click)="onSessionsPageChange(page)"
+                    >
+                      {{ page }}
+                    </button>
+                  }
+                }
+                <button
+                  type="button"
+                  class="join-item btn btn-sm"
+                  [disabled]="sessionsPage() === totalPages()"
+                  (click)="onSessionsPageChange(sessionsPage() + 1)"
+                  aria-label="Next page"
+                >
+                  »
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <p class="text-sm text-base-content/60">
+    <a
+      routerLink="/dashboard/admin/accounting"
+      [queryParams]="{ tab: 'reconciliation' }"
+      class="link link-hover"
+    >
+      View reconciliation history in Accounting →
+    </a>
+  </p>
+</div>

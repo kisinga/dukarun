@@ -1,4 +1,5 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
+import { gql } from '@apollo/client/core';
 import { ApolloService } from '../apollo.service';
 import { map, catchError, of, from, tap } from 'rxjs';
 import {
@@ -7,10 +8,25 @@ import {
   GET_CASHIER_SESSIONS,
   GET_CHANNEL_RECONCILIATION_CONFIG,
   GET_RECONCILIATIONS,
+  GET_RECONCILIATION_DETAILS,
   OPEN_CASHIER_SESSION,
   CLOSE_CASHIER_SESSION,
   CREATE_CASHIER_SESSION_RECONCILIATION,
+  CREATE_RECONCILIATION,
 } from '../../graphql/operations.graphql';
+
+const GET_SESSION_RECONCILIATION_DETAILS = gql`
+  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String) {
+    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind) {
+      accountId
+      accountCode
+      accountName
+      declaredAmountCents
+      expectedBalanceCents
+      varianceCents
+    }
+  }
+`;
 
 export interface CashierSession {
   id: string;
@@ -47,6 +63,24 @@ export interface ReconciliationListOptions {
   skip?: number;
 }
 
+export interface AccountDeclaredAmountInput {
+  accountId: string;
+  amountCents: string;
+}
+
+export interface CreateReconciliationInput {
+  channelId: number;
+  scope: string;
+  scopeRefId: string;
+  rangeStart: string;
+  rangeEnd: string;
+  expectedBalance?: string;
+  actualBalance: string;
+  notes?: string;
+  accountIds?: string[];
+  accountDeclaredAmounts?: AccountDeclaredAmountInput[];
+}
+
 export interface CashierSessionLedgerTotals {
   cashTotal: string;
   mpesaTotal: string;
@@ -78,6 +112,15 @@ export interface Reconciliation {
   varianceAmount: string;
   notes?: string | null;
   createdBy: number;
+}
+
+export interface ReconciliationAccountDetail {
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  declaredAmountCents: string | null;
+  expectedBalanceCents: string | null;
+  varianceCents: string | null;
 }
 
 export interface CashierSessionListOptions {
@@ -278,6 +321,44 @@ export class CashierSessionService {
     );
   }
 
+  /** Per-account details for a reconciliation (lazy-loaded when expanding a row). */
+  getReconciliationDetails(reconciliationId: string) {
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{
+        reconciliationDetails: ReconciliationAccountDetail[];
+      }>({
+        query: GET_RECONCILIATION_DETAILS as any,
+        variables: { reconciliationId },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => result.data?.reconciliationDetails ?? []),
+      catchError(() => of([])),
+    );
+  }
+
+  /**
+   * Per-account reconciliation details for a session.
+   * @param sessionId - Session ID
+   * @param kind - 'opening' for variances at open (e.g. current shift), 'closing' for variances at close (default)
+   */
+  getSessionReconciliationDetails(sessionId: string, kind: 'opening' | 'closing' = 'closing') {
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{
+        sessionReconciliationDetails: ReconciliationAccountDetail[];
+      }>({
+        query: GET_SESSION_RECONCILIATION_DETAILS,
+        variables: { sessionId, kind: kind === 'opening' ? 'opening' : 'closing' },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => result.data?.sessionReconciliationDetails ?? []),
+      catchError(() => of([])),
+    );
+  }
+
   /**
    * Close a cashier session with per-account closing amounts (same shape as opening).
    * Pass channelId so the backend can resolve the current session when sessionId is missing or stale.
@@ -348,6 +429,33 @@ export class CashierSessionService {
       map((result) => {
         this.isLoading.set(false);
         return result.data?.createCashierSessionReconciliation ?? null;
+      }),
+      catchError((err) => {
+        this.error.set(err.message || 'Failed to create reconciliation');
+        this.isLoading.set(false);
+        return of(null);
+      }),
+    );
+  }
+
+  /**
+   * Create a manual reconciliation (capture all accounts).
+   * Use scope 'manual' and pass per-account declared amounts.
+   */
+  createManualReconciliation(input: CreateReconciliationInput) {
+    this.isLoading.set(true);
+    this.error.set(null);
+
+    const client = this.apolloService.getClient();
+    const mutationPromise = client.mutate<{ createReconciliation: Reconciliation }>({
+      mutation: CREATE_RECONCILIATION as any,
+      variables: { input },
+    });
+
+    return from(mutationPromise).pipe(
+      map((result) => {
+        this.isLoading.set(false);
+        return result.data?.createReconciliation ?? null;
       }),
       catchError((err) => {
         this.error.set(err.message || 'Failed to create reconciliation');

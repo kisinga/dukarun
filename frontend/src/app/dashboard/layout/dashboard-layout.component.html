@@ -143,8 +143,7 @@
               </a>
               @if (isTrialActive()) {
                 <a
-                  [routerLink]="['/dashboard/settings']"
-                  [queryParams]="{ tab: 'subscription' }"
+                  routerLink="/dashboard/admin/subscription"
                   class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-primary/10 text-primary cursor-pointer"
                 >
                   <div class="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center">
@@ -346,27 +345,74 @@
         </div>
       </div>
 
-      <!-- Navigation - Large touch targets -->
+      <!-- Navigation - Flat list with section labels -->
       <div class="flex-1 overflow-y-auto py-2 px-2">
-        <nav class="space-y-0.5">
-          @for (item of navItems(); track item.label) {
-            <a
-              [routerLink]="item.route"
-              [queryParams]="item.queryParams"
-              routerLinkActive="bg-primary/10 text-primary font-bold"
-              [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' }"
-              (click)="closeDrawer()"
-              class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-base-content/70 active:bg-base-200 transition-colors"
+        <nav class="space-y-1">
+          <!-- Overview -->
+          <a
+            [routerLink]="overviewItem.route"
+            routerLinkActive="bg-primary/15 text-primary font-bold border-l-2 border-primary"
+            [routerLinkActiveOptions]="{ exact: true }"
+            (click)="closeDrawer()"
+            class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-base-content min-h-[2.75rem] active:bg-base-200 transition-colors"
+          >
+            <span
+              class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-base-200 text-base-content/80"
             >
-              <span class="text-base w-6 text-center">{{ item.icon }}</span>
-              <span>{{ item.label }}</span>
-            </a>
+              <app-nav-icon [name]="overviewItem.icon" />
+            </span>
+            <span>{{ overviewItem.label }}</span>
+          </a>
+
+          @for (section of navSections(); track $index) {
+            @if (section.label) {
+              <div
+                class="pt-3 pb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-base-content/50"
+              >
+                {{ section.label }}
+              </div>
+            }
+            @for (item of section.items; track item.label) {
+              @if (item.visible === undefined || item.visible()) {
+                <a
+                  [routerLink]="item.route"
+                  [queryParams]="item.queryParams"
+                  routerLinkActive="bg-primary/15 text-primary font-bold border-l-2 border-primary"
+                  [routerLinkActiveOptions]="{ exact: false }"
+                  (click)="closeDrawer()"
+                  class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-base-content min-h-[2.75rem] active:bg-base-200 transition-colors"
+                >
+                  <span
+                    class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-base-200 text-base-content/80"
+                  >
+                    <app-nav-icon [name]="item.icon" />
+                  </span>
+                  <span>{{ item.label }}</span>
+                </a>
+              }
+            }
           }
         </nav>
       </div>
 
-      <!-- Sidebar Footer -->
+      <!-- Sidebar Footer - Settings segregated with company selector -->
       <div class="border-t border-base-300/50 p-2 space-y-2 bg-base-200/20">
+        @if (hasSettingsForFooter()) {
+          <a
+            routerLink="/dashboard/settings"
+            routerLinkActive="bg-primary/15 text-primary font-bold"
+            [routerLinkActiveOptions]="{ exact: false }"
+            (click)="closeDrawer()"
+            class="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold text-base-content hover:bg-base-200 transition-colors"
+          >
+            <span
+              class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-base-200 text-base-content/80"
+            >
+              <app-nav-icon name="settings" />
+            </span>
+            <span>Settings</span>
+          </a>
+        }
         @if (companies().length > 1) {
           <div class="dropdown dropdown-top w-full">
             <div

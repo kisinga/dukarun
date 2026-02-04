@@ -292,51 +292,40 @@ export class OpenSessionService {
     }
 
     const totalDeclared = input.closingBalances.reduce((sum, b) => sum + b.amountCents, 0);
+    const channelId = session.channelId;
 
-    const closingCount = await this.recordCashCount(ctx, {
-      sessionId,
-      declaredCash: totalDeclared,
-      countType: 'closing',
+    return this.connection.withTransaction(ctx, async txCtx => {
+      const closingCount = await this.recordCashCount(txCtx, {
+        sessionId,
+        declaredCash: totalDeclared,
+        countType: 'closing',
+      });
+
+      const txSessionRepo = this.connection.getRepository(txCtx, CashierSession);
+      const sessionInTx = await txSessionRepo.findOne({ where: { id: sessionId } });
+      if (!sessionInTx) {
+        throw new Error(`Cashier session ${sessionId} not found`);
+      }
+      sessionInTx.closedAt = new Date();
+      sessionInTx.closingDeclared = String(totalDeclared);
+      sessionInTx.status = 'closed';
+      await txSessionRepo.save(sessionInTx);
+
+      const codes = input.closingBalances.map(b => b.accountCode);
+      const byCode = await this.getAccountIdsByCode(txCtx, channelId, codes);
+      const accountDeclaredAmounts: Record<string, string> = {};
+      for (const { accountCode, amountCents } of input.closingBalances) {
+        const accountId = byCode[accountCode];
+        if (accountId) accountDeclaredAmounts[accountId] = String(amountCents);
+      }
+      await this.createSessionReconciliation(txCtx, sessionId, input.notes, accountDeclaredAmounts);
+
+      const summary = await this.getSessionSummary(txCtx, sessionId);
+      this.logger.log(
+        `Cashier session ${sessionId} closed. Expected: ${summary.openingFloat + summary.ledgerTotals.cashTotal}, Declared: ${totalDeclared}, Variance: ${summary.variance}, ClosingCountId: ${closingCount.count.id}`
+      );
+      return summary;
     });
-
-    const ledgerTotals = await this.ledgerQueryService.getCashierSessionTotals(
-      session.channelId,
-      session.id
-    );
-
-    session.closedAt = new Date();
-    session.closingDeclared = String(totalDeclared);
-    session.status = 'closed';
-    await sessionRepo.save(session);
-
-    const codes = input.closingBalances.map(b => b.accountCode);
-    const byCode = await this.getAccountIdsByCode(ctx, session.channelId, codes);
-    const accountDeclaredAmounts: Record<string, string> = {};
-    for (const { accountCode, amountCents } of input.closingBalances) {
-      const accountId = byCode[accountCode];
-      if (accountId) accountDeclaredAmounts[accountId] = String(amountCents);
-    }
-    await this.createSessionReconciliation(ctx, session.id, input.notes, accountDeclaredAmounts);
-
-    const openingTotal = await this.getOpeningBalanceForSession(ctx, session.id);
-    const expectedCash = openingTotal + ledgerTotals.cashTotal;
-    const variance = totalDeclared - expectedCash;
-
-    this.logger.log(
-      `Cashier session ${session.id} closed. Expected: ${expectedCash}, Declared: ${totalDeclared}, Variance: ${variance}, ClosingCountId: ${closingCount.count.id}`
-    );
-
-    return {
-      sessionId: session.id,
-      cashierUserId: session.cashierUserId,
-      openedAt: session.openedAt,
-      closedAt: session.closedAt,
-      status: session.status,
-      openingFloat: openingTotal,
-      closingDeclared: totalDeclared,
-      ledgerTotals,
-      variance,
-    };
   }
 
   /**
@@ -458,6 +447,57 @@ export class OpenSessionService {
   }
 
   /**
+   * List closed cashier sessions that have no closing reconciliation record.
+   * Use for operational visibility and repair via createCashierSessionReconciliation(sessionId, notes).
+   */
+  async getClosedSessionsMissingReconciliation(
+    ctx: RequestContext,
+    channelId: number,
+    options?: { startDate?: string; endDate?: string; take?: number; skip?: number }
+  ): Promise<Array<{ sessionId: string; closedAt: Date }>> {
+    const { items: closedSessions } = await this.getSessions(ctx, channelId, {
+      status: 'closed',
+      startDate: options?.startDate,
+      endDate: options?.endDate,
+      take: options?.take ?? 500,
+      skip: options?.skip ?? 0,
+    });
+
+    if (closedSessions.length === 0) {
+      return [];
+    }
+
+    const reconRepo = this.connection.getRepository(ctx, Reconciliation);
+    const scopeRefId = (id: string) => toScopeRefId({ scope: 'cash-session', sessionId: id });
+
+    const missing: Array<{ sessionId: string; closedAt: Date }> = [];
+    for (const session of closedSessions) {
+      const rangeStart = session.openedAt.toISOString().slice(0, 10);
+      const rangeEnd = session.closedAt
+        ? new Date(session.closedAt).toISOString().slice(0, 10)
+        : '';
+      if (!rangeEnd) continue;
+
+      const existing = await reconRepo.findOne({
+        where: {
+          channelId,
+          scope: 'cash-session',
+          scopeRefId: scopeRefId(session.id),
+          rangeStart,
+          rangeEnd,
+        },
+      });
+      if (!existing) {
+        missing.push({
+          sessionId: session.id,
+          closedAt: session.closedAt!,
+        });
+      }
+    }
+    return missing;
+  }
+
+  /**
    * Create reconciliation record for a closed session.
    * When closingDeclaredAmounts is provided (from closeSession), stores per-account declared amounts; otherwise uses session total only.
    */
@@ -475,8 +515,26 @@ export class OpenSessionService {
       );
     }
 
-    const expectedBalance = summary.openingFloat + summary.ledgerTotals.cashTotal;
     const channelId = await this.getSessionChannelId(ctx, sessionId);
+    const scopeRefId = toScopeRefId({ scope: 'cash-session', sessionId });
+    const rangeStart = summary.openedAt.toISOString().slice(0, 10);
+    const rangeEnd = (summary.closedAt || new Date()).toISOString().slice(0, 10);
+
+    const reconRepo = this.connection.getRepository(ctx, Reconciliation);
+    const existingClosing = await reconRepo.findOne({
+      where: {
+        channelId,
+        scope: 'cash-session',
+        scopeRefId,
+        rangeStart,
+        rangeEnd,
+      },
+    });
+    if (existingClosing) {
+      return existingClosing;
+    }
+
+    const expectedBalance = summary.openingFloat + summary.ledgerTotals.cashTotal;
     const accountIds = await this.getCashierControlledAccountIds(ctx, channelId);
 
     const actualBalance =
@@ -489,9 +547,9 @@ export class OpenSessionService {
     const input: CreateReconciliationInput = {
       channelId,
       scope: 'cash-session',
-      scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId }),
-      rangeStart: summary.openedAt.toISOString().slice(0, 10),
-      rangeEnd: (summary.closedAt || new Date()).toISOString().slice(0, 10),
+      scopeRefId,
+      rangeStart,
+      rangeEnd,
       expectedBalance: expectedBalance.toString(),
       actualBalance,
       notes: notes || `Cashier session reconciliation for session ${sessionId}`,

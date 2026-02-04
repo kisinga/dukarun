@@ -29,6 +29,10 @@
    - Vendure inserts `customFields__fix_relational_custom_fields__` if you only declare relations.
    - Always add at least one scalar custom field (`boolean`, `int`, `string`, `datetime`) next to relations to prevent schema drift.
 
+5. **Standalone entities (not custom fields)**
+   - Some schema is implemented as standalone tables and entities (e.g. `role_template`, `role_template_assignment`) because Vendure does not support custom fields on every core entity (e.g. Role).
+   - The same migration principles apply: idempotent (IF NOT EXISTS / ON CONFLICT), guarded (DO $$ BEGIN ... EXCEPTION ... END $$ where useful), build-before-run, and document every schema touch. See [COMPANY_ADMINS.md](COMPANY_ADMINS.md) for the role-template tables.
+
 ---
 
 ## 2. Custom Field Checklist (Channel example)

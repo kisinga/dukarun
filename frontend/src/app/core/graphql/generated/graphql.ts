@@ -621,7 +621,6 @@ export type ChannelCustomFields = {
   billingCycle?: Maybe<Scalars['String']['output']>;
   cashControlEnabled?: Maybe<Scalars['Boolean']['output']>;
   cashierFlowEnabled?: Maybe<Scalars['Boolean']['output']>;
-  cashierOpen?: Maybe<Scalars['Boolean']['output']>;
   companyLogoAsset?: Maybe<Asset>;
   enablePrinter?: Maybe<Scalars['Boolean']['output']>;
   eventConfig?: Maybe<Scalars['String']['output']>;
@@ -694,7 +693,6 @@ export type ChannelFilterParameter = {
   billingCycle?: InputMaybe<StringOperators>;
   cashControlEnabled?: InputMaybe<BooleanOperators>;
   cashierFlowEnabled?: InputMaybe<BooleanOperators>;
-  cashierOpen?: InputMaybe<BooleanOperators>;
   code?: InputMaybe<StringOperators>;
   createdAt?: InputMaybe<DateOperators>;
   currencyCode?: InputMaybe<StringOperators>;
@@ -753,7 +751,6 @@ export type ChannelListOptions = {
 export type ChannelSettings = {
   __typename?: 'ChannelSettings';
   cashierFlowEnabled: Scalars['Boolean']['output'];
-  cashierOpen: Scalars['Boolean']['output'];
   companyLogoAsset?: Maybe<Asset>;
   enablePrinter: Scalars['Boolean']['output'];
 };
@@ -786,7 +783,6 @@ export type ChannelSortParameter = {
   billingCycle?: InputMaybe<SortOrder>;
   cashControlEnabled?: InputMaybe<SortOrder>;
   cashierFlowEnabled?: InputMaybe<SortOrder>;
-  cashierOpen?: InputMaybe<SortOrder>;
   code?: InputMaybe<SortOrder>;
   companyLogoAsset?: InputMaybe<SortOrder>;
   createdAt?: InputMaybe<SortOrder>;
@@ -836,6 +832,7 @@ export type ChannelSubscription = {
 };
 
 export type CloseCashierSessionInput = {
+  channelId?: InputMaybe<Scalars['Int']['input']>;
   closingBalances: Array<AccountAmountInput>;
   notes?: InputMaybe<Scalars['String']['input']>;
   sessionId: Scalars['ID']['input'];
@@ -1175,7 +1172,6 @@ export type CreateChannelCustomFieldsInput = {
   billingCycle?: InputMaybe<Scalars['String']['input']>;
   cashControlEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
-  cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
   companyLogoAssetId?: InputMaybe<Scalars['ID']['input']>;
   enablePrinter?: InputMaybe<Scalars['Boolean']['input']>;
   eventConfig?: InputMaybe<Scalars['String']['input']>;
@@ -4739,7 +4735,6 @@ export type MutationUpdateAssetArgs = {
 
 export type MutationUpdateCashierSettingsArgs = {
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
-  cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export type MutationUpdateChannelArgs = {
@@ -8265,7 +8260,6 @@ export type UpdateChannelCustomFieldsInput = {
   billingCycle?: InputMaybe<Scalars['String']['input']>;
   cashControlEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
-  cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
   companyLogoAssetId?: InputMaybe<Scalars['ID']['input']>;
   enablePrinter?: InputMaybe<Scalars['Boolean']['input']>;
   eventConfig?: InputMaybe<Scalars['String']['input']>;
@@ -11578,6 +11572,29 @@ export type CreateCashierSessionReconciliationMutationVariables = Exact<{
 export type CreateCashierSessionReconciliationMutation = {
   __typename?: 'Mutation';
   createCashierSessionReconciliation: {
+    __typename?: 'Reconciliation';
+    id: string;
+    channelId: number;
+    scope: string;
+    scopeRefId: string;
+    rangeStart: any;
+    rangeEnd: any;
+    status: string;
+    expectedBalance?: string | null;
+    actualBalance?: string | null;
+    varianceAmount: string;
+    notes?: string | null;
+    createdBy: number;
+  };
+};
+
+export type CreateReconciliationMutationVariables = Exact<{
+  input: CreateReconciliationInput;
+}>;
+
+export type CreateReconciliationMutation = {
+  __typename?: 'Mutation';
+  createReconciliation: {
     __typename?: 'Reconciliation';
     id: string;
     channelId: number;
@@ -20614,6 +20631,59 @@ export const CreateCashierSessionReconciliationDocument = {
   CreateCashierSessionReconciliationMutation,
   CreateCashierSessionReconciliationMutationVariables
 >;
+export const CreateReconciliationDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'CreateReconciliation' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'CreateReconciliationInput' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'createReconciliation' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'scope' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'scopeRefId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'rangeStart' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'rangeEnd' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'expectedBalance' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'actualBalance' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'varianceAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'createdBy' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<CreateReconciliationMutation, CreateReconciliationMutationVariables>;
 export const GetReconciliationsDocument = {
   kind: 'Document',
   definitions: [

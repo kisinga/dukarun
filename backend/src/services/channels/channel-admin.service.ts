@@ -8,11 +8,12 @@ import {
   User,
   RequestContext,
   Permission,
+  ChannelService,
 } from '@vendure/core';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { CommunicationService } from '../../infrastructure/communication/communication.service';
-import { ROLE_TEMPLATES, RoleTemplate } from '../auth/provisioning/role-provisioner.service';
-import { ChannelService } from '@vendure/core';
+import { RoleTemplate } from '../../domain/role-template/role-template.entity';
+import { RoleTemplateService } from './role-template.service';
 
 export interface InviteAdministratorInput {
   emailAddress?: string;
@@ -47,14 +48,15 @@ export class ChannelAdminService {
     private readonly connection: TransactionalConnection,
     private readonly auditService: AuditService,
     private readonly communicationService: CommunicationService,
-    private readonly channelService: ChannelService
+    private readonly channelService: ChannelService,
+    private readonly roleTemplateService: RoleTemplateService
   ) {}
 
   /**
-   * Get available role templates
+   * Get available role templates (from DB). Resolver uses RoleTemplateService.getAllTemplates directly.
    */
-  getRoleTemplates(): RoleTemplate[] {
-    return Object.values(ROLE_TEMPLATES);
+  async getRoleTemplates(ctx: RequestContext): Promise<RoleTemplate[]> {
+    return this.roleTemplateService.getAllTemplates(ctx);
   }
 
   /**
@@ -100,27 +102,45 @@ export class ChannelAdminService {
         );
       }
 
+      await this.checkAdminCountLimit(ctx);
+
       const roleTemplateCode =
         'roleTemplateCode' in cleanInput ? cleanInput.roleTemplateCode : 'admin';
-      const template = roleTemplateCode ? ROLE_TEMPLATES[roleTemplateCode] : undefined;
+      const template = await this.roleTemplateService.getTemplateByCode(ctx, roleTemplateCode);
       if (!template) {
         throw new BadRequestException(`Invalid role template code: ${roleTemplateCode}`);
       }
 
-      const finalPermissions =
-        'permissionOverrides' in cleanInput && cleanInput.permissionOverrides
-          ? cleanInput.permissionOverrides
-          : template.permissions;
+      const hasOverrides =
+        'permissionOverrides' in cleanInput &&
+        Array.isArray(cleanInput.permissionOverrides) &&
+        cleanInput.permissionOverrides.length > 0;
+      const finalPermissions = hasOverrides
+        ? (cleanInput.permissionOverrides as string[])
+        : template.permissions;
 
-      const roleCode = `channel-${roleTemplateCode}-${channelId}-${Date.now()}`;
-      const createRoleInput = {
-        code: roleCode,
-        description: `${template.name} role for ${cleanInput.firstName} ${cleanInput.lastName}`,
-        permissions: finalPermissions,
-        channelIds: [channelId],
-      };
-
-      const role = await this.roleService.create(ctx, createRoleInput);
+      let role: Role;
+      if (!hasOverrides) {
+        const existingRole = await this.roleTemplateService.findRoleByChannelAndTemplateId(
+          ctx,
+          channelId,
+          template.id
+        );
+        if (existingRole) {
+          role = existingRole;
+        } else {
+          role = await this.createRoleForTemplate(ctx, channelId, template, cleanInput);
+          await this.roleTemplateService.assignTemplateToRole(ctx, role.id as number, template.id);
+        }
+      } else {
+        role = await this.createRoleWithOverrides(
+          ctx,
+          channelId,
+          template,
+          finalPermissions,
+          cleanInput
+        );
+      }
 
       await this.attachRoleToExistingUser(ctx, existingUser, role);
 
@@ -165,25 +185,41 @@ export class ChannelAdminService {
 
     const roleTemplateCode =
       'roleTemplateCode' in cleanInput ? cleanInput.roleTemplateCode : 'admin';
-    const template = roleTemplateCode ? ROLE_TEMPLATES[roleTemplateCode] : undefined;
+    const template = await this.roleTemplateService.getTemplateByCode(ctx, roleTemplateCode);
     if (!template) {
       throw new BadRequestException(`Invalid role template code: ${roleTemplateCode}`);
     }
 
-    const finalPermissions =
-      'permissionOverrides' in cleanInput && cleanInput.permissionOverrides
-        ? cleanInput.permissionOverrides
-        : template.permissions;
+    const hasOverrides =
+      'permissionOverrides' in cleanInput &&
+      Array.isArray(cleanInput.permissionOverrides) &&
+      cleanInput.permissionOverrides.length > 0;
+    const finalPermissions = hasOverrides
+      ? (cleanInput.permissionOverrides as string[])
+      : template.permissions;
 
-    const roleCode = `channel-${roleTemplateCode}-${channelId}-${Date.now()}`;
-    const createRoleInput = {
-      code: roleCode,
-      description: `${template.name} role for ${cleanInput.firstName} ${cleanInput.lastName}`,
-      permissions: finalPermissions,
-      channelIds: [channelId],
-    };
-
-    const role = await this.roleService.create(ctx, createRoleInput);
+    let role: Role;
+    if (!hasOverrides) {
+      const existingRole = await this.roleTemplateService.findRoleByChannelAndTemplateId(
+        ctx,
+        channelId,
+        template.id
+      );
+      if (existingRole) {
+        role = existingRole;
+      } else {
+        role = await this.createRoleForTemplate(ctx, channelId, template, cleanInput);
+        await this.roleTemplateService.assignTemplateToRole(ctx, role.id as number, template.id);
+      }
+    } else {
+      role = await this.createRoleWithOverrides(
+        ctx,
+        channelId,
+        template,
+        finalPermissions,
+        cleanInput
+      );
+    }
 
     const emailToUse =
       'emailAddress' in cleanInput &&
@@ -364,6 +400,62 @@ export class ChannelAdminService {
     }
   }
 
+  /**
+   * Create a new role from a template (no overrides). Caller assigns template to role after.
+   */
+  private async createRoleForTemplate(
+    ctx: RequestContext,
+    channelId: string | number,
+    template: RoleTemplate,
+    cleanInput: { firstName: string; lastName: string }
+  ): Promise<Role> {
+    const roleCode = `channel-${channelId}-${template.id}`;
+    return this.roleService.create(ctx, {
+      code: roleCode,
+      description: `${template.name} role for ${cleanInput.firstName} ${cleanInput.lastName}`,
+      permissions: template.permissions as Permission[],
+      channelIds: [channelId],
+    });
+  }
+
+  /**
+   * Create a custom role with overridden permissions. No template assignment.
+   */
+  private async createRoleWithOverrides(
+    ctx: RequestContext,
+    channelId: string | number,
+    template: RoleTemplate,
+    permissions: string[],
+    cleanInput: { firstName: string; lastName: string }
+  ): Promise<Role> {
+    const roleCode = `channel-${channelId}-${template.code}-custom-${Date.now()}`;
+    return this.roleService.create(ctx, {
+      code: roleCode,
+      description: `${template.name} role (custom) for ${cleanInput.firstName} ${cleanInput.lastName}`,
+      permissions: permissions as Permission[],
+      channelIds: [channelId],
+    });
+  }
+
+  /**
+   * Count distinct administrators for the channel (one row per admin, not per role).
+   */
+  private async getChannelAdminCount(
+    ctx: RequestContext,
+    channelId: string | number
+  ): Promise<number> {
+    const result = await this.connection
+      .getRepository(ctx, Administrator)
+      .createQueryBuilder('admin')
+      .innerJoin('admin.user', 'user')
+      .innerJoin('user.roles', 'role')
+      .innerJoin('role.channels', 'channel')
+      .where('channel.id = :channelId', { channelId })
+      .select('DISTINCT admin.id')
+      .getRawMany<{ admin_id: number }>();
+    return result.length;
+  }
+
   private async checkAdminCountLimit(ctx: RequestContext): Promise<void> {
     const channelId = ctx.channelId!;
     const channel = await this.channelService.findOne(ctx, channelId);
@@ -376,17 +468,9 @@ export class ChannelAdminService {
     };
 
     const maxAdminCount = customFields.maxAdminCount ?? 5;
+    const count = await this.getChannelAdminCount(ctx, channelId);
 
-    const administrators = await this.connection
-      .getRepository(ctx, Administrator)
-      .createQueryBuilder('admin')
-      .leftJoinAndSelect('admin.user', 'user')
-      .leftJoinAndSelect('user.roles', 'role')
-      .leftJoinAndSelect('role.channels', 'channel')
-      .where('channel.id = :channelId', { channelId })
-      .getMany();
-
-    if (administrators.length >= maxAdminCount) {
+    if (count >= maxAdminCount) {
       throw new BadRequestException(
         `Maximum admin count (${maxAdminCount}) reached for this channel.`
       );
