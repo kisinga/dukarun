@@ -1,3 +1,4 @@
+import { describe, expect, it, jest } from '@jest/globals';
 import { Order, OrderService, RequestContext } from '@vendure/core';
 import { CreditService } from '../../src/services/credit/credit.service';
 import { FinancialService } from '../../src/services/financial/financial.service';
@@ -11,7 +12,7 @@ describe('CreditService', () => {
 
   const createFinancialService = (outstandingAmount: number): FinancialService => {
     return {
-      getCustomerBalance: jest.fn().mockResolvedValue(outstandingAmount),
+      getCustomerBalance: jest.fn().mockResolvedValue(outstandingAmount as never),
     } as unknown as FinancialService;
   };
 
@@ -28,13 +29,13 @@ describe('CreditService', () => {
     const saveMock = jest.fn();
 
     // Mock for Order repository queries (used by calculateOutstandingAmount)
-    const findOrdersMock = jest.fn().mockResolvedValue(orders);
+    const findOrdersMock = jest.fn().mockResolvedValue(orders as never);
 
     const connection = {
       getRepository: jest.fn().mockImplementation((ctx, entity) => {
         // Return Order repository mock when querying for Order
         // Check by constructor name or use a more reliable method
-        if (entity === Order || (entity && entity.name === 'Order')) {
+        if (entity === Order || (entity && (entity as { name?: string }).name === 'Order')) {
           return {
             find: findOrdersMock,
           };
@@ -106,7 +107,7 @@ describe('CreditService', () => {
 
     // releaseCreditCharge updates lastRepaymentDate and lastRepaymentAmount
     expect(saveMock).toHaveBeenCalledTimes(1);
-    const savedCustomer = saveMock.mock.calls[0][0];
+    const savedCustomer = saveMock.mock.calls[0][0] as { customFields: Record<string, unknown> };
     expect(savedCustomer.customFields).toMatchObject({
       lastRepaymentDate: expect.any(Date),
       lastRepaymentAmount: 150,

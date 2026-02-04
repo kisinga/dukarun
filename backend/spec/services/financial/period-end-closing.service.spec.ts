@@ -115,9 +115,7 @@ describe('PeriodEndClosingService', () => {
     });
 
     it('should throw error if period end date is in the future', async () => {
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + 1);
-      const periodEndDate = futureDate.toISOString().slice(0, 10);
+      const periodEndDate = '2099-01-01';
 
       await expect(service.closeAccountingPeriod(ctx, 1, periodEndDate)).rejects.toThrow(
         'cannot be in the future'

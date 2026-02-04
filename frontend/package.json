@@ -8,7 +8,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "test:headless": "USE_HEADLESS=true ng test --watch=false",
-    "test:ci": "CI=true ng test --code-coverage --watch=false",
+    "test:ci": "CI=true ng test --code-coverage --watch=false --no-progress",
     "test:coverage": "ng test --code-coverage --watch=false",
     "codegen": "graphql-codegen --config codegen.ts",
     "codegen:watch": "graphql-codegen --config codegen.ts",

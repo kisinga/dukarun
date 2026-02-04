@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { EventBus, RequestContext } from '@vendure/core';
 import { MockDb, MlExtractionQueueRow } from '../../support/mock-db';
 import { MlExtractionQueueService } from '../../../src/services/ml/ml-extraction-queue.service';
