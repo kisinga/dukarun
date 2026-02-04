@@ -53,7 +53,10 @@ export const LEDGER_VIEWER_SCHEMA = gql`
 
   extend type Query {
     ledgerAccounts: LedgerAccountsResult!
-    paymentSourceAccounts: LedgerAccountsResult!
+    """
+    Ledger accounts eligible as payment/debit sources (asset, leaf, excluding AR and inventory).
+    """
+    eligibleDebitAccounts: LedgerAccountsResult!
     journalEntries(options: JournalEntriesOptions): JournalEntriesResult!
     journalEntry(id: ID!): JournalEntry
   }

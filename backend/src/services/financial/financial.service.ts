@@ -198,7 +198,8 @@ export class FinancialService {
     order: Order,
     paymentMethod: string,
     amount: number,
-    debitAccountCode?: string
+    debitAccountCode?: string,
+    openSessionId?: string
   ): Promise<void> {
     if (amount <= 0) {
       throw new Error(
@@ -213,6 +214,7 @@ export class FinancialService {
       orderCode: order.code,
       customerId: order.customer?.id?.toString(),
       resolvedAccountCode: debitAccountCode?.trim() || undefined,
+      openSessionId,
     };
 
     await this.postingService.postPaymentAllocation(ctx, paymentId, context);
@@ -221,6 +223,33 @@ export class FinancialService {
     this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.ACCOUNTS_RECEIVABLE);
     const clearingAccount = debitAccountCode?.trim() || this.mapMethodToAccount(paymentMethod);
     this.queryService.invalidateCache(ctx.channelId as number, clearingAccount);
+  }
+
+  /**
+   * Post a variance adjustment so the ledger balances (short/over).
+   * Call when declared != expected on opening/closing count or reconciliation.
+   */
+  async postVarianceAdjustment(
+    ctx: RequestContext,
+    sessionId: string,
+    accountCode: string,
+    varianceCents: number,
+    reason: string,
+    countId: string
+  ): Promise<void> {
+    const channelId = ctx.channelId as number;
+    const sourceId = `${sessionId}-${accountCode}-${countId}`;
+    await this.postingService.postVarianceAdjustment(
+      ctx,
+      channelId,
+      sessionId,
+      accountCode,
+      varianceCents,
+      reason,
+      sourceId
+    );
+    this.queryService.invalidateCache(channelId, accountCode);
+    this.queryService.invalidateCache(channelId, ACCOUNT_CODES.CASH_SHORT_OVER);
   }
 
   /**

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RequestContext, TransactionalConnection } from '@vendure/core';
 import { Reconciliation, ReconciliationScope } from '../../domain/recon/reconciliation.entity';
+import { ReconciliationAccount } from '../../domain/recon/reconciliation-account.entity';
 import { AccountBalanceService } from './account-balance.service';
 import { ReconciliationStatus, ScopeReconciliationStatus } from './period-management.types';
 
@@ -13,6 +14,10 @@ export interface CreateReconciliationInput {
   expectedBalance?: string; // in smallest currency unit
   actualBalance: string; // in smallest currency unit
   notes?: string;
+  /** Account IDs (UUID) this reconciliation covers; rows inserted into reconciliation_account */
+  accountIds?: string[];
+  /** Per-account declared amounts (accountId -> declaredAmountCents string) for opening/closing */
+  accountDeclaredAmounts?: Record<string, string>;
 }
 
 /**
@@ -60,7 +65,22 @@ export class ReconciliationService {
       createdBy,
     });
 
-    return reconciliationRepo.save(reconciliation);
+    const saved = await reconciliationRepo.save(reconciliation);
+
+    if (input.accountIds?.length) {
+      const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
+      const declared = input.accountDeclaredAmounts ?? {};
+      const rows = input.accountIds.map(accountId =>
+        junctionRepo.create({
+          reconciliationId: saved.id,
+          accountId,
+          declaredAmountCents: declared[accountId] ?? null,
+        })
+      );
+      await junctionRepo.save(rows);
+    }
+
+    return saved;
   }
 
   /**
@@ -120,6 +140,162 @@ export class ReconciliationService {
       periodEndDate,
       scopes,
     };
+  }
+
+  /**
+   * List reconciliations for a channel with optional filters (for history UI).
+   */
+  async getReconciliations(
+    ctx: RequestContext,
+    channelId: number,
+    options?: {
+      startDate?: string;
+      endDate?: string;
+      scope?: string;
+      hasVariance?: boolean;
+      take?: number;
+      skip?: number;
+    }
+  ): Promise<{ items: Reconciliation[]; totalItems: number }> {
+    const qb = this.connection
+      .getRepository(ctx, Reconciliation)
+      .createQueryBuilder('r')
+      .where('r.channelId = :channelId', { channelId })
+      .orderBy('r.rangeEnd', 'DESC')
+      .addOrderBy('r.rangeStart', 'DESC');
+
+    if (options?.startDate) {
+      qb.andWhere('r.rangeEnd >= :startDate', { startDate: options.startDate });
+    }
+    if (options?.endDate) {
+      qb.andWhere('r.rangeStart <= :endDate', { endDate: options.endDate });
+    }
+    if (options?.scope) {
+      qb.andWhere('r.scope = :scope', { scope: options.scope });
+    }
+    if (options?.hasVariance === true) {
+      qb.andWhere('r.varianceAmount != :zero', { zero: '0' });
+    }
+
+    const totalItems = await qb.getCount();
+
+    if (options?.take != null) {
+      qb.take(options.take);
+    }
+    if (options?.skip != null) {
+      qb.skip(options.skip);
+    }
+
+    const items = await qb.getMany();
+    return { items, totalItems };
+  }
+
+  /**
+   * Get per-account details for a reconciliation (accounts reconciled and variance per account).
+   * Executed lazily when the user expands a row. Returns empty array if no reconciliation_account rows.
+   */
+  async getReconciliationDetails(
+    ctx: RequestContext,
+    reconciliationId: string
+  ): Promise<
+    Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      declaredAmountCents: string | null;
+      expectedBalanceCents: string | null;
+      varianceCents: string | null;
+    }>
+  > {
+    const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
+    const reconciliation = await reconciliationRepo.findOne({
+      where: { id: reconciliationId },
+    });
+    if (!reconciliation) {
+      return [];
+    }
+
+    const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
+    const rows = await junctionRepo.find({
+      where: { reconciliationId },
+      relations: ['account'],
+    });
+
+    const result: Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      declaredAmountCents: string | null;
+      expectedBalanceCents: string | null;
+      varianceCents: string | null;
+    }> = [];
+
+    for (const row of rows) {
+      const account = row.account;
+      if (!account) continue;
+      const declaredStr = row.declaredAmountCents ?? null;
+      let expectedStr: string | null = null;
+      let varianceStr: string | null = null;
+      try {
+        const balance = await this.accountBalanceService.getAccountBalance(
+          ctx,
+          account.code,
+          reconciliation.channelId,
+          reconciliation.rangeEnd
+        );
+        expectedStr = String(balance.balance);
+        const expected = BigInt(expectedStr);
+        const declared = declaredStr !== null ? BigInt(declaredStr) : BigInt(0);
+        varianceStr = (expected - declared).toString();
+      } catch {
+        // Account may be deleted or balance unavailable
+      }
+      result.push({
+        accountId: account.id,
+        accountCode: account.code,
+        accountName: account.name,
+        declaredAmountCents: declaredStr,
+        expectedBalanceCents: expectedStr,
+        varianceCents: varianceStr,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Get per-account reconciliation details for a cashier session.
+   * @param kind - 'opening' = reconciliation at session open (first by rangeStart); 'closing' = at close (first by rangeEnd DESC). Default 'closing'.
+   * Returns [] if no matching reconciliation exists.
+   */
+  async getSessionReconciliationDetails(
+    ctx: RequestContext,
+    sessionId: string,
+    kind: 'opening' | 'closing' = 'closing'
+  ): Promise<
+    Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      declaredAmountCents: string | null;
+      expectedBalanceCents: string | null;
+      varianceCents: string | null;
+    }>
+  > {
+    const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
+    const qb = reconciliationRepo
+      .createQueryBuilder('r')
+      .where('r.scope = :scope', { scope: 'cash-session' })
+      .andWhere('r.scopeRefId = :sessionId', { sessionId });
+    if (kind === 'opening') {
+      qb.orderBy('r.rangeStart', 'ASC').addOrderBy('r.rangeEnd', 'ASC');
+    } else {
+      qb.orderBy('r.rangeEnd', 'DESC').addOrderBy('r.rangeStart', 'DESC');
+    }
+    const list = await qb.take(1).getMany();
+    const reconciliation = list[0];
+    if (!reconciliation) return [];
+    return this.getReconciliationDetails(ctx, reconciliation.id);
   }
 
   /**

@@ -1,17 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Channel, PaymentMethod, RequestContext, TransactionalConnection } from '@vendure/core';
+import { In } from 'typeorm';
 import { CashDrawerCount, CashCountType } from '../../domain/cashier/cash-drawer-count.entity';
 import { CashierSession } from '../../domain/cashier/cashier-session.entity';
 import { MpesaVerification } from '../../domain/cashier/mpesa-verification.entity';
+import { Account } from '../../ledger/account.entity';
 import { Reconciliation } from '../../domain/recon/reconciliation.entity';
+import { ReconciliationAccount } from '../../domain/recon/reconciliation-account.entity';
 import { LedgerQueryService } from './ledger-query.service';
+import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import {
   getAccountCodeFromPaymentMethod,
   getReconciliationTypeFromPaymentMethod,
   isCashierControlledPaymentMethod,
   requiresReconciliation,
 } from './payment-method-mapping.config';
+import { FinancialService } from './financial.service';
 import { CreateReconciliationInput, ReconciliationService } from './reconciliation.service';
+import {
+  PaymentMethodReconciliationConfig,
+  SessionReconciliationRequirements,
+  toScopeRefId,
+} from './period-management.types';
+import { ChannelPaymentMethodService } from './channel-payment-method.service';
 
 /**
  * Cashier Session Summary
@@ -34,20 +45,28 @@ export interface CashierSessionSummary {
 }
 
 /**
- * Close Session Input
+ * Close Session Input (per-account closing, like opening).
  */
 export interface CloseSessionInput {
   sessionId: string;
-  closingDeclared: number; // Amount declared by cashier (in cents)
+  closingBalances: Array<{ accountCode: string; amountCents: number }>;
   notes?: string;
 }
 
 /**
- * Open Session Input
+ * Per-account opening balance (cashier-controlled account).
+ */
+export interface OpeningBalanceInput {
+  accountCode: string;
+  amountCents: number;
+}
+
+/**
+ * Open Session Input (per-account opening; no single float).
  */
 export interface OpenSessionInput {
   channelId: number;
-  openingFloat: number; // Starting cash float (in cents)
+  openingBalances: OpeningBalanceInput[];
 }
 
 /**
@@ -57,6 +76,8 @@ export interface RecordCashCountInput {
   sessionId: string;
   declaredCash: number; // Amount cashier counted (in cents)
   countType: CashCountType;
+  /** Reason for variance (stored on count and in ledger line meta for audit) */
+  varianceReason?: string;
 }
 
 /**
@@ -80,28 +101,6 @@ export interface VerifyMpesaInput {
 }
 
 /**
- * Payment method reconciliation config for a session
- */
-export interface PaymentMethodReconciliationConfig {
-  paymentMethodId: string;
-  paymentMethodCode: string;
-  reconciliationType: 'blind_count' | 'transaction_verification' | 'statement_match' | 'none';
-  ledgerAccountCode: string;
-  isCashierControlled: boolean;
-  requiresReconciliation: boolean;
-}
-
-/**
- * Session reconciliation requirements
- * Derived from payment method configuration
- */
-export interface SessionReconciliationRequirements {
-  blindCountRequired: boolean;
-  verificationRequired: boolean;
-  paymentMethods: PaymentMethodReconciliationConfig[];
-}
-
-/**
  * Cashier Session Service
  *
  * Manages cashier sessions and provides ledger-integrated reconciliation.
@@ -111,30 +110,27 @@ export interface SessionReconciliationRequirements {
  * IMPORTANT: All financial figures come from the ledger as the single source of truth.
  */
 @Injectable()
-export class CashierSessionService {
-  private readonly logger = new Logger(CashierSessionService.name);
+export class OpenSessionService {
+  private readonly logger = new Logger(OpenSessionService.name);
 
   constructor(
     private readonly connection: TransactionalConnection,
     private readonly ledgerQueryService: LedgerQueryService,
-    private readonly reconciliationService: ReconciliationService
+    private readonly reconciliationService: ReconciliationService,
+    private readonly financialService: FinancialService,
+    private readonly channelPaymentMethodService: ChannelPaymentMethodService
   ) {}
 
   /**
-   * Start a new cashier session
-   * If requireOpeningCount is enabled, creates an opening cash count
+   * Start a new cashier session with per-account opening reconciliation.
+   * Opening is stored as one reconciliation + reconciliation_account rows with declaredAmountCents.
    */
   async startSession(ctx: RequestContext, input: OpenSessionInput): Promise<CashierSession> {
     const sessionRepo = this.connection.getRepository(ctx, CashierSession);
 
-    // Check for existing open session for this channel
     const existingOpenSession = await sessionRepo.findOne({
-      where: {
-        channelId: input.channelId,
-        status: 'open',
-      },
+      where: { channelId: input.channelId, status: 'open' },
     });
-
     if (existingOpenSession) {
       throw new Error(
         `Channel ${input.channelId} already has an open cashier session. ` +
@@ -142,115 +138,194 @@ export class CashierSessionService {
       );
     }
 
-    const cashierUserId = ctx.activeUserId ? parseInt(ctx.activeUserId.toString(), 10) : 0;
+    const requirements = await this.getChannelReconciliationRequirements(ctx, input.channelId);
+    const requiredCodes = new Set(requirements.paymentMethods.map(pm => pm.ledgerAccountCode));
+    const givenCodes = new Set(input.openingBalances.map(b => b.accountCode));
+    const missing = [...requiredCodes].filter(c => !givenCodes.has(c));
+    if (missing.length > 0) {
+      throw new Error(
+        `Opening must include every cashier-controlled account. Missing: ${missing.join(', ')}`
+      );
+    }
 
+    const cashierUserId = ctx.activeUserId ? parseInt(ctx.activeUserId.toString(), 10) : 0;
     const session = sessionRepo.create({
       channelId: input.channelId,
       cashierUserId,
       openedAt: new Date(),
-      openingFloat: input.openingFloat.toString(),
       closingDeclared: '0',
       status: 'open',
     });
-
     const savedSession = await sessionRepo.save(session);
 
-    // Check if opening count is required
-    const requireOpeningCount = await this.isOpeningCountRequired(ctx, input.channelId);
-    if (requireOpeningCount) {
-      // Create opening cash count - this records the opening float as a verified count
-      await this.recordCashCount(ctx, {
-        sessionId: savedSession.id,
-        declaredCash: input.openingFloat,
-        countType: 'opening',
-      });
+    const today = savedSession.openedAt.toISOString().slice(0, 10);
+    const accountIds = await this.getCashierControlledAccountIds(ctx, input.channelId);
+    const byCode = await this.getAccountIdsByCode(ctx, input.channelId, [...requiredCodes]);
+    const accountDeclaredAmounts: Record<string, string> = {};
+    let totalDeclared = 0;
+    for (const { accountCode, amountCents } of input.openingBalances) {
+      const accountId = byCode[accountCode];
+      if (accountId) {
+        accountDeclaredAmounts[accountId] = String(amountCents);
+        totalDeclared += amountCents;
+      }
+    }
+
+    const openingRecon = await this.reconciliationService.createReconciliation(ctx, {
+      channelId: input.channelId,
+      scope: 'cash-session',
+      scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId: savedSession.id }),
+      rangeStart: today,
+      rangeEnd: today,
+      expectedBalance: '0',
+      actualBalance: String(totalDeclared),
+      notes: `Opening reconciliation for session ${savedSession.id}`,
+      accountIds,
+      accountDeclaredAmounts,
+    });
+
+    for (const { accountCode, amountCents } of input.openingBalances) {
+      if (amountCents !== 0) {
+        await this.financialService.postVarianceAdjustment(
+          ctx,
+          savedSession.id,
+          accountCode,
+          amountCents,
+          'Opening balance',
+          openingRecon.id
+        );
+      }
     }
 
     this.logger.log(
-      `Cashier session ${savedSession.id} started for channel ${input.channelId} ` +
-        `by user ${cashierUserId} with opening float ${input.openingFloat}`
+      `Cashier session ${savedSession.id} started for channel ${input.channelId} by user ${cashierUserId} (per-account opening)`
     );
-
     return savedSession;
   }
 
   /**
-   * Check if opening count is required for a channel
+   * Resolve account codes to account IDs for the channel.
    */
-  private async isOpeningCountRequired(ctx: RequestContext, channelId: number): Promise<boolean> {
-    const channelRepo = this.connection.getRepository(ctx, Channel);
-    const channel = await channelRepo.findOne({
-      where: { id: channelId },
+  private async getAccountIdsByCode(
+    ctx: RequestContext,
+    channelId: number,
+    codes: string[]
+  ): Promise<Record<string, string>> {
+    if (codes.length === 0) return {};
+    const accountRepo = this.connection.getRepository(ctx, Account);
+    const accounts = await accountRepo.find({
+      where: { channelId, code: In(codes) },
+      select: ['id', 'code'],
     });
+    return Object.fromEntries(accounts.map(a => [a.code, a.id]));
+  }
 
-    if (!channel) {
-      return true; // Default to required
-    }
+  /**
+   * Derive session opening total from the opening reconciliation (sum of declaredAmountCents).
+   */
+  async getOpeningBalanceForSession(ctx: RequestContext, sessionId: string): Promise<number> {
+    const reconRepo = this.connection.getRepository(ctx, Reconciliation);
+    const sessionRepo = this.connection.getRepository(ctx, CashierSession);
+    const session = await sessionRepo.findOne({
+      where: { id: sessionId },
+      select: ['id', 'openedAt'],
+    });
+    if (!session) return 0;
 
-    return (channel as any).customFields?.requireOpeningCount ?? true;
+    const openingRecons = await reconRepo.find({
+      where: {
+        scope: 'cash-session',
+        scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId }),
+      },
+      order: { rangeStart: 'ASC' },
+      take: 1,
+    });
+    const openingRecon = openingRecons[0];
+    if (!openingRecon) return 0;
+
+    const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
+    const rows = await junctionRepo.find({
+      where: { reconciliationId: openingRecon.id },
+      select: ['declaredAmountCents'],
+    });
+    return rows.reduce(
+      (sum, r) => sum + (r.declaredAmountCents ? parseInt(r.declaredAmountCents, 10) : 0),
+      0
+    );
   }
 
   /**
    * Close a cashier session and calculate variance
-   * Automatically creates a closing cash count record
+   * Per-account closing amounts (like opening); creates one blind count with total and reconciliation with per-account breakdown.
    */
-  async closeSession(ctx: RequestContext, input: CloseSessionInput): Promise<CashierSessionSummary> {
+  async closeSession(
+    ctx: RequestContext,
+    input: CloseSessionInput
+  ): Promise<CashierSessionSummary> {
+    const sessionId = typeof input.sessionId === 'string' ? input.sessionId.trim() : '';
+    if (!sessionId || sessionId === '-1') {
+      throw new Error('Invalid session id');
+    }
+
     const sessionRepo = this.connection.getRepository(ctx, CashierSession);
 
     const session = await sessionRepo.findOne({
-      where: { id: input.sessionId },
+      where: { id: sessionId },
     });
 
     if (!session) {
-      throw new Error(`Cashier session ${input.sessionId} not found`);
+      throw new Error(`Cashier session ${sessionId} not found`);
     }
 
     if (session.status === 'closed') {
-      throw new Error(`Cashier session ${input.sessionId} is already closed`);
+      throw new Error(`Cashier session ${sessionId} is already closed`);
     }
 
-    // Create a closing cash count (blind count)
-    const closingCount = await this.recordCashCount(ctx, {
-      sessionId: input.sessionId,
-      declaredCash: input.closingDeclared,
-      countType: 'closing',
+    const requirements = await this.getChannelReconciliationRequirements(ctx, session.channelId);
+    const requiredCodes = new Set(requirements.paymentMethods.map(pm => pm.ledgerAccountCode));
+    const givenCodes = new Set(input.closingBalances.map(b => b.accountCode));
+    const missing = [...requiredCodes].filter(c => !givenCodes.has(c));
+    if (missing.length > 0) {
+      throw new Error(
+        `Closing must include every cashier-controlled account. Missing: ${missing.join(', ')}`
+      );
+    }
+
+    const totalDeclared = input.closingBalances.reduce((sum, b) => sum + b.amountCents, 0);
+    const channelId = session.channelId;
+
+    return this.connection.withTransaction(ctx, async txCtx => {
+      const closingCount = await this.recordCashCount(txCtx, {
+        sessionId,
+        declaredCash: totalDeclared,
+        countType: 'closing',
+      });
+
+      const txSessionRepo = this.connection.getRepository(txCtx, CashierSession);
+      const sessionInTx = await txSessionRepo.findOne({ where: { id: sessionId } });
+      if (!sessionInTx) {
+        throw new Error(`Cashier session ${sessionId} not found`);
+      }
+      sessionInTx.closedAt = new Date();
+      sessionInTx.closingDeclared = String(totalDeclared);
+      sessionInTx.status = 'closed';
+      await txSessionRepo.save(sessionInTx);
+
+      const codes = input.closingBalances.map(b => b.accountCode);
+      const byCode = await this.getAccountIdsByCode(txCtx, channelId, codes);
+      const accountDeclaredAmounts: Record<string, string> = {};
+      for (const { accountCode, amountCents } of input.closingBalances) {
+        const accountId = byCode[accountCode];
+        if (accountId) accountDeclaredAmounts[accountId] = String(amountCents);
+      }
+      await this.createSessionReconciliation(txCtx, sessionId, input.notes, accountDeclaredAmounts);
+
+      const summary = await this.getSessionSummary(txCtx, sessionId);
+      this.logger.log(
+        `Cashier session ${sessionId} closed. Expected: ${summary.openingFloat + summary.ledgerTotals.cashTotal}, Declared: ${totalDeclared}, Variance: ${summary.variance}, ClosingCountId: ${closingCount.count.id}`
+      );
+      return summary;
     });
-
-    // Get ledger totals for this session
-    const ledgerTotals = await this.ledgerQueryService.getCashierSessionTotals(
-      session.channelId,
-      session.id
-    );
-
-    // Update session
-    session.closedAt = new Date();
-    session.closingDeclared = input.closingDeclared.toString();
-    session.status = 'closed';
-
-    await sessionRepo.save(session);
-
-    // Calculate variance
-    const openingFloat = parseInt(session.openingFloat, 10);
-    const expectedCash = openingFloat + ledgerTotals.cashTotal;
-    const variance = input.closingDeclared - expectedCash;
-
-    this.logger.log(
-      `Cashier session ${session.id} closed. ` +
-        `Expected: ${expectedCash}, Declared: ${input.closingDeclared}, Variance: ${variance}, ` +
-        `ClosingCountId: ${closingCount.count.id}`
-    );
-
-    return {
-      sessionId: session.id,
-      cashierUserId: session.cashierUserId,
-      openedAt: session.openedAt,
-      closedAt: session.closedAt,
-      status: session.status,
-      openingFloat,
-      closingDeclared: input.closingDeclared,
-      ledgerTotals,
-      variance,
-    };
   }
 
   /**
@@ -267,13 +342,12 @@ export class CashierSessionService {
       throw new Error(`Cashier session ${sessionId} not found`);
     }
 
-    // Get ledger totals for this session
     const ledgerTotals = await this.ledgerQueryService.getCashierSessionTotals(
       session.channelId,
       session.id
     );
 
-    const openingFloat = parseInt(session.openingFloat, 10);
+    const openingFloat = await this.getOpeningBalanceForSession(ctx, session.id);
     const closingDeclared = parseInt(session.closingDeclared, 10);
     const expectedCash = openingFloat + ledgerTotals.cashTotal;
     const variance = session.status === 'closed' ? closingDeclared - expectedCash : 0;
@@ -303,6 +377,20 @@ export class CashierSessionService {
         status: 'open',
       },
     });
+  }
+
+  /**
+   * Require an open session for the channel. Throws if none exists.
+   * Use this gate before any transaction that must be session-scoped.
+   */
+  async requireOpenSession(ctx: RequestContext, channelId: number): Promise<CashierSession> {
+    const session = await this.getCurrentSession(ctx, channelId);
+    if (!session) {
+      throw new Error(
+        'No open session for this channel. Open a session before performing transactions.'
+      );
+    }
+    return session;
   }
 
   /**
@@ -359,34 +447,136 @@ export class CashierSessionService {
   }
 
   /**
-   * Create reconciliation record for a closed session
+   * List closed cashier sessions that have no closing reconciliation record.
+   * Use for operational visibility and repair via createCashierSessionReconciliation(sessionId, notes).
+   */
+  async getClosedSessionsMissingReconciliation(
+    ctx: RequestContext,
+    channelId: number,
+    options?: { startDate?: string; endDate?: string; take?: number; skip?: number }
+  ): Promise<Array<{ sessionId: string; closedAt: Date }>> {
+    const { items: closedSessions } = await this.getSessions(ctx, channelId, {
+      status: 'closed',
+      startDate: options?.startDate,
+      endDate: options?.endDate,
+      take: options?.take ?? 500,
+      skip: options?.skip ?? 0,
+    });
+
+    if (closedSessions.length === 0) {
+      return [];
+    }
+
+    const reconRepo = this.connection.getRepository(ctx, Reconciliation);
+    const scopeRefId = (id: string) => toScopeRefId({ scope: 'cash-session', sessionId: id });
+
+    const missing: Array<{ sessionId: string; closedAt: Date }> = [];
+    for (const session of closedSessions) {
+      const rangeStart = session.openedAt.toISOString().slice(0, 10);
+      const rangeEnd = session.closedAt
+        ? new Date(session.closedAt).toISOString().slice(0, 10)
+        : '';
+      if (!rangeEnd) continue;
+
+      const existing = await reconRepo.findOne({
+        where: {
+          channelId,
+          scope: 'cash-session',
+          scopeRefId: scopeRefId(session.id),
+          rangeStart,
+          rangeEnd,
+        },
+      });
+      if (!existing) {
+        missing.push({
+          sessionId: session.id,
+          closedAt: session.closedAt!,
+        });
+      }
+    }
+    return missing;
+  }
+
+  /**
+   * Create reconciliation record for a closed session.
+   * When closingDeclaredAmounts is provided (from closeSession), stores per-account declared amounts; otherwise uses session total only.
    */
   async createSessionReconciliation(
     ctx: RequestContext,
     sessionId: string,
-    notes?: string
+    notes?: string,
+    closingDeclaredAmounts?: Record<string, string>
   ): Promise<Reconciliation> {
     const summary = await this.getSessionSummary(ctx, sessionId);
 
     if (summary.status !== 'closed') {
-      throw new Error(`Cannot create reconciliation for open session ${sessionId}. Close the session first.`);
+      throw new Error(
+        `Cannot create reconciliation for open session ${sessionId}. Close the session first.`
+      );
     }
 
-    // Expected balance = opening float + cash collected from ledger
+    const channelId = await this.getSessionChannelId(ctx, sessionId);
+    const scopeRefId = toScopeRefId({ scope: 'cash-session', sessionId });
+    const rangeStart = summary.openedAt.toISOString().slice(0, 10);
+    const rangeEnd = (summary.closedAt || new Date()).toISOString().slice(0, 10);
+
+    const reconRepo = this.connection.getRepository(ctx, Reconciliation);
+    const existingClosing = await reconRepo.findOne({
+      where: {
+        channelId,
+        scope: 'cash-session',
+        scopeRefId,
+        rangeStart,
+        rangeEnd,
+      },
+    });
+    if (existingClosing) {
+      return existingClosing;
+    }
+
     const expectedBalance = summary.openingFloat + summary.ledgerTotals.cashTotal;
+    const accountIds = await this.getCashierControlledAccountIds(ctx, channelId);
+
+    const actualBalance =
+      closingDeclaredAmounts && Object.keys(closingDeclaredAmounts).length > 0
+        ? Object.values(closingDeclaredAmounts)
+            .reduce((s, v) => s + BigInt(v), BigInt(0))
+            .toString()
+        : summary.closingDeclared.toString();
 
     const input: CreateReconciliationInput = {
-      channelId: await this.getSessionChannelId(ctx, sessionId),
+      channelId,
       scope: 'cash-session',
-      scopeRefId: sessionId,
-      rangeStart: summary.openedAt.toISOString().slice(0, 10),
-      rangeEnd: (summary.closedAt || new Date()).toISOString().slice(0, 10),
+      scopeRefId,
+      rangeStart,
+      rangeEnd,
       expectedBalance: expectedBalance.toString(),
-      actualBalance: summary.closingDeclared.toString(),
+      actualBalance,
       notes: notes || `Cashier session reconciliation for session ${sessionId}`,
+      accountIds: accountIds.length > 0 ? accountIds : undefined,
+      accountDeclaredAmounts: closingDeclaredAmounts,
     };
 
     return this.reconciliationService.createReconciliation(ctx, input);
+  }
+
+  /**
+   * Get ledger account IDs for cashier-controlled accounts in the channel (for reconciliation scope).
+   */
+  private async getCashierControlledAccountIds(
+    ctx: RequestContext,
+    channelId: number
+  ): Promise<string[]> {
+    const requirements = await this.getChannelReconciliationRequirements(ctx, channelId);
+    const codes = [...new Set(requirements.paymentMethods.map(pm => pm.ledgerAccountCode))];
+    if (codes.length === 0) return [];
+
+    const accountRepo = this.connection.getRepository(ctx, Account);
+    const accounts = await accountRepo.find({
+      where: { channelId, code: In(codes) },
+      select: ['id'],
+    });
+    return accounts.map(a => a.id);
   }
 
   /**
@@ -446,12 +636,24 @@ export class CashierSessionService {
       declaredCash: input.declaredCash.toString(),
       expectedCash: expectedCash.toString(),
       variance: variance.toString(),
+      varianceReason: input.varianceReason ?? null,
       countedByUserId,
     });
 
     const savedCount = await countRepo.save(count);
 
     const hasVariance = Math.abs(variance) > 0;
+
+    if (hasVariance) {
+      await this.financialService.postVarianceAdjustment(
+        ctx,
+        session.id,
+        ACCOUNT_CODES.CASH_ON_HAND,
+        variance,
+        input.varianceReason ?? 'Session count variance',
+        savedCount.id
+      );
+    }
 
     this.logger.log(
       `Cash count recorded for session ${session.id}. ` +
@@ -486,17 +688,12 @@ export class CashierSessionService {
     ctx: RequestContext,
     session: CashierSession
   ): Promise<number> {
-    const openingFloat = parseInt(session.openingFloat, 10);
-
-    // Get cash collected during session from ledger
+    const openingTotal = await this.getOpeningBalanceForSession(ctx, session.id);
     const ledgerTotals = await this.ledgerQueryService.getCashierSessionTotals(
       session.channelId,
       session.id
     );
-
-    // Expected = opening float + cash sales
-    // Note: M-Pesa goes directly to till, not cashier's control
-    return openingFloat + ledgerTotals.cashTotal;
+    return openingTotal + ledgerTotals.cashTotal;
   }
 
   /**
@@ -550,8 +747,7 @@ export class CashierSessionService {
     const savedCount = await countRepo.save(count);
 
     this.logger.log(
-      `Cash count ${countId} reviewed by user ${reviewedByUserId}. ` +
-        `Variance: ${count.variance}`
+      `Cash count ${countId} reviewed by user ${reviewedByUserId}. ` + `Variance: ${count.variance}`
     );
 
     return savedCount;
@@ -579,9 +775,7 @@ export class CashierSessionService {
 
     const savedCount = await countRepo.save(count);
 
-    this.logger.log(
-      `Variance explanation added for count ${countId}: "${reason}"`
-    );
+    this.logger.log(`Variance explanation added for count ${countId}: "${reason}"`);
 
     return savedCount;
   }
@@ -589,10 +783,7 @@ export class CashierSessionService {
   /**
    * Get all cash counts for a session
    */
-  async getSessionCashCounts(
-    ctx: RequestContext,
-    sessionId: string
-  ): Promise<CashDrawerCount[]> {
+  async getSessionCashCounts(ctx: RequestContext, sessionId: string): Promise<CashDrawerCount[]> {
     const countRepo = this.connection.getRepository(ctx, CashDrawerCount);
 
     return countRepo.find({
@@ -711,7 +902,10 @@ export class CashierSessionService {
       throw new Error(`Cashier session ${sessionId} not found`);
     }
 
-    const paymentMethods = await this.getChannelPaymentMethods(ctx, session.channelId);
+    const paymentMethods = await this.channelPaymentMethodService.getChannelPaymentMethods(
+      ctx,
+      session.channelId
+    );
 
     // Filter to enabled, cashier-controlled payment methods
     const cashierControlled = paymentMethods.filter(
@@ -722,6 +916,7 @@ export class CashierSessionService {
     const paymentMethodConfigs: PaymentMethodReconciliationConfig[] = cashierControlled.map(pm => ({
       paymentMethodId: pm.id.toString(),
       paymentMethodCode: pm.code,
+      paymentMethodName: this.channelPaymentMethodService.getPaymentMethodDisplayName(pm),
       reconciliationType: getReconciliationTypeFromPaymentMethod(pm),
       ledgerAccountCode: getAccountCodeFromPaymentMethod(pm),
       isCashierControlled: isCashierControlledPaymentMethod(pm),
@@ -729,9 +924,7 @@ export class CashierSessionService {
     }));
 
     return {
-      blindCountRequired: paymentMethodConfigs.some(
-        pm => pm.reconciliationType === 'blind_count'
-      ),
+      blindCountRequired: paymentMethodConfigs.some(pm => pm.reconciliationType === 'blind_count'),
       verificationRequired: paymentMethodConfigs.some(
         pm => pm.reconciliationType === 'transaction_verification'
       ),
@@ -746,7 +939,10 @@ export class CashierSessionService {
     ctx: RequestContext,
     channelId: number
   ): Promise<SessionReconciliationRequirements> {
-    const paymentMethods = await this.getChannelPaymentMethods(ctx, channelId);
+    const paymentMethods = await this.channelPaymentMethodService.getChannelPaymentMethods(
+      ctx,
+      channelId
+    );
 
     // Filter to enabled, cashier-controlled payment methods
     const cashierControlled = paymentMethods.filter(
@@ -757,6 +953,7 @@ export class CashierSessionService {
     const paymentMethodConfigs: PaymentMethodReconciliationConfig[] = cashierControlled.map(pm => ({
       paymentMethodId: pm.id.toString(),
       paymentMethodCode: pm.code,
+      paymentMethodName: this.channelPaymentMethodService.getPaymentMethodDisplayName(pm),
       reconciliationType: getReconciliationTypeFromPaymentMethod(pm),
       ledgerAccountCode: getAccountCodeFromPaymentMethod(pm),
       isCashierControlled: isCashierControlledPaymentMethod(pm),
@@ -764,31 +961,11 @@ export class CashierSessionService {
     }));
 
     return {
-      blindCountRequired: paymentMethodConfigs.some(
-        pm => pm.reconciliationType === 'blind_count'
-      ),
+      blindCountRequired: paymentMethodConfigs.some(pm => pm.reconciliationType === 'blind_count'),
       verificationRequired: paymentMethodConfigs.some(
         pm => pm.reconciliationType === 'transaction_verification'
       ),
       paymentMethods: paymentMethodConfigs,
     };
   }
-
-  /**
-   * Get all payment methods for a channel
-   */
-  private async getChannelPaymentMethods(
-    ctx: RequestContext,
-    channelId: number
-  ): Promise<PaymentMethod[]> {
-    const channelRepo = this.connection.getRepository(ctx, Channel);
-    const channel = await channelRepo.findOne({
-      where: { id: channelId },
-      relations: ['paymentMethods'],
-    });
-
-    return channel?.paymentMethods || [];
-  }
 }
-
-

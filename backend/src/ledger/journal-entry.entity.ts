@@ -20,8 +20,8 @@ export class JournalEntry {
   @Column({ type: 'varchar', length: 64 })
   sourceType!: string; // e.g., 'Payment', 'MoneyEvent'
 
-  @Column({ type: 'varchar', length: 64 })
-  sourceId!: string; // external id (Payment.id, MoneyEvent.id)
+  @Column({ type: 'varchar', length: 128 })
+  sourceId!: string; // external id (Payment.id, composite e.g. sessionId-accountCode-countId)
 
   @Column({ type: 'varchar', length: 16, default: 'posted' })
   status!: 'posted';

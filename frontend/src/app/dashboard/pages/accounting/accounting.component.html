@@ -74,7 +74,7 @@
   />
 
   <!-- Tabs -->
-  <app-accounting-tabs [activeTab]="activeTab()" (tabChange)="setActiveTab($event)" />
+  <app-accounting-tabs />
 
   <!-- Tab Content -->
   <div class="mt-3">
@@ -104,7 +104,7 @@
         [getAccountTypeTotal]="getAccountTypeTotal"
         [isLoading]="isLoading()"
         (accountSelect)="selectAccount($event)"
-        (viewTransactions)="setActiveTab('transactions'); selectAccount($event)"
+        (viewTransactions)="goToTransactionsTab($event)"
       />
     }
 
@@ -136,14 +136,17 @@
     <!-- Reconciliation Tab -->
     @if (activeTab() === 'reconciliation') {
       <app-reconciliation-tab
-        [entries]="paginatedEntries()"
-        [isLoading]="isLoading()"
-        [totalPages]="totalPages()"
-        [currentPage]="currentPage()"
+        [reconciliations]="reconciliations()"
+        [accounts]="accounts()"
+        [channelId]="channelId"
+        [isLoading]="reconciliationsLoading()"
+        [totalItems]="reconciliationsTotal()"
+        [currentPage]="reconciliationPage()"
+        [pageSize]="reconciliationPageSize"
         [formatDate]="formatDate"
-        [formatDateTime]="formatDateTime"
-        (entryView)="viewTransaction($event)"
-        (pageChange)="goToPage($event)"
+        [formatCurrency]="formatReconciliationAmount"
+        (pageChange)="goToReconciliationPage($event)"
+        (reconciliationCreated)="loadReconciliations()"
       />
     }
   </div>

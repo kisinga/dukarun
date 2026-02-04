@@ -7,7 +7,6 @@ import {
   EventBus,
   RequestContext,
   TransactionalConnection,
-  UserInputError,
 } from '@vendure/core';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { ChannelStatusEvent } from '../../infrastructure/events/custom-events';
@@ -15,14 +14,12 @@ import { getChannelStatus } from '../../domain/channel-custom-fields';
 
 export interface ChannelSettings {
   cashierFlowEnabled: boolean;
-  cashierOpen: boolean;
   enablePrinter: boolean;
   companyLogoAsset?: Asset | null;
 }
 
 export interface UpdateChannelSettingsInput {
   cashierFlowEnabled?: boolean;
-  cashierOpen?: boolean;
   enablePrinter?: boolean;
   companyLogoAssetId?: string | null;
 }
@@ -79,18 +76,12 @@ export class ChannelSettingsService {
 
   async updateCashierSettings(
     ctx: RequestContext,
-    cashierFlowEnabled?: boolean,
-    cashierOpen?: boolean
+    cashierFlowEnabled?: boolean
   ): Promise<ChannelSettings> {
     const channelId = ctx.channelId!;
-    // Validate
-    if (cashierFlowEnabled === false && cashierOpen === true) {
-      throw new UserInputError('error.cashier-cannot-be-open-when-flow-disabled');
-    }
 
     const updates: any = {};
     if (cashierFlowEnabled !== undefined) updates.cashierFlowEnabled = cashierFlowEnabled;
-    if (cashierOpen !== undefined) updates.cashierOpen = cashierOpen;
 
     if (Object.keys(updates).length > 0) {
       // Use channelService.update for scalar fields (handles column mapping correctly)
@@ -257,14 +248,12 @@ export class ChannelSettingsService {
   private mapChannelSettings(channel: Channel): ChannelSettings {
     const customFields = (channel.customFields ?? {}) as {
       cashierFlowEnabled?: boolean;
-      cashierOpen?: boolean;
       enablePrinter?: boolean;
       companyLogoAsset?: Asset | null;
     };
 
     return {
       cashierFlowEnabled: customFields.cashierFlowEnabled ?? false,
-      cashierOpen: customFields.cashierOpen ?? false,
       enablePrinter: customFields.enablePrinter ?? true,
       companyLogoAsset: customFields.companyLogoAsset ?? null,
     };

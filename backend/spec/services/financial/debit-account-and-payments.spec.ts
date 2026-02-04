@@ -2,7 +2,7 @@
  * Debit account validation and payment flows
  *
  * Tests ChartOfAccountsService.validatePaymentSourceAccount, PaymentAllocationService.paySingleOrder
- * amount/debit validation, and paymentSourceAccounts filter (via LedgerViewerResolver).
+ * amount/debit validation, and eligibleDebitAccounts filter (via LedgerViewerResolver).
  */
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
@@ -157,6 +157,11 @@ describe('PaymentAllocationService.paySingleOrder', () => {
     mockChartOfAccountsService = {
       validatePaymentSourceAccount: jest.fn(),
     };
+    const mockCashierSessionService = {
+      requireOpenSession: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve({ id: 'session-123', channelId: 1 })),
+    } as any;
     service = new PaymentAllocationService(
       mockConnection,
       mockOrderService,
@@ -164,6 +169,7 @@ describe('PaymentAllocationService.paySingleOrder', () => {
       mockFinancialService,
       {} as any,
       mockChartOfAccountsService,
+      mockCashierSessionService,
       undefined
     );
   });
@@ -265,6 +271,7 @@ describe('PaymentAllocationService.paySingleOrder', () => {
     const recordCall = mockFinancialService.recordPaymentAllocation.mock.calls[0];
     expect(recordCall[4]).toBe(5000);
     expect(recordCall[5]).toBe('CASH_ON_HAND');
+    expect(recordCall[6]).toBe('session-123');
   });
 
   it('should call recordPaymentAllocation without debitAccountCode when not provided', async () => {
@@ -289,10 +296,11 @@ describe('PaymentAllocationService.paySingleOrder', () => {
     expect(mockChartOfAccountsService.validatePaymentSourceAccount).not.toHaveBeenCalled();
     const recordCall = mockFinancialService.recordPaymentAllocation.mock.calls[0];
     expect(recordCall[5]).toBeUndefined();
+    expect(recordCall[6]).toBe('session-123');
   });
 });
 
-describe('LedgerViewerResolver.paymentSourceAccounts', () => {
+describe('LedgerViewerResolver.eligibleDebitAccounts', () => {
   const ctx = { channelId: 1 } as RequestContext;
   let resolver: LedgerViewerResolver;
   let mockAccountRepo: any;
@@ -333,7 +341,7 @@ describe('LedgerViewerResolver.paymentSourceAccounts', () => {
     };
     mockAccountRepo.find.mockResolvedValue([cashOnHand, bankMain]);
 
-    const result = await resolver.paymentSourceAccounts(ctx);
+    const result = await resolver.eligibleDebitAccounts(ctx);
 
     expect(result.items).toHaveLength(2);
     const codes = result.items.map((a: any) => a.code);
@@ -366,7 +374,7 @@ describe('LedgerViewerResolver.paymentSourceAccounts', () => {
       },
     ]);
 
-    await resolver.paymentSourceAccounts(ctx);
+    await resolver.eligibleDebitAccounts(ctx);
 
     const findCall = mockAccountRepo.find.mock.calls[0][0];
     expect(findCall.where.channelId).toBe(1);

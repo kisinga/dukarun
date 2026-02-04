@@ -1,14 +1,32 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
+import { gql } from '@apollo/client/core';
 import { ApolloService } from '../apollo.service';
 import { map, catchError, of, from, tap } from 'rxjs';
 import {
   GET_CURRENT_CASHIER_SESSION,
   GET_CASHIER_SESSION,
   GET_CASHIER_SESSIONS,
+  GET_CHANNEL_RECONCILIATION_CONFIG,
+  GET_RECONCILIATIONS,
+  GET_RECONCILIATION_DETAILS,
   OPEN_CASHIER_SESSION,
   CLOSE_CASHIER_SESSION,
   CREATE_CASHIER_SESSION_RECONCILIATION,
+  CREATE_RECONCILIATION,
 } from '../../graphql/operations.graphql';
+
+const GET_SESSION_RECONCILIATION_DETAILS = gql`
+  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String) {
+    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind) {
+      accountId
+      accountCode
+      accountName
+      declaredAmountCents
+      expectedBalanceCents
+      varianceCents
+    }
+  }
+`;
 
 export interface CashierSession {
   id: string;
@@ -16,9 +34,51 @@ export interface CashierSession {
   cashierUserId: number;
   openedAt: string;
   closedAt?: string | null;
-  openingFloat: string;
   closingDeclared: string;
   status: 'open' | 'closed';
+}
+
+export interface PaymentMethodReconciliationConfig {
+  paymentMethodId: string;
+  paymentMethodCode: string;
+  /** Present when backend schema and codegen include it; otherwise use paymentMethodCode for display. */
+  paymentMethodName?: string;
+  reconciliationType: string;
+  ledgerAccountCode: string;
+  isCashierControlled: boolean;
+  requiresReconciliation: boolean;
+}
+
+export interface OpeningBalanceInput {
+  accountCode: string;
+  amountCents: number;
+}
+
+export interface ReconciliationListOptions {
+  startDate?: string;
+  endDate?: string;
+  scope?: string;
+  hasVariance?: boolean;
+  take?: number;
+  skip?: number;
+}
+
+export interface AccountDeclaredAmountInput {
+  accountId: string;
+  amountCents: string;
+}
+
+export interface CreateReconciliationInput {
+  channelId: number;
+  scope: string;
+  scopeRefId: string;
+  rangeStart: string;
+  rangeEnd: string;
+  expectedBalance?: string;
+  actualBalance: string;
+  notes?: string;
+  accountIds?: string[];
+  accountDeclaredAmounts?: AccountDeclaredAmountInput[];
 }
 
 export interface CashierSessionLedgerTotals {
@@ -52,6 +112,15 @@ export interface Reconciliation {
   varianceAmount: string;
   notes?: string | null;
   createdBy: number;
+}
+
+export interface ReconciliationAccountDetail {
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  declaredAmountCents: string | null;
+  expectedBalanceCents: string | null;
+  varianceCents: string | null;
 }
 
 export interface CashierSessionListOptions {
@@ -181,9 +250,26 @@ export class CashierSessionService {
   }
 
   /**
-   * Open a new cashier session
+   * Get channel reconciliation config (cashier-controlled accounts for opening balances).
    */
-  openSession(channelId: number, openingFloat: number) {
+  getChannelReconciliationConfig(channelId: number) {
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{ channelReconciliationConfig: PaymentMethodReconciliationConfig[] }>({
+        query: GET_CHANNEL_RECONCILIATION_CONFIG as any,
+        variables: { channelId },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => result.data?.channelReconciliationConfig ?? []),
+      catchError(() => of([])),
+    );
+  }
+
+  /**
+   * Open a new cashier session with per-account opening balances.
+   */
+  openSession(channelId: number, openingBalances: OpeningBalanceInput[]) {
     this.isLoading.set(true);
     this.error.set(null);
 
@@ -193,7 +279,10 @@ export class CashierSessionService {
       variables: {
         input: {
           channelId,
-          openingFloat: openingFloat.toString(),
+          openingBalances: openingBalances.map((b) => ({
+            accountCode: b.accountCode,
+            amountCents: b.amountCents,
+          })),
         },
       },
     });
@@ -216,22 +305,91 @@ export class CashierSessionService {
   }
 
   /**
-   * Close a cashier session
+   * List reconciliations for a channel (for Reconciliation History UI).
    */
-  closeSession(sessionId: string, closingDeclared: number, notes?: string) {
+  getReconciliations(channelId: number, options?: ReconciliationListOptions) {
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{ reconciliations: { items: Reconciliation[]; totalItems: number } }>({
+        query: GET_RECONCILIATIONS as any,
+        variables: { channelId, options: options ?? {} },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => result.data?.reconciliations ?? { items: [], totalItems: 0 }),
+      catchError(() => of({ items: [], totalItems: 0 })),
+    );
+  }
+
+  /** Per-account details for a reconciliation (lazy-loaded when expanding a row). */
+  getReconciliationDetails(reconciliationId: string) {
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{
+        reconciliationDetails: ReconciliationAccountDetail[];
+      }>({
+        query: GET_RECONCILIATION_DETAILS as any,
+        variables: { reconciliationId },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => result.data?.reconciliationDetails ?? []),
+      catchError(() => of([])),
+    );
+  }
+
+  /**
+   * Per-account reconciliation details for a session.
+   * @param sessionId - Session ID
+   * @param kind - 'opening' for variances at open (e.g. current shift), 'closing' for variances at close (default)
+   */
+  getSessionReconciliationDetails(sessionId: string, kind: 'opening' | 'closing' = 'closing') {
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{
+        sessionReconciliationDetails: ReconciliationAccountDetail[];
+      }>({
+        query: GET_SESSION_RECONCILIATION_DETAILS,
+        variables: { sessionId, kind: kind === 'opening' ? 'opening' : 'closing' },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => result.data?.sessionReconciliationDetails ?? []),
+      catchError(() => of([])),
+    );
+  }
+
+  /**
+   * Close a cashier session with per-account closing amounts (same shape as opening).
+   * Pass channelId so the backend can resolve the current session when sessionId is missing or stale.
+   */
+  closeSession(
+    sessionId: string,
+    closingBalances: Array<{ accountCode: string; amountCents: number }>,
+    notes?: string,
+    channelId?: number,
+  ) {
     this.isLoading.set(true);
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const mutationPromise = client.mutate<{ closeCashierSession: CashierSessionSummary }>({
-      mutation: CLOSE_CASHIER_SESSION as any,
-      variables: {
-        input: {
-          sessionId,
-          closingDeclared: closingDeclared.toString(),
-          notes,
-        },
-      },
+    const input: {
+      sessionId: string;
+      closingBalances: Array<{ accountCode: string; amountCents: number }>;
+      notes?: string;
+      channelId?: number;
+    } = {
+      sessionId,
+      closingBalances,
+      notes,
+    };
+    if (channelId != null && !Number.isNaN(channelId)) {
+      input.channelId = channelId;
+    }
+
+    const mutationPromise = client.mutate({
+      mutation: CLOSE_CASHIER_SESSION,
+      variables: { input },
     });
 
     return from(mutationPromise).pipe(
@@ -281,6 +439,33 @@ export class CashierSessionService {
   }
 
   /**
+   * Create a manual reconciliation (capture all accounts).
+   * Use scope 'manual' and pass per-account declared amounts.
+   */
+  createManualReconciliation(input: CreateReconciliationInput) {
+    this.isLoading.set(true);
+    this.error.set(null);
+
+    const client = this.apolloService.getClient();
+    const mutationPromise = client.mutate<{ createReconciliation: Reconciliation }>({
+      mutation: CREATE_RECONCILIATION as any,
+      variables: { input },
+    });
+
+    return from(mutationPromise).pipe(
+      map((result) => {
+        this.isLoading.set(false);
+        return result.data?.createReconciliation ?? null;
+      }),
+      catchError((err) => {
+        this.error.set(err.message || 'Failed to create reconciliation');
+        this.isLoading.set(false);
+        return of(null);
+      }),
+    );
+  }
+
+  /**
    * Clear error state
    */
   clearError() {
@@ -299,10 +484,3 @@ export class CashierSessionService {
     this.error.set(null);
   }
 }
-
-
-
-
-
-
-

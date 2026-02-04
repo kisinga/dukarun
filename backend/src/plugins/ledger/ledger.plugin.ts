@@ -8,13 +8,20 @@ import { MoneyEvent } from '../../domain/money/money-event.entity';
 import { AccountingPeriod } from '../../domain/period/accounting-period.entity';
 import { PeriodLock } from '../../domain/period/period-lock.entity';
 import { Reconciliation } from '../../domain/recon/reconciliation.entity';
+import { ReconciliationAccount } from '../../domain/recon/reconciliation-account.entity';
 import { Account } from '../../ledger/account.entity';
 import { JournalEntry } from '../../ledger/journal-entry.entity';
 import { JournalLine } from '../../ledger/journal-line.entity';
 import { PostingService } from '../../ledger/posting.service';
 import { AccountBalanceService } from '../../services/financial/account-balance.service';
-import { CashierSessionService } from '../../services/financial/cashier-session.service';
+import { ChannelPaymentMethodService } from '../../services/financial/channel-payment-method.service';
 import { ChartOfAccountsService } from '../../services/financial/chart-of-accounts.service';
+import { FinancialService } from '../../services/financial/financial.service';
+import { LedgerPostingService } from '../../services/financial/ledger-posting.service';
+import { LedgerTransactionService } from '../../services/financial/ledger-transaction.service';
+import { OpenSessionService } from '../../services/financial/open-session.service';
+import { PurchasePostingStrategy } from '../../services/financial/strategies/purchase-posting.strategy';
+import { SalePostingStrategy } from '../../services/financial/strategies/sale-posting.strategy';
 import { InventoryReconciliationService } from '../../services/financial/inventory-reconciliation.service';
 import { LedgerQueryService } from '../../services/financial/ledger-query.service';
 import { PeriodEndClosingService } from '../../services/financial/period-end-closing.service';
@@ -48,6 +55,7 @@ const COMBINED_SCHEMA = gql`
     CashDrawerCount,
     MpesaVerification,
     Reconciliation,
+    ReconciliationAccount,
     PeriodLock,
     AccountingPeriod,
     PurchasePayment,
@@ -55,6 +63,7 @@ const COMBINED_SCHEMA = gql`
   providers: [
     PostingService,
     ChartOfAccountsService,
+    ChannelPaymentMethodService,
     DashboardStatsResolver,
     LedgerViewerResolver,
     PeriodManagementResolver,
@@ -65,9 +74,14 @@ const COMBINED_SCHEMA = gql`
     ReconciliationValidatorService,
     InventoryReconciliationService,
     PeriodEndClosingService,
-    CashierSessionService,
+    LedgerPostingService,
+    PurchasePostingStrategy,
+    SalePostingStrategy,
+    LedgerTransactionService,
+    FinancialService,
+    OpenSessionService,
   ],
-  exports: [PostingService, AccountBalanceService, CashierSessionService],
+  exports: [PostingService, AccountBalanceService, OpenSessionService],
   configuration: config => {
     // Register custom permissions
     config.authOptions.customPermissions = [

@@ -216,7 +216,6 @@ export const GET_ACTIVE_CHANNEL = graphql(`
           preview
         }
         cashierFlowEnabled
-        cashierOpen
         enablePrinter
         subscriptionStatus
         trialEndsAt
@@ -1949,7 +1948,6 @@ export const UPDATE_CHANNEL_LOGO = graphql(`
   mutation UpdateChannelLogo($logoAssetId: ID) {
     updateChannelLogo(logoAssetId: $logoAssetId) {
       cashierFlowEnabled
-      cashierOpen
       enablePrinter
       companyLogoAsset {
         id
@@ -1961,10 +1959,9 @@ export const UPDATE_CHANNEL_LOGO = graphql(`
 `);
 
 export const UPDATE_CASHIER_SETTINGS = graphql(`
-  mutation UpdateCashierSettings($cashierFlowEnabled: Boolean, $cashierOpen: Boolean) {
-    updateCashierSettings(cashierFlowEnabled: $cashierFlowEnabled, cashierOpen: $cashierOpen) {
+  mutation UpdateCashierSettings($cashierFlowEnabled: Boolean) {
+    updateCashierSettings(cashierFlowEnabled: $cashierFlowEnabled) {
       cashierFlowEnabled
-      cashierOpen
       enablePrinter
       companyLogoAsset {
         id
@@ -1979,7 +1976,6 @@ export const UPDATE_PRINTER_SETTINGS = graphql(`
   mutation UpdatePrinterSettings($enablePrinter: Boolean!) {
     updatePrinterSettings(enablePrinter: $enablePrinter) {
       cashierFlowEnabled
-      cashierOpen
       enablePrinter
       companyLogoAsset {
         id
@@ -2452,9 +2448,9 @@ export const GET_LEDGER_ACCOUNTS = graphql(`
   }
 `);
 
-export const GET_PAYMENT_SOURCE_ACCOUNTS = graphql(`
-  query GetPaymentSourceAccounts {
-    paymentSourceAccounts {
+export const GET_ELIGIBLE_DEBIT_ACCOUNTS = graphql(`
+  query GetEligibleDebitAccounts {
+    eligibleDebitAccounts {
       items {
         id
         code
@@ -2518,6 +2514,19 @@ export const GET_JOURNAL_ENTRY = graphql(`
 // CASHIER SESSION MANAGEMENT
 // ============================================================================
 
+export const GET_CHANNEL_RECONCILIATION_CONFIG = graphql(`
+  query GetChannelReconciliationConfig($channelId: Int!) {
+    channelReconciliationConfig(channelId: $channelId) {
+      paymentMethodId
+      paymentMethodCode
+      reconciliationType
+      ledgerAccountCode
+      isCashierControlled
+      requiresReconciliation
+    }
+  }
+`);
+
 export const GET_CURRENT_CASHIER_SESSION = graphql(`
   query GetCurrentCashierSession($channelId: Int!) {
     currentCashierSession(channelId: $channelId) {
@@ -2526,7 +2535,6 @@ export const GET_CURRENT_CASHIER_SESSION = graphql(`
       cashierUserId
       openedAt
       closedAt
-      openingFloat
       closingDeclared
       status
     }
@@ -2562,7 +2570,6 @@ export const GET_CASHIER_SESSIONS = graphql(`
         cashierUserId
         openedAt
         closedAt
-        openingFloat
         closingDeclared
         status
       }
@@ -2578,7 +2585,6 @@ export const OPEN_CASHIER_SESSION = graphql(`
       channelId
       cashierUserId
       openedAt
-      openingFloat
       status
     }
   }
@@ -2619,6 +2625,73 @@ export const CREATE_CASHIER_SESSION_RECONCILIATION = graphql(`
       varianceAmount
       notes
       createdBy
+    }
+  }
+`);
+
+export const CREATE_RECONCILIATION = graphql(`
+  mutation CreateReconciliation($input: CreateReconciliationInput!) {
+    createReconciliation(input: $input) {
+      id
+      channelId
+      scope
+      scopeRefId
+      rangeStart
+      rangeEnd
+      status
+      expectedBalance
+      actualBalance
+      varianceAmount
+      notes
+      createdBy
+    }
+  }
+`);
+
+export const GET_RECONCILIATIONS = graphql(`
+  query GetReconciliations($channelId: Int!, $options: ReconciliationListOptions) {
+    reconciliations(channelId: $channelId, options: $options) {
+      items {
+        id
+        channelId
+        scope
+        scopeRefId
+        rangeStart
+        rangeEnd
+        status
+        expectedBalance
+        actualBalance
+        varianceAmount
+        notes
+        createdBy
+      }
+      totalItems
+    }
+  }
+`);
+
+export const GET_RECONCILIATION_DETAILS = graphql(`
+  query GetReconciliationDetails($reconciliationId: ID!) {
+    reconciliationDetails(reconciliationId: $reconciliationId) {
+      accountId
+      accountCode
+      accountName
+      declaredAmountCents
+      expectedBalanceCents
+      varianceCents
+    }
+  }
+`);
+
+export const GET_SESSION_RECONCILIATION_DETAILS = graphql(`
+  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String) {
+    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind) {
+      accountId
+      accountCode
+      accountName
+      declaredAmountCents
+      expectedBalanceCents
+      varianceCents
     }
   }
 `);

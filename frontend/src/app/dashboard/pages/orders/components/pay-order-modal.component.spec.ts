@@ -5,22 +5,24 @@
  * and loading payment source accounts on show.
  */
 
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
-import { PayOrderModalComponent, PayOrderModalData } from './pay-order-modal.component';
+import { CashierSessionService } from '../../../../core/services/cashier-session/cashier-session.service';
+import { CompanyService } from '../../../../core/services/company.service';
+import { CurrencyService } from '../../../../core/services/currency.service';
 import { CustomerPaymentService } from '../../../../core/services/customer/customer-payment.service';
 import { CustomerStateService } from '../../../../core/services/customer/customer-state.service';
-import { CurrencyService } from '../../../../core/services/currency.service';
 import { LedgerService } from '../../../../core/services/ledger/ledger.service';
 import { OrdersService } from '../../../../core/services/orders.service';
 import { PaymentMethodService } from '../../../../core/services/payment-method.service';
+import { PayOrderModalComponent, PayOrderModalData } from './pay-order-modal.component';
 
 describe('PayOrderModalComponent', () => {
   let component: PayOrderModalComponent;
   let fixture: ComponentFixture<PayOrderModalComponent>;
   let paymentServiceSpy: jasmine.SpyObj<Pick<CustomerPaymentService, 'paySingleOrder'>>;
-  let ledgerServiceSpy: jasmine.SpyObj<Pick<LedgerService, 'loadPaymentSourceAccounts'>>;
+  let ledgerServiceSpy: jasmine.SpyObj<Pick<LedgerService, 'loadEligibleDebitAccounts'>>;
 
   const defaultModalData: PayOrderModalData = {
     orderId: 'order-1',
@@ -40,8 +42,8 @@ describe('PayOrderModalComponent', () => {
       }),
     );
 
-    ledgerServiceSpy = jasmine.createSpyObj('LedgerService', ['loadPaymentSourceAccounts']);
-    ledgerServiceSpy.loadPaymentSourceAccounts.and.returnValue(
+    ledgerServiceSpy = jasmine.createSpyObj('LedgerService', ['loadEligibleDebitAccounts']);
+    ledgerServiceSpy.loadEligibleDebitAccounts.and.returnValue(
       of([
         {
           id: '1',
@@ -76,20 +78,30 @@ describe('PayOrderModalComponent', () => {
         {
           provide: PaymentMethodService,
           useValue: {
-            getPaymentMethods: jasmine
-              .createSpy()
-              .and.returnValue(
-                Promise.resolve([
-                  {
-                    id: '1',
-                    code: 'credit',
-                    name: 'Credit',
-                    enabled: true,
-                    customFields: { isActive: true },
-                  },
-                ]),
-              ),
+            getPaymentMethods: jasmine.createSpy().and.returnValue(
+              Promise.resolve([
+                {
+                  id: '1',
+                  code: 'credit',
+                  name: 'Credit',
+                  enabled: true,
+                  customFields: { isActive: true },
+                },
+              ]),
+            ),
           },
+        },
+        {
+          provide: CashierSessionService,
+          useValue: {
+            hasActiveSession: signal(true) as any,
+            currentSession: signal({ id: 's1', channelId: 1 }),
+            getCurrentSession: jasmine.createSpy().and.returnValue(of({ id: 's1', channelId: 1 })),
+          },
+        },
+        {
+          provide: CompanyService,
+          useValue: { activeCompanyId: signal('1') },
         },
       ],
     }).compileComponents();
@@ -135,7 +147,7 @@ describe('PayOrderModalComponent', () => {
   describe('show', () => {
     it('should load payment source accounts when show is called', async () => {
       await component.show();
-      expect(ledgerServiceSpy.loadPaymentSourceAccounts).toHaveBeenCalled();
+      expect(ledgerServiceSpy.loadEligibleDebitAccounts).toHaveBeenCalled();
     });
   });
 

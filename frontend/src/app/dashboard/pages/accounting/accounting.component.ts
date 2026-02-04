@@ -8,7 +8,13 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
+import {
+  CashierSessionService,
+  type Reconciliation,
+} from '../../../core/services/cashier-session/cashier-session.service';
+import { CompanyService } from '../../../core/services/company.service';
 import {
   JournalEntry,
   LedgerAccount,
@@ -46,6 +52,10 @@ import { TransactionsTabComponent } from './components/transactions-tab.componen
 })
 export class AccountingComponent implements OnInit {
   private readonly ledgerService = inject(LedgerService);
+  private readonly cashierSessionService = inject(CashierSessionService);
+  private readonly companyService = inject(CompanyService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly transactionModal = viewChild<TransactionDetailModalComponent>('transactionModal');
 
@@ -57,6 +67,13 @@ export class AccountingComponent implements OnInit {
 
   // Tab management
   readonly activeTab = signal<TabType>('overview');
+
+  // Reconciliation history (Reconciliation tab)
+  readonly reconciliations = signal<Reconciliation[]>([]);
+  readonly reconciliationsTotal = signal(0);
+  readonly reconciliationsLoading = signal(false);
+  readonly reconciliationPage = signal(1);
+  readonly reconciliationPageSize = 50;
 
   // Filters and search
   readonly selectedAccount = signal<LedgerAccount | null>(null);
@@ -302,11 +319,60 @@ export class AccountingComponent implements OnInit {
 
   ngOnInit() {
     this.loadData();
+    const syncTab = (params: Record<string, string>) => {
+      const tab = params['tab'] as TabType | undefined;
+      const valid: TabType[] = ['overview', 'accounts', 'transactions', 'reconciliation'];
+      const next = tab && valid.includes(tab) ? tab : 'overview';
+      this.activeTab.set(next);
+      this.currentPage.set(1);
+      if (next === 'reconciliation') {
+        this.reconciliationPage.set(1);
+        this.loadReconciliations();
+      }
+    };
+    syncTab(this.route.snapshot.queryParams);
+    this.route.queryParams.subscribe(syncTab);
   }
 
-  setActiveTab(tab: TabType) {
-    this.activeTab.set(tab);
-    this.currentPage.set(1);
+  goToTransactionsTab(account: LedgerAccount) {
+    this.selectAccount(account);
+    this.router.navigate(['/dashboard/admin/accounting'], {
+      queryParams: { tab: 'transactions' },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  loadReconciliations() {
+    const channelId = this.channelId;
+    if (!channelId || Number.isNaN(channelId)) {
+      this.reconciliations.set([]);
+      this.reconciliationsTotal.set(0);
+      this.reconciliationsLoading.set(false);
+      return;
+    }
+    this.reconciliationsLoading.set(true);
+    const page = this.reconciliationPage();
+    const take = this.reconciliationPageSize;
+    const skip = (page - 1) * take;
+    this.cashierSessionService.getReconciliations(channelId, { take, skip }).subscribe({
+      next: (res) => {
+        this.reconciliations.set(res.items ?? []);
+        this.reconciliationsTotal.set(res.totalItems ?? 0);
+        this.reconciliationsLoading.set(false);
+      },
+      error: () => {
+        this.reconciliations.set([]);
+        this.reconciliationsTotal.set(0);
+        this.reconciliationsLoading.set(false);
+      },
+    });
+  }
+
+  get channelId(): number {
+    const id = this.companyService.activeCompanyId();
+    if (!id) return 0;
+    const num = parseInt(id, 10);
+    return Number.isNaN(num) ? 0 : num;
   }
 
   loadData() {
@@ -468,6 +534,16 @@ export class AccountingComponent implements OnInit {
 
   goToPage(page: number) {
     this.currentPage.set(page);
+  }
+
+  goToReconciliationPage(page: number) {
+    this.reconciliationPage.set(page);
+    this.loadReconciliations();
+  }
+
+  /** Format reconciliation amount string (cents) for display */
+  formatReconciliationAmount(amountCentsStr: string): string {
+    return this.formatCurrency(parseInt(amountCentsStr || '0', 10));
   }
 
   formatCurrency(amountInCents: number): string {

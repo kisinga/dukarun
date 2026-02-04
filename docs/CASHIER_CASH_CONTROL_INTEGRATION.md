@@ -97,9 +97,10 @@ class CashierFlowIntegrationService {
   shouldEnforceCashControl(ctx, channelId): Promise<boolean>
   getPaymentMethodsForCashControl(ctx, channelId): Promise<PaymentMethod[]>
   isCashierFlowEnabled(ctx, channelId): Promise<boolean>
-  isCashierOpen(ctx, channelId): Promise<boolean>
 }
 ```
+
+Shift-open status is derived from the existence of an open cashier session (query `currentCashierSession(channelId)` or frontend `CashierSessionService.hasActiveSession`), not from a channel field.
 
 #### ReconciliationValidatorService
 

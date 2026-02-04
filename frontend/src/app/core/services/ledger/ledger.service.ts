@@ -8,9 +8,9 @@ import {
   GetJournalEntryDocument,
 } from '../../graphql/generated/graphql';
 
-const GetPaymentSourceAccountsDocument = gql`
-  query GetPaymentSourceAccounts {
-    paymentSourceAccounts {
+const GetEligibleDebitAccountsDocument = gql`
+  query GetEligibleDebitAccounts {
+    eligibleDebitAccounts {
       items {
         id
         code
@@ -71,31 +71,31 @@ export class LedgerService {
   private readonly apolloService = inject(ApolloService);
 
   readonly accounts = signal<LedgerAccount[]>([]);
-  readonly paymentSourceAccountsList = signal<LedgerAccount[]>([]);
+  readonly eligibleDebitAccountsList = signal<LedgerAccount[]>([]);
   readonly entries = signal<JournalEntry[]>([]);
   readonly totalEntries = signal(0);
   readonly isLoading = signal(false);
   readonly error = signal<string | null>(null);
 
-  loadPaymentSourceAccounts() {
+  loadEligibleDebitAccounts() {
     this.error.set(null);
     const client = this.apolloService.getClient();
-    const queryPromise = client.query<{ paymentSourceAccounts: { items: LedgerAccount[] } }>({
-      query: GetPaymentSourceAccountsDocument,
+    const queryPromise = client.query<{ eligibleDebitAccounts: { items: LedgerAccount[] } }>({
+      query: GetEligibleDebitAccountsDocument,
       fetchPolicy: 'network-only',
     });
     return from(queryPromise).pipe(
       map((result) => {
-        if (result.data?.paymentSourceAccounts?.items) {
-          this.paymentSourceAccountsList.set(result.data.paymentSourceAccounts.items);
-          return result.data.paymentSourceAccounts.items;
+        if (result.data?.eligibleDebitAccounts?.items) {
+          this.eligibleDebitAccountsList.set(result.data.eligibleDebitAccounts.items);
+          return result.data.eligibleDebitAccounts.items;
         }
-        this.paymentSourceAccountsList.set([]);
+        this.eligibleDebitAccountsList.set([]);
         return [];
       }),
       catchError((err) => {
-        this.error.set(err.message || 'Failed to load payment source accounts');
-        this.paymentSourceAccountsList.set([]);
+        this.error.set(err.message || 'Failed to load eligible debit accounts');
+        this.eligibleDebitAccountsList.set([]);
         return of([]);
       }),
     );

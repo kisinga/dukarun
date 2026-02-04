@@ -110,24 +110,6 @@
         />
       </label>
 
-      <!-- Cashier Open (conditional) -->
-      @if (settings()?.cashierFlowEnabled) {
-        <label
-          class="flex items-center justify-between bg-base-200 rounded-lg p-3 cursor-pointer ml-4"
-        >
-          <div class="flex-1 min-w-0 pr-4">
-            <div class="text-sm font-medium">Cashier Open</div>
-            <div class="text-xs opacity-60">Is a cashier currently serving?</div>
-          </div>
-          <input
-            type="checkbox"
-            class="toggle toggle-success toggle-sm"
-            [checked]="settings()?.cashierOpen"
-            (change)="toggleCashierOpen($event)"
-          />
-        </label>
-      }
-
       <!-- Printer -->
       <label class="flex items-center justify-between bg-base-200 rounded-lg p-3 cursor-pointer">
         <div class="flex-1 min-w-0 pr-4">

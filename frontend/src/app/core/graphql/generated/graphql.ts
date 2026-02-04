@@ -28,6 +28,11 @@ export type Scalars = {
   Upload: { input: any; output: any };
 };
 
+export type AccountAmountInput = {
+  accountCode: Scalars['String']['input'];
+  amountCents: Scalars['Int']['input'];
+};
+
 export type AccountBreakdown = {
   __typename?: 'AccountBreakdown';
   icon: Scalars['String']['output'];
@@ -526,7 +531,6 @@ export type CashierSession = {
   closingDeclared: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   openedAt: Scalars['DateTime']['output'];
-  openingFloat: Scalars['String']['output'];
   status: Scalars['String']['output'];
 };
 
@@ -617,7 +621,6 @@ export type ChannelCustomFields = {
   billingCycle?: Maybe<Scalars['String']['output']>;
   cashControlEnabled?: Maybe<Scalars['Boolean']['output']>;
   cashierFlowEnabled?: Maybe<Scalars['Boolean']['output']>;
-  cashierOpen?: Maybe<Scalars['Boolean']['output']>;
   companyLogoAsset?: Maybe<Asset>;
   enablePrinter?: Maybe<Scalars['Boolean']['output']>;
   eventConfig?: Maybe<Scalars['String']['output']>;
@@ -690,7 +693,6 @@ export type ChannelFilterParameter = {
   billingCycle?: InputMaybe<StringOperators>;
   cashControlEnabled?: InputMaybe<BooleanOperators>;
   cashierFlowEnabled?: InputMaybe<BooleanOperators>;
-  cashierOpen?: InputMaybe<BooleanOperators>;
   code?: InputMaybe<StringOperators>;
   createdAt?: InputMaybe<DateOperators>;
   currencyCode?: InputMaybe<StringOperators>;
@@ -749,7 +751,6 @@ export type ChannelListOptions = {
 export type ChannelSettings = {
   __typename?: 'ChannelSettings';
   cashierFlowEnabled: Scalars['Boolean']['output'];
-  cashierOpen: Scalars['Boolean']['output'];
   companyLogoAsset?: Maybe<Asset>;
   enablePrinter: Scalars['Boolean']['output'];
 };
@@ -782,7 +783,6 @@ export type ChannelSortParameter = {
   billingCycle?: InputMaybe<SortOrder>;
   cashControlEnabled?: InputMaybe<SortOrder>;
   cashierFlowEnabled?: InputMaybe<SortOrder>;
-  cashierOpen?: InputMaybe<SortOrder>;
   code?: InputMaybe<SortOrder>;
   companyLogoAsset?: InputMaybe<SortOrder>;
   createdAt?: InputMaybe<SortOrder>;
@@ -832,7 +832,8 @@ export type ChannelSubscription = {
 };
 
 export type CloseCashierSessionInput = {
-  closingDeclared: Scalars['String']['input'];
+  channelId?: InputMaybe<Scalars['Int']['input']>;
+  closingBalances: Array<AccountAmountInput>;
   notes?: InputMaybe<Scalars['String']['input']>;
   sessionId: Scalars['ID']['input'];
 };
@@ -1171,7 +1172,6 @@ export type CreateChannelCustomFieldsInput = {
   billingCycle?: InputMaybe<Scalars['String']['input']>;
   cashControlEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
-  cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
   companyLogoAssetId?: InputMaybe<Scalars['ID']['input']>;
   enablePrinter?: InputMaybe<Scalars['Boolean']['input']>;
   eventConfig?: InputMaybe<Scalars['String']['input']>;
@@ -1508,6 +1508,7 @@ export type CreateZoneInput = {
   name: Scalars['String']['input'];
 };
 
+/** All monetary amounts in CreditSummary are in smallest currency unit (cents) */
 export type CreditSummary = {
   __typename?: 'CreditSummary';
   availableCredit: Scalars['Float']['output'];
@@ -2783,9 +2784,12 @@ export type InterAccountTransferInput = {
   amount: Scalars['String']['input'];
   channelId: Scalars['Int']['input'];
   entryDate: Scalars['DateTime']['input'];
+  expenseTag?: InputMaybe<Scalars['String']['input']>;
+  feeAmount?: InputMaybe<Scalars['String']['input']>;
   fromAccountCode: Scalars['String']['input'];
   memo?: InputMaybe<Scalars['String']['input']>;
   toAccountCode: Scalars['String']['input'];
+  transferId: Scalars['String']['input'];
 };
 
 /** Returned if the user authentication credentials are not valid */
@@ -4731,7 +4735,6 @@ export type MutationUpdateAssetArgs = {
 
 export type MutationUpdateCashierSettingsArgs = {
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
-  cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export type MutationUpdateChannelArgs = {
@@ -5050,7 +5053,7 @@ export type OtpResponse = {
 
 export type OpenCashierSessionInput = {
   channelId: Scalars['Int']['input'];
-  openingFloat: Scalars['String']['input'];
+  openingBalances: Array<AccountAmountInput>;
 };
 
 export type Order = Node & {
@@ -5393,7 +5396,9 @@ export type PaginatedList = {
   totalItems: Scalars['Int']['output'];
 };
 
+/** paymentAmount in smallest currency unit (cents) */
 export type PaySingleOrderInput = {
+  debitAccountCode?: InputMaybe<Scalars['String']['input']>;
   orderId: Scalars['ID']['input'];
   paymentAmount?: InputMaybe<Scalars['Float']['input']>;
   paymentMethodCode?: InputMaybe<Scalars['String']['input']>;
@@ -5416,12 +5421,14 @@ export type Payment = Node & {
   updatedAt: Scalars['DateTime']['output'];
 };
 
+/** paymentAmount in smallest currency unit (cents) */
 export type PaymentAllocationInput = {
   customerId: Scalars['ID']['input'];
   orderIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   paymentAmount: Scalars['Float']['input'];
 };
 
+/** All monetary amounts in PaymentAllocationResult are in smallest currency unit (cents) */
 export type PaymentAllocationResult = {
   __typename?: 'PaymentAllocationResult';
   excessPayment: Scalars['Float']['output'];
@@ -5524,6 +5531,7 @@ export type PaymentMethodReconciliationConfig = {
   ledgerAccountCode: Scalars['String']['output'];
   paymentMethodCode: Scalars['String']['output'];
   paymentMethodId: Scalars['ID']['output'];
+  paymentMethodName: Scalars['String']['output'];
   reconciliationType: Scalars['String']['output'];
   requiresReconciliation: Scalars['Boolean']['output'];
 };
@@ -6424,6 +6432,8 @@ export type Query = {
   customerGroups: CustomerGroupList;
   customers: CustomerList;
   dashboardStats: DashboardStats;
+  /** Ledger accounts eligible as payment/debit sources (asset, leaf, excluding AR and inventory). */
+  eligibleDebitAccounts: LedgerAccountsResult;
   /** Returns a list of eligible shipping methods for the draft Order */
   eligibleShippingMethodsForDraftOrder: Array<ShippingMethodQuote>;
   /** Returns all configured EntityDuplicators. */
@@ -6492,6 +6502,7 @@ export type Query = {
   province?: Maybe<Province>;
   provinces: ProvinceList;
   purchases: StockPurchaseList;
+  reconciliations: ReconciliationList;
   role?: Maybe<Role>;
   roleTemplates: Array<RoleTemplate>;
   roles: RoleList;
@@ -6807,6 +6818,11 @@ export type QueryPurchasesArgs = {
   options?: InputMaybe<PurchaseListOptions>;
 };
 
+export type QueryReconciliationsArgs = {
+  channelId: Scalars['Int']['input'];
+  options?: InputMaybe<ReconciliationListOptions>;
+};
+
 export type QueryRoleArgs = {
   id: Scalars['ID']['input'];
 };
@@ -6934,6 +6950,21 @@ export type Reconciliation = {
   scopeRefId: Scalars['String']['output'];
   status: Scalars['String']['output'];
   varianceAmount: Scalars['String']['output'];
+};
+
+export type ReconciliationList = {
+  __typename?: 'ReconciliationList';
+  items: Array<Reconciliation>;
+  totalItems: Scalars['Int']['output'];
+};
+
+export type ReconciliationListOptions = {
+  endDate?: InputMaybe<Scalars['DateTime']['input']>;
+  hasVariance?: InputMaybe<Scalars['Boolean']['input']>;
+  scope?: InputMaybe<Scalars['String']['input']>;
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  startDate?: InputMaybe<Scalars['DateTime']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type ReconciliationStatus = {
@@ -7872,6 +7903,7 @@ export type Success = {
   success: Scalars['Boolean']['output'];
 };
 
+/** All monetary amounts in SupplierCreditSummary are in smallest currency unit (cents) */
 export type SupplierCreditSummary = {
   __typename?: 'SupplierCreditSummary';
   availableCredit: Scalars['Float']['output'];
@@ -7884,12 +7916,14 @@ export type SupplierCreditSummary = {
   supplierId: Scalars['ID']['output'];
 };
 
+/** paymentAmount in smallest currency unit (cents) */
 export type SupplierPaymentAllocationInput = {
   paymentAmount: Scalars['Float']['input'];
   purchaseIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   supplierId: Scalars['ID']['input'];
 };
 
+/** All monetary amounts in SupplierPaymentAllocationResult are in smallest currency unit (cents) */
 export type SupplierPaymentAllocationResult = {
   __typename?: 'SupplierPaymentAllocationResult';
   excessPayment: Scalars['Float']['output'];
@@ -8226,7 +8260,6 @@ export type UpdateChannelCustomFieldsInput = {
   billingCycle?: InputMaybe<Scalars['String']['input']>;
   cashControlEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
-  cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
   companyLogoAssetId?: InputMaybe<Scalars['ID']['input']>;
   enablePrinter?: InputMaybe<Scalars['Boolean']['input']>;
   eventConfig?: InputMaybe<Scalars['String']['input']>;
@@ -8926,7 +8959,6 @@ export type GetActiveChannelQuery = {
     customFields?: {
       __typename?: 'ChannelCustomFields';
       cashierFlowEnabled?: boolean | null;
-      cashierOpen?: boolean | null;
       enablePrinter?: boolean | null;
       subscriptionStatus?: string | null;
       trialEndsAt?: any | null;
@@ -10780,7 +10812,6 @@ export type UpdateChannelLogoMutation = {
   updateChannelLogo: {
     __typename?: 'ChannelSettings';
     cashierFlowEnabled: boolean;
-    cashierOpen: boolean;
     enablePrinter: boolean;
     companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
   };
@@ -10788,7 +10819,6 @@ export type UpdateChannelLogoMutation = {
 
 export type UpdateCashierSettingsMutationVariables = Exact<{
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
-  cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type UpdateCashierSettingsMutation = {
@@ -10796,7 +10826,6 @@ export type UpdateCashierSettingsMutation = {
   updateCashierSettings: {
     __typename?: 'ChannelSettings';
     cashierFlowEnabled: boolean;
-    cashierOpen: boolean;
     enablePrinter: boolean;
     companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
   };
@@ -10811,7 +10840,6 @@ export type UpdatePrinterSettingsMutation = {
   updatePrinterSettings: {
     __typename?: 'ChannelSettings';
     cashierFlowEnabled: boolean;
-    cashierOpen: boolean;
     enablePrinter: boolean;
     companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
   };
@@ -11336,6 +11364,26 @@ export type GetLedgerAccountsQuery = {
   };
 };
 
+export type GetEligibleDebitAccountsQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetEligibleDebitAccountsQuery = {
+  __typename?: 'Query';
+  eligibleDebitAccounts: {
+    __typename?: 'LedgerAccountsResult';
+    items: Array<{
+      __typename?: 'LedgerAccount';
+      id: string;
+      code: string;
+      name: string;
+      type: string;
+      isActive: boolean;
+      balance: number;
+      parentAccountId?: string | null;
+      isParent: boolean;
+    }>;
+  };
+};
+
 export type GetJournalEntriesQueryVariables = Exact<{
   options?: InputMaybe<JournalEntriesOptions>;
 }>;
@@ -11392,6 +11440,23 @@ export type GetJournalEntryQuery = {
   } | null;
 };
 
+export type GetChannelReconciliationConfigQueryVariables = Exact<{
+  channelId: Scalars['Int']['input'];
+}>;
+
+export type GetChannelReconciliationConfigQuery = {
+  __typename?: 'Query';
+  channelReconciliationConfig: Array<{
+    __typename?: 'PaymentMethodReconciliationConfig';
+    paymentMethodId: string;
+    paymentMethodCode: string;
+    reconciliationType: string;
+    ledgerAccountCode: string;
+    isCashierControlled: boolean;
+    requiresReconciliation: boolean;
+  }>;
+};
+
 export type GetCurrentCashierSessionQueryVariables = Exact<{
   channelId: Scalars['Int']['input'];
 }>;
@@ -11405,7 +11470,6 @@ export type GetCurrentCashierSessionQuery = {
     cashierUserId: number;
     openedAt: any;
     closedAt?: any | null;
-    openingFloat: string;
     closingDeclared: string;
     status: string;
   } | null;
@@ -11453,7 +11517,6 @@ export type GetCashierSessionsQuery = {
       cashierUserId: number;
       openedAt: any;
       closedAt?: any | null;
-      openingFloat: string;
       closingDeclared: string;
       status: string;
     }>;
@@ -11472,7 +11535,6 @@ export type OpenCashierSessionMutation = {
     channelId: number;
     cashierUserId: number;
     openedAt: any;
-    openingFloat: string;
     status: string;
   };
 };
@@ -11523,6 +11585,57 @@ export type CreateCashierSessionReconciliationMutation = {
     varianceAmount: string;
     notes?: string | null;
     createdBy: number;
+  };
+};
+
+export type CreateReconciliationMutationVariables = Exact<{
+  input: CreateReconciliationInput;
+}>;
+
+export type CreateReconciliationMutation = {
+  __typename?: 'Mutation';
+  createReconciliation: {
+    __typename?: 'Reconciliation';
+    id: string;
+    channelId: number;
+    scope: string;
+    scopeRefId: string;
+    rangeStart: any;
+    rangeEnd: any;
+    status: string;
+    expectedBalance?: string | null;
+    actualBalance?: string | null;
+    varianceAmount: string;
+    notes?: string | null;
+    createdBy: number;
+  };
+};
+
+export type GetReconciliationsQueryVariables = Exact<{
+  channelId: Scalars['Int']['input'];
+  options?: InputMaybe<ReconciliationListOptions>;
+}>;
+
+export type GetReconciliationsQuery = {
+  __typename?: 'Query';
+  reconciliations: {
+    __typename?: 'ReconciliationList';
+    totalItems: number;
+    items: Array<{
+      __typename?: 'Reconciliation';
+      id: string;
+      channelId: number;
+      scope: string;
+      scopeRefId: string;
+      rangeStart: any;
+      rangeEnd: any;
+      status: string;
+      expectedBalance?: string | null;
+      actualBalance?: string | null;
+      varianceAmount: string;
+      notes?: string | null;
+      createdBy: number;
+    }>;
   };
 };
 
@@ -12564,7 +12677,6 @@ export const GetActiveChannelDocument = {
                         },
                       },
                       { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'cashierOpen' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'subscriptionStatus' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'trialEndsAt' } },
@@ -18331,7 +18443,6 @@ export const UpdateChannelLogoDocument = {
               kind: 'SelectionSet',
               selections: [
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'cashierOpen' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                 {
                   kind: 'Field',
@@ -18366,11 +18477,6 @@ export const UpdateCashierSettingsDocument = {
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
           type: { kind: 'NamedType', name: { kind: 'Name', value: 'Boolean' } },
         },
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'cashierOpen' } },
-          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Boolean' } },
-        },
       ],
       selectionSet: {
         kind: 'SelectionSet',
@@ -18384,17 +18490,11 @@ export const UpdateCashierSettingsDocument = {
                 name: { kind: 'Name', value: 'cashierFlowEnabled' },
                 value: { kind: 'Variable', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
               },
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'cashierOpen' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'cashierOpen' } },
-              },
             ],
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'cashierOpen' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                 {
                   kind: 'Field',
@@ -18450,7 +18550,6 @@ export const UpdatePrinterSettingsDocument = {
               kind: 'SelectionSet',
               selections: [
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'cashierOpen' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                 {
                   kind: 'Field',
@@ -19960,6 +20059,47 @@ export const GetLedgerAccountsDocument = {
     },
   ],
 } as unknown as DocumentNode<GetLedgerAccountsQuery, GetLedgerAccountsQueryVariables>;
+export const GetEligibleDebitAccountsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetEligibleDebitAccounts' },
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'eligibleDebitAccounts' },
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'items' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'type' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isActive' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'balance' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'parentAccountId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isParent' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetEligibleDebitAccountsQuery, GetEligibleDebitAccountsQueryVariables>;
 export const GetJournalEntriesDocument = {
   kind: 'Document',
   definitions: [
@@ -20091,6 +20231,56 @@ export const GetJournalEntryDocument = {
     },
   ],
 } as unknown as DocumentNode<GetJournalEntryQuery, GetJournalEntryQueryVariables>;
+export const GetChannelReconciliationConfigDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetChannelReconciliationConfig' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'channelReconciliationConfig' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'channelId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'paymentMethodId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'paymentMethodCode' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'reconciliationType' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'ledgerAccountCode' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'isCashierControlled' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'requiresReconciliation' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  GetChannelReconciliationConfigQuery,
+  GetChannelReconciliationConfigQueryVariables
+>;
 export const GetCurrentCashierSessionDocument = {
   kind: 'Document',
   definitions: [
@@ -20129,7 +20319,6 @@ export const GetCurrentCashierSessionDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierUserId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'openedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'closedAt' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'openingFloat' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'closingDeclared' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'status' } },
               ],
@@ -20255,7 +20444,6 @@ export const GetCashierSessionsDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'cashierUserId' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'openedAt' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'closedAt' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'openingFloat' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'closingDeclared' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'status' } },
                     ],
@@ -20307,7 +20495,6 @@ export const OpenCashierSessionDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierUserId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'openedAt' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'openingFloat' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'status' } },
               ],
             },
@@ -20444,6 +20631,132 @@ export const CreateCashierSessionReconciliationDocument = {
   CreateCashierSessionReconciliationMutation,
   CreateCashierSessionReconciliationMutationVariables
 >;
+export const CreateReconciliationDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'CreateReconciliation' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'CreateReconciliationInput' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'createReconciliation' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'scope' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'scopeRefId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'rangeStart' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'rangeEnd' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'expectedBalance' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'actualBalance' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'varianceAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'createdBy' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<CreateReconciliationMutation, CreateReconciliationMutationVariables>;
+export const GetReconciliationsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetReconciliations' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'ReconciliationListOptions' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'reconciliations' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'channelId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'options' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'items' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'scope' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'scopeRefId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'rangeStart' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'rangeEnd' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'expectedBalance' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'actualBalance' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'varianceAmount' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'createdBy' } },
+                    ],
+                  },
+                },
+                { kind: 'Field', name: { kind: 'Name', value: 'totalItems' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetReconciliationsQuery, GetReconciliationsQueryVariables>;
 export const GetSessionCashCountsDocument = {
   kind: 'Document',
   definitions: [

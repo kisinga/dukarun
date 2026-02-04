@@ -32,10 +32,14 @@ authService.isAuthenticated(); // Computed signal
 
 ## GraphQL Codegen
 
+Codegen reads the backend schema from `/admin-api` and generates types and document maps into `src/app/core/graphql/generated/`. **Start the backend first** so the schema is available, then run:
+
 ```bash
 npm run codegen         # Generate types (backend must be running)
 npm run codegen:watch   # Watch mode
 ```
+
+If the backend is not running, codegen will fail. For CI or offline generation, you can point codegen at a schema file instead by changing `schema` in `codegen.ts` (e.g. to a dumped `schema.graphql`).
 
 ## Structure
 

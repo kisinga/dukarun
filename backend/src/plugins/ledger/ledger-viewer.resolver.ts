@@ -62,7 +62,7 @@ export class LedgerViewerResolver {
 
   @Query()
   @Allow(Permission.ReadOrder)
-  async paymentSourceAccounts(@Ctx() ctx: RequestContext) {
+  async eligibleDebitAccounts(@Ctx() ctx: RequestContext) {
     const channelId = ctx.channelId as number;
     const accountRepo = this.dataSource.getRepository(Account);
 

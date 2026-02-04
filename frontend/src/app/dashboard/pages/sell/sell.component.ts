@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -10,6 +11,7 @@ import {
 } from '@angular/core';
 import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
+import { CashierSessionService } from '../../../core/services/cashier-session/cashier-session.service';
 import { CustomerService } from '../../../core/services/customer.service';
 import { CompanyService } from '../../../core/services/company.service';
 import { OrderService } from '../../../core/services/order.service';
@@ -56,6 +58,7 @@ type PaymentMethodCode = string;
   selector: 'app-sell',
   imports: [
     CommonModule,
+    RouterModule,
     ProductScannerComponent,
     SearchViewComponent,
     ProductConfirmModalComponent,
@@ -76,6 +79,7 @@ export class SellComponent implements OnInit, OnDestroy {
   private readonly authService = inject(AuthService);
   private readonly cartService = inject(CartService);
   private readonly customerService = inject(CustomerService);
+  protected readonly cashierSessionService = inject(CashierSessionService);
   private readonly apolloService = inject(ApolloService);
   private readonly currencyService = inject(CurrencyService);
   private readonly printService = inject(PrintService);
@@ -158,18 +162,21 @@ export class SellComponent implements OnInit, OnDestroy {
   });
 
   async ngOnInit(): Promise<void> {
-    // Check mobile status
     this.checkMobile();
     this.resizeListener = () => this.checkMobile();
     window.addEventListener('resize', this.resizeListener);
 
-    // Load cart from cache on initialization
     this.cartService.loadCartFromCache();
-
-    // Sync with cart service state
     this.cartItems.set(this.cartService.cartItems());
 
-    // Load recent products for quick selection
+    const companyId = this.companyService.activeCompanyId();
+    if (companyId) {
+      const channelId = parseInt(companyId, 10);
+      if (!isNaN(channelId)) {
+        this.cashierSessionService.getCurrentSession(channelId).subscribe();
+      }
+    }
+
     await this.loadRecentProducts();
   }
 

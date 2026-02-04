@@ -267,21 +267,6 @@ export const config: VendureConfig = {
         ui: { tab: 'Settings' },
       },
       {
-        name: 'cashierOpen',
-        type: 'boolean',
-        label: [{ languageCode: LanguageCode.en, value: 'Cashier Currently Open' }],
-        description: [
-          {
-            languageCode: LanguageCode.en,
-            value: 'Real-time status: Is a cashier currently serving in this channel?',
-          },
-        ],
-        defaultValue: false,
-        public: true,
-        nullable: false,
-        ui: { tab: 'Settings' },
-      },
-      {
         name: 'maxAdminCount',
         type: 'int',
         label: [{ languageCode: LanguageCode.en, value: 'Maximum Admin Count' }],

@@ -54,9 +54,9 @@ services:
       COOKIE_SECRET: ${COOKIE_SECRET:-default-secret-key}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
 
-      # CORS configuration
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:4200}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4200}
+      # CORS configuration (set CORS_ORIGIN/FRONTEND_URL in env e.g. http://localhost:4200)
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      FRONTEND_URL: ${FRONTEND_URL:-}
 
       # Asset storage
       ASSET_STORAGE_STRATEGY: ${ASSET_STORAGE_STRATEGY:-LocalAssetStorageStrategy}
@@ -79,10 +79,10 @@ services:
       TEXTSMS_PARTNER_ID: ${TEXTSMS_PARTNER_ID:-}
       TEXTSMS_SHORTCODE: ${TEXTSMS_SHORTCODE:-}
 
-      # Push Notification Configuration (VAPID)
+      # Push Notification Configuration (VAPID) - set VAPID_EMAIL in env e.g. mailto:admin@example.com
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
-      VAPID_EMAIL: ${VAPID_EMAIL:-mailto:admin@dukarun.com}
+      VAPID_EMAIL: ${VAPID_EMAIL:-}
 
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-info}

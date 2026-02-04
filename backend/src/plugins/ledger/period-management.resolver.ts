@@ -1,6 +1,6 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext, TransactionalConnection } from '@vendure/core';
-import { CashDrawerCount } from '../../domain/cashier/cash-drawer-count.entity';
+import { CashDrawerCount, CashCountType } from '../../domain/cashier/cash-drawer-count.entity';
 import { CashierSession } from '../../domain/cashier/cashier-session.entity';
 import { MpesaVerification } from '../../domain/cashier/mpesa-verification.entity';
 import { AccountingPeriod } from '../../domain/period/accounting-period.entity';
@@ -10,20 +10,37 @@ import { JournalEntry } from '../../ledger/journal-entry.entity';
 import { PostingService } from '../../ledger/posting.service';
 import {
   CashCountResult,
-  CashierSessionService,
+  OpenSessionService,
   CashierSessionSummary,
-  SessionReconciliationRequirements,
-} from '../../services/financial/cashier-session.service';
+} from '../../services/financial/open-session.service';
 import { ChartOfAccountsService } from '../../services/financial/chart-of-accounts.service';
 import { InventoryReconciliationService } from '../../services/financial/inventory-reconciliation.service';
 import { PeriodEndClosingService } from '../../services/financial/period-end-closing.service';
 import { PeriodLockService } from '../../services/financial/period-lock.service';
 import {
   PaymentMethodReconciliationConfig,
-  ReconciliationValidatorService,
-} from '../../services/financial/reconciliation-validator.service';
+  SessionReconciliationRequirements,
+} from '../../services/financial/period-management.types';
+import { ReconciliationValidatorService } from '../../services/financial/reconciliation-validator.service';
 import { ReconciliationService } from '../../services/financial/reconciliation.service';
 import { CloseAccountingPeriodPermission, ManageReconciliationPermission } from './permissions';
+
+/** GraphQL-shaped type for CashDrawerCount (matches schema; expectedCash/variance nullable when hidden). */
+interface CashDrawerCountGraphQL {
+  id: string;
+  channelId: number;
+  sessionId: string;
+  countType: CashCountType;
+  takenAt: Date;
+  declaredCash: string;
+  expectedCash: string | null;
+  variance: string | null;
+  varianceReason: string | null;
+  reviewedByUserId: number | null;
+  reviewedAt: Date | null;
+  reviewNotes: string | null;
+  countedByUserId: number;
+}
 
 @Resolver()
 export class PeriodManagementResolver {
@@ -31,7 +48,7 @@ export class PeriodManagementResolver {
     private readonly periodEndClosingService: PeriodEndClosingService,
     private readonly reconciliationService: ReconciliationService,
     private readonly inventoryReconciliationService: InventoryReconciliationService,
-    private readonly cashierSessionService: CashierSessionService,
+    private readonly cashierSessionService: OpenSessionService,
     private readonly postingService: PostingService,
     private readonly connection: TransactionalConnection,
     private readonly periodLockService: PeriodLockService,
@@ -99,7 +116,19 @@ export class PeriodManagementResolver {
     @Ctx() ctx: RequestContext,
     @Args('input') input: any
   ): Promise<Reconciliation> {
-    return this.reconciliationService.createReconciliation(ctx, input);
+    const accountDeclaredAmounts: Record<string, string> | undefined =
+      Array.isArray(input.accountDeclaredAmounts) && input.accountDeclaredAmounts.length > 0
+        ? Object.fromEntries(
+            input.accountDeclaredAmounts.map((a: { accountId: string; amountCents: string }) => [
+              a.accountId,
+              a.amountCents,
+            ])
+          )
+        : undefined;
+    return this.reconciliationService.createReconciliation(ctx, {
+      ...input,
+      accountDeclaredAmounts: accountDeclaredAmounts ?? input.accountDeclaredAmounts,
+    });
   }
 
   @Mutation()
@@ -156,6 +185,9 @@ export class PeriodManagementResolver {
     await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, input.fromAccountCode);
     await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, input.toAccountCode);
 
+    const session = await this.cashierSessionService.requireOpenSession(ctx, input.channelId);
+    const sessionMeta = { openSessionId: session.id };
+
     const principal = Number(BigInt(input.amount));
     if (principal <= 0) {
       throw new Error('Transfer amount must be greater than zero.');
@@ -181,19 +213,19 @@ export class PeriodManagementResolver {
       // Credit from (principal + fee), Debit to (principal), Debit expense (fee with tag)
       const fromCredit = principal + feeAmount;
       lines.push(
-        { accountCode: input.fromAccountCode, debit: 0, credit: fromCredit },
-        { accountCode: input.toAccountCode, debit: principal, credit: 0 },
+        { accountCode: input.fromAccountCode, debit: 0, credit: fromCredit, meta: sessionMeta },
+        { accountCode: input.toAccountCode, debit: principal, credit: 0, meta: sessionMeta },
         {
           accountCode: ACCOUNT_CODES.PROCESSOR_FEES,
           debit: feeAmount,
           credit: 0,
-          meta: { expenseTag },
+          meta: { ...sessionMeta, expenseTag },
         }
       );
     } else {
       lines.push(
-        { accountCode: input.fromAccountCode, debit: 0, credit: principal },
-        { accountCode: input.toAccountCode, debit: principal, credit: 0 }
+        { accountCode: input.fromAccountCode, debit: 0, credit: principal, meta: sessionMeta },
+        { accountCode: input.toAccountCode, debit: principal, credit: 0, meta: sessionMeta }
       );
     }
 
@@ -253,16 +285,45 @@ export class PeriodManagementResolver {
   ): Promise<CashierSession> {
     return this.cashierSessionService.startSession(ctx, {
       channelId: input.channelId,
-      openingFloat: parseInt(input.openingFloat, 10),
+      openingBalances: (input.openingBalances || []).map(
+        (b: { accountCode: string; amountCents: number }) => ({
+          accountCode: b.accountCode,
+          amountCents:
+            typeof b.amountCents === 'number' ? b.amountCents : parseInt(b.amountCents, 10),
+        })
+      ),
     });
   }
 
   @Mutation()
   @Allow(ManageReconciliationPermission.Permission)
   async closeCashierSession(@Ctx() ctx: RequestContext, @Args('input') input: any) {
+    let sessionId = typeof input?.sessionId === 'string' ? input.sessionId.trim() : '';
+    const channelId = typeof input?.channelId === 'number' ? input.channelId : undefined;
+
+    if (!sessionId || sessionId === '-1') {
+      if (channelId != null && !Number.isNaN(channelId)) {
+        const currentSession = await this.cashierSessionService.getCurrentSession(ctx, channelId);
+        if (currentSession) {
+          sessionId = currentSession.id;
+        } else {
+          throw new Error('No open session for this channel');
+        }
+      } else {
+        throw new Error('Session ID or channel ID required to close a session');
+      }
+    }
+
+    const closingBalances = (input.closingBalances || []).map(
+      (b: { accountCode: string; amountCents: number }) => ({
+        accountCode: b.accountCode,
+        amountCents:
+          typeof b.amountCents === 'number' ? b.amountCents : parseInt(b.amountCents, 10),
+      })
+    );
     const summary = await this.cashierSessionService.closeSession(ctx, {
-      sessionId: input.sessionId,
-      closingDeclared: parseInt(input.closingDeclared, 10),
+      sessionId,
+      closingBalances,
       notes: input.notes,
     });
     return this.formatSessionSummaryForGraphQL(summary);
@@ -291,7 +352,9 @@ export class PeriodManagementResolver {
     const counts = await this.cashierSessionService.getSessionCashCounts(ctx, sessionId);
     // Apply role-based visibility - hide variance details for non-managers
     const isManager = this.hasManageReconciliationPermission(ctx);
-    return counts.map(count => this.formatCashCountForGraphQL(count, isManager));
+    return counts.map(count =>
+      this.formatCashCountForGraphQL(count, isManager)
+    ) as CashDrawerCount[];
   }
 
   @Query()
@@ -302,7 +365,7 @@ export class PeriodManagementResolver {
   ): Promise<CashDrawerCount[]> {
     const counts = await this.cashierSessionService.getPendingVarianceReviews(ctx, channelId);
     // Managers always see full details
-    return counts.map(count => this.formatCashCountForGraphQL(count, true));
+    return counts.map(count => this.formatCashCountForGraphQL(count, true)) as CashDrawerCount[];
   }
 
   @Query()
@@ -336,6 +399,62 @@ export class PeriodManagementResolver {
     return this.reconciliationValidatorService.getChannelReconciliationConfig(ctx, channelId);
   }
 
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async reconciliations(
+    @Ctx() ctx: RequestContext,
+    @Args('channelId') channelId: number,
+    @Args('options', { nullable: true })
+    options?: {
+      startDate?: string;
+      endDate?: string;
+      scope?: string;
+      hasVariance?: boolean;
+      take?: number;
+      skip?: number;
+    }
+  ) {
+    return this.reconciliationService.getReconciliations(ctx, channelId, options);
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async reconciliationDetails(
+    @Ctx() ctx: RequestContext,
+    @Args('reconciliationId') reconciliationId: string
+  ) {
+    return this.reconciliationService.getReconciliationDetails(ctx, reconciliationId);
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async sessionReconciliationDetails(
+    @Ctx() ctx: RequestContext,
+    @Args('sessionId') sessionId: string,
+    @Args('kind', { nullable: true }) kind?: string
+  ) {
+    const reconKind = kind === 'opening' ? 'opening' : 'closing';
+    return this.reconciliationService.getSessionReconciliationDetails(ctx, sessionId, reconKind);
+  }
+
+  @Query()
+  @Allow(ManageReconciliationPermission.Permission)
+  async closedSessionsMissingReconciliation(
+    @Ctx() ctx: RequestContext,
+    @Args('channelId') channelId: number,
+    @Args('startDate', { nullable: true }) startDate?: string,
+    @Args('endDate', { nullable: true }) endDate?: string,
+    @Args('take', { nullable: true }) take?: number,
+    @Args('skip', { nullable: true }) skip?: number
+  ): Promise<Array<{ sessionId: string; closedAt: Date }>> {
+    return this.cashierSessionService.getClosedSessionsMissingReconciliation(ctx, channelId, {
+      startDate,
+      endDate,
+      take,
+      skip,
+    });
+  }
+
   // ============================================================================
   // CASH CONTROL MUTATIONS
   // ============================================================================
@@ -354,7 +473,7 @@ export class PeriodManagementResolver {
 
     // Always hide variance from the cashier
     return {
-      count: this.formatCashCountForGraphQL(result.count, false),
+      count: this.formatCashCountForGraphQL(result.count, false) as CashDrawerCount,
       hasVariance: result.hasVariance,
       varianceHidden: true,
     };
@@ -369,7 +488,7 @@ export class PeriodManagementResolver {
   ): Promise<CashDrawerCount> {
     const count = await this.cashierSessionService.explainVariance(ctx, countId, reason);
     // Cashier still doesn't see variance amount after explaining
-    return this.formatCashCountForGraphQL(count, false);
+    return this.formatCashCountForGraphQL(count, false) as CashDrawerCount;
   }
 
   @Mutation()
@@ -381,7 +500,7 @@ export class PeriodManagementResolver {
   ): Promise<CashDrawerCount> {
     const count = await this.cashierSessionService.reviewCashCount(ctx, countId, notes);
     // Managers see full details
-    return this.formatCashCountForGraphQL(count, true);
+    return this.formatCashCountForGraphQL(count, true) as CashDrawerCount;
   }
 
   @Mutation()
@@ -416,9 +535,13 @@ export class PeriodManagementResolver {
   }
 
   /**
-   * Format cash count for GraphQL - applies role-based visibility
+   * Format cash count for GraphQL - applies role-based visibility.
+   * Return type matches the GraphQL CashDrawerCount type.
    */
-  private formatCashCountForGraphQL(count: CashDrawerCount, showVariance: boolean): any {
+  private formatCashCountForGraphQL(
+    count: CashDrawerCount,
+    showVariance: boolean
+  ): CashDrawerCountGraphQL {
     return {
       id: count.id,
       channelId: count.channelId,
@@ -426,13 +549,12 @@ export class PeriodManagementResolver {
       countType: count.countType,
       takenAt: count.takenAt,
       declaredCash: count.declaredCash,
-      // Only show these fields if user is a manager
       expectedCash: showVariance ? count.expectedCash : null,
       variance: showVariance ? count.variance : null,
-      varianceReason: count.varianceReason,
-      reviewedByUserId: count.reviewedByUserId,
-      reviewedAt: count.reviewedAt,
-      reviewNotes: count.reviewNotes,
+      varianceReason: count.varianceReason ?? null,
+      reviewedByUserId: count.reviewedByUserId ?? null,
+      reviewedAt: count.reviewedAt ?? null,
+      reviewNotes: count.reviewNotes ?? null,
       countedByUserId: count.countedByUserId,
     };
   }

@@ -1422,12 +1422,12 @@ Location-based two-step payment system that enables salespersons to send orders 
 **Implementation:**
 
 ```typescript
-// Reads from active location
+// Reads from active channel / session
 readonly cashierFlowEnabled = stockLocationService.cashierFlowEnabled;
-readonly cashierOpen = stockLocationService.cashierOpen;
+readonly hasActiveSession = stockLocationService.hasActiveSession;
 
-// Conditional UI rendering
-@if (cashierFlowEnabled && cashierOpen) {
+// Conditional UI rendering (shift open = open cashier session)
+@if (cashierFlowEnabled && hasActiveSession()) {
   <button class="btn btn-primary" (click)="handleCompleteCashier()">
     Send to Cashier
   </button>
@@ -1447,32 +1447,27 @@ readonly cashierOpen = stockLocationService.cashierOpen;
 **Implementation:**
 
 ```typescript
-// Status computation
+// Status computation (shift open = open cashier session)
 get cashierStatus(): string {
   if (!this.stockLocationService.cashierFlowEnabled) return '';
-  return this.stockLocationService.cashierOpen ? 'open' : 'closed';
+  return this.stockLocationService.hasActiveSession() ? 'open' : 'closed';
 }
 ```
 
 ### Data Flow
 
-#### StockLocation Custom Fields
+#### Channel and session
 
-```typescript
-// Backend custom fields on StockLocation entity
-{
-  cashierFlowEnabled: boolean,  // Enable feature at this location
-  cashierOpen: boolean          // Currently accepting orders
-}
-```
+- **Channel:** `cashierFlowEnabled` (custom field) controls whether cashier flow is enabled for the channel.
+- **Shift open:** Derived from an open cashier session (`currentCashierSession(channelId)` / `CashierSessionService.hasActiveSession`), not from a channel field.
 
 #### Service Integration
 
 **StockLocationService:**
 
-- `cashierFlowEnabled()` - Signal for feature toggle
-- `cashierOpen()` - Signal for status toggle
-- Fetches location data including custom fields
+- `cashierFlowEnabled()` - Signal for feature toggle (from channel)
+- `hasActiveSession()` - Signal for shift-open status (from open cashier session)
+- Fetches location data; shift status from CashierSessionService
 
 **GraphQL Queries:**
 

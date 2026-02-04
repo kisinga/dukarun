@@ -11,19 +11,14 @@ import {
   isCashierControlledPaymentMethod,
   requiresReconciliation,
 } from './payment-method-mapping.config';
-import { MissingReconciliation, ValidationResult } from './period-management.types';
-
-/**
- * Reconciliation configuration derived from PaymentMethod custom fields
- */
-export interface PaymentMethodReconciliationConfig {
-  paymentMethodId: string;
-  paymentMethodCode: string;
-  reconciliationType: 'blind_count' | 'transaction_verification' | 'statement_match' | 'none';
-  ledgerAccountCode: string;
-  isCashierControlled: boolean;
-  requiresReconciliation: boolean;
-}
+import {
+  MissingReconciliation,
+  PaymentMethodReconciliationConfig,
+  toScopeRefId,
+  type ReconciliationScopeRef,
+  ValidationResult,
+} from './period-management.types';
+import { ChannelPaymentMethodService } from './channel-payment-method.service';
 
 /**
  * Reconciliation Validator Service
@@ -32,7 +27,10 @@ export interface PaymentMethodReconciliationConfig {
  */
 @Injectable()
 export class ReconciliationValidatorService {
-  constructor(private readonly connection: TransactionalConnection) {}
+  constructor(
+    private readonly connection: TransactionalConnection,
+    private readonly channelPaymentMethodService: ChannelPaymentMethodService
+  ) {}
 
   /**
    * Validate all required scopes are reconciled for a period
@@ -50,18 +48,13 @@ export class ReconciliationValidatorService {
 
     // Check each payment method account has verified reconciliation
     for (const account of paymentMethodAccounts) {
-      const reconciliation = await this.findReconciliation(
-        ctx,
-        channelId,
-        'method',
-        account.code,
-        periodEndDate
-      );
+      const ref: ReconciliationScopeRef = { scope: 'method', methodCode: account.code };
+      const reconciliation = await this.findReconciliation(ctx, channelId, ref, periodEndDate);
 
       if (!reconciliation) {
         missingReconciliations.push({
           scope: 'method',
-          scopeRefId: account.code,
+          scopeRefId: toScopeRefId(ref),
           displayName: account.name,
         });
         errors.push(`Missing reconciliation for payment method: ${account.name} (${account.code})`);
@@ -123,13 +116,17 @@ export class ReconciliationValidatorService {
     ctx: RequestContext,
     channelId: number
   ): Promise<PaymentMethodReconciliationConfig[]> {
-    const paymentMethods = await this.getChannelPaymentMethods(ctx, channelId);
+    const paymentMethods = await this.channelPaymentMethodService.getChannelPaymentMethods(
+      ctx,
+      channelId
+    );
 
     return paymentMethods
       .filter(pm => pm.enabled && requiresReconciliation(pm))
       .map(pm => ({
         paymentMethodId: pm.id.toString(),
         paymentMethodCode: pm.code,
+        paymentMethodName: this.channelPaymentMethodService.getPaymentMethodDisplayName(pm),
         reconciliationType: getReconciliationTypeFromPaymentMethod(pm),
         ledgerAccountCode: getAccountCodeFromPaymentMethod(pm),
         isCashierControlled: isCashierControlledPaymentMethod(pm),
@@ -145,13 +142,17 @@ export class ReconciliationValidatorService {
     ctx: RequestContext,
     channelId: number
   ): Promise<PaymentMethodReconciliationConfig[]> {
-    const paymentMethods = await this.getChannelPaymentMethods(ctx, channelId);
+    const paymentMethods = await this.channelPaymentMethodService.getChannelPaymentMethods(
+      ctx,
+      channelId
+    );
 
     return paymentMethods
       .filter(pm => pm.enabled)
       .map(pm => ({
         paymentMethodId: pm.id.toString(),
         paymentMethodCode: pm.code,
+        paymentMethodName: this.channelPaymentMethodService.getPaymentMethodDisplayName(pm),
         reconciliationType: getReconciliationTypeFromPaymentMethod(pm),
         ledgerAccountCode: getAccountCodeFromPaymentMethod(pm),
         isCashierControlled: isCashierControlledPaymentMethod(pm),
@@ -213,7 +214,7 @@ export class ReconciliationValidatorService {
         missingReconciliations: [
           {
             scope: 'cash-session',
-            scopeRefId: sessionId,
+            scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId }),
             displayName: `Closing count for ${paymentMethod.code}`,
           },
         ],
@@ -252,7 +253,7 @@ export class ReconciliationValidatorService {
         missingReconciliations: [
           {
             scope: 'cash-session',
-            scopeRefId: sessionId,
+            scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId }),
             displayName: `M-Pesa verification for ${paymentMethod.code}`,
           },
         ],
@@ -272,22 +273,6 @@ export class ReconciliationValidatorService {
   ): Promise<ValidationResult> {
     // TODO: Implement bank statement matching validation
     return { isValid: true, errors: [], missingReconciliations: [] };
-  }
-
-  /**
-   * Get payment methods for a channel
-   */
-  private async getChannelPaymentMethods(
-    ctx: RequestContext,
-    channelId: number
-  ): Promise<PaymentMethod[]> {
-    const channelRepo = this.connection.getRepository(ctx, Channel);
-    const channel = await channelRepo.findOne({
-      where: { id: channelId },
-      relations: ['paymentMethods'],
-    });
-
-    return channel?.paymentMethods || [];
   }
 
   /**
@@ -317,26 +302,19 @@ export class ReconciliationValidatorService {
 
     // Check each session has a verified reconciliation
     for (const session of sessionsNeedingReconciliation) {
-      const reconciliation = await this.findReconciliation(
-        ctx,
-        channelId,
-        'cash-session',
-        session.id,
-        periodEndDate
-      );
+      const ref: ReconciliationScopeRef = { scope: 'cash-session', sessionId: session.id };
+      const reconciliation = await this.findReconciliation(ctx, channelId, ref, periodEndDate);
 
       if (!reconciliation) {
         const displayName = `Session ${session.openedAt.toISOString().slice(0, 10)} (User ${session.cashierUserId})`;
         missingReconciliations.push({
           scope: 'cash-session',
-          scopeRefId: session.id,
+          scopeRefId: toScopeRefId(ref),
           displayName,
         });
         errors.push(`Missing reconciliation for cashier session: ${displayName}`);
       } else if (reconciliation.status !== 'verified') {
-        errors.push(
-          `Reconciliation for cashier session ${session.id} is not verified`
-        );
+        errors.push(`Reconciliation for cashier session ${session.id} is not verified`);
       }
     }
 
@@ -422,22 +400,21 @@ export class ReconciliationValidatorService {
   }
 
   /**
-   * Find reconciliation for a scope and scopeRefId
+   * Find reconciliation for a scope and ref (type-safe).
    */
   private async findReconciliation(
     ctx: RequestContext,
     channelId: number,
-    scope: ReconciliationScope,
-    scopeRefId: string,
+    ref: ReconciliationScopeRef,
     periodEndDate: string
   ): Promise<Reconciliation | null> {
     const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
+    const scopeRefId = toScopeRefId(ref);
 
-    // Find reconciliation where periodEndDate falls within rangeStart and rangeEnd
     return reconciliationRepo
       .createQueryBuilder('reconciliation')
       .where('reconciliation.channelId = :channelId', { channelId })
-      .andWhere('reconciliation.scope = :scope', { scope })
+      .andWhere('reconciliation.scope = :scope', { scope: ref.scope })
       .andWhere('reconciliation.scopeRefId = :scopeRefId', { scopeRefId })
       .andWhere('reconciliation.rangeStart <= :periodEndDate', { periodEndDate })
       .andWhere('reconciliation.rangeEnd >= :periodEndDate', { periodEndDate })

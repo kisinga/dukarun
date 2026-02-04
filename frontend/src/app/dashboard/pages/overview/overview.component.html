@@ -5,14 +5,20 @@
       <div class="flex items-center gap-2 mb-1.5">
         <h1 class="text-2xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Dashboard</h1>
 
-        @if (cashierFlowEnabled() && cashierOpen()) {
+        @if (sessionOpen()) {
           <span class="badge badge-success badge-soft badge-xs gap-1 font-medium shrink-0">
             <span class="w-1.5 h-1.5 bg-success rounded-full animate-pulse"></span>
             Open
           </span>
+          <button type="button" class="btn btn-ghost btn-xs" (click)="openCloseDayModal()">
+            Close shift
+          </button>
         }
-        @if (cashierFlowEnabled() && !cashierOpen()) {
+        @if (!sessionOpen()) {
           <span class="badge badge-ghost badge-xs shrink-0">Closed</span>
+          <button type="button" class="btn btn-primary btn-xs" (click)="openOpenDayModal()">
+            Open shift
+          </button>
         }
       </div>
 
@@ -449,5 +455,74 @@
         </div>
       }
     </div>
+  }
+
+  <!-- Open / Close shift modal (same view for both) -->
+  @if (dayModalMode()) {
+    <dialog class="modal modal-open">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg">
+          {{ dayModalMode() === 'open' ? 'Open shift' : 'Close shift' }}
+        </h3>
+        @if (cashierSessionService.error()) {
+          <div role="alert" class="alert alert-error text-sm mt-2">
+            <span>{{ cashierSessionService.error() }}</span>
+          </div>
+        }
+        <p class="py-2 text-sm text-base-content/70">
+          {{
+            dayModalMode() === 'open' ? 'Enter opening balance' : 'Enter closing declared amount'
+          }}
+          for each cashier-controlled account
+        </p>
+        @for (acc of dayModalConfig(); track acc.ledgerAccountCode) {
+          <label class="label">
+            <span class="label-text">{{ acc.paymentMethodName || acc.paymentMethodCode }}</span>
+            <span class="label-text-alt text-base-content/60">sh</span>
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            class="input input-bordered w-full"
+            [ngModel]="dayModalBalances()[acc.ledgerAccountCode] || ''"
+            (ngModelChange)="setDayModalBalance(acc.ledgerAccountCode, $event)"
+            placeholder="0.00"
+            [attr.aria-label]="
+              (dayModalMode() === 'open' ? 'Opening balance' : 'Closing declared') + ' in shillings'
+            "
+          />
+        }
+        @if (dayModalConfig().length === 0) {
+          <p class="text-sm text-base-content/70 py-2">Loading accounts…</p>
+        }
+        @if (dayModalMode() === 'close') {
+          <label class="label">
+            <span class="label-text">Notes (optional)</span>
+          </label>
+          <textarea
+            class="textarea textarea-bordered w-full"
+            [ngModel]="dayModalNotes()"
+            (ngModelChange)="dayModalNotes.set($event)"
+            placeholder="Optional notes"
+            rows="2"
+          ></textarea>
+        }
+        <div class="modal-action">
+          <button type="button" class="btn btn-ghost" (click)="closeDayModal()">Cancel</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            (click)="submitDayModal()"
+            [disabled]="dayModalConfig().length === 0"
+          >
+            {{ dayModalMode() === 'open' ? 'Open' : 'Close' }}
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button type="submit" (click)="closeDayModal()">close</button>
+      </form>
+    </dialog>
   }
 </div>

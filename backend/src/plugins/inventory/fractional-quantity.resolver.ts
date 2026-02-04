@@ -1,9 +1,21 @@
 import { Args, Mutation, Resolver } from '@nestjs/graphql';
-import { Allow, Ctx, OrderService, Permission, RequestContext } from '@vendure/core';
+import {
+  Allow,
+  Ctx,
+  OrderLine,
+  OrderService,
+  Permission,
+  RequestContext,
+  TransactionalConnection,
+  UserInputError,
+} from '@vendure/core';
 
 @Resolver()
 export class FractionalQuantityResolver {
-  constructor(private orderService: OrderService) {}
+  constructor(
+    private readonly orderService: OrderService,
+    private readonly connection: TransactionalConnection
+  ) {}
 
   @Mutation()
   @Allow(Permission.UpdateOrder)
@@ -12,20 +24,31 @@ export class FractionalQuantityResolver {
     @Args('orderLineId') orderLineId: string,
     @Args('quantity') quantity: number
   ) {
-    // Validate fractional quantity (max 1 decimal place)
     if (this.hasInvalidFractionalQuantity(quantity)) {
-      throw new Error('Quantity can have at most 1 decimal place');
+      throw new UserInputError('Quantity can have at most 1 decimal place');
     }
 
-    // For now, just validate the quantity and return success
-    // The actual order line update will be handled by the frontend
-    // using the existing order service methods
+    const orderLine = await this.connection.getRepository(ctx, OrderLine).findOne({
+      where: { id: orderLineId },
+      relations: ['order'],
+    });
 
-    return {
-      __typename: 'Order',
-      id: 'temp',
-      lines: [],
-    };
+    if (!orderLine || !orderLine.order) {
+      throw new UserInputError('Order line not found');
+    }
+
+    const orderId = orderLine.order.id;
+    const result = await this.orderService.adjustOrderLine(
+      ctx,
+      orderId as string,
+      orderLineId,
+      quantity
+    );
+
+    if (result && typeof result === 'object' && 'errorCode' in result) {
+      return result;
+    }
+    return result;
   }
 
   /**
@@ -34,7 +57,6 @@ export class FractionalQuantityResolver {
    * Accepts: 0.5, 1.0, 2.3
    */
   private hasInvalidFractionalQuantity(quantity: number): boolean {
-    // Check if quantity has more than 1 decimal place
     const decimalPlaces = (quantity.toString().split('.')[1] || '').length;
     return decimalPlaces > 1;
   }

@@ -7,11 +7,14 @@
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { RequestContext } from '@vendure/core';
-import { CashierSessionService } from '../../src/services/financial/cashier-session.service';
+import { OpenSessionService } from '../../src/services/financial/open-session.service';
 import { PaymentAllocationService } from '../../src/services/payments/payment-allocation.service';
 import { PeriodManagementResolver } from '../../src/plugins/ledger/period-management.resolver';
 import { CashierSession } from '../../src/domain/cashier/cashier-session.entity';
 import { CashDrawerCount } from '../../src/domain/cashier/cash-drawer-count.entity';
+import { Reconciliation } from '../../src/domain/recon/reconciliation.entity';
+import { ReconciliationAccount } from '../../src/domain/recon/reconciliation-account.entity';
+import { Account } from '../../src/ledger/account.entity';
 import { ACCOUNT_CODES } from '../../src/ledger/account-codes.constants';
 import { Channel } from '@vendure/core';
 
@@ -34,29 +37,38 @@ describe('Cashier-ledger flows', () => {
         cashierUserId: 1,
         openedAt: new Date(),
         status: 'open',
-        openingFloat: '10000',
         closingDeclared: '0',
       } as CashierSession;
-      mockSessionRepo.findOne.mockImplementation((opts: any) => {
-        if (opts?.where?.channelId === channel1Id && opts?.where?.status === 'open') {
-          return Promise.resolve(null);
-        }
-        return Promise.resolve(null);
-      });
+      mockSessionRepo.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(session)
+        .mockResolvedValue(session);
       mockSessionRepo.create.mockReturnValue(session);
       mockSessionRepo.save.mockResolvedValue(session);
       const mockChannelRepo = {
-        findOne: jest.fn().mockImplementation(() => Promise.resolve({ id: channel1Id })),
+        findOne: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve({ id: channel1Id, paymentMethods: [] })),
       } as any;
       const mockCountRepo = {
         create: jest.fn().mockImplementation((o: any) => ({ ...o, id: 'c1' })),
         save: jest.fn().mockImplementation(() => Promise.resolve({ id: 'c1' })),
       } as any;
+      const mockReconciliationRepo: any = {
+        // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
+        find: jest.fn().mockResolvedValue([]),
+        create: jest.fn(),
+        save: jest.fn().mockImplementation((r: any) => Promise.resolve({ ...r, id: 'rec1' })),
+      };
       const mockConnection = {
-        getRepository: jest.fn((_ctx: any, entity: any) => {
+        getRepository: jest.fn((_ctx: any, entity: any): any => {
           if (entity === CashierSession) return mockSessionRepo;
           if (entity === Channel) return mockChannelRepo;
           if (entity === CashDrawerCount) return mockCountRepo;
+          if (entity === Reconciliation) return mockReconciliationRepo;
+          if (entity === ReconciliationAccount) return mockCountRepo;
+          // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
+          if (entity === Account) return { find: jest.fn().mockResolvedValue([]) };
           return mockCountRepo;
         }),
       } as any;
@@ -67,20 +79,30 @@ describe('Cashier-ledger flows', () => {
             Promise.resolve({ cashTotal: 0, mpesaTotal: 0, totalCollected: 0 })
           ),
       } as any;
-      const cashierSessionService = new CashierSessionService(
+      const mockOpenSessionFinancial = {
+        // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
+        postVarianceAdjustment: jest.fn().mockResolvedValue(undefined),
+      } as any;
+      const mockChannelPaymentMethodService = {
+        getChannelPaymentMethods: (jest.fn() as any).mockResolvedValue([]),
+        getPaymentMethodDisplayName: jest.fn((pm: { code: string }) => pm.code),
+      } as any;
+      const cashierSessionService = new (OpenSessionService as any)(
         mockConnection,
         mockLedgerQueryService,
-        { createReconciliation: jest.fn() } as any
+        // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
+        { createReconciliation: jest.fn().mockResolvedValue({ id: 'rec1' }) },
+        mockOpenSessionFinancial,
+        mockChannelPaymentMethodService
       );
 
-      mockSessionRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(session);
       const opened = await cashierSessionService.startSession(ctx1, {
         channelId: channel1Id,
-        openingFloat: 10000,
+        openingBalances: [],
       });
       expect(opened.channelId).toBe(channel1Id);
 
-      const mockFinancialService = {
+      const mockPaymentFinancialService = {
         recordPaymentAllocation: jest.fn().mockImplementation(() => Promise.resolve()),
       } as any;
       const mockOrderRepo = {
@@ -123,11 +145,12 @@ describe('Cashier-ledger flows', () => {
         } as any,
         mockOrderService,
         { settlePayment: jest.fn().mockImplementation(() => Promise.resolve()) } as any,
-        mockFinancialService,
+        mockPaymentFinancialService,
         {} as any,
         {
           validatePaymentSourceAccount: jest.fn().mockImplementation(() => Promise.resolve()),
         } as any,
+        cashierSessionService,
         undefined as any
       );
 
@@ -140,13 +163,14 @@ describe('Cashier-ledger flows', () => {
         ACCOUNT_CODES.CASH_ON_HAND
       );
 
-      expect(mockFinancialService.recordPaymentAllocation).toHaveBeenCalledWith(
+      expect(mockPaymentFinancialService.recordPaymentAllocation).toHaveBeenCalledWith(
         ctx1,
         expect.any(String),
         expect.any(Object),
         'credit',
         5000,
-        ACCOUNT_CODES.CASH_ON_HAND
+        ACCOUNT_CODES.CASH_ON_HAND,
+        's1'
       );
     });
   });
@@ -189,6 +213,11 @@ describe('Cashier-ledger flows', () => {
       mockOrderServiceFlowB.findOne
         .mockResolvedValueOnce(orderFlowB)
         .mockResolvedValueOnce({ ...orderFlowB, payments: [paymentFlowB] });
+      const mockCashierSessionServiceFlowB = {
+        requireOpenSession: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve({ id: 'session-b', channelId: channel1Id })),
+      } as any;
       const paymentAllocationServiceFlowB = new PaymentAllocationService(
         {
           withTransaction: (c: any, fn: (t: any) => Promise<any>) => fn(c),
@@ -201,6 +230,7 @@ describe('Cashier-ledger flows', () => {
         {
           validatePaymentSourceAccount: jest.fn().mockImplementation(() => Promise.resolve()),
         } as any,
+        mockCashierSessionServiceFlowB,
         undefined as any
       );
 
@@ -238,11 +268,16 @@ describe('Cashier-ledger flows', () => {
           })
         ),
       } as any;
+      const mockCashierSessionServiceFlowC = {
+        requireOpenSession: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve({ id: 'session-c', channelId: channel1Id })),
+      } as any;
       const resolver = new PeriodManagementResolver(
         {} as any,
         {} as any,
         {} as any,
-        {} as any,
+        mockCashierSessionServiceFlowC,
         mockPostingService,
         {} as any,
         mockPeriodLockService,
@@ -291,11 +326,16 @@ describe('Cashier-ledger flows', () => {
       const mockChartOfAccountsService = {
         validatePaymentSourceAccount: jest.fn().mockImplementation(() => Promise.resolve()),
       } as any;
+      const mockCashierSessionServiceFlowD = {
+        requireOpenSession: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve({ id: 'session-d', channelId: channel1Id })),
+      } as any;
       const resolver = new PeriodManagementResolver(
         {} as any,
         {} as any,
         {} as any,
-        {} as any,
+        mockCashierSessionServiceFlowD,
         mockPostingService,
         {} as any,
         mockPeriodLockService,

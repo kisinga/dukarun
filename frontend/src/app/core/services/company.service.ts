@@ -141,15 +141,6 @@ export class CompanyService {
   });
 
   /**
-   * Cashier open status for the active channel
-   * Real-time status of whether a cashier is currently serving
-   */
-  readonly cashierOpen = computed(() => {
-    const channelData = this.activeChannelDataSignal();
-    return channelData?.customFields?.cashierOpen ?? false;
-  });
-
-  /**
    * Printer enabled for the active channel
    * Controls whether "Complete & Print" button is shown at checkout
    */

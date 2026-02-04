@@ -4,7 +4,7 @@
  * Verifies that ledger and session operations are isolated by channel:
  * - PostingService loads accounts by payload.channelId and rejects when accounts missing for that channel
  * - Sessions and currentCashierSession are keyed by channelId
- * - paymentSourceAccounts uses ctx.channelId so each channel sees only its accounts
+ * - eligibleDebitAccounts uses ctx.channelId so each channel sees only its accounts
  *
  * Implemented with mocks (no DB) to assert channelId is always used and never mixed.
  */
@@ -17,7 +17,7 @@ import { JournalLine } from '../../../src/ledger/journal-line.entity';
 import { PeriodLock } from '../../../src/domain/period/period-lock.entity';
 import { PostingService, PostingPayload } from '../../../src/ledger/posting.service';
 import { ACCOUNT_CODES } from '../../../src/ledger/account-codes.constants';
-import { CashierSessionService } from '../../../src/services/financial/cashier-session.service';
+import { OpenSessionService } from '../../../src/services/financial/open-session.service';
 import { CashierSession } from '../../../src/domain/cashier/cashier-session.entity';
 import { LedgerViewerResolver } from '../../../src/plugins/ledger/ledger-viewer.resolver';
 
@@ -151,10 +151,18 @@ describe('Ledger Channel Isolation', () => {
       } as any;
       const mockLedgerQueryService = { getCashierSessionTotals: jest.fn() } as any;
       const mockReconciliationService = { createReconciliation: jest.fn() } as any;
-      const service = new CashierSessionService(
+      const mockFinancialService = {
+        postVarianceAdjustment: jest.fn().mockImplementation(() => Promise.resolve()),
+      } as any;
+      const mockChannelPaymentMethodService = {
+        getChannelPaymentMethods: (jest.fn() as any).mockResolvedValue([]),
+      } as any;
+      const service = new OpenSessionService(
         mockConnection,
         mockLedgerQueryService,
-        mockReconciliationService
+        mockReconciliationService,
+        mockFinancialService,
+        mockChannelPaymentMethodService
       );
       const ctx1 = { channelId: channel1Id } as RequestContext;
       const ctx2 = { channelId: channel2Id } as RequestContext;
@@ -169,7 +177,7 @@ describe('Ledger Channel Isolation', () => {
     });
   });
 
-  describe('paymentSourceAccounts uses ctx.channelId', () => {
+  describe('eligibleDebitAccounts uses ctx.channelId', () => {
     it('resolver queries accounts with channelId from context', async () => {
       const mockAccountRepo = {
         find: jest.fn().mockImplementation((opts: any) => {
@@ -194,7 +202,7 @@ describe('Ledger Channel Isolation', () => {
       const resolver = new LedgerViewerResolver(mockDataSource, mockLedgerQueryService);
       const ctx = { channelId: channel1Id } as RequestContext;
 
-      await resolver.paymentSourceAccounts(ctx);
+      await resolver.eligibleDebitAccounts(ctx);
 
       expect(mockAccountRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({

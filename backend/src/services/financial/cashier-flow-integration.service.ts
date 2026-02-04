@@ -29,7 +29,7 @@ export class CashierFlowIntegrationService {
     // Currently, only check cash control
     // When cashier flow is implemented, this can check:
     // - cashControlEnabled OR
-    // - (cashierFlowEnabled AND cashierOpen)
+    // - (cashierFlowEnabled AND open session for channel)
     return this.cashControlService.isEnabled(ctx, channelId);
   }
 
@@ -62,26 +62,4 @@ export class CashierFlowIntegrationService {
     const cashierFlowEnabled = (channel as any).customFields?.cashierFlowEnabled;
     return cashierFlowEnabled === true;
   }
-
-  /**
-   * Check if cashier is currently open
-   * This is a placeholder for future cashier flow implementation
-   */
-  async isCashierOpen(ctx: RequestContext, channelId: number): Promise<boolean> {
-    const channelRepo = this.connection.getRepository(ctx, Channel);
-    const channel = await channelRepo.findOne({
-      where: { id: channelId },
-    });
-
-    if (!channel) {
-      return false;
-    }
-
-    const cashierOpen = (channel as any).customFields?.cashierOpen;
-    return cashierOpen === true;
-  }
 }
-
-
-
-

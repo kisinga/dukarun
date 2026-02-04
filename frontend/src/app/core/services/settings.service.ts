@@ -19,7 +19,6 @@ import { CompanyService } from './company.service';
 
 export interface ChannelSettings {
   cashierFlowEnabled: boolean;
-  cashierOpen: boolean;
   enablePrinter: boolean;
   companyLogoAsset?: {
     id: string;
@@ -133,14 +132,12 @@ export class SettingsService {
 
     return {
       cashierFlowEnabled: customFields.cashierFlowEnabled ?? false,
-      cashierOpen: customFields.cashierOpen ?? false,
       enablePrinter: customFields.enablePrinter ?? true,
       companyLogoAsset: customFields.companyLogoAsset ?? null,
     };
   });
 
   readonly cashierFlowEnabled = this.companyService.cashierFlowEnabled;
-  readonly cashierOpen = this.companyService.cashierOpen;
   readonly enablePrinter = this.companyService.enablePrinter;
   readonly companyLogoAsset = this.companyService.companyLogoAsset;
 
@@ -175,7 +172,7 @@ export class SettingsService {
   /**
    * Update cashier settings
    */
-  async updateCashierSettings(cashierFlowEnabled?: boolean, cashierOpen?: boolean): Promise<void> {
+  async updateCashierSettings(cashierFlowEnabled?: boolean): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
 
@@ -183,7 +180,7 @@ export class SettingsService {
       const client = this.apolloService.getClient();
       const result = await client.mutate({
         mutation: UPDATE_CASHIER_SETTINGS as any,
-        variables: { cashierFlowEnabled, cashierOpen },
+        variables: { cashierFlowEnabled },
       });
 
       if ((result.data as any)?.updateCashierSettings) {
