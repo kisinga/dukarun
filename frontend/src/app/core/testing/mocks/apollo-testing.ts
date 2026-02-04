@@ -1,12 +1,16 @@
 /**
- * Test Apollo client with MockLink. Default mocks cover GET_ACTIVE_CHANNEL and
- * GET_USER_CHANNELS so integration/behavior specs do not hit /admin-api.
- * Pass custom mocks to provideTestApolloClient(mocks) to override or extend.
+ * Test Apollo client with MockLink. Default mocks cover GET_ACTIVE_CHANNEL,
+ * GET_USER_CHANNELS, and GET_ACTIVE_ADMIN so integration/behavior specs do not
+ * hit /admin-api. Pass custom mocks to provideTestApolloClient(mocks) to override or extend.
  */
 
 import { ApolloClient, InMemoryCache } from '@apollo/client';
 import { MockLink } from '@apollo/client/testing';
-import { GET_ACTIVE_CHANNEL, GET_USER_CHANNELS } from '../../graphql/operations.graphql';
+import {
+  GET_ACTIVE_ADMIN,
+  GET_ACTIVE_CHANNEL,
+  GET_USER_CHANNELS,
+} from '../../graphql/operations.graphql';
 import { APOLLO_TEST_CLIENT } from '../../services/apollo-test-client.token';
 
 export { APOLLO_TEST_CLIENT };
@@ -29,6 +33,27 @@ const defaultMocks: MockResponse[] = [
           id: '1',
           identifier: 'test',
           channels: [],
+        },
+      },
+    },
+  },
+  {
+    request: { query: GET_ACTIVE_ADMIN },
+    result: {
+      data: {
+        activeAdministrator: {
+          id: '1',
+          firstName: 'Test',
+          lastName: 'Admin',
+          emailAddress: 'test@test.local',
+          user: {
+            id: '1',
+            identifier: 'test',
+            roles: [{ id: '1', code: 'SuperAdmin', permissions: [], __typename: 'Role' }],
+            __typename: 'User',
+          },
+          customFields: { profilePicture: null, __typename: 'AdministratorCustomFields' },
+          __typename: 'Administrator',
         },
       },
     },
