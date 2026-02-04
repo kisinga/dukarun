@@ -392,6 +392,56 @@ export class LedgerPostingService {
   }
 
   /**
+   * Post a variance adjustment (short/over) so the ledger balances.
+   * Shortage: debit CASH_SHORT_OVER, credit account (e.g. CASH_ON_HAND).
+   * Overage: debit account, credit CASH_SHORT_OVER.
+   */
+  async postVarianceAdjustment(
+    ctx: RequestContext,
+    channelId: number,
+    sessionId: string,
+    accountCode: string,
+    varianceCents: number,
+    reason: string,
+    sourceId: string
+  ): Promise<void> {
+    if (varianceCents === 0) return;
+
+    const absAmount = Math.abs(varianceCents);
+    const meta = { openSessionId: sessionId, varianceReason: reason };
+
+    const lines: Array<{
+      accountCode: string;
+      debit?: number;
+      credit?: number;
+      meta?: Record<string, unknown>;
+    }> =
+      varianceCents < 0
+        ? [
+            { accountCode: ACCOUNT_CODES.CASH_SHORT_OVER, debit: absAmount, meta },
+            { accountCode, credit: absAmount, meta },
+          ]
+        : [
+            { accountCode, debit: absAmount, meta },
+            { accountCode: ACCOUNT_CODES.CASH_SHORT_OVER, credit: absAmount, meta },
+          ];
+
+    await this.ensureAccountsExist(ctx, [accountCode, ACCOUNT_CODES.CASH_SHORT_OVER]);
+
+    const payload: PostingPayload = {
+      channelId,
+      entryDate: new Date().toISOString().slice(0, 10),
+      memo: `Variance adjustment: ${reason}`,
+      lines,
+    };
+
+    await this.postingService.post(ctx, 'variance-adjustment', sourceId, payload);
+    this.logger.log(
+      `Posted variance adjustment for session ${sessionId}, account ${accountCode}, amount ${varianceCents}`
+    );
+  }
+
+  /**
    * Assert that, for a given order, AR credits do not exceed AR debits.
    * Runs inside the same transaction as the posting to guarantee consistency.
    */

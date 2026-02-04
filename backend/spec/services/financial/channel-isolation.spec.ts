@@ -17,7 +17,7 @@ import { JournalLine } from '../../../src/ledger/journal-line.entity';
 import { PeriodLock } from '../../../src/domain/period/period-lock.entity';
 import { PostingService, PostingPayload } from '../../../src/ledger/posting.service';
 import { ACCOUNT_CODES } from '../../../src/ledger/account-codes.constants';
-import { CashierSessionService } from '../../../src/services/financial/cashier-session.service';
+import { OpenSessionService } from '../../../src/services/financial/open-session.service';
 import { CashierSession } from '../../../src/domain/cashier/cashier-session.entity';
 import { LedgerViewerResolver } from '../../../src/plugins/ledger/ledger-viewer.resolver';
 
@@ -151,10 +151,14 @@ describe('Ledger Channel Isolation', () => {
       } as any;
       const mockLedgerQueryService = { getCashierSessionTotals: jest.fn() } as any;
       const mockReconciliationService = { createReconciliation: jest.fn() } as any;
-      const service = new CashierSessionService(
+      const mockFinancialService = {
+        postVarianceAdjustment: jest.fn().mockImplementation(() => Promise.resolve()),
+      } as any;
+      const service = new OpenSessionService(
         mockConnection,
         mockLedgerQueryService,
-        mockReconciliationService
+        mockReconciliationService,
+        mockFinancialService
       );
       const ctx1 = { channelId: channel1Id } as RequestContext;
       const ctx2 = { channelId: channel2Id } as RequestContext;

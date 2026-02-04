@@ -26,12 +26,18 @@ describe('PeriodManagementResolver.createInterAccountTransfer', () => {
     memo: 'Test transfer',
   };
 
+  const MOCK_SESSION = { id: 'session-123', channelId: 1, status: 'open' as const };
+  let mockCashierSessionService: any;
+
   beforeEach(() => {
     mockPeriodLockService = {
       validatePeriodIsOpen: jest.fn().mockImplementation(() => Promise.resolve()),
     } as any;
     mockChartOfAccountsService = {
       validatePaymentSourceAccount: jest.fn().mockImplementation(() => Promise.resolve()),
+    } as any;
+    mockCashierSessionService = {
+      requireOpenSession: jest.fn().mockImplementation(() => Promise.resolve(MOCK_SESSION)),
     } as any;
     const mockJournalEntry = {
       id: 'je-1',
@@ -49,7 +55,7 @@ describe('PeriodManagementResolver.createInterAccountTransfer', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
+      mockCashierSessionService,
       mockPostingService,
       {} as any,
       mockPeriodLockService,
@@ -149,6 +155,7 @@ describe('PeriodManagementResolver.createInterAccountTransfer', () => {
   it('should call post with sourceType and sourceId for idempotency', async () => {
     await resolver.createInterAccountTransfer(ctx, validInput);
 
+    const sessionMeta = { openSessionId: MOCK_SESSION.id };
     expect(mockPostingService.post).toHaveBeenCalledWith(
       ctx,
       'inter-account-transfer',
@@ -158,27 +165,41 @@ describe('PeriodManagementResolver.createInterAccountTransfer', () => {
         entryDate: validInput.entryDate,
         memo: validInput.memo,
         lines: [
-          { accountCode: validInput.fromAccountCode, debit: 0, credit: 10000 },
-          { accountCode: validInput.toAccountCode, debit: 10000, credit: 0 },
+          { accountCode: validInput.fromAccountCode, debit: 0, credit: 10000, meta: sessionMeta },
+          { accountCode: validInput.toAccountCode, debit: 10000, credit: 0, meta: sessionMeta },
         ],
       })
     );
   });
 
-  it('should build two lines when no fee', async () => {
+  it('should reject when no open session', async () => {
+    mockCashierSessionService.requireOpenSession.mockRejectedValue(
+      new Error('No open session for this channel. Open a session before performing transactions.')
+    );
+
+    await expect(resolver.createInterAccountTransfer(ctx, validInput)).rejects.toThrow(
+      /No open session/
+    );
+    expect(mockPostingService.post).not.toHaveBeenCalled();
+  });
+
+  it('should build two lines when no fee (with openSessionId in meta)', async () => {
     await resolver.createInterAccountTransfer(ctx, validInput);
 
     const payload = mockPostingService.post.mock.calls[0][3];
+    const sessionMeta = { openSessionId: MOCK_SESSION.id };
     expect(payload.lines).toHaveLength(2);
     expect(payload.lines[0]).toEqual({
       accountCode: ACCOUNT_CODES.CASH_ON_HAND,
       debit: 0,
       credit: 10000,
+      meta: sessionMeta,
     });
     expect(payload.lines[1]).toEqual({
       accountCode: ACCOUNT_CODES.BANK_MAIN,
       debit: 10000,
       credit: 0,
+      meta: sessionMeta,
     });
   });
 
@@ -191,22 +212,25 @@ describe('PeriodManagementResolver.createInterAccountTransfer', () => {
     });
 
     const payload = mockPostingService.post.mock.calls[0][3];
+    const sessionMeta = { openSessionId: MOCK_SESSION.id };
     expect(payload.lines).toHaveLength(3);
     expect(payload.lines[0]).toEqual({
       accountCode: ACCOUNT_CODES.CASH_ON_HAND,
       debit: 0,
       credit: 10100,
+      meta: sessionMeta,
     });
     expect(payload.lines[1]).toEqual({
       accountCode: ACCOUNT_CODES.BANK_MAIN,
       debit: 10000,
       credit: 0,
+      meta: sessionMeta,
     });
     expect(payload.lines[2]).toEqual({
       accountCode: ACCOUNT_CODES.PROCESSOR_FEES,
       debit: 100,
       credit: 0,
-      meta: { expenseTag: 'bank_fee' },
+      meta: { ...sessionMeta, expenseTag: 'bank_fee' },
     });
   });
 

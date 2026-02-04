@@ -5,6 +5,8 @@ import {
   GET_CURRENT_CASHIER_SESSION,
   GET_CASHIER_SESSION,
   GET_CASHIER_SESSIONS,
+  GET_CHANNEL_RECONCILIATION_CONFIG,
+  GET_RECONCILIATIONS,
   OPEN_CASHIER_SESSION,
   CLOSE_CASHIER_SESSION,
   CREATE_CASHIER_SESSION_RECONCILIATION,
@@ -16,9 +18,32 @@ export interface CashierSession {
   cashierUserId: number;
   openedAt: string;
   closedAt?: string | null;
-  openingFloat: string;
   closingDeclared: string;
   status: 'open' | 'closed';
+}
+
+export interface PaymentMethodReconciliationConfig {
+  paymentMethodId: string;
+  paymentMethodCode: string;
+  paymentMethodName: string;
+  reconciliationType: string;
+  ledgerAccountCode: string;
+  isCashierControlled: boolean;
+  requiresReconciliation: boolean;
+}
+
+export interface OpeningBalanceInput {
+  accountCode: string;
+  amountCents: number;
+}
+
+export interface ReconciliationListOptions {
+  startDate?: string;
+  endDate?: string;
+  scope?: string;
+  hasVariance?: boolean;
+  take?: number;
+  skip?: number;
 }
 
 export interface CashierSessionLedgerTotals {
@@ -181,9 +206,26 @@ export class CashierSessionService {
   }
 
   /**
-   * Open a new cashier session
+   * Get channel reconciliation config (cashier-controlled accounts for opening balances).
    */
-  openSession(channelId: number, openingFloat: number) {
+  getChannelReconciliationConfig(channelId: number) {
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{ channelReconciliationConfig: PaymentMethodReconciliationConfig[] }>({
+        query: GET_CHANNEL_RECONCILIATION_CONFIG as any,
+        variables: { channelId },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => result.data?.channelReconciliationConfig ?? []),
+      catchError(() => of([])),
+    );
+  }
+
+  /**
+   * Open a new cashier session with per-account opening balances.
+   */
+  openSession(channelId: number, openingBalances: OpeningBalanceInput[]) {
     this.isLoading.set(true);
     this.error.set(null);
 
@@ -193,7 +235,10 @@ export class CashierSessionService {
       variables: {
         input: {
           channelId,
-          openingFloat: openingFloat.toString(),
+          openingBalances: openingBalances.map((b) => ({
+            accountCode: b.accountCode,
+            amountCents: b.amountCents,
+          })),
         },
       },
     });
@@ -212,6 +257,23 @@ export class CashierSessionService {
         this.isLoading.set(false);
         return of(null);
       }),
+    );
+  }
+
+  /**
+   * List reconciliations for a channel (for Reconciliation History UI).
+   */
+  getReconciliations(channelId: number, options?: ReconciliationListOptions) {
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{ reconciliations: { items: Reconciliation[]; totalItems: number } }>({
+        query: GET_RECONCILIATIONS as any,
+        variables: { channelId, options: options ?? {} },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => result.data?.reconciliations ?? { items: [], totalItems: 0 }),
+      catchError(() => of({ items: [], totalItems: 0 })),
     );
   }
 
@@ -299,10 +361,3 @@ export class CashierSessionService {
     this.error.set(null);
   }
 }
-
-
-
-
-
-
-

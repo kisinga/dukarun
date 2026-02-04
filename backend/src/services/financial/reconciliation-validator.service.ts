@@ -19,6 +19,7 @@ import { MissingReconciliation, ValidationResult } from './period-management.typ
 export interface PaymentMethodReconciliationConfig {
   paymentMethodId: string;
   paymentMethodCode: string;
+  paymentMethodName: string;
   reconciliationType: 'blind_count' | 'transaction_verification' | 'statement_match' | 'none';
   ledgerAccountCode: string;
   isCashierControlled: boolean;
@@ -130,6 +131,7 @@ export class ReconciliationValidatorService {
       .map(pm => ({
         paymentMethodId: pm.id.toString(),
         paymentMethodCode: pm.code,
+        paymentMethodName: this.getPaymentMethodDisplayName(pm),
         reconciliationType: getReconciliationTypeFromPaymentMethod(pm),
         ledgerAccountCode: getAccountCodeFromPaymentMethod(pm),
         isCashierControlled: isCashierControlledPaymentMethod(pm),
@@ -152,11 +154,21 @@ export class ReconciliationValidatorService {
       .map(pm => ({
         paymentMethodId: pm.id.toString(),
         paymentMethodCode: pm.code,
+        paymentMethodName: this.getPaymentMethodDisplayName(pm),
         reconciliationType: getReconciliationTypeFromPaymentMethod(pm),
         ledgerAccountCode: getAccountCodeFromPaymentMethod(pm),
         isCashierControlled: isCashierControlledPaymentMethod(pm),
         requiresReconciliation: requiresReconciliation(pm),
       }));
+  }
+
+  /**
+   * Display name for a payment method (translation name or code fallback).
+   */
+  private getPaymentMethodDisplayName(pm: PaymentMethod): string {
+    const t = (pm as { translations?: Array<{ name: string }> }).translations;
+    const name = t?.[0]?.name;
+    return name && name.trim() ? name : pm.code;
   }
 
   /**
@@ -284,7 +296,7 @@ export class ReconciliationValidatorService {
     const channelRepo = this.connection.getRepository(ctx, Channel);
     const channel = await channelRepo.findOne({
       where: { id: channelId },
-      relations: ['paymentMethods'],
+      relations: ['paymentMethods', 'paymentMethods.translations'],
     });
 
     return channel?.paymentMethods || [];
@@ -334,9 +346,7 @@ export class ReconciliationValidatorService {
         });
         errors.push(`Missing reconciliation for cashier session: ${displayName}`);
       } else if (reconciliation.status !== 'verified') {
-        errors.push(
-          `Reconciliation for cashier session ${session.id} is not verified`
-        );
+        errors.push(`Reconciliation for cashier session ${session.id} is not verified`);
       }
     }
 

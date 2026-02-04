@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -10,10 +11,13 @@ import {
   signal,
 } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
+import {
+  CashierSessionService,
+  type PaymentMethodReconciliationConfig,
+} from '../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../core/services/company.service';
-import { DashboardService, PeriodStats } from '../../../core/services/dashboard.service';
-import { StockLocationService } from '../../../core/services/stock-location.service';
 import { CurrencyService } from '../../../core/services/currency.service';
+import { DashboardService, PeriodStats } from '../../../core/services/dashboard.service';
 
 interface CategoryStat {
   period: string;
@@ -57,7 +61,7 @@ interface RecentActivity {
  */
 @Component({
   selector: 'app-overview',
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './overview.component.html',
   styleUrl: './overview.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -65,9 +69,9 @@ interface RecentActivity {
 export class OverviewComponent implements OnInit, OnDestroy {
   private readonly dashboardService = inject(DashboardService);
   private readonly companyService = inject(CompanyService);
-  private readonly stockLocationService = inject(StockLocationService);
   private readonly currencyService = inject(CurrencyService);
   private readonly router = inject(Router);
+  protected readonly cashierSessionService = inject(CashierSessionService);
 
   protected readonly expandedCategory = signal<string | null>(null);
   protected readonly showRecentActivity = signal(false);
@@ -117,17 +121,8 @@ export class OverviewComponent implements OnInit, OnDestroy {
     return this.dashboardService.stats()?.profitMargin || 0;
   });
 
-  /**
-   * Cashier flow enabled (from location settings)
-   * Controls whether to show cashier-specific UI elements
-   */
-  protected readonly cashierFlowEnabled = this.stockLocationService.cashierFlowEnabled;
-
-  /**
-   * Cashier status (from location settings)
-   * Shows whether the cashier is currently open
-   */
-  protected readonly cashierOpen = this.stockLocationService.cashierOpen;
+  /** Session open = real session state from backend */
+  protected readonly sessionOpen = this.cashierSessionService.hasActiveSession;
 
   protected readonly quickActions = [
     { label: 'New Sale', icon: '💰', action: 'sell' },
@@ -136,14 +131,25 @@ export class OverviewComponent implements OnInit, OnDestroy {
     { label: 'Reports', icon: '📈', action: 'reports' },
   ];
 
+  protected readonly showOpenDayModal = signal(false);
+  protected readonly showCloseDayModal = signal(false);
+  /** Cashier-controlled accounts for opening balances (loaded when modal opens). */
+  protected readonly openDayConfig = signal<PaymentMethodReconciliationConfig[]>([]);
+  /** Per-account opening amount in currency units (key = ledgerAccountCode). */
+  protected readonly openDayBalances = signal<Record<string, string>>({});
+  protected readonly closeDayDeclared = signal('');
+  protected readonly closeDayNotes = signal('');
+
   constructor() {
-    // React to company changes and refresh dashboard
     effect(
       () => {
         const companyId = this.companyService.activeCompanyId();
         if (companyId) {
-          console.log(`📊 Dashboard fetching data for company: ${companyId}`);
           this.dashboardService.fetchDashboardData();
+          const channelId = parseInt(companyId, 10);
+          if (!isNaN(channelId)) {
+            this.cashierSessionService.getCurrentSession(channelId).subscribe();
+          }
         }
       },
       { allowSignalWrites: true },
@@ -151,13 +157,14 @@ export class OverviewComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Fetch stock locations with cashier status
-    this.stockLocationService.fetchStockLocationsWithCashier();
-
-    // Fetch dashboard data (channel-scoped)
+    const companyId = this.companyService.activeCompanyId();
+    if (companyId) {
+      const channelId = parseInt(companyId, 10);
+      if (!isNaN(channelId)) {
+        this.cashierSessionService.getCurrentSession(channelId).subscribe();
+      }
+    }
     this.dashboardService.fetchDashboardData();
-
-    // Auto-expand sales breakdown on desktop
     this.autoExpandSalesOnDesktop();
   }
 
@@ -289,11 +296,96 @@ export class OverviewComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Refresh dashboard data
-   */
   async refresh(): Promise<void> {
     await this.dashboardService.refresh();
+    const companyId = this.companyService.activeCompanyId();
+    if (companyId) {
+      const channelId = parseInt(companyId, 10);
+      if (!isNaN(channelId)) {
+        this.cashierSessionService.getCurrentSession(channelId).subscribe();
+      }
+    }
+  }
+
+  openOpenDayModal(): void {
+    const companyId = this.companyService.activeCompanyId();
+    if (!companyId) return;
+    const channelId = parseInt(companyId, 10);
+    if (isNaN(channelId)) return;
+    this.openDayBalances.set({});
+    this.cashierSessionService.getChannelReconciliationConfig(channelId).subscribe((config) => {
+      const cashierControlled = config.filter((c) => c.isCashierControlled);
+      this.openDayConfig.set(cashierControlled);
+      const balances: Record<string, string> = {};
+      cashierControlled.forEach((c) => (balances[c.ledgerAccountCode] = ''));
+      this.openDayBalances.set(balances);
+      this.showOpenDayModal.set(true);
+    });
+  }
+
+  closeOpenDayModal(): void {
+    this.showOpenDayModal.set(false);
+    this.openDayConfig.set([]);
+    this.openDayBalances.set({});
+  }
+
+  setOpenDayBalance(accountCode: string, value: string): void {
+    this.openDayBalances.update((prev) => ({ ...prev, [accountCode]: value }));
+  }
+
+  async submitOpenDay(): Promise<void> {
+    const config = this.openDayConfig();
+    const balances = this.openDayBalances();
+    const companyId = this.companyService.activeCompanyId();
+    if (!companyId || config.length === 0) return;
+    const channelId = parseInt(companyId, 10);
+    if (isNaN(channelId)) return;
+
+    const openingBalances: { accountCode: string; amountCents: number }[] = [];
+    for (const c of config) {
+      const str = (balances[c.ledgerAccountCode] ?? '').trim();
+      const amountCents = Math.round(parseFloat(str || '0') * 100);
+      if (isNaN(amountCents) || amountCents < 0) return;
+      openingBalances.push({ accountCode: c.ledgerAccountCode, amountCents });
+    }
+
+    this.cashierSessionService.openSession(channelId, openingBalances).subscribe((session) => {
+      if (session) {
+        this.closeOpenDayModal();
+      }
+    });
+  }
+
+  openCloseDayModal(): void {
+    const session = this.cashierSessionService.currentSession();
+    if (!session) return;
+    this.closeDayDeclared.set('');
+    this.closeDayNotes.set('');
+    this.showCloseDayModal.set(true);
+  }
+
+  closeCloseDayModal(): void {
+    this.showCloseDayModal.set(false);
+  }
+
+  async submitCloseDay(): Promise<void> {
+    const session = this.cashierSessionService.currentSession();
+    if (!session) return;
+    const declaredStr = this.closeDayDeclared().trim();
+    const declaredCents = parseFloat(declaredStr) * 100;
+    if (isNaN(declaredCents) || declaredCents < 0) return;
+    this.cashierSessionService
+      .closeSession(session.id, Math.round(declaredCents), this.closeDayNotes().trim() || undefined)
+      .subscribe((summary) => {
+        if (summary) {
+          this.closeCloseDayModal();
+        }
+      });
+  }
+
+  get channelId(): number {
+    const id = this.companyService.activeCompanyId();
+    return id ? parseInt(id, 10) : 0;
   }
 
   /**

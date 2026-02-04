@@ -11,6 +11,8 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
+import { CashierSessionService } from '../../../../core/services/cashier-session/cashier-session.service';
+import { CompanyService } from '../../../../core/services/company.service';
 import { CustomerPaymentService } from '../../../../core/services/customer/customer-payment.service';
 import { CustomerStateService } from '../../../../core/services/customer/customer-state.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
@@ -105,6 +107,28 @@ export interface PayOrderModalData {
               ></path>
             </svg>
             <span class="text-sm">{{ error() }}</span>
+          </div>
+        }
+
+        <!-- No session message -->
+        @if (!successResult() && !cashierSessionService.hasActiveSession()) {
+          <div class="alert alert-warning mb-4">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <span
+              >Open a session to record payments. Go to the Dashboard and click "Open shift"
+              first.</span
+            >
           </div>
         }
 
@@ -305,6 +329,7 @@ export interface PayOrderModalData {
                 [class.loading]="isProcessing()"
                 [disabled]="
                   isProcessing() ||
+                  !cashierSessionService.hasActiveSession() ||
                   !selectedPaymentMethod() ||
                   !referenceCode() ||
                   referenceCode().trim().length === 0 ||
@@ -349,6 +374,8 @@ export class PayOrderModalComponent {
   private readonly ordersService = inject(OrdersService);
   private readonly paymentMethodService = inject(PaymentMethodService);
   private readonly ledgerService = inject(LedgerService);
+  protected readonly cashierSessionService = inject(CashierSessionService);
+  private readonly companyService = inject(CompanyService);
 
   // Inputs
   readonly orderData = input<PayOrderModalData | null>(null);
@@ -410,6 +437,14 @@ export class PayOrderModalComponent {
     this.paymentMethodsError.set(null);
     this.paymentAmountInput.set('');
     this.selectedDebitAccountCode.set('');
+
+    const companyId = this.companyService.activeCompanyId();
+    if (companyId) {
+      const channelId = parseInt(companyId, 10);
+      if (!isNaN(channelId)) {
+        await firstValueFrom(this.cashierSessionService.getCurrentSession(channelId));
+      }
+    }
 
     await Promise.all([this.loadPaymentMethods(), this.loadPaymentSourceAccounts()]);
 

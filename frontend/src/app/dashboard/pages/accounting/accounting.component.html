@@ -136,14 +136,14 @@
     <!-- Reconciliation Tab -->
     @if (activeTab() === 'reconciliation') {
       <app-reconciliation-tab
-        [entries]="paginatedEntries()"
-        [isLoading]="isLoading()"
-        [totalPages]="totalPages()"
-        [currentPage]="currentPage()"
+        [reconciliations]="reconciliations()"
+        [isLoading]="reconciliationsLoading()"
+        [totalItems]="reconciliationsTotal()"
+        [currentPage]="reconciliationPage()"
+        [pageSize]="reconciliationPageSize"
         [formatDate]="formatDate"
-        [formatDateTime]="formatDateTime"
-        (entryView)="viewTransaction($event)"
-        (pageChange)="goToPage($event)"
+        [formatCurrency]="formatReconciliationAmount"
+        (pageChange)="goToReconciliationPage($event)"
       />
     }
   </div>

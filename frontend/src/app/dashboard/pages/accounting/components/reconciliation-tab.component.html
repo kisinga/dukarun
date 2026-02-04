@@ -1,60 +1,71 @@
 <div class="space-y-4">
   <div class="card bg-base-100 shadow">
     <div class="card-body">
-      <h2 class="card-title">Detailed Audit Trail</h2>
+      <h2 class="card-title">Reconciliation History</h2>
       <p class="text-base-content/70">
-        Complete transaction history with full metadata for reconciliation purposes.
+        List of reconciliation events with expected vs actual balances and variance.
       </p>
 
       @if (isLoading()) {
         <div class="flex justify-center py-8">
           <span class="loading loading-spinner loading-lg"></span>
         </div>
-      } @else if (entries().length === 0) {
+      } @else if (reconciliations().length === 0) {
         <div class="text-center py-8 text-base-content/70">
-          <p>No transactions found</p>
+          <p>No reconciliations found</p>
         </div>
       } @else {
         <div class="overflow-x-auto mt-4">
           <table class="table table-zebra">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Posted At</th>
-                <th>Source Type</th>
-                <th>Source ID</th>
-                <th>Memo</th>
-                <th>Lines</th>
-                <th>Actions</th>
+                <th>Date range</th>
+                <th>Scope</th>
+                <th>Scope ref</th>
+                <th>Expected</th>
+                <th>Actual</th>
+                <th>Variance</th>
+                <th>Status</th>
+                <th>Notes</th>
               </tr>
             </thead>
             <tbody>
-              @for (entry of entries(); track entry.id) {
-                <tr>
-                  <td>{{ formatDate()(entry.entryDate) }}</td>
-                  <td class="text-sm text-base-content/70">
-                    {{ formatDateTime()(entry.postedAt) }}
+              @for (r of reconciliations(); track r.id) {
+                <tr [class.bg-warning/10]="hasVariance(r)">
+                  <td class="whitespace-nowrap">
+                    {{ formatDate()(r.rangeStart) }} – {{ formatDate()(r.rangeEnd) }}
                   </td>
                   <td>
-                    <div class="badge badge-outline">{{ entry.sourceType }}</div>
+                    <span class="badge badge-outline">{{ r.scope }}</span>
                   </td>
-                  <td class="font-mono text-sm">{{ entry.sourceId }}</td>
-                  <td>{{ entry.memo || '-' }}</td>
+                  <td class="font-mono text-sm">{{ r.scopeRefId }}</td>
+                  <td>{{ formatCurrency()(r.expectedBalance ?? '0') }}</td>
+                  <td>{{ formatCurrency()(r.actualBalance ?? '0') }}</td>
                   <td>
-                    <span class="badge">{{ entry.lines.length }} lines</span>
+                    @if (hasVariance(r)) {
+                      <span class="font-semibold text-warning">{{
+                        formatCurrency()(r.varianceAmount)
+                      }}</span>
+                    } @else {
+                      {{ formatCurrency()(r.varianceAmount) }}
+                    }
                   </td>
                   <td>
-                    <button class="btn btn-sm btn-ghost" (click)="onViewEntry(entry)">
-                      View Details
-                    </button>
+                    <span
+                      class="badge"
+                      [class.badge-success]="r.status === 'verified'"
+                      [class.badge-warning]="r.status !== 'verified'"
+                    >
+                      {{ r.status }}
+                    </span>
                   </td>
+                  <td class="max-w-32 truncate" [title]="r.notes ?? ''">{{ r.notes ?? '–' }}</td>
                 </tr>
               }
             </tbody>
           </table>
         </div>
 
-        <!-- Pagination -->
         @if (totalPages() > 1) {
           <div class="join flex justify-center mt-4">
             <button
@@ -64,13 +75,13 @@
             >
               «
             </button>
-            @for (page of [].constructor(totalPages()); track $index) {
+            @for (page of pageNumbers(); track page) {
               <button
                 class="join-item btn btn-sm"
-                [class.btn-active]="currentPage() === $index + 1"
-                (click)="onPageChange($index + 1)"
+                [class.btn-active]="currentPage() === page"
+                (click)="onPageChange(page)"
               >
-                {{ $index + 1 }}
+                {{ page }}
               </button>
             }
             <button

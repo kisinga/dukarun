@@ -157,6 +157,11 @@ describe('PaymentAllocationService.paySingleOrder', () => {
     mockChartOfAccountsService = {
       validatePaymentSourceAccount: jest.fn(),
     };
+    const mockCashierSessionService = {
+      requireOpenSession: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve({ id: 'session-123', channelId: 1 })),
+    } as any;
     service = new PaymentAllocationService(
       mockConnection,
       mockOrderService,
@@ -164,6 +169,7 @@ describe('PaymentAllocationService.paySingleOrder', () => {
       mockFinancialService,
       {} as any,
       mockChartOfAccountsService,
+      mockCashierSessionService,
       undefined
     );
   });
@@ -265,6 +271,7 @@ describe('PaymentAllocationService.paySingleOrder', () => {
     const recordCall = mockFinancialService.recordPaymentAllocation.mock.calls[0];
     expect(recordCall[4]).toBe(5000);
     expect(recordCall[5]).toBe('CASH_ON_HAND');
+    expect(recordCall[6]).toBe('session-123');
   });
 
   it('should call recordPaymentAllocation without debitAccountCode when not provided', async () => {
@@ -289,6 +296,7 @@ describe('PaymentAllocationService.paySingleOrder', () => {
     expect(mockChartOfAccountsService.validatePaymentSourceAccount).not.toHaveBeenCalled();
     const recordCall = mockFinancialService.recordPaymentAllocation.mock.calls[0];
     expect(recordCall[5]).toBeUndefined();
+    expect(recordCall[6]).toBe('session-123');
   });
 });
 

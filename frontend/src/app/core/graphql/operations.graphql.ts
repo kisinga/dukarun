@@ -2518,6 +2518,20 @@ export const GET_JOURNAL_ENTRY = graphql(`
 // CASHIER SESSION MANAGEMENT
 // ============================================================================
 
+export const GET_CHANNEL_RECONCILIATION_CONFIG = graphql(`
+  query GetChannelReconciliationConfig($channelId: Int!) {
+    channelReconciliationConfig(channelId: $channelId) {
+      paymentMethodId
+      paymentMethodCode
+      paymentMethodName
+      reconciliationType
+      ledgerAccountCode
+      isCashierControlled
+      requiresReconciliation
+    }
+  }
+`);
+
 export const GET_CURRENT_CASHIER_SESSION = graphql(`
   query GetCurrentCashierSession($channelId: Int!) {
     currentCashierSession(channelId: $channelId) {
@@ -2526,7 +2540,6 @@ export const GET_CURRENT_CASHIER_SESSION = graphql(`
       cashierUserId
       openedAt
       closedAt
-      openingFloat
       closingDeclared
       status
     }
@@ -2562,7 +2575,6 @@ export const GET_CASHIER_SESSIONS = graphql(`
         cashierUserId
         openedAt
         closedAt
-        openingFloat
         closingDeclared
         status
       }
@@ -2578,7 +2590,6 @@ export const OPEN_CASHIER_SESSION = graphql(`
       channelId
       cashierUserId
       openedAt
-      openingFloat
       status
     }
   }
@@ -2619,6 +2630,28 @@ export const CREATE_CASHIER_SESSION_RECONCILIATION = graphql(`
       varianceAmount
       notes
       createdBy
+    }
+  }
+`);
+
+export const GET_RECONCILIATIONS = graphql(`
+  query GetReconciliations($channelId: Int!, $options: ReconciliationListOptions) {
+    reconciliations(channelId: $channelId, options: $options) {
+      items {
+        id
+        channelId
+        scope
+        scopeRefId
+        rangeStart
+        rangeEnd
+        status
+        expectedBalance
+        actualBalance
+        varianceAmount
+        notes
+        createdBy
+      }
+      totalItems
     }
   }
 `);

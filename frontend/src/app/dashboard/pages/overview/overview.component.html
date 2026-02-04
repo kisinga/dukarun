@@ -5,14 +5,20 @@
       <div class="flex items-center gap-2 mb-1.5">
         <h1 class="text-2xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Dashboard</h1>
 
-        @if (cashierFlowEnabled() && cashierOpen()) {
+        @if (sessionOpen()) {
           <span class="badge badge-success badge-soft badge-xs gap-1 font-medium shrink-0">
             <span class="w-1.5 h-1.5 bg-success rounded-full animate-pulse"></span>
             Open
           </span>
+          <button type="button" class="btn btn-ghost btn-xs" (click)="openCloseDayModal()">
+            Close day
+          </button>
         }
-        @if (cashierFlowEnabled() && !cashierOpen()) {
+        @if (!sessionOpen()) {
           <span class="badge badge-ghost badge-xs shrink-0">Closed</span>
+          <button type="button" class="btn btn-primary btn-xs" (click)="openOpenDayModal()">
+            Open shift
+          </button>
         }
       </div>
 
@@ -449,5 +455,89 @@
         </div>
       }
     </div>
+  }
+
+  <!-- Open shift modal -->
+  @if (showOpenDayModal()) {
+    <dialog class="modal modal-open">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg">Open shift</h3>
+        <p class="py-2 text-sm text-base-content/70">
+          Enter opening balance for each cashier-controlled account (in main currency units).
+        </p>
+        @for (acc of openDayConfig(); track acc.ledgerAccountCode) {
+          <label class="label">
+            <span class="label-text">{{ acc.paymentMethodName || acc.paymentMethodCode }}</span>
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            class="input input-bordered w-full"
+            [ngModel]="openDayBalances()[acc.ledgerAccountCode] || ''"
+            (ngModelChange)="setOpenDayBalance(acc.ledgerAccountCode, $event)"
+            placeholder="0.00"
+          />
+        }
+        @if (openDayConfig().length === 0) {
+          <p class="text-sm text-base-content/70 py-2">Loading accounts…</p>
+        }
+        <div class="modal-action">
+          <button type="button" class="btn btn-ghost" (click)="closeOpenDayModal()">Cancel</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            (click)="submitOpenDay()"
+            [disabled]="openDayConfig().length === 0"
+          >
+            Open
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button type="submit" (click)="closeOpenDayModal()">close</button>
+      </form>
+    </dialog>
+  }
+
+  <!-- Close day modal -->
+  @if (showCloseDayModal()) {
+    <dialog class="modal modal-open">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg">Close day</h3>
+        <p class="py-2 text-sm text-base-content/70">
+          Enter closing declared amount (in main currency units).
+        </p>
+        <label class="label">
+          <span class="label-text">Closing declared</span>
+        </label>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          class="input input-bordered w-full"
+          [ngModel]="closeDayDeclared()"
+          (ngModelChange)="closeDayDeclared.set($event)"
+          placeholder="0.00"
+        />
+        <label class="label">
+          <span class="label-text">Notes (optional)</span>
+        </label>
+        <textarea
+          class="textarea textarea-bordered w-full"
+          [ngModel]="closeDayNotes()"
+          (ngModelChange)="closeDayNotes.set($event)"
+          placeholder="Optional notes"
+          rows="2"
+        ></textarea>
+        <div class="modal-action">
+          <button type="button" class="btn btn-ghost" (click)="closeCloseDayModal()">Cancel</button>
+          <button type="button" class="btn btn-primary" (click)="submitCloseDay()">Close</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button type="submit" (click)="closeCloseDayModal()">close</button>
+      </form>
+    </dialog>
   }
 </div>

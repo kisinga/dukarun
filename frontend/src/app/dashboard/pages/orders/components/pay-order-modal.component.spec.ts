@@ -7,8 +7,11 @@
 
 import { provideZonelessChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { PayOrderModalComponent, PayOrderModalData } from './pay-order-modal.component';
+import { CashierSessionService } from '../../../../core/services/cashier-session/cashier-session.service';
+import { CompanyService } from '../../../../core/services/company.service';
 import { CustomerPaymentService } from '../../../../core/services/customer/customer-payment.service';
 import { CustomerStateService } from '../../../../core/services/customer/customer-state.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
@@ -76,20 +79,30 @@ describe('PayOrderModalComponent', () => {
         {
           provide: PaymentMethodService,
           useValue: {
-            getPaymentMethods: jasmine
-              .createSpy()
-              .and.returnValue(
-                Promise.resolve([
-                  {
-                    id: '1',
-                    code: 'credit',
-                    name: 'Credit',
-                    enabled: true,
-                    customFields: { isActive: true },
-                  },
-                ]),
-              ),
+            getPaymentMethods: jasmine.createSpy().and.returnValue(
+              Promise.resolve([
+                {
+                  id: '1',
+                  code: 'credit',
+                  name: 'Credit',
+                  enabled: true,
+                  customFields: { isActive: true },
+                },
+              ]),
+            ),
           },
+        },
+        {
+          provide: CashierSessionService,
+          useValue: {
+            hasActiveSession: signal(true) as any,
+            currentSession: signal({ id: 's1', channelId: 1 }),
+            getCurrentSession: jasmine.createSpy().and.returnValue(of({ id: 's1', channelId: 1 })),
+          },
+        },
+        {
+          provide: CompanyService,
+          useValue: { activeCompanyId: signal('1') },
         },
       ],
     }).compileComponents();

@@ -38,7 +38,6 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     cashierUserId: Int!
     openedAt: DateTime!
     closedAt: DateTime
-    openingFloat: String!
     closingDeclared: String!
     status: String!
   }
@@ -66,9 +65,14 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     totalItems: Int!
   }
 
+  input OpeningBalanceInput {
+    accountCode: String!
+    amountCents: Int!
+  }
+
   input OpenCashierSessionInput {
     channelId: Int!
-    openingFloat: String!
+    openingBalances: [OpeningBalanceInput!]!
   }
 
   input CloseCashierSessionInput {
@@ -138,6 +142,7 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
   type PaymentMethodReconciliationConfig {
     paymentMethodId: ID!
     paymentMethodCode: String!
+    paymentMethodName: String!
     reconciliationType: String! # blind_count, transaction_verification, statement_match, none
     ledgerAccountCode: String!
     isCashierControlled: Boolean!
@@ -184,6 +189,20 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     notes: String
     createdBy: Int!
     reviewedBy: Int
+  }
+
+  input ReconciliationListOptions {
+    startDate: DateTime
+    endDate: DateTime
+    scope: String
+    hasVariance: Boolean
+    take: Int
+    skip: Int
+  }
+
+  type ReconciliationList {
+    items: [Reconciliation!]!
+    totalItems: Int!
   }
 
   input CreateReconciliationInput {
@@ -236,6 +255,7 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     # Reconciliation Config Queries (driven by PaymentMethod custom fields)
     sessionReconciliationRequirements(sessionId: ID!): SessionReconciliationRequirements!
     channelReconciliationConfig(channelId: Int!): [PaymentMethodReconciliationConfig!]!
+    reconciliations(channelId: Int!, options: ReconciliationListOptions): ReconciliationList!
   }
 
   extend type Mutation {

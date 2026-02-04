@@ -10,10 +10,10 @@ import { JournalEntry } from '../../ledger/journal-entry.entity';
 import { PostingService } from '../../ledger/posting.service';
 import {
   CashCountResult,
-  CashierSessionService,
+  OpenSessionService,
   CashierSessionSummary,
   SessionReconciliationRequirements,
-} from '../../services/financial/cashier-session.service';
+} from '../../services/financial/open-session.service';
 import { ChartOfAccountsService } from '../../services/financial/chart-of-accounts.service';
 import { InventoryReconciliationService } from '../../services/financial/inventory-reconciliation.service';
 import { PeriodEndClosingService } from '../../services/financial/period-end-closing.service';
@@ -31,7 +31,7 @@ export class PeriodManagementResolver {
     private readonly periodEndClosingService: PeriodEndClosingService,
     private readonly reconciliationService: ReconciliationService,
     private readonly inventoryReconciliationService: InventoryReconciliationService,
-    private readonly cashierSessionService: CashierSessionService,
+    private readonly cashierSessionService: OpenSessionService,
     private readonly postingService: PostingService,
     private readonly connection: TransactionalConnection,
     private readonly periodLockService: PeriodLockService,
@@ -156,6 +156,9 @@ export class PeriodManagementResolver {
     await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, input.fromAccountCode);
     await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, input.toAccountCode);
 
+    const session = await this.cashierSessionService.requireOpenSession(ctx, input.channelId);
+    const sessionMeta = { openSessionId: session.id };
+
     const principal = Number(BigInt(input.amount));
     if (principal <= 0) {
       throw new Error('Transfer amount must be greater than zero.');
@@ -181,19 +184,19 @@ export class PeriodManagementResolver {
       // Credit from (principal + fee), Debit to (principal), Debit expense (fee with tag)
       const fromCredit = principal + feeAmount;
       lines.push(
-        { accountCode: input.fromAccountCode, debit: 0, credit: fromCredit },
-        { accountCode: input.toAccountCode, debit: principal, credit: 0 },
+        { accountCode: input.fromAccountCode, debit: 0, credit: fromCredit, meta: sessionMeta },
+        { accountCode: input.toAccountCode, debit: principal, credit: 0, meta: sessionMeta },
         {
           accountCode: ACCOUNT_CODES.PROCESSOR_FEES,
           debit: feeAmount,
           credit: 0,
-          meta: { expenseTag },
+          meta: { ...sessionMeta, expenseTag },
         }
       );
     } else {
       lines.push(
-        { accountCode: input.fromAccountCode, debit: 0, credit: principal },
-        { accountCode: input.toAccountCode, debit: principal, credit: 0 }
+        { accountCode: input.fromAccountCode, debit: 0, credit: principal, meta: sessionMeta },
+        { accountCode: input.toAccountCode, debit: principal, credit: 0, meta: sessionMeta }
       );
     }
 
@@ -253,7 +256,13 @@ export class PeriodManagementResolver {
   ): Promise<CashierSession> {
     return this.cashierSessionService.startSession(ctx, {
       channelId: input.channelId,
-      openingFloat: parseInt(input.openingFloat, 10),
+      openingBalances: (input.openingBalances || []).map(
+        (b: { accountCode: string; amountCents: number }) => ({
+          accountCode: b.accountCode,
+          amountCents:
+            typeof b.amountCents === 'number' ? b.amountCents : parseInt(b.amountCents, 10),
+        })
+      ),
     });
   }
 
@@ -334,6 +343,24 @@ export class PeriodManagementResolver {
     @Args('channelId') channelId: number
   ): Promise<PaymentMethodReconciliationConfig[]> {
     return this.reconciliationValidatorService.getChannelReconciliationConfig(ctx, channelId);
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async reconciliations(
+    @Ctx() ctx: RequestContext,
+    @Args('channelId') channelId: number,
+    @Args('options', { nullable: true })
+    options?: {
+      startDate?: string;
+      endDate?: string;
+      scope?: string;
+      hasVariance?: boolean;
+      take?: number;
+      skip?: number;
+    }
+  ) {
+    return this.reconciliationService.getReconciliations(ctx, channelId, options);
   }
 
   // ============================================================================

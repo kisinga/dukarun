@@ -9,6 +9,9 @@ import { Account } from './account.entity';
 // Migration 1766000500000-EnsureGinIndexes will convert them to GIN indexes
 @Index('IDX_journal_line_meta_customer', ['meta'], { where: `"meta"->>'customerId' IS NOT NULL` })
 @Index('IDX_journal_line_meta_supplier', ['meta'], { where: `"meta"->>'supplierId' IS NOT NULL` })
+@Index('IDX_journal_line_meta_open_session', ['meta'], {
+  where: `"meta"->>'openSessionId' IS NOT NULL`,
+})
 export class JournalLine {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

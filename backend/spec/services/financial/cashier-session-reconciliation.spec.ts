@@ -8,12 +8,15 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Channel, PaymentMethod, RequestContext, TransactionalConnection } from '@vendure/core';
 import {
-  CashierSessionService,
+  OpenSessionService,
   SessionReconciliationRequirements,
-} from '../../../src/services/financial/cashier-session.service';
+} from '../../../src/services/financial/open-session.service';
 import { CashierSession } from '../../../src/domain/cashier/cashier-session.entity';
 import { CashDrawerCount } from '../../../src/domain/cashier/cash-drawer-count.entity';
 import { MpesaVerification } from '../../../src/domain/cashier/mpesa-verification.entity';
+import { Reconciliation } from '../../../src/domain/recon/reconciliation.entity';
+import { ReconciliationAccount } from '../../../src/domain/recon/reconciliation-account.entity';
+import { FinancialService } from '../../../src/services/financial/financial.service';
 import { LedgerQueryService } from '../../../src/services/financial/ledger-query.service';
 import { ReconciliationService } from '../../../src/services/financial/reconciliation.service';
 
@@ -23,10 +26,11 @@ describe('CashierSessionService - Reconciliation Integration', () => {
     activeUserId: '1',
   } as RequestContext;
 
-  let service: CashierSessionService;
+  let service: OpenSessionService;
   let mockConnection: jest.Mocked<TransactionalConnection>;
   let mockLedgerQueryService: jest.Mocked<LedgerQueryService>;
   let mockReconciliationService: jest.Mocked<ReconciliationService>;
+  let mockFinancialService: any;
   let mockSessionRepo: any;
   let mockChannelRepo: any;
   let mockCountRepo: any;
@@ -50,11 +54,18 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       findOne: jest.fn(),
     };
 
+    // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
+    const mockReconRepo: any = { find: jest.fn().mockResolvedValue([]) };
+    // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
+    const mockReconAccountRepo: any = { find: jest.fn().mockResolvedValue([]) };
+
     mockConnection = {
-      getRepository: jest.fn((_ctx, entity) => {
+      getRepository: jest.fn((_ctx: any, entity: any) => {
         if (entity === CashierSession) return mockSessionRepo;
         if (entity === Channel) return mockChannelRepo;
         if (entity === CashDrawerCount) return mockCountRepo;
+        if (entity === Reconciliation) return mockReconRepo;
+        if (entity === ReconciliationAccount) return mockReconAccountRepo;
         if (entity === MpesaVerification)
           return { create: jest.fn(), save: jest.fn(), findOne: jest.fn() };
         return {};
@@ -66,13 +77,19 @@ describe('CashierSessionService - Reconciliation Integration', () => {
     } as any;
 
     mockReconciliationService = {
-      createReconciliation: jest.fn(),
+      // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
+      createReconciliation: jest.fn().mockResolvedValue({ id: 'rec1' }),
     } as any;
 
-    service = new CashierSessionService(
+    mockFinancialService = {
+      postVarianceAdjustment: jest.fn().mockImplementation(() => Promise.resolve()),
+    };
+
+    service = new (OpenSessionService as any)(
       mockConnection,
       mockLedgerQueryService,
-      mockReconciliationService
+      mockReconciliationService,
+      mockFinancialService
     );
   });
 
@@ -81,25 +98,23 @@ describe('CashierSessionService - Reconciliation Integration', () => {
 
     it('should create session when none open and getCurrentSession returns it', async () => {
       const channelId = 1;
-      const openingFloat = 10000;
       const savedSession: CashierSession = {
         id: 'session-1',
         channelId,
         cashierUserId: 1,
         openedAt: new Date(),
         status: 'open',
-        openingFloat: String(openingFloat),
         closingDeclared: '0',
       } as CashierSession;
       mockSessionRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(savedSession);
-      mockChannelRepo.findOne.mockResolvedValue({ id: channelId });
+      mockChannelRepo.findOne.mockResolvedValue({ id: channelId, paymentMethods: [] });
       mockSessionRepo.create.mockReturnValue(savedSession);
       mockSessionRepo.save.mockResolvedValue(savedSession);
       mockLedgerQueryService.getCashierSessionTotals.mockResolvedValue(defaultLedgerTotals);
       mockCountRepo.create.mockImplementation((o: any) => ({ ...o, id: 'count-1' }));
       mockCountRepo.save.mockResolvedValue({ id: 'count-1' });
 
-      const result = await service.startSession(ctx, { channelId, openingFloat });
+      const result = await service.startSession(ctx, { channelId, openingBalances: [] });
 
       expect(result.status).toBe('open');
       expect(result.channelId).toBe(channelId);
@@ -119,19 +134,18 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         cashierUserId: 1,
         openedAt: new Date(),
         status: 'open',
-        openingFloat: '5000',
         closingDeclared: '0',
       } as CashierSession;
       mockSessionRepo.findOne.mockResolvedValue(existingSession);
 
-      await expect(service.startSession(ctx, { channelId, openingFloat: 10000 })).rejects.toThrow(
+      await expect(service.startSession(ctx, { channelId, openingBalances: [] })).rejects.toThrow(
         /already has an open cashier session/
       );
 
       expect(mockSessionRepo.findOne).toHaveBeenCalledWith({
         where: { channelId, status: 'open' },
       });
-      await expect(service.startSession(ctx, { channelId, openingFloat: 10000 })).rejects.toThrow(
+      await expect(service.startSession(ctx, { channelId, openingBalances: [] })).rejects.toThrow(
         existingSession.id
       );
     });
@@ -144,23 +158,38 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         cashierUserId: 1,
         openedAt: new Date(),
         status: 'open',
-        openingFloat: '10000',
         closingDeclared: '0',
       } as CashierSession;
       mockSessionRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(session1);
-      mockChannelRepo.findOne.mockResolvedValue({ id: channelId });
+      mockChannelRepo.findOne.mockResolvedValue({ id: channelId, paymentMethods: [] });
       mockSessionRepo.create.mockImplementation((o: any) => ({ ...o, id: 'session-1' }));
       mockSessionRepo.save.mockImplementation((s: any) => Promise.resolve({ ...s }));
       mockLedgerQueryService.getCashierSessionTotals.mockResolvedValue(defaultLedgerTotals);
       mockCountRepo.create.mockImplementation((o: any) => ({ ...o, id: 'count-1' }));
       mockCountRepo.save.mockResolvedValue({ id: 'count-1' });
 
-      await service.startSession(ctx, { channelId, openingFloat: 10000 });
+      await service.startSession(ctx, { channelId, openingBalances: [] });
 
       const session1Open = { ...session1, status: 'open' as const };
-      mockSessionRepo.findOne.mockResolvedValue(session1Open);
+      const session1Closed = {
+        ...session1,
+        status: 'closed' as const,
+        closedAt: new Date(),
+        closingDeclared: '10000',
+      };
+      let closeSessionSaveCalled = false;
+      mockSessionRepo.save.mockImplementation((s: any) => {
+        if (s.id === session1.id && s.status === 'closed') closeSessionSaveCalled = true;
+        return Promise.resolve({ ...s });
+      });
+      // After closeSession saves, findOne by id must return closed session (for createSessionReconciliation / getSessionSummary)
+      mockSessionRepo.findOne.mockImplementation((opts: any) => {
+        const id = opts?.where?.id;
+        if (id === session1.id && closeSessionSaveCalled) return Promise.resolve(session1Closed);
+        if (id === session1.id) return Promise.resolve(session1Open);
+        return Promise.resolve(null);
+      });
       mockLedgerQueryService.getCashierSessionTotals.mockResolvedValue(defaultLedgerTotals);
-      mockSessionRepo.save.mockImplementation((s: any) => Promise.resolve({ ...s }));
       mockCountRepo.create.mockImplementation((o: any) => ({ ...o, id: 'count-2' }));
       mockCountRepo.save.mockResolvedValue({ id: 'count-2' });
 
@@ -175,7 +204,6 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         cashierUserId: 1,
         openedAt: new Date(),
         status: 'open',
-        openingFloat: '8000',
         closingDeclared: '0',
       } as CashierSession;
       mockSessionRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(session2);
@@ -185,7 +213,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       mockCountRepo.create.mockImplementation((o: any) => ({ ...o, id: 'count-3' }));
       mockCountRepo.save.mockResolvedValue({ id: 'count-3' });
 
-      const opened = await service.startSession(ctx, { channelId, openingFloat: 8000 });
+      const opened = await service.startSession(ctx, { channelId, openingBalances: [] });
       expect(opened.id).toBe('session-2');
       expect(opened.status).toBe('open');
       mockSessionRepo.findOne.mockResolvedValue(session2);
@@ -200,7 +228,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       const ctxB = { ...ctx, channelId: channelB } as RequestContext;
 
       mockChannelRepo.findOne.mockImplementation((_opts: any) =>
-        Promise.resolve({ id: _opts?.where?.id ?? 1 })
+        Promise.resolve({ id: _opts?.where?.id ?? 1, paymentMethods: [] })
       );
       mockLedgerQueryService.getCashierSessionTotals.mockResolvedValue(defaultLedgerTotals);
       mockCountRepo.create.mockImplementation((o: any) => ({ ...o, id: 'count-x' }));
@@ -212,34 +240,32 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         cashierUserId: 1,
         openedAt: new Date(),
         status: 'open',
-        openingFloat: '10000',
         closingDeclared: '0',
       } as CashierSession;
-      mockSessionRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(sessionA);
-      mockSessionRepo.create.mockReturnValueOnce(sessionA);
-      mockSessionRepo.save.mockResolvedValueOnce(sessionA);
-
-      const resultA = await service.startSession(ctxA, {
-        channelId: channelA,
-        openingFloat: 10000,
-      });
-      expect(resultA.channelId).toBe(channelA);
-      expect(resultA.id).toBe('session-a');
-
       const sessionB: CashierSession = {
         id: 'session-b',
         channelId: channelB,
         cashierUserId: 1,
         openedAt: new Date(),
         status: 'open',
-        openingFloat: '5000',
         closingDeclared: '0',
       } as CashierSession;
-      mockSessionRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(sessionB);
-      mockSessionRepo.create.mockReturnValueOnce(sessionB);
-      mockSessionRepo.save.mockResolvedValueOnce(sessionB);
+      // startSession A: findOne(open) -> null; startSession B: findOne(open) -> null
+      mockSessionRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+      mockSessionRepo.create.mockReturnValueOnce(sessionA).mockReturnValueOnce(sessionB);
+      mockSessionRepo.save.mockResolvedValueOnce(sessionA).mockResolvedValueOnce(sessionB);
 
-      const resultB = await service.startSession(ctxB, { channelId: channelB, openingFloat: 5000 });
+      const resultA = await service.startSession(ctxA, {
+        channelId: channelA,
+        openingBalances: [],
+      });
+      expect(resultA.channelId).toBe(channelA);
+      expect(resultA.id).toBe('session-a');
+
+      const resultB = await service.startSession(ctxB, {
+        channelId: channelB,
+        openingBalances: [],
+      });
       expect(resultB.channelId).toBe(channelB);
       expect(resultB.id).toBe('session-b');
 
@@ -281,7 +307,6 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         cashierUserId: 1,
         openedAt: new Date(),
         status: 'open',
-        openingFloat: '10000',
         closingDeclared: '0',
       } as CashierSession;
 
@@ -328,7 +353,6 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         cashierUserId: 1,
         openedAt: new Date(),
         status: 'open',
-        openingFloat: '0',
         closingDeclared: '0',
       } as CashierSession;
 
@@ -363,7 +387,6 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         cashierUserId: 1,
         openedAt: new Date(),
         status: 'open',
-        openingFloat: '10000',
         closingDeclared: '0',
       } as CashierSession;
 
@@ -406,7 +429,6 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         cashierUserId: 1,
         openedAt: new Date(),
         status: 'open',
-        openingFloat: '10000',
         closingDeclared: '0',
       } as CashierSession;
 
@@ -459,7 +481,6 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         cashierUserId: 1,
         openedAt: new Date(),
         status: 'open',
-        openingFloat: '0',
         closingDeclared: '0',
       } as CashierSession;
 

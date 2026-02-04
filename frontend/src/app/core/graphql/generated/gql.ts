@@ -130,14 +130,17 @@ type Documents = {
   '\n  mutation RecordStockAdjustment($input: RecordStockAdjustmentInput!) {\n    recordStockAdjustment(input: $input) {\n      id\n      reason\n      notes\n      adjustedByUserId\n      lines {\n        id\n        variantId\n        quantityChange\n        previousStock\n        newStock\n        stockLocationId\n      }\n      createdAt\n      updatedAt\n    }\n  }\n': typeof types.RecordStockAdjustmentDocument;
   '\n  query GetStockAdjustments($options: StockAdjustmentListOptions) {\n    stockAdjustments(options: $options) {\n      items {\n        id\n        reason\n        notes\n        adjustedByUserId\n        lines {\n          id\n          variantId\n          quantityChange\n          previousStock\n          newStock\n          stockLocationId\n        }\n        createdAt\n        updatedAt\n      }\n      totalItems\n    }\n  }\n': typeof types.GetStockAdjustmentsDocument;
   '\n  query GetLedgerAccounts {\n    ledgerAccounts {\n      items {\n        id\n        code\n        name\n        type\n        isActive\n        balance\n        parentAccountId\n        isParent\n      }\n    }\n  }\n': typeof types.GetLedgerAccountsDocument;
+  '\n  query GetPaymentSourceAccounts {\n    paymentSourceAccounts {\n      items {\n        id\n        code\n        name\n        type\n        isActive\n        balance\n        parentAccountId\n        isParent\n      }\n    }\n  }\n': typeof types.GetPaymentSourceAccountsDocument;
   '\n  query GetJournalEntries($options: JournalEntriesOptions) {\n    journalEntries(options: $options) {\n      items {\n        id\n        entryDate\n        postedAt\n        sourceType\n        sourceId\n        memo\n        lines {\n          id\n          accountCode\n          accountName\n          debit\n          credit\n          meta\n        }\n      }\n      totalItems\n    }\n  }\n': typeof types.GetJournalEntriesDocument;
   '\n  query GetJournalEntry($id: ID!) {\n    journalEntry(id: $id) {\n      id\n      entryDate\n      postedAt\n      sourceType\n      sourceId\n      memo\n      lines {\n        id\n        accountCode\n        accountName\n        debit\n        credit\n        meta\n      }\n    }\n  }\n': typeof types.GetJournalEntryDocument;
-  '\n  query GetCurrentCashierSession($channelId: Int!) {\n    currentCashierSession(channelId: $channelId) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      closedAt\n      openingFloat\n      closingDeclared\n      status\n    }\n  }\n': typeof types.GetCurrentCashierSessionDocument;
+  '\n  query GetChannelReconciliationConfig($channelId: Int!) {\n    channelReconciliationConfig(channelId: $channelId) {\n      paymentMethodId\n      paymentMethodCode\n      reconciliationType\n      ledgerAccountCode\n      isCashierControlled\n      requiresReconciliation\n    }\n  }\n': typeof types.GetChannelReconciliationConfigDocument;
+  '\n  query GetCurrentCashierSession($channelId: Int!) {\n    currentCashierSession(channelId: $channelId) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      closedAt\n      closingDeclared\n      status\n    }\n  }\n': typeof types.GetCurrentCashierSessionDocument;
   '\n  query GetCashierSession($sessionId: ID!) {\n    cashierSession(sessionId: $sessionId) {\n      sessionId\n      cashierUserId\n      openedAt\n      closedAt\n      status\n      openingFloat\n      closingDeclared\n      ledgerTotals {\n        cashTotal\n        mpesaTotal\n        totalCollected\n      }\n      variance\n    }\n  }\n': typeof types.GetCashierSessionDocument;
-  '\n  query GetCashierSessions($channelId: Int!, $options: CashierSessionListOptions) {\n    cashierSessions(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        cashierUserId\n        openedAt\n        closedAt\n        openingFloat\n        closingDeclared\n        status\n      }\n      totalItems\n    }\n  }\n': typeof types.GetCashierSessionsDocument;
-  '\n  mutation OpenCashierSession($input: OpenCashierSessionInput!) {\n    openCashierSession(input: $input) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      openingFloat\n      status\n    }\n  }\n': typeof types.OpenCashierSessionDocument;
+  '\n  query GetCashierSessions($channelId: Int!, $options: CashierSessionListOptions) {\n    cashierSessions(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        cashierUserId\n        openedAt\n        closedAt\n        closingDeclared\n        status\n      }\n      totalItems\n    }\n  }\n': typeof types.GetCashierSessionsDocument;
+  '\n  mutation OpenCashierSession($input: OpenCashierSessionInput!) {\n    openCashierSession(input: $input) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      status\n    }\n  }\n': typeof types.OpenCashierSessionDocument;
   '\n  mutation CloseCashierSession($input: CloseCashierSessionInput!) {\n    closeCashierSession(input: $input) {\n      sessionId\n      cashierUserId\n      openedAt\n      closedAt\n      status\n      openingFloat\n      closingDeclared\n      ledgerTotals {\n        cashTotal\n        mpesaTotal\n        totalCollected\n      }\n      variance\n    }\n  }\n': typeof types.CloseCashierSessionDocument;
   '\n  mutation CreateCashierSessionReconciliation($sessionId: ID!, $notes: String) {\n    createCashierSessionReconciliation(sessionId: $sessionId, notes: $notes) {\n      id\n      channelId\n      scope\n      scopeRefId\n      rangeStart\n      rangeEnd\n      status\n      expectedBalance\n      actualBalance\n      varianceAmount\n      notes\n      createdBy\n    }\n  }\n': typeof types.CreateCashierSessionReconciliationDocument;
+  '\n  query GetReconciliations($channelId: Int!, $options: ReconciliationListOptions) {\n    reconciliations(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        scope\n        scopeRefId\n        rangeStart\n        rangeEnd\n        status\n        expectedBalance\n        actualBalance\n        varianceAmount\n        notes\n        createdBy\n      }\n      totalItems\n    }\n  }\n': typeof types.GetReconciliationsDocument;
   '\n  query GetSessionCashCounts($sessionId: ID!) {\n    sessionCashCounts(sessionId: $sessionId) {\n      id\n      channelId\n      sessionId\n      countType\n      takenAt\n      declaredCash\n      expectedCash\n      variance\n      varianceReason\n      reviewedByUserId\n      reviewedAt\n      reviewNotes\n      countedByUserId\n    }\n  }\n': typeof types.GetSessionCashCountsDocument;
   '\n  query GetPendingVarianceReviews($channelId: Int!) {\n    pendingVarianceReviews(channelId: $channelId) {\n      id\n      channelId\n      sessionId\n      countType\n      takenAt\n      declaredCash\n      expectedCash\n      variance\n      varianceReason\n      reviewedByUserId\n      reviewedAt\n      countedByUserId\n    }\n  }\n': typeof types.GetPendingVarianceReviewsDocument;
   '\n  query GetSessionMpesaVerifications($sessionId: ID!) {\n    sessionMpesaVerifications(sessionId: $sessionId) {\n      id\n      channelId\n      sessionId\n      verifiedAt\n      transactionCount\n      allConfirmed\n      flaggedTransactionIds\n      notes\n      verifiedByUserId\n    }\n  }\n': typeof types.GetSessionMpesaVerificationsDocument;
@@ -376,22 +379,28 @@ const documents: Documents = {
     types.GetStockAdjustmentsDocument,
   '\n  query GetLedgerAccounts {\n    ledgerAccounts {\n      items {\n        id\n        code\n        name\n        type\n        isActive\n        balance\n        parentAccountId\n        isParent\n      }\n    }\n  }\n':
     types.GetLedgerAccountsDocument,
+  '\n  query GetPaymentSourceAccounts {\n    paymentSourceAccounts {\n      items {\n        id\n        code\n        name\n        type\n        isActive\n        balance\n        parentAccountId\n        isParent\n      }\n    }\n  }\n':
+    types.GetPaymentSourceAccountsDocument,
   '\n  query GetJournalEntries($options: JournalEntriesOptions) {\n    journalEntries(options: $options) {\n      items {\n        id\n        entryDate\n        postedAt\n        sourceType\n        sourceId\n        memo\n        lines {\n          id\n          accountCode\n          accountName\n          debit\n          credit\n          meta\n        }\n      }\n      totalItems\n    }\n  }\n':
     types.GetJournalEntriesDocument,
   '\n  query GetJournalEntry($id: ID!) {\n    journalEntry(id: $id) {\n      id\n      entryDate\n      postedAt\n      sourceType\n      sourceId\n      memo\n      lines {\n        id\n        accountCode\n        accountName\n        debit\n        credit\n        meta\n      }\n    }\n  }\n':
     types.GetJournalEntryDocument,
-  '\n  query GetCurrentCashierSession($channelId: Int!) {\n    currentCashierSession(channelId: $channelId) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      closedAt\n      openingFloat\n      closingDeclared\n      status\n    }\n  }\n':
+  '\n  query GetChannelReconciliationConfig($channelId: Int!) {\n    channelReconciliationConfig(channelId: $channelId) {\n      paymentMethodId\n      paymentMethodCode\n      reconciliationType\n      ledgerAccountCode\n      isCashierControlled\n      requiresReconciliation\n    }\n  }\n':
+    types.GetChannelReconciliationConfigDocument,
+  '\n  query GetCurrentCashierSession($channelId: Int!) {\n    currentCashierSession(channelId: $channelId) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      closedAt\n      closingDeclared\n      status\n    }\n  }\n':
     types.GetCurrentCashierSessionDocument,
   '\n  query GetCashierSession($sessionId: ID!) {\n    cashierSession(sessionId: $sessionId) {\n      sessionId\n      cashierUserId\n      openedAt\n      closedAt\n      status\n      openingFloat\n      closingDeclared\n      ledgerTotals {\n        cashTotal\n        mpesaTotal\n        totalCollected\n      }\n      variance\n    }\n  }\n':
     types.GetCashierSessionDocument,
-  '\n  query GetCashierSessions($channelId: Int!, $options: CashierSessionListOptions) {\n    cashierSessions(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        cashierUserId\n        openedAt\n        closedAt\n        openingFloat\n        closingDeclared\n        status\n      }\n      totalItems\n    }\n  }\n':
+  '\n  query GetCashierSessions($channelId: Int!, $options: CashierSessionListOptions) {\n    cashierSessions(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        cashierUserId\n        openedAt\n        closedAt\n        closingDeclared\n        status\n      }\n      totalItems\n    }\n  }\n':
     types.GetCashierSessionsDocument,
-  '\n  mutation OpenCashierSession($input: OpenCashierSessionInput!) {\n    openCashierSession(input: $input) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      openingFloat\n      status\n    }\n  }\n':
+  '\n  mutation OpenCashierSession($input: OpenCashierSessionInput!) {\n    openCashierSession(input: $input) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      status\n    }\n  }\n':
     types.OpenCashierSessionDocument,
   '\n  mutation CloseCashierSession($input: CloseCashierSessionInput!) {\n    closeCashierSession(input: $input) {\n      sessionId\n      cashierUserId\n      openedAt\n      closedAt\n      status\n      openingFloat\n      closingDeclared\n      ledgerTotals {\n        cashTotal\n        mpesaTotal\n        totalCollected\n      }\n      variance\n    }\n  }\n':
     types.CloseCashierSessionDocument,
   '\n  mutation CreateCashierSessionReconciliation($sessionId: ID!, $notes: String) {\n    createCashierSessionReconciliation(sessionId: $sessionId, notes: $notes) {\n      id\n      channelId\n      scope\n      scopeRefId\n      rangeStart\n      rangeEnd\n      status\n      expectedBalance\n      actualBalance\n      varianceAmount\n      notes\n      createdBy\n    }\n  }\n':
     types.CreateCashierSessionReconciliationDocument,
+  '\n  query GetReconciliations($channelId: Int!, $options: ReconciliationListOptions) {\n    reconciliations(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        scope\n        scopeRefId\n        rangeStart\n        rangeEnd\n        status\n        expectedBalance\n        actualBalance\n        varianceAmount\n        notes\n        createdBy\n      }\n      totalItems\n    }\n  }\n':
+    types.GetReconciliationsDocument,
   '\n  query GetSessionCashCounts($sessionId: ID!) {\n    sessionCashCounts(sessionId: $sessionId) {\n      id\n      channelId\n      sessionId\n      countType\n      takenAt\n      declaredCash\n      expectedCash\n      variance\n      varianceReason\n      reviewedByUserId\n      reviewedAt\n      reviewNotes\n      countedByUserId\n    }\n  }\n':
     types.GetSessionCashCountsDocument,
   '\n  query GetPendingVarianceReviews($channelId: Int!) {\n    pendingVarianceReviews(channelId: $channelId) {\n      id\n      channelId\n      sessionId\n      countType\n      takenAt\n      declaredCash\n      expectedCash\n      variance\n      varianceReason\n      reviewedByUserId\n      reviewedAt\n      countedByUserId\n    }\n  }\n':
@@ -1124,6 +1133,12 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
+  source: '\n  query GetPaymentSourceAccounts {\n    paymentSourceAccounts {\n      items {\n        id\n        code\n        name\n        type\n        isActive\n        balance\n        parentAccountId\n        isParent\n      }\n    }\n  }\n',
+): (typeof documents)['\n  query GetPaymentSourceAccounts {\n    paymentSourceAccounts {\n      items {\n        id\n        code\n        name\n        type\n        isActive\n        balance\n        parentAccountId\n        isParent\n      }\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
   source: '\n  query GetJournalEntries($options: JournalEntriesOptions) {\n    journalEntries(options: $options) {\n      items {\n        id\n        entryDate\n        postedAt\n        sourceType\n        sourceId\n        memo\n        lines {\n          id\n          accountCode\n          accountName\n          debit\n          credit\n          meta\n        }\n      }\n      totalItems\n    }\n  }\n',
 ): (typeof documents)['\n  query GetJournalEntries($options: JournalEntriesOptions) {\n    journalEntries(options: $options) {\n      items {\n        id\n        entryDate\n        postedAt\n        sourceType\n        sourceId\n        memo\n        lines {\n          id\n          accountCode\n          accountName\n          debit\n          credit\n          meta\n        }\n      }\n      totalItems\n    }\n  }\n'];
 /**
@@ -1136,8 +1151,14 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
-  source: '\n  query GetCurrentCashierSession($channelId: Int!) {\n    currentCashierSession(channelId: $channelId) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      closedAt\n      openingFloat\n      closingDeclared\n      status\n    }\n  }\n',
-): (typeof documents)['\n  query GetCurrentCashierSession($channelId: Int!) {\n    currentCashierSession(channelId: $channelId) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      closedAt\n      openingFloat\n      closingDeclared\n      status\n    }\n  }\n'];
+  source: '\n  query GetChannelReconciliationConfig($channelId: Int!) {\n    channelReconciliationConfig(channelId: $channelId) {\n      paymentMethodId\n      paymentMethodCode\n      reconciliationType\n      ledgerAccountCode\n      isCashierControlled\n      requiresReconciliation\n    }\n  }\n',
+): (typeof documents)['\n  query GetChannelReconciliationConfig($channelId: Int!) {\n    channelReconciliationConfig(channelId: $channelId) {\n      paymentMethodId\n      paymentMethodCode\n      reconciliationType\n      ledgerAccountCode\n      isCashierControlled\n      requiresReconciliation\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  query GetCurrentCashierSession($channelId: Int!) {\n    currentCashierSession(channelId: $channelId) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      closedAt\n      closingDeclared\n      status\n    }\n  }\n',
+): (typeof documents)['\n  query GetCurrentCashierSession($channelId: Int!) {\n    currentCashierSession(channelId: $channelId) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      closedAt\n      closingDeclared\n      status\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -1148,14 +1169,14 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
-  source: '\n  query GetCashierSessions($channelId: Int!, $options: CashierSessionListOptions) {\n    cashierSessions(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        cashierUserId\n        openedAt\n        closedAt\n        openingFloat\n        closingDeclared\n        status\n      }\n      totalItems\n    }\n  }\n',
-): (typeof documents)['\n  query GetCashierSessions($channelId: Int!, $options: CashierSessionListOptions) {\n    cashierSessions(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        cashierUserId\n        openedAt\n        closedAt\n        openingFloat\n        closingDeclared\n        status\n      }\n      totalItems\n    }\n  }\n'];
+  source: '\n  query GetCashierSessions($channelId: Int!, $options: CashierSessionListOptions) {\n    cashierSessions(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        cashierUserId\n        openedAt\n        closedAt\n        closingDeclared\n        status\n      }\n      totalItems\n    }\n  }\n',
+): (typeof documents)['\n  query GetCashierSessions($channelId: Int!, $options: CashierSessionListOptions) {\n    cashierSessions(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        cashierUserId\n        openedAt\n        closedAt\n        closingDeclared\n        status\n      }\n      totalItems\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
-  source: '\n  mutation OpenCashierSession($input: OpenCashierSessionInput!) {\n    openCashierSession(input: $input) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      openingFloat\n      status\n    }\n  }\n',
-): (typeof documents)['\n  mutation OpenCashierSession($input: OpenCashierSessionInput!) {\n    openCashierSession(input: $input) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      openingFloat\n      status\n    }\n  }\n'];
+  source: '\n  mutation OpenCashierSession($input: OpenCashierSessionInput!) {\n    openCashierSession(input: $input) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      status\n    }\n  }\n',
+): (typeof documents)['\n  mutation OpenCashierSession($input: OpenCashierSessionInput!) {\n    openCashierSession(input: $input) {\n      id\n      channelId\n      cashierUserId\n      openedAt\n      status\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -1168,6 +1189,12 @@ export function graphql(
 export function graphql(
   source: '\n  mutation CreateCashierSessionReconciliation($sessionId: ID!, $notes: String) {\n    createCashierSessionReconciliation(sessionId: $sessionId, notes: $notes) {\n      id\n      channelId\n      scope\n      scopeRefId\n      rangeStart\n      rangeEnd\n      status\n      expectedBalance\n      actualBalance\n      varianceAmount\n      notes\n      createdBy\n    }\n  }\n',
 ): (typeof documents)['\n  mutation CreateCashierSessionReconciliation($sessionId: ID!, $notes: String) {\n    createCashierSessionReconciliation(sessionId: $sessionId, notes: $notes) {\n      id\n      channelId\n      scope\n      scopeRefId\n      rangeStart\n      rangeEnd\n      status\n      expectedBalance\n      actualBalance\n      varianceAmount\n      notes\n      createdBy\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  query GetReconciliations($channelId: Int!, $options: ReconciliationListOptions) {\n    reconciliations(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        scope\n        scopeRefId\n        rangeStart\n        rangeEnd\n        status\n        expectedBalance\n        actualBalance\n        varianceAmount\n        notes\n        createdBy\n      }\n      totalItems\n    }\n  }\n',
+): (typeof documents)['\n  query GetReconciliations($channelId: Int!, $options: ReconciliationListOptions) {\n    reconciliations(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        scope\n        scopeRefId\n        rangeStart\n        rangeEnd\n        status\n        expectedBalance\n        actualBalance\n        varianceAmount\n        notes\n        createdBy\n      }\n      totalItems\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

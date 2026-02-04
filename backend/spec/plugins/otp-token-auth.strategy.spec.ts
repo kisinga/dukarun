@@ -20,7 +20,7 @@ describe('OtpTokenAuthStrategy', () => {
       username: 'superadmin',
       password: 'superadmin',
     });
-    expect(result).toMatchObject({ id: 1 });
+    expect((result as { id?: number })?.id).toBe(1);
   });
 
   it('returns false for OTP token when redis is not available', async () => {

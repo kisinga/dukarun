@@ -24,7 +24,7 @@ export interface PaymentPostingContext {
   orderId: string;
   orderCode: string;
   customerId?: string;
-  cashierSessionId?: string; // Active cashier session for reconciliation
+  openSessionId?: string; // Active open session for reconciliation
   resolvedAccountCode?: string; // Pre-resolved from PaymentMethod custom fields (takes priority over method-based mapping)
 }
 
@@ -106,7 +106,7 @@ export function createPaymentEntry(context: PaymentPostingContext): JournalEntry
   // Use pre-resolved account if provided, otherwise fall back to method-based mapping
   const clearingAccount = context.resolvedAccountCode || mapPaymentMethodToAccount(context.method);
 
-  // Build meta with optional cashierSessionId
+  // Build meta with optional openSessionId
   const baseMeta = {
     orderId: context.orderId,
     orderCode: context.orderCode,
@@ -114,8 +114,8 @@ export function createPaymentEntry(context: PaymentPostingContext): JournalEntry
     customerId: context.customerId,
   };
 
-  const debitMeta = context.cashierSessionId
-    ? { ...baseMeta, cashierSessionId: context.cashierSessionId }
+  const debitMeta = context.openSessionId
+    ? { ...baseMeta, openSessionId: context.openSessionId }
     : baseMeta;
 
   return {
@@ -132,7 +132,7 @@ export function createPaymentEntry(context: PaymentPostingContext): JournalEntry
           orderId: context.orderId,
           orderCode: context.orderCode,
           method: context.method,
-          cashierSessionId: context.cashierSessionId,
+          openSessionId: context.openSessionId,
         },
       },
     ],
@@ -186,7 +186,7 @@ export function createPaymentAllocationEntry(context: PaymentPostingContext): Jo
   // Use pre-resolved account if provided, otherwise fall back to method-based mapping
   const clearingAccount = context.resolvedAccountCode || mapPaymentMethodToAccount(context.method);
 
-  // Build meta with optional cashierSessionId
+  // Build meta with optional openSessionId
   const baseMeta = {
     orderId: context.orderId,
     orderCode: context.orderCode,
@@ -194,8 +194,8 @@ export function createPaymentAllocationEntry(context: PaymentPostingContext): Jo
     customerId: context.customerId,
   };
 
-  const debitMeta = context.cashierSessionId
-    ? { ...baseMeta, cashierSessionId: context.cashierSessionId }
+  const debitMeta = context.openSessionId
+    ? { ...baseMeta, openSessionId: context.openSessionId }
     : baseMeta;
 
   return {
@@ -212,7 +212,7 @@ export function createPaymentAllocationEntry(context: PaymentPostingContext): Jo
           orderId: context.orderId,
           orderCode: context.orderCode,
           customerId: context.customerId,
-          cashierSessionId: context.cashierSessionId,
+          openSessionId: context.openSessionId,
         },
       },
     ],

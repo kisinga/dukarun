@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RequestContext, TransactionalConnection } from '@vendure/core';
 import { Reconciliation, ReconciliationScope } from '../../domain/recon/reconciliation.entity';
+import { ReconciliationAccount } from '../../domain/recon/reconciliation-account.entity';
 import { AccountBalanceService } from './account-balance.service';
 import { ReconciliationStatus, ScopeReconciliationStatus } from './period-management.types';
 
@@ -13,6 +14,10 @@ export interface CreateReconciliationInput {
   expectedBalance?: string; // in smallest currency unit
   actualBalance: string; // in smallest currency unit
   notes?: string;
+  /** Account IDs (UUID) this reconciliation covers; rows inserted into reconciliation_account */
+  accountIds?: string[];
+  /** Per-account declared amounts (accountId -> declaredAmountCents string) for opening/closing */
+  accountDeclaredAmounts?: Record<string, string>;
 }
 
 /**
@@ -60,7 +65,22 @@ export class ReconciliationService {
       createdBy,
     });
 
-    return reconciliationRepo.save(reconciliation);
+    const saved = await reconciliationRepo.save(reconciliation);
+
+    if (input.accountIds?.length) {
+      const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
+      const declared = input.accountDeclaredAmounts ?? {};
+      const rows = input.accountIds.map(accountId =>
+        junctionRepo.create({
+          reconciliationId: saved.id,
+          accountId,
+          declaredAmountCents: declared[accountId] ?? null,
+        })
+      );
+      await junctionRepo.save(rows);
+    }
+
+    return saved;
   }
 
   /**
@@ -120,6 +140,54 @@ export class ReconciliationService {
       periodEndDate,
       scopes,
     };
+  }
+
+  /**
+   * List reconciliations for a channel with optional filters (for history UI).
+   */
+  async getReconciliations(
+    ctx: RequestContext,
+    channelId: number,
+    options?: {
+      startDate?: string;
+      endDate?: string;
+      scope?: string;
+      hasVariance?: boolean;
+      take?: number;
+      skip?: number;
+    }
+  ): Promise<{ items: Reconciliation[]; totalItems: number }> {
+    const qb = this.connection
+      .getRepository(ctx, Reconciliation)
+      .createQueryBuilder('r')
+      .where('r.channelId = :channelId', { channelId })
+      .orderBy('r.rangeEnd', 'DESC')
+      .addOrderBy('r.rangeStart', 'DESC');
+
+    if (options?.startDate) {
+      qb.andWhere('r.rangeEnd >= :startDate', { startDate: options.startDate });
+    }
+    if (options?.endDate) {
+      qb.andWhere('r.rangeStart <= :endDate', { endDate: options.endDate });
+    }
+    if (options?.scope) {
+      qb.andWhere('r.scope = :scope', { scope: options.scope });
+    }
+    if (options?.hasVariance === true) {
+      qb.andWhere('r.varianceAmount != :zero', { zero: '0' });
+    }
+
+    const totalItems = await qb.getCount();
+
+    if (options?.take != null) {
+      qb.take(options.take);
+    }
+    if (options?.skip != null) {
+      qb.skip(options.skip);
+    }
+
+    const items = await qb.getMany();
+    return { items, totalItems };
   }
 
   /**

@@ -10,6 +10,7 @@ import {
 } from '@vendure/core';
 import { In } from 'typeorm';
 import { AuditService } from '../../infrastructure/audit/audit.service';
+import { OpenSessionService } from '../financial/open-session.service';
 import { ChartOfAccountsService } from '../financial/chart-of-accounts.service';
 import { FinancialService } from '../financial/financial.service';
 import { CreditService } from '../credit/credit.service';
@@ -49,6 +50,7 @@ export class PaymentAllocationService {
     private readonly financialService: FinancialService,
     private readonly creditService: CreditService,
     private readonly chartOfAccountsService: ChartOfAccountsService,
+    private readonly cashierSessionService: OpenSessionService,
     @Optional() private readonly auditService?: AuditService
   ) {}
 
@@ -93,6 +95,10 @@ export class PaymentAllocationService {
         input.debitAccountCode.trim()
       );
     }
+    const session = await this.cashierSessionService.requireOpenSession(
+      ctx,
+      ctx.channelId as number
+    );
     return this.connection.withTransaction(ctx, async transactionCtx => {
       try {
         // 1. Get unpaid orders
@@ -185,7 +191,8 @@ export class PaymentAllocationService {
                 updatedOrder,
                 PAYMENT_METHOD_CODES.CREDIT,
                 amountToAllocate,
-                input.debitAccountCode?.trim()
+                input.debitAccountCode?.trim(),
+                session.id
               );
             }
           }
@@ -341,6 +348,11 @@ export class PaymentAllocationService {
       await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, debitAccountCode.trim());
     }
 
+    const session = await this.cashierSessionService.requireOpenSession(
+      ctx,
+      ctx.channelId as number
+    );
+
     // Prepare metadata with reference number if provided
     const metadata: Record<string, any> = {
       paymentType: 'credit',
@@ -461,7 +473,8 @@ export class PaymentAllocationService {
         updatedOrder,
         actualPaymentMethodCode,
         paymentAmountInCents,
-        debitAccountCode?.trim()
+        debitAccountCode?.trim(),
+        session.id
       );
 
       // Update order custom fields for user tracking

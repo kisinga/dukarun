@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { JournalEntry } from '../../../../core/services/ledger/ledger.service';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import type { Reconciliation } from '../../../../core/services/cashier-session/cashier-session.service';
 
 @Component({
   selector: 'app-reconciliation-tab',
@@ -10,18 +10,30 @@ import { JournalEntry } from '../../../../core/services/ledger/ledger.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ReconciliationTabComponent {
-  entries = input.required<JournalEntry[]>();
+  reconciliations = input.required<Reconciliation[]>();
   isLoading = input.required<boolean>();
-  totalPages = input.required<number>();
+  totalItems = input.required<number>();
   currentPage = input.required<number>();
+  pageSize = input.required<number>();
   formatDate = input.required<(date: string) => string>();
-  formatDateTime = input.required<(date: string) => string>();
+  formatCurrency = input.required<(amountCentsOrString: string) => string>();
 
-  entryView = output<JournalEntry>();
   pageChange = output<number>();
 
-  onViewEntry(entry: JournalEntry) {
-    this.entryView.emit(entry);
+  totalPages = computed(() => {
+    const total = this.totalItems();
+    const size = this.pageSize();
+    return Math.ceil(total / size) || 1;
+  });
+
+  pageNumbers = computed(() => {
+    const total = this.totalPages();
+    return Array.from({ length: total }, (_, i) => i + 1);
+  });
+
+  hasVariance(r: Reconciliation): boolean {
+    const v = parseInt(r.varianceAmount, 10);
+    return !Number.isNaN(v) && v !== 0;
   }
 
   onPageChange(page: number) {
