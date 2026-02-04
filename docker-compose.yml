@@ -25,72 +25,72 @@ services:
       - dukarun_services_network
     environment:
       # Database configuration - uses service name from shared network
-      DB_HOST: ${DB_HOST:-postgres_db}
+      DB_HOST: $${DB_HOST:-postgres_db}
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-vendure}
-      DB_USERNAME: ${DB_USERNAME:-vendure}
-      DB_PASSWORD: ${DB_PASSWORD:-vendure}
-      DB_SCHEMA: ${DB_SCHEMA:-public}
+      DB_NAME: $${DB_NAME:-vendure}
+      DB_USERNAME: $${DB_USERNAME:-vendure}
+      DB_PASSWORD: $${DB_PASSWORD:-vendure}
+      DB_SCHEMA: $${DB_SCHEMA:-public}
 
       # Audit Log Database configuration (TimescaleDB) - uses service name
-      AUDIT_DB_HOST: ${AUDIT_DB_HOST:-timescaledb_audit}
+      AUDIT_DB_HOST: $${AUDIT_DB_HOST:-timescaledb_audit}
       AUDIT_DB_PORT: 5432
-      AUDIT_DB_NAME: ${AUDIT_DB_NAME:-audit_logs}
-      AUDIT_DB_USERNAME: ${AUDIT_DB_USERNAME:-audit_user}
-      AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:-audit_password}
+      AUDIT_DB_NAME: $${AUDIT_DB_NAME:-audit_logs}
+      AUDIT_DB_USERNAME: $${AUDIT_DB_USERNAME:-audit_user}
+      AUDIT_DB_PASSWORD: $${AUDIT_DB_PASSWORD:-audit_password}
 
       # Redis configuration - uses service name
       REDIS_HOST: redis
       REDIS_PORT: 6379
 
       # Application configuration
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: $${NODE_ENV:-production}
 
       # Admin credentials
-      SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-superadmin}
-      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-superadmin}
+      SUPERADMIN_USERNAME: $${SUPERADMIN_USERNAME:-superadmin}
+      SUPERADMIN_PASSWORD: $${SUPERADMIN_PASSWORD:-superadmin}
 
       # Security
-      COOKIE_SECRET: ${COOKIE_SECRET:-default-secret-key}
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SECRET: $${COOKIE_SECRET:-default-secret-key}
+      COOKIE_SECURE: $${COOKIE_SECURE:-false}
 
       # CORS configuration (set CORS_ORIGIN/FRONTEND_URL in env e.g. http://localhost:4200)
-      CORS_ORIGIN: ${CORS_ORIGIN:-}
-      FRONTEND_URL: ${FRONTEND_URL:-}
+      CORS_ORIGIN: $${CORS_ORIGIN:-}
+      FRONTEND_URL: $${FRONTEND_URL:-}
 
       # Asset storage
-      ASSET_STORAGE_STRATEGY: ${ASSET_STORAGE_STRATEGY:-LocalAssetStorageStrategy}
-      ASSET_UPLOAD_DIR: ${ASSET_UPLOAD_DIR:-/app/static/assets}
-      ASSET_URL_PREFIX: ${ASSET_URL_PREFIX:-}
+      ASSET_STORAGE_STRATEGY: $${ASSET_STORAGE_STRATEGY:-LocalAssetStorageStrategy}
+      ASSET_UPLOAD_DIR: $${ASSET_UPLOAD_DIR:-/app/static/assets}
+      ASSET_URL_PREFIX: $${ASSET_URL_PREFIX:-}
 
       # Email configuration (optional)
-      MAIL_TRANSPORT: ${MAIL_TRANSPORT:-SMTP}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-}
+      MAIL_TRANSPORT: $${MAIL_TRANSPORT:-SMTP}
+      SMTP_HOST: $${SMTP_HOST:-}
+      SMTP_PORT: $${SMTP_PORT:-587}
+      SMTP_USER: $${SMTP_USER:-}
+      SMTP_PASS: $${SMTP_PASS:-}
+      SMTP_FROM: $${SMTP_FROM:-}
 
       # SMS Provider configuration
-      SMS_PROVIDER: ${SMS_PROVIDER:-textsms}
+      SMS_PROVIDER: $${SMS_PROVIDER:-textsms}
 
       # TextSMS Configuration (default provider)
-      TEXTSMS_API_KEY: ${TEXTSMS_API_KEY:-}
-      TEXTSMS_PARTNER_ID: ${TEXTSMS_PARTNER_ID:-}
-      TEXTSMS_SHORTCODE: ${TEXTSMS_SHORTCODE:-}
+      TEXTSMS_API_KEY: $${TEXTSMS_API_KEY:-}
+      TEXTSMS_PARTNER_ID: $${TEXTSMS_PARTNER_ID:-}
+      TEXTSMS_SHORTCODE: $${TEXTSMS_SHORTCODE:-}
 
       # Push Notification Configuration (VAPID) - set VAPID_EMAIL in env e.g. mailto:admin@example.com
-      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
-      VAPID_EMAIL: ${VAPID_EMAIL:-}
+      VAPID_PUBLIC_KEY: $${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: $${VAPID_PRIVATE_KEY:-}
+      VAPID_EMAIL: $${VAPID_EMAIL:-}
 
       # Logging
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_LEVEL: $${LOG_LEVEL:-info}
 
       # ML Training configuration
-      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:-}
-      ML_TRAINING_INTERVAL_MINUTES: ${ML_TRAINING_INTERVAL_MINUTES:-60}
-      ML_TRAINING_COOLDOWN_HOURS: ${ML_TRAINING_COOLDOWN_HOURS:-4}
+      ML_SERVICE_TOKEN: $${ML_SERVICE_TOKEN:-}
+      ML_TRAINING_INTERVAL_MINUTES: $${ML_TRAINING_INTERVAL_MINUTES:-60}
+      ML_TRAINING_COOLDOWN_HOURS: $${ML_TRAINING_COOLDOWN_HOURS:-4}
 
     volumes:
       - backend_assets:/app/static/assets
@@ -98,7 +98,7 @@ services:
       # Note: .env file mount removed - env vars are passed directly via environment section
       # In platforms like Coolify/Kubernetes, env vars are passed directly, so file mount is not needed
     ports:
-      - '${BACKEND_PORT:-3000}:3000'
+      - '$${BACKEND_PORT:-3000}:3000'
       - '3002:3002' # Admin UI
     # Note: depends_on removed for external services (postgres_db, redis, timescaledb_audit)
     # Backend will retry connections gracefully if services are not yet ready
@@ -121,13 +121,13 @@ services:
     environment:
       # Backend connection - using service name from shared network
       BACKEND_HOST: backend
-      BACKEND_PORT: ${BACKEND_PORT:-3000}
+      BACKEND_PORT: $${BACKEND_PORT:-3000}
 
       # Additional frontend configuration
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: $${NODE_ENV:-production}
 
     # ports:
-    #   - '${FRONTEND_PORT:-4200}:4200'
+    #   - '$${FRONTEND_PORT:-4200}:4200'
     depends_on:
       backend:
         condition: service_healthy
@@ -154,9 +154,9 @@ services:
     networks:
       - dukarun_services_network
     environment:
-      ML_PORT: ${ML_PORT:-3005}
+      ML_PORT: $${ML_PORT:-3005}
       NODE_ENV: production
-      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:-}
+      ML_SERVICE_TOKEN: $${ML_SERVICE_TOKEN:-}
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:3005/health']
       interval: 30s
