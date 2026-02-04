@@ -11,21 +11,25 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { BarcodeScannerComponent } from './barcode-scanner.component';
 import { PhotoManagerComponent } from './photo-manager.component';
 
+/** Identification method: barcode, label photos, or none (name/SKU only). */
+export type IdentificationMethodType = 'barcode' | 'label-photos' | 'none';
+
 /**
  * Identification Selector Component
  *
- * Tabbed interface for barcode vs photo identification.
- * Clean either/or choice with distinct content areas.
+ * Tabbed interface for barcode, photo, or name/SKU-only identification.
  */
 @Component({
   selector: 'app-identification-selector',
   imports: [CommonModule, ReactiveFormsModule, PhotoManagerComponent, BarcodeScannerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="tabs tabs-lift w-full [--tab-bg:var(--color-base-300)] lg:bg-base-200 lg:p-1 lg:rounded-xl">
+    <div
+      class="tabs tabs-lift w-full [--tab-bg:var(--color-base-300)] lg:bg-base-200 lg:p-1 lg:rounded-xl"
+    >
       <!-- Barcode tab -->
       <label
-        class="tab flex-1 gap-2 font-medium"
+        class="tab flex-1 gap-2 font-medium min-w-0"
         [class.tab-active]="identificationMethod() === 'barcode'"
         [class.text-primary]="identificationMethod() === 'barcode'"
       >
@@ -36,10 +40,16 @@ import { PhotoManagerComponent } from './photo-manager.component';
           [checked]="identificationMethod() === 'barcode'"
           (change)="onMethodChange('barcode')"
         />
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M3 5h2v14H3zM7 5h1v14H7zM11 5h2v14h-2zM15 5h1v14h-1zM19 5h2v14h-2z"/>
+        <svg
+          class="w-4 h-4 shrink-0"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+        >
+          <path d="M3 5h2v14H3zM7 5h1v14H7zM11 5h2v14h-2zM15 5h1v14h-1zM19 5h2v14h-2z" />
         </svg>
-        <span>Barcode</span>
+        <span class="truncate">Barcode</span>
         @if (barcodeControl().value) {
           <span class="badge badge-xs badge-success">✓</span>
         }
@@ -69,16 +79,32 @@ import { PhotoManagerComponent } from './photo-manager.component';
                   (click)="startBarcodeScanner()"
                   title="Scan with camera"
                 >
-                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                    <circle cx="12" cy="13" r="4"/>
+                  <svg
+                    class="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
+                    />
+                    <circle cx="12" cy="13" r="4" />
                   </svg>
                 </button>
               </div>
-              @if (barcodeControl().invalid && (barcodeControl().dirty || barcodeControl().touched)) {
+              @if (
+                barcodeControl().invalid && (barcodeControl().dirty || barcodeControl().touched)
+              ) {
                 <div class="alert alert-error py-2">
-                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  <svg
+                    class="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div class="text-xs">
                     @if (barcodeControl().errors?.['barcodeExists']) {
@@ -90,17 +116,28 @@ import { PhotoManagerComponent } from './photo-manager.component';
                 </div>
               } @else if (barcodeControl().value && barcodeControl().valid) {
                 <div class="alert alert-success py-2">
-                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10-3-3"/>
+                  <svg
+                    class="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <path d="m22 4-10 10-3-3" />
                   </svg>
                   <span class="text-sm">Barcode ready</span>
                 </div>
               } @else {
-                <p class="text-xs text-center opacity-60">Scan product barcode or type it manually</p>
+                <p class="text-xs text-center opacity-60">
+                  Scan product barcode or type it manually
+                </p>
               }
             }
           </div>
-        } @else {
+        } @else if (
+          identificationMethod() !== 'label-photos' && identificationMethod() !== 'none'
+        ) {
           <div class="flex items-center justify-center h-16">
             <p class="text-sm text-base-content/40">Enter or scan a barcode</p>
           </div>
@@ -109,7 +146,7 @@ import { PhotoManagerComponent } from './photo-manager.component';
 
       <!-- Photos tab -->
       <label
-        class="tab flex-1 gap-2 font-medium"
+        class="tab flex-1 gap-2 font-medium min-w-0"
         [class.tab-active]="identificationMethod() === 'label-photos'"
         [class.text-primary]="identificationMethod() === 'label-photos'"
       >
@@ -120,10 +157,18 @@ import { PhotoManagerComponent } from './photo-manager.component';
           [checked]="identificationMethod() === 'label-photos'"
           (change)="onMethodChange('label-photos')"
         />
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>
+        <svg
+          class="w-4 h-4 shrink-0"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <path d="m21 15-5-5L5 21" />
         </svg>
-        <span>Photos</span>
+        <span class="truncate">Photos</span>
         @if (photoCount() >= 5) {
           <span class="badge badge-xs badge-success">✓</span>
         } @else if (photoCount() > 0) {
@@ -133,24 +178,72 @@ import { PhotoManagerComponent } from './photo-manager.component';
       <div class="tab-content bg-base-100 border-base-300 p-3 min-h-[100px]">
         @if (identificationMethod() === 'label-photos') {
           <div class="space-y-3">
-            <app-photo-manager
-              #photoManager
-              (photosChanged)="onPhotosChanged($event)"
-            />
+            <app-photo-manager #photoManager (photosChanged)="onPhotosChanged($event)" />
             @if (photoCount() >= 5) {
               <div class="alert alert-success py-2">
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10-3-3"/>
+                <svg
+                  class="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <path d="m22 4-10 10-3-3" />
                 </svg>
                 <span class="text-sm">{{ photoCount() }} photos ready</span>
               </div>
             } @else {
-              <p class="text-xs text-center opacity-60">Take {{ 5 - photoCount() }} more photo{{ 5 - photoCount() > 1 ? 's' : '' }} of the product label</p>
+              <p class="text-xs text-center opacity-60">
+                Take {{ 5 - photoCount() }} more photo{{ 5 - photoCount() > 1 ? 's' : '' }} of the
+                product label
+              </p>
             }
+          </div>
+        } @else if (identificationMethod() !== 'barcode' && identificationMethod() !== 'none') {
+          <div class="flex items-center justify-center h-16">
+            <p class="text-sm text-base-content/40">Take photos of the product label</p>
+          </div>
+        }
+      </div>
+
+      <!-- Name or SKU only tab -->
+      <label
+        class="tab flex-1 gap-2 font-medium min-w-0"
+        [class.tab-active]="identificationMethod() === 'none'"
+        [class.text-primary]="identificationMethod() === 'none'"
+      >
+        <input
+          type="radio"
+          name="identification_tabs"
+          class="hidden"
+          [checked]="identificationMethod() === 'none'"
+          (change)="onMethodChange('none')"
+        />
+        <svg
+          class="w-4 h-4 shrink-0"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+        >
+          <path d="M4 7V4h16v3M9 20h6M12 4v16" />
+        </svg>
+        <span class="truncate">Name / SKU</span>
+        @if (identificationMethod() === 'none' && hasValidIdentification()) {
+          <span class="badge badge-xs badge-success">✓</span>
+        }
+      </label>
+      <div class="tab-content bg-base-100 border-base-300 p-3 min-h-[100px]">
+        @if (identificationMethod() === 'none') {
+          <div class="flex flex-col items-center justify-center min-h-[80px] gap-2 text-center">
+            <p class="text-sm text-base-content/80">
+              No barcode or photos required. You can sell this item by name or SKU at the till.
+            </p>
           </div>
         } @else {
           <div class="flex items-center justify-center h-16">
-            <p class="text-sm text-base-content/40">Take photos of the product label</p>
+            <p class="text-sm text-base-content/40">Sell by name or SKU only</p>
           </div>
         }
       </div>
@@ -163,13 +256,13 @@ export class IdentificationSelectorComponent {
   readonly barcodeScanner = viewChild<BarcodeScannerComponent>('barcodeScanner');
 
   // Inputs
-  readonly identificationMethod = input.required<'barcode' | 'label-photos' | null>();
+  readonly identificationMethod = input.required<IdentificationMethodType | null>();
   readonly barcodeControl = input.required<FormControl>();
   readonly photoCount = input.required<number>();
   readonly hasValidIdentification = input.required<boolean>();
 
   // Outputs
-  readonly methodChange = output<'barcode' | 'label-photos'>();
+  readonly methodChange = output<IdentificationMethodType>();
   readonly barcodeScanned = output<string>();
   readonly photosChanged = output<File[]>();
 
@@ -179,7 +272,7 @@ export class IdentificationSelectorComponent {
   /**
    * Handle identification method change
    */
-  onMethodChange(method: 'barcode' | 'label-photos'): void {
+  onMethodChange(method: IdentificationMethodType): void {
     // Stop scanner if switching away from barcode
     if (method !== 'barcode' && this.isScannerActive()) {
       this.stopScanner();

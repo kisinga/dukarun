@@ -10,7 +10,7 @@
 
 ```
 Product: "Tomatoes"
-├── identification: barcode OR label photos (required, choose ONE)
+├── identification: optional — barcode, label photos (5+), or none (name/SKU only)
 └── SKUs (ProductVariants) - Multiple price points
     ├── SKU 1: "TOM-1KG" → 1kg @ 100/=, stock: 50
     ├── SKU 2: "TOM-2KG" → 2kg @ 180/=, stock: 30
@@ -23,7 +23,7 @@ Product: "Tomatoes"
 - **Service tiers**: Regular vs Premium vs Kids haircut
 - **Package sizes**: 300ml vs 500ml vs 1L Coca Cola
 
-**Item Identification Methods (Choose ONE):**
+**Item Identification Methods (optional — choose one or none):**
 
 **Method 1: Barcode** (For packaged/manufactured goods)
 
@@ -37,6 +37,11 @@ Product: "Tomatoes"
 - ML model trains on the label, not the item itself
 - Best for: Fresh produce, bulk items, handwritten tags
 - Example: Tomatoes with "TOMATO 10/=" tag
+
+**Method 3: Name or SKU only** (No barcode or photos)
+
+- No barcode or label photos required. Product is sold at the till by searching name or SKU.
+- Best for: Simple items, services, or when barcode/photos are not available.
 
 **Why Label Photos, Not Product Photos?**
 
@@ -88,10 +93,11 @@ No workflow change. Maximum reliability. KISS.
 
 **UX Flow (CRITICAL: Multiple SKUs):**
 
-**Step 1: Identify Item** (Choose ONE method)
+**Step 1: Identify Item** (Optional — choose one or "Name or SKU only")
 
 - **Option A**: Scan barcode (packaged goods)
 - **Option B**: Take 5+ photos of THE LABEL/CARD (fresh produce/services)
+- **Option C**: Name or SKU only — no barcode or photos; sell by search at the till
 
 **Step 2: Name the Product**
 
