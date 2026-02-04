@@ -8,5 +8,5 @@
     "noPropertyAccessFromIndexSignature": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts"]
+  "exclude": ["src/**/*.spec.ts", "src/app/core/testing/**"]
 }
