@@ -156,8 +156,8 @@ export class ProductCreateComponent implements OnInit {
   // Default location for the active channel (from StockLocationService)
   readonly defaultLocation = this.stockLocationService.defaultLocation;
 
-  // Identification method chosen
-  readonly identificationMethod = signal<'barcode' | 'label-photos' | null>('barcode');
+  // Identification method chosen (barcode | label-photos | none = name/SKU only)
+  readonly identificationMethod = signal<'barcode' | 'label-photos' | 'none' | null>('barcode');
   readonly photoCount = signal(0);
   readonly barcodeValue = signal<string>(''); // Track barcode as signal
   readonly productNameValue = signal<string>(''); // Track name as signal
@@ -165,9 +165,12 @@ export class ProductCreateComponent implements OnInit {
   readonly skuValidityTrigger = signal<number>(0); // Trigger to recompute SKU validation
   readonly formValid = signal<boolean>(false); // Track overall form validity
 
-  // Computed: Has valid identification
+  // Computed: Has valid identification (none = always valid for name/SKU-only products)
   readonly hasValidIdentification = computed(() => {
     const method = this.identificationMethod();
+    if (method === 'none') {
+      return true;
+    }
     if (method === 'barcode') {
       return !!this.barcodeValue()?.trim();
     }
@@ -192,9 +195,11 @@ export class ProductCreateComponent implements OnInit {
   readonly validationIssues = computed(() => {
     const issues: string[] = [];
     const stage = this.currentStage();
+    const method = this.identificationMethod();
 
-    if (!this.hasValidIdentification()) {
-      issues.push(`Barcode OR 5+ label photos`);
+    // Only require barcode/photos when user chose barcode or label-photos but didn't satisfy it
+    if (method !== 'none' && !this.hasValidIdentification()) {
+      issues.push(`Barcode OR 5+ label photos OR choose "Name or SKU only"`);
     }
     if (!this.productNameValid()) issues.push('Product name required');
 
@@ -523,7 +528,7 @@ export class ProductCreateComponent implements OnInit {
 
     if (!hasName || !hasId) {
       this.submitError.set(
-        'Add a product name and a barcode or 5+ label photos before continuing.',
+        'Add a product name and choose identification: barcode, 5+ label photos, or "Name or SKU only".',
       );
       return;
     }
@@ -713,7 +718,7 @@ export class ProductCreateComponent implements OnInit {
   /**
    * Choose identification method
    */
-  chooseIdentificationMethod(method: 'barcode' | 'label-photos'): void {
+  chooseIdentificationMethod(method: 'barcode' | 'label-photos' | 'none'): void {
     this.identificationMethod.set(method);
 
     // Clear other method
@@ -724,13 +729,22 @@ export class ProductCreateComponent implements OnInit {
     if (method !== 'label-photos') {
       this.photoCount.set(0);
     }
+    if (method === 'none') {
+      this.productForm.patchValue({ barcode: '' });
+      this.barcodeValue.set('');
+      this.photoCount.set(0);
+    }
   }
 
   /**
-   * Async validator for barcode uniqueness
+   * Async validator for barcode uniqueness (skipped when identification method is 'none')
    */
   private barcodeAsyncValidator(): AsyncValidatorFn {
     return (control: AbstractControl): Promise<ValidationErrors | null> => {
+      // Skip when user chose "Name or SKU only" – no barcode required
+      if (this.identificationMethod() === 'none') {
+        return Promise.resolve(null);
+      }
       const barcode = control.value?.trim();
 
       // Skip validation if barcode is empty
@@ -807,6 +821,15 @@ export class ProductCreateComponent implements OnInit {
       if (product.customFields?.barcode) {
         this.identificationMethod.set('barcode');
         this.barcodeValue.set(product.customFields.barcode);
+      } else if (product.assets?.length >= 5) {
+        // Has enough assets to count as label-photos
+        this.identificationMethod.set('label-photos');
+        this.photoCount.set(product.assets.length);
+      } else {
+        // No barcode and no/insufficient photos → name/SKU only
+        this.identificationMethod.set('none');
+        this.barcodeValue.set('');
+        this.photoCount.set(0);
       }
 
       // Determine item type: Check if any variant has trackInventory: false → service
@@ -930,12 +953,15 @@ export class ProductCreateComponent implements OnInit {
         return;
       }
 
-      // Product/Service input
+      // Product/Service input (no barcode when identification is "Name or SKU only")
       const productInput = {
         name: formValue.name.trim(),
         description: '',
         enabled: true,
-        barcode: formValue.barcode?.trim() || undefined,
+        barcode:
+          this.identificationMethod() === 'none'
+            ? undefined
+            : formValue.barcode?.trim() || undefined,
       };
 
       // Multiple variant inputs from SKUs FormArray
