@@ -10,6 +10,7 @@ import {
 } from '@vendure/core';
 import { In } from 'typeorm';
 import { AuditService } from '../../infrastructure/audit/audit.service';
+import { ChartOfAccountsService } from '../financial/chart-of-accounts.service';
 import { FinancialService } from '../financial/financial.service';
 import { CreditService } from '../credit/credit.service';
 import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
@@ -23,6 +24,7 @@ export interface PaymentAllocationInput {
   customerId: string;
   paymentAmount: number; // In smallest currency unit (cents)
   orderIds?: string[]; // Optional - if not provided, auto-select oldest
+  debitAccountCode?: string; // Optional - overrides method-based debit account
 }
 
 export interface PaymentAllocationResult {
@@ -46,6 +48,7 @@ export class PaymentAllocationService {
     private readonly paymentService: PaymentService,
     private readonly financialService: FinancialService,
     private readonly creditService: CreditService,
+    private readonly chartOfAccountsService: ChartOfAccountsService,
     @Optional() private readonly auditService?: AuditService
   ) {}
 
@@ -84,6 +87,12 @@ export class PaymentAllocationService {
     ctx: RequestContext,
     input: PaymentAllocationInput
   ): Promise<PaymentAllocationResult> {
+    if (input.debitAccountCode?.trim()) {
+      await this.chartOfAccountsService.validatePaymentSourceAccount(
+        ctx,
+        input.debitAccountCode.trim()
+      );
+    }
     return this.connection.withTransaction(ctx, async transactionCtx => {
       try {
         // 1. Get unpaid orders
@@ -175,7 +184,8 @@ export class PaymentAllocationService {
                 payment.id.toString(),
                 updatedOrder,
                 PAYMENT_METHOD_CODES.CREDIT,
-                amountToAllocate
+                amountToAllocate,
+                input.debitAccountCode?.trim()
               );
             }
           }
@@ -276,7 +286,8 @@ export class PaymentAllocationService {
     orderId: string,
     paymentAmount?: number, // In smallest currency unit (cents), optional - defaults to outstanding amount
     paymentMethodCode?: string, // Payment method code (optional, defaults to credit)
-    referenceNumber?: string // Payment reference number (optional)
+    referenceNumber?: string, // Payment reference number (optional)
+    debitAccountCode?: string // Optional - overrides method-based debit account
   ): Promise<PaymentAllocationResult> {
     // Get the order to find the customer
     const order = await this.orderService.findOne(ctx, orderId, ['customer', 'payments']);
@@ -311,6 +322,9 @@ export class PaymentAllocationService {
     // Use the outstanding amount as payment amount if not specified, or validate payment amount
     const actualPaymentAmount = paymentAmount ?? outstandingAmount;
 
+    if (actualPaymentAmount <= 0) {
+      throw new UserInputError('Payment amount must be greater than zero.');
+    }
     if (actualPaymentAmount > outstandingAmount) {
       throw new UserInputError(
         `Payment amount (${actualPaymentAmount}) cannot exceed outstanding amount (${outstandingAmount})`
@@ -322,6 +336,10 @@ export class PaymentAllocationService {
 
     // Use payment method code if provided, otherwise default to credit
     const actualPaymentMethodCode = paymentMethodCode || PAYMENT_METHOD_CODES.CREDIT;
+
+    if (debitAccountCode?.trim()) {
+      await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, debitAccountCode.trim());
+    }
 
     // Prepare metadata with reference number if provided
     const metadata: Record<string, any> = {
@@ -442,7 +460,8 @@ export class PaymentAllocationService {
         payment.id.toString(),
         updatedOrder,
         actualPaymentMethodCode,
-        paymentAmountInCents
+        paymentAmountInCents,
+        debitAccountCode?.trim()
       );
 
       // Update order custom fields for user tracking

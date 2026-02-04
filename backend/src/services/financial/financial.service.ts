@@ -197,7 +197,8 @@ export class FinancialService {
     paymentId: string,
     order: Order,
     paymentMethod: string,
-    amount: number
+    amount: number,
+    debitAccountCode?: string
   ): Promise<void> {
     if (amount <= 0) {
       throw new Error(
@@ -211,13 +212,14 @@ export class FinancialService {
       orderId: order.id.toString(),
       orderCode: order.code,
       customerId: order.customer?.id?.toString(),
+      resolvedAccountCode: debitAccountCode?.trim() || undefined,
     };
 
     await this.postingService.postPaymentAllocation(ctx, paymentId, context);
 
-    // Invalidate cache
+    // Invalidate cache (clearing account = debit account used)
     this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.ACCOUNTS_RECEIVABLE);
-    const clearingAccount = this.mapMethodToAccount(paymentMethod);
+    const clearingAccount = debitAccountCode?.trim() || this.mapMethodToAccount(paymentMethod);
     this.queryService.invalidateCache(ctx.channelId as number, clearingAccount);
   }
 
@@ -264,7 +266,8 @@ export class FinancialService {
     purchaseReference: string,
     supplierId: string,
     amount: number,
-    paymentMethod: string
+    paymentMethod: string,
+    debitAccountCode?: string
   ): Promise<void> {
     if (amount <= 0) {
       throw new Error(
@@ -278,13 +281,14 @@ export class FinancialService {
       purchaseReference,
       supplierId,
       method: paymentMethod,
+      resolvedAccountCode: debitAccountCode?.trim() || undefined,
     };
 
     await this.postingService.postSupplierPayment(ctx, paymentId, context);
 
-    // Invalidate cache
+    // Invalidate cache (cash account = debit account used)
     this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.ACCOUNTS_PAYABLE);
-    const cashAccount = this.mapMethodToAccount(paymentMethod);
+    const cashAccount = debitAccountCode?.trim() || this.mapMethodToAccount(paymentMethod);
     this.queryService.invalidateCache(ctx.channelId as number, cashAccount);
   }
 

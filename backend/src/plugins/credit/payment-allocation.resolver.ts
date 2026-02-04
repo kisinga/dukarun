@@ -11,6 +11,7 @@ interface PaySingleOrderInput {
   paymentAmount?: number;
   paymentMethodCode?: string;
   referenceNumber?: string;
+  debitAccountCode?: string;
 }
 
 @Resolver()
@@ -46,7 +47,8 @@ export class PaymentAllocationResolver {
       input.orderId,
       input.paymentAmount,
       input.paymentMethodCode,
-      input.referenceNumber
+      input.referenceNumber,
+      input.debitAccountCode
     );
   }
 }

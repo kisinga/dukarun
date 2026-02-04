@@ -207,11 +207,14 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
 
   input InterAccountTransferInput {
     channelId: Int!
+    transferId: String! # Client-supplied id for idempotency (sourceId)
     fromAccountCode: String!
     toAccountCode: String!
-    amount: String! # in smallest currency unit
+    amount: String! # in smallest currency unit (principal)
     entryDate: DateTime!
     memo: String
+    feeAmount: String # optional, in smallest currency unit (tagged expense)
+    expenseTag: String # optional, e.g. "transaction_fee"; used in meta when feeAmount present
   }
 
   extend type Query {

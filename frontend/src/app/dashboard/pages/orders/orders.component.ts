@@ -274,11 +274,18 @@ export class OrdersComponent implements OnInit {
         'Walk-in Customer'
       : 'Walk-in Customer';
 
+    const total = order.totalWithTax || order.total || 0;
+    const settled = (order.payments || [])
+      .filter((p: { state: string }) => p.state === 'Settled')
+      .reduce((sum: number, p: { amount: number }) => sum + p.amount, 0);
+    const outstanding = Math.max(0, total - settled);
+
     const modalData: PayOrderModalData = {
       orderId: order.id,
       orderCode: order.code || '',
       customerName,
-      totalAmount: order.totalWithTax || order.total || 0,
+      totalAmount: total,
+      outstandingAmount: outstanding,
     };
 
     this.selectedOrderForPayment.set(modalData);

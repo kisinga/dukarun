@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { RequestContext, TransactionalConnection, UserInputError } from '@vendure/core';
 import { In } from 'typeorm';
 import { AuditService } from '../../infrastructure/audit/audit.service';
+import { ChartOfAccountsService } from '../financial/chart-of-accounts.service';
 import { SupplierCreditService } from '../credit/supplier-credit.service';
 import { FinancialService } from '../financial/financial.service';
 import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
@@ -16,6 +17,7 @@ export interface SupplierPaymentAllocationInput {
   supplierId: string;
   paymentAmount: number; // In smallest currency unit (cents)
   purchaseIds?: string[]; // Optional - if not provided, auto-select oldest
+  debitAccountCode?: string; // Optional - overrides method-based debit account
 }
 
 export interface SupplierPaymentAllocationResult {
@@ -37,6 +39,7 @@ export class SupplierPaymentAllocationService {
     private readonly connection: TransactionalConnection,
     private readonly supplierCreditService: SupplierCreditService,
     private readonly financialService: FinancialService,
+    private readonly chartOfAccountsService: ChartOfAccountsService,
     @Optional() private readonly auditService?: AuditService
   ) {}
 
@@ -80,6 +83,12 @@ export class SupplierPaymentAllocationService {
     ctx: RequestContext,
     input: SupplierPaymentAllocationInput
   ): Promise<SupplierPaymentAllocationResult> {
+    if (input.debitAccountCode?.trim()) {
+      await this.chartOfAccountsService.validatePaymentSourceAccount(
+        ctx,
+        input.debitAccountCode.trim()
+      );
+    }
     return this.connection.withTransaction(ctx, async transactionCtx => {
       try {
         // 1. Get unpaid purchases
@@ -167,7 +176,8 @@ export class SupplierPaymentAllocationService {
             purchase.referenceNumber || purchase.id,
             input.supplierId,
             allocation.amountToAllocate,
-            PAYMENT_METHOD_CODES.CASH // Default to cash, can be made configurable
+            PAYMENT_METHOD_CODES.CASH, // Default to cash, can be made configurable
+            input.debitAccountCode?.trim()
           );
 
           purchasesPaid.push({

@@ -121,6 +121,7 @@ const COMBINED_SCHEMA = gql`
     paymentAmount: Float
     paymentMethodCode: String
     referenceNumber: String
+    debitAccountCode: String
   }
 
   type CreditValidationResult {

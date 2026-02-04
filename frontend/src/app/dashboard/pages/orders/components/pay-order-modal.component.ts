@@ -10,9 +10,11 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import { CustomerPaymentService } from '../../../../core/services/customer/customer-payment.service';
 import { CustomerStateService } from '../../../../core/services/customer/customer-state.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
+import { LedgerService } from '../../../../core/services/ledger/ledger.service';
 import { OrdersService } from '../../../../core/services/orders.service';
 import {
   PaymentMethod,
@@ -24,6 +26,8 @@ export interface PayOrderModalData {
   orderCode: string;
   customerName: string;
   totalAmount: number;
+  /** Outstanding amount in smallest currency unit (cents). Used for partial payment cap. */
+  outstandingAmount: number;
 }
 
 /**
@@ -107,16 +111,55 @@ export interface PayOrderModalData {
         <!-- Payment Form -->
         @if (!successResult()) {
           <form (ngSubmit)="onConfirmPayment()" class="space-y-4">
-            <!-- Payment Amount Display -->
-            <div class="card bg-base-200">
-              <div class="card-body p-4">
-                <div class="flex justify-between items-center">
-                  <span class="text-sm font-medium text-base-content">Amount to Pay</span>
-                  <span class="text-xl font-bold text-primary">
-                    {{ formatCurrency(orderData()?.totalAmount || 0) }}
-                  </span>
-                </div>
-              </div>
+            <!-- Amount to Pay (main currency; empty = full outstanding) -->
+            <div class="form-control">
+              <label class="label" for="paymentAmount">
+                <span class="label-text font-semibold">Amount to Pay</span>
+                <span class="label-text-alt text-base-content/60">
+                  Outstanding:
+                  {{
+                    formatCurrency(orderData()?.outstandingAmount ?? orderData()?.totalAmount ?? 0)
+                  }}
+                </span>
+              </label>
+              <input
+                id="paymentAmount"
+                type="text"
+                inputmode="decimal"
+                placeholder="Leave empty for full amount"
+                [value]="paymentAmountDisplay()"
+                (input)="onPaymentAmountInput($any($event.target).value)"
+                name="paymentAmount"
+                class="input input-bordered w-full"
+                [disabled]="isProcessing()"
+              />
+              <label class="label">
+                <span class="label-text-alt text-base-content/60">
+                  Enter amount in {{ currencyService.currency() }} (e.g. 500.00) or leave empty for
+                  full
+                </span>
+              </label>
+            </div>
+
+            <!-- Debit Account (optional) -->
+            <div class="form-control">
+              <label class="label" for="debitAccount">
+                <span class="label-text font-semibold">Pay From (Account)</span>
+                <span class="label-text-alt text-base-content/60">Optional</span>
+              </label>
+              <select
+                id="debitAccount"
+                [value]="selectedDebitAccountCode()"
+                (change)="selectedDebitAccountCode.set($any($event.target).value)"
+                name="debitAccount"
+                class="select select-bordered w-full"
+                [disabled]="isProcessing() || isLoadingPaymentSourceAccounts()"
+              >
+                <option value="">Default (from payment method)</option>
+                @for (acc of paymentSourceAccounts(); track acc.code) {
+                  <option [value]="acc.code">{{ acc.name }} ({{ acc.code }})</option>
+                }
+              </select>
             </div>
 
             <!-- Payment Method Selection -->
@@ -264,7 +307,8 @@ export interface PayOrderModalData {
                   isProcessing() ||
                   !selectedPaymentMethod() ||
                   !referenceCode() ||
-                  referenceCode().trim().length === 0
+                  referenceCode().trim().length === 0 ||
+                  getEffectivePaymentAmountCents() <= 0
                 "
               >
                 @if (!isProcessing()) {
@@ -301,9 +345,10 @@ export interface PayOrderModalData {
 export class PayOrderModalComponent {
   private readonly paymentService = inject(CustomerPaymentService);
   private readonly stateService = inject(CustomerStateService);
-  private readonly currencyService = inject(CurrencyService);
+  readonly currencyService = inject(CurrencyService);
   private readonly ordersService = inject(OrdersService);
   private readonly paymentMethodService = inject(PaymentMethodService);
+  private readonly ledgerService = inject(LedgerService);
 
   // Inputs
   readonly orderData = input<PayOrderModalData | null>(null);
@@ -323,30 +368,65 @@ export class PayOrderModalComponent {
   readonly paymentMethods = signal<PaymentMethod[]>([]);
   readonly isLoadingPaymentMethods = signal(false);
   readonly paymentMethodsError = signal<string | null>(null);
+  readonly paymentAmountInput = signal<string>('');
+  readonly selectedDebitAccountCode = signal<string>('');
+  readonly paymentSourceAccounts = signal<{ code: string; name: string }[]>([]);
+  readonly isLoadingPaymentSourceAccounts = signal(false);
   readonly successResult = signal<{
     ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
     remainingBalance: number;
     totalAllocated: number;
   } | null>(null);
 
+  paymentAmountDisplay(): string {
+    return this.paymentAmountInput();
+  }
+
+  onPaymentAmountInput(value: string): void {
+    this.paymentAmountInput.set(value ?? '');
+  }
+
+  getEffectivePaymentAmountCents(): number {
+    const data = this.orderData();
+    if (!data) return 0;
+    const outstandingCents = data.outstandingAmount ?? data.totalAmount;
+    const raw = this.paymentAmountInput().trim();
+    if (!raw) return outstandingCents;
+    const parsed = parseFloat(raw.replace(/,/g, ''));
+    if (Number.isNaN(parsed) || parsed <= 0) return 0;
+    const cents = Math.round(parsed * 100);
+    return Math.min(cents, outstandingCents);
+  }
+
   /**
    * Show the modal
    */
   async show(): Promise<void> {
-    // Reset state
     this.error.set(null);
     this.successResult.set(null);
     this.isProcessing.set(false);
     this.referenceCode.set('');
     this.selectedPaymentMethod.set(null);
     this.paymentMethodsError.set(null);
+    this.paymentAmountInput.set('');
+    this.selectedDebitAccountCode.set('');
 
-    // Fetch payment methods
-    await this.loadPaymentMethods();
+    await Promise.all([this.loadPaymentMethods(), this.loadPaymentSourceAccounts()]);
 
-    // Show modal
     const modal = this.modalRef()?.nativeElement;
     modal?.showModal();
+  }
+
+  async loadPaymentSourceAccounts(): Promise<void> {
+    this.isLoadingPaymentSourceAccounts.set(true);
+    try {
+      const items = await firstValueFrom(this.ledgerService.loadPaymentSourceAccounts());
+      this.paymentSourceAccounts.set(items.map((a) => ({ code: a.code, name: a.name })));
+    } catch {
+      this.paymentSourceAccounts.set([]);
+    } finally {
+      this.isLoadingPaymentSourceAccounts.set(false);
+    }
   }
 
   /**
@@ -411,15 +491,19 @@ export class PayOrderModalComponent {
       return;
     }
 
+    const amountCents = this.getEffectivePaymentAmountCents();
+    const debitAccountCode = this.selectedDebitAccountCode()?.trim() || undefined;
+
     this.isProcessing.set(true);
     this.error.set(null);
 
     try {
       const result = await this.paymentService.paySingleOrder(
         data.orderId,
-        data.totalAmount, // Pass cents
+        amountCents,
         paymentMethodCode,
         refCode,
+        debitAccountCode,
       );
 
       if (result) {

@@ -1,6 +1,8 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
+import { In, Not } from 'typeorm';
 import { DataSource } from 'typeorm';
+import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import { Account } from '../../ledger/account.entity';
 import { JournalEntry } from '../../ledger/journal-entry.entity';
 import { JournalLine } from '../../ledger/journal-line.entity';
@@ -47,6 +49,47 @@ export class LedgerViewerResolver {
           type: account.type,
           isActive: account.isActive,
           balance: balance.balance, // In smallest currency unit (cents)
+          parentAccountId: account.parentAccountId || null,
+          isParent: account.isParent,
+        };
+      })
+    );
+
+    return {
+      items: accountsWithBalances,
+    };
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async paymentSourceAccounts(@Ctx() ctx: RequestContext) {
+    const channelId = ctx.channelId as number;
+    const accountRepo = this.dataSource.getRepository(Account);
+
+    const accounts = await accountRepo.find({
+      where: {
+        channelId,
+        isActive: true,
+        type: 'asset',
+        isParent: false,
+        code: Not(In([ACCOUNT_CODES.ACCOUNTS_RECEIVABLE, ACCOUNT_CODES.INVENTORY])),
+      },
+      order: { code: 'ASC' },
+    });
+
+    const accountsWithBalances = await Promise.all(
+      accounts.map(async account => {
+        const balance = await this.ledgerQueryService.getAccountBalance({
+          channelId,
+          accountCode: account.code,
+        });
+        return {
+          id: account.id,
+          code: account.code,
+          name: account.name,
+          type: account.type,
+          isActive: account.isActive,
+          balance: balance.balance,
           parentAccountId: account.parentAccountId || null,
           isParent: account.isParent,
         };

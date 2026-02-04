@@ -2452,6 +2452,23 @@ export const GET_LEDGER_ACCOUNTS = graphql(`
   }
 `);
 
+export const GET_PAYMENT_SOURCE_ACCOUNTS = graphql(`
+  query GetPaymentSourceAccounts {
+    paymentSourceAccounts {
+      items {
+        id
+        code
+        name
+        type
+        isActive
+        balance
+        parentAccountId
+        isParent
+      }
+    }
+  }
+`);
+
 export const GET_JOURNAL_ENTRIES = graphql(`
   query GetJournalEntries($options: JournalEntriesOptions) {
     journalEntries(options: $options) {

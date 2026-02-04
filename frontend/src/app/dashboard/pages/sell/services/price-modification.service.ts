@@ -10,19 +10,17 @@ const INCREASE_FACTOR = 1.03;
 const DECREASE_FACTOR = 0.97;
 
 /**
- * Compute next increased price (3% up, rounded).
+ * Compute next increased price (3% up, rounded). Input and output in cents.
  */
 export function computeNextIncrease(current: number): number {
-  current = current / 100;
-  return Math.round(current * INCREASE_FACTOR) * 100;
+  return Math.round(current * INCREASE_FACTOR);
 }
 
 /**
- * Compute next decreased price (3% down, rounded), floored at floorCents.
+ * Compute next decreased price (3% down, rounded), floored at floorCents. Input and output in cents.
  */
 export function computeNextDecrease(current: number, floorCents: number): number {
-  current = current / 100;
-  const next = Math.round(current * DECREASE_FACTOR) * 100;
+  const next = Math.round(current * DECREASE_FACTOR);
   return next < floorCents ? floorCents : next;
 }
 

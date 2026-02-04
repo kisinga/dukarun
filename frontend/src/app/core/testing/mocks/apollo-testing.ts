@@ -18,12 +18,18 @@ export { APOLLO_TEST_CLIENT };
 export interface MockResponse {
   request: { query: unknown; variables?: Record<string, unknown> };
   result: { data?: unknown; errors?: unknown[] };
+  /** Allow this mock to be used multiple times (default 1). Use a high number for queries called repeatedly (e.g. by CompanyService/AuthSessionService). */
+  maxUsageCount?: number;
 }
+
+/** High reuse count so GetActiveChannel / GetUserChannels / GetActiveAdministrator can be called many times across tests. */
+const MOCK_REUSE_COUNT = 100;
 
 const defaultMocks: MockResponse[] = [
   {
     request: { query: GET_ACTIVE_CHANNEL },
     result: { data: { activeChannel: null } },
+    maxUsageCount: MOCK_REUSE_COUNT,
   },
   {
     request: { query: GET_USER_CHANNELS },
@@ -32,10 +38,25 @@ const defaultMocks: MockResponse[] = [
         me: {
           id: '1',
           identifier: 'test',
-          channels: [],
+          channels: [
+            {
+              id: 'channel-1',
+              code: 'company-1',
+              token: 'token-1',
+              __typename: 'CurrentUserChannel',
+            },
+            {
+              id: 'channel-2',
+              code: 'company-2',
+              token: 'token-2',
+              __typename: 'CurrentUserChannel',
+            },
+          ],
+          __typename: 'CurrentUser',
         },
       },
     },
+    maxUsageCount: MOCK_REUSE_COUNT,
   },
   {
     request: { query: GET_ACTIVE_ADMIN },
@@ -57,11 +78,19 @@ const defaultMocks: MockResponse[] = [
         },
       },
     },
+    maxUsageCount: MOCK_REUSE_COUNT,
   },
 ];
 
+/**
+ * Builds the full mocks array: custom mocks first (so they override defaults for the same query), then defaults so GET_ACTIVE_CHANNEL / GET_USER_CHANNELS / GET_ACTIVE_ADMIN are always available with reuse.
+ */
+function buildMocks(customMocks?: MockResponse[]): MockResponse[] {
+  return customMocks ? [...customMocks, ...defaultMocks] : defaultMocks;
+}
+
 export function createTestApolloClient(mocks?: MockResponse[]): ApolloClient {
-  const link = new MockLink((mocks ?? defaultMocks) as never);
+  const link = new MockLink(buildMocks(mocks) as never);
   return new ApolloClient({
     link,
     cache: new InMemoryCache(),

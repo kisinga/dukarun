@@ -47,6 +47,7 @@ export const SUPPLIER_CREDIT_SCHEMA = gql`
     supplierId: ID!
     paymentAmount: Float!
     purchaseIds: [ID!]
+    debitAccountCode: String
   }
 
   extend type Query {

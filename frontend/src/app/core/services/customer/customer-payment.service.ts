@@ -95,9 +95,10 @@ export class CustomerPaymentService {
   /**
    * Pay a single credit order directly
    * @param orderId - Order ID to pay
-   * @param paymentAmount - Payment amount (optional, defaults to full outstanding amount)
+   * @param paymentAmount - Payment amount in cents (optional, defaults to full outstanding)
    * @param paymentMethodCode - Payment method code (optional)
    * @param referenceNumber - Payment reference number (optional)
+   * @param debitAccountCode - Ledger account to debit (optional; overrides method-based)
    * @returns Payment allocation result or null if failed
    */
   async paySingleOrder(
@@ -105,6 +106,7 @@ export class CustomerPaymentService {
     paymentAmount?: number,
     paymentMethodCode?: string,
     referenceNumber?: string,
+    debitAccountCode?: string,
   ): Promise<{
     ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
     remainingBalance: number;
@@ -115,20 +117,24 @@ export class CustomerPaymentService {
     try {
       const client = this.apolloService.getClient();
 
-      const input: any = {
+      const input: Record<string, unknown> = {
         orderId,
       };
 
       if (paymentAmount !== undefined) {
-        input.paymentAmount = paymentAmount;
+        input['paymentAmount'] = paymentAmount;
       }
 
       if (paymentMethodCode) {
-        input.paymentMethodCode = paymentMethodCode;
+        input['paymentMethodCode'] = paymentMethodCode;
       }
 
       if (referenceNumber) {
-        input.referenceNumber = referenceNumber;
+        input['referenceNumber'] = referenceNumber;
+      }
+
+      if (debitAccountCode) {
+        input['debitAccountCode'] = debitAccountCode;
       }
 
       const result = await client.mutate<{
