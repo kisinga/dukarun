@@ -146,21 +146,21 @@ services:
   # ========================================
   # ML Trainer Microservice (image built in CI; no build: here so Coolify deploy path matches services.yml)
   # ========================================
-  ml-trainer:
-    image: ghcr.io/kisinga/dukarun/ml-trainer:latest
-    platform: linux/amd64
-    restart: unless-stopped
-    networks:
-      - dukarun_services_network
-    environment:
-      ML_PORT: ${ML_PORT:-3005}
-      NODE_ENV: production
-      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN}
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:3005/health']
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # ml-trainer:
+  #   image: ghcr.io/kisinga/dukarun/ml-trainer:latest
+  #   platform: linux/amd64
+  #   restart: unless-stopped
+  #   networks:
+  #     - dukarun_services_network
+  #   environment:
+  #     ML_PORT: ${ML_PORT:-3005}
+  #     NODE_ENV: production
+  #     ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN}
+  #   healthcheck:
+  #     test: ['CMD', 'curl', '-f', 'http://localhost:3005/health']
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
 
 # ========================================
 # Networks
