@@ -42,7 +42,8 @@ describe('PriceModificationService', () => {
   describe('increase sequence from 100', () => {
     it('should build stack [100,103,106,...,130] over 9 increases', () => {
       let current = 100;
-      const expected = [100, 103, 106, 109, 112, 115, 119, 122, 126, 130];
+      // 3% each step, rounded: 115*1.03=118.45→118, 118*1.03=121.54→122
+      const expected = [100, 103, 106, 109, 112, 115, 118, 122, 126, 130];
 
       for (let i = 0; i < 9; i++) {
         const result = service.increasePrice(variantId, current, context);
@@ -75,7 +76,7 @@ describe('PriceModificationService', () => {
       }
       expect(current).toBe(130);
 
-      const sequence = [126, 122, 119, 115, 112, 109, 106, 103, 100];
+      const sequence = [126, 122, 118, 115, 112, 109, 106, 103, 100];
       for (const expected of sequence) {
         const result = service.decreasePrice(variantId, current, 1, undefined, context);
         expect(result).not.toBeNull();
