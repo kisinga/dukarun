@@ -2,8 +2,9 @@
 # Dukarun Application Services
 # =====================================
 #
-# This file contains only application services (backend, frontend)
+# This file contains only application services (backend, frontend, ml-trainer).
 # Infrastructure services (databases, cache, observability) are in docker-compose.services.yml
+# All images are built in CI (build-and-push.yml); no build: here so Coolify uses deploy-only path.
 #
 # Usage:
 #   # Start infrastructure first:
@@ -143,13 +144,11 @@ services:
       start_period: 30s
 
   # ========================================
-  # ML Trainer Microservice
+  # ML Trainer Microservice (image built in CI; no build: here so Coolify deploy path matches services.yml)
   # ========================================
   ml-trainer:
-    build:
-      context: ./ml-trainer
-      dockerfile: Dockerfile
     image: ghcr.io/kisinga/dukarun/ml-trainer:latest
+    platform: linux/amd64
     restart: unless-stopped
     networks:
       - dukarun_services_network
