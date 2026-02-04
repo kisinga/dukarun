@@ -58,7 +58,6 @@ export class GeneralSettingsComponent {
   private areSettingsEqual(a: ChannelSettings, b: ChannelSettings): boolean {
     return (
       a.cashierFlowEnabled === b.cashierFlowEnabled &&
-      a.cashierOpen === b.cashierOpen &&
       a.enablePrinter === b.enablePrinter &&
       (a.companyLogoAsset?.id ?? null) === (b.companyLogoAsset?.id ?? null)
     );
@@ -77,19 +76,7 @@ export class GeneralSettingsComponent {
     const target = event.target as HTMLInputElement;
     this.settingsState.update((settings) => {
       if (!settings) return settings;
-      if (!target.checked) {
-        return { ...settings, cashierFlowEnabled: false, cashierOpen: false };
-      }
-      return { ...settings, cashierFlowEnabled: true };
-    });
-    this.evaluateChanges(this.settingsState());
-  }
-
-  toggleCashierOpen(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    this.settingsState.update((settings) => {
-      if (!settings) return settings;
-      return { ...settings, cashierOpen: target.checked };
+      return { ...settings, cashierFlowEnabled: target.checked };
     });
     this.evaluateChanges(this.settingsState());
   }
@@ -172,14 +159,8 @@ export class GeneralSettingsComponent {
       await this.settingsService.updateChannelLogo(logoAssetId);
     }
 
-    if (
-      currentSettings.cashierFlowEnabled !== this.originalSettings?.cashierFlowEnabled ||
-      currentSettings.cashierOpen !== this.originalSettings?.cashierOpen
-    ) {
-      await this.settingsService.updateCashierSettings(
-        currentSettings.cashierFlowEnabled,
-        currentSettings.cashierOpen,
-      );
+    if (currentSettings.cashierFlowEnabled !== this.originalSettings?.cashierFlowEnabled) {
+      await this.settingsService.updateCashierSettings(currentSettings.cashierFlowEnabled);
     }
 
     if (currentSettings.enablePrinter !== this.originalSettings?.enablePrinter) {

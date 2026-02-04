@@ -4,7 +4,11 @@ import { Reconciliation } from '../../domain/recon/reconciliation.entity';
 import { InventoryBatch } from '../inventory/entities/inventory-batch.entity';
 import { AccountBalanceService } from './account-balance.service';
 import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
-import { InventoryReconciliationResult, InventoryValuation } from './period-management.types';
+import {
+  InventoryReconciliationResult,
+  InventoryValuation,
+  toScopeRefId,
+} from './period-management.types';
 
 export interface CreateInventoryReconciliationInput {
   channelId: number;
@@ -138,7 +142,10 @@ export class InventoryReconciliationService {
     const actualBalance = BigInt(input.actualBalance);
     const varianceAmount = (expectedBalance - actualBalance).toString();
 
-    const scopeRefId = input.stockLocationId ? input.stockLocationId.toString() : 'ALL';
+    const scopeRefId = toScopeRefId({
+      scope: 'inventory',
+      stockLocationId: input.stockLocationId ?? 'ALL',
+    });
 
     const createdBy = ctx.activeUserId ? parseInt(ctx.activeUserId.toString(), 10) : 0;
 

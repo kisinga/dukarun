@@ -18,7 +18,7 @@ export const channelSettingsSchema = gql`
 
   extend type Mutation {
     updateChannelLogo(logoAssetId: ID): ChannelSettings!
-    updateCashierSettings(cashierFlowEnabled: Boolean, cashierOpen: Boolean): ChannelSettings!
+    updateCashierSettings(cashierFlowEnabled: Boolean): ChannelSettings!
     updatePrinterSettings(enablePrinter: Boolean!): ChannelSettings!
     updateChannelStatus(channelId: ID!, status: String!): Channel!
     inviteChannelAdministrator(input: InviteAdministratorInput!): Administrator!
@@ -31,7 +31,6 @@ export const channelSettingsSchema = gql`
 
   type ChannelSettings {
     cashierFlowEnabled: Boolean!
-    cashierOpen: Boolean!
     enablePrinter: Boolean!
     companyLogoAsset: Asset
   }
@@ -100,10 +99,9 @@ export class ChannelSettingsResolver {
   @Allow(Permission.UpdateSettings)
   async updateCashierSettings(
     @Ctx() ctx: RequestContext,
-    @Args('cashierFlowEnabled', { nullable: true }) cashierFlowEnabled?: boolean,
-    @Args('cashierOpen', { nullable: true }) cashierOpen?: boolean
+    @Args('cashierFlowEnabled', { nullable: true }) cashierFlowEnabled?: boolean
   ) {
-    return this.channelSettingsService.updateCashierSettings(ctx, cashierFlowEnabled, cashierOpen);
+    return this.channelSettingsService.updateCashierSettings(ctx, cashierFlowEnabled);
   }
 
   @Mutation()

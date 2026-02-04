@@ -1,7 +1,7 @@
 /**
  * LedgerService tests
  *
- * Ensures loadPaymentSourceAccounts runs the query and sets paymentSourceAccountsList.
+ * Ensures loadEligibleDebitAccounts runs the query and sets eligibleDebitAccountsList.
  */
 
 import { provideZonelessChangeDetection } from '@angular/core';
@@ -18,7 +18,7 @@ describe('LedgerService', () => {
     querySpy = jasmine.createSpy('query').and.returnValue(
       Promise.resolve({
         data: {
-          paymentSourceAccounts: {
+          eligibleDebitAccounts: {
             items: [
               {
                 id: '1',
@@ -56,14 +56,14 @@ describe('LedgerService', () => {
     service = TestBed.inject(LedgerService);
   });
 
-  describe('loadPaymentSourceAccounts', () => {
-    it('should run paymentSourceAccounts query and set paymentSourceAccountsList', (done) => {
-      service.loadPaymentSourceAccounts().subscribe((items) => {
+  describe('loadEligibleDebitAccounts', () => {
+    it('should run eligibleDebitAccounts query and set eligibleDebitAccountsList', (done) => {
+      service.loadEligibleDebitAccounts().subscribe((items) => {
         expect(items.length).toBe(2);
         expect(items[0].code).toBe('CASH_ON_HAND');
         expect(items[1].code).toBe('BANK_MAIN');
-        expect(service.paymentSourceAccountsList().length).toBe(2);
-        expect(service.paymentSourceAccountsList()[0].name).toBe('Cash on Hand');
+        expect(service.eligibleDebitAccountsList().length).toBe(2);
+        expect(service.eligibleDebitAccountsList()[0].name).toBe('Cash on Hand');
         done();
       });
     });
@@ -71,9 +71,9 @@ describe('LedgerService', () => {
     it('should set empty list on query error', (done) => {
       querySpy.and.returnValue(Promise.reject(new Error('Network error')));
 
-      service.loadPaymentSourceAccounts().subscribe((items) => {
+      service.loadEligibleDebitAccounts().subscribe((items) => {
         expect(items).toEqual([]);
-        expect(service.paymentSourceAccountsList()).toEqual([]);
+        expect(service.eligibleDebitAccountsList()).toEqual([]);
         done();
       });
     });

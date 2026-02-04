@@ -4,7 +4,7 @@
  * Verifies that ledger and session operations are isolated by channel:
  * - PostingService loads accounts by payload.channelId and rejects when accounts missing for that channel
  * - Sessions and currentCashierSession are keyed by channelId
- * - paymentSourceAccounts uses ctx.channelId so each channel sees only its accounts
+ * - eligibleDebitAccounts uses ctx.channelId so each channel sees only its accounts
  *
  * Implemented with mocks (no DB) to assert channelId is always used and never mixed.
  */
@@ -154,11 +154,15 @@ describe('Ledger Channel Isolation', () => {
       const mockFinancialService = {
         postVarianceAdjustment: jest.fn().mockImplementation(() => Promise.resolve()),
       } as any;
+      const mockChannelPaymentMethodService = {
+        getChannelPaymentMethods: (jest.fn() as any).mockResolvedValue([]),
+      } as any;
       const service = new OpenSessionService(
         mockConnection,
         mockLedgerQueryService,
         mockReconciliationService,
-        mockFinancialService
+        mockFinancialService,
+        mockChannelPaymentMethodService
       );
       const ctx1 = { channelId: channel1Id } as RequestContext;
       const ctx2 = { channelId: channel2Id } as RequestContext;
@@ -173,7 +177,7 @@ describe('Ledger Channel Isolation', () => {
     });
   });
 
-  describe('paymentSourceAccounts uses ctx.channelId', () => {
+  describe('eligibleDebitAccounts uses ctx.channelId', () => {
     it('resolver queries accounts with channelId from context', async () => {
       const mockAccountRepo = {
         find: jest.fn().mockImplementation((opts: any) => {
@@ -198,7 +202,7 @@ describe('Ledger Channel Isolation', () => {
       const resolver = new LedgerViewerResolver(mockDataSource, mockLedgerQueryService);
       const ctx = { channelId: channel1Id } as RequestContext;
 
-      await resolver.paymentSourceAccounts(ctx);
+      await resolver.eligibleDebitAccounts(ctx);
 
       expect(mockAccountRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({

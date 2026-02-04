@@ -216,7 +216,6 @@ export const GET_ACTIVE_CHANNEL = graphql(`
           preview
         }
         cashierFlowEnabled
-        cashierOpen
         enablePrinter
         subscriptionStatus
         trialEndsAt
@@ -1949,7 +1948,6 @@ export const UPDATE_CHANNEL_LOGO = graphql(`
   mutation UpdateChannelLogo($logoAssetId: ID) {
     updateChannelLogo(logoAssetId: $logoAssetId) {
       cashierFlowEnabled
-      cashierOpen
       enablePrinter
       companyLogoAsset {
         id
@@ -1961,10 +1959,9 @@ export const UPDATE_CHANNEL_LOGO = graphql(`
 `);
 
 export const UPDATE_CASHIER_SETTINGS = graphql(`
-  mutation UpdateCashierSettings($cashierFlowEnabled: Boolean, $cashierOpen: Boolean) {
-    updateCashierSettings(cashierFlowEnabled: $cashierFlowEnabled, cashierOpen: $cashierOpen) {
+  mutation UpdateCashierSettings($cashierFlowEnabled: Boolean) {
+    updateCashierSettings(cashierFlowEnabled: $cashierFlowEnabled) {
       cashierFlowEnabled
-      cashierOpen
       enablePrinter
       companyLogoAsset {
         id
@@ -1979,7 +1976,6 @@ export const UPDATE_PRINTER_SETTINGS = graphql(`
   mutation UpdatePrinterSettings($enablePrinter: Boolean!) {
     updatePrinterSettings(enablePrinter: $enablePrinter) {
       cashierFlowEnabled
-      cashierOpen
       enablePrinter
       companyLogoAsset {
         id
@@ -2452,9 +2448,9 @@ export const GET_LEDGER_ACCOUNTS = graphql(`
   }
 `);
 
-export const GET_PAYMENT_SOURCE_ACCOUNTS = graphql(`
-  query GetPaymentSourceAccounts {
-    paymentSourceAccounts {
+export const GET_ELIGIBLE_DEBIT_ACCOUNTS = graphql(`
+  query GetEligibleDebitAccounts {
+    eligibleDebitAccounts {
       items {
         id
         code
@@ -2523,7 +2519,6 @@ export const GET_CHANNEL_RECONCILIATION_CONFIG = graphql(`
     channelReconciliationConfig(channelId: $channelId) {
       paymentMethodId
       paymentMethodCode
-      paymentMethodName
       reconciliationType
       ledgerAccountCode
       isCashierControlled

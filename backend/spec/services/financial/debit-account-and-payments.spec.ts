@@ -2,7 +2,7 @@
  * Debit account validation and payment flows
  *
  * Tests ChartOfAccountsService.validatePaymentSourceAccount, PaymentAllocationService.paySingleOrder
- * amount/debit validation, and paymentSourceAccounts filter (via LedgerViewerResolver).
+ * amount/debit validation, and eligibleDebitAccounts filter (via LedgerViewerResolver).
  */
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
@@ -300,7 +300,7 @@ describe('PaymentAllocationService.paySingleOrder', () => {
   });
 });
 
-describe('LedgerViewerResolver.paymentSourceAccounts', () => {
+describe('LedgerViewerResolver.eligibleDebitAccounts', () => {
   const ctx = { channelId: 1 } as RequestContext;
   let resolver: LedgerViewerResolver;
   let mockAccountRepo: any;
@@ -341,7 +341,7 @@ describe('LedgerViewerResolver.paymentSourceAccounts', () => {
     };
     mockAccountRepo.find.mockResolvedValue([cashOnHand, bankMain]);
 
-    const result = await resolver.paymentSourceAccounts(ctx);
+    const result = await resolver.eligibleDebitAccounts(ctx);
 
     expect(result.items).toHaveLength(2);
     const codes = result.items.map((a: any) => a.code);
@@ -374,7 +374,7 @@ describe('LedgerViewerResolver.paymentSourceAccounts', () => {
       },
     ]);
 
-    await resolver.paymentSourceAccounts(ctx);
+    await resolver.eligibleDebitAccounts(ctx);
 
     const findCall = mockAccountRepo.find.mock.calls[0][0];
     expect(findCall.where.channelId).toBe(1);

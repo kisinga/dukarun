@@ -177,10 +177,10 @@ export interface PayOrderModalData {
                 (change)="selectedDebitAccountCode.set($any($event.target).value)"
                 name="debitAccount"
                 class="select select-bordered w-full"
-                [disabled]="isProcessing() || isLoadingPaymentSourceAccounts()"
+                [disabled]="isProcessing() || isLoadingEligibleDebitAccounts()"
               >
                 <option value="">Default (from payment method)</option>
-                @for (acc of paymentSourceAccounts(); track acc.code) {
+                @for (acc of eligibleDebitAccounts(); track acc.code) {
                   <option [value]="acc.code">{{ acc.name }} ({{ acc.code }})</option>
                 }
               </select>
@@ -397,8 +397,8 @@ export class PayOrderModalComponent {
   readonly paymentMethodsError = signal<string | null>(null);
   readonly paymentAmountInput = signal<string>('');
   readonly selectedDebitAccountCode = signal<string>('');
-  readonly paymentSourceAccounts = signal<{ code: string; name: string }[]>([]);
-  readonly isLoadingPaymentSourceAccounts = signal(false);
+  readonly eligibleDebitAccounts = signal<{ code: string; name: string }[]>([]);
+  readonly isLoadingEligibleDebitAccounts = signal(false);
   readonly successResult = signal<{
     ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
     remainingBalance: number;
@@ -446,21 +446,21 @@ export class PayOrderModalComponent {
       }
     }
 
-    await Promise.all([this.loadPaymentMethods(), this.loadPaymentSourceAccounts()]);
+    await Promise.all([this.loadPaymentMethods(), this.loadEligibleDebitAccounts()]);
 
     const modal = this.modalRef()?.nativeElement;
     modal?.showModal();
   }
 
-  async loadPaymentSourceAccounts(): Promise<void> {
-    this.isLoadingPaymentSourceAccounts.set(true);
+  async loadEligibleDebitAccounts(): Promise<void> {
+    this.isLoadingEligibleDebitAccounts.set(true);
     try {
-      const items = await firstValueFrom(this.ledgerService.loadPaymentSourceAccounts());
-      this.paymentSourceAccounts.set(items.map((a) => ({ code: a.code, name: a.name })));
+      const items = await firstValueFrom(this.ledgerService.loadEligibleDebitAccounts());
+      this.eligibleDebitAccounts.set(items.map((a) => ({ code: a.code, name: a.name })));
     } catch {
-      this.paymentSourceAccounts.set([]);
+      this.eligibleDebitAccounts.set([]);
     } finally {
-      this.isLoadingPaymentSourceAccounts.set(false);
+      this.isLoadingEligibleDebitAccounts.set(false);
     }
   }
 

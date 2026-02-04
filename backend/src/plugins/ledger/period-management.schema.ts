@@ -65,19 +65,20 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     totalItems: Int!
   }
 
-  input OpeningBalanceInput {
+  input AccountAmountInput {
     accountCode: String!
     amountCents: Int!
   }
 
   input OpenCashierSessionInput {
     channelId: Int!
-    openingBalances: [OpeningBalanceInput!]!
+    openingBalances: [AccountAmountInput!]!
   }
 
   input CloseCashierSessionInput {
     sessionId: ID!
-    closingDeclared: String!
+    channelId: Int
+    closingBalances: [AccountAmountInput!]!
     notes: String
   }
 

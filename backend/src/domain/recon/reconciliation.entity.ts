@@ -15,8 +15,9 @@ export class Reconciliation {
   @Column({ type: 'varchar', length: 32 })
   scope!: ReconciliationScope;
 
+  /** When scope=cash-session then sessionId; when scope=method then payment method code; when scope=bank then payoutId; when scope=inventory then stockLocationId or 'ALL'. */
   @Column({ type: 'varchar', length: 64 })
-  scopeRefId!: string; // e.g., sessionId, methodCode, payoutId
+  scopeRefId!: string;
 
   @Column({ type: 'date' })
   rangeStart!: string;

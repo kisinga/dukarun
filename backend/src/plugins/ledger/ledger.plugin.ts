@@ -14,6 +14,7 @@ import { JournalEntry } from '../../ledger/journal-entry.entity';
 import { JournalLine } from '../../ledger/journal-line.entity';
 import { PostingService } from '../../ledger/posting.service';
 import { AccountBalanceService } from '../../services/financial/account-balance.service';
+import { ChannelPaymentMethodService } from '../../services/financial/channel-payment-method.service';
 import { ChartOfAccountsService } from '../../services/financial/chart-of-accounts.service';
 import { FinancialService } from '../../services/financial/financial.service';
 import { LedgerPostingService } from '../../services/financial/ledger-posting.service';
@@ -62,6 +63,7 @@ const COMBINED_SCHEMA = gql`
   providers: [
     PostingService,
     ChartOfAccountsService,
+    ChannelPaymentMethodService,
     DashboardStatsResolver,
     LedgerViewerResolver,
     PeriodManagementResolver,

@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import type { GetStockLocationsQuery } from '../graphql/generated/graphql';
 import { GET_STOCK_LOCATIONS } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
+import { CashierSessionService } from './cashier-session/cashier-session.service';
 import { CompanyService } from './company.service';
 
 /**
@@ -34,6 +35,7 @@ export interface StockLocation {
 export class StockLocationService {
   private readonly apolloService = inject(ApolloService);
   private readonly companyService = inject(CompanyService);
+  private readonly cashierSessionService = inject(CashierSessionService);
 
   // State signals
   private readonly locationsSignal = signal<StockLocation[]>([]);
@@ -71,11 +73,10 @@ export class StockLocationService {
   readonly cashierFlowEnabled = this.companyService.cashierFlowEnabled;
 
   /**
-   * Cashier open status for the active channel
-   * Returns whether cashier is currently available
-   * Delegates to CompanyService which reads from channel custom fields
+   * Whether a shift is currently open for the active channel
+   * Derived from open cashier session (single source of truth)
    */
-  readonly cashierOpen = this.companyService.cashierOpen;
+  readonly hasActiveSession = this.cashierSessionService.hasActiveSession;
 
   /**
    * Fetch all stock locations

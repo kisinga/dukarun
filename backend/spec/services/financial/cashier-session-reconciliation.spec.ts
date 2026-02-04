@@ -7,15 +7,14 @@
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Channel, PaymentMethod, RequestContext, TransactionalConnection } from '@vendure/core';
-import {
-  OpenSessionService,
-  SessionReconciliationRequirements,
-} from '../../../src/services/financial/open-session.service';
+import { OpenSessionService } from '../../../src/services/financial/open-session.service';
+import { SessionReconciliationRequirements } from '../../../src/services/financial/period-management.types';
 import { CashierSession } from '../../../src/domain/cashier/cashier-session.entity';
 import { CashDrawerCount } from '../../../src/domain/cashier/cash-drawer-count.entity';
 import { MpesaVerification } from '../../../src/domain/cashier/mpesa-verification.entity';
 import { Reconciliation } from '../../../src/domain/recon/reconciliation.entity';
 import { ReconciliationAccount } from '../../../src/domain/recon/reconciliation-account.entity';
+import { Account } from '../../../src/ledger/account.entity';
 import { FinancialService } from '../../../src/services/financial/financial.service';
 import { LedgerQueryService } from '../../../src/services/financial/ledger-query.service';
 import { ReconciliationService } from '../../../src/services/financial/reconciliation.service';
@@ -34,6 +33,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
   let mockSessionRepo: any;
   let mockChannelRepo: any;
   let mockCountRepo: any;
+  let mockChannelPaymentMethodService: any;
 
   beforeEach(() => {
     mockSessionRepo = {
@@ -59,6 +59,9 @@ describe('CashierSessionService - Reconciliation Integration', () => {
     // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
     const mockReconAccountRepo: any = { find: jest.fn().mockResolvedValue([]) };
 
+    const mockAccountRepo = {
+      find: (jest.fn() as any).mockResolvedValue([{ id: 'acc-1', code: 'CASH_ON_HAND' }]),
+    };
     mockConnection = {
       getRepository: jest.fn((_ctx: any, entity: any) => {
         if (entity === CashierSession) return mockSessionRepo;
@@ -66,6 +69,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         if (entity === CashDrawerCount) return mockCountRepo;
         if (entity === Reconciliation) return mockReconRepo;
         if (entity === ReconciliationAccount) return mockReconAccountRepo;
+        if (entity === Account) return mockAccountRepo;
         if (entity === MpesaVerification)
           return { create: jest.fn(), save: jest.fn(), findOne: jest.fn() };
         return {};
@@ -85,11 +89,17 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       postVarianceAdjustment: jest.fn().mockImplementation(() => Promise.resolve()),
     };
 
+    mockChannelPaymentMethodService = {
+      getChannelPaymentMethods: (jest.fn() as any).mockResolvedValue([]),
+      getPaymentMethodDisplayName: jest.fn((pm: { code: string }) => pm.code),
+    };
+
     service = new (OpenSessionService as any)(
       mockConnection,
       mockLedgerQueryService,
       mockReconciliationService,
-      mockFinancialService
+      mockFinancialService,
+      mockChannelPaymentMethodService
     );
   });
 
@@ -195,7 +205,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
 
       await service.closeSession(ctx, {
         sessionId: session1.id,
-        closingDeclared: 10000,
+        closingBalances: [{ accountCode: 'CASH_ON_HAND', amountCents: 10000 }],
       });
 
       const session2: CashierSession = {
@@ -327,12 +337,10 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         requiresReconciliation: true,
       });
 
-      const channel = {
-        id: channelId,
-        paymentMethods: [cashPaymentMethod, mpesaPaymentMethod],
-      };
-
-      mockChannelRepo.findOne.mockResolvedValue(channel);
+      mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([
+        cashPaymentMethod,
+        mpesaPaymentMethod,
+      ]);
 
       const result = await service.getSessionReconciliationRequirements(ctx, sessionId);
 
@@ -366,10 +374,9 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         requiresReconciliation: true,
       });
 
-      mockChannelRepo.findOne.mockResolvedValue({
-        id: channelId,
-        paymentMethods: [mpesaPaymentMethod],
-      });
+      mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([
+        mpesaPaymentMethod,
+      ]);
 
       const result = await service.getSessionReconciliationRequirements(ctx, sessionId);
 
@@ -407,10 +414,10 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         requiresReconciliation: false,
       });
 
-      mockChannelRepo.findOne.mockResolvedValue({
-        id: channelId,
-        paymentMethods: [cashPaymentMethod, creditPaymentMethod],
-      });
+      mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([
+        cashPaymentMethod,
+        creditPaymentMethod,
+      ]);
 
       const result = await service.getSessionReconciliationRequirements(ctx, sessionId);
 
@@ -451,10 +458,10 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         enabled: false, // Disabled
       };
 
-      mockChannelRepo.findOne.mockResolvedValue({
-        id: channelId,
-        paymentMethods: [cashPaymentMethod, mpesaPaymentMethod],
-      });
+      mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([
+        cashPaymentMethod,
+        mpesaPaymentMethod,
+      ]);
 
       const result = await service.getSessionReconciliationRequirements(ctx, sessionId);
 
@@ -485,10 +492,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       } as CashierSession;
 
       mockSessionRepo.findOne.mockResolvedValue(session);
-      mockChannelRepo.findOne.mockResolvedValue({
-        id: channelId,
-        paymentMethods: [],
-      });
+      mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([]);
 
       const result = await service.getSessionReconciliationRequirements(ctx, sessionId);
 
@@ -514,10 +518,9 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         },
       } as unknown as PaymentMethod;
 
-      mockChannelRepo.findOne.mockResolvedValue({
-        id: channelId,
-        paymentMethods: [cashPaymentMethod],
-      });
+      mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([
+        cashPaymentMethod,
+      ]);
 
       const result = await service.getChannelReconciliationRequirements(ctx, channelId);
 

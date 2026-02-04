@@ -28,6 +28,11 @@ export type Scalars = {
   Upload: { input: any; output: any };
 };
 
+export type AccountAmountInput = {
+  accountCode: Scalars['String']['input'];
+  amountCents: Scalars['Int']['input'];
+};
+
 export type AccountBreakdown = {
   __typename?: 'AccountBreakdown';
   icon: Scalars['String']['output'];
@@ -831,7 +836,7 @@ export type ChannelSubscription = {
 };
 
 export type CloseCashierSessionInput = {
-  closingDeclared: Scalars['String']['input'];
+  closingBalances: Array<AccountAmountInput>;
   notes?: InputMaybe<Scalars['String']['input']>;
   sessionId: Scalars['ID']['input'];
 };
@@ -5053,12 +5058,7 @@ export type OtpResponse = {
 
 export type OpenCashierSessionInput = {
   channelId: Scalars['Int']['input'];
-  openingBalances: Array<OpeningBalanceInput>;
-};
-
-export type OpeningBalanceInput = {
-  accountCode: Scalars['String']['input'];
-  amountCents: Scalars['Int']['input'];
+  openingBalances: Array<AccountAmountInput>;
 };
 
 export type Order = Node & {
@@ -5536,6 +5536,7 @@ export type PaymentMethodReconciliationConfig = {
   ledgerAccountCode: Scalars['String']['output'];
   paymentMethodCode: Scalars['String']['output'];
   paymentMethodId: Scalars['ID']['output'];
+  paymentMethodName: Scalars['String']['output'];
   reconciliationType: Scalars['String']['output'];
   requiresReconciliation: Scalars['Boolean']['output'];
 };
@@ -6436,6 +6437,8 @@ export type Query = {
   customerGroups: CustomerGroupList;
   customers: CustomerList;
   dashboardStats: DashboardStats;
+  /** Ledger accounts eligible as payment/debit sources (asset, leaf, excluding AR and inventory). */
+  eligibleDebitAccounts: LedgerAccountsResult;
   /** Returns a list of eligible shipping methods for the draft Order */
   eligibleShippingMethodsForDraftOrder: Array<ShippingMethodQuote>;
   /** Returns all configured EntityDuplicators. */
@@ -6480,7 +6483,6 @@ export type Query = {
   paymentMethodEligibilityCheckers: Array<ConfigurableOperationDefinition>;
   paymentMethodHandlers: Array<ConfigurableOperationDefinition>;
   paymentMethods: PaymentMethodList;
-  paymentSourceAccounts: LedgerAccountsResult;
   pendingSearchIndexUpdates: Scalars['Int']['output'];
   pendingVarianceReviews: Array<CashDrawerCount>;
   periodReconciliationStatus: ReconciliationStatus;
@@ -8963,7 +8965,6 @@ export type GetActiveChannelQuery = {
     customFields?: {
       __typename?: 'ChannelCustomFields';
       cashierFlowEnabled?: boolean | null;
-      cashierOpen?: boolean | null;
       enablePrinter?: boolean | null;
       subscriptionStatus?: string | null;
       trialEndsAt?: any | null;
@@ -10817,7 +10818,6 @@ export type UpdateChannelLogoMutation = {
   updateChannelLogo: {
     __typename?: 'ChannelSettings';
     cashierFlowEnabled: boolean;
-    cashierOpen: boolean;
     enablePrinter: boolean;
     companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
   };
@@ -10825,7 +10825,6 @@ export type UpdateChannelLogoMutation = {
 
 export type UpdateCashierSettingsMutationVariables = Exact<{
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
-  cashierOpen?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type UpdateCashierSettingsMutation = {
@@ -10833,7 +10832,6 @@ export type UpdateCashierSettingsMutation = {
   updateCashierSettings: {
     __typename?: 'ChannelSettings';
     cashierFlowEnabled: boolean;
-    cashierOpen: boolean;
     enablePrinter: boolean;
     companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
   };
@@ -10848,7 +10846,6 @@ export type UpdatePrinterSettingsMutation = {
   updatePrinterSettings: {
     __typename?: 'ChannelSettings';
     cashierFlowEnabled: boolean;
-    cashierOpen: boolean;
     enablePrinter: boolean;
     companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
   };
@@ -11373,11 +11370,11 @@ export type GetLedgerAccountsQuery = {
   };
 };
 
-export type GetPaymentSourceAccountsQueryVariables = Exact<{ [key: string]: never }>;
+export type GetEligibleDebitAccountsQueryVariables = Exact<{ [key: string]: never }>;
 
-export type GetPaymentSourceAccountsQuery = {
+export type GetEligibleDebitAccountsQuery = {
   __typename?: 'Query';
-  paymentSourceAccounts: {
+  eligibleDebitAccounts: {
     __typename?: 'LedgerAccountsResult';
     items: Array<{
       __typename?: 'LedgerAccount';
@@ -12663,7 +12660,6 @@ export const GetActiveChannelDocument = {
                         },
                       },
                       { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'cashierOpen' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'subscriptionStatus' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'trialEndsAt' } },
@@ -18430,7 +18426,6 @@ export const UpdateChannelLogoDocument = {
               kind: 'SelectionSet',
               selections: [
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'cashierOpen' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                 {
                   kind: 'Field',
@@ -18465,11 +18460,6 @@ export const UpdateCashierSettingsDocument = {
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
           type: { kind: 'NamedType', name: { kind: 'Name', value: 'Boolean' } },
         },
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'cashierOpen' } },
-          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Boolean' } },
-        },
       ],
       selectionSet: {
         kind: 'SelectionSet',
@@ -18483,17 +18473,11 @@ export const UpdateCashierSettingsDocument = {
                 name: { kind: 'Name', value: 'cashierFlowEnabled' },
                 value: { kind: 'Variable', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
               },
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'cashierOpen' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'cashierOpen' } },
-              },
             ],
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'cashierOpen' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                 {
                   kind: 'Field',
@@ -18549,7 +18533,6 @@ export const UpdatePrinterSettingsDocument = {
               kind: 'SelectionSet',
               selections: [
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'cashierOpen' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                 {
                   kind: 'Field',
@@ -20059,19 +20042,19 @@ export const GetLedgerAccountsDocument = {
     },
   ],
 } as unknown as DocumentNode<GetLedgerAccountsQuery, GetLedgerAccountsQueryVariables>;
-export const GetPaymentSourceAccountsDocument = {
+export const GetEligibleDebitAccountsDocument = {
   kind: 'Document',
   definitions: [
     {
       kind: 'OperationDefinition',
       operation: 'query',
-      name: { kind: 'Name', value: 'GetPaymentSourceAccounts' },
+      name: { kind: 'Name', value: 'GetEligibleDebitAccounts' },
       selectionSet: {
         kind: 'SelectionSet',
         selections: [
           {
             kind: 'Field',
-            name: { kind: 'Name', value: 'paymentSourceAccounts' },
+            name: { kind: 'Name', value: 'eligibleDebitAccounts' },
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
@@ -20099,7 +20082,7 @@ export const GetPaymentSourceAccountsDocument = {
       },
     },
   ],
-} as unknown as DocumentNode<GetPaymentSourceAccountsQuery, GetPaymentSourceAccountsQueryVariables>;
+} as unknown as DocumentNode<GetEligibleDebitAccountsQuery, GetEligibleDebitAccountsQueryVariables>;
 export const GetJournalEntriesDocument = {
   kind: 'Document',
   definitions: [

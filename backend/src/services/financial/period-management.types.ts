@@ -2,6 +2,83 @@ import { ReconciliationScope } from '../../domain/recon/reconciliation.entity';
 import { AccountingPeriod } from '../../domain/period/accounting-period.entity';
 
 /**
+ * Discriminated union for reconciliation scope + ref.
+ * scopeRefId in the DB is the string produced by toScopeRefId(ref).
+ */
+export type ReconciliationScopeRef =
+  | { scope: 'cash-session'; sessionId: string }
+  | { scope: 'method'; methodCode: string }
+  | { scope: 'bank'; payoutId: string }
+  | { scope: 'inventory'; stockLocationId: number | 'ALL' };
+
+export function toScopeRefId(ref: ReconciliationScopeRef): string {
+  switch (ref.scope) {
+    case 'cash-session':
+      return ref.sessionId;
+    case 'method':
+      return ref.methodCode;
+    case 'bank':
+      return ref.payoutId;
+    case 'inventory':
+      return ref.stockLocationId === 'ALL' ? 'ALL' : String(ref.stockLocationId);
+    default:
+      return assertNever(ref);
+  }
+}
+
+function assertNever(x: never): never {
+  throw new Error(`Unexpected reconciliation scope ref: ${JSON.stringify(x)}`);
+}
+
+export function fromScopeRefId(
+  scope: ReconciliationScope,
+  scopeRefId: string
+): ReconciliationScopeRef {
+  switch (scope) {
+    case 'cash-session':
+      return { scope: 'cash-session', sessionId: scopeRefId };
+    case 'method':
+      return { scope: 'method', methodCode: scopeRefId };
+    case 'bank':
+      return { scope: 'bank', payoutId: scopeRefId };
+    case 'inventory':
+      return {
+        scope: 'inventory',
+        stockLocationId: scopeRefId === 'ALL' ? 'ALL' : parseInt(scopeRefId, 10),
+      };
+    default:
+      return assertNeverScope(scope);
+  }
+}
+
+function assertNeverScope(x: never): never {
+  throw new Error(`Unexpected reconciliation scope: ${x}`);
+}
+
+/**
+ * Payment method reconciliation config (single source of truth).
+ * Used by ReconciliationValidatorService, OpenSessionService, and GraphQL.
+ */
+export type PaymentMethodReconciliationConfig = {
+  paymentMethodId: string;
+  paymentMethodCode: string;
+  paymentMethodName: string;
+  reconciliationType: 'blind_count' | 'transaction_verification' | 'statement_match' | 'none';
+  ledgerAccountCode: string;
+  isCashierControlled: boolean;
+  requiresReconciliation: boolean;
+};
+
+/**
+ * Session reconciliation requirements (blind count, verification, payment methods).
+ */
+export type SessionReconciliationRequirements = {
+  blindCountRequired: boolean;
+  verificationRequired: boolean;
+  paymentMethods: PaymentMethodReconciliationConfig[];
+};
+
+/**
  * Period Status
  * Current period state and reconciliation status
  */

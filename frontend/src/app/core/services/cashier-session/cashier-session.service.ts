@@ -25,7 +25,8 @@ export interface CashierSession {
 export interface PaymentMethodReconciliationConfig {
   paymentMethodId: string;
   paymentMethodCode: string;
-  paymentMethodName: string;
+  /** Present when backend schema and codegen include it; otherwise use paymentMethodCode for display. */
+  paymentMethodName?: string;
   reconciliationType: string;
   ledgerAccountCode: string;
   isCashierControlled: boolean;
@@ -278,22 +279,36 @@ export class CashierSessionService {
   }
 
   /**
-   * Close a cashier session
+   * Close a cashier session with per-account closing amounts (same shape as opening).
+   * Pass channelId so the backend can resolve the current session when sessionId is missing or stale.
    */
-  closeSession(sessionId: string, closingDeclared: number, notes?: string) {
+  closeSession(
+    sessionId: string,
+    closingBalances: Array<{ accountCode: string; amountCents: number }>,
+    notes?: string,
+    channelId?: number,
+  ) {
     this.isLoading.set(true);
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const mutationPromise = client.mutate<{ closeCashierSession: CashierSessionSummary }>({
-      mutation: CLOSE_CASHIER_SESSION as any,
-      variables: {
-        input: {
-          sessionId,
-          closingDeclared: closingDeclared.toString(),
-          notes,
-        },
-      },
+    const input: {
+      sessionId: string;
+      closingBalances: Array<{ accountCode: string; amountCents: number }>;
+      notes?: string;
+      channelId?: number;
+    } = {
+      sessionId,
+      closingBalances,
+      notes,
+    };
+    if (channelId != null && !Number.isNaN(channelId)) {
+      input.channelId = channelId;
+    }
+
+    const mutationPromise = client.mutate({
+      mutation: CLOSE_CASHIER_SESSION,
+      variables: { input },
     });
 
     return from(mutationPromise).pipe(

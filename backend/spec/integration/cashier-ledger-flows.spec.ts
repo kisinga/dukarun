@@ -83,12 +83,17 @@ describe('Cashier-ledger flows', () => {
         // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
         postVarianceAdjustment: jest.fn().mockResolvedValue(undefined),
       } as any;
+      const mockChannelPaymentMethodService = {
+        getChannelPaymentMethods: (jest.fn() as any).mockResolvedValue([]),
+        getPaymentMethodDisplayName: jest.fn((pm: { code: string }) => pm.code),
+      } as any;
       const cashierSessionService = new (OpenSessionService as any)(
         mockConnection,
         mockLedgerQueryService,
         // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
         { createReconciliation: jest.fn().mockResolvedValue({ id: 'rec1' }) },
-        mockOpenSessionFinancial
+        mockOpenSessionFinancial,
+        mockChannelPaymentMethodService
       );
 
       const opened = await cashierSessionService.startSession(ctx1, {

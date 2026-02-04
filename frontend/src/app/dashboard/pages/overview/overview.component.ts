@@ -131,14 +131,14 @@ export class OverviewComponent implements OnInit, OnDestroy {
     { label: 'Reports', icon: '📈', action: 'reports' },
   ];
 
-  protected readonly showOpenDayModal = signal(false);
-  protected readonly showCloseDayModal = signal(false);
-  /** Cashier-controlled accounts for opening balances (loaded when modal opens). */
-  protected readonly openDayConfig = signal<PaymentMethodReconciliationConfig[]>([]);
-  /** Per-account opening amount in currency units (key = ledgerAccountCode). */
-  protected readonly openDayBalances = signal<Record<string, string>>({});
-  protected readonly closeDayDeclared = signal('');
-  protected readonly closeDayNotes = signal('');
+  /** 'open' | 'close' when modal is open, null when closed. */
+  protected readonly dayModalMode = signal<'open' | 'close' | null>(null);
+  /** Cashier-controlled accounts (same for open and close). */
+  protected readonly dayModalConfig = signal<PaymentMethodReconciliationConfig[]>([]);
+  /** Per-account amount in sh (key = ledgerAccountCode). */
+  protected readonly dayModalBalances = signal<Record<string, string>>({});
+  /** Notes (close only). */
+  protected readonly dayModalNotes = signal('');
 
   constructor() {
     effect(
@@ -312,74 +312,103 @@ export class OverviewComponent implements OnInit, OnDestroy {
     if (!companyId) return;
     const channelId = parseInt(companyId, 10);
     if (isNaN(channelId)) return;
-    this.openDayBalances.set({});
+    this.cashierSessionService.error.set(null);
+    this.dayModalMode.set('open');
+    this.dayModalBalances.set({});
+    this.dayModalNotes.set('');
     this.cashierSessionService.getChannelReconciliationConfig(channelId).subscribe((config) => {
       const cashierControlled = config.filter((c) => c.isCashierControlled);
-      this.openDayConfig.set(cashierControlled);
+      this.dayModalConfig.set(cashierControlled);
       const balances: Record<string, string> = {};
       cashierControlled.forEach((c) => (balances[c.ledgerAccountCode] = ''));
-      this.openDayBalances.set(balances);
-      this.showOpenDayModal.set(true);
-    });
-  }
-
-  closeOpenDayModal(): void {
-    this.showOpenDayModal.set(false);
-    this.openDayConfig.set([]);
-    this.openDayBalances.set({});
-  }
-
-  setOpenDayBalance(accountCode: string, value: string): void {
-    this.openDayBalances.update((prev) => ({ ...prev, [accountCode]: value }));
-  }
-
-  async submitOpenDay(): Promise<void> {
-    const config = this.openDayConfig();
-    const balances = this.openDayBalances();
-    const companyId = this.companyService.activeCompanyId();
-    if (!companyId || config.length === 0) return;
-    const channelId = parseInt(companyId, 10);
-    if (isNaN(channelId)) return;
-
-    const openingBalances: { accountCode: string; amountCents: number }[] = [];
-    for (const c of config) {
-      const str = (balances[c.ledgerAccountCode] ?? '').trim();
-      const amountCents = Math.round(parseFloat(str || '0') * 100);
-      if (isNaN(amountCents) || amountCents < 0) return;
-      openingBalances.push({ accountCode: c.ledgerAccountCode, amountCents });
-    }
-
-    this.cashierSessionService.openSession(channelId, openingBalances).subscribe((session) => {
-      if (session) {
-        this.closeOpenDayModal();
-      }
+      this.dayModalBalances.set(balances);
     });
   }
 
   openCloseDayModal(): void {
     const session = this.cashierSessionService.currentSession();
     if (!session) return;
-    this.closeDayDeclared.set('');
-    this.closeDayNotes.set('');
-    this.showCloseDayModal.set(true);
+    this.cashierSessionService.error.set(null);
+    const channelId =
+      typeof session.channelId === 'number'
+        ? session.channelId
+        : parseInt(String(session.channelId), 10);
+    this.dayModalMode.set('close');
+    this.dayModalBalances.set({});
+    this.dayModalNotes.set('');
+    this.cashierSessionService.getChannelReconciliationConfig(channelId).subscribe((config) => {
+      const cashierControlled = config.filter((c) => c.isCashierControlled);
+      this.dayModalConfig.set(cashierControlled);
+      const balances: Record<string, string> = {};
+      cashierControlled.forEach((c) => (balances[c.ledgerAccountCode] = ''));
+      this.dayModalBalances.set(balances);
+    });
   }
 
-  closeCloseDayModal(): void {
-    this.showCloseDayModal.set(false);
+  closeDayModal(): void {
+    this.dayModalMode.set(null);
+    this.dayModalConfig.set([]);
+    this.dayModalBalances.set({});
+    this.cashierSessionService.error.set(null);
   }
 
-  async submitCloseDay(): Promise<void> {
+  setDayModalBalance(accountCode: string, value: string | number): void {
+    const str = value != null && value !== '' ? String(value) : '';
+    this.dayModalBalances.update((prev) => ({ ...prev, [accountCode]: str }));
+  }
+
+  async submitDayModal(): Promise<void> {
+    const mode = this.dayModalMode();
+    const config = this.dayModalConfig();
+    const balances = this.dayModalBalances();
+    if (!mode || config.length === 0) return;
+
+    if (mode === 'open') {
+      const companyId = this.companyService.activeCompanyId();
+      if (!companyId) return;
+      const channelId = parseInt(companyId, 10);
+      if (isNaN(channelId)) return;
+      const openingBalances: { accountCode: string; amountCents: number }[] = [];
+      for (const c of config) {
+        const raw = balances[c.ledgerAccountCode];
+        const str = (raw != null ? String(raw) : '').trim();
+        const amountCents = Math.round(parseFloat(str || '0') * 100);
+        if (isNaN(amountCents) || amountCents < 0) return;
+        openingBalances.push({ accountCode: c.ledgerAccountCode, amountCents });
+      }
+      this.cashierSessionService.openSession(channelId, openingBalances).subscribe((session) => {
+        if (session) this.closeDayModal();
+      });
+      return;
+    }
+
     const session = this.cashierSessionService.currentSession();
     if (!session) return;
-    const declaredStr = this.closeDayDeclared().trim();
-    const declaredCents = parseFloat(declaredStr) * 100;
-    if (isNaN(declaredCents) || declaredCents < 0) return;
+    const id = typeof session.id === 'string' ? session.id.trim() : '';
+    if (!id || id === '-1') return;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) return;
+    const closingBalances: Array<{ accountCode: string; amountCents: number }> = [];
+    for (const c of config) {
+      const raw = balances[c.ledgerAccountCode];
+      const str = (raw != null ? String(raw) : '').trim();
+      const amountCents = Math.round(parseFloat(str || '0') * 100);
+      if (isNaN(amountCents) || amountCents < 0) return;
+      closingBalances.push({ accountCode: c.ledgerAccountCode, amountCents });
+    }
+    const channelId =
+      typeof session.channelId === 'number'
+        ? session.channelId
+        : parseInt(String(session.channelId), 10);
     this.cashierSessionService
-      .closeSession(session.id, Math.round(declaredCents), this.closeDayNotes().trim() || undefined)
+      .closeSession(
+        id,
+        closingBalances,
+        this.dayModalNotes().trim() || undefined,
+        Number.isNaN(channelId) ? undefined : channelId,
+      )
       .subscribe((summary) => {
-        if (summary) {
-          this.closeCloseDayModal();
-        }
+        if (summary) this.closeDayModal();
       });
   }
 
