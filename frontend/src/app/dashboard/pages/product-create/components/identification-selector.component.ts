@@ -11,13 +11,13 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { BarcodeScannerComponent } from './barcode-scanner.component';
 import { PhotoManagerComponent } from './photo-manager.component';
 
-/** Identification method: barcode, label photos, or none (name/SKU only). */
-export type IdentificationMethodType = 'barcode' | 'label-photos' | 'none';
+/** Identification method: barcode or label photos. */
+export type IdentificationMethodType = 'barcode' | 'label-photos';
 
 /**
  * Identification Selector Component
  *
- * Tabbed interface for barcode, photo, or name/SKU-only identification.
+ * Tabbed interface for barcode or photo identification.
  */
 @Component({
   selector: 'app-identification-selector',
@@ -135,9 +135,7 @@ export type IdentificationMethodType = 'barcode' | 'label-photos' | 'none';
               }
             }
           </div>
-        } @else if (
-          identificationMethod() !== 'label-photos' && identificationMethod() !== 'none'
-        ) {
+        } @else if (identificationMethod() !== 'label-photos') {
           <div class="flex items-center justify-center h-16">
             <p class="text-sm text-base-content/40">Enter or scan a barcode</p>
           </div>
@@ -200,50 +198,9 @@ export type IdentificationMethodType = 'barcode' | 'label-photos' | 'none';
               </p>
             }
           </div>
-        } @else if (identificationMethod() !== 'barcode' && identificationMethod() !== 'none') {
+        } @else if (identificationMethod() !== 'barcode') {
           <div class="flex items-center justify-center h-16">
             <p class="text-sm text-base-content/40">Take photos of the product label</p>
-          </div>
-        }
-      </div>
-
-      <!-- Name or SKU only tab -->
-      <label
-        class="tab flex-1 gap-2 font-medium min-w-0"
-        [class.tab-active]="identificationMethod() === 'none'"
-        [class.text-primary]="identificationMethod() === 'none'"
-      >
-        <input
-          type="radio"
-          name="identification_tabs"
-          class="hidden"
-          [checked]="identificationMethod() === 'none'"
-          (change)="onMethodChange('none')"
-        />
-        <svg
-          class="w-4 h-4 shrink-0"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-        >
-          <path d="M4 7V4h16v3M9 20h6M12 4v16" />
-        </svg>
-        <span class="truncate">Name / SKU</span>
-        @if (identificationMethod() === 'none' && hasValidIdentification()) {
-          <span class="badge badge-xs badge-success">✓</span>
-        }
-      </label>
-      <div class="tab-content bg-base-100 border-base-300 p-3 min-h-[100px]">
-        @if (identificationMethod() === 'none') {
-          <div class="flex flex-col items-center justify-center min-h-[80px] gap-2 text-center">
-            <p class="text-sm text-base-content/80">
-              No barcode or photos required. You can sell this item by name or SKU at the till.
-            </p>
-          </div>
-        } @else {
-          <div class="flex items-center justify-center h-16">
-            <p class="text-sm text-base-content/40">Sell by name or SKU only</p>
           </div>
         }
       </div>
@@ -259,7 +216,6 @@ export class IdentificationSelectorComponent {
   readonly identificationMethod = input.required<IdentificationMethodType | null>();
   readonly barcodeControl = input.required<FormControl>();
   readonly photoCount = input.required<number>();
-  readonly hasValidIdentification = input.required<boolean>();
 
   // Outputs
   readonly methodChange = output<IdentificationMethodType>();

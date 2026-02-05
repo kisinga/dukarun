@@ -1,6 +1,10 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
+import {
+  ProductLabelComponent,
+  type ProductLabelFacetValue,
+} from '../../shared/components/product-label.component';
 
 export interface ProductCardData {
   id: string;
@@ -8,6 +12,7 @@ export interface ProductCardData {
   description?: string;
   enabled: boolean;
   featuredAsset?: { preview?: string };
+  facetValues?: ProductLabelFacetValue[];
   variants?: Array<{
     id: string;
     name: string;
@@ -26,7 +31,7 @@ export type ProductAction = 'view' | 'edit' | 'purchase' | 'delete';
  */
 @Component({
   selector: 'app-product-card',
-  imports: [CommonModule],
+  imports: [CommonModule, ProductLabelComponent],
   templateUrl: './product-card.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

@@ -9,8 +9,15 @@ export class ProductMapperService {
   /**
    * Transform GraphQL product to ProductSearchResult.
    * All variants pass through toProductVariant for consistent shape.
+   * Maps facetValues for manufacturer/category pills.
    */
   toProductSearchResult(graphqlProduct: any): ProductSearchResult {
+    const facetValues = (graphqlProduct.facetValues || [])
+      .filter((fv: any) => fv?.facet?.code === 'manufacturer' || fv?.facet?.code === 'category')
+      .map((fv: any) => ({
+        name: fv.name,
+        facetCode: fv.facet?.code ?? '',
+      }));
     return {
       id: graphqlProduct.id,
       name: graphqlProduct.name,
@@ -18,6 +25,7 @@ export class ProductMapperService {
       variants: (graphqlProduct.variants || []).map((v: any) =>
         this.toProductVariant(v, graphqlProduct),
       ),
+      facetValues: facetValues.length > 0 ? facetValues : undefined,
     };
   }
 

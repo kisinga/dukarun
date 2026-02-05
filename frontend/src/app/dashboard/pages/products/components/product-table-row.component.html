@@ -52,7 +52,7 @@
 <!-- Product Name & Description -->
 <td>
   <div class="flex flex-col">
-    <div class="font-semibold">{{ product().name }}</div>
+    <app-product-label [productName]="product().name" [facetValues]="product().facetValues ?? []" />
     @if (product().description) {
       <div class="text-xs text-base-content/60 line-clamp-1">
         {{ product().description }}

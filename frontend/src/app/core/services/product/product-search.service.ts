@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { GET_PRODUCT, SEARCH_BY_BARCODE, SEARCH_PRODUCTS } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
+import { isBarcodeIgnored } from './barcode.util';
 import { ProductCacheService } from './product-cache.service';
 import { ProductMapperService } from './product-mapper.service';
 
@@ -26,6 +27,12 @@ export interface ProductVariant {
   };
 }
 
+/** Facet value for display (manufacturer/category pills) */
+export interface ProductFacetValue {
+  name: string;
+  facetCode: string;
+}
+
 /**
  * Product search result
  */
@@ -36,6 +43,8 @@ export interface ProductSearchResult {
   featuredAsset?: {
     preview: string;
   };
+  /** For manufacturer/category pills (facet.code = manufacturer | category) */
+  facetValues?: ProductFacetValue[];
 }
 
 /**
@@ -139,6 +148,7 @@ export class ProductSearchService {
    * Search by barcode
    */
   async searchByBarcode(barcode: string): Promise<ProductVariant | null> {
+    if (isBarcodeIgnored(barcode)) return null;
     try {
       const client = this.apolloService.getClient();
       const result = await client.query<{

@@ -9,9 +9,19 @@ import {
   signal,
 } from '@angular/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
-import { PriceModificationService } from '../services/price-modification.service';
-import { PriceOverrideData } from '../services/price-modification.service';
+import { ProductLabelComponent } from '../../shared/components/product-label.component';
+import {
+  PriceModificationService,
+  PriceOverrideData,
+} from '../services/price-modification.service';
 import { QuantityInputData, QuantityInputSheetComponent } from './quantity-input-sheet.component';
+
+/** Facet value for manufacturer/category pill */
+export interface CartItemFacetValue {
+  name: string;
+  facetCode?: string;
+  facet?: { code: string };
+}
 
 export interface CartItemData {
   variant: {
@@ -28,12 +38,13 @@ export interface CartItemData {
   subtotal: number;
   customLinePrice?: number;
   priceOverrideReason?: string;
+  facetValues?: CartItemFacetValue[];
 }
 
 @Component({
   selector: 'app-cart-item',
   standalone: true,
-  imports: [CommonModule, QuantityInputSheetComponent],
+  imports: [CommonModule, ProductLabelComponent, QuantityInputSheetComponent],
   template: `
     <div class="card bg-base-100 shadow-sm border border-base-300">
       <div class="card-body p-2">
@@ -65,9 +76,10 @@ export interface CartItemData {
 
             <!-- Product Info -->
             <div class="flex-1 min-w-0">
-              <div class="font-semibold text-sm leading-tight truncate">
-                {{ item().variant.productName }}
-              </div>
+              <app-product-label
+                [productName]="item().variant.productName"
+                [facetValues]="item().facetValues ?? []"
+              />
               @if (item().variant.name !== item().variant.productName) {
                 <div class="text-xs text-base-content/60 leading-tight truncate">
                   {{ item().variant.name }}

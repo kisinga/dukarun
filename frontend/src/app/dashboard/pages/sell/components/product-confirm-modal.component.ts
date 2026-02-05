@@ -13,15 +13,18 @@ import {
   ProductSearchResult,
   ProductVariant,
 } from '../../../../core/services/product/product-search.service';
-import { PriceModificationService } from '../services/price-modification.service';
-import { PriceOverrideData } from '../services/price-modification.service';
+import { ProductLabelComponent } from '../../shared/components/product-label.component';
+import {
+  PriceModificationService,
+  PriceOverrideData,
+} from '../services/price-modification.service';
 
 /**
  * Modal for confirming product and selecting variant/quantity
  */
 @Component({
   selector: 'app-product-confirm-modal',
-  imports: [CommonModule],
+  imports: [CommonModule, ProductLabelComponent],
   template: `
     @if (isOpen() && product()) {
       <div class="modal modal-open modal-bottom sm:modal-middle animate-in">
@@ -63,7 +66,10 @@ import { PriceOverrideData } from '../services/price-modification.service';
                 </div>
               }
               <div class="flex-1 min-w-0">
-                <h4 class="font-bold text-base leading-tight">{{ product()!.name }}</h4>
+                <app-product-label
+                  [productName]="product()!.name"
+                  [facetValues]="product()!.facetValues ?? []"
+                />
                 <p class="text-xs opacity-60 mt-0.5">
                   {{ product()!.variants.length }} variant{{
                     product()!.variants.length > 1 ? 's' : ''
@@ -464,6 +470,7 @@ export class ProductConfirmModalComponent {
     variant: ProductVariant;
     quantity: number;
     priceOverride?: PriceOverrideData;
+    facetValues?: { name: string; facetCode?: string; facet?: { code: string } }[];
   }>();
   readonly closeModal = output<void>();
 
@@ -541,7 +548,12 @@ export class ProductConfirmModalComponent {
       currentPrice !== basePrice
         ? { variantId: variant.id, customLinePrice: currentPrice, reason: 'Price adjusted' }
         : undefined;
-    this.variantSelected.emit({ variant, quantity: 1, priceOverride });
+    const facetValues = this.product()?.facetValues?.map((fv) => ({
+      name: fv.name,
+      facetCode: fv.facetCode,
+      facet: fv.facetCode ? { code: fv.facetCode } : undefined,
+    }));
+    this.variantSelected.emit({ variant, quantity: 1, priceOverride, facetValues });
   }
 
   handleSingleVariantAdd(quantityValue: string): void {
@@ -557,6 +569,11 @@ export class ProductConfirmModalComponent {
       currentPrice !== basePrice
         ? { variantId: variant.id, customLinePrice: currentPrice, reason: 'Price adjusted' }
         : undefined;
-    this.variantSelected.emit({ variant, quantity: +quantityValue, priceOverride });
+    const facetValues = this.product()?.facetValues?.map((fv) => ({
+      name: fv.name,
+      facetCode: fv.facetCode,
+      facet: fv.facetCode ? { code: fv.facetCode } : undefined,
+    }));
+    this.variantSelected.emit({ variant, quantity: +quantityValue, priceOverride, facetValues });
   }
 }

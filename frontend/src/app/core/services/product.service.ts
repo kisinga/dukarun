@@ -15,6 +15,8 @@ export interface ProductInput {
   description: string;
   enabled: boolean;
   barcode?: string; // Optional product-level barcode
+  /** Facet value IDs (manufacturer, category, tags). This form owns all facet assignments. */
+  facetValueIds?: string[];
 }
 
 /**
@@ -257,17 +259,23 @@ export class ProductService {
   }
 
   /**
-   * Update product base data (name, barcode) and variant details (name + price + wholesalePrice).
-   * Used by the product edit screen.
+   * Update product base data (name, barcode, optional facetValueIds) and variant details.
+   * When facetValueIds is provided (e.g. from product-create), facets are fully replaced.
+   * When omitted (e.g. from product-edit), existing facets are left unchanged.
    */
   async updateProductWithVariants(
     productId: string,
     name: string,
     variants: { id: string; name: string; price: number; wholesalePrice?: number | null }[],
     barcode?: string,
+    facetValueIds?: string[],
   ): Promise<boolean> {
     try {
-      const productUpdated = await this.apiService.updateProductName(productId, name, barcode);
+      const productUpdated = await this.apiService.updateProduct(productId, {
+        name,
+        barcode,
+        facetValueIds,
+      });
       if (!productUpdated) {
         return false;
       }
