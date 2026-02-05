@@ -7,6 +7,7 @@ import { Account } from '../../ledger/account.entity';
 import { JournalLine } from '../../ledger/journal-line.entity';
 import { PostingPayload, PostingService } from '../../ledger/posting.service';
 import {
+  ExpensePostingContext,
   InventoryPurchasePostingContext,
   InventorySalePostingContext,
   InventoryWriteOffPostingContext,
@@ -16,6 +17,7 @@ import {
   SalePostingContext,
   SupplierPaymentPostingContext,
   createCreditSaleEntry,
+  createExpenseEntry,
   createInventoryPurchaseEntry,
   createInventorySaleCogsEntry,
   createInventoryWriteOffEntry,
@@ -208,6 +210,29 @@ export class LedgerPostingService {
     await this.assertAccountsPayableInvariant(ctx, context.supplierId);
     this.logger.log(
       `Posted supplier payment entry for payment ${sourceId}, purchase ${context.purchaseReference}`
+    );
+  }
+
+  /**
+   * Post an expense entry (debit EXPENSES, credit source-of-funds account)
+   */
+  async postExpense(
+    ctx: RequestContext,
+    sourceId: string,
+    context: ExpensePostingContext
+  ): Promise<void> {
+    const template = createExpenseEntry(context);
+    const accountCodes = template.lines.map(l => l.accountCode);
+    await this.ensureAccountsExist(ctx, accountCodes);
+    const payload: PostingPayload = {
+      channelId: ctx.channelId as number,
+      entryDate: new Date().toISOString().slice(0, 10),
+      memo: template.memo,
+      lines: template.lines,
+    };
+    await this.postingService.post(ctx, 'Expense', sourceId, payload);
+    this.logger.log(
+      `Posted expense entry ${sourceId}, amount: ${context.amount}, source: ${context.sourceAccountCode}`
     );
   }
 

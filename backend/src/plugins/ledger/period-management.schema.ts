@@ -220,6 +220,13 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     varianceCents: String
   }
 
+  type AccountBalanceAsOfItem {
+    accountId: ID!
+    accountCode: String!
+    accountName: String!
+    balanceCents: String!
+  }
+
   input AccountDeclaredAmountInput {
     accountId: ID!
     amountCents: String!
@@ -280,6 +287,7 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     reconciliations(channelId: Int!, options: ReconciliationListOptions): ReconciliationList!
     reconciliationDetails(reconciliationId: ID!): [ReconciliationAccountDetail!]!
     sessionReconciliationDetails(sessionId: ID!, kind: String): [ReconciliationAccountDetail!]!
+    accountBalancesAsOf(channelId: Int!, asOfDate: String!): [AccountBalanceAsOfItem!]!
     closedSessionsMissingReconciliation(
       channelId: Int!
       startDate: DateTime
@@ -289,7 +297,18 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     ): [ClosedSessionMissingReconciliation!]!
   }
 
+  input RecordExpenseInput {
+    amount: Int!
+    sourceAccountCode: String!
+    memo: String
+  }
+
+  type RecordExpenseResult {
+    sourceId: String!
+  }
+
   extend type Mutation {
+    recordExpense(input: RecordExpenseInput!): RecordExpenseResult!
     createReconciliation(input: CreateReconciliationInput!): Reconciliation!
     verifyReconciliation(reconciliationId: ID!): Reconciliation!
     closeAccountingPeriod(channelId: Int!, periodEndDate: DateTime!): PeriodEndCloseResult!

@@ -129,12 +129,12 @@ describe('Ledger Channel Isolation', () => {
   describe('Session isolation by channelId', () => {
     it('getCurrentSession returns session for requested channel only', async () => {
       const session1 = {
-        id: 's1',
+        id: '11111111-1111-4111-8111-111111111111',
         channelId: channel1Id,
         status: 'open',
       } as CashierSession;
       const session2 = {
-        id: 's2',
+        id: '22222222-2222-4222-8222-222222222222',
         channelId: channel2Id,
         status: 'open',
       } as CashierSession;
@@ -170,8 +170,8 @@ describe('Ledger Channel Isolation', () => {
       const current1 = await service.getCurrentSession(ctx1, channel1Id);
       const current2 = await service.getCurrentSession(ctx2, channel2Id);
 
-      expect(current1?.id).toBe('s1');
-      expect(current2?.id).toBe('s2');
+      expect(current1?.id).toBe('11111111-1111-4111-8111-111111111111');
+      expect(current2?.id).toBe('22222222-2222-4222-8222-222222222222');
       expect(current1?.channelId).toBe(channel1Id);
       expect(current2?.channelId).toBe(channel2Id);
     });
@@ -179,9 +179,17 @@ describe('Ledger Channel Isolation', () => {
 
   describe('eligibleDebitAccounts uses ctx.channelId', () => {
     it('resolver queries accounts with channelId from context', async () => {
-      const mockAccountRepo = {
+      const cashParentId = 'cash-parent-id';
+      const cashParent = {
+        id: cashParentId,
+        code: ACCOUNT_CODES.CASH,
+        channelId: channel1Id,
+      };
+      const mockAccountRepo: any = {
+        findOne: jest.fn((() => Promise.resolve(cashParent)) as any),
         find: jest.fn().mockImplementation((opts: any) => {
           expect(opts.where.channelId).toBeDefined();
+          expect(opts.where.parentAccountId).toBe(cashParentId);
           return Promise.resolve([
             {
               id: '1',
@@ -208,6 +216,7 @@ describe('Ledger Channel Isolation', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             channelId: channel1Id,
+            parentAccountId: cashParentId,
           }),
         })
       );

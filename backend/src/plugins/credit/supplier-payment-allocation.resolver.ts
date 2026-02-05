@@ -31,4 +31,18 @@ export class SupplierPaymentAllocationResolver {
   ): Promise<SupplierPaymentAllocationResult> {
     return this.supplierPaymentAllocationService.allocatePaymentToPurchases(ctx, input);
   }
+
+  @Mutation()
+  @Allow(ManageSupplierCreditPurchasesPermission.Permission)
+  async paySinglePurchase(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { purchaseId: string; paymentAmount?: number; debitAccountCode?: string }
+  ): Promise<SupplierPaymentAllocationResult> {
+    return this.supplierPaymentAllocationService.paySinglePurchase(
+      ctx,
+      input.purchaseId,
+      input.paymentAmount,
+      input.debitAccountCode
+    );
+  }
 }

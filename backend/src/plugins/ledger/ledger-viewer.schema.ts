@@ -10,6 +10,7 @@ export const LEDGER_VIEWER_SCHEMA = gql`
     balance: Float!
     parentAccountId: ID
     isParent: Boolean!
+    isSystemAccount: Boolean!
   }
 
   type JournalLine {

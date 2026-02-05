@@ -81,14 +81,7 @@
     <!-- Overview Tab -->
     @if (activeTab() === 'overview') {
       <app-overview-tab
-        [keyAccounts]="keyAccounts()"
-        [recentEntries]="recentEntries()"
-        [isLoading]="isLoading()"
-        [selectedAccount]="selectedAccount()"
-        [formatCurrency]="formatCurrency"
-        [formatDate]="formatDate"
-        [getEntryTotalDebit]="getEntryTotalDebit"
-        [getEntryTotalCredit]="getEntryTotalCredit"
+        [context]="accountingContext()"
         (accountSelect)="selectAccount($event)"
         (entryView)="viewTransaction($event)"
       />
@@ -97,12 +90,7 @@
     <!-- Accounts Tab -->
     @if (activeTab() === 'accounts') {
       <app-accounts-tab
-        [hierarchicalAccounts]="hierarchicalAccounts()"
-        [selectedAccount]="selectedAccount()"
-        [formatCurrency]="formatCurrency"
-        [getAccountTypeLabel]="getAccountTypeLabel"
-        [getAccountTypeTotal]="getAccountTypeTotal"
-        [isLoading]="isLoading()"
+        [context]="accountingContext()"
         (accountSelect)="selectAccount($event)"
         (viewTransactions)="goToTransactionsTab($event)"
       />
@@ -111,19 +99,7 @@
     <!-- Transactions Tab -->
     @if (activeTab() === 'transactions') {
       <app-transactions-tab
-        [entries]="paginatedEntries()"
-        [isLoading]="isLoading()"
-        [expandedEntries]="expandedEntries()"
-        [totalPages]="totalPages()"
-        [currentPage]="currentPage()"
-        [searchTerm]="searchTerm()"
-        [selectedAccount]="selectedAccount()"
-        [sourceTypeFilter]="sourceTypeFilter()"
-        [dateFilter]="dateFilter()"
-        [formatCurrency]="formatCurrency"
-        [formatDate]="formatDate"
-        [getEntryTotalDebit]="getEntryTotalDebit"
-        [getEntryTotalCredit]="getEntryTotalCredit"
+        [context]="transactionsContext()"
         (entryToggle)="toggleEntry($event)"
         (entryView)="viewTransaction($event)"
         (expandAll)="expandAll()"
@@ -136,15 +112,7 @@
     <!-- Reconciliation Tab -->
     @if (activeTab() === 'reconciliation') {
       <app-reconciliation-tab
-        [reconciliations]="reconciliations()"
-        [accounts]="accounts()"
-        [channelId]="channelId"
-        [isLoading]="reconciliationsLoading()"
-        [totalItems]="reconciliationsTotal()"
-        [currentPage]="reconciliationPage()"
-        [pageSize]="reconciliationPageSize"
-        [formatDate]="formatDate"
-        [formatCurrency]="formatReconciliationAmount"
+        [context]="reconciliationContext()"
         (pageChange)="goToReconciliationPage($event)"
         (reconciliationCreated)="loadReconciliations()"
       />

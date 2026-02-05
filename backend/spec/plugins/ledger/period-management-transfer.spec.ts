@@ -51,6 +51,7 @@ describe('PeriodManagementResolver.createInterAccountTransfer', () => {
     mockPostingService = {
       post: jest.fn().mockImplementation(() => Promise.resolve(mockJournalEntry)),
     } as any;
+    const mockFinancialService = {} as any;
     resolver = new PeriodManagementResolver(
       {} as any,
       {} as any,
@@ -60,7 +61,8 @@ describe('PeriodManagementResolver.createInterAccountTransfer', () => {
       {} as any,
       mockPeriodLockService,
       {} as any,
-      mockChartOfAccountsService
+      mockChartOfAccountsService,
+      mockFinancialService
     );
   });
 

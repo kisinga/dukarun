@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext, TransactionalConnection } from '@vendure/core';
 import { CashDrawerCount, CashCountType } from '../../domain/cashier/cash-drawer-count.entity';
@@ -23,7 +24,12 @@ import {
 } from '../../services/financial/period-management.types';
 import { ReconciliationValidatorService } from '../../services/financial/reconciliation-validator.service';
 import { ReconciliationService } from '../../services/financial/reconciliation.service';
-import { CloseAccountingPeriodPermission, ManageReconciliationPermission } from './permissions';
+import { FinancialService } from '../../services/financial/financial.service';
+import {
+  CloseAccountingPeriodPermission,
+  CreateInterAccountTransferPermission,
+  ManageReconciliationPermission,
+} from './permissions';
 
 /** GraphQL-shaped type for CashDrawerCount (matches schema; expectedCash/variance nullable when hidden). */
 interface CashDrawerCountGraphQL {
@@ -53,7 +59,8 @@ export class PeriodManagementResolver {
     private readonly connection: TransactionalConnection,
     private readonly periodLockService: PeriodLockService,
     private readonly reconciliationValidatorService: ReconciliationValidatorService,
-    private readonly chartOfAccountsService: ChartOfAccountsService
+    private readonly chartOfAccountsService: ChartOfAccountsService,
+    private readonly financialService: FinancialService
   ) {}
 
   @Query()
@@ -129,6 +136,20 @@ export class PeriodManagementResolver {
       ...input,
       accountDeclaredAmounts: accountDeclaredAmounts ?? input.accountDeclaredAmounts,
     });
+  }
+
+  @Mutation()
+  @Allow(CreateInterAccountTransferPermission.Permission)
+  async recordExpense(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { amount: number; sourceAccountCode: string; memo?: string }
+  ): Promise<{ sourceId: string }> {
+    return this.financialService.recordExpense(
+      ctx,
+      input.amount,
+      input.sourceAccountCode,
+      input.memo?.trim() || undefined
+    );
   }
 
   @Mutation()
@@ -428,11 +449,26 @@ export class PeriodManagementResolver {
 
   @Query()
   @Allow(Permission.ReadOrder)
+  async accountBalancesAsOf(
+    @Ctx() ctx: RequestContext,
+    @Args('channelId') channelId: number,
+    @Args('asOfDate') asOfDate: string
+  ) {
+    return this.reconciliationService.getAccountBalancesAsOf(ctx, channelId, asOfDate);
+  }
+
+  private static readonly logger = new Logger('PeriodManagementResolver');
+
+  @Query()
+  @Allow(Permission.ReadOrder)
   async sessionReconciliationDetails(
     @Ctx() ctx: RequestContext,
     @Args('sessionId') sessionId: string,
     @Args('kind', { nullable: true }) kind?: string
   ) {
+    PeriodManagementResolver.logger.log(
+      `sessionReconciliationDetails called sessionId=${sessionId} kind=${kind}`
+    );
     const reconKind = kind === 'opening' ? 'opening' : 'closing';
     return this.reconciliationService.getSessionReconciliationDetails(ctx, sessionId, reconKind);
   }

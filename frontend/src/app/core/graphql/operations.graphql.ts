@@ -1767,6 +1767,21 @@ export const PAY_SINGLE_ORDER = graphql(`
   }
 `);
 
+export const PAY_SINGLE_PURCHASE = graphql(`
+  mutation PaySinglePurchase($input: PaySinglePurchaseInput!) {
+    paySinglePurchase(input: $input) {
+      purchasesPaid {
+        purchaseId
+        purchaseReference
+        amountPaid
+      }
+      remainingBalance
+      totalAllocated
+      excessPayment
+    }
+  }
+`);
+
 // ============================================================================
 // PRICE OVERRIDE OPERATIONS
 // ============================================================================
@@ -2465,6 +2480,14 @@ export const GET_ELIGIBLE_DEBIT_ACCOUNTS = graphql(`
   }
 `);
 
+export const RECORD_EXPENSE = graphql(`
+  mutation RecordExpense($input: RecordExpenseInput!) {
+    recordExpense(input: $input) {
+      sourceId
+    }
+  }
+`);
+
 export const GET_JOURNAL_ENTRIES = graphql(`
   query GetJournalEntries($options: JournalEntriesOptions) {
     journalEntries(options: $options) {
@@ -2692,6 +2715,17 @@ export const GET_SESSION_RECONCILIATION_DETAILS = graphql(`
       declaredAmountCents
       expectedBalanceCents
       varianceCents
+    }
+  }
+`);
+
+export const GET_ACCOUNT_BALANCES_AS_OF = graphql(`
+  query GetAccountBalancesAsOf($channelId: Int!, $asOfDate: String!) {
+    accountBalancesAsOf(channelId: $channelId, asOfDate: $asOfDate) {
+      accountId
+      accountCode
+      accountName
+      balanceCents
     }
   }
 `);

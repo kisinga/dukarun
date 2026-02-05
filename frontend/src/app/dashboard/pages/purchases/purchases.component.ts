@@ -17,6 +17,10 @@ import { PurchaseCardComponent } from './components/purchase-card.component';
 import { PurchaseSearchBarComponent } from './components/purchase-search-bar.component';
 import { PurchaseStats, PurchaseStatsComponent } from './components/purchase-stats.component';
 import {
+  PayPurchaseModalComponent,
+  PayPurchaseModalData,
+} from './components/pay-purchase-modal.component';
+import {
   PurchaseAction,
   PurchaseTableRowComponent,
 } from './components/purchase-table-row.component';
@@ -39,6 +43,7 @@ import { PurchaseDetailComponent } from './purchase-detail/purchase-detail.compo
     PurchaseSearchBarComponent,
     PurchaseCardComponent,
     PurchaseTableRowComponent,
+    PayPurchaseModalComponent,
     PaginationComponent,
     PurchaseDetailComponent,
   ],
@@ -63,7 +68,9 @@ export class PurchasesComponent implements OnInit {
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
   readonly selectedPurchaseId = signal<string | null>(null);
+  readonly selectedPurchaseForPayment = signal<PayPurchaseModalData | null>(null);
   private readonly purchaseDetailModal = viewChild(PurchaseDetailComponent);
+  private readonly payPurchaseModal = viewChild(PayPurchaseModalComponent);
 
   // Computed: filtered purchases
   readonly filteredPurchases = computed(() => {
@@ -121,15 +128,11 @@ export class PurchasesComponent implements OnInit {
   });
 
   constructor() {
-    // Effect to show modal when purchase is selected
     effect(() => {
-      const purchaseId = this.selectedPurchaseId();
-      const modal = this.purchaseDetailModal();
-      if (purchaseId && modal) {
-        // Use setTimeout to ensure modal is ready
-        setTimeout(async () => {
-          // The modal will auto-open when purchaseId is set
-        }, 0);
+      const payData = this.selectedPurchaseForPayment();
+      const modal = this.payPurchaseModal();
+      if (payData && modal) {
+        setTimeout(() => modal.show(), 0);
       }
     });
   }
@@ -157,20 +160,45 @@ export class PurchasesComponent implements OnInit {
 
     switch (action) {
       case 'view':
-        // Show purchase detail in modal
         this.selectedPurchaseId.set(purchaseId);
         break;
 
+      case 'pay': {
+        const purchase = this.purchases().find((p) => p.id === purchaseId);
+        if (purchase) {
+          const supplier = purchase.supplier;
+          const supplierName = supplier
+            ? `${supplier.firstName} ${supplier.lastName}`.trim() ||
+              supplier.emailAddress ||
+              'Unknown'
+            : 'Unknown';
+          this.selectedPurchaseForPayment.set({
+            purchaseId: purchase.id,
+            purchaseReference: purchase.referenceNumber || purchase.id,
+            supplierName,
+            totalCost: purchase.totalCost,
+          });
+        }
+        break;
+      }
+
       case 'edit':
-        // Navigate to edit purchase (to be implemented)
         console.log('Edit purchase:', purchaseId);
         break;
 
       case 'delete':
-        // Delete purchase (to be implemented)
         console.log('Delete purchase:', purchaseId);
         break;
     }
+  }
+
+  onPayPurchaseRecorded(): void {
+    this.selectedPurchaseForPayment.set(null);
+    this.loadPurchases();
+  }
+
+  onPayPurchaseCancelled(): void {
+    this.selectedPurchaseForPayment.set(null);
   }
 
   /**

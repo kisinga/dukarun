@@ -329,8 +329,25 @@ export class ChartOfAccountsService {
   ];
 
   /**
+   * Returns true iff the account is a child of the CASH parent (used for payment source and eligible debit list).
+   */
+  async isCashChildAccount(ctx: RequestContext, account: Account): Promise<boolean> {
+    if (!account.parentAccountId) {
+      return false;
+    }
+    const accountRepo = this.connection.getRepository(ctx, Account);
+    const parent = await accountRepo.findOne({
+      where: {
+        id: account.parentAccountId,
+        channelId: ctx.channelId as number,
+      },
+    });
+    return parent?.code === ACCOUNT_CODES.CASH;
+  }
+
+  /**
    * Validate that a debit account code is allowed as a payment source for the channel.
-   * Rule: exists, active, type === asset, non-parent (leaf only), not in exclusion list.
+   * Rule: exists, active, type === asset, non-parent (leaf only), not in exclusion list, and must be a cash child account.
    *
    * @param ctx Request context (for channelId)
    * @param debitAccountCode Account code to validate
@@ -368,6 +385,12 @@ export class ChartOfAccountsService {
     }
     if (ChartOfAccountsService.PAYMENT_SOURCE_EXCLUDED_CODES.includes(code)) {
       throw new Error(`Account ${code} is not an allowed payment source.`);
+    }
+    const isCashChild = await this.isCashChildAccount(ctx, account);
+    if (!isCashChild) {
+      throw new Error(
+        'Only cash accounts (e.g. Cash on hand, Bank, M-Pesa) can be used as payment source.'
+      );
     }
   }
 }

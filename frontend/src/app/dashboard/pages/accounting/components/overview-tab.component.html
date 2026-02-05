@@ -4,22 +4,22 @@
     <div class="card-body">
       <h2 class="card-title">Key Accounts</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-        @for (account of keyAccounts(); track account.id) {
-        <div
-          class="p-4 rounded-lg border border-base-300 hover:border-primary transition-colors cursor-pointer"
-          [class.bg-primary/10]="selectedAccount()?.id === account.id"
-          (click)="onAccountClick(account)"
-        >
-          <div class="text-sm font-medium text-base-content/70">{{ account.code }}</div>
-          <div class="text-lg font-semibold mt-1">{{ account.name }}</div>
+        @for (account of context().keyAccounts; track account.id) {
           <div
-            class="text-xl font-bold mt-2"
-            [class.text-success]="account.balance >= 0"
-            [class.text-error]="account.balance < 0"
+            class="p-4 rounded-lg border border-base-300 hover:border-primary transition-colors cursor-pointer"
+            [class.bg-primary/10]="context().selectedAccount?.id === account.id"
+            (click)="onAccountClick(account)"
           >
-            {{ formatCurrency()(account.balance) }}
+            <div class="text-sm font-medium text-base-content/70">{{ account.code }}</div>
+            <div class="text-lg font-semibold mt-1">{{ account.name }}</div>
+            <div
+              class="text-xl font-bold mt-2"
+              [class.text-success]="account.balance >= 0"
+              [class.text-error]="account.balance < 0"
+            >
+              {{ context().formatCurrency(account.balance) }}
+            </div>
           </div>
-        </div>
         }
       </div>
     </div>
@@ -29,58 +29,57 @@
   <div class="card bg-base-100 shadow">
     <div class="card-body">
       <h2 class="card-title">Recent Transactions</h2>
-      @if (isLoading()) {
-      <div class="flex justify-center py-8">
-        <span class="loading loading-spinner loading-lg"></span>
-      </div>
-      } @else if (recentEntries().length === 0) {
-      <div class="text-center py-8 text-base-content/70">
-        <p>No recent transactions found</p>
-      </div>
+      @if (context().isLoading) {
+        <div class="flex justify-center py-8">
+          <span class="loading loading-spinner loading-lg"></span>
+        </div>
+      } @else if (context().recentEntries.length === 0) {
+        <div class="text-center py-8 text-base-content/70">
+          <p>No recent transactions found</p>
+        </div>
       } @else {
-      <div class="overflow-x-auto mt-4">
-        <table class="table table-zebra">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Description</th>
-              <th>Amount</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (entry of recentEntries(); track entry.id) {
-            <tr>
-              <td>{{ formatDate()(entry.entryDate) }}</td>
-              <td>
-                <div class="badge badge-outline">{{ entry.sourceType }}</div>
-              </td>
-              <td>{{ entry.memo || entry.sourceId }}</td>
-              <td>
-                <div class="flex gap-2">
-                  @if (getEntryTotalDebit()(entry) > 0) {
-                  <span class="text-success font-semibold">
-                    +{{ formatCurrency()(getEntryTotalDebit()(entry)) }}
-                  </span>
-                  }
-                  @if (getEntryTotalCredit()(entry) > 0) {
-                  <span class="text-error font-semibold">
-                    -{{ formatCurrency()(getEntryTotalCredit()(entry)) }}
-                  </span>
-                  }
-                </div>
-              </td>
-              <td>
-                <button class="btn btn-sm btn-ghost" (click)="onEntryView(entry)">View</button>
-              </td>
-            </tr>
-            }
-          </tbody>
-        </table>
-      </div>
+        <div class="overflow-x-auto mt-4">
+          <table class="table table-zebra">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (entry of context().recentEntries; track entry.id) {
+                <tr>
+                  <td>{{ context().formatDate(entry.entryDate) }}</td>
+                  <td>
+                    <div class="badge badge-outline">{{ entry.sourceType }}</div>
+                  </td>
+                  <td>{{ entry.memo || entry.sourceId }}</td>
+                  <td>
+                    <div class="flex gap-2">
+                      @if (context().getEntryTotalDebit(entry) > 0) {
+                        <span class="text-success font-semibold">
+                          +{{ context().formatCurrency(context().getEntryTotalDebit(entry)) }}
+                        </span>
+                      }
+                      @if (context().getEntryTotalCredit(entry) > 0) {
+                        <span class="text-error font-semibold">
+                          -{{ context().formatCurrency(context().getEntryTotalCredit(entry)) }}
+                        </span>
+                      }
+                    </div>
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-ghost" (click)="onEntryView(entry)">View</button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
       }
     </div>
   </div>
 </div>
-

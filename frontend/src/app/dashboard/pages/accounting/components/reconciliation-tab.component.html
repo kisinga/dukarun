@@ -1,12 +1,12 @@
 <div class="space-y-4">
   <!-- Create manual reconciliation -->
-  @if (leafAccounts().length > 0) {
+  @if (tableAccounts().length > 0) {
     <div class="card bg-base-100 shadow">
       <div class="card-body">
         <h2 class="card-title">Create manual reconciliation</h2>
         <p class="text-base-content/70">
-          Record actual account values for all accounts as of a date range. This creates a
-          reconciliation event that appears in history below.
+          Record actual account values for all accounts as of the reconciliation date. This creates
+          a reconciliation event that appears in history below.
         </p>
         @if (manualError(); as err) {
           <div role="alert" class="alert alert-error mt-2">
@@ -16,25 +16,10 @@
             </button>
           </div>
         }
-        <div class="mt-4 grid gap-4 sm:grid-cols-2">
-          <label class="form-control w-full max-w-xs">
-            <span class="label">From date</span>
-            <input
-              type="date"
-              class="input input-bordered w-full"
-              [value]="manualRangeStart()"
-              (input)="manualRangeStart.set($any($event.target).value)"
-            />
-          </label>
-          <label class="form-control w-full max-w-xs">
-            <span class="label">To date</span>
-            <input
-              type="date"
-              class="input input-bordered w-full"
-              [value]="manualRangeEnd()"
-              (input)="manualRangeEnd.set($any($event.target).value)"
-            />
-          </label>
+        <div class="mt-4">
+          <span class="label">Reconciliation date</span>
+          <p class="text-base font-medium mt-1" aria-readonly="true">{{ reconciliationDate() }}</p>
+          <p class="label-text-alt text-base-content/60">Snapshot as of this date (read-only).</p>
         </div>
         <label class="form-control mt-2 w-full max-w-md">
           <span class="label">Notes (optional)</span>
@@ -46,30 +31,59 @@
             (input)="manualNotes.set($any($event.target).value)"
           />
         </label>
-        <p class="label mt-4">Declared amount per account (cents)</p>
+        <p class="label mt-4">Declared amount per account (Ksh)</p>
+        <p class="label-text-alt text-base-content/60 mb-2">
+          Enter amounts in shillings (e.g. 2000 for Ksh 2,000.00). Current ledger balances and
+          variance are shown for the reconciliation date.
+        </p>
+        @if (manualBalancesLoading()) {
+          <p class="text-sm text-base-content/60 py-2">Loading current balances…</p>
+        }
         <div class="overflow-x-auto max-h-60 overflow-y-auto border border-base-300 rounded-lg">
           <table class="table table-sm">
             <thead>
               <tr>
                 <th>Account</th>
                 <th>Code</th>
-                <th>Declared (cents)</th>
+                <th>Type</th>
+                <th>Current (Ksh)</th>
+                <th>Declared (Ksh)</th>
+                <th>Variance (Ksh)</th>
               </tr>
             </thead>
             <tbody>
-              @for (acc of leafAccounts(); track acc.id) {
+              @for (acc of tableAccounts(); track acc.id) {
                 <tr>
                   <td>{{ acc.name }}</td>
                   <td class="font-mono text-sm">{{ acc.code }}</td>
                   <td>
-                    <input
-                      type="number"
-                      class="input input-bordered input-sm w-28"
-                      min="0"
-                      step="1"
-                      [value]="getManualDeclared(acc.id)"
-                      (input)="setManualDeclared(acc.id, +$any($event.target).value || 0)"
-                    />
+                    <span class="badge badge-ghost badge-sm">{{ accountTypeLabel(acc.type) }}</span>
+                    @if (acc.isSystemAccount) {
+                      <span class="badge badge-warning badge-soft badge-sm ml-1">System</span>
+                    }
+                  </td>
+                  <td class="tabular-nums">
+                    {{ formatShillings(getCurrentBalanceShillings(acc.id)) }}
+                  </td>
+                  <td>
+                    @if (acc.isSystemAccount) {
+                      <span class="text-base-content/50 text-sm">—</span>
+                    } @else {
+                      <input
+                        type="number"
+                        class="input input-bordered input-sm w-28"
+                        min="0"
+                        step="0.01"
+                        [value]="getManualDeclared(acc.id)"
+                        (input)="setManualDeclared(acc.id, +$any($event.target).value || 0)"
+                      />
+                    }
+                  </td>
+                  <td
+                    class="tabular-nums"
+                    [class.text-warning]="getVarianceShillings(acc.id) !== 0"
+                  >
+                    {{ formatShillings(getVarianceShillings(acc.id)) }}
                   </td>
                 </tr>
               }
@@ -101,11 +115,11 @@
         row shows expected vs actual balances and variance.
       </p>
 
-      @if (isLoading()) {
+      @if (context().isLoading) {
         <div class="flex justify-center py-8">
           <span class="loading loading-spinner loading-lg"></span>
         </div>
-      } @else if (reconciliations().length === 0) {
+      } @else if (context().reconciliations.length === 0) {
         <div class="text-center py-8 text-base-content/70">
           <p>No reconciliations found</p>
         </div>
@@ -126,7 +140,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (r of reconciliations(); track r.id) {
+              @for (r of context().reconciliations; track r.id) {
                 <tr [class.bg-warning/10]="hasVariance(r)">
                   <td class="align-middle">
                     <button
@@ -145,21 +159,22 @@
                     </button>
                   </td>
                   <td class="whitespace-nowrap">
-                    {{ formatDate()(r.rangeStart) }} – {{ formatDate()(r.rangeEnd) }}
+                    {{ context().formatDate(r.rangeStart) }} –
+                    {{ context().formatDate(r.rangeEnd) }}
                   </td>
                   <td>
                     <span class="badge badge-outline">{{ r.scope }}</span>
                   </td>
                   <td class="font-mono text-sm">{{ r.scopeRefId }}</td>
-                  <td>{{ formatCurrency()(r.expectedBalance ?? '0') }}</td>
-                  <td>{{ formatCurrency()(r.actualBalance ?? '0') }}</td>
+                  <td>{{ context().formatCurrency(r.expectedBalance ?? '0') }}</td>
+                  <td>{{ context().formatCurrency(r.actualBalance ?? '0') }}</td>
                   <td>
                     @if (hasVariance(r)) {
                       <span class="font-semibold text-warning">{{
-                        formatCurrency()(r.varianceAmount)
+                        context().formatCurrency(r.varianceAmount)
                       }}</span>
                     } @else {
-                      {{ formatCurrency()(r.varianceAmount) }}
+                      {{ context().formatCurrency(r.varianceAmount) }}
                     }
                   </td>
                   <td>
@@ -211,26 +226,26 @@
                                     <td>
                                       {{
                                         d.expectedBalanceCents != null
-                                          ? formatCurrency()(d.expectedBalanceCents)
+                                          ? context().formatCurrency(d.expectedBalanceCents)
                                           : '–'
                                       }}
                                     </td>
                                     <td>
                                       {{
                                         d.declaredAmountCents != null
-                                          ? formatCurrency()(d.declaredAmountCents)
+                                          ? context().formatCurrency(d.declaredAmountCents)
                                           : '–'
                                       }}
                                     </td>
                                     <td>
                                       @if (d.varianceCents && d.varianceCents !== '0') {
                                         <span class="font-semibold text-warning">{{
-                                          formatCurrency()(d.varianceCents)
+                                          context().formatCurrency(d.varianceCents)
                                         }}</span>
                                       } @else {
                                         {{
                                           d.varianceCents != null
-                                            ? formatCurrency()(d.varianceCents)
+                                            ? context().formatCurrency(d.varianceCents)
                                             : '–'
                                         }}
                                       }
@@ -254,15 +269,15 @@
           <div class="join flex justify-center mt-4">
             <button
               class="join-item btn btn-sm"
-              [disabled]="currentPage() === 1"
-              (click)="onPageChange(currentPage() - 1)"
+              [disabled]="context().currentPage === 1"
+              (click)="onPageChange(context().currentPage - 1)"
             >
               «
             </button>
             @for (page of pageNumbers(); track page) {
               <button
                 class="join-item btn btn-sm"
-                [class.btn-active]="currentPage() === page"
+                [class.btn-active]="context().currentPage === page"
                 (click)="onPageChange(page)"
               >
                 {{ page }}
@@ -270,8 +285,8 @@
             }
             <button
               class="join-item btn btn-sm"
-              [disabled]="currentPage() === totalPages()"
-              (click)="onPageChange(currentPage() + 1)"
+              [disabled]="context().currentPage === totalPages()"
+              (click)="onPageChange(context().currentPage + 1)"
             >
               »
             </button>

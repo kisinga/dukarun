@@ -165,10 +165,10 @@ export interface PayOrderModalData {
               </label>
             </div>
 
-            <!-- Debit Account (optional) -->
+            <!-- Destination account (where payment is received) -->
             <div class="form-control">
               <label class="label" for="debitAccount">
-                <span class="label-text font-semibold">Pay From (Account)</span>
+                <span class="label-text font-semibold">Receive payment into</span>
                 <span class="label-text-alt text-base-content/60">Optional</span>
               </label>
               <select
@@ -184,6 +184,11 @@ export interface PayOrderModalData {
                   <option [value]="acc.code">{{ acc.name }} ({{ acc.code }})</option>
                 }
               </select>
+              <label class="label">
+                <span class="label-text-alt text-base-content/60">
+                  Account where this payment will be recorded (e.g. Cash, M-Pesa).
+                </span>
+              </label>
             </div>
 
             <!-- Payment Method Selection -->

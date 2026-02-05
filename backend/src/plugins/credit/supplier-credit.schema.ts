@@ -50,6 +50,12 @@ export const SUPPLIER_CREDIT_SCHEMA = gql`
     debitAccountCode: String
   }
 
+  input PaySinglePurchaseInput {
+    purchaseId: ID!
+    paymentAmount: Float
+    debitAccountCode: String
+  }
+
   extend type Query {
     supplierCreditSummary(supplierId: ID!): SupplierCreditSummary!
     unpaidPurchasesForSupplier(supplierId: ID!): [StockPurchase!]!
@@ -62,5 +68,6 @@ export const SUPPLIER_CREDIT_SCHEMA = gql`
     allocateBulkSupplierPayment(
       input: SupplierPaymentAllocationInput!
     ): SupplierPaymentAllocationResult!
+    paySinglePurchase(input: PaySinglePurchaseInput!): SupplierPaymentAllocationResult!
   }
 `;

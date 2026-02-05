@@ -1,9 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { RequestContext, TransactionalConnection } from '@vendure/core';
 import { Reconciliation, ReconciliationScope } from '../../domain/recon/reconciliation.entity';
 import { ReconciliationAccount } from '../../domain/recon/reconciliation-account.entity';
+import { Account } from '../../ledger/account.entity';
 import { AccountBalanceService } from './account-balance.service';
-import { ReconciliationStatus, ScopeReconciliationStatus } from './period-management.types';
+import {
+  ReconciliationStatus,
+  ScopeReconciliationStatus,
+  toScopeRefId,
+} from './period-management.types';
 
 export interface CreateReconciliationInput {
   channelId: number;
@@ -30,6 +35,8 @@ export interface CreateReconciliationInput {
  */
 @Injectable()
 export class ReconciliationService {
+  private readonly logger = new Logger(ReconciliationService.name);
+
   constructor(
     private readonly connection: TransactionalConnection,
     private readonly accountBalanceService: AccountBalanceService
@@ -143,6 +150,53 @@ export class ReconciliationService {
   }
 
   /**
+   * Get ledger balance (in cents) for each leaf account as of a date. Used by manual reconciliation UI.
+   */
+  async getAccountBalancesAsOf(
+    ctx: RequestContext,
+    channelId: number,
+    asOfDate: string
+  ): Promise<
+    Array<{ accountId: string; accountCode: string; accountName: string; balanceCents: string }>
+  > {
+    const accountRepo = this.connection.getRepository(ctx, Account);
+    const accounts = await accountRepo.find({
+      where: { channelId, isActive: true, isParent: false },
+      order: { code: 'ASC' },
+    });
+    const result: Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      balanceCents: string;
+    }> = [];
+    for (const account of accounts) {
+      try {
+        const balance = await this.accountBalanceService.getAccountBalance(
+          ctx,
+          account.code,
+          channelId,
+          asOfDate
+        );
+        result.push({
+          accountId: account.id,
+          accountCode: account.code,
+          accountName: account.name,
+          balanceCents: String(balance.balance),
+        });
+      } catch {
+        result.push({
+          accountId: account.id,
+          accountCode: account.code,
+          accountName: account.name,
+          balanceCents: '0',
+        });
+      }
+    }
+    return result;
+  }
+
+  /**
    * List reconciliations for a channel with optional filters (for history UI).
    */
   async getReconciliations(
@@ -220,6 +274,9 @@ export class ReconciliationService {
       where: { reconciliationId },
       relations: ['account'],
     });
+    this.logger.log(
+      `getReconciliationDetails reconciliationId=${reconciliationId} junctionRows=${rows.length}`
+    );
 
     const result: Array<{
       accountId: string;
@@ -263,10 +320,14 @@ export class ReconciliationService {
     return result;
   }
 
+  /** Session id must be a UUID; reject placeholders like "-1" so invalid ids are never used. */
+  private static readonly UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
   /**
    * Get per-account reconciliation details for a cashier session.
    * @param kind - 'opening' = reconciliation at session open (first by rangeStart); 'closing' = at close (first by rangeEnd DESC). Default 'closing'.
-   * Returns [] if no matching reconciliation exists.
+   * Returns [] if no matching reconciliation exists or if sessionId is not a valid UUID.
    */
   async getSessionReconciliationDetails(
     ctx: RequestContext,
@@ -282,11 +343,20 @@ export class ReconciliationService {
       varianceCents: string | null;
     }>
   > {
+    const trimmed = typeof sessionId === 'string' ? sessionId.trim() : '';
+    if (!trimmed || trimmed === '-1' || !ReconciliationService.UUID_REGEX.test(trimmed)) {
+      this.logger.warn(
+        `getSessionReconciliationDetails: invalid sessionId (rejected), kind=${kind}`
+      );
+      return [];
+    }
     const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
     const qb = reconciliationRepo
       .createQueryBuilder('r')
       .where('r.scope = :scope', { scope: 'cash-session' })
-      .andWhere('r.scopeRefId = :sessionId', { sessionId });
+      .andWhere('r.scopeRefId = :scopeRefId', {
+        scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId: trimmed }),
+      });
     if (kind === 'opening') {
       qb.orderBy('r.rangeStart', 'ASC').addOrderBy('r.rangeEnd', 'ASC');
     } else {
@@ -294,6 +364,9 @@ export class ReconciliationService {
     }
     const list = await qb.take(1).getMany();
     const reconciliation = list[0];
+    this.logger.log(
+      `getSessionReconciliationDetails sessionId=${sessionId} kind=${kind} found=${!!reconciliation} reconciliationId=${reconciliation?.id ?? 'n/a'}`
+    );
     if (!reconciliation) return [];
     return this.getReconciliationDetails(ctx, reconciliation.id);
   }

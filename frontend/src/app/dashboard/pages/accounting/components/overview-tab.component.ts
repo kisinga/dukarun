@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { LedgerAccount, JournalEntry } from '../../../../core/services/ledger/ledger.service';
+import type { AccountingContext } from '../accounting-context';
 
 @Component({
   selector: 'app-overview-tab',
@@ -10,14 +11,7 @@ import { LedgerAccount, JournalEntry } from '../../../../core/services/ledger/le
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class OverviewTabComponent {
-  keyAccounts = input.required<LedgerAccount[]>();
-  recentEntries = input.required<JournalEntry[]>();
-  isLoading = input.required<boolean>();
-  selectedAccount = input.required<LedgerAccount | null>();
-  formatCurrency = input.required<(amount: number) => string>();
-  formatDate = input.required<(date: string) => string>();
-  getEntryTotalDebit = input.required<(entry: JournalEntry) => number>();
-  getEntryTotalCredit = input.required<(entry: JournalEntry) => number>();
+  context = input.required<AccountingContext>();
 
   accountSelect = output<LedgerAccount>();
   entryView = output<JournalEntry>();

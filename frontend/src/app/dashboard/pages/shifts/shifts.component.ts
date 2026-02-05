@@ -103,21 +103,21 @@ export class ShiftsComponent implements OnInit {
     if (!channelId) return;
 
     this.cashierSessionService.getCurrentSession(channelId).subscribe({
-      next: () => this.loadCurrentSessionOpeningDetails(),
+      next: (session) => {
+        const sid = session?.id != null ? String(session.id) : '';
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sid);
+        if (isUuid) this.loadCurrentSessionOpeningDetails(sid);
+        else this.currentSessionOpeningDetails.set(null);
+      },
     });
     this.loadSessions(channelId);
   }
 
   /** Load opening reconciliation details for the current session (variances at open). Shown at top when there is an open shift. */
-  loadCurrentSessionOpeningDetails(): void {
-    const session = this.cashierSessionService.currentSession();
-    if (!session || this.cashierSessionService.hasActiveSession() !== true) {
-      this.currentSessionOpeningDetails.set(null);
-      return;
-    }
+  loadCurrentSessionOpeningDetails(sessionId: string): void {
     this.loadingCurrentOpeningDetails.set(true);
     this.currentSessionOpeningDetails.set(null);
-    this.cashierSessionService.getSessionReconciliationDetails(session.id, 'opening').subscribe({
+    this.cashierSessionService.getSessionReconciliationDetails(sessionId, 'opening').subscribe({
       next: (details) => {
         this.currentSessionOpeningDetails.set(details);
         this.loadingCurrentOpeningDetails.set(false);
@@ -165,27 +165,29 @@ export class ShiftsComponent implements OnInit {
   }
 
   isExpanded(session: CashierSession): boolean {
-    return this.expandedSessionId() === session.id;
+    const sessionId = typeof session.id === 'string' ? session.id.trim() : String(session.id);
+    return this.expandedSessionId() === sessionId;
   }
 
   toggleExpand(session: CashierSession): void {
+    const sessionId = typeof session.id === 'string' ? session.id.trim() : String(session.id);
     const current = this.expandedSessionId();
-    if (current === session.id) {
+    if (current === sessionId) {
       this.expandedSessionId.set(null);
       return;
     }
-    this.expandedSessionId.set(session.id);
+    this.expandedSessionId.set(sessionId);
     const cache = this.sessionDetailsCache();
-    if (cache[session.id] !== undefined) {
+    if (cache[sessionId] !== undefined) {
       return;
     }
     if (!session.closedAt) {
       return;
     }
-    this.loadingDetailsSessionId.set(session.id);
-    this.cashierSessionService.getSessionReconciliationDetails(session.id).subscribe({
+    this.loadingDetailsSessionId.set(sessionId);
+    this.cashierSessionService.getSessionReconciliationDetails(sessionId, 'closing').subscribe({
       next: (details) => {
-        this.sessionDetailsCache.update((c) => ({ ...c, [session.id]: details }));
+        this.sessionDetailsCache.update((c) => ({ ...c, [sessionId]: details }));
         this.loadingDetailsSessionId.set(null);
       },
       error: () => this.loadingDetailsSessionId.set(null),
@@ -193,7 +195,8 @@ export class ShiftsComponent implements OnInit {
   }
 
   getSessionDetails(session: CashierSession): ReconciliationAccountDetail[] {
-    return this.sessionDetailsCache()[session.id] ?? [];
+    const sessionId = typeof session.id === 'string' ? session.id.trim() : String(session.id);
+    return this.sessionDetailsCache()[sessionId] ?? [];
   }
 
   /** Format amount in cents for display (e.g. "12345" → "123.45"). */
