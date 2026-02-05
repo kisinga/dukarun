@@ -395,12 +395,11 @@ export class ProductCreateComponent implements OnInit {
   }
 
   /**
-   * Set product type (measured or discrete)
+   * Set product type (measured or discrete).
+   * Unit comes from the variant (edit) or measurement unit selector (create); no preset-based default.
    */
   setProductType(type: ProductType): void {
     this.productType.set(type);
-    // Product type is now mostly driven by howSoldPreset.
-    // We still regenerate SKUs when type is changed manually (edit mode).
     this.generateSkus();
   }
 
@@ -614,18 +613,21 @@ export class ProductCreateComponent implements OnInit {
   }
 
   /**
-   * Generate SKUs for measured products
+   * Generate SKUs for measured products.
+   * Uses selected measurement unit and product name so the SKU respects the entered value.
    */
   private generateMeasuredSkus(): void {
-    const unit = this.measurementUnit() || 'UNIT';
+    const unit = this.measurementUnit()?.trim() || 'UNIT';
+    const productName = this.productForm.get('name')?.value?.trim() || 'Product';
     const dimensions = this.variantDimensions();
 
     if (dimensions.length === 0) {
-      // Pure measured: just the unit
+      // Pure measured: product name + unit (e.g. "Rice - KG") so SKU respects entered values
+      const name = `${productName} - ${unit}`;
       const index = this.skus.length + 1;
-      const baseSku = this.generateSku(unit);
+      const baseSku = this.generateSku(name);
       const skuCode = this.buildUniqueSkuCode(baseSku, index);
-      this.skus.push(this.createSkuFormGroup(skuCode, unit, 1, 0, true, 0, null));
+      this.skus.push(this.createSkuFormGroup(skuCode, name, 1, 0, true, 0, null));
     } else {
       // Measured with variants: "Grade A - KG", "Grade B - KG"
       dimensions[0].options.forEach((option) => {
