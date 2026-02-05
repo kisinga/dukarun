@@ -20,14 +20,24 @@ import {
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import type { FacetCode, FacetValueSummary } from '../../../core/services/product/facet.types';
+import {
+  FACET_CODE_CATEGORY,
+  FACET_CODE_MANUFACTURER,
+  FACET_CODE_TAGS,
+} from '../../../core/services/product/facet.types';
 import { AppInitService } from '../../../core/services/app-init.service';
 import { CompanyService } from '../../../core/services/company.service';
+import { FacetService } from '../../../core/services/product/facet.service';
+import { normalizeBarcodeForApi } from '../../../core/services/product/barcode.util';
 import { ProductService } from '../../../core/services/product.service';
 import { ProductValidationService } from '../../../core/services/product/product-validation.service';
 import { ProductVariantService } from '../../../core/services/product/product-variant.service';
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { HowSoldSelectorComponent } from './components/how-sold-selector.component';
 import { IdentificationSelectorComponent } from './components/identification-selector.component';
+import { MultiFacetSelectorComponent } from './components/multi-facet-selector.component';
+import { SingleFacetSelectorComponent } from './components/single-facet-selector.component';
 import { ItemTypeSelectorComponent } from './components/item-type-selector.component';
 import { LocationDisplayComponent } from './components/location-display.component';
 import { MeasurementUnitSelectorComponent } from './components/measurement-unit-selector.component';
@@ -73,6 +83,8 @@ import {
     ItemTypeSelectorComponent,
     HowSoldSelectorComponent,
     ProductNameInputComponent,
+    SingleFacetSelectorComponent,
+    MultiFacetSelectorComponent,
     IdentificationSelectorComponent,
     MeasurementUnitSelectorComponent,
     SizeTemplateSelectorComponent,
@@ -96,6 +108,7 @@ export class ProductCreateComponent implements OnInit {
   private readonly stockLocationService = inject(StockLocationService);
   private readonly appInitService = inject(AppInitService);
   private readonly validationService = inject(ProductValidationService);
+  private readonly facetService = inject(FacetService);
   readonly companyService = inject(CompanyService);
 
   /**
@@ -156,8 +169,8 @@ export class ProductCreateComponent implements OnInit {
   // Default location for the active channel (from StockLocationService)
   readonly defaultLocation = this.stockLocationService.defaultLocation;
 
-  // Identification method chosen (barcode | label-photos | none = name/SKU only)
-  readonly identificationMethod = signal<'barcode' | 'label-photos' | 'none' | null>('barcode');
+  // Identification method chosen (barcode | label-photos)
+  readonly identificationMethod = signal<'barcode' | 'label-photos' | null>('barcode');
   readonly photoCount = signal(0);
   readonly barcodeValue = signal<string>(''); // Track barcode as signal
   readonly productNameValue = signal<string>(''); // Track name as signal
@@ -165,12 +178,14 @@ export class ProductCreateComponent implements OnInit {
   readonly skuValidityTrigger = signal<number>(0); // Trigger to recompute SKU validation
   readonly formValid = signal<boolean>(false); // Track overall form validity
 
-  // Computed: Has valid identification (none = always valid for name/SKU-only products)
+  // Facets (manufacturer, category, tags) – form owns full replacement on submit
+  readonly manufacturer = signal<FacetValueSummary | null>(null);
+  readonly category = signal<FacetValueSummary | null>(null);
+  readonly tags = signal<FacetValueSummary[]>([]);
+
+  // Computed: Has valid identification (barcode entered or 5+ photos)
   readonly hasValidIdentification = computed(() => {
     const method = this.identificationMethod();
-    if (method === 'none') {
-      return true;
-    }
     if (method === 'barcode') {
       return !!this.barcodeValue()?.trim();
     }
@@ -195,11 +210,9 @@ export class ProductCreateComponent implements OnInit {
   readonly validationIssues = computed(() => {
     const issues: string[] = [];
     const stage = this.currentStage();
-    const method = this.identificationMethod();
 
-    // Only require barcode/photos when user chose barcode or label-photos but didn't satisfy it
-    if (method !== 'none' && !this.hasValidIdentification()) {
-      issues.push(`Barcode OR 5+ label photos OR choose "Name or SKU only"`);
+    if (!this.hasValidIdentification()) {
+      issues.push('Enter a barcode OR add 5+ label photos');
     }
     if (!this.productNameValid()) issues.push('Product name required');
 
@@ -478,9 +491,16 @@ export class ProductCreateComponent implements OnInit {
       this.measurementUnit.set('KG');
       this.variantDimensions.set([]);
     } else if (preset === 'by-volume-litre') {
-      this.productType.set('measured');
-      this.measurementUnit.set('L');
-      this.variantDimensions.set([]);
+      // Custom: no pre-population — leave hints only; fractional toggle drives productType
+      this.productType.set('discrete'); // fractional toggle defaults off
+      this.measurementUnit.set(null);
+      // One empty variant so Stage 2 loads with 1 row to fill in
+      const emptyDimension: VariantDimension = {
+        id: Date.now().toString(),
+        name: '',
+        options: [],
+      };
+      this.variantDimensions.set([emptyDimension]);
     }
 
     this.generateSkus();
@@ -527,9 +547,7 @@ export class ProductCreateComponent implements OnInit {
     const hasId = this.hasValidIdentification();
 
     if (!hasName || !hasId) {
-      this.submitError.set(
-        'Add a product name and choose identification: barcode, 5+ label photos, or "Name or SKU only".',
-      );
+      this.submitError.set('Add a product name and enter a barcode OR add 5+ label photos.');
       return;
     }
 
@@ -718,10 +736,8 @@ export class ProductCreateComponent implements OnInit {
   /**
    * Choose identification method
    */
-  chooseIdentificationMethod(method: 'barcode' | 'label-photos' | 'none'): void {
+  chooseIdentificationMethod(method: 'barcode' | 'label-photos'): void {
     this.identificationMethod.set(method);
-
-    // Clear other method
     if (method !== 'barcode') {
       this.productForm.patchValue({ barcode: '' });
       this.barcodeValue.set('');
@@ -729,22 +745,13 @@ export class ProductCreateComponent implements OnInit {
     if (method !== 'label-photos') {
       this.photoCount.set(0);
     }
-    if (method === 'none') {
-      this.productForm.patchValue({ barcode: '' });
-      this.barcodeValue.set('');
-      this.photoCount.set(0);
-    }
   }
 
   /**
-   * Async validator for barcode uniqueness (skipped when identification method is 'none')
+   * Async validator for barcode uniqueness
    */
   private barcodeAsyncValidator(): AsyncValidatorFn {
     return (control: AbstractControl): Promise<ValidationErrors | null> => {
-      // Skip when user chose "Name or SKU only" – no barcode required
-      if (this.identificationMethod() === 'none') {
-        return Promise.resolve(null);
-      }
       const barcode = control.value?.trim();
 
       // Skip validation if barcode is empty
@@ -826,11 +833,39 @@ export class ProductCreateComponent implements OnInit {
         this.identificationMethod.set('label-photos');
         this.photoCount.set(product.assets.length);
       } else {
-        // No barcode and no/insufficient photos → name/SKU only
-        this.identificationMethod.set('none');
+        // No barcode and no/insufficient photos → default to barcode (empty)
+        this.identificationMethod.set('barcode');
         this.barcodeValue.set('');
         this.photoCount.set(0);
       }
+
+      // Partition facetValues by facet.code (manufacturer, category, tags)
+      const facetValues = (product.facetValues ?? []) as Array<{
+        id: string;
+        name: string;
+        code: string;
+        facet: { id: string; code: string };
+      }>;
+      const toSummary = (fv: (typeof facetValues)[0]): FacetValueSummary => ({
+        id: fv.id,
+        name: fv.name,
+        code: fv.code,
+      });
+      const byCode = facetValues.reduce<Record<string, typeof facetValues>>((acc, fv) => {
+        const code = fv.facet?.code;
+        if (code) {
+          if (!acc[code]) acc[code] = [];
+          acc[code].push(fv);
+        }
+        return acc;
+      }, {});
+      this.manufacturer.set(
+        byCode[FACET_CODE_MANUFACTURER]?.[0] ? toSummary(byCode[FACET_CODE_MANUFACTURER][0]) : null,
+      );
+      this.category.set(
+        byCode[FACET_CODE_CATEGORY]?.[0] ? toSummary(byCode[FACET_CODE_CATEGORY][0]) : null,
+      );
+      this.tags.set((byCode[FACET_CODE_TAGS] ?? []).map(toSummary));
 
       // Determine item type: Check if any variant has trackInventory: false → service
       const isService = product.variants?.some((variant: any) => variant.trackInventory === false);
@@ -927,6 +962,33 @@ export class ProductCreateComponent implements OnInit {
   }
 
   /**
+   * Resolve manufacturer, category, and tags to facet value IDs.
+   * Uses existing id when present; otherwise creates the facet value on the server (lazy persistence).
+   */
+  private async resolveFacetValueIds(): Promise<string[]> {
+    const ids: string[] = [];
+    const resolve = async (
+      summary: FacetValueSummary | null,
+      facetCode: FacetCode,
+    ): Promise<string | null> => {
+      if (!summary?.name?.trim()) return null;
+      if (summary.id?.trim()) return summary.id;
+      const facet = await this.facetService.getFacetByCode(facetCode);
+      const created = await this.facetService.createFacetValue(facet.id, summary.name.trim());
+      return created.id;
+    };
+    const m = await resolve(this.manufacturer(), FACET_CODE_MANUFACTURER);
+    if (m) ids.push(m);
+    const c = await resolve(this.category(), FACET_CODE_CATEGORY);
+    if (c) ids.push(c);
+    for (const t of this.tags()) {
+      const id = await resolve(t, FACET_CODE_TAGS);
+      if (id) ids.push(id);
+    }
+    return ids;
+  }
+
+  /**
    * Submit form - creates product/service with multiple SKUs
    */
   async onSubmit(): Promise<void> {
@@ -953,15 +1015,19 @@ export class ProductCreateComponent implements OnInit {
         return;
       }
 
+      // Resolve facet value IDs (create any new facet values on save; form owns full replacement)
+      const facetValueIds = await this.resolveFacetValueIds();
+
       // Product/Service input (no barcode when identification is "Name or SKU only")
       const productInput = {
         name: formValue.name.trim(),
         description: '',
         enabled: true,
         barcode:
-          this.identificationMethod() === 'none'
-            ? undefined
-            : formValue.barcode?.trim() || undefined,
+          this.identificationMethod() === 'barcode'
+            ? normalizeBarcodeForApi(formValue.barcode)
+            : undefined,
+        facetValueIds: facetValueIds.length > 0 ? facetValueIds : undefined,
       };
 
       // Multiple variant inputs from SKUs FormArray
@@ -1037,12 +1103,13 @@ export class ProductCreateComponent implements OnInit {
             };
           });
 
-        // Update product name and barcode
+        // Update product name, barcode, and facets (full replacement)
         const updated = await this.productService.updateProductWithVariants(
           productId,
           productInput.name,
           existingVariants,
           productInput.barcode,
+          productInput.facetValueIds,
         );
 
         if (!updated) {

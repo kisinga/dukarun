@@ -5,6 +5,13 @@ import { CACHE_CONFIGS, CacheService } from './cache.service';
 import { CompanyService } from './company.service';
 import { ProductVariant } from './product/product-search.service';
 
+/** Facet value for manufacturer/category pill on cart items */
+export interface CartItemFacetValue {
+  name: string;
+  facetCode?: string;
+  facet?: { code: string };
+}
+
 /**
  * Cart item interface - aligned with cart component
  */
@@ -14,6 +21,8 @@ export interface CartItem {
   subtotal: number;
   customLinePrice?: number; // Line price in cents
   priceOverrideReason?: string; // Reason code
+  /** Product-level facet values (manufacturer, category) for pill display */
+  facetValues?: CartItemFacetValue[];
 }
 
 /**
@@ -202,7 +211,11 @@ export class CartService {
    * Add item locally (for POS quick add)
    * This is a local-only operation for the POS system
    */
-  addItemLocal(variant: ProductVariant, quantity: number): void {
+  addItemLocal(
+    variant: ProductVariant,
+    quantity: number,
+    facetValues?: CartItemFacetValue[],
+  ): void {
     const items = this.cartItemsSignal();
     const existingIndex = items.findIndex((item) => item.variant.id === variant.id);
 
@@ -217,7 +230,15 @@ export class CartService {
                 }
               : item,
           )
-        : [...items, { variant, quantity, subtotal: quantity * variant.priceWithTax }];
+        : [
+            ...items,
+            {
+              variant,
+              quantity,
+              subtotal: quantity * variant.priceWithTax,
+              facetValues: facetValues ?? [],
+            },
+          ];
 
     this.cartItemsSignal.set(newItems);
     this.persistCart();

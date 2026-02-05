@@ -10,13 +10,14 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ProductSearchResult } from '../../../../core/services/product/product-search.service';
+import { ProductLabelComponent } from '../../shared/components/product-label.component';
 
 /**
  * Unified search interface with integrated camera toggle
  */
 @Component({
   selector: 'app-search-view',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ProductLabelComponent],
   template: `
     <div class="card bg-base-100 shadow-lg">
       <div class="card-body p-3">
@@ -131,7 +132,10 @@ import { ProductSearchResult } from '../../../../core/services/product/product-s
 
                 <!-- Product Info -->
                 <div class="flex-1 text-left min-w-0">
-                  <div class="font-semibold text-sm truncate">{{ product.name }}</div>
+                  <app-product-label
+                    [productName]="product.name"
+                    [facetValues]="product.facetValues ?? []"
+                  />
                   <div class="text-xs opacity-60">
                     {{ product.variants.length }} variant{{
                       product.variants.length > 1 ? 's' : ''

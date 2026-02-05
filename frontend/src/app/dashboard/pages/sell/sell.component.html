@@ -134,7 +134,10 @@
 
                   <!-- Product Info -->
                   <div class="flex-1 text-left min-w-0">
-                    <div class="font-semibold text-sm truncate">{{ product.name }}</div>
+                    <app-product-label
+                      [productName]="product.name"
+                      [facetValues]="product.facetValues ?? []"
+                    />
                     <div class="text-xs opacity-60">
                       @if (product.variants.length === 1) {
                         {{ formatPrice(product.variants[0].priceWithTax) }}

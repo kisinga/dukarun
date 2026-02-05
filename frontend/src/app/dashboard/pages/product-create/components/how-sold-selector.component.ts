@@ -26,8 +26,16 @@ import { HowSoldPreset } from '../types/product-creation.types';
           [class.border-base-300]="selected() !== 'single-item'"
           (click)="onSelect('single-item')"
         >
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="m7.5 4.27 9 5.15M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          <svg
+            class="w-4 h-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              d="m7.5 4.27 9 5.15M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+            />
           </svg>
           <span class="text-[11px] font-medium">Single item</span>
         </button>
@@ -41,9 +49,17 @@ import { HowSoldPreset } from '../types/product-creation.types';
           [class.border-base-300]="selected() !== 'multi-variant'"
           (click)="onSelect('multi-variant')"
         >
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-            <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+          <svg
+            class="w-4 h-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
           </svg>
           <span class="text-[11px] font-medium">Sizes / Packs</span>
         </button>
@@ -58,17 +74,25 @@ import { HowSoldPreset } from '../types/product-creation.types';
           (click)="onSelect('by-weight-kg')"
         >
           <!-- Scale/weight icon -->
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 16h6"/>
-            <path d="M19 13v6"/>
-            <path d="M12 15V3"/>
-            <path d="m5 6 3.5 3.5"/>
-            <path d="m19 6-3.5 3.5"/>
-            <path d="M2 12h4"/>
-            <path d="M18 12h4"/>
-            <circle cx="12" cy="17" r="4"/>
+          <svg
+            class="w-4 h-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M16 16h6" />
+            <path d="M19 13v6" />
+            <path d="M12 15V3" />
+            <path d="m5 6 3.5 3.5" />
+            <path d="m19 6-3.5 3.5" />
+            <path d="M2 12h4" />
+            <path d="M18 12h4" />
+            <circle cx="12" cy="17" r="4" />
           </svg>
-          <span class="text-[11px] font-medium">By weight</span>
+          <span class="text-[11px] font-medium">Weight / Volume</span>
         </button>
 
         <!-- By volume -->
@@ -81,12 +105,20 @@ import { HowSoldPreset } from '../types/product-creation.types';
           (click)="onSelect('by-volume-litre')"
         >
           <!-- Beaker/liquid icon -->
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4.5 3h15"/>
-            <path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3"/>
-            <path d="M6 14h12"/>
+          <svg
+            class="w-4 h-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M4.5 3h15" />
+            <path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3" />
+            <path d="M6 14h12" />
           </svg>
-          <span class="text-[11px] font-medium">By volume</span>
+          <span class="text-[11px] font-medium">Custom</span>
         </button>
       </div>
     </div>

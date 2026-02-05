@@ -3356,6 +3356,7 @@ export type LedgerAccount = {
   id: Scalars['ID']['output'];
   isActive: Scalars['Boolean']['output'];
   isParent: Scalars['Boolean']['output'];
+  isSystemAccount: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
   parentAccountId?: Maybe<Scalars['ID']['output']>;
   type: Scalars['String']['output'];
@@ -9093,7 +9094,6 @@ export type CheckSkuExistsQuery = {
 
 export type CheckBarcodeExistsQueryVariables = Exact<{
   barcode: Scalars['String']['input'];
-  excludeProductId?: InputMaybe<Scalars['ID']['input']>;
 }>;
 
 export type CheckBarcodeExistsQuery = {
@@ -9240,6 +9240,13 @@ export type GetProductDetailQuery = {
     description: string;
     enabled: boolean;
     customFields?: { __typename?: 'ProductCustomFields'; barcode?: string | null } | null;
+    facetValues: Array<{
+      __typename?: 'FacetValue';
+      id: string;
+      name: string;
+      code: string;
+      facet: { __typename?: 'Facet'; id: string; code: string };
+    }>;
     assets: Array<{
       __typename?: 'Asset';
       id: string;
@@ -9294,6 +9301,12 @@ export type GetProductsQuery = {
       description: string;
       enabled: boolean;
       featuredAsset?: { __typename?: 'Asset'; id: string; preview: string } | null;
+      facetValues: Array<{
+        __typename?: 'FacetValue';
+        id: string;
+        name: string;
+        facet: { __typename?: 'Facet'; code: string };
+      }>;
       variants: Array<{
         __typename?: 'ProductVariant';
         id: string;
@@ -9413,6 +9426,12 @@ export type SearchProductsQuery = {
       id: string;
       name: string;
       featuredAsset?: { __typename?: 'Asset'; preview: string } | null;
+      facetValues: Array<{
+        __typename?: 'FacetValue';
+        id: string;
+        name: string;
+        facet: { __typename?: 'Facet'; code: string };
+      }>;
       variants: Array<{
         __typename?: 'ProductVariant';
         id: string;
@@ -9448,6 +9467,12 @@ export type GetProductQuery = {
     id: string;
     name: string;
     featuredAsset?: { __typename?: 'Asset'; preview: string } | null;
+    facetValues: Array<{
+      __typename?: 'FacetValue';
+      id: string;
+      name: string;
+      facet: { __typename?: 'Facet'; code: string };
+    }>;
     variants: Array<{
       __typename?: 'ProductVariant';
       id: string;
@@ -9510,6 +9535,12 @@ export type SearchByBarcodeQuery = {
       name: string;
       customFields?: { __typename?: 'ProductCustomFields'; barcode?: string | null } | null;
       featuredAsset?: { __typename?: 'Asset'; preview: string } | null;
+      facetValues: Array<{
+        __typename?: 'FacetValue';
+        id: string;
+        name: string;
+        facet: { __typename?: 'Facet'; code: string };
+      }>;
       variants: Array<{
         __typename?: 'ProductVariant';
         id: string;
@@ -9542,6 +9573,12 @@ export type PrefetchProductsQuery = {
       id: string;
       name: string;
       featuredAsset?: { __typename?: 'Asset'; preview: string } | null;
+      facetValues: Array<{
+        __typename?: 'FacetValue';
+        id: string;
+        name: string;
+        facet: { __typename?: 'Facet'; code: string };
+      }>;
       variants: Array<{
         __typename?: 'ProductVariant';
         id: string;
@@ -9563,6 +9600,49 @@ export type PrefetchProductsQuery = {
       }>;
     }>;
   };
+};
+
+export type GetFacetsByCodesQueryVariables = Exact<{
+  codes: Array<Scalars['String']['input']> | Scalars['String']['input'];
+}>;
+
+export type GetFacetsByCodesQuery = {
+  __typename?: 'Query';
+  facets: {
+    __typename?: 'FacetList';
+    items: Array<{ __typename?: 'Facet'; id: string; code: string; name: string }>;
+  };
+};
+
+export type GetFacetValuesQueryVariables = Exact<{
+  facetId: Scalars['String']['input'];
+  term?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetFacetValuesQuery = {
+  __typename?: 'Query';
+  facetValues: {
+    __typename?: 'FacetValueList';
+    items: Array<{ __typename?: 'FacetValue'; id: string; name: string; code: string }>;
+  };
+};
+
+export type CreateFacetMutationVariables = Exact<{
+  input: CreateFacetInput;
+}>;
+
+export type CreateFacetMutation = {
+  __typename?: 'Mutation';
+  createFacet: { __typename?: 'Facet'; id: string; code: string; name: string };
+};
+
+export type CreateFacetValueMutationVariables = Exact<{
+  input: CreateFacetValueInput;
+}>;
+
+export type CreateFacetValueMutation = {
+  __typename?: 'Mutation';
+  createFacetValue: { __typename?: 'FacetValue'; id: string; name: string; code: string };
 };
 
 export type GetOrdersForPeriodQueryVariables = Exact<{
@@ -11944,14 +12024,33 @@ export type VerifyMpesaTransactionsMutation = {
   };
 };
 
-export type UpdateProductMutationVariables = Exact<{
+export type UpdateProductBasicMutationVariables = Exact<{
   id: Scalars['ID']['input'];
   name: Scalars['String']['input'];
   slug: Scalars['String']['input'];
   barcode?: InputMaybe<Scalars['String']['input']>;
 }>;
 
-export type UpdateProductMutation = {
+export type UpdateProductBasicMutation = {
+  __typename?: 'Mutation';
+  updateProduct: {
+    __typename?: 'Product';
+    id: string;
+    name: string;
+    slug: string;
+    customFields?: { __typename?: 'ProductCustomFields'; barcode?: string | null } | null;
+  };
+};
+
+export type UpdateProductWithFacetsMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+  name: Scalars['String']['input'];
+  slug: Scalars['String']['input'];
+  barcode?: InputMaybe<Scalars['String']['input']>;
+  facetValueIds: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
+}>;
+
+export type UpdateProductWithFacetsMutation = {
   __typename?: 'Mutation';
   updateProduct: {
     __typename?: 'Product';
@@ -13022,11 +13121,6 @@ export const CheckBarcodeExistsDocument = {
             type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
           },
         },
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'excludeProductId' } },
-          type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
-        },
       ],
       selectionSet: {
         kind: 'SelectionSet',
@@ -13687,6 +13781,29 @@ export const GetProductDetailDocument = {
                 },
                 {
                   kind: 'Field',
+                  name: { kind: 'Name', value: 'facetValues' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'facet' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
                   name: { kind: 'Name', value: 'assets' },
                   selectionSet: {
                     kind: 'SelectionSet',
@@ -13830,6 +13947,27 @@ export const GetProductsDocument = {
                           selections: [
                             { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'preview' } },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'facetValues' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'facet' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                                ],
+                              },
+                            },
                           ],
                         },
                       },
@@ -14275,6 +14413,27 @@ export const SearchProductsDocument = {
                       },
                       {
                         kind: 'Field',
+                        name: { kind: 'Name', value: 'facetValues' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'facet' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
                         name: { kind: 'Name', value: 'variants' },
                         selectionSet: {
                           kind: 'SelectionSet',
@@ -14369,6 +14528,25 @@ export const GetProductDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [{ kind: 'Field', name: { kind: 'Name', value: 'preview' } }],
+                  },
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'facetValues' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'facet' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [{ kind: 'Field', name: { kind: 'Name', value: 'code' } }],
+                        },
+                      },
+                    ],
                   },
                 },
                 {
@@ -14591,6 +14769,27 @@ export const SearchByBarcodeDocument = {
                       },
                       {
                         kind: 'Field',
+                        name: { kind: 'Name', value: 'facetValues' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'facet' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
                         name: { kind: 'Name', value: 'variants' },
                         selectionSet: {
                           kind: 'SelectionSet',
@@ -14698,6 +14897,27 @@ export const PrefetchProductsDocument = {
                       },
                       {
                         kind: 'Field',
+                        name: { kind: 'Name', value: 'facetValues' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'facet' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
                         name: { kind: 'Name', value: 'variants' },
                         selectionSet: {
                           kind: 'SelectionSet',
@@ -14750,6 +14970,298 @@ export const PrefetchProductsDocument = {
     },
   ],
 } as unknown as DocumentNode<PrefetchProductsQuery, PrefetchProductsQueryVariables>;
+export const GetFacetsByCodesDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetFacetsByCodes' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'codes' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'ListType',
+              type: {
+                kind: 'NonNullType',
+                type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+              },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'facets' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'options' },
+                value: {
+                  kind: 'ObjectValue',
+                  fields: [
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'filter' },
+                      value: {
+                        kind: 'ObjectValue',
+                        fields: [
+                          {
+                            kind: 'ObjectField',
+                            name: { kind: 'Name', value: 'code' },
+                            value: {
+                              kind: 'ObjectValue',
+                              fields: [
+                                {
+                                  kind: 'ObjectField',
+                                  name: { kind: 'Name', value: 'in' },
+                                  value: {
+                                    kind: 'Variable',
+                                    name: { kind: 'Name', value: 'codes' },
+                                  },
+                                },
+                              ],
+                            },
+                          },
+                        ],
+                      },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'take' },
+                      value: { kind: 'IntValue', value: '10' },
+                    },
+                  ],
+                },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'items' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetFacetsByCodesQuery, GetFacetsByCodesQueryVariables>;
+export const GetFacetValuesDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetFacetValues' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'facetId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'term' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'facetValues' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'options' },
+                value: {
+                  kind: 'ObjectValue',
+                  fields: [
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'filter' },
+                      value: {
+                        kind: 'ObjectValue',
+                        fields: [
+                          {
+                            kind: 'ObjectField',
+                            name: { kind: 'Name', value: 'facetId' },
+                            value: {
+                              kind: 'ObjectValue',
+                              fields: [
+                                {
+                                  kind: 'ObjectField',
+                                  name: { kind: 'Name', value: 'eq' },
+                                  value: {
+                                    kind: 'Variable',
+                                    name: { kind: 'Name', value: 'facetId' },
+                                  },
+                                },
+                              ],
+                            },
+                          },
+                          {
+                            kind: 'ObjectField',
+                            name: { kind: 'Name', value: 'name' },
+                            value: {
+                              kind: 'ObjectValue',
+                              fields: [
+                                {
+                                  kind: 'ObjectField',
+                                  name: { kind: 'Name', value: 'contains' },
+                                  value: {
+                                    kind: 'Variable',
+                                    name: { kind: 'Name', value: 'term' },
+                                  },
+                                },
+                              ],
+                            },
+                          },
+                        ],
+                      },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'take' },
+                      value: { kind: 'IntValue', value: '20' },
+                    },
+                  ],
+                },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'items' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetFacetValuesQuery, GetFacetValuesQueryVariables>;
+export const CreateFacetDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'CreateFacet' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'CreateFacetInput' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'createFacet' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<CreateFacetMutation, CreateFacetMutationVariables>;
+export const CreateFacetValueDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'CreateFacetValue' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'CreateFacetValueInput' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'createFacetValue' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<CreateFacetValueMutation, CreateFacetValueMutationVariables>;
 export const GetOrdersForPeriodDocument = {
   kind: 'Document',
   definitions: [
@@ -21573,13 +22085,13 @@ export const VerifyMpesaTransactionsDocument = {
   VerifyMpesaTransactionsMutation,
   VerifyMpesaTransactionsMutationVariables
 >;
-export const UpdateProductDocument = {
+export const UpdateProductBasicDocument = {
   kind: 'Document',
   definitions: [
     {
       kind: 'OperationDefinition',
       operation: 'mutation',
-      name: { kind: 'Name', value: 'UpdateProduct' },
+      name: { kind: 'Name', value: 'UpdateProductBasic' },
       variableDefinitions: [
         {
           kind: 'VariableDefinition',
@@ -21697,4 +22209,151 @@ export const UpdateProductDocument = {
       },
     },
   ],
-} as unknown as DocumentNode<UpdateProductMutation, UpdateProductMutationVariables>;
+} as unknown as DocumentNode<UpdateProductBasicMutation, UpdateProductBasicMutationVariables>;
+export const UpdateProductWithFacetsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateProductWithFacets' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'name' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'slug' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'barcode' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'facetValueIds' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'ListType',
+              type: {
+                kind: 'NonNullType',
+                type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+              },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateProduct' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: {
+                  kind: 'ObjectValue',
+                  fields: [
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'id' },
+                      value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'translations' },
+                      value: {
+                        kind: 'ListValue',
+                        values: [
+                          {
+                            kind: 'ObjectValue',
+                            fields: [
+                              {
+                                kind: 'ObjectField',
+                                name: { kind: 'Name', value: 'languageCode' },
+                                value: { kind: 'EnumValue', value: 'en' },
+                              },
+                              {
+                                kind: 'ObjectField',
+                                name: { kind: 'Name', value: 'name' },
+                                value: { kind: 'Variable', name: { kind: 'Name', value: 'name' } },
+                              },
+                              {
+                                kind: 'ObjectField',
+                                name: { kind: 'Name', value: 'slug' },
+                                value: { kind: 'Variable', name: { kind: 'Name', value: 'slug' } },
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'customFields' },
+                      value: {
+                        kind: 'ObjectValue',
+                        fields: [
+                          {
+                            kind: 'ObjectField',
+                            name: { kind: 'Name', value: 'barcode' },
+                            value: { kind: 'Variable', name: { kind: 'Name', value: 'barcode' } },
+                          },
+                        ],
+                      },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'facetValueIds' },
+                      value: { kind: 'Variable', name: { kind: 'Name', value: 'facetValueIds' } },
+                    },
+                  ],
+                },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'slug' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'customFields' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [{ kind: 'Field', name: { kind: 'Name', value: 'barcode' } }],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  UpdateProductWithFacetsMutation,
+  UpdateProductWithFacetsMutationVariables
+>;

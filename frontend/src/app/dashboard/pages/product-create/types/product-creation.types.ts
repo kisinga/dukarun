@@ -19,7 +19,7 @@ export interface ProductCreationState {
   itemType: ItemType;
   productType?: ProductType; // Only for products
   productName: string;
-  identificationMethod: 'barcode' | 'label-photos' | 'none' | null;
+  identificationMethod: 'barcode' | 'label-photos' | null;
   barcode?: string;
   photoCount: number;
 

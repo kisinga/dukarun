@@ -1,23 +1,24 @@
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
 import {
   ChangeDetectionStrategy,
   Component,
-  OnInit,
   OnDestroy,
+  OnInit,
   computed,
   inject,
   signal,
 } from '@angular/core';
+import { RouterModule } from '@angular/router';
+import { GET_PRODUCTS } from '../../../core/graphql/operations.graphql';
+import { ApolloService } from '../../../core/services/apollo.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
 import { CashierSessionService } from '../../../core/services/cashier-session/cashier-session.service';
-import { CustomerService } from '../../../core/services/customer.service';
 import { CompanyService } from '../../../core/services/company.service';
+import { CurrencyService } from '../../../core/services/currency.service';
+import { CustomerService } from '../../../core/services/customer.service';
 import { OrderService } from '../../../core/services/order.service';
 import { OrdersService } from '../../../core/services/orders.service';
-import { ApolloService } from '../../../core/services/apollo.service';
-import { CurrencyService } from '../../../core/services/currency.service';
 import { PrintService } from '../../../core/services/print.service';
 import {
   ProductSearchResult,
@@ -25,7 +26,7 @@ import {
   ProductVariant,
 } from '../../../core/services/product/product-search.service';
 import { StockLocationService } from '../../../core/services/stock-location.service';
-import { GET_PRODUCTS } from '../../../core/graphql/operations.graphql';
+import { ProductLabelComponent } from '../shared/components/product-label.component';
 import { CartComponent, CartItem } from './components/cart.component';
 import { CheckoutFabComponent } from './components/checkout-fab.component';
 import { CheckoutModalComponent } from './components/checkout-modal.component';
@@ -59,6 +60,7 @@ type PaymentMethodCode = string;
   imports: [
     CommonModule,
     RouterModule,
+    ProductLabelComponent,
     ProductScannerComponent,
     SearchViewComponent,
     ProductConfirmModalComponent,
@@ -220,6 +222,11 @@ export class SellComponent implements OnInit, OnDestroy {
         featuredAsset: product.featuredAsset
           ? { preview: product.featuredAsset.preview }
           : undefined,
+        facetValues: (product.facetValues || []).map((fv: any) => ({
+          name: fv.name,
+          facetCode: fv.facet?.code,
+          facet: fv.facet ? { code: fv.facet.code } : undefined,
+        })),
         variants: product.variants.map((v: any) => ({
           id: v.id,
           name: v.name,
@@ -301,7 +308,12 @@ export class SellComponent implements OnInit, OnDestroy {
     // Single variant: direct add to cart
     if (product.variants.length === 1) {
       const variant = product.variants[0];
-      this.addToCart(variant, 1);
+      const facetValues = product.facetValues?.map((fv) => ({
+        name: fv.name,
+        facetCode: fv.facetCode,
+        facet: fv.facetCode ? { code: fv.facetCode } : undefined,
+      }));
+      this.addToCart(variant, 1, { facetValues });
       this.showNotification(`${product.name} added to cart`, 'success');
     } else {
       // Multiple variants: show modal for selection
@@ -354,8 +366,12 @@ export class SellComponent implements OnInit, OnDestroy {
     variant: ProductVariant;
     quantity: number;
     priceOverride?: { variantId: string; customLinePrice?: number; reason?: string };
+    facetValues?: { name: string; facetCode?: string; facet?: { code: string } }[];
   }): void {
-    this.addToCart(data.variant, data.quantity, data.priceOverride);
+    this.addToCart(data.variant, data.quantity, {
+      priceOverride: data.priceOverride,
+      facetValues: data.facetValues,
+    });
   }
 
   handleConfirmModalClose(): void {
@@ -381,22 +397,25 @@ export class SellComponent implements OnInit, OnDestroy {
   private addToCart(
     variant: ProductVariant,
     quantity: number,
-    priceOverride?: { variantId: string; customLinePrice?: number; reason?: string },
+    options?: {
+      priceOverride?: { variantId: string; customLinePrice?: number; reason?: string };
+      facetValues?: { name: string; facetCode?: string; facet?: { code: string } }[];
+    },
   ): void {
     // Use CartService for persistence
-    this.cartService.addItemLocal(variant, quantity);
+    this.cartService.addItemLocal(variant, quantity, options?.facetValues);
 
     // Update local state
     const items = this.cartService.cartItems();
     this.cartItems.set(items);
 
     // Apply price override if provided
-    if (priceOverride?.customLinePrice) {
+    if (options?.priceOverride?.customLinePrice) {
       const item = items.find((i) => i.variant.id === variant.id);
       if (item) {
-        item.customLinePrice = priceOverride.customLinePrice;
-        item.priceOverrideReason = priceOverride.reason;
-        item.subtotal = priceOverride.customLinePrice; // Already in cents
+        item.customLinePrice = options.priceOverride!.customLinePrice;
+        item.priceOverrideReason = options.priceOverride!.reason;
+        item.subtotal = options.priceOverride!.customLinePrice; // Already in cents
         this.cartItems.set([...items]);
       }
     }

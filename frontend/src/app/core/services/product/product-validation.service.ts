@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { CHECK_BARCODE_EXISTS, CHECK_SKU_EXISTS } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { VariantInput } from '../product.service';
+import { isBarcodeIgnored } from './barcode.util';
 
 /**
  * Product Validation Service
@@ -45,7 +46,7 @@ export class ProductValidationService {
     barcode: string,
     excludeProductId?: string,
   ): Promise<{ exists: boolean; productId?: string; productName?: string }> {
-    if (!barcode || !barcode.trim()) {
+    if (isBarcodeIgnored(barcode)) {
       return { exists: false };
     }
 
@@ -53,7 +54,7 @@ export class ProductValidationService {
       const client = this.apolloService.getClient();
       const result = await client.query<any>({
         query: CHECK_BARCODE_EXISTS as any,
-        variables: { barcode: barcode.trim(), excludeProductId },
+        variables: { barcode: barcode.trim() },
         fetchPolicy: 'network-only',
       });
 

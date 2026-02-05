@@ -1,8 +1,15 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { ProductVariant } from '../../../../core/services/product/product-search.service';
-import { CartItemComponent } from './cart-item.component';
 import { PriceOverrideData } from '../services/price-modification.service';
+import { CartItemComponent } from './cart-item.component';
+
+/** Facet value for manufacturer/category pill */
+export interface CartItemFacetValue {
+  name: string;
+  facetCode?: string;
+  facet?: { code: string };
+}
 
 export interface CartItem {
   variant: ProductVariant;
@@ -10,6 +17,7 @@ export interface CartItem {
   subtotal: number;
   customLinePrice?: number; // Line price in cents
   priceOverrideReason?: string; // Reason code
+  facetValues?: CartItemFacetValue[];
 }
 
 /**

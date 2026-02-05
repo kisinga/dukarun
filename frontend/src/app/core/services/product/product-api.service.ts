@@ -1,12 +1,13 @@
 import { inject, Injectable } from '@angular/core';
+import { gql } from '@apollo/client/core';
 import {
   CREATE_PRODUCT,
   DELETE_PRODUCT,
   GET_PRODUCT_DETAIL,
 } from '../../graphql/operations.graphql';
-import { gql } from '@apollo/client/core';
 import { ApolloService } from '../apollo.service';
 import { ProductInput } from '../product.service';
+import { normalizeBarcodeForApi } from './barcode.util';
 import { ProductStateService } from './product-state.service';
 
 /**
@@ -29,7 +30,7 @@ export class ProductApiService {
     try {
       const client = this.apolloService.getClient();
 
-      // Prepare input for Vendure
+      // Prepare input for Vendure (this form owns all facet assignments; no merge)
       const createInput: any = {
         enabled: input.enabled,
         translations: [
@@ -40,7 +41,12 @@ export class ProductApiService {
             description: input.description,
           },
         ],
-        customFields: input.barcode ? { barcode: input.barcode } : undefined,
+        customFields: (() => {
+          const b = normalizeBarcodeForApi(input.barcode);
+          return b ? { barcode: b } : undefined;
+        })(),
+        facetValueIds:
+          input.facetValueIds && input.facetValueIds.length > 0 ? input.facetValueIds : undefined,
       };
 
       const result = await client.mutate<any>({
@@ -49,19 +55,33 @@ export class ProductApiService {
       });
 
       return result.data?.createProduct?.id || null;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Product creation failed:', error);
-      throw error;
+      const message =
+        (error as { graphQLErrors?: Array<{ message?: string }> })?.graphQLErrors?.[0]?.message ??
+        (error as Error)?.message;
+      throw new Error(message || 'Failed to create product');
     }
   }
 
   /**
-   * Update basic product information such as name, slug, and barcode.
-   * Light wrapper around Vendure's updateProduct mutation.
+   * Update basic product information: name, slug, barcode, and optionally facet value IDs.
+   * When facetValueIds is provided, this form owns all facet assignments (full replacement).
+   * When omitted, facets are left unchanged (e.g. when updating from product-edit page).
    */
-  async updateProductName(productId: string, name: string, barcode?: string): Promise<boolean> {
-    const UPDATE_PRODUCT = gql`
-      mutation UpdateProduct($id: ID!, $name: String!, $slug: String!, $barcode: String) {
+  async updateProduct(
+    productId: string,
+    payload: {
+      name: string;
+      barcode?: string;
+      facetValueIds?: string[];
+    },
+  ): Promise<boolean> {
+    const slug = this.generateSlug(payload.name);
+    const hasFacets = payload.facetValueIds !== undefined;
+
+    const UPDATE_PRODUCT_BASIC = gql`
+      mutation UpdateProductBasic($id: ID!, $name: String!, $slug: String!, $barcode: String) {
         updateProduct(
           input: {
             id: $id
@@ -79,14 +99,49 @@ export class ProductApiService {
       }
     `;
 
+    const UPDATE_PRODUCT_WITH_FACETS = gql`
+      mutation UpdateProductWithFacets(
+        $id: ID!
+        $name: String!
+        $slug: String!
+        $barcode: String
+        $facetValueIds: [ID!]!
+      ) {
+        updateProduct(
+          input: {
+            id: $id
+            translations: [{ languageCode: en, name: $name, slug: $slug }]
+            customFields: { barcode: $barcode }
+            facetValueIds: $facetValueIds
+          }
+        ) {
+          id
+          name
+          slug
+          customFields {
+            barcode
+          }
+        }
+      }
+    `;
+
     try {
       const client = this.apolloService.getClient();
-      const slug = this.generateSlug(name);
-
-      const result = await client.mutate<any>({
-        mutation: UPDATE_PRODUCT,
-        variables: { id: productId, name, slug, barcode: barcode || null },
-      });
+      const baseVariables = {
+        id: productId,
+        name: payload.name,
+        slug,
+        barcode: normalizeBarcodeForApi(payload.barcode) ?? null,
+      };
+      const result = hasFacets
+        ? await client.mutate<any>({
+            mutation: UPDATE_PRODUCT_WITH_FACETS,
+            variables: { ...baseVariables, facetValueIds: payload.facetValueIds ?? [] },
+          })
+        : await client.mutate<any>({
+            mutation: UPDATE_PRODUCT_BASIC,
+            variables: baseVariables,
+          });
 
       return !!result.data?.updateProduct?.id;
     } catch (error) {

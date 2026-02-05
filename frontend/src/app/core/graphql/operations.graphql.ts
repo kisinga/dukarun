@@ -260,7 +260,7 @@ export const CHECK_SKU_EXISTS = graphql(`
 // Products are filtered to the active channel, so barcode uniqueness is checked
 // within the current channel only (multi-vendor support).
 export const CHECK_BARCODE_EXISTS = graphql(`
-  query CheckBarcodeExists($barcode: String!, $excludeProductId: ID) {
+  query CheckBarcodeExists($barcode: String!) {
     products(options: { filter: { barcode: { eq: $barcode } }, take: 1 }) {
       items {
         id
@@ -398,6 +398,15 @@ export const GET_PRODUCT_DETAIL = graphql(`
       customFields {
         barcode
       }
+      facetValues {
+        id
+        name
+        code
+        facet {
+          id
+          code
+        }
+      }
       assets {
         id
         name
@@ -450,6 +459,13 @@ export const GET_PRODUCTS = graphql(`
         featuredAsset {
           id
           preview
+        }
+        facetValues {
+          id
+          name
+          facet {
+            code
+          }
         }
         variants {
           id
@@ -560,6 +576,13 @@ export const SEARCH_PRODUCTS = graphql(`
         featuredAsset {
           preview
         }
+        facetValues {
+          id
+          name
+          facet {
+            code
+          }
+        }
         variants {
           id
           name
@@ -589,6 +612,13 @@ export const GET_PRODUCT = graphql(`
       name
       featuredAsset {
         preview
+      }
+      facetValues {
+        id
+        name
+        facet {
+          code
+        }
       }
       variants {
         id
@@ -645,6 +675,13 @@ export const SEARCH_BY_BARCODE = graphql(`
         featuredAsset {
           preview
         }
+        facetValues {
+          id
+          name
+          facet {
+            code
+          }
+        }
         variants {
           id
           name
@@ -672,6 +709,13 @@ export const PREFETCH_PRODUCTS = graphql(`
         featuredAsset {
           preview
         }
+        facetValues {
+          id
+          name
+          facet {
+            code
+          }
+        }
         variants {
           id
           name
@@ -689,6 +733,56 @@ export const PREFETCH_PRODUCTS = graphql(`
           }
         }
       }
+    }
+  }
+`);
+
+// ============================================================================
+// FACETS (Manufacturer, Category, Tags)
+// ============================================================================
+
+export const GET_FACETS_BY_CODES = graphql(`
+  query GetFacetsByCodes($codes: [String!]!) {
+    facets(options: { filter: { code: { in: $codes } }, take: 10 }) {
+      items {
+        id
+        code
+        name
+      }
+    }
+  }
+`);
+
+export const GET_FACET_VALUES = graphql(`
+  query GetFacetValues($facetId: String!, $term: String) {
+    facetValues(
+      options: { filter: { facetId: { eq: $facetId }, name: { contains: $term } }, take: 20 }
+    ) {
+      items {
+        id
+        name
+        code
+      }
+    }
+  }
+`);
+
+export const CREATE_FACET = graphql(`
+  mutation CreateFacet($input: CreateFacetInput!) {
+    createFacet(input: $input) {
+      id
+      code
+      name
+    }
+  }
+`);
+
+export const CREATE_FACET_VALUE = graphql(`
+  mutation CreateFacetValue($input: CreateFacetValueInput!) {
+    createFacetValue(input: $input) {
+      id
+      name
+      code
     }
   }
 `);
