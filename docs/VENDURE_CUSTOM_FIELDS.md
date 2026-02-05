@@ -194,6 +194,7 @@ Wrap in `IF EXISTS` to avoid failures on fresh DBs.
 | Startup warns “schema does not match” and suggests FK rename   | Constraint name or FK action differs               | Drop both legacy and hashed constraints, then add the hashed constraint with Vendure’s expected actions (see §3.2 / migration `1761900000005`). |
 | Vendure creates `customFields__fix_relational_custom_fields__` | Only relational custom fields defined              | Add a scalar custom field alongside relations; run migration to drop the workaround column if already created.                                  |
 | Migration fails with “already exists”                          | Running against DB where schema partially applied  | Wrap `ALTER` statements in `BEGIN ... EXCEPTION` and `IF EXISTS` guards. Re-run migration after adjusting.                                      |
+| Startup suggests CREATE INDEX or ADD CONSTRAINT (schema drift) | With `synchronize: false`, TypeORM never creates indexes/FKs from decorators | Add an idempotent migration that creates the exact index and FK names TypeORM expects. See `9000000000009-AlignChannelIdIndexesAndAdministratorProfilePicture.ts` and MIGRATION_PATTERNS.md. |
 
 ---
 

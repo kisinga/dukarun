@@ -2,8 +2,9 @@
 # Dukarun Application Services
 # =====================================
 #
-# This file contains only application services (backend, frontend)
+# This file contains only application services (backend, frontend, ml-trainer).
 # Infrastructure services (databases, cache, observability) are in docker-compose.services.yml
+# All images are built in CI (build-and-push.yml); no build: here so Coolify uses deploy-only path.
 #
 # Usage:
 #   # Start infrastructure first:
@@ -55,40 +56,40 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
 
       # CORS configuration (set CORS_ORIGIN/FRONTEND_URL in env e.g. http://localhost:4200)
-      CORS_ORIGIN: ${CORS_ORIGIN:-}
-      FRONTEND_URL: ${FRONTEND_URL:-}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      FRONTEND_URL: ${FRONTEND_URL}
 
       # Asset storage
       ASSET_STORAGE_STRATEGY: ${ASSET_STORAGE_STRATEGY:-LocalAssetStorageStrategy}
       ASSET_UPLOAD_DIR: ${ASSET_UPLOAD_DIR:-/app/static/assets}
-      ASSET_URL_PREFIX: ${ASSET_URL_PREFIX:-}
+      ASSET_URL_PREFIX: ${ASSET_URL_PREFIX}
 
       # Email configuration (optional)
       MAIL_TRANSPORT: ${MAIL_TRANSPORT:-SMTP}
-      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
 
       # SMS Provider configuration
       SMS_PROVIDER: ${SMS_PROVIDER:-textsms}
 
       # TextSMS Configuration (default provider)
-      TEXTSMS_API_KEY: ${TEXTSMS_API_KEY:-}
-      TEXTSMS_PARTNER_ID: ${TEXTSMS_PARTNER_ID:-}
-      TEXTSMS_SHORTCODE: ${TEXTSMS_SHORTCODE:-}
+      TEXTSMS_API_KEY: ${TEXTSMS_API_KEY}
+      TEXTSMS_PARTNER_ID: ${TEXTSMS_PARTNER_ID}
+      TEXTSMS_SHORTCODE: ${TEXTSMS_SHORTCODE}
 
       # Push Notification Configuration (VAPID) - set VAPID_EMAIL in env e.g. mailto:admin@example.com
-      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
-      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
-      VAPID_EMAIL: ${VAPID_EMAIL:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_EMAIL: ${VAPID_EMAIL}
 
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-info}
 
       # ML Training configuration
-      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:-}
+      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN}
       ML_TRAINING_INTERVAL_MINUTES: ${ML_TRAINING_INTERVAL_MINUTES:-60}
       ML_TRAINING_COOLDOWN_HOURS: ${ML_TRAINING_COOLDOWN_HOURS:-4}
 
@@ -143,25 +144,23 @@ services:
       start_period: 30s
 
   # ========================================
-  # ML Trainer Microservice
+  # ML Trainer Microservice (image built in CI; no build: here so Coolify deploy path matches services.yml)
   # ========================================
-  ml-trainer:
-    build:
-      context: ./ml-trainer
-      dockerfile: Dockerfile
-    image: ghcr.io/kisinga/dukarun/ml-trainer:latest
-    restart: unless-stopped
-    networks:
-      - dukarun_services_network
-    environment:
-      ML_PORT: ${ML_PORT:-3005}
-      NODE_ENV: production
-      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN:-}
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:3005/health']
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # ml-trainer:
+  #   image: ghcr.io/kisinga/dukarun/ml-trainer:latest
+  #   platform: linux/amd64
+  #   restart: unless-stopped
+  #   networks:
+  #     - dukarun_services_network
+  #   environment:
+  #     ML_PORT: ${ML_PORT:-3005}
+  #     NODE_ENV: production
+  #     ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN}
+  #   healthcheck:
+  #     test: ['CMD', 'curl', '-f', 'http://localhost:3005/health']
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
 
 # ========================================
 # Networks

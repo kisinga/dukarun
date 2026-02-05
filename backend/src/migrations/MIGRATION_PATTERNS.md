@@ -78,6 +78,11 @@ export class EntityName {
 }
 ```
 
+**With `synchronize: false`** (our setup): TypeORM never creates indexes or FKs at runtime. So:
+
+- For **indexes**: Add a follow-up migration that creates the exact index names used in `@Index('IDX_...', [...])` (e.g. `CREATE INDEX IF NOT EXISTS "IDX_..." ON "table" ("column");`). See `9000000000009-AlignChannelIdIndexesAndAdministratorProfilePicture.ts`.
+- For **FKs** that were only added as columns (e.g. custom field relations): Add the same migration or a dedicated "align" migration that creates the exact FK name TypeORM expects (check startup "schema does not match" message or down() of the migration that added the column).
+
 ### Step 3: Deployment Process
 
 **For Production with Existing Data:**
