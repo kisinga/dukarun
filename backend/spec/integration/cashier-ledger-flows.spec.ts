@@ -26,13 +26,14 @@ describe('Cashier-ledger flows', () => {
 
   describe('Flow A: Single channel – session, pay order with debit account, transfer', () => {
     it('open session then pay order with debitAccountCode; recordPaymentAllocation receives channel and account', async () => {
+      const FLOW_A_SESSION_ID = 'a1b2c3d4-e5f6-4171-a111-111111111111';
       const mockSessionRepo = {
         findOne: jest.fn(),
         create: jest.fn(),
         save: jest.fn(),
       } as any;
       const session: CashierSession = {
-        id: 's1',
+        id: FLOW_A_SESSION_ID,
         channelId: channel1Id,
         cashierUserId: 1,
         openedAt: new Date(),
@@ -170,7 +171,7 @@ describe('Cashier-ledger flows', () => {
         'credit',
         5000,
         ACCOUNT_CODES.CASH_ON_HAND,
-        's1'
+        FLOW_A_SESSION_ID
       );
     });
   });
@@ -273,6 +274,7 @@ describe('Cashier-ledger flows', () => {
           .fn()
           .mockImplementation(() => Promise.resolve({ id: 'session-c', channelId: channel1Id })),
       } as any;
+      const mockFinancialService = {} as any;
       const resolver = new PeriodManagementResolver(
         {} as any,
         {} as any,
@@ -282,7 +284,8 @@ describe('Cashier-ledger flows', () => {
         {} as any,
         mockPeriodLockService,
         {} as any,
-        mockChartOfAccountsService
+        mockChartOfAccountsService,
+        mockFinancialService
       );
 
       const result = await resolver.createInterAccountTransfer(ctx1, {
@@ -331,6 +334,7 @@ describe('Cashier-ledger flows', () => {
           .fn()
           .mockImplementation(() => Promise.resolve({ id: 'session-d', channelId: channel1Id })),
       } as any;
+      const mockFinancialServiceFlowD = {} as any;
       const resolver = new PeriodManagementResolver(
         {} as any,
         {} as any,
@@ -340,7 +344,8 @@ describe('Cashier-ledger flows', () => {
         {} as any,
         mockPeriodLockService,
         {} as any,
-        mockChartOfAccountsService
+        mockChartOfAccountsService,
+        mockFinancialServiceFlowD
       );
 
       const input = {

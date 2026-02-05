@@ -19,6 +19,12 @@ import { FinancialService } from '../../../src/services/financial/financial.serv
 import { LedgerQueryService } from '../../../src/services/financial/ledger-query.service';
 import { ReconciliationService } from '../../../src/services/financial/reconciliation.service';
 
+const UUID_SESSION_1 = 'a1b2c3d4-e5f6-4171-8111-111111111111';
+const UUID_SESSION_2 = 'b2c3d4e5-f6a7-4272-8222-222222222222';
+const UUID_EXISTING = 'c3d4e5f6-a7b8-4373-8333-333333333333';
+const UUID_SESSION_A = 'd4e5f6a7-b8c9-4474-8444-444444444444';
+const UUID_SESSION_B = 'e5f6a7b8-c9d0-4575-8555-555555555555';
+
 describe('CashierSessionService - Reconciliation Integration', () => {
   const ctx = {
     channelId: 1,
@@ -112,7 +118,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
     it('should create session when none open and getCurrentSession returns it', async () => {
       const channelId = 1;
       const savedSession: CashierSession = {
-        id: 'session-1',
+        id: UUID_SESSION_1,
         channelId,
         cashierUserId: 1,
         openedAt: new Date(),
@@ -131,18 +137,18 @@ describe('CashierSessionService - Reconciliation Integration', () => {
 
       expect(result.status).toBe('open');
       expect(result.channelId).toBe(channelId);
-      expect(result.id).toBe('session-1');
+      expect(result.id).toBe(UUID_SESSION_1);
       mockSessionRepo.findOne.mockResolvedValue(savedSession);
       const current = await service.getCurrentSession(ctx, channelId);
       expect(current).not.toBeNull();
-      expect(current!.id).toBe('session-1');
+      expect(current!.id).toBe(UUID_SESSION_1);
       expect(current!.channelId).toBe(channelId);
     });
 
     it('should throw when opening second session for same channel', async () => {
       const channelId = 1;
       const existingSession: CashierSession = {
-        id: 'existing-session',
+        id: UUID_EXISTING,
         channelId,
         cashierUserId: 1,
         openedAt: new Date(),
@@ -166,7 +172,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
     it('should allow open after close for same channel', async () => {
       const channelId = 1;
       const session1: CashierSession = {
-        id: 'session-1',
+        id: UUID_SESSION_1,
         channelId,
         cashierUserId: 1,
         openedAt: new Date(),
@@ -175,7 +181,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       } as CashierSession;
       mockSessionRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(session1);
       mockChannelRepo.findOne.mockResolvedValue({ id: channelId, paymentMethods: [] });
-      mockSessionRepo.create.mockImplementation((o: any) => ({ ...o, id: 'session-1' }));
+      mockSessionRepo.create.mockImplementation((o: any) => ({ ...o, id: UUID_SESSION_1 }));
       mockSessionRepo.save.mockImplementation((s: any) => Promise.resolve({ ...s }));
       mockLedgerQueryService.getCashierSessionTotals.mockResolvedValue(defaultLedgerTotals);
       mockCountRepo.create.mockImplementation((o: any) => ({ ...o, id: 'count-1' }));
@@ -212,7 +218,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       });
 
       const session2: CashierSession = {
-        id: 'session-2',
+        id: UUID_SESSION_2,
         channelId,
         cashierUserId: 1,
         openedAt: new Date(),
@@ -227,11 +233,11 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       mockCountRepo.save.mockResolvedValue({ id: 'count-3' });
 
       const opened = await service.startSession(ctx, { channelId, openingBalances: [] });
-      expect(opened.id).toBe('session-2');
+      expect(opened.id).toBe(UUID_SESSION_2);
       expect(opened.status).toBe('open');
       mockSessionRepo.findOne.mockResolvedValue(session2);
       const current = await service.getCurrentSession(ctx, channelId);
-      expect(current!.id).toBe('session-2');
+      expect(current!.id).toBe(UUID_SESSION_2);
     });
 
     it('should allow open sessions for two different channels', async () => {
@@ -248,7 +254,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       mockCountRepo.save.mockResolvedValue({ id: 'count-x' });
 
       const sessionA: CashierSession = {
-        id: 'session-a',
+        id: UUID_SESSION_A,
         channelId: channelA,
         cashierUserId: 1,
         openedAt: new Date(),
@@ -256,7 +262,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         closingDeclared: '0',
       } as CashierSession;
       const sessionB: CashierSession = {
-        id: 'session-b',
+        id: UUID_SESSION_B,
         channelId: channelB,
         cashierUserId: 1,
         openedAt: new Date(),
@@ -273,14 +279,14 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         openingBalances: [],
       });
       expect(resultA.channelId).toBe(channelA);
-      expect(resultA.id).toBe('session-a');
+      expect(resultA.id).toBe(UUID_SESSION_A);
 
       const resultB = await service.startSession(ctxB, {
         channelId: channelB,
         openingBalances: [],
       });
       expect(resultB.channelId).toBe(channelB);
-      expect(resultB.id).toBe('session-b');
+      expect(resultB.id).toBe(UUID_SESSION_B);
 
       mockSessionRepo.findOne.mockImplementation((opts: any) => {
         if (opts.where.channelId === channelA) return Promise.resolve(sessionA);
@@ -290,8 +296,8 @@ describe('CashierSessionService - Reconciliation Integration', () => {
 
       const currentA = await service.getCurrentSession(ctxA, channelA);
       const currentB = await service.getCurrentSession(ctxB, channelB);
-      expect(currentA!.id).toBe('session-a');
-      expect(currentB!.id).toBe('session-b');
+      expect(currentA!.id).toBe(UUID_SESSION_A);
+      expect(currentB!.id).toBe(UUID_SESSION_B);
       expect(currentA!.channelId).toBe(channelA);
       expect(currentB!.channelId).toBe(channelB);
     });

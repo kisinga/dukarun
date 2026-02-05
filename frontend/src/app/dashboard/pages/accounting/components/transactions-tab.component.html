@@ -1,5 +1,5 @@
 <div class="space-y-4">
-  @if (isLoading()) {
+  @if (context().isLoading) {
     <div class="card bg-base-100 shadow">
       <div class="card-body">
         <div class="flex flex-col items-center justify-center py-16">
@@ -8,7 +8,7 @@
         </div>
       </div>
     </div>
-  } @else if (entries().length === 0) {
+  } @else if (context().entries.length === 0) {
     <div class="card bg-base-100 shadow">
       <div class="card-body">
         <div class="text-center py-12 lg:py-20 px-4">
@@ -71,11 +71,11 @@
               </tr>
             </thead>
             <tbody>
-              @for (entry of entries(); track entry.id) {
+              @for (entry of context().entries; track entry.id) {
                 <tr>
                   <td>
                     <button class="btn btn-ghost btn-xs" (click)="onToggleEntry(entry.id)">
-                      @if (expandedEntries().has(entry.id)) {
+                      @if (context().expandedEntries.has(entry.id)) {
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           class="h-4 w-4"
@@ -108,7 +108,7 @@
                       }
                     </button>
                   </td>
-                  <td>{{ formatDate()(entry.entryDate) }}</td>
+                  <td>{{ context().formatDate(entry.entryDate) }}</td>
                   <td>
                     <div class="badge badge-outline">{{ entry.sourceType }}</div>
                   </td>
@@ -116,12 +116,12 @@
                   <td>{{ entry.memo || '-' }}</td>
                   <td class="text-right">
                     <span class="text-success font-semibold">
-                      {{ formatCurrency()(getEntryTotalDebit()(entry)) }}
+                      {{ context().formatCurrency(context().getEntryTotalDebit(entry)) }}
                     </span>
                   </td>
                   <td class="text-right">
                     <span class="text-error font-semibold">
-                      {{ formatCurrency()(getEntryTotalCredit()(entry)) }}
+                      {{ context().formatCurrency(context().getEntryTotalCredit(entry)) }}
                     </span>
                   </td>
                   <td class="text-right">
@@ -131,7 +131,7 @@
                   </td>
                 </tr>
                 <!-- Expanded Row: Journal Lines -->
-                @if (expandedEntries().has(entry.id)) {
+                @if (context().expandedEntries.has(entry.id)) {
                   <tr>
                     <td colspan="8" class="bg-base-200 p-0">
                       <div class="p-4">
@@ -154,7 +154,7 @@
                                   <td class="text-right">
                                     @if (line.debit > 0) {
                                       <span class="text-success">
-                                        {{ formatCurrency()(line.debit) }}
+                                        {{ context().formatCurrency(line.debit) }}
                                       </span>
                                     } @else {
                                       <span class="text-base-content/30">-</span>
@@ -163,7 +163,7 @@
                                   <td class="text-right">
                                     @if (line.credit > 0) {
                                       <span class="text-error">
-                                        {{ formatCurrency()(line.credit) }}
+                                        {{ context().formatCurrency(line.credit) }}
                                       </span>
                                     } @else {
                                       <span class="text-base-content/30">-</span>
@@ -184,19 +184,19 @@
         </div>
 
         <!-- Pagination -->
-        @if (totalPages() > 1) {
+        @if (context().totalPages > 1) {
           <div class="join flex justify-center mt-4">
             <button
               class="join-item btn btn-sm"
-              [disabled]="currentPage() === 1"
-              (click)="onPageChange(currentPage() - 1)"
+              [disabled]="context().currentPage === 1"
+              (click)="onPageChange(context().currentPage - 1)"
             >
               «
             </button>
-            @for (page of [].constructor(totalPages()); track $index) {
+            @for (page of [].constructor(context().totalPages); track $index) {
               <button
                 class="join-item btn btn-sm"
-                [class.btn-active]="currentPage() === $index + 1"
+                [class.btn-active]="context().currentPage === $index + 1"
                 (click)="onPageChange($index + 1)"
               >
                 {{ $index + 1 }}
@@ -204,8 +204,8 @@
             }
             <button
               class="join-item btn btn-sm"
-              [disabled]="currentPage() === totalPages()"
-              (click)="onPageChange(currentPage() + 1)"
+              [disabled]="context().currentPage === context().totalPages"
+              (click)="onPageChange(context().currentPage + 1)"
             >
               »
             </button>

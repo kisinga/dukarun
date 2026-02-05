@@ -29,16 +29,24 @@ describe('ChartOfAccountsService.validatePaymentSourceAccount', () => {
     service = new ChartOfAccountsService(mockConnection);
   });
 
-  it('should not throw for valid asset, active, non-parent, non-excluded account', async () => {
-    mockAccountRepo.findOne.mockResolvedValue({
-      id: 'acc-1',
-      channelId: 1,
-      code: ACCOUNT_CODES.CASH_ON_HAND,
-      name: 'Cash on Hand',
-      type: 'asset',
-      isActive: true,
-      isParent: false,
-    });
+  it('should not throw for valid cash child account', async () => {
+    const cashParentId = 'cash-parent-id';
+    mockAccountRepo.findOne
+      .mockResolvedValueOnce({
+        id: 'acc-1',
+        channelId: 1,
+        code: ACCOUNT_CODES.CASH_ON_HAND,
+        name: 'Cash on Hand',
+        type: 'asset',
+        isActive: true,
+        isParent: false,
+        parentAccountId: cashParentId,
+      })
+      .mockResolvedValueOnce({
+        id: cashParentId,
+        code: ACCOUNT_CODES.CASH,
+        channelId: 1,
+      });
     await expect(
       service.validatePaymentSourceAccount(ctx, ACCOUNT_CODES.CASH_ON_HAND)
     ).resolves.not.toThrow();
@@ -118,6 +126,44 @@ describe('ChartOfAccountsService.validatePaymentSourceAccount', () => {
     await expect(
       service.validatePaymentSourceAccount(ctx, ACCOUNT_CODES.INVENTORY)
     ).rejects.toThrow(/not an allowed payment source/);
+  });
+
+  it('should throw when account is not a cash child (no parent)', async () => {
+    mockAccountRepo.findOne.mockResolvedValue({
+      id: 'acc-1',
+      channelId: 1,
+      code: ACCOUNT_CODES.CLEARING_GENERIC,
+      name: 'Clearing Generic',
+      type: 'asset',
+      isActive: true,
+      isParent: false,
+      parentAccountId: null,
+    });
+    await expect(
+      service.validatePaymentSourceAccount(ctx, ACCOUNT_CODES.CLEARING_GENERIC)
+    ).rejects.toThrow(/Only cash accounts/);
+  });
+
+  it('should throw when account parent is not CASH', async () => {
+    mockAccountRepo.findOne
+      .mockResolvedValueOnce({
+        id: 'acc-1',
+        channelId: 1,
+        code: ACCOUNT_CODES.CLEARING_CREDIT,
+        name: 'Clearing Credit',
+        type: 'asset',
+        isActive: true,
+        isParent: false,
+        parentAccountId: 'other-parent-id',
+      })
+      .mockResolvedValueOnce({
+        id: 'other-parent-id',
+        code: 'OTHER_PARENT',
+        channelId: 1,
+      });
+    await expect(
+      service.validatePaymentSourceAccount(ctx, ACCOUNT_CODES.CLEARING_CREDIT)
+    ).rejects.toThrow(/Only cash accounts/);
   });
 });
 
@@ -302,13 +348,20 @@ describe('PaymentAllocationService.paySingleOrder', () => {
 
 describe('LedgerViewerResolver.eligibleDebitAccounts', () => {
   const ctx = { channelId: 1 } as RequestContext;
+  const cashParentId = 'cash-parent-id';
   let resolver: LedgerViewerResolver;
   let mockAccountRepo: any;
   let mockDataSource: any;
   let mockLedgerQueryService: any;
 
   beforeEach(() => {
+    const cashParent = {
+      id: cashParentId,
+      code: ACCOUNT_CODES.CASH,
+      channelId: 1,
+    };
     mockAccountRepo = {
+      findOne: jest.fn((() => Promise.resolve(cashParent)) as any),
       find: jest.fn(),
     };
     mockDataSource = {
@@ -320,7 +373,7 @@ describe('LedgerViewerResolver.eligibleDebitAccounts', () => {
     resolver = new LedgerViewerResolver(mockDataSource, mockLedgerQueryService);
   });
 
-  it('should return only asset, active, non-parent accounts excluding AR and INVENTORY', async () => {
+  it('should return only cash child accounts (parentAccountId = CASH)', async () => {
     const cashOnHand: Partial<Account> = {
       id: '1',
       code: ACCOUNT_CODES.CASH_ON_HAND,
@@ -329,6 +382,7 @@ describe('LedgerViewerResolver.eligibleDebitAccounts', () => {
       isActive: true,
       isParent: false,
       channelId: 1,
+      parentAccountId: cashParentId,
     };
     const bankMain: Partial<Account> = {
       id: '2',
@@ -338,6 +392,7 @@ describe('LedgerViewerResolver.eligibleDebitAccounts', () => {
       isActive: true,
       isParent: false,
       channelId: 1,
+      parentAccountId: cashParentId,
     };
     mockAccountRepo.find.mockResolvedValue([cashOnHand, bankMain]);
 
@@ -347,39 +402,27 @@ describe('LedgerViewerResolver.eligibleDebitAccounts', () => {
     const codes = result.items.map((a: any) => a.code);
     expect(codes).toContain(ACCOUNT_CODES.CASH_ON_HAND);
     expect(codes).toContain(ACCOUNT_CODES.BANK_MAIN);
-    expect(codes).not.toContain(ACCOUNT_CODES.ACCOUNTS_RECEIVABLE);
-    expect(codes).not.toContain(ACCOUNT_CODES.INVENTORY);
+    expect(mockAccountRepo.findOne).toHaveBeenCalledWith({
+      where: { channelId: 1, code: ACCOUNT_CODES.CASH },
+    });
     expect(mockAccountRepo.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
+        where: {
           channelId: 1,
           isActive: true,
-          type: 'asset',
-          isParent: false,
-        }),
+          parentAccountId: cashParentId,
+        },
+        order: { code: 'ASC' },
       })
     );
   });
 
-  it('should query with exclusion of AR and INVENTORY (code filter in where)', async () => {
-    mockAccountRepo.find.mockResolvedValue([
-      {
-        id: '1',
-        code: ACCOUNT_CODES.CASH_ON_HAND,
-        name: 'Cash',
-        type: 'asset',
-        isActive: true,
-        isParent: false,
-        channelId: 1,
-      },
-    ]);
+  it('should return empty items when CASH parent not found', async () => {
+    mockAccountRepo.findOne.mockResolvedValue(null);
 
-    await resolver.eligibleDebitAccounts(ctx);
+    const result = await resolver.eligibleDebitAccounts(ctx);
 
-    const findCall = mockAccountRepo.find.mock.calls[0][0];
-    expect(findCall.where.channelId).toBe(1);
-    expect(findCall.where.type).toBe('asset');
-    expect(findCall.where.isParent).toBe(false);
-    expect(findCall.where.code).toBeDefined();
+    expect(result.items).toEqual([]);
+    expect(mockAccountRepo.find).not.toHaveBeenCalled();
   });
 });

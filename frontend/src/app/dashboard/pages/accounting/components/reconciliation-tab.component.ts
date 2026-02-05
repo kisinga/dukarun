@@ -14,7 +14,7 @@ import {
   type Reconciliation,
   type ReconciliationAccountDetail,
 } from '../../../../core/services/cashier-session/cashier-session.service';
-import type { LedgerAccount } from '../../../../core/services/ledger/ledger.service';
+import type { ReconciliationTabContext } from '../accounting-context';
 
 @Component({
   selector: 'app-reconciliation-tab',
@@ -26,15 +26,7 @@ import type { LedgerAccount } from '../../../../core/services/ledger/ledger.serv
 export class ReconciliationTabComponent {
   private readonly cashierSessionService = inject(CashierSessionService);
 
-  reconciliations = input.required<Reconciliation[]>();
-  accounts = input<LedgerAccount[]>([]);
-  channelId = input.required<number>();
-  isLoading = input.required<boolean>();
-  totalItems = input.required<number>();
-  currentPage = input.required<number>();
-  pageSize = input.required<number>();
-  formatDate = input.required<(date: string) => string>();
-  formatCurrency = input.required<(amountCentsOrString: string) => string>();
+  context = input.required<ReconciliationTabContext>();
 
   pageChange = output<number>();
   reconciliationCreated = output<void>();
@@ -61,8 +53,8 @@ export class ReconciliationTabComponent {
   loadingDetailsId = signal<string | null>(null);
 
   totalPages = computed(() => {
-    const total = this.totalItems();
-    const size = this.pageSize();
+    const total = this.context().totalItems;
+    const size = this.context().pageSize;
     return Math.ceil(total / size) || 1;
   });
 
@@ -71,11 +63,7 @@ export class ReconciliationTabComponent {
     return Array.from({ length: total }, (_, i) => i + 1);
   });
 
-  /** Leaf accounts only (no parents) for manual reconciliation */
-  leafAccounts = computed(() => {
-    const accounts = this.accounts();
-    return accounts.filter((a) => !a.isParent && a.isActive);
-  });
+  tableAccounts = computed(() => this.context().reconciliationTableAccounts);
 
   static getTodayIsoDate(): string {
     return new Date().toISOString().slice(0, 10);
@@ -84,7 +72,7 @@ export class ReconciliationTabComponent {
   constructor() {
     effect((onCleanup) => {
       const asOfDate = this.reconciliationDate();
-      const channelId = this.channelId();
+      const channelId = this.context().channelId;
       if (!asOfDate || !channelId || Number.isNaN(channelId)) {
         this.manualBalancesAsOf.set([]);
         return;
@@ -181,9 +169,9 @@ export class ReconciliationTabComponent {
   }
 
   submitManualReconciliation() {
-    const channelId = this.channelId();
+    const channelId = this.context().channelId;
     const asOfDate = this.reconciliationDate();
-    const accounts = this.leafAccounts();
+    const accounts = this.tableAccounts();
     const amounts = this.manualDeclaredAmounts();
 
     if (!asOfDate) {
@@ -191,7 +179,7 @@ export class ReconciliationTabComponent {
       return;
     }
     if (accounts.length === 0) {
-      this.manualError.set('No accounts available. Load accounting data first.');
+      this.manualError.set('No cash accounts available. Load accounting data first.');
       return;
     }
 

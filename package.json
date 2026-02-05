@@ -20,6 +20,7 @@
     "dev:ml": "npm run dev -w @dukarun/ml-trainer",
     "services:up": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml up -d",
     "services:down": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml down",
+    "test": "npm run test --workspaces --if-present",
     "prepare": "node -e \"if (process.env.CI === 'true' || process.env.HUSKY === '0') process.exit(0); require('child_process').execSync('npx husky install', {stdio:'inherit'})\""
   },
   "devDependencies": {

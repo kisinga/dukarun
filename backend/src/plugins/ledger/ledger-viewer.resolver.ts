@@ -1,6 +1,5 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
-import { In, Not } from 'typeorm';
 import { DataSource } from 'typeorm';
 import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import { Account } from '../../ledger/account.entity';
@@ -67,13 +66,18 @@ export class LedgerViewerResolver {
     const channelId = ctx.channelId as number;
     const accountRepo = this.dataSource.getRepository(Account);
 
+    const cashParent = await accountRepo.findOne({
+      where: { channelId, code: ACCOUNT_CODES.CASH },
+    });
+    if (!cashParent) {
+      return { items: [] };
+    }
+
     const accounts = await accountRepo.find({
       where: {
         channelId,
         isActive: true,
-        type: 'asset',
-        isParent: false,
-        code: Not(In([ACCOUNT_CODES.ACCOUNTS_RECEIVABLE, ACCOUNT_CODES.INVENTORY])),
+        parentAccountId: cashParent.id,
       },
       order: { code: 'ASC' },
     });

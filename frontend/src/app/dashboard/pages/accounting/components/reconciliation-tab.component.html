@@ -1,6 +1,6 @@
 <div class="space-y-4">
   <!-- Create manual reconciliation -->
-  @if (leafAccounts().length > 0) {
+  @if (tableAccounts().length > 0) {
     <div class="card bg-base-100 shadow">
       <div class="card-body">
         <h2 class="card-title">Create manual reconciliation</h2>
@@ -52,7 +52,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (acc of leafAccounts(); track acc.id) {
+              @for (acc of tableAccounts(); track acc.id) {
                 <tr>
                   <td>{{ acc.name }}</td>
                   <td class="font-mono text-sm">{{ acc.code }}</td>
@@ -115,11 +115,11 @@
         row shows expected vs actual balances and variance.
       </p>
 
-      @if (isLoading()) {
+      @if (context().isLoading) {
         <div class="flex justify-center py-8">
           <span class="loading loading-spinner loading-lg"></span>
         </div>
-      } @else if (reconciliations().length === 0) {
+      } @else if (context().reconciliations.length === 0) {
         <div class="text-center py-8 text-base-content/70">
           <p>No reconciliations found</p>
         </div>
@@ -140,7 +140,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (r of reconciliations(); track r.id) {
+              @for (r of context().reconciliations; track r.id) {
                 <tr [class.bg-warning/10]="hasVariance(r)">
                   <td class="align-middle">
                     <button
@@ -159,21 +159,22 @@
                     </button>
                   </td>
                   <td class="whitespace-nowrap">
-                    {{ formatDate()(r.rangeStart) }} – {{ formatDate()(r.rangeEnd) }}
+                    {{ context().formatDate(r.rangeStart) }} –
+                    {{ context().formatDate(r.rangeEnd) }}
                   </td>
                   <td>
                     <span class="badge badge-outline">{{ r.scope }}</span>
                   </td>
                   <td class="font-mono text-sm">{{ r.scopeRefId }}</td>
-                  <td>{{ formatCurrency()(r.expectedBalance ?? '0') }}</td>
-                  <td>{{ formatCurrency()(r.actualBalance ?? '0') }}</td>
+                  <td>{{ context().formatCurrency(r.expectedBalance ?? '0') }}</td>
+                  <td>{{ context().formatCurrency(r.actualBalance ?? '0') }}</td>
                   <td>
                     @if (hasVariance(r)) {
                       <span class="font-semibold text-warning">{{
-                        formatCurrency()(r.varianceAmount)
+                        context().formatCurrency(r.varianceAmount)
                       }}</span>
                     } @else {
-                      {{ formatCurrency()(r.varianceAmount) }}
+                      {{ context().formatCurrency(r.varianceAmount) }}
                     }
                   </td>
                   <td>
@@ -225,26 +226,26 @@
                                     <td>
                                       {{
                                         d.expectedBalanceCents != null
-                                          ? formatCurrency()(d.expectedBalanceCents)
+                                          ? context().formatCurrency(d.expectedBalanceCents)
                                           : '–'
                                       }}
                                     </td>
                                     <td>
                                       {{
                                         d.declaredAmountCents != null
-                                          ? formatCurrency()(d.declaredAmountCents)
+                                          ? context().formatCurrency(d.declaredAmountCents)
                                           : '–'
                                       }}
                                     </td>
                                     <td>
                                       @if (d.varianceCents && d.varianceCents !== '0') {
                                         <span class="font-semibold text-warning">{{
-                                          formatCurrency()(d.varianceCents)
+                                          context().formatCurrency(d.varianceCents)
                                         }}</span>
                                       } @else {
                                         {{
                                           d.varianceCents != null
-                                            ? formatCurrency()(d.varianceCents)
+                                            ? context().formatCurrency(d.varianceCents)
                                             : '–'
                                         }}
                                       }
@@ -268,15 +269,15 @@
           <div class="join flex justify-center mt-4">
             <button
               class="join-item btn btn-sm"
-              [disabled]="currentPage() === 1"
-              (click)="onPageChange(currentPage() - 1)"
+              [disabled]="context().currentPage === 1"
+              (click)="onPageChange(context().currentPage - 1)"
             >
               «
             </button>
             @for (page of pageNumbers(); track page) {
               <button
                 class="join-item btn btn-sm"
-                [class.btn-active]="currentPage() === page"
+                [class.btn-active]="context().currentPage === page"
                 (click)="onPageChange(page)"
               >
                 {{ page }}
@@ -284,8 +285,8 @@
             }
             <button
               class="join-item btn btn-sm"
-              [disabled]="currentPage() === totalPages()"
-              (click)="onPageChange(currentPage() + 1)"
+              [disabled]="context().currentPage === totalPages()"
+              (click)="onPageChange(context().currentPage + 1)"
             >
               »
             </button>
