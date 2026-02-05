@@ -20,15 +20,15 @@ import {
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import type { FacetValueSummary, FacetCode } from '../../../core/services/product/facet.types';
+import type { FacetCode, FacetValueSummary } from '../../../core/services/product/facet.types';
 import {
   FACET_CODE_CATEGORY,
   FACET_CODE_MANUFACTURER,
   FACET_CODE_TAGS,
 } from '../../../core/services/product/facet.types';
-import { FacetService } from '../../../core/services/product/facet.service';
 import { AppInitService } from '../../../core/services/app-init.service';
 import { CompanyService } from '../../../core/services/company.service';
+import { FacetService } from '../../../core/services/product/facet.service';
 import { normalizeBarcodeForApi } from '../../../core/services/product/barcode.util';
 import { ProductService } from '../../../core/services/product.service';
 import { ProductValidationService } from '../../../core/services/product/product-validation.service';
@@ -962,28 +962,28 @@ export class ProductCreateComponent implements OnInit {
   }
 
   /**
-   * Resolve facet value IDs for submit. Creates any pending (new) facet values
-   * only at submit time; existing selections keep their ids.
+   * Resolve manufacturer, category, and tags to facet value IDs.
+   * Uses existing id when present; otherwise creates the facet value on the server (lazy persistence).
    */
   private async resolveFacetValueIds(): Promise<string[]> {
     const ids: string[] = [];
-
-    const resolveOne = async (value: FacetValueSummary | null | undefined): Promise<void> => {
-      if (!value?.name?.trim()) return;
-      if (value.id) {
-        ids.push(value.id);
-        return;
-      }
-      const facetCode = (value.code as FacetCode) || FACET_CODE_MANUFACTURER;
+    const resolve = async (
+      summary: FacetValueSummary | null,
+      facetCode: FacetCode,
+    ): Promise<string | null> => {
+      if (!summary?.name?.trim()) return null;
+      if (summary.id?.trim()) return summary.id;
       const facet = await this.facetService.getFacetByCode(facetCode);
-      const created = await this.facetService.createFacetValue(facet.id, value.name.trim());
-      ids.push(created.id);
+      const created = await this.facetService.createFacetValue(facet.id, summary.name.trim());
+      return created.id;
     };
-
-    await resolveOne(this.manufacturer());
-    await resolveOne(this.category());
-    for (const t of this.tags() ?? []) {
-      await resolveOne(t);
+    const m = await resolve(this.manufacturer(), FACET_CODE_MANUFACTURER);
+    if (m) ids.push(m);
+    const c = await resolve(this.category(), FACET_CODE_CATEGORY);
+    if (c) ids.push(c);
+    for (const t of this.tags()) {
+      const id = await resolve(t, FACET_CODE_TAGS);
+      if (id) ids.push(id);
     }
     return ids;
   }
@@ -1015,12 +1015,8 @@ export class ProductCreateComponent implements OnInit {
         return;
       }
 
-      // Build facet value IDs (form owns full replacement: manufacturer, category, tags)
-      const facetValueIds: string[] = [
-        this.manufacturer()?.id,
-        this.category()?.id,
-        ...(this.tags().map((t) => t.id) ?? []),
-      ].filter((id): id is string => !!id);
+      // Resolve facet value IDs (create any new facet values on save; form owns full replacement)
+      const facetValueIds = await this.resolveFacetValueIds();
 
       // Product/Service input (no barcode when identification is "Name or SKU only")
       const productInput = {

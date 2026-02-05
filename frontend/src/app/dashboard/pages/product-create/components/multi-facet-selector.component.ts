@@ -203,24 +203,28 @@ export class MultiFacetSelectorComponent {
     this.valueChange.emit(this.selected().filter((s) => s.id !== item.id));
   }
 
-  createAndSelect(event: Event): void {
+  async createAndSelect(event: Event): Promise<void> {
     event.preventDefault();
     if (this.blurTimer) {
       clearTimeout(this.blurTimer);
       this.blurTimer = null;
     }
     const term = this.inputValue().trim();
-    if (!term) return;
-    // Emit pending value (no API call); parent will create on form submit
-    const pending: FacetValueSummary = { id: '', name: term, code: this.facetCode() };
-    const already = this.selected().some(
-      (s) => s.id === pending.id && s.name.toLowerCase() === pending.name.toLowerCase(),
-    );
-    if (!already) {
-      this.valueChange.emit([...this.selected(), pending]);
+    if (!term || !this.facetId) return;
+    this.isSearching.set(true);
+    this.errorMessage.set(null);
+    try {
+      const created = await this.facetService.createFacetValue(this.facetId, term);
+      this.inputValue.set('');
+      this.suggestions.set([]);
+      if (!this.selected().some((s) => s.id === created.id)) {
+        this.valueChange.emit([...this.selected(), created]);
+      }
+    } catch (e) {
+      this.errorMessage.set('Failed to create. It may already exist.');
+    } finally {
+      this.isSearching.set(false);
     }
-    this.inputValue.set('');
-    this.suggestions.set([]);
   }
 
   canCreate(): boolean {

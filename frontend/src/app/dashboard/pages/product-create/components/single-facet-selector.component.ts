@@ -10,8 +10,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FacetService } from '../../../../core/services/product/facet.service';
-import type { FacetValueSummary } from '../../../../core/services/product/facet.types';
-import type { FacetCode } from '../../../../core/services/product/facet.types';
+import type { FacetCode, FacetValueSummary } from '../../../../core/services/product/facet.types';
 
 /**
  * Single-facet selector: one value (e.g. manufacturer, category).
@@ -187,20 +186,27 @@ export class SingleFacetSelectorComponent {
     this.valueChange.emit(null);
   }
 
-  createAndSelect(event: Event): void {
+  async createAndSelect(event: Event): Promise<void> {
     event.preventDefault();
     if (this.blurTimer) {
       clearTimeout(this.blurTimer);
       this.blurTimer = null;
     }
     const term = this.inputValue().trim();
-    if (!term) return;
-    // Emit pending value (no API call); parent will create on form submit
-    const pending: FacetValueSummary = { id: '', name: term, code: this.facetCode() };
-    this.inputValue.set('');
-    this.suggestions.set([]);
-    this.dropdownOpen.set(false);
-    this.valueChange.emit(pending);
+    if (!term || !this.facetId) return;
+    this.isSearching.set(true);
+    this.errorMessage.set(null);
+    try {
+      const created = await this.facetService.createFacetValue(this.facetId, term);
+      this.inputValue.set('');
+      this.suggestions.set([]);
+      this.dropdownOpen.set(false);
+      this.valueChange.emit(created);
+    } catch (e) {
+      this.errorMessage.set('Failed to create. It may already exist.');
+    } finally {
+      this.isSearching.set(false);
+    }
   }
 
   canCreate(): boolean {

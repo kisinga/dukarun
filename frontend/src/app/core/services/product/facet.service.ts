@@ -1,9 +1,9 @@
 import { inject, Injectable } from '@angular/core';
+import { GetFacetValuesDocument } from '../../graphql/generated/graphql';
 import {
   CREATE_FACET,
   CREATE_FACET_VALUE,
   GET_FACETS_BY_CODES,
-  GET_FACET_VALUES,
 } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import type { FacetValueSummary } from './facet.types';
@@ -72,10 +72,8 @@ export class FacetService {
    */
   async searchFacetValues(facetId: string, term: string = ''): Promise<FacetValueSummary[]> {
     const client = this.apollo.getClient();
-    const result = await client.query<{
-      facetValues: { items: Array<{ id: string; name: string; code: string }> };
-    }>({
-      query: GET_FACET_VALUES,
+    const result = await client.query({
+      query: GetFacetValuesDocument,
       variables: { facetId, term: term || '' },
     });
 

@@ -51,7 +51,7 @@ type Documents = {
   '\n  query SearchByBarcode($barcode: String!) {\n    products(options: { filter: { barcode: { eq: $barcode } }, take: 1 }) {\n      items {\n        id\n        name\n        customFields {\n          barcode\n        }\n        featuredAsset {\n          preview\n        }\n        facetValues {\n          id\n          name\n          facet {\n            code\n          }\n        }\n        variants {\n          id\n          name\n          sku\n          priceWithTax\n          stockOnHand\n          trackInventory\n          customFields {\n            wholesalePrice\n            allowFractionalQuantity\n          }\n        }\n      }\n    }\n  }\n': typeof types.SearchByBarcodeDocument;
   '\n  query PrefetchProducts($take: Int!) {\n    products(options: { take: $take, skip: 0 }) {\n      totalItems\n      items {\n        id\n        name\n        featuredAsset {\n          preview\n        }\n        facetValues {\n          id\n          name\n          facet {\n            code\n          }\n        }\n        variants {\n          id\n          name\n          sku\n          price\n          priceWithTax\n          stockOnHand\n          customFields {\n            wholesalePrice\n            allowFractionalQuantity\n          }\n          prices {\n            price\n            currencyCode\n          }\n        }\n      }\n    }\n  }\n': typeof types.PrefetchProductsDocument;
   '\n  query GetFacetsByCodes($codes: [String!]!) {\n    facets(options: { filter: { code: { in: $codes } }, take: 10 }) {\n      items {\n        id\n        code\n        name\n      }\n    }\n  }\n': typeof types.GetFacetsByCodesDocument;
-  '\n  query GetFacetValues($facetId: String!, $term: String) {\n    facetValues(\n      options: {\n        filter: { facetId: { eq: $facetId }, name: { contains: $term } }\n        take: 20\n      }\n    ) {\n      items {\n        id\n        name\n        code\n      }\n    }\n  }\n': typeof types.GetFacetValuesDocument;
+  '\n  query GetFacetValues($facetId: String!, $term: String) {\n    facetValues(\n      options: {\n        filter: { facetId: { eq: $facetId }, name: { contains: $term } },\n        take: 20\n      }\n    ) {\n      items {\n        id\n        name\n        code\n      }\n    }\n  }\n': typeof types.GetFacetValuesDocument;
   '\n  mutation CreateFacet($input: CreateFacetInput!) {\n    createFacet(input: $input) {\n      id\n      code\n      name\n    }\n  }\n': typeof types.CreateFacetDocument;
   '\n  mutation CreateFacetValue($input: CreateFacetValueInput!) {\n    createFacetValue(input: $input) {\n      id\n      name\n      code\n    }\n  }\n': typeof types.CreateFacetValueDocument;
   '\n  query GetOrdersForPeriod($startDate: DateTime!) {\n    orders(options: { filter: { orderPlacedAt: { after: $startDate } }, take: 100 }) {\n      items {\n        id\n        total\n        totalWithTax\n        orderPlacedAt\n        state\n        payments {\n          id\n          amount\n          method\n          state\n        }\n      }\n    }\n  }\n': typeof types.GetOrdersForPeriodDocument;
@@ -235,7 +235,7 @@ const documents: Documents = {
     types.PrefetchProductsDocument,
   '\n  query GetFacetsByCodes($codes: [String!]!) {\n    facets(options: { filter: { code: { in: $codes } }, take: 10 }) {\n      items {\n        id\n        code\n        name\n      }\n    }\n  }\n':
     types.GetFacetsByCodesDocument,
-  '\n  query GetFacetValues($facetId: String!, $term: String) {\n    facetValues(\n      options: {\n        filter: { facetId: { eq: $facetId }, name: { contains: $term } }\n        take: 20\n      }\n    ) {\n      items {\n        id\n        name\n        code\n      }\n    }\n  }\n':
+  '\n  query GetFacetValues($facetId: String!, $term: String) {\n    facetValues(\n      options: {\n        filter: { facetId: { eq: $facetId }, name: { contains: $term } },\n        take: 20\n      }\n    ) {\n      items {\n        id\n        name\n        code\n      }\n    }\n  }\n':
     types.GetFacetValuesDocument,
   '\n  mutation CreateFacet($input: CreateFacetInput!) {\n    createFacet(input: $input) {\n      id\n      code\n      name\n    }\n  }\n':
     types.CreateFacetDocument,
@@ -692,8 +692,8 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
-  source: '\n  query GetFacetValues($facetId: String!, $term: String) {\n    facetValues(\n      options: {\n        filter: { facetId: { eq: $facetId }, name: { contains: $term } }\n        take: 20\n      }\n    ) {\n      items {\n        id\n        name\n        code\n      }\n    }\n  }\n',
-): (typeof documents)['\n  query GetFacetValues($facetId: String!, $term: String) {\n    facetValues(\n      options: {\n        filter: { facetId: { eq: $facetId }, name: { contains: $term } }\n        take: 20\n      }\n    ) {\n      items {\n        id\n        name\n        code\n      }\n    }\n  }\n'];
+  source: '\n  query GetFacetValues($facetId: String!, $term: String) {\n    facetValues(\n      options: {\n        filter: { facetId: { eq: $facetId }, name: { contains: $term } },\n        take: 20\n      }\n    ) {\n      items {\n        id\n        name\n        code\n      }\n    }\n  }\n',
+): (typeof documents)['\n  query GetFacetValues($facetId: String!, $term: String) {\n    facetValues(\n      options: {\n        filter: { facetId: { eq: $facetId }, name: { contains: $term } },\n        take: 20\n      }\n    ) {\n      items {\n        id\n        name\n        code\n      }\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
