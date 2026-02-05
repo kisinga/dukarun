@@ -34,6 +34,8 @@ export interface LedgerAccount {
   balance: number;
   parentAccountId?: string | null;
   isParent: boolean;
+  /** Present once backend schema exposes it; system accounts are not manually adjusted in reconciliation */
+  isSystemAccount?: boolean;
 }
 
 export interface JournalLine {

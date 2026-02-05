@@ -33,11 +33,24 @@ export type AccountAmountInput = {
   amountCents: Scalars['Int']['input'];
 };
 
+export type AccountBalanceAsOfItem = {
+  __typename?: 'AccountBalanceAsOfItem';
+  accountCode: Scalars['String']['output'];
+  accountId: Scalars['ID']['output'];
+  accountName: Scalars['String']['output'];
+  balanceCents: Scalars['String']['output'];
+};
+
 export type AccountBreakdown = {
   __typename?: 'AccountBreakdown';
   icon: Scalars['String']['output'];
   label: Scalars['String']['output'];
   value: Scalars['Float']['output'];
+};
+
+export type AccountDeclaredAmountInput = {
+  accountId: Scalars['ID']['input'];
+  amountCents: Scalars['String']['input'];
 };
 
 export type AccountingPeriod = {
@@ -838,6 +851,12 @@ export type CloseCashierSessionInput = {
   sessionId: Scalars['ID']['input'];
 };
 
+export type ClosedSessionMissingReconciliation = {
+  __typename?: 'ClosedSessionMissingReconciliation';
+  closedAt: Scalars['DateTime']['output'];
+  sessionId: Scalars['ID']['output'];
+};
+
 export type Collection = Node & {
   __typename?: 'Collection';
   assets: Array<Asset>;
@@ -1445,6 +1464,8 @@ export type CreateProvinceInput = {
 };
 
 export type CreateReconciliationInput = {
+  accountDeclaredAmounts?: InputMaybe<Array<AccountDeclaredAmountInput>>;
+  accountIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   actualBalance: Scalars['String']['input'];
   channelId: Scalars['Int']['input'];
   expectedBalance?: InputMaybe<Scalars['String']['input']>;
@@ -3809,7 +3830,9 @@ export type Mutation = {
   openAccountingPeriod: AccountingPeriod;
   openCashierSession: CashierSession;
   paySingleOrder: PaymentAllocationResult;
+  paySinglePurchase: SupplierPaymentAllocationResult;
   recordCashCount: CashCountResult;
+  recordExpense: RecordExpenseResult;
   recordPurchase: StockPurchase;
   recordStockAdjustment: InventoryStockAdjustment;
   refundOrder: RefundOrderResult;
@@ -4521,8 +4544,16 @@ export type MutationPaySingleOrderArgs = {
   input: PaySingleOrderInput;
 };
 
+export type MutationPaySinglePurchaseArgs = {
+  input: PaySinglePurchaseInput;
+};
+
 export type MutationRecordCashCountArgs = {
   input: RecordCashCountInput;
+};
+
+export type MutationRecordExpenseArgs = {
+  input: RecordExpenseInput;
 };
 
 export type MutationRecordPurchaseArgs = {
@@ -5405,6 +5436,12 @@ export type PaySingleOrderInput = {
   referenceNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type PaySinglePurchaseInput = {
+  debitAccountCode?: InputMaybe<Scalars['String']['input']>;
+  paymentAmount?: InputMaybe<Scalars['Float']['input']>;
+  purchaseId: Scalars['ID']['input'];
+};
+
 export type Payment = Node & {
   __typename?: 'Payment';
   amount: Scalars['Money']['output'];
@@ -5667,6 +5704,8 @@ export enum Permission {
   CreateCustomerGroup = 'CreateCustomerGroup',
   /** Grants permission to create Facet */
   CreateFacet = 'CreateFacet',
+  /** Allows creating inter-account transfers during reconciliation sessions. */
+  CreateInterAccountTransfer = 'CreateInterAccountTransfer',
   /** Grants permission to create Order */
   CreateOrder = 'CreateOrder',
   /** Grants permission to create PaymentMethod */
@@ -6398,6 +6437,7 @@ export type QuantityTooGreatError = ErrorResult & {
 
 export type Query = {
   __typename?: 'Query';
+  accountBalancesAsOf: Array<AccountBalanceAsOfItem>;
   activeAdministrator?: Maybe<Administrator>;
   activeChannel: Channel;
   administrator?: Maybe<Administrator>;
@@ -6418,6 +6458,7 @@ export type Query = {
   /** Quick subscription status check */
   checkSubscriptionStatus: SubscriptionStatus;
   closedPeriods: Array<AccountingPeriod>;
+  closedSessionsMissingReconciliation: Array<ClosedSessionMissingReconciliation>;
   /** Get a Collection either by id or slug. If neither id nor slug is specified, an error will result. */
   collection?: Maybe<Collection>;
   collectionFilters: Array<ConfigurableOperationDefinition>;
@@ -6502,6 +6543,7 @@ export type Query = {
   province?: Maybe<Province>;
   provinces: ProvinceList;
   purchases: StockPurchaseList;
+  reconciliationDetails: Array<ReconciliationAccountDetail>;
   reconciliations: ReconciliationList;
   role?: Maybe<Role>;
   roleTemplates: Array<RoleTemplate>;
@@ -6512,6 +6554,7 @@ export type Query = {
   sellers: SellerList;
   sessionCashCounts: Array<CashDrawerCount>;
   sessionMpesaVerifications: Array<MpesaVerification>;
+  sessionReconciliationDetails: Array<ReconciliationAccountDetail>;
   sessionReconciliationRequirements: SessionReconciliationRequirements;
   shippingCalculators: Array<ConfigurableOperationDefinition>;
   shippingEligibilityCheckers: Array<ConfigurableOperationDefinition>;
@@ -6536,6 +6579,11 @@ export type Query = {
   validateCredit: CreditValidationResult;
   zone?: Maybe<Zone>;
   zones: ZoneList;
+};
+
+export type QueryAccountBalancesAsOfArgs = {
+  asOfDate: Scalars['String']['input'];
+  channelId: Scalars['Int']['input'];
 };
 
 export type QueryAdministratorArgs = {
@@ -6599,6 +6647,14 @@ export type QueryClosedPeriodsArgs = {
   channelId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryClosedSessionsMissingReconciliationArgs = {
+  channelId: Scalars['Int']['input'];
+  endDate?: InputMaybe<Scalars['DateTime']['input']>;
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  startDate?: InputMaybe<Scalars['DateTime']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryCollectionArgs = {
@@ -6818,6 +6874,10 @@ export type QueryPurchasesArgs = {
   options?: InputMaybe<PurchaseListOptions>;
 };
 
+export type QueryReconciliationDetailsArgs = {
+  reconciliationId: Scalars['ID']['input'];
+};
+
 export type QueryReconciliationsArgs = {
   channelId: Scalars['Int']['input'];
   options?: InputMaybe<ReconciliationListOptions>;
@@ -6848,6 +6908,11 @@ export type QuerySessionCashCountsArgs = {
 };
 
 export type QuerySessionMpesaVerificationsArgs = {
+  sessionId: Scalars['ID']['input'];
+};
+
+export type QuerySessionReconciliationDetailsArgs = {
+  kind?: InputMaybe<Scalars['String']['input']>;
   sessionId: Scalars['ID']['input'];
 };
 
@@ -6952,6 +7017,16 @@ export type Reconciliation = {
   varianceAmount: Scalars['String']['output'];
 };
 
+export type ReconciliationAccountDetail = {
+  __typename?: 'ReconciliationAccountDetail';
+  accountCode: Scalars['String']['output'];
+  accountId: Scalars['ID']['output'];
+  accountName: Scalars['String']['output'];
+  declaredAmountCents?: Maybe<Scalars['String']['output']>;
+  expectedBalanceCents?: Maybe<Scalars['String']['output']>;
+  varianceCents?: Maybe<Scalars['String']['output']>;
+};
+
 export type ReconciliationList = {
   __typename?: 'ReconciliationList';
   items: Array<Reconciliation>;
@@ -6983,6 +7058,17 @@ export type RecordCashCountInput = {
   countType: Scalars['String']['input'];
   declaredCash: Scalars['String']['input'];
   sessionId: Scalars['ID']['input'];
+};
+
+export type RecordExpenseInput = {
+  amount: Scalars['Int']['input'];
+  memo?: InputMaybe<Scalars['String']['input']>;
+  sourceAccountCode: Scalars['String']['input'];
+};
+
+export type RecordExpenseResult = {
+  __typename?: 'RecordExpenseResult';
+  sourceId: Scalars['String']['output'];
 };
 
 export type RecordPurchaseInput = {
@@ -7918,6 +8004,7 @@ export type SupplierCreditSummary = {
 
 /** paymentAmount in smallest currency unit (cents) */
 export type SupplierPaymentAllocationInput = {
+  debitAccountCode?: InputMaybe<Scalars['String']['input']>;
   paymentAmount: Scalars['Float']['input'];
   purchaseIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   supplierId: Scalars['ID']['input'];
@@ -10619,6 +10706,26 @@ export type PaySingleOrderMutation = {
   };
 };
 
+export type PaySinglePurchaseMutationVariables = Exact<{
+  input: PaySinglePurchaseInput;
+}>;
+
+export type PaySinglePurchaseMutation = {
+  __typename?: 'Mutation';
+  paySinglePurchase: {
+    __typename?: 'SupplierPaymentAllocationResult';
+    remainingBalance: number;
+    totalAllocated: number;
+    excessPayment: number;
+    purchasesPaid: Array<{
+      __typename?: 'SupplierPurchasePayment';
+      purchaseId: string;
+      purchaseReference: string;
+      amountPaid: number;
+    }>;
+  };
+};
+
 export type SetOrderLineCustomPriceMutationVariables = Exact<{
   input: SetOrderLineCustomPriceInput;
 }>;
@@ -11384,6 +11491,15 @@ export type GetEligibleDebitAccountsQuery = {
   };
 };
 
+export type RecordExpenseMutationVariables = Exact<{
+  input: RecordExpenseInput;
+}>;
+
+export type RecordExpenseMutation = {
+  __typename?: 'Mutation';
+  recordExpense: { __typename?: 'RecordExpenseResult'; sourceId: string };
+};
+
 export type GetJournalEntriesQueryVariables = Exact<{
   options?: InputMaybe<JournalEntriesOptions>;
 }>;
@@ -11637,6 +11753,57 @@ export type GetReconciliationsQuery = {
       createdBy: number;
     }>;
   };
+};
+
+export type GetReconciliationDetailsQueryVariables = Exact<{
+  reconciliationId: Scalars['ID']['input'];
+}>;
+
+export type GetReconciliationDetailsQuery = {
+  __typename?: 'Query';
+  reconciliationDetails: Array<{
+    __typename?: 'ReconciliationAccountDetail';
+    accountId: string;
+    accountCode: string;
+    accountName: string;
+    declaredAmountCents?: string | null;
+    expectedBalanceCents?: string | null;
+    varianceCents?: string | null;
+  }>;
+};
+
+export type GetSessionReconciliationDetailsQueryVariables = Exact<{
+  sessionId: Scalars['ID']['input'];
+  kind?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type GetSessionReconciliationDetailsQuery = {
+  __typename?: 'Query';
+  sessionReconciliationDetails: Array<{
+    __typename?: 'ReconciliationAccountDetail';
+    accountId: string;
+    accountCode: string;
+    accountName: string;
+    declaredAmountCents?: string | null;
+    expectedBalanceCents?: string | null;
+    varianceCents?: string | null;
+  }>;
+};
+
+export type GetAccountBalancesAsOfQueryVariables = Exact<{
+  channelId: Scalars['Int']['input'];
+  asOfDate: Scalars['String']['input'];
+}>;
+
+export type GetAccountBalancesAsOfQuery = {
+  __typename?: 'Query';
+  accountBalancesAsOf: Array<{
+    __typename?: 'AccountBalanceAsOfItem';
+    accountId: string;
+    accountCode: string;
+    accountName: string;
+    balanceCents: string;
+  }>;
 };
 
 export type GetSessionCashCountsQueryVariables = Exact<{
@@ -17918,6 +18085,62 @@ export const PaySingleOrderDocument = {
     },
   ],
 } as unknown as DocumentNode<PaySingleOrderMutation, PaySingleOrderMutationVariables>;
+export const PaySinglePurchaseDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'PaySinglePurchase' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'PaySinglePurchaseInput' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'paySinglePurchase' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'purchasesPaid' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'purchaseId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'purchaseReference' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'amountPaid' } },
+                    ],
+                  },
+                },
+                { kind: 'Field', name: { kind: 'Name', value: 'remainingBalance' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'totalAllocated' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'excessPayment' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<PaySinglePurchaseMutation, PaySinglePurchaseMutationVariables>;
 export const SetOrderLineCustomPriceDocument = {
   kind: 'Document',
   definitions: [
@@ -20100,6 +20323,46 @@ export const GetEligibleDebitAccountsDocument = {
     },
   ],
 } as unknown as DocumentNode<GetEligibleDebitAccountsQuery, GetEligibleDebitAccountsQueryVariables>;
+export const RecordExpenseDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'RecordExpense' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'RecordExpenseInput' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'recordExpense' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [{ kind: 'Field', name: { kind: 'Name', value: 'sourceId' } }],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<RecordExpenseMutation, RecordExpenseMutationVariables>;
 export const GetJournalEntriesDocument = {
   kind: 'Document',
   definitions: [
@@ -20757,6 +21020,171 @@ export const GetReconciliationsDocument = {
     },
   ],
 } as unknown as DocumentNode<GetReconciliationsQuery, GetReconciliationsQueryVariables>;
+export const GetReconciliationDetailsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetReconciliationDetails' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'reconciliationId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'reconciliationDetails' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'reconciliationId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'reconciliationId' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'accountId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'accountCode' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'accountName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'declaredAmountCents' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'expectedBalanceCents' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'varianceCents' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetReconciliationDetailsQuery, GetReconciliationDetailsQueryVariables>;
+export const GetSessionReconciliationDetailsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetSessionReconciliationDetails' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'sessionId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'kind' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'sessionReconciliationDetails' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'sessionId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'sessionId' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'kind' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'kind' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'accountId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'accountCode' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'accountName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'declaredAmountCents' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'expectedBalanceCents' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'varianceCents' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  GetSessionReconciliationDetailsQuery,
+  GetSessionReconciliationDetailsQueryVariables
+>;
+export const GetAccountBalancesAsOfDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetAccountBalancesAsOf' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'asOfDate' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'accountBalancesAsOf' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'channelId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'asOfDate' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'asOfDate' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'accountId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'accountCode' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'accountName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'balanceCents' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetAccountBalancesAsOfQuery, GetAccountBalancesAsOfQueryVariables>;
 export const GetSessionCashCountsDocument = {
   kind: 'Document',
   definitions: [

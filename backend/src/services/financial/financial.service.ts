@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Order, Payment, RequestContext } from '@vendure/core';
+import { randomUUID } from 'crypto';
 import { ACCOUNT_CODES, type AccountCode } from '../../ledger/account-codes.constants';
+import { ChartOfAccountsService } from './chart-of-accounts.service';
 import { LedgerPostingService } from './ledger-posting.service';
 import { LedgerQueryService } from './ledger-query.service';
 import { LedgerTransactionService } from './ledger-transaction.service';
@@ -32,7 +34,8 @@ export class FinancialService {
   constructor(
     private readonly postingService: LedgerPostingService,
     private readonly queryService: LedgerQueryService,
-    private readonly ledgerTransactionService: LedgerTransactionService
+    private readonly ledgerTransactionService: LedgerTransactionService,
+    private readonly chartOfAccountsService: ChartOfAccountsService
   ) {}
 
   // ==================== READ OPERATIONS ====================
@@ -346,6 +349,35 @@ export class FinancialService {
     this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.SALES_RETURNS);
     const clearingAccount = this.mapMethodToAccount(originalPayment.method);
     this.queryService.invalidateCache(ctx.channelId as number, clearingAccount);
+  }
+
+  /**
+   * Record an expense (debit EXPENSES, credit source-of-funds account).
+   * Validates sourceAccountCode with same rules as payment source (asset, leaf, active).
+   */
+  async recordExpense(
+    ctx: RequestContext,
+    amount: number,
+    sourceAccountCode: string,
+    memo?: string
+  ): Promise<{ sourceId: string }> {
+    if (amount <= 0) {
+      throw new Error('Expense amount must be greater than zero.');
+    }
+    const code = sourceAccountCode?.trim();
+    if (!code) {
+      throw new Error('Source of funds (account code) is required.');
+    }
+    await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, code);
+    const sourceId = `expense-${randomUUID()}`;
+    await this.postingService.postExpense(ctx, sourceId, {
+      amount,
+      sourceAccountCode: code,
+      memo,
+    });
+    this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.EXPENSES);
+    this.queryService.invalidateCache(ctx.channelId as number, code);
+    return { sourceId };
   }
 
   /**

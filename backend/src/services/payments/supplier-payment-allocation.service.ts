@@ -7,6 +7,7 @@ import { SupplierCreditService } from '../credit/supplier-credit.service';
 import { FinancialService } from '../financial/financial.service';
 import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
 import { StockPurchase } from '../stock/entities/purchase.entity';
+import { PurchasePayment } from '../stock/entities/purchase-payment.entity';
 import {
   PaymentAllocationItem,
   calculatePaymentAllocation,
@@ -44,7 +45,31 @@ export class SupplierPaymentAllocationService {
   ) {}
 
   /**
-   * Get unpaid credit purchases for a supplier (oldest first)
+   * Get paid amount per purchase (sum of PurchasePayment.amount) for a supplier in the channel.
+   * Single source of truth for how much has been paid on each purchase.
+   */
+  private async getPaidAmountByPurchaseId(
+    ctx: RequestContext,
+    supplierId: string
+  ): Promise<Map<string, number>> {
+    const paymentRepo = this.connection.getRepository(ctx, PurchasePayment);
+    const channelId = ctx.channelId as number;
+    const supplierIdNum = parseInt(String(supplierId), 10);
+    const payments = await paymentRepo.find({
+      where: { channelId, supplierId: supplierIdNum },
+      select: ['purchaseId', 'amount'],
+    });
+    const map = new Map<string, number>();
+    for (const p of payments) {
+      const current = map.get(p.purchaseId) ?? 0;
+      map.set(p.purchaseId, current + Number(p.amount));
+    }
+    return map;
+  }
+
+  /**
+   * Get unpaid credit purchases for a supplier (oldest first).
+   * Uses paymentStatus for filtering; paidAmount for allocation comes from getPaidAmountByPurchaseId.
    */
   async getUnpaidPurchasesForSupplier(
     ctx: RequestContext,
@@ -52,7 +77,6 @@ export class SupplierPaymentAllocationService {
   ): Promise<StockPurchase[]> {
     const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
 
-    // Convert Vendure ID (string) to integer for database query
     const channelId = ctx.channelId as number;
     const purchases = await purchaseRepo.find({
       where: {
@@ -66,13 +90,7 @@ export class SupplierPaymentAllocationService {
       },
     });
 
-    // Filter to only purchases that are not fully paid
-    // For now, we'll use paymentStatus to determine if fully paid
-    // In the future, this should track actual payment amounts
-    return purchases.filter(purchase => {
-      // 'paid' means fully paid, 'partial' means partially paid, 'pending' means unpaid
-      return purchase.paymentStatus !== 'paid';
-    });
+    return purchases.filter(purchase => purchase.paymentStatus !== 'paid');
   }
 
   /**
@@ -104,43 +122,41 @@ export class SupplierPaymentAllocationService {
         // 2. Payment amount is already in cents
         const paymentAmountInCents = input.paymentAmount;
 
-        // 3. Convert purchases to PaymentAllocationItem format
-        const allocationItems: PaymentAllocationItem[] = unpaidPurchases.map(purchase => {
-          // Calculate paid amount based on paymentStatus
-          // This is a simplification - ideally we'd track actual payment amounts
-          let paidAmount = 0;
-          if (purchase.paymentStatus === 'paid') {
-            paidAmount = purchase.totalCost; // Fully paid
-          } else if (purchase.paymentStatus === 'partial') {
-            // For partial payments, we'd need to track actual paid amount
-            // For now, we'll estimate as 50% paid (this should be replaced with actual payment tracking)
-            paidAmount = Math.floor(purchase.totalCost * 0.5);
-          }
-          // 'pending' means paidAmount = 0
+        // 3. Paid amount per purchase (single source of truth: sum of PurchasePayment)
+        const paidAmountByPurchaseId = await this.getPaidAmountByPurchaseId(
+          transactionCtx,
+          input.supplierId
+        );
 
+        // 4. Convert purchases to PaymentAllocationItem format
+        const allocationItems: PaymentAllocationItem[] = unpaidPurchases.map(purchase => {
+          const paidAmount = paidAmountByPurchaseId.get(purchase.id) ?? 0;
           return {
             id: purchase.id,
             code: purchase.referenceNumber || purchase.id,
             totalAmount: purchase.totalCost,
-            paidAmount: paidAmount,
+            paidAmount,
             createdAt: purchase.createdAt,
           };
         });
 
-        // 4. Calculate allocation using shared utility
+        // 5. Calculate allocation using shared utility
         const calculation = calculatePaymentAllocation({
           itemsToPay: allocationItems,
           paymentAmount: paymentAmountInCents,
           selectedItemIds: input.purchaseIds,
         });
 
-        // 5. Apply allocations to purchases
+        // 6. Apply allocations: update paymentStatus, create PurchasePayment, post to ledger (single place)
         const purchasesPaid: Array<{
           purchaseId: string;
           purchaseReference: string;
           amountPaid: number;
         }> = [];
-        const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
+        const purchaseRepo = this.connection.getRepository(transactionCtx, StockPurchase);
+        const purchasePaymentRepo = this.connection.getRepository(transactionCtx, PurchasePayment);
+        const supplierIdNum = parseInt(String(input.supplierId), 10);
+        const channelId = transactionCtx.channelId as number;
 
         for (const allocation of calculation.allocations) {
           const purchase = unpaidPurchases.find(p => p.id === allocation.itemId);
@@ -148,13 +164,11 @@ export class SupplierPaymentAllocationService {
             continue;
           }
 
-          // Calculate new paid amount
           const currentPaidAmount =
-            allocationItems.find(item => item.id === allocation.itemId)?.paidAmount || 0;
+            allocationItems.find(item => item.id === allocation.itemId)?.paidAmount ?? 0;
           const newPaidAmount = currentPaidAmount + allocation.amountToAllocate;
           const newTotalCost = purchase.totalCost;
 
-          // Update payment status based on new paid amount
           let newPaymentStatus: string;
           if (newPaidAmount >= newTotalCost) {
             newPaymentStatus = 'paid';
@@ -164,10 +178,19 @@ export class SupplierPaymentAllocationService {
             newPaymentStatus = 'pending';
           }
 
-          // Update purchase payment status
           await purchaseRepo.update({ id: purchase.id }, { paymentStatus: newPaymentStatus });
 
-          // Post to ledger via FinancialService (single source of truth)
+          // Persist payment for audit and so paidAmount = sum(PurchasePayment) stays single source of truth
+          const paymentRecord = purchasePaymentRepo.create({
+            channelId,
+            purchaseId: purchase.id,
+            amount: allocation.amountToAllocate,
+            method: PAYMENT_METHOD_CODES.CASH,
+            reference: null,
+            supplierId: supplierIdNum,
+          });
+          await purchasePaymentRepo.save(paymentRecord);
+
           const paymentId = `supplier-payment-${purchase.id}-${Date.now()}`;
           await this.financialService.recordSupplierPayment(
             transactionCtx,
@@ -176,7 +199,7 @@ export class SupplierPaymentAllocationService {
             purchase.referenceNumber || purchase.id,
             input.supplierId,
             allocation.amountToAllocate,
-            PAYMENT_METHOD_CODES.CASH, // Default to cash, can be made configurable
+            PAYMENT_METHOD_CODES.CASH,
             input.debitAccountCode?.trim()
           );
 
@@ -187,32 +210,31 @@ export class SupplierPaymentAllocationService {
           });
         }
 
-        // 6. Record repayment tracking if any payment was made
+        // 7. Record repayment tracking if any payment was made
         if (calculation.totalAllocated > 0) {
           await this.supplierCreditService.recordSupplierRepayment(
             transactionCtx,
             input.supplierId,
-            calculation.totalAllocated // Amount in cents
+            calculation.totalAllocated
           );
         }
 
-        // 7. Calculate remaining balance
+        // 8. Remaining balance: use paid amounts from PurchasePayment (now includes new payments)
         const remainingUnpaidPurchases = await this.getUnpaidPurchasesForSupplier(
           transactionCtx,
           input.supplierId
         );
+        const paidAmountByPurchaseIdAfter = await this.getPaidAmountByPurchaseId(
+          transactionCtx,
+          input.supplierId
+        );
         const remainingItems: PaymentAllocationItem[] = remainingUnpaidPurchases.map(purchase => {
-          let paidAmount = 0;
-          if (purchase.paymentStatus === 'paid') {
-            paidAmount = purchase.totalCost;
-          } else if (purchase.paymentStatus === 'partial') {
-            paidAmount = Math.floor(purchase.totalCost * 0.5);
-          }
+          const paidAmount = paidAmountByPurchaseIdAfter.get(purchase.id) ?? 0;
           return {
             id: purchase.id,
             code: purchase.referenceNumber || purchase.id,
             totalAmount: purchase.totalCost,
-            paidAmount: paidAmount,
+            paidAmount,
             createdAt: purchase.createdAt,
           };
         });
@@ -220,7 +242,7 @@ export class SupplierPaymentAllocationService {
         const excessPayment = calculation.excessPayment;
         const totalAllocated = calculation.totalAllocated;
 
-        // 9. Log audit event
+        // 9. Log audit
         if (this.auditService) {
           await this.auditService.log(transactionCtx, 'supplier.payment.allocated', {
             entityType: 'Customer',
@@ -257,6 +279,48 @@ export class SupplierPaymentAllocationService {
         );
         throw error;
       }
+    });
+  }
+
+  /**
+   * Pay a single purchase (convenience for UI). Reuses allocatePaymentToPurchases with one purchase.
+   */
+  async paySinglePurchase(
+    ctx: RequestContext,
+    purchaseId: string,
+    paymentAmount?: number,
+    debitAccountCode?: string
+  ): Promise<SupplierPaymentAllocationResult> {
+    const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
+    const purchase = await purchaseRepo.findOne({
+      where: { id: purchaseId, channelId: ctx.channelId as number },
+    });
+    if (!purchase) {
+      throw new UserInputError(`Purchase ${purchaseId} not found.`);
+    }
+    if (!purchase.isCreditPurchase) {
+      throw new UserInputError(`Purchase ${purchaseId} is not a credit purchase.`);
+    }
+    const paidMap = await this.getPaidAmountByPurchaseId(ctx, String(purchase.supplierId));
+    const paidAmount = paidMap.get(purchase.id) ?? 0;
+    const outstanding = purchase.totalCost - paidAmount;
+    if (outstanding <= 0) {
+      throw new UserInputError(`Purchase ${purchaseId} has no outstanding balance.`);
+    }
+    const amount = paymentAmount ?? outstanding;
+    if (amount <= 0) {
+      throw new UserInputError('Payment amount must be greater than zero.');
+    }
+    if (amount > outstanding) {
+      throw new UserInputError(
+        `Payment amount (${amount}) cannot exceed outstanding (${outstanding}).`
+      );
+    }
+    return this.allocatePaymentToPurchases(ctx, {
+      supplierId: String(purchase.supplierId),
+      paymentAmount: amount,
+      purchaseIds: [purchaseId],
+      debitAccountCode: debitAccountCode?.trim() || undefined,
     });
   }
 }

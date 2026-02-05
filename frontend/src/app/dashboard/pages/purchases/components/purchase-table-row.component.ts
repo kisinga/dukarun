@@ -2,7 +2,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 
-export type PurchaseAction = 'view' | 'edit' | 'delete';
+export type PurchaseAction = 'view' | 'pay' | 'edit' | 'delete';
 
 export interface PurchaseCardData {
   id: string;
@@ -58,6 +58,11 @@ export class PurchaseTableRowComponent {
     if (status === 'paid') return 'badge-success';
     if (status === 'partial') return 'badge-warning';
     return 'badge-error';
+  }
+
+  canPay(): boolean {
+    const p = this.purchase();
+    return p.isCreditPurchase && p.paymentStatus?.toLowerCase() !== 'paid';
   }
 
   onAction(actionType: PurchaseAction): void {

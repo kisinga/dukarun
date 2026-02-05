@@ -94,6 +94,7 @@ type Documents = {
   '\n  query GetUnpaidOrdersForCustomer($customerId: ID!) {\n    unpaidOrdersForCustomer(customerId: $customerId) {\n      id\n      code\n      state\n      total\n      totalWithTax\n      createdAt\n      payments {\n        id\n        state\n        amount\n        method\n      }\n    }\n  }\n': typeof types.GetUnpaidOrdersForCustomerDocument;
   '\n  mutation AllocateBulkPayment($input: PaymentAllocationInput!) {\n    allocateBulkPayment(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n': typeof types.AllocateBulkPaymentDocument;
   '\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n': typeof types.PaySingleOrderDocument;
+  '\n  mutation PaySinglePurchase($input: PaySinglePurchaseInput!) {\n    paySinglePurchase(input: $input) {\n      purchasesPaid {\n        purchaseId\n        purchaseReference\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n      excessPayment\n    }\n  }\n': typeof types.PaySinglePurchaseDocument;
   '\n  mutation SetOrderLineCustomPrice($input: SetOrderLineCustomPriceInput!) {\n    setOrderLineCustomPrice(input: $input) {\n      ... on OrderLine {\n        id\n        quantity\n        linePrice\n        linePriceWithTax\n        customFields {\n          customLinePrice\n          priceOverrideReason\n        }\n        productVariant {\n          id\n          name\n          price\n        }\n      }\n      ... on Error {\n        errorCode\n        message\n      }\n    }\n  }\n': typeof types.SetOrderLineCustomPriceDocument;
   '\n  query GetSuppliers($options: CustomerListOptions) {\n    customers(options: $options) {\n      totalItems\n      items {\n        id\n        firstName\n        lastName\n        emailAddress\n        phoneNumber\n        createdAt\n        updatedAt\n        customFields {\n          isSupplier\n          supplierType\n          contactPerson\n          taxId\n          paymentTerms\n          notes\n          isCreditApproved\n          creditLimit\n        }\n        addresses {\n          id\n          fullName\n          streetLine1\n          streetLine2\n          city\n          postalCode\n          country {\n            code\n            name\n          }\n          phoneNumber\n        }\n      }\n    }\n  }\n': typeof types.GetSuppliersDocument;
   '\n  query GetSupplier($id: ID!) {\n    customer(id: $id) {\n      id\n      firstName\n      lastName\n      emailAddress\n      phoneNumber\n      createdAt\n      updatedAt\n      customFields {\n        isSupplier\n        supplierType\n        contactPerson\n        taxId\n        paymentTerms\n        notes\n        isCreditApproved\n        creditLimit\n        lastRepaymentDate\n        lastRepaymentAmount\n        creditDuration\n      }\n      addresses {\n        id\n        fullName\n        streetLine1\n        streetLine2\n        city\n        postalCode\n        country {\n          code\n          name\n        }\n        phoneNumber\n      }\n    }\n  }\n': typeof types.GetSupplierDocument;
@@ -131,6 +132,7 @@ type Documents = {
   '\n  query GetStockAdjustments($options: StockAdjustmentListOptions) {\n    stockAdjustments(options: $options) {\n      items {\n        id\n        reason\n        notes\n        adjustedByUserId\n        lines {\n          id\n          variantId\n          quantityChange\n          previousStock\n          newStock\n          stockLocationId\n        }\n        createdAt\n        updatedAt\n      }\n      totalItems\n    }\n  }\n': typeof types.GetStockAdjustmentsDocument;
   '\n  query GetLedgerAccounts {\n    ledgerAccounts {\n      items {\n        id\n        code\n        name\n        type\n        isActive\n        balance\n        parentAccountId\n        isParent\n      }\n    }\n  }\n': typeof types.GetLedgerAccountsDocument;
   '\n  query GetEligibleDebitAccounts {\n    eligibleDebitAccounts {\n      items {\n        id\n        code\n        name\n        type\n        isActive\n        balance\n        parentAccountId\n        isParent\n      }\n    }\n  }\n': typeof types.GetEligibleDebitAccountsDocument;
+  '\n  mutation RecordExpense($input: RecordExpenseInput!) {\n    recordExpense(input: $input) {\n      sourceId\n    }\n  }\n': typeof types.RecordExpenseDocument;
   '\n  query GetJournalEntries($options: JournalEntriesOptions) {\n    journalEntries(options: $options) {\n      items {\n        id\n        entryDate\n        postedAt\n        sourceType\n        sourceId\n        memo\n        lines {\n          id\n          accountCode\n          accountName\n          debit\n          credit\n          meta\n        }\n      }\n      totalItems\n    }\n  }\n': typeof types.GetJournalEntriesDocument;
   '\n  query GetJournalEntry($id: ID!) {\n    journalEntry(id: $id) {\n      id\n      entryDate\n      postedAt\n      sourceType\n      sourceId\n      memo\n      lines {\n        id\n        accountCode\n        accountName\n        debit\n        credit\n        meta\n      }\n    }\n  }\n': typeof types.GetJournalEntryDocument;
   '\n  query GetChannelReconciliationConfig($channelId: Int!) {\n    channelReconciliationConfig(channelId: $channelId) {\n      paymentMethodId\n      paymentMethodCode\n      reconciliationType\n      ledgerAccountCode\n      isCashierControlled\n      requiresReconciliation\n    }\n  }\n': typeof types.GetChannelReconciliationConfigDocument;
@@ -142,6 +144,9 @@ type Documents = {
   '\n  mutation CreateCashierSessionReconciliation($sessionId: ID!, $notes: String) {\n    createCashierSessionReconciliation(sessionId: $sessionId, notes: $notes) {\n      id\n      channelId\n      scope\n      scopeRefId\n      rangeStart\n      rangeEnd\n      status\n      expectedBalance\n      actualBalance\n      varianceAmount\n      notes\n      createdBy\n    }\n  }\n': typeof types.CreateCashierSessionReconciliationDocument;
   '\n  mutation CreateReconciliation($input: CreateReconciliationInput!) {\n    createReconciliation(input: $input) {\n      id\n      channelId\n      scope\n      scopeRefId\n      rangeStart\n      rangeEnd\n      status\n      expectedBalance\n      actualBalance\n      varianceAmount\n      notes\n      createdBy\n    }\n  }\n': typeof types.CreateReconciliationDocument;
   '\n  query GetReconciliations($channelId: Int!, $options: ReconciliationListOptions) {\n    reconciliations(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        scope\n        scopeRefId\n        rangeStart\n        rangeEnd\n        status\n        expectedBalance\n        actualBalance\n        varianceAmount\n        notes\n        createdBy\n      }\n      totalItems\n    }\n  }\n': typeof types.GetReconciliationsDocument;
+  '\n  query GetReconciliationDetails($reconciliationId: ID!) {\n    reconciliationDetails(reconciliationId: $reconciliationId) {\n      accountId\n      accountCode\n      accountName\n      declaredAmountCents\n      expectedBalanceCents\n      varianceCents\n    }\n  }\n': typeof types.GetReconciliationDetailsDocument;
+  '\n  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String) {\n    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind) {\n      accountId\n      accountCode\n      accountName\n      declaredAmountCents\n      expectedBalanceCents\n      varianceCents\n    }\n  }\n': typeof types.GetSessionReconciliationDetailsDocument;
+  '\n  query GetAccountBalancesAsOf($channelId: Int!, $asOfDate: String!) {\n    accountBalancesAsOf(channelId: $channelId, asOfDate: $asOfDate) {\n      accountId\n      accountCode\n      accountName\n      balanceCents\n    }\n  }\n': typeof types.GetAccountBalancesAsOfDocument;
   '\n  query GetSessionCashCounts($sessionId: ID!) {\n    sessionCashCounts(sessionId: $sessionId) {\n      id\n      channelId\n      sessionId\n      countType\n      takenAt\n      declaredCash\n      expectedCash\n      variance\n      varianceReason\n      reviewedByUserId\n      reviewedAt\n      reviewNotes\n      countedByUserId\n    }\n  }\n': typeof types.GetSessionCashCountsDocument;
   '\n  query GetPendingVarianceReviews($channelId: Int!) {\n    pendingVarianceReviews(channelId: $channelId) {\n      id\n      channelId\n      sessionId\n      countType\n      takenAt\n      declaredCash\n      expectedCash\n      variance\n      varianceReason\n      reviewedByUserId\n      reviewedAt\n      countedByUserId\n    }\n  }\n': typeof types.GetPendingVarianceReviewsDocument;
   '\n  query GetSessionMpesaVerifications($sessionId: ID!) {\n    sessionMpesaVerifications(sessionId: $sessionId) {\n      id\n      channelId\n      sessionId\n      verifiedAt\n      transactionCount\n      allConfirmed\n      flaggedTransactionIds\n      notes\n      verifiedByUserId\n    }\n  }\n': typeof types.GetSessionMpesaVerificationsDocument;
@@ -311,6 +316,8 @@ const documents: Documents = {
     types.AllocateBulkPaymentDocument,
   '\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n':
     types.PaySingleOrderDocument,
+  '\n  mutation PaySinglePurchase($input: PaySinglePurchaseInput!) {\n    paySinglePurchase(input: $input) {\n      purchasesPaid {\n        purchaseId\n        purchaseReference\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n      excessPayment\n    }\n  }\n':
+    types.PaySinglePurchaseDocument,
   '\n  mutation SetOrderLineCustomPrice($input: SetOrderLineCustomPriceInput!) {\n    setOrderLineCustomPrice(input: $input) {\n      ... on OrderLine {\n        id\n        quantity\n        linePrice\n        linePriceWithTax\n        customFields {\n          customLinePrice\n          priceOverrideReason\n        }\n        productVariant {\n          id\n          name\n          price\n        }\n      }\n      ... on Error {\n        errorCode\n        message\n      }\n    }\n  }\n':
     types.SetOrderLineCustomPriceDocument,
   '\n  query GetSuppliers($options: CustomerListOptions) {\n    customers(options: $options) {\n      totalItems\n      items {\n        id\n        firstName\n        lastName\n        emailAddress\n        phoneNumber\n        createdAt\n        updatedAt\n        customFields {\n          isSupplier\n          supplierType\n          contactPerson\n          taxId\n          paymentTerms\n          notes\n          isCreditApproved\n          creditLimit\n        }\n        addresses {\n          id\n          fullName\n          streetLine1\n          streetLine2\n          city\n          postalCode\n          country {\n            code\n            name\n          }\n          phoneNumber\n        }\n      }\n    }\n  }\n':
@@ -382,6 +389,8 @@ const documents: Documents = {
     types.GetLedgerAccountsDocument,
   '\n  query GetEligibleDebitAccounts {\n    eligibleDebitAccounts {\n      items {\n        id\n        code\n        name\n        type\n        isActive\n        balance\n        parentAccountId\n        isParent\n      }\n    }\n  }\n':
     types.GetEligibleDebitAccountsDocument,
+  '\n  mutation RecordExpense($input: RecordExpenseInput!) {\n    recordExpense(input: $input) {\n      sourceId\n    }\n  }\n':
+    types.RecordExpenseDocument,
   '\n  query GetJournalEntries($options: JournalEntriesOptions) {\n    journalEntries(options: $options) {\n      items {\n        id\n        entryDate\n        postedAt\n        sourceType\n        sourceId\n        memo\n        lines {\n          id\n          accountCode\n          accountName\n          debit\n          credit\n          meta\n        }\n      }\n      totalItems\n    }\n  }\n':
     types.GetJournalEntriesDocument,
   '\n  query GetJournalEntry($id: ID!) {\n    journalEntry(id: $id) {\n      id\n      entryDate\n      postedAt\n      sourceType\n      sourceId\n      memo\n      lines {\n        id\n        accountCode\n        accountName\n        debit\n        credit\n        meta\n      }\n    }\n  }\n':
@@ -404,6 +413,12 @@ const documents: Documents = {
     types.CreateReconciliationDocument,
   '\n  query GetReconciliations($channelId: Int!, $options: ReconciliationListOptions) {\n    reconciliations(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        scope\n        scopeRefId\n        rangeStart\n        rangeEnd\n        status\n        expectedBalance\n        actualBalance\n        varianceAmount\n        notes\n        createdBy\n      }\n      totalItems\n    }\n  }\n':
     types.GetReconciliationsDocument,
+  '\n  query GetReconciliationDetails($reconciliationId: ID!) {\n    reconciliationDetails(reconciliationId: $reconciliationId) {\n      accountId\n      accountCode\n      accountName\n      declaredAmountCents\n      expectedBalanceCents\n      varianceCents\n    }\n  }\n':
+    types.GetReconciliationDetailsDocument,
+  '\n  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String) {\n    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind) {\n      accountId\n      accountCode\n      accountName\n      declaredAmountCents\n      expectedBalanceCents\n      varianceCents\n    }\n  }\n':
+    types.GetSessionReconciliationDetailsDocument,
+  '\n  query GetAccountBalancesAsOf($channelId: Int!, $asOfDate: String!) {\n    accountBalancesAsOf(channelId: $channelId, asOfDate: $asOfDate) {\n      accountId\n      accountCode\n      accountName\n      balanceCents\n    }\n  }\n':
+    types.GetAccountBalancesAsOfDocument,
   '\n  query GetSessionCashCounts($sessionId: ID!) {\n    sessionCashCounts(sessionId: $sessionId) {\n      id\n      channelId\n      sessionId\n      countType\n      takenAt\n      declaredCash\n      expectedCash\n      variance\n      varianceReason\n      reviewedByUserId\n      reviewedAt\n      reviewNotes\n      countedByUserId\n    }\n  }\n':
     types.GetSessionCashCountsDocument,
   '\n  query GetPendingVarianceReviews($channelId: Int!) {\n    pendingVarianceReviews(channelId: $channelId) {\n      id\n      channelId\n      sessionId\n      countType\n      takenAt\n      declaredCash\n      expectedCash\n      variance\n      varianceReason\n      reviewedByUserId\n      reviewedAt\n      countedByUserId\n    }\n  }\n':
@@ -920,6 +935,12 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
+  source: '\n  mutation PaySinglePurchase($input: PaySinglePurchaseInput!) {\n    paySinglePurchase(input: $input) {\n      purchasesPaid {\n        purchaseId\n        purchaseReference\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n      excessPayment\n    }\n  }\n',
+): (typeof documents)['\n  mutation PaySinglePurchase($input: PaySinglePurchaseInput!) {\n    paySinglePurchase(input: $input) {\n      purchasesPaid {\n        purchaseId\n        purchaseReference\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n      excessPayment\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
   source: '\n  mutation SetOrderLineCustomPrice($input: SetOrderLineCustomPriceInput!) {\n    setOrderLineCustomPrice(input: $input) {\n      ... on OrderLine {\n        id\n        quantity\n        linePrice\n        linePriceWithTax\n        customFields {\n          customLinePrice\n          priceOverrideReason\n        }\n        productVariant {\n          id\n          name\n          price\n        }\n      }\n      ... on Error {\n        errorCode\n        message\n      }\n    }\n  }\n',
 ): (typeof documents)['\n  mutation SetOrderLineCustomPrice($input: SetOrderLineCustomPriceInput!) {\n    setOrderLineCustomPrice(input: $input) {\n      ... on OrderLine {\n        id\n        quantity\n        linePrice\n        linePriceWithTax\n        customFields {\n          customLinePrice\n          priceOverrideReason\n        }\n        productVariant {\n          id\n          name\n          price\n        }\n      }\n      ... on Error {\n        errorCode\n        message\n      }\n    }\n  }\n'];
 /**
@@ -1142,6 +1163,12 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
+  source: '\n  mutation RecordExpense($input: RecordExpenseInput!) {\n    recordExpense(input: $input) {\n      sourceId\n    }\n  }\n',
+): (typeof documents)['\n  mutation RecordExpense($input: RecordExpenseInput!) {\n    recordExpense(input: $input) {\n      sourceId\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
   source: '\n  query GetJournalEntries($options: JournalEntriesOptions) {\n    journalEntries(options: $options) {\n      items {\n        id\n        entryDate\n        postedAt\n        sourceType\n        sourceId\n        memo\n        lines {\n          id\n          accountCode\n          accountName\n          debit\n          credit\n          meta\n        }\n      }\n      totalItems\n    }\n  }\n',
 ): (typeof documents)['\n  query GetJournalEntries($options: JournalEntriesOptions) {\n    journalEntries(options: $options) {\n      items {\n        id\n        entryDate\n        postedAt\n        sourceType\n        sourceId\n        memo\n        lines {\n          id\n          accountCode\n          accountName\n          debit\n          credit\n          meta\n        }\n      }\n      totalItems\n    }\n  }\n'];
 /**
@@ -1204,6 +1231,24 @@ export function graphql(
 export function graphql(
   source: '\n  query GetReconciliations($channelId: Int!, $options: ReconciliationListOptions) {\n    reconciliations(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        scope\n        scopeRefId\n        rangeStart\n        rangeEnd\n        status\n        expectedBalance\n        actualBalance\n        varianceAmount\n        notes\n        createdBy\n      }\n      totalItems\n    }\n  }\n',
 ): (typeof documents)['\n  query GetReconciliations($channelId: Int!, $options: ReconciliationListOptions) {\n    reconciliations(channelId: $channelId, options: $options) {\n      items {\n        id\n        channelId\n        scope\n        scopeRefId\n        rangeStart\n        rangeEnd\n        status\n        expectedBalance\n        actualBalance\n        varianceAmount\n        notes\n        createdBy\n      }\n      totalItems\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  query GetReconciliationDetails($reconciliationId: ID!) {\n    reconciliationDetails(reconciliationId: $reconciliationId) {\n      accountId\n      accountCode\n      accountName\n      declaredAmountCents\n      expectedBalanceCents\n      varianceCents\n    }\n  }\n',
+): (typeof documents)['\n  query GetReconciliationDetails($reconciliationId: ID!) {\n    reconciliationDetails(reconciliationId: $reconciliationId) {\n      accountId\n      accountCode\n      accountName\n      declaredAmountCents\n      expectedBalanceCents\n      varianceCents\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String) {\n    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind) {\n      accountId\n      accountCode\n      accountName\n      declaredAmountCents\n      expectedBalanceCents\n      varianceCents\n    }\n  }\n',
+): (typeof documents)['\n  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String) {\n    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind) {\n      accountId\n      accountCode\n      accountName\n      declaredAmountCents\n      expectedBalanceCents\n      varianceCents\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  query GetAccountBalancesAsOf($channelId: Int!, $asOfDate: String!) {\n    accountBalancesAsOf(channelId: $channelId, asOfDate: $asOfDate) {\n      accountId\n      accountCode\n      accountName\n      balanceCents\n    }\n  }\n',
+): (typeof documents)['\n  query GetAccountBalancesAsOf($channelId: Int!, $asOfDate: String!) {\n    accountBalancesAsOf(channelId: $channelId, asOfDate: $asOfDate) {\n      accountId\n      accountCode\n      accountName\n      balanceCents\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

@@ -51,6 +51,7 @@ export class LedgerViewerResolver {
           balance: balance.balance, // In smallest currency unit (cents)
           parentAccountId: account.parentAccountId || null,
           isParent: account.isParent,
+          isSystemAccount: account.isSystemAccount ?? false,
         };
       })
     );
@@ -92,6 +93,7 @@ export class LedgerViewerResolver {
           balance: balance.balance,
           parentAccountId: account.parentAccountId || null,
           isParent: account.isParent,
+          isSystemAccount: account.isSystemAccount ?? false,
         };
       })
     );

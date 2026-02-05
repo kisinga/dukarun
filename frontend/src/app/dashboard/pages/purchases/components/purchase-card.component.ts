@@ -38,6 +38,11 @@ export class PurchaseCardComponent {
     return 'badge-error';
   }
 
+  canPay(): boolean {
+    const p = this.purchase();
+    return p.isCreditPurchase && p.paymentStatus?.toLowerCase() !== 'paid';
+  }
+
   onAction(actionType: PurchaseAction): void {
     this.action.emit({ action: actionType, purchaseId: this.purchase().id });
   }

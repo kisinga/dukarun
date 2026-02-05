@@ -9,6 +9,14 @@ import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
 import { CreditService } from '../credit/credit.service';
 
 /**
+ * Payment amount contract (single source of truth):
+ * - If metadata.allocatedAmount is present and valid (number, > 0, <= order.total), use it (enables partial payments).
+ * - Otherwise use order.total.
+ * - We do NOT use the amount parameter passed by Vendure to createPayment; callers must set metadata.allocatedAmount when they want a specific amount.
+ * - Validation of allocatedAmount vs outstanding is done by the caller (e.g. paySingleOrder, allocation loop) before calling addManualPaymentToOrder.
+ */
+
+/**
  * Cash Payment Handler
  *
  * Immediately settles payment as cash transactions are instant.
@@ -24,9 +32,16 @@ export const cashPaymentHandler = new PaymentMethodHandler({
   ],
   args: {},
 
-  createPayment: async (ctx, order, amount, args, metadata): Promise<CreatePaymentResult> => {
+  createPayment: async (ctx, order, _amount, args, metadata): Promise<CreatePaymentResult> => {
+    const orderTotal = order.total ?? 0;
+    const amount =
+      typeof metadata?.allocatedAmount === 'number' &&
+      metadata.allocatedAmount > 0 &&
+      metadata.allocatedAmount <= orderTotal
+        ? metadata.allocatedAmount
+        : orderTotal;
     const result = {
-      amount: order.total,
+      amount,
       state: 'Settled' as const,
       transactionId: `CASH-${Date.now()}`,
       metadata: {
@@ -69,11 +84,18 @@ export const mpesaPaymentHandler = new PaymentMethodHandler({
   ],
   args: {},
 
-  createPayment: async (ctx, order, amount, args, metadata): Promise<CreatePaymentResult> => {
+  createPayment: async (ctx, order, _amount, args, metadata): Promise<CreatePaymentResult> => {
+    const orderTotal = order.total ?? 0;
+    const amount =
+      typeof metadata?.allocatedAmount === 'number' &&
+      metadata.allocatedAmount > 0 &&
+      metadata.allocatedAmount <= orderTotal
+        ? metadata.allocatedAmount
+        : orderTotal;
     // TODO: Future - Trigger STK Push, await callback
     // For now, mark as settled immediately
     const result = {
-      amount: order.total,
+      amount,
       state: 'Settled' as const,
       transactionId: `MPESA-${Date.now()}`,
       metadata: {
@@ -113,7 +135,7 @@ export function createCreditPaymentHandler(creditService: CreditService): Paymen
       },
     ],
     args: {},
-    createPayment: async (ctx, order): Promise<CreatePaymentResult> => {
+    createPayment: async (ctx, order, _amount, args, metadata): Promise<CreatePaymentResult> => {
       const customerId = order.customer?.id;
 
       if (!customerId) {
@@ -127,13 +149,21 @@ export function createCreditPaymentHandler(creditService: CreditService): Paymen
         throw new UserInputError('Customer is not approved for credit purchases.');
       }
 
-      if (summary.availableCredit < order.total) {
-        // Both availableCredit and order.total are in cents
+      const orderTotal = order.total ?? 0;
+      const amount =
+        typeof metadata?.allocatedAmount === 'number' &&
+        metadata.allocatedAmount > 0 &&
+        metadata.allocatedAmount <= orderTotal
+          ? metadata.allocatedAmount
+          : orderTotal;
+
+      if (summary.availableCredit < amount) {
+        // Both availableCredit and amount are in cents
         throw new UserInputError('Customer credit limit exceeded.');
       }
 
       const result: CreatePaymentResult = {
-        amount: order.total,
+        amount,
         state: 'Authorized' as const,
         transactionId: `CREDIT-${Date.now()}`,
         metadata: {
@@ -142,6 +172,7 @@ export function createCreditPaymentHandler(creditService: CreditService): Paymen
           creditLimit: summary.creditLimit,
           outstandingAmount: summary.outstandingAmount,
           userId: ctx.activeUserId?.toString(),
+          ...(metadata || {}),
         },
       };
 

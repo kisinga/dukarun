@@ -157,9 +157,14 @@ export class OpenSessionService {
       status: 'open',
     });
     const savedSession = await sessionRepo.save(session);
+    if (!OpenSessionService.isValidSessionId(savedSession.id)) {
+      this.logger.error(
+        `startSession: saved session has invalid id (channelId=${input.channelId}, id=${savedSession.id}); this should never happen with uuid column`
+      );
+      throw new Error('Session was created with an invalid id; please contact support.');
+    }
 
     const today = savedSession.openedAt.toISOString().slice(0, 10);
-    const accountIds = await this.getCashierControlledAccountIds(ctx, input.channelId);
     const byCode = await this.getAccountIdsByCode(ctx, input.channelId, [...requiredCodes]);
     const accountDeclaredAmounts: Record<string, string> = {};
     let totalDeclared = 0;
@@ -170,6 +175,7 @@ export class OpenSessionService {
         totalDeclared += amountCents;
       }
     }
+    const accountIds = Object.keys(accountDeclaredAmounts);
 
     const openingRecon = await this.reconciliationService.createReconciliation(ctx, {
       channelId: input.channelId,
@@ -365,18 +371,36 @@ export class OpenSessionService {
     };
   }
 
+  /** UUID v4 format; ensures we never return or use placeholder/invalid ids (e.g. -1). */
+  private static readonly UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  private static isValidSessionId(id: unknown): id is string {
+    return typeof id === 'string' && OpenSessionService.UUID_REGEX.test(id.trim());
+  }
+
   /**
-   * Get current open session for a channel (if any)
+   * Get current open session for a channel (if any).
+   * Never returns a session with a non-UUID id (e.g. -1); such rows would be data corruption.
    */
   async getCurrentSession(ctx: RequestContext, channelId: number): Promise<CashierSession | null> {
     const sessionRepo = this.connection.getRepository(ctx, CashierSession);
 
-    return sessionRepo.findOne({
+    const session = await sessionRepo.findOne({
       where: {
         channelId,
         status: 'open',
       },
     });
+
+    if (!session) return null;
+    if (!OpenSessionService.isValidSessionId(session.id)) {
+      this.logger.warn(
+        `getCurrentSession: ignoring session with invalid id (channelId=${channelId}, id=${session.id}); possible data corruption`
+      );
+      return null;
+    }
+    return session;
   }
 
   /**

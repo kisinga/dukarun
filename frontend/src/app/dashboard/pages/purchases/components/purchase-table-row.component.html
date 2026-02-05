@@ -55,6 +55,15 @@
         />
       </svg>
     </button>
+    @if (canPay()) {
+      <button
+        (click)="onAction('pay'); $event.preventDefault(); $event.stopPropagation()"
+        class="btn btn-success btn-xs"
+        title="Pay"
+      >
+        Pay
+      </button>
+    }
     <button (click)="onAction('edit')" class="btn btn-ghost btn-xs" title="Edit">
       <svg
         xmlns="http://www.w3.org/2000/svg"

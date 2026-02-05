@@ -9,6 +9,7 @@ import {
   effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import {
@@ -18,6 +19,7 @@ import {
 import { CompanyService } from '../../../core/services/company.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { DashboardService, PeriodStats } from '../../../core/services/dashboard.service';
+import { RecordExpenseModalComponent } from '../shifts/record-expense-modal.component';
 
 interface CategoryStat {
   period: string;
@@ -61,7 +63,7 @@ interface RecentActivity {
  */
 @Component({
   selector: 'app-overview',
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, RecordExpenseModalComponent],
   templateUrl: './overview.component.html',
   styleUrl: './overview.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -72,6 +74,8 @@ export class OverviewComponent implements OnInit, OnDestroy {
   private readonly currencyService = inject(CurrencyService);
   private readonly router = inject(Router);
   protected readonly cashierSessionService = inject(CashierSessionService);
+
+  private readonly recordExpenseModal = viewChild(RecordExpenseModalComponent);
 
   protected readonly expandedCategory = signal<string | null>(null);
   protected readonly showRecentActivity = signal(false);
@@ -351,6 +355,16 @@ export class OverviewComponent implements OnInit, OnDestroy {
     this.dayModalBalances.set({});
     this.cashierSessionService.error.set(null);
   }
+
+  openRecordExpense(): void {
+    this.recordExpenseModal()?.show();
+  }
+
+  onExpenseRecorded(): void {
+    this.refresh();
+  }
+
+  onExpenseCancelled(): void {}
 
   setDayModalBalance(accountCode: string, value: string | number): void {
     const str = value != null && value !== '' ? String(value) : '';

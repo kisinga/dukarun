@@ -81,14 +81,7 @@
     <!-- Overview Tab -->
     @if (activeTab() === 'overview') {
       <app-overview-tab
-        [keyAccounts]="keyAccounts()"
-        [recentEntries]="recentEntries()"
-        [isLoading]="isLoading()"
-        [selectedAccount]="selectedAccount()"
-        [formatCurrency]="formatCurrency"
-        [formatDate]="formatDate"
-        [getEntryTotalDebit]="getEntryTotalDebit"
-        [getEntryTotalCredit]="getEntryTotalCredit"
+        [context]="accountingContext()"
         (accountSelect)="selectAccount($event)"
         (entryView)="viewTransaction($event)"
       />
@@ -97,12 +90,7 @@
     <!-- Accounts Tab -->
     @if (activeTab() === 'accounts') {
       <app-accounts-tab
-        [hierarchicalAccounts]="hierarchicalAccounts()"
-        [selectedAccount]="selectedAccount()"
-        [formatCurrency]="formatCurrency"
-        [getAccountTypeLabel]="getAccountTypeLabel"
-        [getAccountTypeTotal]="getAccountTypeTotal"
-        [isLoading]="isLoading()"
+        [context]="accountingContext()"
         (accountSelect)="selectAccount($event)"
         (viewTransactions)="goToTransactionsTab($event)"
       />

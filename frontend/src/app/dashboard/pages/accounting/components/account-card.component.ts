@@ -5,7 +5,7 @@ import { AccountNode } from './accounts-tab.component';
 
 @Component({
   selector: 'app-account-card',
-  imports: [CommonModule, AccountCardComponent],
+  imports: [CommonModule],
   templateUrl: './account-card.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

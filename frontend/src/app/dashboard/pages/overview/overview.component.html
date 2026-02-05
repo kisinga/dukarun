@@ -2,21 +2,38 @@
   <!-- Header -->
   <div class="flex items-start justify-between gap-3">
     <div class="flex-1 min-w-0">
-      <div class="flex items-center gap-2 mb-1.5">
+      <div class="flex flex-wrap items-center gap-2 mb-1.5">
         <h1 class="text-2xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Dashboard</h1>
 
         @if (sessionOpen()) {
-          <span class="badge badge-success badge-soft badge-xs gap-1 font-medium shrink-0">
+          <span class="badge badge-success badge-soft badge-sm gap-1 font-semibold shrink-0">
             <span class="w-1.5 h-1.5 bg-success rounded-full animate-pulse"></span>
             Open
           </span>
-          <button type="button" class="btn btn-ghost btn-xs" (click)="openCloseDayModal()">
-            Close shift
-          </button>
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm font-semibold"
+              (click)="openCloseDayModal()"
+            >
+              Close shift
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm btn-outline font-semibold"
+              (click)="openRecordExpense()"
+            >
+              Record expense
+            </button>
+          </div>
         }
         @if (!sessionOpen()) {
-          <span class="badge badge-ghost badge-xs shrink-0">Closed</span>
-          <button type="button" class="btn btn-primary btn-xs" (click)="openOpenDayModal()">
+          <span class="badge badge-ghost badge-sm shrink-0">Closed</span>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm font-semibold"
+            (click)="openOpenDayModal()"
+          >
             Open shift
           </button>
         }
@@ -525,4 +542,9 @@
       </form>
     </dialog>
   }
+
+  <app-record-expense-modal
+    (recorded)="onExpenseRecorded()"
+    (cancelled)="onExpenseCancelled()"
+  ></app-record-expense-modal>
 </div>

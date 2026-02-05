@@ -211,6 +211,13 @@ const COMBINED_SCHEMA = gql`
     supplierId: ID!
     paymentAmount: Float!
     purchaseIds: [ID!]
+    debitAccountCode: String
+  }
+
+  input PaySinglePurchaseInput {
+    purchaseId: ID!
+    paymentAmount: Float
+    debitAccountCode: String
   }
 
   extend type Query {
@@ -225,6 +232,7 @@ const COMBINED_SCHEMA = gql`
     allocateBulkSupplierPayment(
       input: SupplierPaymentAllocationInput!
     ): SupplierPaymentAllocationResult!
+    paySinglePurchase(input: PaySinglePurchaseInput!): SupplierPaymentAllocationResult!
   }
 `;
 

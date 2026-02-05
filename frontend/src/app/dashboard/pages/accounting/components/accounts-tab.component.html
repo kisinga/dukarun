@@ -1,5 +1,5 @@
 <div class="space-y-4">
-  @if (isLoading()) {
+  @if (context().isLoading) {
     <div class="card bg-base-100 shadow">
       <div class="card-body">
         <div class="flex flex-col items-center justify-center py-16">
@@ -39,31 +39,33 @@
     </div>
   } @else {
     @for (type of accountTypes; track type) {
-      @if (hierarchicalAccounts()[type] && hierarchicalAccounts()[type].length > 0) {
-        <!-- Account Type Section -->
-        <div class="collapse collapse-arrow bg-base-100 shadow">
+      @if (
+        context().hierarchicalAccounts[type] && context().hierarchicalAccounts[type].length > 0
+      ) {
+        <!-- Account Type Section (collapse-open keeps list visible by default) -->
+        <div class="collapse collapse-arrow collapse-open bg-base-100 shadow">
           <input type="checkbox" checked />
           <div class="collapse-title text-xl font-medium">
-            {{ getAccountTypeLabel()(type) }}
+            {{ context().getAccountTypeLabel(type) }}
             <span class="badge badge-outline ml-2">
-              {{ hierarchicalAccounts()[type].length }} accounts
+              {{ context().hierarchicalAccounts[type].length }} accounts
             </span>
             <span
               class="badge ml-2"
-              [class.badge-success]="getAccountTypeTotal()(type) >= 0"
-              [class.badge-error]="getAccountTypeTotal()(type) < 0"
+              [class.badge-success]="context().getAccountTypeTotal(type) >= 0"
+              [class.badge-error]="context().getAccountTypeTotal(type) < 0"
             >
-              {{ formatCurrency()(getAccountTypeTotal()(type)) }}
+              {{ context().formatCurrency(context().getAccountTypeTotal(type)) }}
             </span>
           </div>
           <div class="collapse-content">
             <!-- Mobile: Card View -->
             <div class="lg:hidden space-y-3">
-              @for (account of hierarchicalAccounts()[type]; track account.id) {
+              @for (account of context().hierarchicalAccounts[type]; track account.id) {
                 <app-account-card
                   [account]="account"
-                  [selectedAccount]="selectedAccount()"
-                  [formatCurrency]="formatCurrency()"
+                  [selectedAccount]="context().selectedAccount"
+                  [formatCurrency]="context().formatCurrency"
                   [getDisplayBalance]="getDisplayBalance"
                   [level]="0"
                   (accountSelect)="onAccountClick($event)"
@@ -84,11 +86,11 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @for (account of hierarchicalAccounts()[type]; track account.id) {
+                  @for (account of context().hierarchicalAccounts[type]; track account.id) {
                     <app-account-row
                       [account]="account"
-                      [selectedAccount]="selectedAccount()"
-                      [formatCurrency]="formatCurrency()"
+                      [selectedAccount]="context().selectedAccount"
+                      [formatCurrency]="context().formatCurrency"
                       [getDisplayBalance]="getDisplayBalance"
                       [level]="0"
                       (accountSelect)="onAccountClick($event)"

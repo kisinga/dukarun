@@ -263,3 +263,12 @@
     (closed)="onPurchaseDetailClosed()"
   />
 }
+
+<!-- Pay Purchase Modal -->
+@if (selectedPurchaseForPayment()) {
+  <app-pay-purchase-modal
+    [purchaseData]="selectedPurchaseForPayment()"
+    (paymentRecorded)="onPayPurchaseRecorded()"
+    (cancelled)="onPayPurchaseCancelled()"
+  />
+}

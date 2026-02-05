@@ -9,7 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { forkJoin, startWith } from 'rxjs';
 import {
   CashierSessionService,
   type Reconciliation,
@@ -20,6 +20,7 @@ import {
   LedgerAccount,
   LedgerService,
 } from '../../../core/services/ledger/ledger.service';
+import type { AccountingContext } from './accounting-context';
 import {
   AccountingFilters,
   AccountingFiltersComponent,
@@ -243,7 +244,7 @@ export class AccountingComponent implements OnInit {
     return entries;
   });
 
-  // Summary statistics (depend on filteredEntries)
+  // Header stats: totals from filtered journal entries (date/search/account filters). Not per-account balances.
   readonly totalDebits = computed(() => {
     return this.filteredEntries().reduce((sum, entry) => {
       return sum + entry.lines.reduce((lineSum, line) => lineSum + line.debit, 0);
@@ -317,6 +318,25 @@ export class AccountingComponent implements OnInit {
     showQuickFilters: this.activeTab() === 'overview',
   }));
 
+  /** Single context object for tabs; reduces duplicate inputs. */
+  readonly accountingContext = computed<AccountingContext>(() => ({
+    accounts: this.accounts(),
+    hierarchicalAccounts: this.hierarchicalAccounts(),
+    formatCurrency: this.formatCurrency.bind(this),
+    formatDate: this.formatDate.bind(this),
+    getAccountTypeLabel: this.getAccountTypeLabel.bind(this),
+    getAccountTypeTotal: this.getAccountTypeTotal.bind(this),
+    getEntryTotalDebit: this.getEntryTotalDebit.bind(this),
+    getEntryTotalCredit: this.getEntryTotalCredit.bind(this),
+    isLoading: this.isLoading(),
+    error: this.error(),
+    selectedAccount: this.selectedAccount(),
+    keyAccounts: this.keyAccounts(),
+    recentEntries: this.recentEntries(),
+    stats: this.stats(),
+    filters: this.filters(),
+  }));
+
   ngOnInit() {
     this.loadData();
     const syncTab = (params: Record<string, string>) => {
@@ -330,8 +350,10 @@ export class AccountingComponent implements OnInit {
         this.loadReconciliations();
       }
     };
-    syncTab(this.route.snapshot.queryParams);
-    this.route.queryParams.subscribe(syncTab);
+    syncTab(this.route.snapshot.queryParams as Record<string, string>);
+    this.route.queryParams
+      .pipe(startWith(this.route.snapshot.queryParams as Record<string, string>))
+      .subscribe(syncTab);
   }
 
   goToTransactionsTab(account: LedgerAccount) {

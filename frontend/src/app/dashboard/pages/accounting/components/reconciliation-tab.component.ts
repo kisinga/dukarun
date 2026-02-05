@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
   output,
@@ -38,13 +39,19 @@ export class ReconciliationTabComponent {
   pageChange = output<number>();
   reconciliationCreated = output<void>();
 
-  /** Per-account declared amount (cents) for manual reconciliation form */
+  /** Per-account declared amount (shillings) for manual reconciliation form; converted to cents on submit */
   manualDeclaredAmounts = signal<Record<string, number>>({});
-  manualRangeStart = signal<string>('');
-  manualRangeEnd = signal<string>('');
+  /** Reconciliation date (as-of). Non-editable, always current date at component init. */
+  reconciliationDate = signal<string>(ReconciliationTabComponent.getTodayIsoDate());
   manualNotes = signal<string>('');
   manualSubmitting = signal(false);
   manualError = signal<string | null>(null);
+
+  /** Current ledger balance (cents) per account as of manual range end date; loaded when range end is set */
+  manualBalancesAsOf = signal<
+    Array<{ accountId: string; accountCode: string; accountName: string; balanceCents: string }>
+  >([]);
+  manualBalancesLoading = signal(false);
 
   /** Expandable row: which reconciliation id is expanded (null = none). */
   expandedRowId = signal<string | null>(null);
@@ -69,6 +76,61 @@ export class ReconciliationTabComponent {
     const accounts = this.accounts();
     return accounts.filter((a) => !a.isParent && a.isActive);
   });
+
+  static getTodayIsoDate(): string {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  constructor() {
+    effect((onCleanup) => {
+      const asOfDate = this.reconciliationDate();
+      const channelId = this.channelId();
+      if (!asOfDate || !channelId || Number.isNaN(channelId)) {
+        this.manualBalancesAsOf.set([]);
+        return;
+      }
+      this.manualBalancesLoading.set(true);
+      const sub = this.cashierSessionService.getAccountBalancesAsOf(channelId, asOfDate).subscribe({
+        next: (list) => {
+          this.manualBalancesAsOf.set(list);
+          this.manualBalancesLoading.set(false);
+        },
+        error: () => this.manualBalancesLoading.set(false),
+      });
+      onCleanup(() => {
+        sub.unsubscribe();
+      });
+    });
+  }
+
+  /** Current balance in shillings for an account (from ledger as of range end date). */
+  getCurrentBalanceShillings(accountId: string): number {
+    const list = this.manualBalancesAsOf();
+    const item = list.find((b) => b.accountId === accountId);
+    if (!item) return 0;
+    const cents = parseInt(item.balanceCents, 10);
+    return Number.isNaN(cents) ? 0 : cents / 100;
+  }
+
+  /** Variance in shillings (declared - current). */
+  getVarianceShillings(accountId: string): number {
+    const declared = this.getManualDeclared(accountId);
+    const current = this.getCurrentBalanceShillings(accountId);
+    return declared - current;
+  }
+
+  /** Format shillings for display (e.g. 2000 -> "2,000.00"). */
+  formatShillings(shillings: number): string {
+    return new Intl.NumberFormat('en-KE', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(shillings);
+  }
+
+  /** Account type label for display (e.g. asset -> Asset). */
+  accountTypeLabel(type: string): string {
+    return type ? type.charAt(0).toUpperCase() + type.slice(1).toLowerCase() : '';
+  }
 
   hasVariance(r: Reconciliation): boolean {
     const v = parseInt(r.varianceAmount, 10);
@@ -108,23 +170,24 @@ export class ReconciliationTabComponent {
     return this.detailsCache()[r.id] ?? [];
   }
 
-  setManualDeclared(accountId: string, value: number) {
-    this.manualDeclaredAmounts.update((m) => ({ ...m, [accountId]: value }));
+  /** Set declared amount in shillings (user-facing). */
+  setManualDeclared(accountId: string, valueShillings: number) {
+    this.manualDeclaredAmounts.update((m) => ({ ...m, [accountId]: valueShillings }));
   }
 
+  /** Get declared amount in shillings (user-facing). */
   getManualDeclared(accountId: string): number {
     return this.manualDeclaredAmounts()[accountId] ?? 0;
   }
 
   submitManualReconciliation() {
     const channelId = this.channelId();
-    const rangeStart = this.manualRangeStart();
-    const rangeEnd = this.manualRangeEnd();
+    const asOfDate = this.reconciliationDate();
     const accounts = this.leafAccounts();
     const amounts = this.manualDeclaredAmounts();
 
-    if (!rangeStart || !rangeEnd) {
-      this.manualError.set('Please set date range');
+    if (!asOfDate) {
+      this.manualError.set('Reconciliation date is required.');
       return;
     }
     if (accounts.length === 0) {
@@ -136,13 +199,15 @@ export class ReconciliationTabComponent {
     const accountDeclaredAmounts: { accountId: string; amountCents: string }[] = [];
     let totalCents = 0;
     for (const acc of accounts) {
-      const cents = amounts[acc.id] ?? 0;
+      if (acc.isSystemAccount) continue;
+      const shillings = amounts[acc.id] ?? 0;
+      const cents = Math.round(Number(shillings) * 100);
       accountIds.push(acc.id);
       accountDeclaredAmounts.push({ accountId: acc.id, amountCents: String(cents) });
       totalCents += cents;
     }
 
-    const scopeRefId = `${rangeEnd}-manual-${Date.now()}`;
+    const scopeRefId = `${asOfDate}-manual-${Date.now()}`;
     this.manualSubmitting.set(true);
     this.manualError.set(null);
 
@@ -151,10 +216,10 @@ export class ReconciliationTabComponent {
         channelId,
         scope: 'manual',
         scopeRefId,
-        rangeStart,
-        rangeEnd,
+        rangeStart: asOfDate,
+        rangeEnd: asOfDate,
         actualBalance: String(totalCents),
-        notes: this.manualNotes() || `Manual reconciliation ${rangeStart}–${rangeEnd}`,
+        notes: this.manualNotes() || `Manual reconciliation as of ${asOfDate}`,
         accountIds,
         accountDeclaredAmounts,
       })

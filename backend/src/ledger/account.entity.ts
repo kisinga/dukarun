@@ -30,4 +30,8 @@ export class Account {
 
   @Column({ type: 'boolean', default: false })
   isParent!: boolean; // True if account can have children
+
+  /** System accounts (e.g. clearing, short/over) are not manually adjusted in reconciliation */
+  @Column({ type: 'boolean', default: false })
+  isSystemAccount!: boolean;
 }

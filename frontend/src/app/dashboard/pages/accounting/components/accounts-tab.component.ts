@@ -1,17 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { LedgerAccount } from '../../../../core/services/ledger/ledger.service';
+import type { AccountingContext } from '../accounting-context';
+import type { AccountNode, HierarchicalAccounts } from '../account-node.types';
 import { AccountCardComponent } from './account-card.component';
 import { AccountRowComponent } from './account-row.component';
 
-export interface AccountNode extends LedgerAccount {
-  children: AccountNode[];
-  calculatedBalance: number;
-}
-
-export interface HierarchicalAccounts {
-  [key: string]: AccountNode[];
-}
+export type { AccountNode, HierarchicalAccounts };
 
 @Component({
   selector: 'app-accounts-tab',
@@ -21,21 +16,16 @@ export interface HierarchicalAccounts {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AccountsTabComponent {
-  hierarchicalAccounts = input.required<HierarchicalAccounts>();
-  selectedAccount = input.required<LedgerAccount | null>();
-  formatCurrency = input.required<(amount: number) => string>();
-  getAccountTypeLabel = input.required<(type: string) => string>();
-  getAccountTypeTotal = input.required<(type: string) => number>();
-  isLoading = input<boolean>(false);
+  context = input.required<AccountingContext>();
 
   accountSelect = output<LedgerAccount>();
   viewTransactions = output<LedgerAccount>();
 
   readonly accountTypes = ['asset', 'liability', 'equity', 'income', 'expense'] as const;
 
-  // Check if there are any accounts at all
   hasAccounts(): boolean {
-    return this.accountTypes.some((type) => this.hierarchicalAccounts()[type]?.length > 0);
+    const h = this.context().hierarchicalAccounts;
+    return this.accountTypes.some((type) => h[type]?.length > 0);
   }
 
   onAccountClick(account: LedgerAccount) {

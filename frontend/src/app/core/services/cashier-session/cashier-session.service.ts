@@ -3,6 +3,7 @@ import { gql } from '@apollo/client/core';
 import { ApolloService } from '../apollo.service';
 import { map, catchError, of, from, tap } from 'rxjs';
 import {
+  GET_ACCOUNT_BALANCES_AS_OF,
   GET_CURRENT_CASHIER_SESSION,
   GET_CASHIER_SESSION,
   GET_CASHIER_SESSIONS,
@@ -156,8 +157,17 @@ export class CashierSessionService {
   /** Computed: has variance (non-zero) */
   readonly hasVariance = computed(() => Math.abs(this.varianceAmount()) > 0);
 
+  /** Session id must be a valid UUID; never store placeholder/invalid ids (e.g. -1). */
+  private static isValidSessionId(id: unknown): boolean {
+    if (id == null) return false;
+    const s = typeof id === 'string' ? id.trim() : String(id);
+    if (s === '' || s === '-1') return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+  }
+
   /**
-   * Get current open session for a channel
+   * Get current open session for a channel.
+   * Only stores a session when its id is a valid UUID; otherwise treats as no session.
    */
   getCurrentSession(channelId: number) {
     this.isLoading.set(true);
@@ -172,7 +182,8 @@ export class CashierSessionService {
 
     return from(queryPromise).pipe(
       map((result) => {
-        const session = result.data?.currentCashierSession ?? null;
+        const raw = result.data?.currentCashierSession ?? null;
+        const session = raw && CashierSessionService.isValidSessionId(raw.id) ? raw : null;
         this.currentSession.set(session);
         this.isLoading.set(false);
         return session;
@@ -180,6 +191,7 @@ export class CashierSessionService {
       catchError((err) => {
         this.error.set(err.message || 'Failed to get current session');
         this.isLoading.set(false);
+        this.currentSession.set(null);
         return of(null);
       }),
     );
@@ -289,10 +301,9 @@ export class CashierSessionService {
 
     return from(mutationPromise).pipe(
       map((result) => {
-        const session = result.data?.openCashierSession ?? null;
-        if (session) {
-          this.currentSession.set(session);
-        }
+        const raw = result.data?.openCashierSession ?? null;
+        const session = raw && CashierSessionService.isValidSessionId(raw.id) ? raw : null;
+        this.currentSession.set(session);
         this.isLoading.set(false);
         return session;
       }),
@@ -300,6 +311,33 @@ export class CashierSessionService {
         this.error.set(err.message || 'Failed to open session');
         this.isLoading.set(false);
         return of(null);
+      }),
+    );
+  }
+
+  /**
+   * Get ledger balance (cents) per leaf account as of a date. For manual reconciliation UI (current balance + variance).
+   */
+  getAccountBalancesAsOf(channelId: number, asOfDate: string) {
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{
+        accountBalancesAsOf: Array<{
+          accountId: string;
+          accountCode: string;
+          accountName: string;
+          balanceCents: string;
+        }>;
+      }>({
+        query: GET_ACCOUNT_BALANCES_AS_OF as any,
+        variables: { channelId, asOfDate },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => result.data?.accountBalancesAsOf ?? []),
+      catchError((err) => {
+        console.warn('[CashierSession] getAccountBalancesAsOf failed', err);
+        return of([]);
       }),
     );
   }
@@ -317,7 +355,10 @@ export class CashierSessionService {
       }),
     ).pipe(
       map((result) => result.data?.reconciliations ?? { items: [], totalItems: 0 }),
-      catchError(() => of({ items: [], totalItems: 0 })),
+      catchError((err) => {
+        console.warn('[CashierSession] getReconciliations failed', err);
+        return of({ items: [], totalItems: 0 });
+      }),
     );
   }
 
@@ -340,10 +381,13 @@ export class CashierSessionService {
 
   /**
    * Per-account reconciliation details for a session.
-   * @param sessionId - Session ID
+   * @param sessionId - Session ID (must be a valid UUID; invalid/placeholder ids are not sent to the API).
    * @param kind - 'opening' for variances at open (e.g. current shift), 'closing' for variances at close (default)
    */
   getSessionReconciliationDetails(sessionId: string, kind: 'opening' | 'closing' = 'closing') {
+    if (!CashierSessionService.isValidSessionId(sessionId)) {
+      return of([]);
+    }
     const client = this.apolloService.getClient();
     return from(
       client.query<{
@@ -355,7 +399,10 @@ export class CashierSessionService {
       }),
     ).pipe(
       map((result) => result.data?.sessionReconciliationDetails ?? []),
-      catchError(() => of([])),
+      catchError((err) => {
+        console.warn('[CashierSession] getSessionReconciliationDetails failed', err);
+        return of([]);
+      }),
     );
   }
 

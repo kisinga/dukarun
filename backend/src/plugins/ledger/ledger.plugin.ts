@@ -35,7 +35,11 @@ import { LedgerViewerResolver } from './ledger-viewer.resolver';
 import { LEDGER_VIEWER_SCHEMA } from './ledger-viewer.schema';
 import { PeriodManagementResolver } from './period-management.resolver';
 import { PERIOD_MANAGEMENT_SCHEMA } from './period-management.schema';
-import { CloseAccountingPeriodPermission, ManageReconciliationPermission } from './permissions';
+import {
+  CloseAccountingPeriodPermission,
+  CreateInterAccountTransferPermission,
+  ManageReconciliationPermission,
+} from './permissions';
 
 // Merge schemas
 const COMBINED_SCHEMA = gql`
@@ -88,6 +92,7 @@ const COMBINED_SCHEMA = gql`
       ...(config.authOptions.customPermissions || []),
       ManageReconciliationPermission,
       CloseAccountingPeriodPermission,
+      CreateInterAccountTransferPermission,
     ];
     return config;
   },

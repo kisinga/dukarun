@@ -62,6 +62,13 @@ export interface RefundPostingContext {
   resolvedAccountCode?: string; // Pre-resolved from PaymentMethod custom fields
 }
 
+/** Expense: debit expense account, credit source-of-funds (asset) account */
+export interface ExpensePostingContext {
+  amount: number; // in cents
+  sourceAccountCode: string; // asset account to credit (source of funds)
+  memo?: string;
+}
+
 export interface InventoryPurchasePostingContext {
   purchaseId: string;
   purchaseReference: string;
@@ -297,6 +304,30 @@ export function createSupplierPaymentEntry(
       },
     ],
     memo: `Payment to supplier for purchase ${context.purchaseReference}`,
+  };
+}
+
+/**
+ * Generate journal entry template for expense
+ *
+ * Debits: EXPENSES (expense increase)
+ * Credits: sourceAccountCode (asset decrease - source of funds)
+ */
+export function createExpenseEntry(context: ExpensePostingContext): JournalEntryTemplate {
+  return {
+    lines: [
+      {
+        accountCode: ACCOUNT_CODES.EXPENSES,
+        debit: context.amount,
+        meta: { sourceAccountCode: context.sourceAccountCode },
+      },
+      {
+        accountCode: context.sourceAccountCode,
+        credit: context.amount,
+        meta: {},
+      },
+    ],
+    memo: context.memo ?? `Expense (source: ${context.sourceAccountCode})`,
   };
 }
 
