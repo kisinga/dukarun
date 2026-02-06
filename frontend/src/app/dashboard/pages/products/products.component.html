@@ -90,8 +90,62 @@
   <!-- Search & Filter Bar -->
   <div class="flex flex-col gap-3">
     <!-- Active Filter Badges -->
-    @if (showLowStockOnly()) {
-      <div class="flex flex-wrap gap-2">
+    <div class="flex flex-wrap gap-2 items-center">
+      @if (searchQuery()) {
+        <span class="badge badge-outline gap-2">
+          Search: {{ searchQuery() }}
+          <button
+            class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+            (click)="onSearchQueryChange('')"
+            type="button"
+            aria-label="Clear search"
+          >
+            ×
+          </button>
+        </span>
+      }
+      @for (code of facetCodes; track code) {
+        @if ((selectedFacetValueIds()[code]?.length ?? 0) > 0) {
+          <span class="badge badge-outline gap-2">
+            {{ code }}: {{ selectedFacetValueIds()[code]!.length }} selected
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="setFacetIds(code, [])"
+              type="button"
+              [attr.aria-label]="'Clear ' + code"
+            >
+              ×
+            </button>
+          </span>
+        }
+      }
+      @if (enabledFilter() !== 'all') {
+        <span class="badge badge-outline gap-2">
+          Status: {{ enabledFilter() }}
+          <button
+            class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+            (click)="setEnabledFilter('all')"
+            type="button"
+            aria-label="Clear status"
+          >
+            ×
+          </button>
+        </span>
+      }
+      @if (sortBy()) {
+        <span class="badge badge-outline gap-2">
+          Sort: {{ sortBy() === 'name_asc' ? 'A–Z' : 'Z–A' }}
+          <button
+            class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+            (click)="setSortBy(null)"
+            type="button"
+            aria-label="Clear sort"
+          >
+            ×
+          </button>
+        </span>
+      }
+      @if (showLowStockOnly()) {
         <span class="badge badge-warning gap-2">
           Low Stock Only
           <button
@@ -103,27 +157,75 @@
             ×
           </button>
         </span>
-      </div>
-    }
-
-    <div class="flex flex-col sm:flex-row gap-3">
-      <div class="flex-1">
-        <app-product-search-bar [(searchQuery)]="searchQuery" />
-      </div>
-      <div class="flex items-center gap-2">
-        <label
-          class="label cursor-pointer gap-3 px-4 py-2 rounded-lg border border-base-300 bg-base-100 hover:bg-base-200 transition-colors"
-          [class.border-warning]="showLowStockOnly()"
-          [class.bg-warning/10]="showLowStockOnly()"
+      }
+      @if (
+        searchQuery() ||
+        (selectedFacetValueIds()['manufacturer']?.length ?? 0) > 0 ||
+        (selectedFacetValueIds()['category']?.length ?? 0) > 0 ||
+        (selectedFacetValueIds()['tags']?.length ?? 0) > 0 ||
+        enabledFilter() !== 'all' ||
+        sortBy()
+      ) {
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs"
+          (click)="clearAllFilters()"
         >
-          <span class="label-text font-medium text-sm">Low Stock Only</span>
-          <input
-            type="checkbox"
-            class="toggle toggle-warning toggle-sm"
-            [checked]="showLowStockOnly()"
-            (change)="toggleLowStockFilter($any($event.target).checked)"
+          Clear all
+        </button>
+      }
+    </div>
+
+    <div class="flex flex-col gap-3">
+      <div class="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div class="flex-1 min-w-[200px]">
+          <app-product-search-bar
+            [searchQuery]="searchQuery()"
+            (searchQueryChange)="onSearchQueryChange($event)"
           />
-        </label>
+        </div>
+        <div class="flex flex-wrap items-end gap-2">
+          <select
+            class="select select-bordered select-sm w-32"
+            [value]="enabledFilter()"
+            (change)="setEnabledFilter($any($event.target).value)"
+          >
+            <option value="all">All status</option>
+            <option value="active">Active</option>
+            <option value="disabled">Disabled</option>
+          </select>
+          <select
+            class="select select-bordered select-sm w-36"
+            [value]="sortBy() ?? ''"
+            (change)="setSortBy($any($event.target).value || null)"
+          >
+            <option value="">Sort</option>
+            <option value="name_asc">Name A–Z</option>
+            <option value="name_desc">Name Z–A</option>
+          </select>
+          <label
+            class="label cursor-pointer gap-3 px-4 py-2 rounded-lg border border-base-300 bg-base-100 hover:bg-base-200 transition-colors"
+            [class.border-warning]="showLowStockOnly()"
+            [class.bg-warning/10]="showLowStockOnly()"
+          >
+            <span class="label-text font-medium text-sm">Low Stock Only</span>
+            <input
+              type="checkbox"
+              class="toggle toggle-warning toggle-sm"
+              [checked]="showLowStockOnly()"
+              (change)="toggleLowStockFilter($any($event.target).checked)"
+            />
+          </label>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        @for (code of facetCodes; track code) {
+          <app-product-list-facet-selector
+            [facetCode]="code"
+            [selectedIds]="selectedFacetValueIds()[code] ?? []"
+            (selectedIdsChange)="setFacetIds(code, $event)"
+          />
+        }
       </div>
     </div>
   </div>
@@ -163,7 +265,7 @@
   }
 
   <!-- Empty State -->
-  @else if (filteredProducts().length === 0 && !error()) {
+  @else if (totalItems() === 0 && !error()) {
     <div class="card bg-base-100 shadow">
       <div class="card-body">
         <div class="text-center py-12 lg:py-16 px-4">
@@ -198,14 +300,12 @@
               }
             </p>
             <div class="flex gap-2 justify-center mt-6">
-              @if (searchQuery()) {
-                <button (click)="searchQuery.set('')" class="btn btn-outline btn-sm">
-                  Clear Search
-                </button>
-              }
+              <button (click)="clearAllFilters()" class="btn btn-outline btn-sm">
+                Clear filters
+              </button>
               @if (showLowStockOnly()) {
                 <button (click)="toggleLowStockFilter(false)" class="btn btn-outline btn-sm">
-                  Clear Low Stock Filter
+                  Clear Low Stock
                 </button>
               }
             </div>
@@ -242,7 +342,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1">
       <div class="text-sm text-base-content/60">
         Showing {{ (currentPage() - 1) * itemsPerPage() + 1 }} to {{ endItem() }} of
-        {{ filteredProducts().length }} products
+        {{ totalItems() }} products
       </div>
 
       <div class="flex items-center gap-2">
@@ -261,7 +361,7 @@
 
     <!-- Mobile: Card View -->
     <div class="lg:hidden space-y-4">
-      @for (product of paginatedProducts(); track trackByProductId($index, product)) {
+      @for (product of displayedProducts(); track trackByProductId($index, product)) {
         <app-product-card [product]="product" (action)="onProductAction($event)" />
       }
     </div>
@@ -282,7 +382,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (product of paginatedProducts(); track trackByProductId($index, product)) {
+            @for (product of displayedProducts(); track trackByProductId($index, product)) {
               <tr app-product-table-row [product]="product" (action)="onProductAction($event)"></tr>
             }
           </tbody>
@@ -294,7 +394,7 @@
     <app-pagination
       [currentPage]="currentPage()"
       [totalPages]="totalPages()"
-      [totalItems]="filteredProducts().length"
+      [totalItems]="totalItems()"
       [itemsPerPage]="itemsPerPage()"
       [itemLabel]="'products'"
       (pageChange)="goToPage($event)"

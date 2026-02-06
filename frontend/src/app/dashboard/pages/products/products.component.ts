@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  effect,
   OnInit,
   computed,
   inject,
@@ -9,6 +10,11 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import {
+  buildProductListOptions,
+  type ProductListFilterState,
+} from '../../../core/services/product/product-list-filter.model';
+import { FACET_CODES, type FacetCode } from '../../../core/services/product/facet.types';
 import { ProductService } from '../../../core/services/product.service';
 import { calculateProductStats } from '../../../core/services/stats/product-stats.util';
 import {
@@ -17,6 +23,7 @@ import {
 } from '../../components/shared/delete-confirmation-modal.component';
 import { PaginationComponent } from '../../components/shared/pagination.component';
 import { ProductAction, ProductCardComponent } from './components/product-card.component';
+import { ProductListFacetSelectorComponent } from './components/product-list-facet-selector.component';
 import { ProductSearchBarComponent } from './components/product-search-bar.component';
 import { ProductStats, ProductStatsComponent } from './components/product-stats.component';
 import { ProductTableRowComponent } from './components/product-table-row.component';
@@ -37,6 +44,7 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
     CommonModule,
     RouterLink,
     ProductCardComponent,
+    ProductListFacetSelectorComponent,
     ProductStatsComponent,
     ProductSearchBarComponent,
     ProductTableRowComponent,
@@ -62,8 +70,11 @@ export class ProductsComponent implements OnInit {
   readonly error = this.productService.error;
   readonly totalItems = this.productService.totalItems;
 
-  // Local UI state
+  // Local UI state: filters (server-side) + low stock (client-side on current page)
   readonly searchQuery = signal('');
+  readonly selectedFacetValueIds = signal<Partial<Record<FacetCode, string[]>>>({});
+  readonly enabledFilter = signal<'all' | 'active' | 'disabled'>('all');
+  readonly sortBy = signal<'name_asc' | 'name_desc' | null>(null);
   readonly showLowStockOnly = signal(false);
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
@@ -75,76 +86,75 @@ export class ProductsComponent implements OnInit {
   });
   readonly productToDelete = signal<string | null>(null);
 
-  // Computed: filtered products
-  readonly filteredProducts = computed(() => {
-    const query = this.searchQuery().toLowerCase().trim();
-    const lowStockOnly = this.showLowStockOnly();
-    let allProducts = this.products();
+  // Build filter state from signals for buildProductListOptions
+  private readonly filterState = computed((): ProductListFilterState => ({
+    searchTerm: this.searchQuery().trim() || undefined,
+    facetValueIds: this.selectedFacetValueIds(),
+    enabled:
+      this.enabledFilter() === 'all'
+        ? null
+        : this.enabledFilter() === 'active',
+    sort:
+      this.sortBy() === 'name_asc'
+        ? { name: 'ASC' }
+        : this.sortBy() === 'name_desc'
+          ? { name: 'DESC' }
+          : undefined,
+  }));
 
-    // Apply low stock filter first
-    if (lowStockOnly) {
-      allProducts = allProducts.filter((product) =>
-        product.variants?.some((v: any) => (v.stockOnHand || 0) < 10),
-      );
-    }
-
-    // Apply search query filter
-    if (!query) return allProducts;
-
-    return allProducts.filter(
-      (product) =>
-        product.name.toLowerCase().includes(query) ||
-        product.description?.toLowerCase().includes(query) ||
-        product.variants?.some((v: any) => v.sku.toLowerCase().includes(query)),
+  // Server returns current page; apply low-stock filter client-side only to that page
+  readonly displayedProducts = computed(() => {
+    const list = this.products();
+    if (!this.showLowStockOnly()) return list;
+    return list.filter((product) =>
+      product.variants?.some((v: { stockOnHand?: number }) => (v.stockOnHand ?? 0) < 10),
     );
   });
 
-  // Computed: paginated products
-  readonly paginatedProducts = computed(() => {
-    const filtered = this.filteredProducts();
-    const page = this.currentPage();
-    const perPage = this.itemsPerPage();
-    const start = (page - 1) * perPage;
-    const end = start + perPage;
-
-    return filtered.slice(start, end);
-  });
-
-  // Computed: total pages
   readonly totalPages = computed(() => {
-    const filtered = this.filteredProducts();
+    const total = this.totalItems();
     const perPage = this.itemsPerPage();
-    return Math.ceil(filtered.length / perPage) || 1;
+    return Math.ceil(total / perPage) || 1;
   });
 
-  // Computed: statistics - using utility for single source of truth
   readonly stats = computed((): ProductStats => {
     return calculateProductStats(this.products());
   });
 
-  // Computed: end item for pagination display
   readonly endItem = computed(() => {
-    return Math.min(this.currentPage() * this.itemsPerPage(), this.filteredProducts().length);
+    const page = this.currentPage();
+    const perPage = this.itemsPerPage();
+    const total = this.totalItems();
+    return Math.min(page * perPage, total);
   });
 
+  constructor() {
+    effect(() => {
+      this.filterState();
+      this.currentPage();
+      this.itemsPerPage();
+      this.loadProducts();
+    });
+  }
+
   ngOnInit(): void {
-    // Check for query params (e.g., ?lowStock=true)
     this.route.queryParams.subscribe((params) => {
       const lowStockParam = params['lowStock'] === 'true';
       if (lowStockParam !== this.showLowStockOnly()) {
         this.showLowStockOnly.set(lowStockParam);
-        this.currentPage.set(1); // Reset to first page when filter changes
       }
     });
-
-    this.loadProducts();
   }
 
   async loadProducts(): Promise<void> {
-    await this.productService.fetchProducts({
-      take: 100,
-      skip: 0,
+    const state = this.filterState();
+    const perPage = this.itemsPerPage();
+    const page = this.currentPage();
+    const options = buildProductListOptions(state, {
+      take: perPage,
+      skip: (page - 1) * perPage,
     });
+    await this.productService.fetchProducts(options);
   }
 
   async refreshProducts(): Promise<void> {
@@ -257,7 +267,35 @@ export class ProductsComponent implements OnInit {
    */
   changeItemsPerPage(items: number): void {
     this.itemsPerPage.set(items);
-    this.currentPage.set(1); // Reset to first page
+    this.currentPage.set(1);
+  }
+
+  onSearchQueryChange(q: string): void {
+    this.searchQuery.set(q);
+    this.currentPage.set(1);
+  }
+
+  setFacetIds(code: FacetCode, ids: string[]): void {
+    this.selectedFacetValueIds.update((m) => ({ ...m, [code]: ids }));
+    this.currentPage.set(1);
+  }
+
+  setEnabledFilter(value: 'all' | 'active' | 'disabled'): void {
+    this.enabledFilter.set(value);
+    this.currentPage.set(1);
+  }
+
+  setSortBy(value: 'name_asc' | 'name_desc' | null): void {
+    this.sortBy.set(value);
+    this.currentPage.set(1);
+  }
+
+  clearAllFilters(): void {
+    this.searchQuery.set('');
+    this.selectedFacetValueIds.set({});
+    this.enabledFilter.set('all');
+    this.sortBy.set(null);
+    this.currentPage.set(1);
   }
 
   /**
@@ -301,4 +339,6 @@ export class ProductsComponent implements OnInit {
    * Math utilities for template
    */
   readonly Math = Math;
+
+  readonly facetCodes = FACET_CODES;
 }
