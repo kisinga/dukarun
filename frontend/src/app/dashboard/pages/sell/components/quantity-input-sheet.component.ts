@@ -26,21 +26,25 @@ export interface QuantityInputData {
   imports: [CommonModule, ReactiveFormsModule],
   template: `
     <!-- Backdrop -->
-    <div 
+    <div
       class="fixed inset-0 bg-black/50 z-40 transition-opacity"
       [class.opacity-0]="!isOpen()"
       [class.pointer-events-none]="!isOpen()"
       (click)="close()"
     ></div>
 
-    <!-- Bottom Sheet -->
-    <div 
-      class="fixed bottom-0 left-0 right-0 bg-base-100 rounded-t-2xl shadow-2xl z-50 transform transition-transform duration-300 ease-out"
+    <!-- Bottom sheet on mobile; centered modal on desktop -->
+    <div
+      class="fixed left-0 right-0 z-50 bg-base-100 shadow-2xl transform transition-all duration-300 ease-out
+             bottom-0 rounded-t-2xl max-h-[90vh] overflow-y-auto
+             md:bottom-auto md:left-1/2 md:right-auto md:top-1/2 md:max-h-[85vh] md:w-full md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-box"
       [class.translate-y-full]="!isOpen()"
       [class.translate-y-0]="isOpen()"
+      [class.opacity-0]="!isOpen()"
+      [class.pointer-events-none]="!isOpen()"
     >
-      <!-- Handle -->
-      <div class="flex justify-center pt-3 pb-2">
+      <!-- Handle (mobile only) -->
+      <div class="flex justify-center pt-3 pb-2 md:hidden">
         <div class="w-12 h-1 bg-base-300 rounded-full"></div>
       </div>
 
@@ -48,13 +52,20 @@ export interface QuantityInputData {
       <div class="px-6 pb-4 border-b border-base-300">
         <div class="flex items-center justify-between">
           <h3 class="font-semibold text-lg">Update Quantity</h3>
-          <button 
-            class="btn btn-ghost btn-sm btn-circle"
-            (click)="close()"
-            aria-label="Close"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          <button class="btn btn-ghost btn-sm btn-circle" (click)="close()" aria-label="Close">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -78,7 +89,7 @@ export interface QuantityInputData {
               Quantity {{ data()?.allowFractionalQuantity ? '(e.g., 0.5)' : '' }}
             </span>
           </label>
-          
+
           <div class="relative">
             <input
               type="number"
@@ -134,12 +145,7 @@ export interface QuantityInputData {
 
         <!-- Action Buttons -->
         <div class="flex gap-3">
-          <button
-            class="btn btn-ghost flex-1"
-            (click)="close()"
-          >
-            Cancel
-          </button>
+          <button class="btn btn-ghost flex-1" (click)="close()">Cancel</button>
           <button
             class="btn btn-primary flex-1"
             [disabled]="!isValidQuantity()"

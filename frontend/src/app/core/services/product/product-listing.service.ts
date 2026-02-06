@@ -1,15 +1,18 @@
 import { inject, Injectable } from '@angular/core';
+import type { ProductListOptions } from '../../graphql/generated/graphql';
 import { extractCents } from '../../utils/data-extractors';
 import { GET_PRODUCTS } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { ProductMapperService } from './product-mapper.service';
 import { ProductStateService } from './product-state.service';
 
+const DEFAULT_OPTIONS: ProductListOptions = { take: 50, skip: 0 };
+
 /**
  * Product Listing Service
  *
- * Handles product listing and fetching operations.
- * Manages product list state and processing.
+ * Handles product listing and fetching operations. Caller builds options
+ * (e.g. via buildProductListOptions from product-list-filter.model).
  */
 @Injectable({
   providedIn: 'root',
@@ -20,22 +23,19 @@ export class ProductListingService {
   private readonly stateService = inject(ProductStateService);
 
   /**
-   * Fetch all products with optional pagination
-   * @param options - Optional pagination and filter options
+   * Fetch products with the given list options (filter, sort, pagination).
+   * @param options - ProductListOptions from buildProductListOptions or equivalent
    */
-  async fetchProducts(options?: any): Promise<void> {
+  async fetchProducts(options?: ProductListOptions): Promise<void> {
     this.stateService.setIsLoading(true);
     this.stateService.setError(null);
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<any>({
+      const result = await client.query<{ products: { items: any[]; totalItems: number } }>({
         query: GET_PRODUCTS,
         variables: {
-          options: options || {
-            take: 50,
-            skip: 0,
-          },
+          options: options ?? DEFAULT_OPTIONS,
         },
         fetchPolicy: 'network-only',
       });
