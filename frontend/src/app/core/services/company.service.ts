@@ -16,10 +16,8 @@ import { ApolloService } from './apollo.service';
  * - User then selects shop in separate shop selector (primary navbar action)
  * - Company selector is in extended menu (rare use, only for multi-company users)
  *
- * Channel token ownership:
- * - This service is the single source of truth for the channel token.
- * - The token is derived from activeCompany().token (never stored independently).
- * - ApolloService reads it via the onChannelTokenProvider callback registered below.
+ * Channel token: this service calls apolloService.setChannelToken() whenever the
+ * active company changes (activate, restore from storage, clear).
  */
 @Injectable({
   providedIn: 'root',
@@ -50,11 +48,8 @@ export class CompanyService {
   });
 
   constructor() {
-    // Clean up legacy 'channel_token' key (now derived from company_session)
+    // Clean up legacy 'channel_token' key
     localStorage.removeItem('channel_token');
-
-    // Register as the channel token provider — ApolloService reads token from here
-    this.apolloService.onChannelTokenProvider(() => this.getChannelToken());
 
     // Handle CHANNEL_NOT_FOUND errors by clearing stale company state
     this.apolloService.onChannelNotFound(() => {
@@ -65,10 +60,16 @@ export class CompanyService {
 
   /**
    * Get the channel token for the active company.
-   * This is the single source of truth — derived from the active company signal.
    */
   getChannelToken(): string | null {
     return this.activeCompany()?.token ?? null;
+  }
+
+  /**
+   * Push the active company's token to ApolloService so it's used in request headers.
+   */
+  private syncChannelToken(): void {
+    this.apolloService.setChannelToken(this.activeCompany()?.token ?? null);
   }
 
   /**
@@ -346,7 +347,8 @@ export class CompanyService {
           this.activateCompany(companies[0].id);
         }
       } else {
-        // Company still exists — persist session with fresh server data (tokens may have changed)
+        // Company still exists — sync token from fresh server data (tokens may have changed)
+        this.syncChannelToken();
         this.persistSession();
       }
     } else if (companies.length > 0) {
@@ -370,10 +372,8 @@ export class CompanyService {
 
     console.log(`Activating company: ${company.code} (${companyId})`);
 
-    // Set as active company — getChannelToken() will now return this company's token
     this.activeCompanyIdSignal.set(companyId);
-
-    // Persist and fetch channel custom fields
+    this.syncChannelToken();
     this.persistSession();
     this.fetchActiveChannel();
   }
@@ -416,10 +416,10 @@ export class CompanyService {
     try {
       const session = JSON.parse(stored);
 
-      // Restore everything instantly — getChannelToken() will derive from these signals
       this.companiesSignal.set(session.companies || []);
       this.activeCompanyIdSignal.set(session.activeCompanyId);
       this.activeChannelDataSignal.set(session.channelData);
+      this.syncChannelToken();
 
       console.log('✅ Session restored:', {
         companies: session.companies?.length,
@@ -445,6 +445,7 @@ export class CompanyService {
     this.activeCompanyIdSignal.set(null);
     this.activeChannelDataSignal.set(null);
     this.companiesSignal.set([]);
+    this.syncChannelToken();
     localStorage.removeItem(this.SESSION_KEY);
   }
 }

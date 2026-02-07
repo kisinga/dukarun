@@ -11,10 +11,8 @@ import { APOLLO_TEST_CLIENT } from './apollo-test-client.token';
  * Service for managing Apollo GraphQL client
  * Handles authentication tokens, headers, and request configuration
  *
- * Channel token ownership:
- * - CompanyService is the single source of truth for the channel token.
- * - It registers a provider via onChannelTokenProvider() at startup.
- * - ApolloService only reads the token (never writes it).
+ * Channel token: CompanyService calls setChannelToken() whenever the active company changes.
+ * The token is held in memory (not localStorage) and read by the authLink on every request.
  */
 @Injectable({
   providedIn: 'root',
@@ -27,8 +25,8 @@ export class ApolloService {
 
   private apolloClient: ApolloClient;
   private sessionExpiredCallback?: () => void;
-  private channelTokenProvider?: () => string | null;
   private channelNotFoundCallback?: () => void;
+  private _channelToken: string | null = null;
 
   constructor(@Optional() @Inject(APOLLO_TEST_CLIENT) testClient?: ApolloClient) {
     this.apolloClient = testClient ?? this.createApolloClient();
@@ -43,12 +41,10 @@ export class ApolloService {
   }
 
   /**
-   * Register the channel token provider.
-   * CompanyService registers this at startup so the token is always
-   * derived from the active company (single source of truth).
+   * Set the channel token. Called by CompanyService whenever the active company changes.
    */
-  onChannelTokenProvider(provider: () => string | null): void {
-    this.channelTokenProvider = provider;
+  setChannelToken(token: string | null): void {
+    this._channelToken = token;
   }
 
   /**
@@ -88,11 +84,10 @@ export class ApolloService {
   }
 
   /**
-   * Get channel token from the registered provider (CompanyService).
-   * Returns null if no provider is registered yet (before app init completes).
+   * Get the current channel token.
    */
   getChannelToken(): string | null {
-    return this.channelTokenProvider?.() ?? null;
+    return this._channelToken;
   }
 
   /**
