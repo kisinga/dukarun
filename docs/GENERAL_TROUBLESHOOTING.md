@@ -1,6 +1,18 @@
 - OBSERVABILITY: `ssh -L 3301:localhost:3301 user@server`
 - VENDURE: `ssh -L 3000:localhost:3000 user@server`
 
+# Backend: EACCES permission denied, mkdir '.../static/assets'
+
+If the backend entrypoint fails with:
+
+```text
+Entrypoint failed: Error: EACCES: permission denied, mkdir '/app/static/assets'
+```
+
+- **Cause:** The app runs as a non-root user; the asset directory is created by Docker (or a volume) as root-owned, so Vendure’s AssetServerPlugin cannot create or write to it.
+- **Fix (this repo):** The backend image includes a `docker-entrypoint.sh` that runs as root, creates `ASSET_UPLOAD_DIR` (and uploads dir), chowns them to the app user, then starts the app. Rebuild the backend image so the new entrypoint is used.
+- **Path:** Use `ASSET_UPLOAD_DIR=/usr/src/app/static/assets` when running the standard backend Dockerfile (WORKDIR is `/usr/src/app`). If your platform uses a different WORKDIR (e.g. `/app`), set `ASSET_UPLOAD_DIR` to that path (e.g. `/app/static/assets`) and ensure the volume is mounted at the same path; the entrypoint will create and chown that path.
+
 # Manually Reset vendure superadmin password
 
 ```bash

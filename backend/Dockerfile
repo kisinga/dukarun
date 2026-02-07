@@ -54,6 +54,7 @@ COPY --from=builder /app/dist ./dist
 
 # Copy static assets and templates
 COPY static ./static
+RUN mkdir -p static/assets/cache static/uploads
 
 # Verify copied files exist
 RUN echo "Verifying production files:" && \

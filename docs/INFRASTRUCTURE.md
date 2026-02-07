@@ -277,7 +277,7 @@ The nginx configuration supports both Docker internal DNS and public DNS resolut
 | Variable                 | Example                     | Default                     | Notes                         |
 | ------------------------ | --------------------------- | --------------------------- | ----------------------------- |
 | `ASSET_STORAGE_STRATEGY` | `LocalAssetStorageStrategy` | `LocalAssetStorageStrategy` | Storage strategy              |
-| `ASSET_UPLOAD_DIR`       | `/app/static/assets`        | `/app/static/assets`        | Asset upload directory        |
+| `ASSET_UPLOAD_DIR`       | `/usr/src/app/static/assets` | `/usr/src/app/static/assets` (backend Dockerfile) | Asset upload directory; must match path where volume is mounted and entrypoint creates the dir |
 | `ASSET_URL_PREFIX`       | `https://cdn.example.com`   | —                           | CDN URL for assets (optional) |
 
 ### Optional Settings
