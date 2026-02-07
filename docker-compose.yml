@@ -61,7 +61,7 @@ services:
 
       # Asset storage
       ASSET_STORAGE_STRATEGY: ${ASSET_STORAGE_STRATEGY:-LocalAssetStorageStrategy}
-      ASSET_UPLOAD_DIR: ${ASSET_UPLOAD_DIR:-/app/static/assets}
+      ASSET_UPLOAD_DIR: ${ASSET_UPLOAD_DIR:-/usr/src/app/static/assets}
       ASSET_URL_PREFIX: ${ASSET_URL_PREFIX}
 
       # Email configuration (optional)
@@ -94,8 +94,8 @@ services:
       ML_TRAINING_COOLDOWN_HOURS: ${ML_TRAINING_COOLDOWN_HOURS:-4}
 
     volumes:
-      - backend_assets:/app/static/assets
-      - backend_uploads:/app/static/uploads
+      - backend_assets:/usr/src/app/static/assets
+      - backend_uploads:/usr/src/app/static/uploads
       # Note: .env file mount removed - env vars are passed directly via environment section
       # In platforms like Coolify/Kubernetes, env vars are passed directly, so file mount is not needed
     ports:
