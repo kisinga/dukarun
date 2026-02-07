@@ -309,10 +309,24 @@ export class CompanyService {
     this.companiesSignal.set(companies);
     console.log('📦 Set companies from channels:', companies);
 
-    // Auto-activate first company if:
-    // 1. No company is currently active
-    // 2. We have at least one company available
-    if (!this.activeCompanyIdSignal() && companies.length > 0) {
+    const currentActiveId = this.activeCompanyIdSignal();
+
+    if (currentActiveId) {
+      // Validate the cached active company still exists in the fresh list
+      const stillExists = companies.find((c) => c.id === currentActiveId);
+      if (stillExists) {
+        // Re-sync channel token from the fresh server data (token may have changed,
+        // or localStorage 'channel_token' may be stale from a previous company)
+        this.apolloService.setChannelToken(stillExists.token);
+      } else {
+        // Cached company no longer in list — activate first available
+        console.warn(`Active company ${currentActiveId} no longer available, switching`);
+        this.activeCompanyIdSignal.set(null);
+        if (companies.length > 0) {
+          this.activateCompany(companies[0].id);
+        }
+      }
+    } else if (companies.length > 0) {
       this.activateCompany(companies[0].id);
     }
   }

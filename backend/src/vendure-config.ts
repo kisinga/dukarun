@@ -1458,7 +1458,7 @@ export const config: VendureConfig = {
     PhoneAuthPlugin,
     AssetServerPlugin.init({
       route: 'assets',
-      assetUploadDir: path.join(__dirname, '../static/assets'),
+      assetUploadDir: env.app.assetUploadDir,
       assetUrlPrefix: env.app.assetUrlPrefix || undefined,
     }),
     DefaultSchedulerPlugin.init(),
