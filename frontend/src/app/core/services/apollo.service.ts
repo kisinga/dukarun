@@ -10,6 +10,11 @@ import { APOLLO_TEST_CLIENT } from './apollo-test-client.token';
 /**
  * Service for managing Apollo GraphQL client
  * Handles authentication tokens, headers, and request configuration
+ *
+ * Channel token ownership:
+ * - CompanyService is the single source of truth for the channel token.
+ * - It registers a provider via onChannelTokenProvider() at startup.
+ * - ApolloService only reads the token (never writes it).
  */
 @Injectable({
   providedIn: 'root',
@@ -18,11 +23,12 @@ export class ApolloService {
   private readonly router = inject(Router);
 
   private readonly AUTH_TOKEN_KEY = 'auth_token';
-  private readonly CHANNEL_TOKEN_KEY = 'channel_token';
   private readonly LANGUAGE_CODE_KEY = 'language_code';
 
   private apolloClient: ApolloClient;
   private sessionExpiredCallback?: () => void;
+  private channelTokenProvider?: () => string | null;
+  private channelNotFoundCallback?: () => void;
 
   constructor(@Optional() @Inject(APOLLO_TEST_CLIENT) testClient?: ApolloClient) {
     this.apolloClient = testClient ?? this.createApolloClient();
@@ -34,6 +40,23 @@ export class ApolloService {
    */
   onSessionExpired(callback: () => void): void {
     this.sessionExpiredCallback = callback;
+  }
+
+  /**
+   * Register the channel token provider.
+   * CompanyService registers this at startup so the token is always
+   * derived from the active company (single source of truth).
+   */
+  onChannelTokenProvider(provider: () => string | null): void {
+    this.channelTokenProvider = provider;
+  }
+
+  /**
+   * Register callback for CHANNEL_NOT_FOUND errors.
+   * CompanyService uses this to clear stale company state.
+   */
+  onChannelNotFound(callback: () => void): void {
+    this.channelNotFoundCallback = callback;
   }
 
   /**
@@ -65,24 +88,11 @@ export class ApolloService {
   }
 
   /**
-   * Set channel token for multi-channel projects
-   */
-  setChannelToken(token: string): void {
-    localStorage.setItem(this.CHANNEL_TOKEN_KEY, token);
-  }
-
-  /**
-   * Get channel token
+   * Get channel token from the registered provider (CompanyService).
+   * Returns null if no provider is registered yet (before app init completes).
    */
   getChannelToken(): string | null {
-    return localStorage.getItem(this.CHANNEL_TOKEN_KEY);
-  }
-
-  /**
-   * Clear channel token
-   */
-  clearChannelToken(): void {
-    localStorage.removeItem(this.CHANNEL_TOKEN_KEY);
+    return this.channelTokenProvider?.() ?? null;
   }
 
   /**
@@ -170,15 +180,17 @@ export class ApolloService {
           const errorCode = gqlError.extensions?.code;
           const errorMessage = gqlError.message || '';
 
-          // Handle CHANNEL_NOT_FOUND - clear stale channel token
+          // Handle CHANNEL_NOT_FOUND - notify CompanyService to clear stale state
           if (
             errorCode === 'CHANNEL_NOT_FOUND' ||
             errorMessage.includes('CHANNEL_NOT_FOUND') ||
             errorMessage.includes('channel-not-found')
           ) {
-            console.warn('Channel not found - clearing stale channel token');
-            this.clearChannelToken();
-            // Don't redirect - just clear the token and let polling stop
+            console.warn('Channel not found - notifying company service');
+            if (this.channelNotFoundCallback) {
+              this.channelNotFoundCallback();
+            }
+            // Don't redirect - just clear the state and let polling stop
             return;
           }
 
@@ -230,11 +242,10 @@ export class ApolloService {
    * Clears local state and redirects to login
    */
   private handleSessionExpired(): void {
-    // Clear local storage
+    // Clear auth token
     this.clearAuthToken();
-    this.clearChannelToken();
 
-    // Notify AuthService to clean up its state
+    // Notify AuthService to clean up its state (including company/channel state)
     if (this.sessionExpiredCallback) {
       this.sessionExpiredCallback();
     }

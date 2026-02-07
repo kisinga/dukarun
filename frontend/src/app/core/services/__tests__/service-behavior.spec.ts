@@ -99,6 +99,33 @@ describe('Service Behavior Tests', () => {
     });
   });
 
+  describe('Channel Token as Derived State', () => {
+    it('should return active company token via getChannelToken after activation', () => {
+      companyService.activateCompany('company-1');
+      expect(companyService.getChannelToken()).toBe('token1');
+    });
+
+    it('should return null from getChannelToken after clearActiveCompany', () => {
+      companyService.activateCompany('company-1');
+      companyService.clearActiveCompany();
+      expect(companyService.getChannelToken()).toBeNull();
+    });
+
+    it('should update getChannelToken when switching companies', () => {
+      companyService.activateCompany('company-1');
+      expect(companyService.getChannelToken()).toBe('token1');
+
+      companyService.activateCompany('company-2');
+      expect(companyService.getChannelToken()).toBe('token2');
+    });
+
+    it('should provide token to ApolloService via callback', () => {
+      companyService.activateCompany('company-1');
+      // ApolloService.getChannelToken() delegates to CompanyService via the registered provider
+      expect(apolloService.getChannelToken()).toBe('token1');
+    });
+  });
+
   describe('Error Handling Behavior', () => {
     it('should handle missing data gracefully', () => {
       // Test: Services should handle missing data

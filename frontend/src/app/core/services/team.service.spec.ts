@@ -73,7 +73,6 @@ describe('TeamService', () => {
 
     const mockApolloService = {
       getClient: jasmine.createSpy('getClient').and.returnValue({ query: mockApolloQuery }),
-      setChannelToken: jasmine.createSpy('setChannelToken'),
     };
 
     const mockCompanyService = {
@@ -115,6 +114,41 @@ describe('TeamService', () => {
       const members = service.members();
       const bob = members.find((m) => m.firstName === 'Bob');
       expect(bob).toBeUndefined();
+    });
+
+    it('does not filter out non-superadmin roles with empty channels', async () => {
+      // Regression: previously, roles with no channels were treated as superadmin
+      mockApolloQuery.and.returnValue(
+        Promise.resolve({
+          data: {
+            administrators: {
+              items: [
+                {
+                  id: '4',
+                  firstName: 'New',
+                  lastName: 'Admin',
+                  emailAddress: 'new@test.com',
+                  user: {
+                    id: 'u4',
+                    identifier: 'new',
+                    verified: true,
+                    roles: [
+                      { id: 'r4', code: 'channel-admin', permissions: [], channels: [{ id: '2' }] },
+                      { id: 'r5', code: 'extra-role', permissions: [], channels: [] },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      );
+
+      await service.loadMembers();
+
+      const members = service.members();
+      expect(members.length).toBe(1);
+      expect(members[0].firstName).toBe('New');
     });
 
     it('sets empty list and error when no active company', async () => {

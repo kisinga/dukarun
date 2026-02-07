@@ -116,6 +116,7 @@ export class AuthSessionService {
   handleSessionExpired(): void {
     console.warn('Session expired - clearing user state');
     this.userSignal.set(null);
+    this.companyService.clearActiveCompany();
     // Note: Apollo service handles redirect and cache clearing
   }
 
