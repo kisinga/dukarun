@@ -166,11 +166,7 @@
         enabledFilter() !== 'all' ||
         sortBy()
       ) {
-        <button
-          type="button"
-          class="btn btn-ghost btn-xs"
-          (click)="clearAllFilters()"
-        >
+        <button type="button" class="btn btn-ghost btn-xs" (click)="clearAllFilters()">
           Clear all
         </button>
       }
@@ -383,7 +379,22 @@
           </thead>
           <tbody>
             @for (product of displayedProducts(); track trackByProductId($index, product)) {
-              <tr app-product-table-row [product]="product" (action)="onProductAction($event)"></tr>
+              <tr
+                app-product-table-row
+                [product]="product"
+                [expanded]="isExpanded(product.id)"
+                (toggleExpand)="toggleExpand(product.id)"
+                (action)="onProductAction($event)"
+              ></tr>
+              @if (isExpanded(product.id)) {
+                <tr class="bg-base-200/40 border-t border-base-300">
+                  <td colspan="7" class="p-0 align-top">
+                    <div class="border-l-2 border-base-300 pl-4 py-2 ml-4 my-1 rounded-r">
+                      <app-variant-list [variants]="product.variants ?? []" [showStock]="true" />
+                    </div>
+                  </td>
+                </tr>
+              }
             }
           </tbody>
         </table>

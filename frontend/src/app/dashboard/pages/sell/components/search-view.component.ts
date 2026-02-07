@@ -11,13 +11,14 @@ import {
 import { FormsModule } from '@angular/forms';
 import { ProductSearchResult } from '../../../../core/services/product/product-search.service';
 import { ProductLabelComponent } from '../../shared/components/product-label.component';
+import { VariantListComponent } from '../../shared/components/variant-list.component';
 
 /**
  * Unified search interface with integrated camera toggle
  */
 @Component({
   selector: 'app-search-view',
-  imports: [CommonModule, FormsModule, ProductLabelComponent],
+  imports: [CommonModule, FormsModule, ProductLabelComponent, VariantListComponent],
   template: `
     <div class="card bg-base-100 shadow-lg">
       <div class="card-body p-3">
@@ -75,90 +76,108 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
 
         <!-- Search Results -->
         @if (searchResults().length > 0) {
-          <div class="mt-2 space-y-1 max-h-[60vh] overflow-y-auto">
+          <div class="mt-2 space-y-2 max-h-[60vh] overflow-y-auto">
             @for (product of searchResults(); track product.id) {
-              <button
-                class="w-full flex items-center gap-2 p-2 rounded-lg bg-base-200 hover:bg-base-300 transition-colors"
-                (click)="productSelected.emit(product)"
-              >
-                <!-- Product Image -->
-                @if (product.featuredAsset) {
-                  <img
-                    [src]="product.featuredAsset.preview"
-                    [alt]="product.name"
-                    class="w-10 h-10 rounded object-cover"
-                  />
-                } @else {
-                  <div class="w-10 h-10 rounded bg-base-300 flex items-center justify-center">
-                    @if (isService(product)) {
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-5 w-5 text-accent"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                        />
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                      </svg>
-                    } @else {
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-5 w-5 text-primary"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                        />
-                      </svg>
-                    }
-                  </div>
-                }
-
-                <!-- Product Info -->
-                <div class="flex-1 text-left min-w-0">
-                  <app-product-label
-                    [productName]="product.name"
-                    [facetValues]="product.facetValues ?? []"
-                  />
-                  <div class="text-xs opacity-60">
-                    {{ product.variants.length }} variant{{
-                      product.variants.length > 1 ? 's' : ''
-                    }}
-                  </div>
-                </div>
-
-                <!-- Add Icon -->
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5 text-primary"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+              <div class="border border-base-300 rounded-lg overflow-hidden bg-base-100">
+                <button
+                  class="w-full flex items-center gap-2 p-2 bg-base-200 hover:bg-base-300 transition-colors"
+                  (click)="productSelected.emit(product)"
                 >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-              </button>
+                  <!-- Product Image -->
+                  @if (product.featuredAsset) {
+                    <img
+                      [src]="product.featuredAsset.preview"
+                      [alt]="product.name"
+                      class="w-10 h-10 rounded object-cover"
+                    />
+                  } @else {
+                    <div class="w-10 h-10 rounded bg-base-300 flex items-center justify-center">
+                      @if (isService(product)) {
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="h-5 w-5 text-accent"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                          />
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                        </svg>
+                      } @else {
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="h-5 w-5 text-primary"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                          />
+                        </svg>
+                      }
+                    </div>
+                  }
+
+                  <!-- Product Info -->
+                  <div class="flex-1 text-left min-w-0">
+                    <app-product-label
+                      [productName]="product.name"
+                      [facetValues]="product.facetValues ?? []"
+                    />
+                    <div class="text-xs opacity-60">
+                      {{ product.variants.length }} variant{{
+                        product.variants.length > 1 ? 's' : ''
+                      }}
+                    </div>
+                  </div>
+
+                  <!-- Add Icon -->
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-5 w-5 text-primary"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                </button>
+                @if (!isMobile() && product.variants.length > 1) {
+                  <details
+                    class="collapse collapse-arrow border-t border-base-300 bg-base-200/60"
+                    [class.collapse-open]="product.variants.length <= 3"
+                    [attr.open]="product.variants.length <= 3"
+                  >
+                    <summary
+                      class="collapse-title min-h-0 py-1 pl-6 pr-2 text-xs opacity-70 cursor-pointer"
+                    >
+                      <span class="sr-only">Toggle variants</span>
+                    </summary>
+                    <div class="collapse-content pl-6 pr-2 pb-1.5 pt-0">
+                      <app-variant-list [variants]="product.variants" />
+                    </div>
+                  </details>
+                }
+              </div>
             }
           </div>
         }

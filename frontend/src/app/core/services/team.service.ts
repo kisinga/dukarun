@@ -69,11 +69,14 @@ export class TeamService {
     this.error.set(null);
 
     try {
-      const channelId = this.companyService.activeCompanyId();
-      if (!channelId) {
+      const company = this.companyService.activeCompany();
+      if (!company?.id) {
         this.error.set('No active channel');
         this.members.set([]);
         return;
+      }
+      if (company.token) {
+        this.apolloService.setChannelToken(company.token);
       }
 
       const client = this.apolloService.getClient();
@@ -116,7 +119,7 @@ export class TeamService {
 
           // Include only admins that belong to the current channel (coerce ID for type-safe comparison)
           return roles.some((role) =>
-            role.channels?.some((ch) => String(ch.id) === String(channelId)),
+            role.channels?.some((ch) => String(ch.id) === String(company.id)),
           );
         })
         .map((admin) => ({
@@ -152,6 +155,10 @@ export class TeamService {
     this.error.set(null);
 
     try {
+      const company = this.companyService.activeCompany();
+      if (company?.token) {
+        this.apolloService.setChannelToken(company.token);
+      }
       const client = this.apolloService.getClient();
       const result = await client.query<GetRoleTemplatesQuery>({
         query: GET_ROLE_TEMPLATES,
@@ -177,11 +184,15 @@ export class TeamService {
     this.error.set(null);
 
     try {
-      const channelId = this.companyService.activeCompanyId();
-      if (!channelId) {
+      const company = this.companyService.activeCompany();
+      if (!company?.id) {
         const errorMessage = 'No active channel';
         this.error.set(errorMessage);
         throw new Error(errorMessage);
+      }
+      // Ensure channel token is set so admin API uses this channel for permission check
+      if (company.token) {
+        this.apolloService.setChannelToken(company.token);
       }
 
       const client = this.apolloService.getClient();
@@ -253,6 +264,10 @@ export class TeamService {
     this.error.set(null);
 
     try {
+      const company = this.companyService.activeCompany();
+      if (company?.token) {
+        this.apolloService.setChannelToken(company.token);
+      }
       const client = this.apolloService.getClient();
       const result = await client.mutate<UpdateChannelAdminMutation>({
         mutation: UPDATE_CHANNEL_ADMIN,
@@ -303,6 +318,10 @@ export class TeamService {
     this.error.set(null);
 
     try {
+      const company = this.companyService.activeCompany();
+      if (company?.token) {
+        this.apolloService.setChannelToken(company.token);
+      }
       const client = this.apolloService.getClient();
       const result = await client.mutate<DisableChannelAdminMutation>({
         mutation: DISABLE_CHANNEL_ADMIN,
