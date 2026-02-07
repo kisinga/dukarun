@@ -1,4 +1,5 @@
 import { Injectable, Injector, computed, inject, signal } from '@angular/core';
+import { ApolloService } from './apollo.service';
 import { CompanyService } from './company.service';
 import { loadMlModelService } from './ml-model.loader';
 import type { MlModelService } from './ml-model/ml-model.service';
@@ -27,6 +28,7 @@ export interface InitStatus {
   providedIn: 'root',
 })
 export class AppInitService {
+  private readonly apolloService = inject(ApolloService);
   private readonly companyService = inject(CompanyService);
   private readonly productCacheService = inject(ProductCacheService);
   private readonly stockLocationService = inject(StockLocationService);
@@ -196,6 +198,7 @@ export class AppInitService {
    * Clear all cached data (on logout or channel switch)
    */
   clearCache(): void {
+    this.apolloService.clearCache();
     this.productCacheService.clearCache();
     this.mlModelService?.unloadModel();
     this.stockLocationService.clearLocations();
