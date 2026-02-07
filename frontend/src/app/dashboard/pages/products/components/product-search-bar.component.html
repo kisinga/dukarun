@@ -1,65 +1,41 @@
-<div class="card bg-base-100 border border-base-300">
-  <div class="card-body p-4 lg:p-5">
-    <div class="flex gap-3">
-      <!-- Search Input -->
-      <label class="input input-lg lg:input-md input-bordered flex items-center gap-3 flex-1">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5 opacity-60 shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-        <input
-          type="text"
-          class="grow text-base"
-          [placeholder]="placeholder()"
-          [(ngModel)]="searchQuery"
+<label class="input input-bordered flex items-center gap-3 w-full">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    class="h-5 w-5 opacity-60 shrink-0"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
+    <path
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+    />
+  </svg>
+  <input
+    type="text"
+    class="grow"
+    [placeholder]="placeholder()"
+    [value]="searchQuery()"
+    (input)="onSearchChange($any($event.target).value)"
+  />
+  @if (searchQuery()) {
+    <button (click)="clearSearch()" class="btn btn-ghost btn-sm btn-circle" type="button">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M6 18L18 6M6 6l12 12"
         />
-        @if (searchQuery()) {
-          <button (click)="clearSearch()" class="btn btn-ghost btn-sm btn-circle">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        }
-      </label>
-
-      <!-- Filter Button -->
-      <label for="filter-drawer" class="btn btn-lg lg:btn-md btn-square btn-outline">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-6 w-6 lg:h-5 lg:w-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-          />
-        </svg>
-      </label>
-    </div>
-  </div>
-</div>
+      </svg>
+    </button>
+  }
+</label>

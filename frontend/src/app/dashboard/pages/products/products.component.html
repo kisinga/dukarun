@@ -88,101 +88,33 @@
   />
 
   <!-- Search & Filter Bar -->
-  <div class="flex flex-col gap-3">
-    <!-- Active Filter Badges -->
-    <div class="flex flex-wrap gap-2 items-center">
-      @if (searchQuery()) {
-        <span class="badge badge-outline gap-2">
-          Search: {{ searchQuery() }}
-          <button
-            class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
-            (click)="onSearchQueryChange('')"
-            type="button"
-            aria-label="Clear search"
-          >
-            ×
-          </button>
-        </span>
-      }
-      @for (code of facetCodes; track code) {
-        @if ((selectedFacetValueIds()[code]?.length ?? 0) > 0) {
-          <span class="badge badge-outline gap-2">
-            {{ code }}: {{ selectedFacetValueIds()[code]!.length }} selected
-            <button
-              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
-              (click)="setFacetIds(code, [])"
-              type="button"
-              [attr.aria-label]="'Clear ' + code"
-            >
-              ×
-            </button>
-          </span>
-        }
-      }
-      @if (enabledFilter() !== 'all') {
-        <span class="badge badge-outline gap-2">
-          Status: {{ enabledFilter() }}
-          <button
-            class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
-            (click)="setEnabledFilter('all')"
-            type="button"
-            aria-label="Clear status"
-          >
-            ×
-          </button>
-        </span>
-      }
-      @if (sortBy()) {
-        <span class="badge badge-outline gap-2">
-          Sort: {{ sortBy() === 'name_asc' ? 'A–Z' : 'Z–A' }}
-          <button
-            class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
-            (click)="setSortBy(null)"
-            type="button"
-            aria-label="Clear sort"
-          >
-            ×
-          </button>
-        </span>
-      }
-      @if (showLowStockOnly()) {
-        <span class="badge badge-warning gap-2">
-          Low Stock Only
-          <button
-            class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
-            (click)="toggleLowStockFilter(false)"
-            type="button"
-            aria-label="Clear filter"
-          >
-            ×
-          </button>
-        </span>
-      }
-      @if (
-        searchQuery() ||
-        (selectedFacetValueIds()['manufacturer']?.length ?? 0) > 0 ||
-        (selectedFacetValueIds()['category']?.length ?? 0) > 0 ||
-        (selectedFacetValueIds()['tags']?.length ?? 0) > 0 ||
-        enabledFilter() !== 'all' ||
-        sortBy()
-      ) {
-        <button type="button" class="btn btn-ghost btn-xs" (click)="clearAllFilters()">
-          Clear all
-        </button>
-      }
-    </div>
+  <div class="card bg-base-100 shadow">
+    <div class="card-body p-4 gap-4">
+      <!-- Search Bar -->
+      <div class="w-full">
+        <app-product-search-bar
+          [searchQuery]="searchQuery()"
+          (searchQueryChange)="onSearchQueryChange($event)"
+        />
+      </div>
 
-    <div class="flex flex-col gap-3">
-      <div class="flex flex-col sm:flex-row gap-3 flex-wrap">
-        <div class="flex-1 min-w-[200px]">
-          <app-product-search-bar
-            [searchQuery]="searchQuery()"
-            (searchQueryChange)="onSearchQueryChange($event)"
-          />
+      <!-- Filters Row -->
+      <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap">
+        <!-- Facet Filters -->
+        <div class="flex flex-wrap gap-2 flex-1">
+          @for (code of facetCodes; track code) {
+            <app-product-list-facet-selector
+              [facetCode]="code"
+              [selectedIds]="selectedFacetValueIds()[code] ?? []"
+              (selectedIdsChange)="setFacetIds(code, $event)"
+            />
+          }
         </div>
-        <div class="flex flex-wrap items-end gap-2">
+
+        <!-- Status & Sort Filters -->
+        <div class="flex gap-2 items-center flex-wrap">
           <select
-            class="select select-bordered select-sm w-32"
+            class="select select-bordered select-sm min-w-[120px]"
             [value]="enabledFilter()"
             (change)="setEnabledFilter($any($event.target).value)"
           >
@@ -190,21 +122,23 @@
             <option value="active">Active</option>
             <option value="disabled">Disabled</option>
           </select>
+
           <select
-            class="select select-bordered select-sm w-36"
+            class="select select-bordered select-sm min-w-[140px]"
             [value]="sortBy() ?? ''"
             (change)="setSortBy($any($event.target).value || null)"
           >
-            <option value="">Sort</option>
+            <option value="">Sort by...</option>
             <option value="name_asc">Name A–Z</option>
             <option value="name_desc">Name Z–A</option>
           </select>
+
           <label
-            class="label cursor-pointer gap-3 px-4 py-2 rounded-lg border border-base-300 bg-base-100 hover:bg-base-200 transition-colors"
+            class="label cursor-pointer gap-2 px-3 py-2 rounded-lg border border-base-300 bg-base-100 hover:bg-base-200 transition-colors min-w-fit"
             [class.border-warning]="showLowStockOnly()"
             [class.bg-warning/10]="showLowStockOnly()"
           >
-            <span class="label-text font-medium text-sm">Low Stock Only</span>
+            <span class="label-text font-medium text-sm whitespace-nowrap">Low Stock</span>
             <input
               type="checkbox"
               class="toggle toggle-warning toggle-sm"
@@ -214,15 +148,115 @@
           </label>
         </div>
       </div>
-      <div class="flex flex-wrap gap-2">
-        @for (code of facetCodes; track code) {
-          <app-product-list-facet-selector
-            [facetCode]="code"
-            [selectedIds]="selectedFacetValueIds()[code] ?? []"
-            (selectedIdsChange)="setFacetIds(code, $event)"
-          />
-        }
-      </div>
+
+      <!-- Active Filters & Clear -->
+      @if (
+        searchQuery() ||
+        (selectedFacetValueIds()['manufacturer']?.length ?? 0) > 0 ||
+        (selectedFacetValueIds()['category']?.length ?? 0) > 0 ||
+        (selectedFacetValueIds()['tags']?.length ?? 0) > 0 ||
+        enabledFilter() !== 'all' ||
+        sortBy() ||
+        showLowStockOnly()
+      ) {
+        <div class="flex flex-wrap gap-2 items-center pt-2 border-t border-base-300">
+          <span class="text-xs font-medium text-base-content/60">Active filters:</span>
+
+          @if (searchQuery()) {
+            <span class="badge badge-sm badge-outline gap-1.5">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-3 w-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              "{{ searchQuery() }}"
+              <button
+                class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
+                (click)="onSearchQueryChange('')"
+                type="button"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            </span>
+          }
+
+          @for (code of facetCodes; track code) {
+            @if ((selectedFacetValueIds()[code]?.length ?? 0) > 0) {
+              <span class="badge badge-sm badge-outline gap-1.5">
+                {{ code | titlecase }}: {{ selectedFacetValueIds()[code]!.length }}
+                <button
+                  class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
+                  (click)="setFacetIds(code, [])"
+                  type="button"
+                  [attr.aria-label]="'Clear ' + code"
+                >
+                  ×
+                </button>
+              </span>
+            }
+          }
+
+          @if (enabledFilter() !== 'all') {
+            <span class="badge badge-sm badge-outline gap-1.5">
+              Status: {{ enabledFilter() | titlecase }}
+              <button
+                class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
+                (click)="setEnabledFilter('all')"
+                type="button"
+                aria-label="Clear status"
+              >
+                ×
+              </button>
+            </span>
+          }
+
+          @if (sortBy()) {
+            <span class="badge badge-sm badge-outline gap-1.5">
+              Sort: {{ sortBy() === 'name_asc' ? 'A–Z' : 'Z–A' }}
+              <button
+                class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
+                (click)="setSortBy(null)"
+                type="button"
+                aria-label="Clear sort"
+              >
+                ×
+              </button>
+            </span>
+          }
+
+          @if (showLowStockOnly()) {
+            <span class="badge badge-sm badge-warning gap-1.5">
+              Low Stock Only
+              <button
+                class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
+                (click)="toggleLowStockFilter(false)"
+                type="button"
+                aria-label="Clear filter"
+              >
+                ×
+              </button>
+            </span>
+          }
+
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs ml-auto"
+            (click)="clearAllFilters(); toggleLowStockFilter(false)"
+          >
+            Clear all filters
+          </button>
+        </div>
+      }
     </div>
   </div>
 
