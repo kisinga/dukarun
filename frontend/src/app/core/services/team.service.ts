@@ -75,6 +75,7 @@ export class TeamService {
         this.members.set([]);
         return;
       }
+      const channelId = company.id;
       if (company.token) {
         this.apolloService.setChannelToken(company.token);
       }
@@ -119,7 +120,7 @@ export class TeamService {
 
           // Include only admins that belong to the current channel (coerce ID for type-safe comparison)
           return roles.some((role) =>
-            role.channels?.some((ch) => String(ch.id) === String(company.id)),
+            role.channels?.some((ch) => String(ch.id) === String(channelId)),
           );
         })
         .map((admin) => ({
@@ -244,11 +245,16 @@ export class TeamService {
       });
 
       // Extract error message from various sources
-      const errorMessage =
+      let errorMessage =
         err?.graphQLErrors?.[0]?.message ||
         err?.networkError?.message ||
         (err instanceof Error ? err.message : 'Failed to create team member');
-
+      if (
+        typeof errorMessage === 'string' &&
+        errorMessage.includes('not currently authorized to perform this action')
+      ) {
+        errorMessage = "Permission denied. Make sure you're in the correct company and try again.";
+      }
       this.error.set(errorMessage);
       throw new Error(errorMessage);
     } finally {

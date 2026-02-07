@@ -77,7 +77,7 @@ export class ChannelAdminService {
     ctx: RequestContext,
     input: InviteAdministratorInput | CreateChannelAdminInput
   ): Promise<Administrator> {
-    const channelId = ctx.channelId!;
+    const channelId = this.requireChannelId(ctx);
 
     // Phone number is required
     if (!('phoneNumber' in input) || !input.phoneNumber) {
@@ -105,7 +105,7 @@ export class ChannelAdminService {
 
     if (existingUser) {
       // User exists - check if they already belong to this channel
-      if (this.userBelongsToChannel(existingUser, channelId.toString())) {
+      if (this.userBelongsToChannel(existingUser, channelId)) {
         throw new BadRequestException(
           `Administrator with phone number ${cleanInput.phoneNumber} already belongs to this channel`
         );
@@ -261,7 +261,7 @@ export class ChannelAdminService {
     ctx: RequestContext,
     input: UpdateChannelAdminInput
   ): Promise<Administrator> {
-    const channelId = ctx.channelId!;
+    const channelId = this.requireChannelId(ctx);
 
     const administrator = await this.administratorService.findOne(ctx, input.id);
     if (!administrator) {
@@ -278,11 +278,16 @@ export class ChannelAdminService {
       relations: ['roles', 'roles.channels'],
     });
 
-    if (!user || !user.roles.some(role => role.channels.some(ch => ch.id === channelId))) {
+    if (
+      !user ||
+      !user.roles.some(role => role.channels?.some(ch => this.channelIdMatches(ch.id, channelId)))
+    ) {
       throw new BadRequestException('Administrator does not belong to this channel');
     }
 
-    const role = user.roles.find(r => r.channels.some(ch => ch.id === channelId));
+    const role = user.roles.find(r =>
+      r.channels?.some(ch => this.channelIdMatches(ch.id, channelId))
+    );
     if (!role) {
       throw new BadRequestException('Role not found for administrator');
     }
@@ -321,7 +326,7 @@ export class ChannelAdminService {
     ctx: RequestContext,
     adminId: string
   ): Promise<{ success: boolean; message: string }> {
-    const channelId = ctx.channelId!;
+    this.requireChannelId(ctx);
 
     const administrator = await this.administratorService.findOne(ctx, adminId);
     if (!administrator) {
@@ -570,11 +575,26 @@ export class ChannelAdminService {
     }
   }
 
-  private userBelongsToChannel(user: User, channelId: string): boolean {
+  private userBelongsToChannel(user: User, channelId: string | number): boolean {
     if (!user.roles) {
       return false;
     }
-    return user.roles.some(role => role.channels?.some(channel => channel.id === channelId));
+    return user.roles.some(role =>
+      role.channels?.some(channel => this.channelIdMatches(channel.id, channelId))
+    );
+  }
+
+  /** Fail fast when channel context is missing (e.g. missing vendure-token header). */
+  private requireChannelId(ctx: RequestContext): string | number {
+    if (ctx.channelId == null) {
+      throw new BadRequestException('Channel context is required');
+    }
+    return ctx.channelId;
+  }
+
+  /** Compare channel IDs safely (Vendure can use string or number). */
+  private channelIdMatches(a: string | number, b: string | number): boolean {
+    return String(a) === String(b);
   }
 
   private async updateAdministratorEmailIfNeeded(
