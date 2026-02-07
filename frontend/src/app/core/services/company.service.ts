@@ -345,8 +345,10 @@ export class CompanyService {
         if (companies.length > 0) {
           this.activateCompany(companies[0].id);
         }
+      } else {
+        // Company still exists — persist session with fresh server data (tokens may have changed)
+        this.persistSession();
       }
-      // If still exists: no action needed — getChannelToken() already derives from activeCompany()
     } else if (companies.length > 0) {
       this.activateCompany(companies[0].id);
     }
