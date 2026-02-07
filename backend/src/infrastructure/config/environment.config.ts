@@ -47,6 +47,7 @@ export class EnvironmentConfig implements OnModuleInit {
     cookieSecure: false,
     frontendUrl: '',
     assetUrlPrefix: '',
+    assetUploadDir: '',
   };
 
   // Email configuration
@@ -221,6 +222,8 @@ export class EnvironmentConfig implements OnModuleInit {
     this.app.cookieSecure = process.env.COOKIE_SECURE === 'true';
     this.app.frontendUrl = process.env.FRONTEND_URL || '';
     this.app.assetUrlPrefix = process.env.ASSET_URL_PREFIX || '';
+    this.app.assetUploadDir =
+      process.env.ASSET_UPLOAD_DIR || path.join(process.cwd(), 'static/assets');
 
     // Load Email configuration
     this.email.transport = process.env.MAIL_TRANSPORT || 'file';
