@@ -98,7 +98,7 @@
             <h3 class="font-semibold text-sm md:text-base mb-2">Quick Select</h3>
           }
           @if (shouldExpandQuickSelect()) {
-            <div class="space-y-1.5 max-h-[50vh] overflow-y-auto mt-2 slide-in-from-top-2">
+            <div class="space-y-1.5 max-h-[23vh] overflow-y-auto mt-2 slide-in-from-top-2">
               @for (product of recentProducts(); track product.id) {
                 <button
                   class="w-full flex items-center gap-2.5 p-2.5 md:p-2 rounded-lg bg-base-200 active:bg-base-300 hover:bg-base-300 transition-colors min-h-[44px] touch-manipulation"
