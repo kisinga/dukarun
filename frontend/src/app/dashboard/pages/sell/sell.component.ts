@@ -28,6 +28,7 @@ import {
 } from '../../../core/services/product/product-search.service';
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { ProductLabelComponent } from '../shared/components/product-label.component';
+import { VariantListComponent } from '../shared/components/variant-list.component';
 import { CartComponent, CartItem } from './components/cart.component';
 import { CheckoutFabComponent } from './components/checkout-fab.component';
 import { CheckoutModalComponent } from './components/checkout-modal.component';
@@ -62,6 +63,7 @@ type PaymentMethodCode = string;
     CommonModule,
     RouterModule,
     ProductLabelComponent,
+    VariantListComponent,
     ProductScannerComponent,
     SearchViewComponent,
     ProductConfirmModalComponent,

@@ -17,11 +17,16 @@ The notification system is built with a **server-side event-driven architecture*
 - **Purpose**: CRUD operations for notifications and channel user resolution
 - **Key Methods**:
   - `createNotification()` - Creates new notifications
+  - `createNotificationIfEnabled()` - Creates only if user preferences allow
   - `getUserNotifications()` - Fetches user's notifications with optional type filtering
   - `markAsRead()` - Marks individual notification as read
   - `markAllAsRead()` - Marks all user's notifications as read
   - `getChannelUsers()` - Resolves all admins and users for a channel
   - `deleteOldNotifications()` - Prunes old notifications (default 30 days)
+  - `hasAnyAdminWithPaymentNotificationsEnabled()` - Used by subscription expiry logic
+  - `getLastExpiringSoonThreshold()` - Used to avoid duplicate expiring-soon alerts
+
+- **Subscription expiry behavior**: See [SUBSCRIPTION_EXPIRY_NOTIFICATIONS.md](SUBSCRIPTION_EXPIRY_NOTIFICATIONS.md) for the full behavior of subscription expiry and expiring-soon notifications.
 
 ### 3. **PushNotificationService** (`/backend/src/services/notifications/push-notification.service.ts`)
 

@@ -57,6 +57,11 @@ This document describes the Paystack subscription and payment flow integration f
    - Blocks mutations when subscription is expired
    - Allows subscription-related mutations even if expired
 
+7. **SubscriptionExpirySubscriber** (`backend/src/plugins/subscriptions/subscription-expiry.subscriber.ts`)
+   - Runs daily in worker process; checks for expiring subscriptions
+   - Emits events that trigger in-app notifications (expired, expiring soon)
+   - See [SUBSCRIPTION_EXPIRY_NOTIFICATIONS.md](SUBSCRIPTION_EXPIRY_NOTIFICATIONS.md) for full behavior and stop conditions
+
 #### Frontend
 
 1. **SubscriptionService** (`frontend/src/app/core/services/subscription.service.ts`)

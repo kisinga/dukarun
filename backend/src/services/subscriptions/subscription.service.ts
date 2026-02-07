@@ -683,6 +683,17 @@ export class SubscriptionService {
   }
 
   /**
+   * Check if we have ever sent an expired reminder for this channel.
+   * Used for the one-time bypass when all admins have notifications disabled.
+   */
+  async hasEverSentExpiredReminder(ctx: RequestContext, channelId: string): Promise<boolean> {
+    const channel = await this.channelService.findOne(ctx, channelId);
+    if (!channel) return false;
+    const lastSent = (channel.customFields as any)?.subscriptionExpiredReminderSentAt;
+    return !!lastSent;
+  }
+
+  /**
    * Check if channel can perform action (not expired/cancelled)
    */
   async canPerformAction(ctx: RequestContext, channelId: string, action: string): Promise<boolean> {

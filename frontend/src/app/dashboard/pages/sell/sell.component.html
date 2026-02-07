@@ -98,76 +98,94 @@
             <h3 class="font-semibold text-sm md:text-base mb-2">Quick Select</h3>
           }
           @if (shouldExpandQuickSelect()) {
-            <div class="space-y-1.5 max-h-[23vh] overflow-y-auto mt-2 slide-in-from-top-2">
+            <div class="space-y-2 max-h-[23vh] overflow-y-auto mt-2 slide-in-from-top-2">
               @for (product of recentProducts(); track product.id) {
-                <button
-                  class="w-full flex items-center gap-2.5 p-2.5 md:p-2 rounded-lg bg-base-200 active:bg-base-300 hover:bg-base-300 transition-colors min-h-[44px] touch-manipulation"
-                  (click)="handleQuickAddProduct(product)"
-                >
-                  <!-- Product Image -->
-                  @if (product.featuredAsset) {
-                    <img
-                      [src]="product.featuredAsset.preview"
-                      [alt]="product.name"
-                      class="w-10 h-10 rounded object-cover flex-shrink-0"
-                    />
-                  } @else {
-                    <div
-                      class="w-10 h-10 rounded bg-base-300 flex items-center justify-center flex-shrink-0"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-5 w-5 text-primary"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                        />
-                      </svg>
-                    </div>
-                  }
-
-                  <!-- Product Info -->
-                  <div class="flex-1 text-left min-w-0">
-                    <app-product-label
-                      [productName]="product.name"
-                      [facetValues]="product.facetValues ?? []"
-                    />
-                    <div class="text-xs opacity-60">
-                      @if (product.variants.length === 1) {
-                        {{ formatPrice(product.variants[0].priceWithTax) }}
-                      } @else {
-                        {{ product.variants.length }} variants
-                      }
-                    </div>
-                  </div>
-
-                  <!-- Price (for single variant) or Add Icon -->
-                  @if (product.variants.length === 1) {
-                    <div class="text-sm font-semibold text-primary flex-shrink-0">
-                      {{ formatPrice(product.variants[0].priceWithTax) }}
-                    </div>
-                  }
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-5 w-5 text-primary flex-shrink-0"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                <div class="border border-base-300 rounded-lg overflow-hidden bg-base-100">
+                  <button
+                    class="w-full flex items-center gap-2.5 p-2.5 md:p-2 bg-base-200 active:bg-base-300 hover:bg-base-300 transition-colors min-h-[44px] touch-manipulation"
+                    (click)="handleQuickAddProduct(product)"
                   >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                </button>
+                    <!-- Product Image -->
+                    @if (product.featuredAsset) {
+                      <img
+                        [src]="product.featuredAsset.preview"
+                        [alt]="product.name"
+                        class="w-10 h-10 rounded object-cover flex-shrink-0"
+                      />
+                    } @else {
+                      <div
+                        class="w-10 h-10 rounded bg-base-300 flex items-center justify-center flex-shrink-0"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="h-5 w-5 text-primary"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                          />
+                        </svg>
+                      </div>
+                    }
+
+                    <!-- Product Info -->
+                    <div class="flex-1 text-left min-w-0">
+                      <app-product-label
+                        [productName]="product.name"
+                        [facetValues]="product.facetValues ?? []"
+                      />
+                      <div class="text-xs opacity-60">
+                        @if (product.variants.length === 1) {
+                          {{ formatPrice(product.variants[0].priceWithTax) }}
+                        } @else {
+                          {{ product.variants.length }} variants
+                        }
+                      </div>
+                    </div>
+
+                    <!-- Price (for single variant) or Add Icon -->
+                    @if (product.variants.length === 1) {
+                      <div class="text-sm font-semibold text-primary flex-shrink-0">
+                        {{ formatPrice(product.variants[0].priceWithTax) }}
+                      </div>
+                    }
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-5 w-5 text-primary flex-shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                  </button>
+                  @if (product.variants.length > 1) {
+                    <details
+                      class="collapse collapse-arrow border-t border-base-300 bg-base-200/60"
+                      [class.collapse-open]="product.variants.length <= 3"
+                      [attr.open]="product.variants.length <= 3"
+                    >
+                      <summary
+                        class="collapse-title min-h-0 py-1 pl-6 pr-2 text-xs opacity-70 cursor-pointer"
+                      >
+                        <span class="sr-only">Toggle variants</span>
+                      </summary>
+                      <div class="collapse-content pl-6 pr-2 pb-1.5 pt-0">
+                        <app-variant-list [variants]="product.variants" />
+                      </div>
+                    </details>
+                  }
+                </div>
               }
             </div>
           }

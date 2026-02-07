@@ -22,10 +22,12 @@ Store owner and admin template receive `ReadAdministrator`, `UpdateSettings`, an
 ### GraphQL API
 
 - `roleTemplates` - List available role templates (from DB)
-- `createChannelAdmin` - Create admin with phone number and role template
+- `createChannelAdmin` - Create admin with phone number and role template (same handler as invite below)
 - `updateChannelAdmin` - Update admin permissions
 - `disableChannelAdmin` - Remove admin
 - `inviteChannelAdministrator` - Invite admin (requires phone number, email optional)
+
+**Create vs invite:** `createChannelAdmin` and `inviteChannelAdministrator` both call `ChannelAdminService.inviteChannelAdministrator`. The schema differs (e.g. `createChannelAdmin` requires `roleTemplateCode`; invite defaults it to `admin`). Validation and behaviour are shared; keep both entry points in sync when changing rules.
 
 ### Key Files
 
@@ -69,6 +71,10 @@ Route: `/dashboard/team`
 ## Configuration
 
 Channel custom field: `maxAdminCount` (default: 5)
+
+## Channel context
+
+Team mutations require an active channel. The frontend sends the active company’s token in the `vendure-token` header so the admin API uses that channel for permission checks. If the header is missing or wrong, the backend returns "Channel context is required" or a permission error. The Team service sets the channel token from the active company before each request.
 
 ## Notes
 

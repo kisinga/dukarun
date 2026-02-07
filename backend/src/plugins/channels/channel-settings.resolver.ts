@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
 import { gql } from 'graphql-tag';
@@ -134,6 +135,9 @@ export class ChannelSettingsResolver {
   @Mutation()
   @Allow(Permission.UpdateSettings)
   async inviteChannelAdministrator(@Ctx() ctx: RequestContext, @Args('input') input: any) {
+    if (ctx.channelId == null) {
+      throw new BadRequestException('Channel context is required');
+    }
     return this.channelAdminService.inviteChannelAdministrator(ctx, input);
   }
 
@@ -143,6 +147,9 @@ export class ChannelSettingsResolver {
     @Ctx() ctx: RequestContext,
     @Args('input') input: CreateChannelAdminInput
   ) {
+    if (ctx.channelId == null) {
+      throw new BadRequestException('Channel context is required');
+    }
     return this.channelAdminService.inviteChannelAdministrator(ctx, input);
   }
 
@@ -153,6 +160,9 @@ export class ChannelSettingsResolver {
     @Args('id') id: string,
     @Args('permissions', { type: () => [String] }) permissions: string[]
   ) {
+    if (ctx.channelId == null) {
+      throw new BadRequestException('Channel context is required');
+    }
     return this.channelAdminService.updateChannelAdministrator(ctx, {
       id,
       permissions: permissions as Permission[],
@@ -162,6 +172,9 @@ export class ChannelSettingsResolver {
   @Mutation()
   @Allow(Permission.UpdateSettings)
   async disableChannelAdmin(@Ctx() ctx: RequestContext, @Args('id') id: string) {
+    if (ctx.channelId == null) {
+      throw new BadRequestException('Channel context is required');
+    }
     return this.channelAdminService.disableChannelAdministrator(ctx, id);
   }
 

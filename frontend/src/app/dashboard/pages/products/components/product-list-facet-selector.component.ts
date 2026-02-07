@@ -3,6 +3,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  ElementRef,
+  HostListener,
   inject,
   input,
   output,
@@ -23,60 +25,69 @@ import type { FacetValueSummary } from '../../../../core/services/product/facet.
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="form-control">
-      <label class="label py-0">
-        <span class="label-text text-sm font-medium text-base-content/70">{{ displayLabel() }}</span>
-      </label>
-      <details class="dropdown" [class.dropdown-open]="isOpen()">
-        <summary
-          class="btn btn-sm btn-outline justify-between min-h-9"
-          (click)="toggle($event)"
-          role="button"
+    <details class="dropdown" [class.dropdown-open]="isOpen()">
+      <summary
+        class="btn btn-sm btn-outline justify-between min-h-9 gap-2"
+        [class.btn-active]="selectedIds().length > 0"
+        (click)="toggle($event)"
+        role="button"
+      >
+        <span class="truncate">{{ displayLabel() }}: {{ summaryText() }}</span>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4 shrink-0 transition-transform"
+          [class.rotate-180]="isOpen()"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
         >
-          <span class="truncate">{{ summaryText() }}</span>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </summary>
-        <ul
-          class="dropdown-content menu z-10 mt-1 max-h-48 w-56 overflow-y-auto rounded-lg border border-base-300 bg-base-100 p-1 shadow-lg"
-        >
-          @if (isLoading()) {
-            <li class="px-2 py-2 text-sm text-base-content/60">
-              <span class="loading loading-spinner loading-xs"></span>
-              Loading...
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </summary>
+      <ul
+        class="dropdown-content menu z-[100] mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-base-300 bg-base-100 p-2 shadow-xl"
+      >
+        @if (isLoading()) {
+          <li class="px-3 py-3 text-sm text-base-content/60 flex items-center gap-2">
+            <span class="loading loading-spinner loading-xs"></span>
+            Loading options...
+          </li>
+        } @else if (options().length === 0) {
+          <li class="px-3 py-3 text-sm text-base-content/60">No options available</li>
+        } @else {
+          @for (item of options(); track item.id) {
+            <li>
+              <label
+                class="flex cursor-pointer gap-2 rounded-md px-3 py-2 hover:bg-base-200 active:bg-base-300"
+              >
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-sm checkbox-primary"
+                  [checked]="isSelected(item.id)"
+                  (change)="toggleId(item.id)"
+                />
+                <span class="flex-1">{{ item.name }}</span>
+              </label>
             </li>
-          } @else {
-            @for (item of options(); track item.id) {
-              <li>
-                <label class="flex cursor-pointer gap-2 rounded px-2 py-1.5">
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-sm"
-                    [checked]="isSelected(item.id)"
-                    (change)="toggleId(item.id)"
-                  />
-                  <span>{{ item.name }}</span>
-                </label>
-              </li>
-            }
-            @if (options().length === 0 && !isLoading()) {
-              <li class="px-2 py-2 text-sm text-base-content/60">No options</li>
-            }
           }
-        </ul>
-      </details>
-    </div>
+        }
+      </ul>
+    </details>
+  `,
+  styles: `
+    :host {
+      display: block;
+    }
   `,
 })
 export class ProductListFacetSelectorComponent {
   private readonly facetService = inject(FacetService);
+  private readonly elementRef = inject(ElementRef);
 
   readonly facetCode = input.required<FacetCode>();
   readonly selectedIds = input<string[]>([]);
@@ -97,10 +108,6 @@ export class ProductListFacetSelectorComponent {
   summaryText(): string {
     const ids = this.selectedIds();
     if (ids.length === 0) return 'All';
-    if (ids.length === 1) {
-      const name = this.options().find((o) => o.id === ids[0])?.name ?? '1 selected';
-      return name;
-    }
     return `${ids.length} selected`;
   }
 
@@ -135,5 +142,13 @@ export class ProductListFacetSelectorComponent {
     const current = this.selectedIds();
     const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
     this.selectedIdsChange.emit(next);
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+    if (!this.elementRef.nativeElement.contains(target)) {
+      this.isOpen.set(false);
+    }
   }
 }

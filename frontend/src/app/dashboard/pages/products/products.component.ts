@@ -27,6 +27,7 @@ import { ProductListFacetSelectorComponent } from './components/product-list-fac
 import { ProductSearchBarComponent } from './components/product-search-bar.component';
 import { ProductStats, ProductStatsComponent } from './components/product-stats.component';
 import { ProductTableRowComponent } from './components/product-table-row.component';
+import { VariantListComponent } from '../shared/components/variant-list.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 
 /**
@@ -48,6 +49,7 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
     ProductStatsComponent,
     ProductSearchBarComponent,
     ProductTableRowComponent,
+    VariantListComponent,
     PaginationComponent,
     DeleteConfirmationModalComponent,
     PageHeaderComponent,
@@ -85,22 +87,23 @@ export class ProductsComponent implements OnInit {
     relatedLabel: 'variant',
   });
   readonly productToDelete = signal<string | null>(null);
+  /** Product IDs whose variant detail row is expanded. Seeded with products that have < 3 variants. */
+  readonly expandedProductIds = signal<Set<string>>(new Set());
 
   // Build filter state from signals for buildProductListOptions
-  private readonly filterState = computed((): ProductListFilterState => ({
-    searchTerm: this.searchQuery().trim() || undefined,
-    facetValueIds: this.selectedFacetValueIds(),
-    enabled:
-      this.enabledFilter() === 'all'
-        ? null
-        : this.enabledFilter() === 'active',
-    sort:
-      this.sortBy() === 'name_asc'
-        ? { name: 'ASC' }
-        : this.sortBy() === 'name_desc'
-          ? { name: 'DESC' }
-          : undefined,
-  }));
+  private readonly filterState = computed(
+    (): ProductListFilterState => ({
+      searchTerm: this.searchQuery().trim() || undefined,
+      facetValueIds: this.selectedFacetValueIds(),
+      enabled: this.enabledFilter() === 'all' ? null : this.enabledFilter() === 'active',
+      sort:
+        this.sortBy() === 'name_asc'
+          ? { name: 'ASC' }
+          : this.sortBy() === 'name_desc'
+            ? { name: 'DESC' }
+            : undefined,
+    }),
+  );
 
   // Server returns current page; apply low-stock filter client-side only to that page
   readonly displayedProducts = computed(() => {
@@ -134,6 +137,36 @@ export class ProductsComponent implements OnInit {
       this.currentPage();
       this.itemsPerPage();
       this.loadProducts();
+    });
+    // Seed expandedProductIds so products with 2–3 variants start expanded (single variant = no expansion UI)
+    effect(() => {
+      const products = this.displayedProducts();
+      this.expandedProductIds.update((prev) => {
+        const next = new Set(prev);
+        products.forEach((p) => {
+          const n = p.variants?.length ?? 0;
+          if (n > 1 && n <= 3) {
+            next.add(p.id);
+          }
+        });
+        return next;
+      });
+    });
+  }
+
+  isExpanded(productId: string): boolean {
+    return this.expandedProductIds().has(productId);
+  }
+
+  toggleExpand(productId: string): void {
+    this.expandedProductIds.update((set) => {
+      const next = new Set(set);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
     });
   }
 

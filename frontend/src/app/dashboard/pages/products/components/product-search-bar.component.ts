@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input, model, output } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
 /**
  * Product search and filter bar component
@@ -8,16 +7,20 @@ import { FormsModule } from '@angular/forms';
  */
 @Component({
   selector: 'app-product-search-bar',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule],
   templateUrl: './product-search-bar.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProductSearchBarComponent {
   readonly placeholder = input<string>('Search by name, description, or SKU...');
-  readonly searchQuery = model<string>('');
-  readonly filterClick = output<void>();
+  readonly searchQuery = input<string>('');
+  readonly searchQueryChange = output<string>();
+
+  onSearchChange(value: string): void {
+    this.searchQueryChange.emit(value);
+  }
 
   clearSearch(): void {
-    this.searchQuery.set('');
+    this.searchQueryChange.emit('');
   }
 }

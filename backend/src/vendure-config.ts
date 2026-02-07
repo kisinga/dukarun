@@ -57,6 +57,7 @@ export const config: VendureConfig = {
     port: serverPort,
     adminApiPath: 'admin-api',
     shopApiPath: 'shop-api',
+    channelTokenKey: 'vendure-token',
     trustProxy: IS_PRODUCTION ? 1 : false,
     cors: {
       origin: IS_PRODUCTION

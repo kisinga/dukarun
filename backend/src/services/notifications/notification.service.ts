@@ -304,4 +304,65 @@ export class NotificationService {
 
     return true;
   }
+
+  // ============================================================================
+  // SUBSCRIPTION EXPIRY NOTIFICATION HELPERS
+  // Used by SubscriptionExpirySubscriber to decide whether to emit events.
+  // ============================================================================
+
+  /**
+   * Check if at least one channel admin has in-app PAYMENT notifications enabled.
+   * Used to avoid emitting subscription expiry events when no one would receive them.
+   */
+  async hasAnyAdminWithPaymentNotificationsEnabled(
+    ctx: RequestContext,
+    channelId: string
+  ): Promise<boolean> {
+    const adminIds = await this.channelUserService.getChannelAdminUserIds(ctx, channelId, {
+      includeSuperAdmins: true,
+    });
+    for (const userId of adminIds) {
+      const prefs = await this.getUserPreferences(ctx, userId, channelId);
+      if (prefs.inApp?.[NotificationType.PAYMENT] !== false) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get the minimum daysRemaining from recent "Subscription Expiring Soon" notifications
+   * for this channel. Used to avoid duplicate expiring_soon alerts for the same threshold.
+   * Returns null if no such notifications exist.
+   *
+   * Logic: only emit expiring_soon when current daysRemaining < this value (or null).
+   * E.g. sent at 7 days → min=7; at 3 days we emit (3<7); sent at 3 → min=3; at 1 we emit (1<3).
+   */
+  async getLastExpiringSoonThreshold(
+    ctx: RequestContext,
+    channelId: string,
+    withinDays: number = 35
+  ): Promise<number | null> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - withinDays);
+
+    const repo = this.connection.rawConnection.getRepository(Notification);
+    const notifications = await repo
+      .createQueryBuilder('n')
+      .where('n.channelId = :channelId', { channelId })
+      .andWhere('n.type = :type', { type: NotificationType.PAYMENT })
+      .andWhere('n.title = :title', { title: 'Subscription Expiring Soon' })
+      .andWhere('n.createdAt >= :cutoff', { cutoff })
+      .select(['n.data'])
+      .getMany();
+
+    let minDays: number | null = null;
+    for (const n of notifications) {
+      const days = n.data?.daysRemaining;
+      if (typeof days === 'number' && (days === 1 || days === 3 || days === 7)) {
+        minDays = minDays === null ? days : Math.min(minDays, days);
+      }
+    }
+    return minDays;
+  }
 }

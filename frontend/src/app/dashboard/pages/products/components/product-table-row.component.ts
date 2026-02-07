@@ -21,7 +21,9 @@ export class ProductTableRowComponent {
   private readonly currencyService = inject(CurrencyService);
 
   readonly product = input.required<ProductCardData>();
+  readonly expanded = input<boolean>(false);
   readonly action = output<{ action: ProductAction; productId: string }>();
+  readonly toggleExpand = output<void>();
 
   variantCount(): number {
     return this.product().variants?.length || 0;
@@ -64,5 +66,9 @@ export class ProductTableRowComponent {
 
   onAction(actionType: ProductAction): void {
     this.action.emit({ action: actionType, productId: this.product().id });
+  }
+
+  onExpandClick(): void {
+    this.toggleExpand.emit();
   }
 }

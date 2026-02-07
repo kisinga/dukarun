@@ -69,11 +69,15 @@ export class TeamService {
     this.error.set(null);
 
     try {
-      const channelId = this.companyService.activeCompanyId();
-      if (!channelId) {
+      const company = this.companyService.activeCompany();
+      if (!company?.id) {
         this.error.set('No active channel');
         this.members.set([]);
         return;
+      }
+      const channelId = company.id;
+      if (company.token) {
+        this.apolloService.setChannelToken(company.token);
       }
 
       const client = this.apolloService.getClient();
@@ -152,6 +156,10 @@ export class TeamService {
     this.error.set(null);
 
     try {
+      const company = this.companyService.activeCompany();
+      if (company?.token) {
+        this.apolloService.setChannelToken(company.token);
+      }
       const client = this.apolloService.getClient();
       const result = await client.query<GetRoleTemplatesQuery>({
         query: GET_ROLE_TEMPLATES,
@@ -177,11 +185,15 @@ export class TeamService {
     this.error.set(null);
 
     try {
-      const channelId = this.companyService.activeCompanyId();
-      if (!channelId) {
+      const company = this.companyService.activeCompany();
+      if (!company?.id) {
         const errorMessage = 'No active channel';
         this.error.set(errorMessage);
         throw new Error(errorMessage);
+      }
+      // Ensure channel token is set so admin API uses this channel for permission check
+      if (company.token) {
+        this.apolloService.setChannelToken(company.token);
       }
 
       const client = this.apolloService.getClient();
@@ -233,11 +245,16 @@ export class TeamService {
       });
 
       // Extract error message from various sources
-      const errorMessage =
+      let errorMessage =
         err?.graphQLErrors?.[0]?.message ||
         err?.networkError?.message ||
         (err instanceof Error ? err.message : 'Failed to create team member');
-
+      if (
+        typeof errorMessage === 'string' &&
+        errorMessage.includes('not currently authorized to perform this action')
+      ) {
+        errorMessage = "Permission denied. Make sure you're in the correct company and try again.";
+      }
       this.error.set(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -253,6 +270,10 @@ export class TeamService {
     this.error.set(null);
 
     try {
+      const company = this.companyService.activeCompany();
+      if (company?.token) {
+        this.apolloService.setChannelToken(company.token);
+      }
       const client = this.apolloService.getClient();
       const result = await client.mutate<UpdateChannelAdminMutation>({
         mutation: UPDATE_CHANNEL_ADMIN,
@@ -303,6 +324,10 @@ export class TeamService {
     this.error.set(null);
 
     try {
+      const company = this.companyService.activeCompany();
+      if (company?.token) {
+        this.apolloService.setChannelToken(company.token);
+      }
       const client = this.apolloService.getClient();
       const result = await client.mutate<DisableChannelAdminMutation>({
         mutation: DISABLE_CHANNEL_ADMIN,
