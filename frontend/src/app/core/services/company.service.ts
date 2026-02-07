@@ -16,8 +16,10 @@ import { ApolloService } from './apollo.service';
  * - User then selects shop in separate shop selector (primary navbar action)
  * - Company selector is in extended menu (rare use, only for multi-company users)
  *
- * Key concept: activeCompanyId is the single source of truth that all dashboard
- * components depend on for fetching company-specific data
+ * Channel token ownership:
+ * - This service is the single source of truth for the channel token.
+ * - The token is derived from activeCompany().token (never stored independently).
+ * - ApolloService reads it via the onChannelTokenProvider callback registered below.
  */
 @Injectable({
   providedIn: 'root',
@@ -46,6 +48,28 @@ export class CompanyService {
     const companies = this.companiesSignal();
     return companies.find((c) => c.id === id) || null;
   });
+
+  constructor() {
+    // Clean up legacy 'channel_token' key (now derived from company_session)
+    localStorage.removeItem('channel_token');
+
+    // Register as the channel token provider — ApolloService reads token from here
+    this.apolloService.onChannelTokenProvider(() => this.getChannelToken());
+
+    // Handle CHANNEL_NOT_FOUND errors by clearing stale company state
+    this.apolloService.onChannelNotFound(() => {
+      console.warn('Channel not found - clearing active company');
+      this.clearActiveCompany();
+    });
+  }
+
+  /**
+   * Get the channel token for the active company.
+   * This is the single source of truth — derived from the active company signal.
+   */
+  getChannelToken(): string | null {
+    return this.activeCompany()?.token ?? null;
+  }
 
   /**
    * ML Model assets for the active channel
@@ -295,7 +319,7 @@ export class CompanyService {
   /**
    * Set companies from login response channels
    * This is the primary method to populate companies after login
-   * Automatically activates the first company
+   * Validates cached active company and auto-activates first company if needed
    *
    * @param channels - Array of channels from login response
    */
@@ -314,11 +338,7 @@ export class CompanyService {
     if (currentActiveId) {
       // Validate the cached active company still exists in the fresh list
       const stillExists = companies.find((c) => c.id === currentActiveId);
-      if (stillExists) {
-        // Re-sync channel token from the fresh server data (token may have changed,
-        // or localStorage 'channel_token' may be stale from a previous company)
-        this.apolloService.setChannelToken(stillExists.token);
-      } else {
+      if (!stillExists) {
         // Cached company no longer in list — activate first available
         console.warn(`Active company ${currentActiveId} no longer available, switching`);
         this.activeCompanyIdSignal.set(null);
@@ -326,6 +346,7 @@ export class CompanyService {
           this.activateCompany(companies[0].id);
         }
       }
+      // If still exists: no action needed — getChannelToken() already derives from activeCompany()
     } else if (companies.length > 0) {
       this.activateCompany(companies[0].id);
     }
@@ -334,6 +355,7 @@ export class CompanyService {
   /**
    * Activate a company (channel) - makes it the active company for all operations
    * This is the primary method that sets activeCompanyId
+   * The channel token is automatically derived via getChannelToken().
    *
    * @param companyId - The channel ID to activate
    */
@@ -346,10 +368,7 @@ export class CompanyService {
 
     console.log(`Activating company: ${company.code} (${companyId})`);
 
-    // Set channel token for subsequent requests
-    this.apolloService.setChannelToken(company.token);
-
-    // Set as active company
+    // Set as active company — getChannelToken() will now return this company's token
     this.activeCompanyIdSignal.set(companyId);
 
     // Persist and fetch channel custom fields
@@ -381,6 +400,7 @@ export class CompanyService {
   /**
    * Initialize company from localStorage on app startup
    * Restores complete session instantly, then refreshes in background
+   * The channel token is automatically available via getChannelToken() once signals are restored.
    */
   initializeFromStorage(): void {
     console.log('🔄 Initializing from storage...');
@@ -394,7 +414,7 @@ export class CompanyService {
     try {
       const session = JSON.parse(stored);
 
-      // Restore everything instantly
+      // Restore everything instantly — getChannelToken() will derive from these signals
       this.companiesSignal.set(session.companies || []);
       this.activeCompanyIdSignal.set(session.activeCompanyId);
       this.activeChannelDataSignal.set(session.channelData);
@@ -405,11 +425,8 @@ export class CompanyService {
         cashierEnabled: session.channelData?.customFields?.cashierFlowEnabled,
       });
 
-      // Set channel token
-      const company = session.companies?.find((c: Company) => c.id === session.activeCompanyId);
-      if (company) {
-        this.apolloService.setChannelToken(company.token);
-        // Refresh in background
+      // Refresh channel data in background if we have an active company
+      if (this.activeCompany()) {
         this.fetchActiveChannel();
       }
     } catch (error) {
@@ -420,12 +437,12 @@ export class CompanyService {
 
   /**
    * Clear active company and all companies (useful for logout)
+   * After this, getChannelToken() will return null.
    */
   clearActiveCompany(): void {
     this.activeCompanyIdSignal.set(null);
     this.activeChannelDataSignal.set(null);
     this.companiesSignal.set([]);
     localStorage.removeItem(this.SESSION_KEY);
-    this.apolloService.clearChannelToken();
   }
 }
