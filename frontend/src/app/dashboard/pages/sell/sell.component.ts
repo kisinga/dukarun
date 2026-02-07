@@ -19,6 +19,7 @@ import { CurrencyService } from '../../../core/services/currency.service';
 import { CustomerService } from '../../../core/services/customer.service';
 import { OrderService } from '../../../core/services/order.service';
 import { OrdersService } from '../../../core/services/orders.service';
+import { PrintPreferencesService } from '../../../core/services/print-preferences.service';
 import { PrintService } from '../../../core/services/print.service';
 import {
   ProductSearchResult,
@@ -85,6 +86,7 @@ export class SellComponent implements OnInit, OnDestroy {
   private readonly apolloService = inject(ApolloService);
   private readonly currencyService = inject(CurrencyService);
   private readonly printService = inject(PrintService);
+  private readonly printPreferences = inject(PrintPreferencesService);
 
   // Configuration
   readonly channelId = computed(() => this.companyService.activeCompanyId() || 'T_1');
@@ -821,7 +823,10 @@ export class SellComponent implements OnInit, OnDestroy {
           // Fetch full order data for printing
           const fullOrder = await this.ordersService.fetchOrderById(order.id);
           if (fullOrder) {
-            await this.printService.printOrder(fullOrder);
+            await this.printService.printOrder(
+              fullOrder,
+              this.printPreferences.getDefaultTemplateId(),
+            );
           } else {
             this.showNotification('Order created but printing failed', 'warning');
           }
@@ -905,7 +910,10 @@ export class SellComponent implements OnInit, OnDestroy {
           // Fetch full order data for printing
           const fullOrder = await this.ordersService.fetchOrderById(order.id);
           if (fullOrder) {
-            await this.printService.printOrder(fullOrder);
+            await this.printService.printOrder(
+              fullOrder,
+              this.printPreferences.getDefaultTemplateId(),
+            );
           } else {
             this.showNotification('Order created but printing failed', 'warning');
           }

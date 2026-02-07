@@ -1,6 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { CompanyService } from './company.service';
-import { PrintTemplate, OrderData, Receipt52mmTemplate, A4Template } from './print-templates';
+import {
+  PrintTemplate,
+  OrderData,
+  Receipt52mmTemplate,
+  Receipt80mmTemplate,
+  A4Template,
+} from './print-templates';
 
 /**
  * Print Service
@@ -17,6 +23,7 @@ export class PrintService {
   // Available templates
   private readonly templates = new Map<string, PrintTemplate>([
     ['receipt-52mm', new Receipt52mmTemplate()],
+    ['receipt-80mm', new Receipt80mmTemplate()],
     ['a4', new A4Template()],
   ]);
 
@@ -78,8 +85,23 @@ export class PrintService {
       document.body.appendChild(printFrame);
     }
 
-    // Wait for iframe to be ready
     return new Promise<void>((resolve, reject) => {
+      let printed = false;
+      const doPrint = () => {
+        if (printed) return;
+        printed = true;
+        try {
+          const win = printFrame.contentWindow;
+          if (win) {
+            win.focus();
+            win.print();
+          }
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+
       const iframeDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
       if (!iframeDoc) {
         reject(new Error('Failed to access iframe document'));
@@ -138,28 +160,10 @@ export class PrintService {
         return;
       }
 
-      printWindow.onload = () => {
-        setTimeout(() => {
-          try {
-            printWindow.focus();
-            printWindow.print();
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        }, 250);
-      };
-
-      // Fallback: if onload doesn't fire, try printing after a delay
+      printWindow.onload = () => setTimeout(doPrint, 250);
       setTimeout(() => {
-        try {
-          if (printWindow.document.readyState === 'complete') {
-            printWindow.focus();
-            printWindow.print();
-            resolve();
-          }
-        } catch (error) {
-          // Ignore errors in fallback
+        if (!printed && printWindow.document.readyState === 'complete') {
+          doPrint();
         }
       }, 500);
     });
