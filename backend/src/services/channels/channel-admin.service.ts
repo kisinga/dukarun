@@ -1,18 +1,25 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   Administrator,
+  AdministratorEvent,
   AdministratorService,
+  Channel,
+  EventBus,
+  NativeAuthenticationMethod,
+  PasswordCipher,
+  Permission,
+  RequestContext,
   Role,
+  RoleEvent,
   RoleService,
   TransactionalConnection,
   User,
-  RequestContext,
-  Permission,
   ChannelService,
 } from '@vendure/core';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { CommunicationService } from '../../infrastructure/communication/communication.service';
 import { RoleTemplate } from '../../domain/role-template/role-template.entity';
+import { RoleTemplateAssignment } from '../../domain/role-template/role-template-assignment.entity';
 import { RoleTemplateService } from './role-template.service';
 
 export interface InviteAdministratorInput {
@@ -49,7 +56,9 @@ export class ChannelAdminService {
     private readonly auditService: AuditService,
     private readonly communicationService: CommunicationService,
     private readonly channelService: ChannelService,
-    private readonly roleTemplateService: RoleTemplateService
+    private readonly roleTemplateService: RoleTemplateService,
+    private readonly passwordCipher: PasswordCipher,
+    private readonly eventBus: EventBus
   ) {}
 
   /**
@@ -130,7 +139,6 @@ export class ChannelAdminService {
           role = existingRole;
         } else {
           role = await this.createRoleForTemplate(ctx, channelId, template, cleanInput);
-          await this.roleTemplateService.assignTemplateToRole(ctx, role.id as number, template.id);
         }
       } else {
         role = await this.createRoleWithOverrides(
@@ -209,7 +217,6 @@ export class ChannelAdminService {
         role = existingRole;
       } else {
         role = await this.createRoleForTemplate(ctx, channelId, template, cleanInput);
-        await this.roleTemplateService.assignTemplateToRole(ctx, role.id as number, template.id);
       }
     } else {
       role = await this.createRoleWithOverrides(
@@ -221,24 +228,7 @@ export class ChannelAdminService {
       );
     }
 
-    const emailToUse =
-      'emailAddress' in cleanInput &&
-      cleanInput.emailAddress &&
-      typeof cleanInput.emailAddress === 'string' &&
-      cleanInput.emailAddress.trim().length > 0
-        ? cleanInput.emailAddress.trim()
-        : cleanInput.phoneNumber;
-
-    const createAdminInput: any = {
-      firstName: cleanInput.firstName,
-      lastName: cleanInput.lastName,
-      password: this.generateTemporaryPassword(),
-      roleIds: [role.id],
-      identifier: cleanInput.phoneNumber,
-      emailAddress: emailToUse,
-    };
-
-    const administrator = await this.administratorService.create(ctx, createAdminInput);
+    const administrator = await this.createUserAndAdministratorViaRepository(ctx, role, cleanInput);
 
     await this.sendWelcomeSms(ctx, cleanInput.phoneNumber, channelId.toString(), false);
 
@@ -401,7 +391,9 @@ export class ChannelAdminService {
   }
 
   /**
-   * Create a new role from a template (no overrides). Caller assigns template to role after.
+   * Create a new role from a template (no overrides) via repository.
+   * Bypasses RoleService.create() so channel admins with UpdateSettings can add admins
+   * without needing to pass Vendure's CreateAdministrator check inside RoleService.
    */
   private async createRoleForTemplate(
     ctx: RequestContext,
@@ -409,17 +401,37 @@ export class ChannelAdminService {
     template: RoleTemplate,
     cleanInput: { firstName: string; lastName: string }
   ): Promise<Role> {
+    const channel = await this.connection.getRepository(ctx, Channel).findOne({
+      where: { id: typeof channelId === 'string' ? parseInt(channelId, 10) : channelId },
+    });
+    if (!channel) {
+      throw new BadRequestException(`Channel ${channelId} not found`);
+    }
     const roleCode = `channel-${channelId}-${template.id}`;
-    return this.roleService.create(ctx, {
+    const role = new Role({
       code: roleCode,
       description: `${template.name} role for ${cleanInput.firstName} ${cleanInput.lastName}`,
-      permissions: template.permissions as Permission[],
-      channelIds: [channelId],
+      permissions: (template.permissions ?? []) as Permission[],
+      channels: [channel],
     });
+    const savedRole = await this.connection.getRepository(ctx, Role).save(role);
+    await this.connection.getRepository(ctx, RoleTemplateAssignment).save({
+      roleId: savedRole.id as number,
+      templateId: template.id,
+    });
+    await this.eventBus.publish(
+      new RoleEvent(ctx, savedRole, 'created', {
+        code: roleCode,
+        description: role.description,
+        permissions: role.permissions,
+        channelIds: [channel.id],
+      })
+    );
+    return savedRole;
   }
 
   /**
-   * Create a custom role with overridden permissions. No template assignment.
+   * Create a custom role with overridden permissions via repository. No template assignment.
    */
   private async createRoleWithOverrides(
     ctx: RequestContext,
@@ -428,13 +440,76 @@ export class ChannelAdminService {
     permissions: string[],
     cleanInput: { firstName: string; lastName: string }
   ): Promise<Role> {
+    const channel = await this.connection.getRepository(ctx, Channel).findOne({
+      where: { id: typeof channelId === 'string' ? parseInt(channelId, 10) : channelId },
+    });
+    if (!channel) {
+      throw new BadRequestException(`Channel ${channelId} not found`);
+    }
     const roleCode = `channel-${channelId}-${template.code}-custom-${Date.now()}`;
-    return this.roleService.create(ctx, {
+    const role = new Role({
       code: roleCode,
       description: `${template.name} role (custom) for ${cleanInput.firstName} ${cleanInput.lastName}`,
       permissions: permissions as Permission[],
-      channelIds: [channelId],
+      channels: [channel],
     });
+    const savedRole = await this.connection.getRepository(ctx, Role).save(role);
+    await this.eventBus.publish(
+      new RoleEvent(ctx, savedRole, 'created', {
+        code: roleCode,
+        description: role.description,
+        permissions: role.permissions,
+        channelIds: [channel.id],
+      })
+    );
+    return savedRole;
+  }
+
+  /**
+   * Create user, native auth method, and administrator via repository.
+   * Bypasses AdministratorService.create() so channel admins with UpdateSettings can add admins
+   * without needing CreateAdministrator permission (which Vendure may enforce in a way that fails for channel-scoped roles).
+   */
+  private async createUserAndAdministratorViaRepository(
+    ctx: RequestContext,
+    role: Role,
+    cleanInput: {
+      firstName: string;
+      lastName: string;
+      phoneNumber: string;
+      emailAddress?: string;
+    }
+  ): Promise<Administrator> {
+    const password = this.generateTemporaryPassword();
+    const emailToUse =
+      cleanInput.emailAddress && cleanInput.emailAddress.trim().length > 0
+        ? cleanInput.emailAddress.trim()
+        : cleanInput.phoneNumber;
+
+    const user = new User({
+      identifier: cleanInput.phoneNumber,
+      verified: true,
+      roles: [role],
+    });
+    const savedUser = await this.connection.getRepository(ctx, User).save(user);
+
+    const passwordHash = await this.passwordCipher.hash(password);
+    const authMethod = new NativeAuthenticationMethod({
+      identifier: cleanInput.phoneNumber,
+      passwordHash,
+      user: savedUser,
+    });
+    await this.connection.getRepository(ctx, NativeAuthenticationMethod).save(authMethod);
+
+    const administrator = new Administrator({
+      emailAddress: emailToUse,
+      firstName: cleanInput.firstName,
+      lastName: cleanInput.lastName,
+      user: savedUser,
+    });
+    const savedAdmin = await this.connection.getRepository(ctx, Administrator).save(administrator);
+    await this.eventBus.publish(new AdministratorEvent(ctx, savedAdmin, 'created'));
+    return savedAdmin;
   }
 
   /**
