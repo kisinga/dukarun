@@ -149,8 +149,6 @@ export class Receipt52mmTemplate extends PrintTemplate {
     const date = order.orderPlacedAt
       ? this.formatDate(order.orderPlacedAt)
       : this.formatDate(order.createdAt);
-    const subtotal = order.total;
-    const tax = order.totalWithTax - order.total;
     const total = order.totalWithTax;
     const paymentMethod = order.payments?.[0]?.method || 'N/A';
 
@@ -195,20 +193,6 @@ export class Receipt52mmTemplate extends PrintTemplate {
                     </table>
                 </div>
                 <div class="totals-section">
-                    <div class="total-row">
-                        <span>Subtotal:</span>
-                        <span>${this.formatCurrency(subtotal, order.currencyCode)}</span>
-                    </div>
-                    ${
-                      tax > 0
-                        ? `
-                    <div class="total-row">
-                        <span>Tax:</span>
-                        <span>${this.formatCurrency(tax, order.currencyCode)}</span>
-                    </div>
-                    `
-                        : ''
-                    }
                     <div class="total-row total-row-final">
                         <span><strong>Total:</strong></span>
                         <span><strong>${this.formatCurrency(total, order.currencyCode)}</strong></span>
@@ -318,6 +302,171 @@ export class Receipt52mmTemplate extends PrintTemplate {
 }
 
 /**
+ * 80mm Receipt Template
+ * Thermal receipt format for 80mm roll paper
+ */
+export class Receipt80mmTemplate extends PrintTemplate {
+  name = '80mm Receipt';
+  width = '80mm';
+
+  render(order: OrderData, companyLogo?: string | null): string {
+    const customerName = this.getCustomerName(order);
+    const isWalkIn = this.isWalkInCustomer(order);
+    const date = order.orderPlacedAt
+      ? this.formatDate(order.orderPlacedAt)
+      : this.formatDate(order.createdAt);
+    const total = order.totalWithTax;
+    const paymentMethod = order.payments?.[0]?.method || 'N/A';
+
+    let html = `
+            <div class="print-template receipt-80mm">
+                <div class="receipt-header">
+                    ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
+                    <h1 class="company-name">Your Company</h1>
+                    <p class="receipt-meta">
+                        <span>Order: ${order.code}</span><br>
+                        <span>Date: ${date}</span>
+                    </p>
+                </div>
+                ${!isWalkIn ? `<div class="customer-info"><strong>Customer:</strong> ${customerName}</div>` : ''}
+                <div class="items-section">
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th class="text-right">Qty</th>
+                                <th class="text-right">Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+    order.lines.forEach((line) => {
+      const itemName = line.productVariant.name;
+      const quantity = line.quantity;
+      const price = this.formatCurrency(line.linePriceWithTax, order.currencyCode);
+      html += `
+                            <tr>
+                                <td>${itemName}</td>
+                                <td class="text-right">${quantity}</td>
+                                <td class="text-right">${price}</td>
+                            </tr>
+            `;
+    });
+
+    html += `
+                        </tbody>
+                    </table>
+                </div>
+                <div class="totals-section">
+                    <div class="total-row total-row-final">
+                        <span><strong>Total:</strong></span>
+                        <span><strong>${this.formatCurrency(total, order.currencyCode)}</strong></span>
+                    </div>
+                </div>
+                <div class="payment-section">
+                    <p><strong>Payment:</strong> ${paymentMethod}</p>
+                </div>
+                <div class="receipt-footer">
+                    <p>Thank you for your business!</p>
+                </div>
+            </div>
+        `;
+
+    return html;
+  }
+
+  getStyles(): string {
+    return `
+            @page { size: 80mm 297mm; margin: 0; }
+            @media print {
+                .print-template.receipt-80mm {
+                    width: 80mm;
+                    max-width: 80mm;
+                    margin: 0 auto;
+                    padding: 10mm 6mm;
+                    font-size: 11px;
+                    line-height: 1.4;
+                }
+                .receipt-80mm .company-logo {
+                    max-width: 100%;
+                    max-height: 45mm;
+                    width: auto;
+                    height: auto;
+                    object-fit: contain;
+                    margin-bottom: 10px;
+                    display: block;
+                    margin-left: auto;
+                    margin-right: auto;
+                }
+                .receipt-80mm .company-name {
+                    font-size: 16px;
+                    font-weight: bold;
+                    margin: 10px 0;
+                    text-align: center;
+                }
+                .receipt-80mm .receipt-meta {
+                    font-size: 10px;
+                    text-align: center;
+                    margin-bottom: 14px;
+                }
+                .receipt-80mm .customer-info {
+                    margin-bottom: 14px;
+                    padding-bottom: 10px;
+                    border-bottom: 1px dashed #000;
+                }
+                .receipt-80mm .items-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 14px;
+                }
+                .receipt-80mm .items-table th,
+                .receipt-80mm .items-table td {
+                    padding: 5px 4px;
+                    text-align: left;
+                    font-size: 10px;
+                }
+                .receipt-80mm .items-table th {
+                    border-bottom: 1px solid #000;
+                    font-weight: bold;
+                }
+                .receipt-80mm .items-table .text-right {
+                    text-align: right;
+                }
+                .receipt-80mm .totals-section {
+                    margin-top: 14px;
+                    padding-top: 10px;
+                    border-top: 1px dashed #000;
+                }
+                .receipt-80mm .total-row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: 4px;
+                    font-size: 10px;
+                }
+                .receipt-80mm .total-row-final {
+                    margin-top: 10px;
+                    padding-top: 10px;
+                    border-top: 1px solid #000;
+                    font-size: 12px;
+                }
+                .receipt-80mm .payment-section {
+                    margin-top: 14px;
+                    padding-top: 10px;
+                    border-top: 1px dashed #000;
+                    font-size: 10px;
+                }
+                .receipt-80mm .receipt-footer {
+                    margin-top: 18px;
+                    text-align: center;
+                    font-size: 10px;
+                }
+            }
+        `;
+  }
+}
+
+/**
  * A4 Invoice Template
  * Full-size professional invoice format
  */
@@ -331,8 +480,6 @@ export class A4Template extends PrintTemplate {
     const date = order.orderPlacedAt
       ? this.formatDate(order.orderPlacedAt)
       : this.formatDate(order.createdAt);
-    const subtotal = order.total;
-    const tax = order.totalWithTax - order.total;
     const total = order.totalWithTax;
     const paymentMethod = order.payments?.[0]?.method || 'N/A';
     const hasFulfillment = order.fulfillments && order.fulfillments.length > 0;
@@ -426,20 +573,6 @@ export class A4Template extends PrintTemplate {
                     </div>
                     <div class="totals-section">
                         <div class="totals-table">
-                            <div class="total-row">
-                                <span>Subtotal:</span>
-                                <span>${this.formatCurrency(subtotal, order.currencyCode)}</span>
-                            </div>
-                            ${
-                              tax > 0
-                                ? `
-                            <div class="total-row">
-                                <span>Tax:</span>
-                                <span>${this.formatCurrency(tax, order.currencyCode)}</span>
-                            </div>
-                            `
-                                : ''
-                            }
                             <div class="total-row total-row-final">
                                 <span><strong>Total:</strong></span>
                                 <span><strong>${this.formatCurrency(total, order.currencyCode)}</strong></span>

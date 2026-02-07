@@ -16,7 +16,6 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { OrdersService } from '../../../../core/services/orders.service';
-import { PrintService } from '../../../../core/services/print.service';
 import { CustomerPaymentService } from '../../../../core/services/customer/customer-payment.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { OrderDetailHeaderComponent } from './components/order-detail-header.component';
@@ -26,6 +25,7 @@ import { OrderItemsTableComponent } from './components/order-items-table.compone
 import { OrderTotalsComponent } from './components/order-totals.component';
 import { OrderPaymentInfoComponent } from './components/order-payment-info.component';
 import { OrderFulfillmentInfoComponent } from './components/order-fulfillment-info.component';
+import { PrintControlsComponent } from '../../../../core/components/print-controls/print-controls.component';
 
 /**
  * Order Detail Component (Container)
@@ -51,6 +51,7 @@ import { OrderFulfillmentInfoComponent } from './components/order-fulfillment-in
     OrderTotalsComponent,
     OrderPaymentInfoComponent,
     OrderFulfillmentInfoComponent,
+    PrintControlsComponent,
   ],
   templateUrl: './order-detail.component.html',
   styleUrl: './order-detail.component.scss',
@@ -58,7 +59,6 @@ import { OrderFulfillmentInfoComponent } from './components/order-fulfillment-in
 })
 export class OrderDetailComponent implements OnInit, AfterViewInit {
   private readonly ordersService = inject(OrdersService);
-  private readonly printService = inject(PrintService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly paymentService = inject(CustomerPaymentService);
@@ -77,15 +77,11 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
   readonly order = this.ordersService.currentOrder;
   readonly isLoading = this.ordersService.isLoading;
   readonly error = this.ordersService.error;
-  readonly selectedTemplate = signal<string>('receipt-52mm');
   readonly isPrintMode = signal(false);
   readonly modalId = signal<string>(
     `order-detail-modal-${Math.random().toString(36).substring(2, 9)}`,
   );
   private readonly modalElement = viewChild<ElementRef<HTMLDialogElement>>('modalDialog');
-
-  // Available templates
-  readonly templates = this.printService.getAvailableTemplates();
 
   // Computed values for child components
   readonly canPrint = computed(() => {
@@ -191,18 +187,6 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
       this.isPrintMode.set(printParam === 'true' || printParam === true);
     });
 
-    // Auto-print if in print mode (page mode only)
-    effect(() => {
-      if (this.modalMode()) return;
-      const order = this.order();
-      const isPrint = this.isPrintMode();
-      if (order && isPrint) {
-        setTimeout(() => {
-          this.handlePrint();
-        }, 500);
-      }
-    });
-
     // Handle modal open/close (modal mode only)
     effect(() => {
       if (!this.modalMode()) return;
@@ -230,14 +214,6 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
         this.ordersService.fetchOrderById(routeOrderId);
       }
     }
-  }
-
-  async handlePrint(): Promise<void> {
-    const order = this.order();
-    if (!order) return;
-
-    const templateId = this.selectedTemplate();
-    await this.printService.printOrder(order as any, templateId);
   }
 
   goBack(): void {
