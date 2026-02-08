@@ -1,61 +1,66 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { ProductVariant } from '../../../../core/services/product/product-search.service';
-import { StockLocation } from '../../../../core/services/stock-location.service';
 import { PurchaseLineItem } from '../../../../core/services/purchase.service.types';
 
 /**
  * Purchase Line Item Form Component
  *
- * Reusable component for adding new line items to a purchase.
- * Handles product search, quantity, unit cost, and location selection.
+ * Handles product search and adding new line items.
+ * Location is auto-selected by the parent component.
  */
 @Component({
   selector: 'app-purchase-line-item-form',
   imports: [CommonModule],
   template: `
-    <div class="card bg-base-200 p-4 space-y-3">
-      <div class="grid grid-cols-1 gap-3">
-        <!-- Product Search -->
-        <div>
-          <input
-            type="text"
-            class="input input-bordered w-full"
-            placeholder="Search product..."
-            [value]="productSearchTerm()"
-            (input)="onProductSearch($any($event.target).value)"
-          />
-          @if (productSearchResults().length > 0) {
-            <div class="relative">
-              <div
-                class="absolute z-10 w-full mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+    <div class="space-y-3">
+      <!-- Product Search -->
+      <div class="relative">
+        <input
+          type="text"
+          class="input input-bordered input-sm w-full"
+          placeholder="Search product by name or SKU..."
+          [value]="productSearchTerm()"
+          (input)="onProductSearch($any($event.target).value)"
+        />
+        @if (productSearchResults().length > 0) {
+          <div
+            class="absolute z-20 w-full mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+          >
+            @for (variant of productSearchResults(); track variant.id) {
+              <button
+                type="button"
+                class="w-full text-left px-3 py-2 hover:bg-base-200 border-b border-base-200 last:border-b-0"
+                (click)="onProductSelect(variant)"
               >
-                @for (variant of productSearchResults(); track variant.id) {
-                  <button
-                    type="button"
-                    class="w-full text-left px-4 py-2 hover:bg-base-200"
-                    (click)="onProductSelect(variant)"
-                  >
-                    <div class="font-medium">
-                      {{ variant.productName || variant.name || variant.sku }}
-                    </div>
-                    @if (variant.name && variant.name !== variant.productName) {
-                      <div class="text-sm opacity-70">{{ variant.name }}</div>
-                    }
-                    <div class="text-xs opacity-60">SKU: {{ variant.sku }}</div>
-                  </button>
+                <div class="text-sm font-medium">
+                  {{ variant.productName || variant.name || variant.sku }}
+                </div>
+                @if (variant.name && variant.name !== variant.productName) {
+                  <div class="text-xs opacity-70">{{ variant.name }}</div>
                 }
-              </div>
-            </div>
-          }
-        </div>
+                <div class="text-xs opacity-50">SKU: {{ variant.sku }}</div>
+              </button>
+            }
+          </div>
+        }
+      </div>
 
-        <!-- Quantity, Unit Cost, Location -->
-        <div class="grid grid-cols-3 gap-2">
-          <div>
+      <!-- Selected product info + Qty/Cost inputs -->
+      @if (lineItem().variantId) {
+        <div class="flex items-end gap-2">
+          <div class="flex-1 text-sm truncate">
+            <span class="font-medium">{{
+              lineItem().variant?.productName || lineItem().variant?.name
+            }}</span>
+          </div>
+          <div class="w-24">
+            <label class="label py-0">
+              <span class="label-text text-xs">Qty</span>
+            </label>
             <input
               type="number"
-              class="input input-bordered w-full"
+              class="input input-bordered input-sm w-full"
               placeholder="Qty"
               step="0.01"
               min="0.01"
@@ -65,11 +70,14 @@ import { PurchaseLineItem } from '../../../../core/services/purchase.service.typ
               "
             />
           </div>
-          <div>
+          <div class="w-28">
+            <label class="label py-0">
+              <span class="label-text text-xs">Unit Cost</span>
+            </label>
             <input
               type="number"
-              class="input input-bordered w-full"
-              placeholder="Unit Cost"
+              class="input input-bordered input-sm w-full"
+              placeholder="Cost"
               step="0.01"
               min="0"
               [value]="lineItem().unitCost || ''"
@@ -78,34 +86,21 @@ import { PurchaseLineItem } from '../../../../core/services/purchase.service.typ
               "
             />
           </div>
-          <div>
-            <select
-              class="select select-bordered w-full"
-              [value]="lineItem().stockLocationId || ''"
-              (change)="onLineItemFieldChange('stockLocationId', $any($event.target).value)"
-            >
-              <option value="">Location...</option>
-              @for (location of stockLocations(); track location.id) {
-                <option [value]="location.id">{{ location.name }}</option>
-              }
-            </select>
-          </div>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            [disabled]="!canAddItem()"
+            (click)="onAddItem()"
+          >
+            Add
+          </button>
         </div>
-      </div>
-      <button
-        type="button"
-        class="btn btn-primary btn-sm"
-        [disabled]="!canAddItem()"
-        (click)="onAddItem()"
-      >
-        ➕ Add Item
-      </button>
+      }
     </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PurchaseLineItemFormComponent {
-  readonly stockLocations = input.required<StockLocation[]>();
   readonly productSearchTerm = input<string>('');
   readonly productSearchResults = input<ProductVariant[]>([]);
   readonly lineItem = input.required<Partial<PurchaseLineItem>>();
@@ -115,11 +110,7 @@ export class PurchaseLineItemFormComponent {
   readonly lineItemFieldChange = output<{ field: keyof PurchaseLineItem; value: any }>();
   readonly addItem = output<void>();
 
-  // Local state for product search term
-  private readonly localSearchTerm = signal<string>('');
-
   onProductSearch(term: string): void {
-    this.localSearchTerm.set(term);
     this.productSearch.emit(term);
   }
 
@@ -137,7 +128,7 @@ export class PurchaseLineItemFormComponent {
 
   canAddItem(): boolean {
     const item = this.lineItem();
-    return !!(item.variantId && item.stockLocationId && item.quantity && item.unitCost);
+    return !!(item.variantId && item.quantity && item.unitCost);
   }
 
   parseFloat(value: string | number): number {

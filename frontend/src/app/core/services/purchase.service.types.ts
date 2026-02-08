@@ -18,9 +18,15 @@ export interface PurchaseDraft {
   supplierId: string | null;
   purchaseDate: Date;
   referenceNumber: string;
-  paymentStatus: 'paid' | 'pending' | 'partial'; // NOTE: This is a placeholder. Actual payment transactions are the source of truth.
+  paymentStatus: 'paid' | 'pending' | 'partial';
   notes: string;
   lines: PurchaseLineItem[];
+  /** Amount paid in base currency units (e.g., 10.99). null = full amount for 'paid' status. */
+  paymentAmount: number | null;
+  /** Debit account code for payment source (e.g., CASH_ON_HAND, CLEARING_MPESA). '' = default. */
+  paymentAccountCode: string;
+  /** External payment reference (M-Pesa code, bank ref, receipt #). */
+  paymentReference: string;
 }
 
 /**

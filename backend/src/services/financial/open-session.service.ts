@@ -78,6 +78,8 @@ export interface RecordCashCountInput {
   countType: CashCountType;
   /** Reason for variance (stored on count and in ledger line meta for audit) */
   varianceReason?: string;
+  /** When true, record the count for audit but skip automatic variance posting (caller handles it). */
+  skipVariancePosting?: boolean;
 }
 
 /**
@@ -180,7 +182,11 @@ export class OpenSessionService {
     const openingRecon = await this.reconciliationService.createReconciliation(ctx, {
       channelId: input.channelId,
       scope: 'cash-session',
-      scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId: savedSession.id }),
+      scopeRefId: toScopeRefId({
+        scope: 'cash-session',
+        sessionId: savedSession.id,
+        kind: 'opening',
+      }),
       rangeStart: today,
       rangeEnd: today,
       expectedBalance: '0',
@@ -238,15 +244,24 @@ export class OpenSessionService {
     });
     if (!session) return 0;
 
-    const openingRecons = await reconRepo.find({
+    // Try kind-specific scopeRefId first, then fall back to legacy bare sessionId
+    let openingRecon = await reconRepo.findOne({
       where: {
         scope: 'cash-session',
-        scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId }),
+        scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId, kind: 'opening' }),
       },
-      order: { rangeStart: 'ASC' },
-      take: 1,
     });
-    const openingRecon = openingRecons[0];
+    if (!openingRecon) {
+      const legacyRecons = await reconRepo.find({
+        where: {
+          scope: 'cash-session',
+          scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId }),
+        },
+        order: { rangeStart: 'ASC' },
+        take: 1,
+      });
+      openingRecon = legacyRecons[0] ?? null;
+    }
     if (!openingRecon) return 0;
 
     const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
@@ -261,8 +276,50 @@ export class OpenSessionService {
   }
 
   /**
+   * Get the opening declared amount for a specific account code in a session.
+   * Reads from the opening reconciliation's ReconciliationAccount junction rows.
+   */
+  private async getOpeningBalanceForAccount(
+    ctx: RequestContext,
+    sessionId: string,
+    accountCode: string
+  ): Promise<number> {
+    const reconRepo = this.connection.getRepository(ctx, Reconciliation);
+
+    // Try kind-specific scopeRefId first, then legacy bare sessionId
+    let openingRecon = await reconRepo.findOne({
+      where: {
+        scope: 'cash-session',
+        scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId, kind: 'opening' }),
+      },
+    });
+    if (!openingRecon) {
+      const legacyRecons = await reconRepo.find({
+        where: {
+          scope: 'cash-session',
+          scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId }),
+        },
+        order: { rangeStart: 'ASC' },
+        take: 1,
+      });
+      openingRecon = legacyRecons[0] ?? null;
+    }
+    if (!openingRecon) return 0;
+
+    const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
+    const rows = await junctionRepo.find({
+      where: { reconciliationId: openingRecon.id },
+      relations: ['account'],
+    });
+
+    const matchingRow = rows.find(r => r.account?.code === accountCode);
+    if (!matchingRow?.declaredAmountCents) return 0;
+    return parseInt(matchingRow.declaredAmountCents, 10) || 0;
+  }
+
+  /**
    * Close a cashier session and calculate variance
-   * Per-account closing amounts (like opening); creates one blind count with total and reconciliation with per-account breakdown.
+   * Per-account closing amounts (like opening); posts per-account variance adjustments.
    */
   async closeSession(
     ctx: RequestContext,
@@ -301,12 +358,15 @@ export class OpenSessionService {
     const channelId = session.channelId;
 
     return this.connection.withTransaction(ctx, async txCtx => {
+      // 1. Record blind count for audit trail (skip automatic variance posting — we handle per-account below)
       const closingCount = await this.recordCashCount(txCtx, {
         sessionId,
         declaredCash: totalDeclared,
         countType: 'closing',
+        skipVariancePosting: true,
       });
 
+      // 2. Close the session
       const txSessionRepo = this.connection.getRepository(txCtx, CashierSession);
       const sessionInTx = await txSessionRepo.findOne({ where: { id: sessionId } });
       if (!sessionInTx) {
@@ -317,6 +377,7 @@ export class OpenSessionService {
       sessionInTx.status = 'closed';
       await txSessionRepo.save(sessionInTx);
 
+      // 3. Build per-account declared amounts and create closing reconciliation
       const codes = input.closingBalances.map(b => b.accountCode);
       const byCode = await this.getAccountIdsByCode(txCtx, channelId, codes);
       const accountDeclaredAmounts: Record<string, string> = {};
@@ -324,8 +385,40 @@ export class OpenSessionService {
         const accountId = byCode[accountCode];
         if (accountId) accountDeclaredAmounts[accountId] = String(amountCents);
       }
-      await this.createSessionReconciliation(txCtx, sessionId, input.notes, accountDeclaredAmounts);
+      const closingRecon = await this.createSessionReconciliation(
+        txCtx,
+        sessionId,
+        input.notes,
+        accountDeclaredAmounts
+      );
 
+      // 4. Post per-account variance adjustments (mirrors opening pattern)
+      for (const { accountCode, amountCents } of input.closingBalances) {
+        const openingForAccount = await this.getOpeningBalanceForAccount(
+          txCtx,
+          sessionId,
+          accountCode
+        );
+        const sessionBalance = await this.ledgerQueryService.getSessionBalance(
+          channelId,
+          accountCode,
+          sessionId
+        );
+        const expected = openingForAccount + sessionBalance.balance;
+        const variance = amountCents - expected;
+        if (variance !== 0) {
+          await this.financialService.postVarianceAdjustment(
+            txCtx,
+            sessionId,
+            accountCode,
+            variance,
+            'Closing balance variance',
+            closingRecon.id
+          );
+        }
+      }
+
+      // 5. Return summary
       const summary = await this.getSessionSummary(txCtx, sessionId);
       this.logger.log(
         `Cashier session ${sessionId} closed. Expected: ${summary.openingFloat + summary.ledgerTotals.cashTotal}, Declared: ${totalDeclared}, Variance: ${summary.variance}, ClosingCountId: ${closingCount.count.id}`
@@ -492,24 +585,26 @@ export class OpenSessionService {
     }
 
     const reconRepo = this.connection.getRepository(ctx, Reconciliation);
-    const scopeRefId = (id: string) => toScopeRefId({ scope: 'cash-session', sessionId: id });
 
     const missing: Array<{ sessionId: string; closedAt: Date }> = [];
     for (const session of closedSessions) {
+      if (!session.closedAt) continue;
+
+      // Check for kind-specific closing reconciliation first, then legacy bare sessionId
+      const kindRef = toScopeRefId({
+        scope: 'cash-session',
+        sessionId: session.id,
+        kind: 'closing',
+      });
+      const legacyRef = toScopeRefId({ scope: 'cash-session', sessionId: session.id });
       const rangeStart = session.openedAt.toISOString().slice(0, 10);
-      const rangeEnd = session.closedAt
-        ? new Date(session.closedAt).toISOString().slice(0, 10)
-        : '';
-      if (!rangeEnd) continue;
+      const rangeEnd = new Date(session.closedAt).toISOString().slice(0, 10);
 
       const existing = await reconRepo.findOne({
-        where: {
-          channelId,
-          scope: 'cash-session',
-          scopeRefId: scopeRefId(session.id),
-          rangeStart,
-          rangeEnd,
-        },
+        where: [
+          { channelId, scope: 'cash-session', scopeRefId: kindRef },
+          { channelId, scope: 'cash-session', scopeRefId: legacyRef, rangeStart, rangeEnd },
+        ],
       });
       if (!existing) {
         missing.push({
@@ -540,7 +635,7 @@ export class OpenSessionService {
     }
 
     const channelId = await this.getSessionChannelId(ctx, sessionId);
-    const scopeRefId = toScopeRefId({ scope: 'cash-session', sessionId });
+    const scopeRefId = toScopeRefId({ scope: 'cash-session', sessionId, kind: 'closing' });
     const rangeStart = summary.openedAt.toISOString().slice(0, 10);
     const rangeEnd = (summary.closedAt || new Date()).toISOString().slice(0, 10);
 
@@ -668,7 +763,7 @@ export class OpenSessionService {
 
     const hasVariance = Math.abs(variance) > 0;
 
-    if (hasVariance) {
+    if (hasVariance && !input.skipVariancePosting) {
       await this.financialService.postVarianceAdjustment(
         ctx,
         session.id,

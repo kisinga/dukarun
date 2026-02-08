@@ -22,6 +22,11 @@ export class PurchaseApiService {
     const client = this.apolloService.getClient();
 
     // Convert unitCost to cents for backend
+    const totalCostCents = draft.lines.reduce(
+      (sum, line) => sum + Math.round(line.unitCost * 100) * line.quantity,
+      0,
+    );
+
     const input: any = {
       supplierId: draft.supplierId!,
       purchaseDate: draft.purchaseDate.toISOString(),
@@ -35,6 +40,16 @@ export class PurchaseApiService {
         stockLocationId: line.stockLocationId,
       })),
     };
+
+    // Include inline payment for paid/partial purchases
+    if (draft.paymentStatus !== 'pending') {
+      input.payment = {
+        amount:
+          draft.paymentAmount != null ? Math.round(draft.paymentAmount * 100) : totalCostCents,
+        debitAccountCode: draft.paymentAccountCode || undefined,
+        reference: draft.paymentReference || undefined,
+      };
+    }
 
     const result = await client.mutate({
       mutation: RECORD_PURCHASE,

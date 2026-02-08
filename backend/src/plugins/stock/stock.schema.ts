@@ -61,6 +61,12 @@ export const STOCK_ADMIN_SCHEMA = gql`
     totalItems: Int!
   }
 
+  input InlinePaymentInput {
+    amount: Int!
+    debitAccountCode: String
+    reference: String
+  }
+
   input RecordPurchaseInput {
     supplierId: ID!
     purchaseDate: DateTime!
@@ -69,6 +75,7 @@ export const STOCK_ADMIN_SCHEMA = gql`
     notes: String
     lines: [PurchaseLineInput!]!
     isCreditPurchase: Boolean
+    payment: InlinePaymentInput
   }
 
   input PurchaseLineInput {

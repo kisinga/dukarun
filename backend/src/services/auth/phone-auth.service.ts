@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  Asset,
   Channel,
   ChannelService,
   RequestContext,
@@ -661,43 +662,35 @@ export class PhoneAuthService {
     input: {
       firstName: string;
       lastName: string;
-      email: string;
       profilePictureId?: string;
     }
   ): Promise<Administrator> {
-    const administrator = await this.connection.getRepository(ctx, Administrator).findOne({
+    const adminRepo = this.connection.getRepository(ctx, Administrator);
+    const administrator = await adminRepo.findOne({
       where: { user: { id: ctx.activeUserId } },
-      relations: ['user'],
+      relations: ['user', 'customFields.profilePicture'],
     });
 
     if (!administrator) {
       throw new Error('Administrator not found');
     }
 
-    // Check if email is being changed and if it's available
-    if (input.email !== administrator.emailAddress) {
-      const isAvailable = await this.checkIdentifierAvailable(ctx, input.email);
-      if (!isAvailable) {
-        throw new Error('Email address is already in use by another account');
-      }
-    }
-
     administrator.firstName = input.firstName;
     administrator.lastName = input.lastName;
-    administrator.emailAddress = input.email;
 
     if (input.profilePictureId) {
-      // Need to cast to any for custom fields
+      const asset = await this.connection.getEntityOrThrow(ctx, Asset, input.profilePictureId);
       (administrator as any).customFields = {
-        profilePictureId: input.profilePictureId,
+        ...(administrator as any).customFields,
+        profilePicture: asset,
       };
     } else if (input.profilePictureId === null) {
-      // Explicit removal
       (administrator as any).customFields = {
-        profilePictureId: null,
+        ...(administrator as any).customFields,
+        profilePicture: null,
       };
     }
 
-    return await this.connection.getRepository(ctx, Administrator).save(administrator);
+    return await adminRepo.save(administrator);
   }
 }

@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { CompanyService } from '../../../../../core/services/company.service';
 import { ChannelSettings, SettingsService } from '../../../../../core/services/settings.service';
@@ -13,44 +21,44 @@ import { ChannelSettings, SettingsService } from '../../../../../core/services/s
 export class GeneralSettingsComponent {
   readonly settingsService = inject(SettingsService);
   private readonly companyService = inject(CompanyService);
+
   private readonly settingsState = signal<ChannelSettings | null>(null);
   readonly settings = this.settingsState.asReadonly();
-  readonly hasChanges = signal(false);
   readonly selectedLogoFile = signal<File | null>(null);
   readonly logoPreview = signal<string | null>(null);
   readonly companyLogoAsset = this.companyService.companyLogoAsset;
 
-  private originalSettings: ChannelSettings | null = null;
-  private lastRemoteSnapshot: ChannelSettings | null = null;
+  private readonly originalSettings = signal<ChannelSettings | null>(null);
+
+  /** Derived: true when local state differs from the last-saved snapshot. */
+  readonly hasChanges = computed(() => {
+    const current = this.settingsState();
+    const original = this.originalSettings();
+    if (!current || !original) return false;
+    if (this.selectedLogoFile() !== null) return true;
+    return !this.areSettingsEqual(current, original);
+  });
 
   constructor() {
+    // Sync remote settings → local state.
+    // Only tracks channelSettings(); reads hasChanges via untracked to avoid circular re-runs.
     effect(() => {
-      const remoteSettings = this.settingsService.channelSettings();
-      const hasChanges = this.hasChanges();
+      const remote = this.settingsService.channelSettings();
 
-      if (!remoteSettings) {
+      if (!remote) {
         this.settingsState.set(null);
-        this.originalSettings = null;
-        this.lastRemoteSnapshot = null;
+        this.originalSettings.set(null);
         return;
       }
 
-      const remoteChanged =
-        !this.lastRemoteSnapshot || !this.areSettingsEqual(this.lastRemoteSnapshot, remoteSettings);
+      // Always update the "original" baseline to match the server.
+      this.originalSettings.set({ ...remote });
 
-      if (remoteChanged) {
-        this.lastRemoteSnapshot = { ...remoteSettings };
-        this.originalSettings = { ...remoteSettings };
-
-        if (!hasChanges) {
-          this.settingsState.set({ ...remoteSettings });
-          this.logoPreview.set(null);
-          this.selectedLogoFile.set(null);
-          this.evaluateChanges(remoteSettings);
-        }
-      } else if (!this.settingsState()) {
-        this.settingsState.set({ ...remoteSettings });
-        this.evaluateChanges(remoteSettings);
+      // Only overwrite local edits when the user has no pending changes.
+      if (!untracked(() => this.hasChanges())) {
+        this.settingsState.set({ ...remote });
+        this.logoPreview.set(null);
+        this.selectedLogoFile.set(null);
       }
     });
   }
@@ -63,31 +71,14 @@ export class GeneralSettingsComponent {
     );
   }
 
-  private evaluateChanges(next: ChannelSettings | null): void {
-    if (!next || !this.originalSettings) {
-      this.hasChanges.set(false);
-      return;
-    }
-    const hasNewLogoFile = this.selectedLogoFile() !== null;
-    this.hasChanges.set(hasNewLogoFile || !this.areSettingsEqual(next, this.originalSettings));
-  }
-
   toggleCashierFlow(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    this.settingsState.update((settings) => {
-      if (!settings) return settings;
-      return { ...settings, cashierFlowEnabled: target.checked };
-    });
-    this.evaluateChanges(this.settingsState());
+    const checked = (event.target as HTMLInputElement).checked;
+    this.settingsState.update((s) => (s ? { ...s, cashierFlowEnabled: checked } : s));
   }
 
   togglePrinter(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    this.settingsState.update((settings) => {
-      if (!settings) return settings;
-      return { ...settings, enablePrinter: target.checked };
-    });
-    this.evaluateChanges(this.settingsState());
+    const checked = (event.target as HTMLInputElement).checked;
+    this.settingsState.update((s) => (s ? { ...s, enablePrinter: checked } : s));
   }
 
   selectLogoFile(): void {
@@ -110,7 +101,6 @@ export class GeneralSettingsComponent {
       const reader = new FileReader();
       reader.onload = (e) => {
         this.logoPreview.set(e.target?.result as string);
-        this.hasChanges.set(true);
       };
       reader.readAsDataURL(file);
     };
@@ -121,26 +111,22 @@ export class GeneralSettingsComponent {
   removeSelectedLogo(): void {
     this.selectedLogoFile.set(null);
     this.logoPreview.set(null);
-    this.evaluateChanges(this.settings());
   }
 
   removeExistingLogo(): void {
     this.logoPreview.set(null);
     this.selectedLogoFile.set(null);
-    this.settingsState.update((settings) => {
-      if (!settings) return settings;
-      return { ...settings, companyLogoAsset: null };
-    });
-    this.evaluateChanges(this.settings());
+    this.settingsState.update((s) => (s ? { ...s, companyLogoAsset: null } : s));
   }
 
   async saveSettings(): Promise<void> {
     const currentSettings = this.settings();
     if (!currentSettings) return;
 
+    const original = this.originalSettings();
     let logoAssetId: string | null | undefined = undefined;
     const currentLogo = currentSettings.companyLogoAsset;
-    const originalLogo = this.originalSettings?.companyLogoAsset;
+    const originalLogo = original?.companyLogoAsset;
 
     const selectedFile = this.selectedLogoFile();
     if (selectedFile) {
@@ -159,18 +145,18 @@ export class GeneralSettingsComponent {
       await this.settingsService.updateChannelLogo(logoAssetId);
     }
 
-    if (currentSettings.cashierFlowEnabled !== this.originalSettings?.cashierFlowEnabled) {
+    if (currentSettings.cashierFlowEnabled !== original?.cashierFlowEnabled) {
       await this.settingsService.updateCashierSettings(currentSettings.cashierFlowEnabled);
     }
 
-    if (currentSettings.enablePrinter !== this.originalSettings?.enablePrinter) {
+    if (currentSettings.enablePrinter !== original?.enablePrinter) {
       await this.settingsService.updatePrinterSettings(currentSettings.enablePrinter);
     }
 
     if (!this.settingsService.error()) {
       this.selectedLogoFile.set(null);
-      this.originalSettings = { ...currentSettings };
-      this.evaluateChanges(this.settings());
+      this.logoPreview.set(null);
+      // originalSettings will be updated by the effect when channelSettings refreshes
     }
   }
 }

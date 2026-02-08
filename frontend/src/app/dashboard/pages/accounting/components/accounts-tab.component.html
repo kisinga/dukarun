@@ -38,54 +38,79 @@
       </div>
     </div>
   } @else {
-    @for (type of accountTypes; track type) {
-      @if (
-        context().hierarchicalAccounts[type] && context().hierarchicalAccounts[type].length > 0
-      ) {
-        <!-- Account Type Section (collapse-open keeps list visible by default) -->
-        <div class="collapse collapse-arrow collapse-open bg-base-100 shadow">
-          <input type="checkbox" checked />
-          <div class="collapse-title text-xl font-medium">
-            {{ context().getAccountTypeLabel(type) }}
-            <span class="badge badge-outline ml-2">
-              {{ context().hierarchicalAccounts[type].length }} accounts
+    <!-- Mobile: Scrollable card list with sticky group headers -->
+    <div class="lg:hidden space-y-3 max-h-[75vh] overflow-y-auto">
+      @for (type of accountTypes; track type) {
+        @if (
+          context().hierarchicalAccounts[type] && context().hierarchicalAccounts[type].length > 0
+        ) {
+          <div class="sticky top-0 z-10 bg-base-100 py-2 px-1 flex items-center gap-2">
+            <h3 class="text-lg font-semibold">
+              {{ context().getAccountTypeLabel(type) }}
+            </h3>
+            <span class="badge badge-outline">
+              {{ context().hierarchicalAccounts[type].length }}
             </span>
             <span
-              class="badge ml-2"
+              class="badge"
               [class.badge-success]="context().getAccountTypeTotal(type) >= 0"
               [class.badge-error]="context().getAccountTypeTotal(type) < 0"
             >
               {{ context().formatCurrency(context().getAccountTypeTotal(type)) }}
             </span>
           </div>
-          <div class="collapse-content">
-            <!-- Mobile: Card View -->
-            <div class="lg:hidden space-y-3">
-              @for (account of context().hierarchicalAccounts[type]; track account.id) {
-                <app-account-card
-                  [account]="account"
-                  [selectedAccount]="context().selectedAccount"
-                  [formatCurrency]="context().formatCurrency"
-                  [getDisplayBalance]="getDisplayBalance"
-                  [level]="0"
-                  (accountSelect)="onAccountClick($event)"
-                  (viewTransactions)="onViewTransactions($event, $any($event))"
-                />
-              }
-            </div>
+          @for (account of context().hierarchicalAccounts[type]; track account.id) {
+            <app-account-card
+              [account]="account"
+              [selectedAccount]="context().selectedAccount"
+              [formatCurrency]="context().formatCurrency"
+              [getDisplayBalance]="getDisplayBalance"
+              [level]="0"
+              (accountSelect)="onAccountClick($event)"
+              (viewTransactions)="onViewTransactions($event, $any($event))"
+            />
+          }
+        }
+      }
+    </div>
 
-            <!-- Desktop: Table View -->
-            <div class="hidden lg:block overflow-x-auto">
-              <table class="table table-zebra">
-                <thead>
-                  <tr>
-                    <th>Code</th>
-                    <th>Name</th>
-                    <th>Balance</th>
-                    <th class="text-right">Actions</th>
+    <!-- Desktop: Single unified table with sticky header and group rows -->
+    <div class="hidden lg:block card bg-base-100 shadow">
+      <div class="card-body p-0">
+        <div class="overflow-x-auto max-h-[75vh] overflow-y-auto">
+          <table class="table table-zebra">
+            <thead class="sticky top-0 z-10 bg-base-100">
+              <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Balance</th>
+                <th class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (type of accountTypes; track type) {
+                @if (
+                  context().hierarchicalAccounts[type] &&
+                  context().hierarchicalAccounts[type].length > 0
+                ) {
+                  <!-- Account type group header -->
+                  <tr class="bg-base-200/80">
+                    <td colspan="4" class="py-3">
+                      <span class="font-semibold text-base">
+                        {{ context().getAccountTypeLabel(type) }}
+                      </span>
+                      <span class="badge badge-outline ml-2">
+                        {{ context().hierarchicalAccounts[type].length }} accounts
+                      </span>
+                      <span
+                        class="badge ml-2"
+                        [class.badge-success]="context().getAccountTypeTotal(type) >= 0"
+                        [class.badge-error]="context().getAccountTypeTotal(type) < 0"
+                      >
+                        {{ context().formatCurrency(context().getAccountTypeTotal(type)) }}
+                      </span>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
                   @for (account of context().hierarchicalAccounts[type]; track account.id) {
                     <app-account-row
                       [account]="account"
@@ -97,12 +122,12 @@
                       (viewTransactions)="onViewTransactions($event, $any($event))"
                     />
                   }
-                </tbody>
-              </table>
-            </div>
-          </div>
+                }
+              }
+            </tbody>
+          </table>
         </div>
-      }
-    }
+      </div>
+    </div>
   }
 </div>

@@ -4,18 +4,18 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 /**
  * Purchase Supplier Selector Component
  *
- * Reusable component for selecting a supplier in purchase forms.
+ * Dropdown for selecting a supplier in purchase forms.
  */
 @Component({
   selector: 'app-purchase-supplier-selector',
   imports: [CommonModule],
   template: `
     <div class="form-control">
-      <label class="label">
-        <span class="label-text font-semibold">🏢 Supplier *</span>
+      <label class="label py-1">
+        <span class="label-text text-sm font-semibold">Supplier</span>
       </label>
       <select
-        class="select select-bordered w-full"
+        class="select select-bordered select-sm w-full"
         [value]="selectedSupplierId() || ''"
         (change)="onSupplierChange($any($event.target).value || null)"
       >

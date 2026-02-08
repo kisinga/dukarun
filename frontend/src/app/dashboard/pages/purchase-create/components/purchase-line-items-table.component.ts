@@ -1,97 +1,131 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { PurchaseLineItem } from '../../../../core/services/purchase.service.types';
-import { StockLocation } from '../../../../core/services/stock-location.service';
 
 /**
  * Purchase Line Items Table Component
  *
- * Reusable component for displaying and editing purchase line items.
+ * Displays line items with inline editing, pricing comparison,
+ * and profit margin indicators.
  */
 @Component({
   selector: 'app-purchase-line-items-table',
   imports: [CommonModule],
   template: `
     @if (lineItems().length > 0) {
-      <div class="overflow-x-auto">
-        <table class="table table-zebra table-sm">
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>Qty</th>
-              <th>Unit Cost</th>
-              <th>Total</th>
-              <th>Location</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (line of lineItems(); track $index) {
-              <tr>
-                <td>{{ line.variant?.name || line.variantId }}</td>
-                <td>
-                  <input
-                    type="number"
-                    class="input input-xs w-20"
-                    step="0.01"
-                    min="0.01"
-                    [value]="line.quantity"
-                    (change)="
-                      onLineItemUpdate($index, 'quantity', parseFloat($any($event.target).value))
-                    "
+      <!-- Mobile card layout -->
+      <div class="space-y-2">
+        @for (line of lineItems(); track $index) {
+          <div class="card bg-base-200 p-3">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium truncate">
+                  {{ line.variant?.productName || line.variant?.name || line.variantId }}
+                </div>
+                @if (line.variant?.sku) {
+                  <div class="text-xs opacity-50">{{ line.variant?.sku }}</div>
+                }
+              </div>
+              <button
+                type="button"
+                class="btn btn-ghost btn-xs text-error"
+                (click)="onLineItemRemove($index)"
+                aria-label="Remove item"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                   />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    class="input input-xs w-24"
-                    step="0.01"
-                    min="0"
-                    [value]="line.unitCost"
-                    (change)="
-                      onLineItemUpdate($index, 'unitCost', parseFloat($any($event.target).value))
-                    "
-                  />
-                </td>
-                <td>{{ formatCurrency(line.quantity * line.unitCost) }}</td>
-                <td>
-                  <select
-                    class="select select-xs"
-                    [value]="line.stockLocationId"
-                    (change)="
-                      onLineItemUpdate($index, 'stockLocationId', $any($event.target).value)
-                    "
-                  >
-                    @for (location of stockLocations(); track location.id) {
-                      <option [value]="location.id">{{ location.name }}</option>
-                    }
-                  </select>
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    class="btn btn-xs btn-error"
-                    (click)="onLineItemRemove($index)"
-                  >
-                    🗑️
-                  </button>
-                </td>
-              </tr>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Qty + Cost row -->
+            <div class="flex items-center gap-2 mt-2">
+              <div class="w-20">
+                <label class="text-xs opacity-60">Qty</label>
+                <input
+                  type="number"
+                  class="input input-bordered input-xs w-full"
+                  step="0.01"
+                  min="0.01"
+                  [value]="line.quantity"
+                  (change)="
+                    onLineItemUpdate($index, 'quantity', parseFloat($any($event.target).value))
+                  "
+                />
+              </div>
+              <div class="w-24">
+                <label class="text-xs opacity-60">Unit Cost</label>
+                <input
+                  type="number"
+                  class="input input-bordered input-xs w-full"
+                  step="0.01"
+                  min="0"
+                  [value]="line.unitCost"
+                  (change)="
+                    onLineItemUpdate($index, 'unitCost', parseFloat($any($event.target).value))
+                  "
+                />
+              </div>
+              <div class="flex-1 text-right">
+                <label class="text-xs opacity-60">Line Total</label>
+                <div class="text-sm font-semibold">
+                  {{ formatCurrency(line.quantity * line.unitCost) }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Pricing comparison -->
+            @if (line.variant && line.unitCost > 0) {
+              <div class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-base-300">
+                @if (getWholesalePrice(line); as wp) {
+                  <div class="flex items-center gap-1">
+                    <span class="text-xs opacity-60">Wholesale:</span>
+                    <span class="text-xs">{{ formatCurrency(wp) }}</span>
+                    <span
+                      class="badge badge-xs"
+                      [class.badge-success]="getMargin(line.unitCost, wp) > 0"
+                      [class.badge-error]="getMargin(line.unitCost, wp) < 0"
+                      [class.badge-ghost]="getMargin(line.unitCost, wp) === 0"
+                    >
+                      {{ formatMargin(getMargin(line.unitCost, wp)) }}
+                    </span>
+                  </div>
+                }
+                @if (getRetailPrice(line); as rp) {
+                  <div class="flex items-center gap-1">
+                    <span class="text-xs opacity-60">Retail:</span>
+                    <span class="text-xs">{{ formatCurrency(rp) }}</span>
+                    <span
+                      class="badge badge-xs"
+                      [class.badge-success]="getMargin(line.unitCost, rp) > 0"
+                      [class.badge-error]="getMargin(line.unitCost, rp) < 0"
+                      [class.badge-ghost]="getMargin(line.unitCost, rp) === 0"
+                    >
+                      {{ formatMargin(getMargin(line.unitCost, rp)) }}
+                    </span>
+                  </div>
+                }
+              </div>
             }
-          </tbody>
-          <tfoot>
-            <tr>
-              <th colspan="3">Total</th>
-              <th>{{ formatCurrency(totalCost()) }}</th>
-              <th colspan="2"></th>
-            </tr>
-          </tfoot>
-        </table>
+          </div>
+        }
+
+        <!-- Total -->
+        <div
+          class="flex justify-between items-center px-3 py-2 bg-base-300 rounded-lg font-semibold"
+        >
+          <span>Total ({{ lineItems().length }} items)</span>
+          <span>{{ formatCurrency(totalCost()) }}</span>
+        </div>
       </div>
     } @else {
-      <div class="text-center py-8 text-base-content/60">
-        <div class="text-4xl mb-2">📦</div>
-        <p>No items added yet</p>
+      <div class="text-center py-6 text-base-content/50">
+        <p class="text-sm">No items added yet. Search for a product above.</p>
       </div>
     }
   `,
@@ -99,7 +133,6 @@ import { StockLocation } from '../../../../core/services/stock-location.service'
 })
 export class PurchaseLineItemsTableComponent {
   readonly lineItems = input.required<PurchaseLineItem[]>();
-  readonly stockLocations = input.required<StockLocation[]>();
   readonly totalCost = input.required<number>();
 
   readonly lineItemUpdate = output<{ index: number; field: keyof PurchaseLineItem; value: any }>();
@@ -111,6 +144,39 @@ export class PurchaseLineItemsTableComponent {
 
   onLineItemRemove(index: number): void {
     this.lineItemRemove.emit(index);
+  }
+
+  /**
+   * Get wholesale price in base currency (convert from cents).
+   * Returns null if not available.
+   */
+  getWholesalePrice(line: PurchaseLineItem): number | null {
+    const wp = line.variant?.customFields?.wholesalePrice;
+    if (wp == null || wp <= 0) return null;
+    return wp / 100;
+  }
+
+  /**
+   * Get retail price in base currency (convert from cents).
+   * Returns null if not available.
+   */
+  getRetailPrice(line: PurchaseLineItem): number | null {
+    const rp = line.variant?.priceWithTax;
+    if (rp == null || rp <= 0) return null;
+    return rp / 100;
+  }
+
+  /**
+   * Calculate profit margin percentage: (sellingPrice - costPrice) / costPrice * 100
+   */
+  getMargin(unitCost: number, sellingPrice: number): number {
+    if (unitCost <= 0) return 0;
+    return ((sellingPrice - unitCost) / unitCost) * 100;
+  }
+
+  formatMargin(margin: number): string {
+    const sign = margin > 0 ? '+' : '';
+    return `${sign}${margin.toFixed(1)}%`;
   }
 
   formatCurrency(amount: number): string {

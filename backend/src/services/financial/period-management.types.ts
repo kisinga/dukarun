@@ -6,7 +6,7 @@ import { AccountingPeriod } from '../../domain/period/accounting-period.entity';
  * scopeRefId in the DB is the string produced by toScopeRefId(ref).
  */
 export type ReconciliationScopeRef =
-  | { scope: 'cash-session'; sessionId: string }
+  | { scope: 'cash-session'; sessionId: string; kind?: 'opening' | 'closing' }
   | { scope: 'method'; methodCode: string }
   | { scope: 'bank'; payoutId: string }
   | { scope: 'inventory'; stockLocationId: number | 'ALL' }
@@ -15,7 +15,7 @@ export type ReconciliationScopeRef =
 export function toScopeRefId(ref: ReconciliationScopeRef): string {
   switch (ref.scope) {
     case 'cash-session':
-      return ref.sessionId;
+      return ref.kind ? `${ref.sessionId}:${ref.kind}` : ref.sessionId;
     case 'method':
       return ref.methodCode;
     case 'bank':
@@ -38,8 +38,15 @@ export function fromScopeRefId(
   scopeRefId: string
 ): ReconciliationScopeRef {
   switch (scope) {
-    case 'cash-session':
+    case 'cash-session': {
+      const colonIdx = scopeRefId.lastIndexOf(':');
+      if (colonIdx > 0) {
+        const sessionId = scopeRefId.slice(0, colonIdx);
+        const kind = scopeRefId.slice(colonIdx + 1) as 'opening' | 'closing';
+        return { scope: 'cash-session', sessionId, kind };
+      }
       return { scope: 'cash-session', sessionId: scopeRefId };
+    }
     case 'method':
       return { scope: 'method', methodCode: scopeRefId };
     case 'bank':

@@ -351,18 +351,31 @@ export class ReconciliationService {
       return [];
     }
     const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
-    const qb = reconciliationRepo
+
+    // Primary: kind-specific scopeRefId (new format: sessionId:opening or sessionId:closing)
+    const kindRef = toScopeRefId({ scope: 'cash-session', sessionId: trimmed, kind });
+    let list = await reconciliationRepo
       .createQueryBuilder('r')
       .where('r.scope = :scope', { scope: 'cash-session' })
-      .andWhere('r.scopeRefId = :scopeRefId', {
-        scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId: trimmed }),
-      });
-    if (kind === 'opening') {
-      qb.orderBy('r.rangeStart', 'ASC').addOrderBy('r.rangeEnd', 'ASC');
-    } else {
-      qb.orderBy('r.rangeEnd', 'DESC').addOrderBy('r.rangeStart', 'DESC');
+      .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: kindRef })
+      .take(1)
+      .getMany();
+
+    // Fallback: legacy bare sessionId (for records created before kind suffix was added)
+    if (list.length === 0) {
+      const legacyRef = toScopeRefId({ scope: 'cash-session', sessionId: trimmed });
+      const legacyQb = reconciliationRepo
+        .createQueryBuilder('r')
+        .where('r.scope = :scope', { scope: 'cash-session' })
+        .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: legacyRef });
+      if (kind === 'opening') {
+        legacyQb.orderBy('r.rangeStart', 'ASC').addOrderBy('r.rangeEnd', 'ASC');
+      } else {
+        legacyQb.orderBy('r.rangeEnd', 'DESC').addOrderBy('r.rangeStart', 'DESC');
+      }
+      list = await legacyQb.take(1).getMany();
     }
-    const list = await qb.take(1).getMany();
+
     const reconciliation = list[0];
     this.logger.log(
       `getSessionReconciliationDetails sessionId=${sessionId} kind=${kind} found=${!!reconciliation} reconciliationId=${reconciliation?.id ?? 'n/a'}`

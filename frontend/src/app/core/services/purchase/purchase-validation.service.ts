@@ -72,6 +72,24 @@ export class PurchaseValidationService {
       }
     }
 
+    // Validate payment fields
+    if (draft.paymentStatus === 'partial') {
+      if (draft.paymentAmount == null || draft.paymentAmount <= 0) {
+        return {
+          isValid: false,
+          error: 'Partial payment requires a positive amount',
+        };
+      }
+      const totalCost = draft.lines.reduce((sum, l) => sum + l.quantity * l.unitCost, 0);
+      if (draft.paymentAmount >= totalCost) {
+        return {
+          isValid: false,
+          error:
+            'Partial payment amount must be less than the total cost. Use "Paid" for full payment.',
+        };
+      }
+    }
+
     return { isValid: true };
   }
 }

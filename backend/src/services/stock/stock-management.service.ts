@@ -4,7 +4,10 @@ import { AuditService } from '../../infrastructure/audit/audit.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { InventoryReconciliationService } from '../inventory/inventory-reconciliation.service';
 import { InventoryConfigurationService } from '../inventory/inventory-configuration.service';
+import { FinancialService } from '../financial/financial.service';
+import { PAYMENT_METHOD_CODES } from '../payments/payment-method-codes.constants';
 import { StockPurchase } from './entities/purchase.entity';
+import { PurchasePayment } from './entities/purchase-payment.entity';
 import { InventoryStockAdjustment } from './entities/stock-adjustment.entity';
 import { PurchaseService, RecordPurchaseInput } from './purchase.service';
 import { StockAdjustmentService, RecordStockAdjustmentInput } from './stock-adjustment.service';
@@ -36,6 +39,7 @@ export class StockManagementService {
     private readonly stockAdjustmentService: StockAdjustmentService,
     private readonly stockMovementService: StockMovementService,
     private readonly validationService: StockValidationService,
+    private readonly financialService: FinancialService,
     @Optional() private readonly purchaseCreditValidator?: PurchaseCreditValidatorService,
     @Optional() private readonly auditService?: AuditService,
     @Optional() private readonly inventoryService?: InventoryService,
@@ -52,6 +56,16 @@ export class StockManagementService {
       try {
         // 1. Validate input
         this.validationService.validatePurchaseInput(input);
+
+        // 1b. Force credit purchase path when inline payment is provided
+        // This ensures the purchase goes through AP so the payment can clear it properly.
+        // Without this, a cash purchase would directly credit Cash On Hand, and we
+        // wouldn't be able to record a payment from a different source (e.g., M-Pesa).
+        if (input.payment && input.payment.amount > 0) {
+          input.isCreditPurchase = true;
+        } else if (input.paymentStatus === 'pending') {
+          input.isCreditPurchase = true;
+        }
 
         // 2. Validate supplier credit if this is a credit purchase
         if (input.isCreditPurchase) {
@@ -97,6 +111,51 @@ export class StockManagementService {
 
         // 7. Log audit event
         await this.logPurchaseAudit(transactionCtx, purchase, stockMovements);
+
+        // 7b. Record inline payment if provided (for paid/partial purchases)
+        if (input.payment && input.payment.amount > 0) {
+          const paymentAmount = input.payment.amount;
+          const purchaseRepo = this.connection.getRepository(transactionCtx, StockPurchase);
+          const purchasePaymentRepo = this.connection.getRepository(
+            transactionCtx,
+            PurchasePayment
+          );
+          const channelId = transactionCtx.channelId as number;
+          const supplierIdNum = parseInt(String(input.supplierId), 10);
+
+          // Create PurchasePayment record for audit trail
+          const paymentRecord = purchasePaymentRepo.create({
+            channelId,
+            purchaseId: purchase.id,
+            amount: paymentAmount,
+            method: PAYMENT_METHOD_CODES.CASH,
+            reference: input.payment.reference || null,
+            supplierId: supplierIdNum,
+          });
+          await purchasePaymentRepo.save(paymentRecord);
+
+          // Post payment to ledger (debit AP, credit payment source)
+          const paymentId = `supplier-payment-${purchase.id}-${Date.now()}`;
+          await this.financialService.recordSupplierPayment(
+            transactionCtx,
+            paymentId,
+            purchase.id,
+            purchase.referenceNumber || purchase.id,
+            String(input.supplierId),
+            paymentAmount,
+            PAYMENT_METHOD_CODES.CASH,
+            input.payment.debitAccountCode?.trim() || undefined
+          );
+
+          // Update paymentStatus based on amount vs totalCost
+          const newPaymentStatus = paymentAmount >= purchase.totalCost ? 'paid' : 'partial';
+          await purchaseRepo.update({ id: purchase.id }, { paymentStatus: newPaymentStatus });
+          purchase.paymentStatus = newPaymentStatus;
+
+          this.logger.log(
+            `Inline payment recorded for purchase ${purchase.id}: ${paymentAmount} cents (${newPaymentStatus})`
+          );
+        }
 
         // 8. Shadow mode: Record purchase in InventoryService if enabled
         if (this.inventoryService && this.inventoryConfig) {
