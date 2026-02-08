@@ -27,7 +27,7 @@ import { PurchaseLineItem } from '../../../../core/services/purchase.service.typ
           <div
             class="absolute z-20 w-full mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
           >
-            @for (variant of productSearchResults(); track variant.id) {
+            @for (variant of getDropdownVariants(); track variant.id) {
               <button
                 type="button"
                 class="w-full text-left px-3 py-2 hover:bg-base-200 border-b border-base-200 last:border-b-0"
@@ -42,6 +42,17 @@ import { PurchaseLineItem } from '../../../../core/services/purchase.service.typ
                 <div class="text-xs opacity-50">SKU: {{ variant.sku }}</div>
               </button>
             }
+            <div class="p-2 border-t border-base-200 bg-base-200/50">
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm btn-block"
+                (click)="onOpenVariantPickerModal()"
+              >
+                View all {{ productSearchResults().length }} variant{{
+                  productSearchResults().length !== 1 ? 's' : ''
+                }}
+              </button>
+            </div>
           </div>
         }
       </div>
@@ -107,8 +118,18 @@ export class PurchaseLineItemFormComponent {
 
   readonly productSearch = output<string>();
   readonly productSelect = output<ProductVariant>();
+  readonly openVariantPickerModal = output<void>();
   readonly lineItemFieldChange = output<{ field: keyof PurchaseLineItem; value: any }>();
   readonly addItem = output<void>();
+
+  private static readonly DROPDOWN_MAX_ITEMS = 5;
+
+  /** Show first N variants in dropdown; modal shows all. */
+  getDropdownVariants(): ProductVariant[] {
+    const all = this.productSearchResults();
+    if (all.length <= PurchaseLineItemFormComponent.DROPDOWN_MAX_ITEMS) return all;
+    return all.slice(0, PurchaseLineItemFormComponent.DROPDOWN_MAX_ITEMS);
+  }
 
   onProductSearch(term: string): void {
     this.productSearch.emit(term);
@@ -116,6 +137,10 @@ export class PurchaseLineItemFormComponent {
 
   onProductSelect(variant: ProductVariant): void {
     this.productSelect.emit(variant);
+  }
+
+  onOpenVariantPickerModal(): void {
+    this.openVariantPickerModal.emit();
   }
 
   onLineItemFieldChange(field: keyof PurchaseLineItem, value: any): void {

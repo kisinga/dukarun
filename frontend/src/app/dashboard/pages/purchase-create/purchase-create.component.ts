@@ -15,6 +15,7 @@ import { SupplierService } from '../../../core/services/supplier.service';
 import { PurchaseLineItemFormComponent } from './components/purchase-line-item-form.component';
 import { PurchaseLineItemsTableComponent } from './components/purchase-line-items-table.component';
 import { PurchasePaymentSectionComponent } from './components/purchase-payment-section.component';
+import { PurchaseVariantPickerModalComponent } from './components/purchase-variant-picker-modal.component';
 
 @Component({
   selector: 'app-purchase-create',
@@ -23,6 +24,7 @@ import { PurchasePaymentSectionComponent } from './components/purchase-payment-s
     PurchaseLineItemFormComponent,
     PurchaseLineItemsTableComponent,
     PurchasePaymentSectionComponent,
+    PurchaseVariantPickerModalComponent,
   ],
   template: `
     <div class="min-h-screen bg-base-100">
@@ -112,6 +114,7 @@ import { PurchasePaymentSectionComponent } from './components/purchase-payment-s
               [lineItem]="newLineItem()"
               (productSearch)="handleProductSearch($event)"
               (productSelect)="handleProductSelect($event)"
+              (openVariantPickerModal)="openVariantPickerModal()"
               (lineItemFieldChange)="updateNewLineItem($event.field, $event.value)"
               (addItem)="handleAddLineItem()"
             />
@@ -174,6 +177,15 @@ import { PurchasePaymentSectionComponent } from './components/purchase-payment-s
           </button>
         </div>
       }
+
+      <!-- Variant picker modal (scrollable list when many variants) -->
+      <app-purchase-variant-picker-modal
+        [isOpen]="showVariantPickerModal()"
+        [variants]="productSearchResults()"
+        [searchTerm]="productSearchTerm()"
+        (variantSelected)="onVariantSelectedFromModal($event)"
+        (close)="showVariantPickerModal.set(false)"
+      />
     </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -202,6 +214,7 @@ export class PurchaseCreateComponent implements OnInit {
   readonly isSearchingProducts = signal<boolean>(false);
   readonly showSuccessMessage = signal<boolean>(false);
   readonly eligibleAccounts = signal<{ code: string; name: string }[]>([]);
+  readonly showVariantPickerModal = signal<boolean>(false);
 
   // New line item form
   readonly newLineItem = signal<Partial<PurchaseLineItem>>({
@@ -263,15 +276,26 @@ export class PurchaseCreateComponent implements OnInit {
 
   handleProductSelect(variant: ProductVariant): void {
     const defaultLocation = this.stockLocations()[0];
+    const unitCost =
+      variant.customFields?.wholesalePrice != null ? variant.customFields.wholesalePrice / 100 : 0;
     this.newLineItem.set({
       variantId: variant.id,
       variant: variant,
-      quantity: 0,
-      unitCost: 0,
+      quantity: 1,
+      unitCost,
       stockLocationId: defaultLocation?.id || '',
     });
     this.productSearchTerm.set('');
     this.productSearchResults.set([]);
+  }
+
+  openVariantPickerModal(): void {
+    this.showVariantPickerModal.set(true);
+  }
+
+  onVariantSelectedFromModal(variant: ProductVariant): void {
+    this.handleProductSelect(variant);
+    this.showVariantPickerModal.set(false);
   }
 
   handleAddLineItem(): void {
