@@ -51,6 +51,26 @@ Both share the `dukarun_services_network` for inter-service communication.
 1. Change network name from `dukarun_services_network` to `coolify` in both compose files
 2. Enable "Connect to Predefined Network" in Coolify UI
 
+### Image Provenance and Troubleshooting
+
+#### When was the image built?
+
+To inspect which commit and when an image was built:
+
+```bash
+docker inspect ghcr.io/kisinga/dukarun/frontend:latest --format='{{json .Config.Labels}}' | jq
+```
+
+- `org.opencontainers.image.revision` — git SHA of the commit used to build the image
+- `org.opencontainers.image.created` — build timestamp (ISO 8601)
+
+Same for backend: replace `frontend` with `backend` in the image name.
+
+#### Why is prod not updating?
+
+1. **Check the Build and Push workflow** — Images are built by the "Build and Push" workflow, which runs only after the "Test Suite" workflow succeeds on `main`. In GitHub Actions, these are separate workflow runs. If the frontend build fails (e.g. Angular budget exceeded), only the Build and Push run fails; the Test Suite may still show success.
+2. **Check whether Coolify pulls the new image** — On redeploy, Coolify must pull the latest image. Ensure the deployment step includes `docker compose pull` (or equivalent) before recreating containers, otherwise the previous image keeps running.
+
 ### Post-Deployment Verification
 
 After deploying with the updated configuration:

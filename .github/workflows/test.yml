@@ -67,10 +67,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y /tmp/google-chrome-stable_current_amd64.deb
 
-      - name: Install and test frontend
+      - name: Install frontend dependencies
         run: |
           cd frontend
           npm ci
+
+      - name: Production build (catches budget errors)
+        run: |
+          cd frontend
+          npm run build -- --configuration production
+
+      - name: Run frontend tests
+        run: |
+          cd frontend
           export CHROME_BIN=/usr/bin/google-chrome-stable
           npm run test:ci
         timeout-minutes: 10
