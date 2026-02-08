@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  Asset,
   Channel,
   ChannelService,
   RequestContext,
@@ -665,9 +666,10 @@ export class PhoneAuthService {
       profilePictureId?: string;
     }
   ): Promise<Administrator> {
-    const administrator = await this.connection.getRepository(ctx, Administrator).findOne({
+    const adminRepo = this.connection.getRepository(ctx, Administrator);
+    const administrator = await adminRepo.findOne({
       where: { user: { id: ctx.activeUserId } },
-      relations: ['user'],
+      relations: ['user', 'customFields.profilePicture'],
     });
 
     if (!administrator) {
@@ -687,17 +689,18 @@ export class PhoneAuthService {
     administrator.emailAddress = input.email;
 
     if (input.profilePictureId) {
-      // Need to cast to any for custom fields
+      const asset = await this.connection.getEntityOrThrow(ctx, Asset, input.profilePictureId);
       (administrator as any).customFields = {
-        profilePictureId: input.profilePictureId,
+        ...(administrator as any).customFields,
+        profilePicture: asset,
       };
     } else if (input.profilePictureId === null) {
-      // Explicit removal
       (administrator as any).customFields = {
-        profilePictureId: null,
+        ...(administrator as any).customFields,
+        profilePicture: null,
       };
     }
 
-    return await this.connection.getRepository(ctx, Administrator).save(administrator);
+    return await adminRepo.save(administrator);
   }
 }

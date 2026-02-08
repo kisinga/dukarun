@@ -1,11 +1,9 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, from } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import { environment } from '../../../environments/environment';
 import type { GetAuditLogsQuery, GetAuditLogsQueryVariables } from '../graphql/generated/graphql';
 import { LanguageCode } from '../graphql/generated/graphql';
 import {
-  ASSIGN_ASSETS_TO_CHANNEL,
   CREATE_CHANNEL_PAYMENT_METHOD,
   GET_AUDIT_LOGS,
   INVITE_CHANNEL_ADMINISTRATOR,
@@ -15,6 +13,7 @@ import {
   UPDATE_CHANNEL_PAYMENT_METHOD,
 } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
+import { AssetUploadService } from './asset-upload.service';
 import { CompanyService } from './company.service';
 
 export interface ChannelSettings {
@@ -119,6 +118,7 @@ export interface AuditLogOptions {
 @Injectable({ providedIn: 'root' })
 export class SettingsService {
   private readonly apolloService = inject(ApolloService);
+  private readonly assetUploadService = inject(AssetUploadService);
   private readonly companyService = inject(CompanyService);
 
   // Signals for reactive state
@@ -329,145 +329,11 @@ export class SettingsService {
     this.error.set(null);
 
     try {
-      console.log('🚀 Starting logo upload:', {
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-      });
-
-      // Use the same pattern as product service - direct fetch with FormData
-      const apiUrl = `${environment.apiUrl}`;
-
-      // GraphQL mutation for creating assets
-      const createAssetsMutation = `
-                mutation CreateAssets($input: [CreateAssetInput!]!) {
-                    createAssets(input: $input) {
-                        ... on Asset {
-                            id
-                            name
-                            preview
-                            source
-                        }
-                    }
-                }
-            `;
-
-      // Create FormData for multipart upload following graphql-multipart-request-spec
-      const formData = new FormData();
-
-      // Build the operations object with file placeholders
-      const operations = {
-        query: createAssetsMutation,
-        variables: {
-          input: [{ file: null }],
-        },
-      };
-
-      // Build the map object to link files to variables
-      const map = {
-        '0': ['variables.input.0.file'],
-      };
-
-      // Append operations and map
-      formData.append('operations', JSON.stringify(operations));
-      formData.append('map', JSON.stringify(map));
-
-      // Append actual file
-      formData.append('0', file, file.name);
-
-      console.log('📤 Uploading logo using multipart protocol...');
-
-      // Get channel token for the request
-      const channelToken = this.apolloService.getChannelToken();
-
-      // Send multipart request
-      const headers: Record<string, string> = {};
-      if (channelToken) {
-        headers['vendure-token'] = channelToken;
-      }
-      // Note: Do NOT set Content-Type for FormData - browser sets it with boundary
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers,
-        credentials: 'include', // Send session cookie
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Upload HTTP error:', response.status, response.statusText);
-        console.error('❌ Response body:', errorText);
-        this.error.set(`Upload failed: ${response.status} ${response.statusText}`);
-        return null;
-      }
-
-      const result = await response.json();
-
-      console.log('📤 Upload response:', {
-        hasErrors: !!result.errors,
-        hasData: !!result.data?.createAssets,
-      });
-
-      if (result.errors) {
-        console.error('❌ GraphQL errors:', result.errors);
-        this.error.set(`Upload failed: ${result.errors[0]?.message || 'Unknown error'}`);
-        return null;
-      }
-
-      const createdAssets = result.data?.createAssets;
-      if (!createdAssets || createdAssets.length === 0) {
-        console.error('❌ No assets created');
-        this.error.set('Upload failed: No assets created');
-        return null;
-      }
-
-      const asset = createdAssets[0];
-      if (!asset.id) {
-        console.error('❌ No valid asset ID returned');
-        this.error.set('Upload failed: No valid asset ID returned');
-        return null;
-      }
-
-      console.log('✅ Upload successful, asset ID:', asset.id);
-
-      // Step 2: Assign asset to current channel
-      const channel = this.companyService.activeChannel();
-      if (!channel?.id) {
-        console.error('❌ No active channel found');
-        this.error.set('Upload failed: No active channel');
-        return null;
-      }
-
-      console.log('🔗 Assigning asset to channel:', channel.id);
-      const client = this.apolloService.getClient();
-      const assignResult = await client.mutate({
-        mutation: ASSIGN_ASSETS_TO_CHANNEL as any,
-        variables: {
-          assetIds: [asset.id],
-          channelId: channel.id,
-        },
-      });
-
-      if (assignResult.error || !assignResult.data) {
-        console.error('❌ Failed to assign asset to channel:', assignResult.error);
-        this.error.set('Upload failed: Could not assign asset to channel');
-        return null;
-      }
-
-      console.log('✅ Asset assigned to channel successfully');
-
-      // Refresh channel data to update UI immediately
-      console.log('🔄 Refreshing channel data...');
-      await this.companyService.fetchActiveChannel();
-      console.log('✅ Channel data refreshed');
-
-      return asset.id;
+      const assets = await this.assetUploadService.uploadAndAssignToChannel([file]);
+      return assets[0]?.id ?? null;
     } catch (err) {
-      console.error('❌ Upload error:', err);
-      this.error.set(
-        `Failed to upload logo: ${err instanceof Error ? err.message : 'Unknown error'}`,
-      );
+      console.error('Failed to upload logo:', err);
+      this.error.set('Failed to upload logo');
       return null;
     } finally {
       this.loading.set(false);

@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { environment } from '../../../../environments/environment';
 import { UPDATE_ADMIN_PROFILE } from '../../../core/graphql/operations.graphql';
 import { ApolloService } from '../../../core/services/apollo.service';
+import { AssetUploadService } from '../../../core/services/asset-upload.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
 
@@ -265,6 +266,7 @@ const CHECK_IDENTIFIER_AVAILABLE = `
 export class ProfileComponent {
   private readonly authService = inject(AuthService);
   private readonly apolloService = inject(ApolloService);
+  private readonly assetUploadService = inject(AssetUploadService);
   private readonly toastService = inject(ToastService);
 
   // Form fields (ngModel bound)
@@ -466,51 +468,8 @@ export class ProfileComponent {
 
   private async uploadPhoto(file: File): Promise<string | null> {
     try {
-      const createAssetsMutation = `
-        mutation CreateAssets($input: [CreateAssetInput!]!) {
-          createAssets(input: $input) {
-            ... on Asset {
-              id
-              preview
-              source
-            }
-          }
-        }
-      `;
-
-      const formData = new FormData();
-      formData.append(
-        'operations',
-        JSON.stringify({
-          query: createAssetsMutation,
-          variables: { input: [{ file: null }] },
-        }),
-      );
-      formData.append('map', JSON.stringify({ '0': ['variables.input.0.file'] }));
-      formData.append('0', file, file.name);
-
-      const headers: Record<string, string> = {};
-      const channelToken = this.apolloService.getChannelToken();
-      if (channelToken) {
-        headers['vendure-token'] = channelToken;
-      }
-
-      const response = await fetch(environment.apiUrl, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: formData,
-      });
-
-      if (!response.ok) return null;
-
-      const result = await response.json();
-      if (result.errors) return null;
-
-      const assets = result.data?.createAssets;
-      if (!assets?.length || !assets[0].id) return null;
-
-      return assets[0].id;
+      const assets = await this.assetUploadService.uploadAssets([file]);
+      return assets[0]?.id ?? null;
     } catch {
       return null;
     }
