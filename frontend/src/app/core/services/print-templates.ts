@@ -79,8 +79,15 @@ export abstract class PrintTemplate {
 
   /**
    * Render the order data into HTML
+   * @param order - Order data
+   * @param companyLogo - Optional logo URL
+   * @param companyName - Company/channel display name (defaults to 'Your Company')
    */
-  abstract render(order: OrderData, companyLogo?: string | null): string;
+  abstract render(
+    order: OrderData,
+    companyLogo?: string | null,
+    companyName?: string | null,
+  ): string;
 
   /**
    * Get CSS styles for this template
@@ -143,7 +150,7 @@ export class Receipt52mmTemplate extends PrintTemplate {
   name = '52mm Receipt';
   width = '52mm';
 
-  render(order: OrderData, companyLogo?: string | null): string {
+  render(order: OrderData, companyLogo?: string | null, companyName?: string | null): string {
     const customerName = this.getCustomerName(order);
     const isWalkIn = this.isWalkInCustomer(order);
     const date = order.orderPlacedAt
@@ -151,12 +158,13 @@ export class Receipt52mmTemplate extends PrintTemplate {
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
     const paymentMethod = order.payments?.[0]?.method || 'N/A';
+    const name = companyName?.trim() || 'Your Company';
 
     let html = `
             <div class="print-template receipt-52mm">
                 <div class="receipt-header">
                     ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
-                    <h1 class="company-name">Your Company</h1>
+                    <h1 class="company-name">${name}</h1>
                     <p class="receipt-meta">
                         <span>Order: ${order.code}</span><br>
                         <span>Date: ${date}</span>
@@ -225,11 +233,11 @@ export class Receipt52mmTemplate extends PrintTemplate {
                 }
                 .receipt-52mm .company-logo {
                     max-width: 100%;
-                    max-height: 40mm;
+                    max-height: 14mm;
                     width: auto;
                     height: auto;
                     object-fit: contain;
-                    margin-bottom: 8px;
+                    margin-bottom: 6px;
                     display: block;
                     margin-left: auto;
                     margin-right: auto;
@@ -309,7 +317,7 @@ export class Receipt80mmTemplate extends PrintTemplate {
   name = '80mm Receipt';
   width = '80mm';
 
-  render(order: OrderData, companyLogo?: string | null): string {
+  render(order: OrderData, companyLogo?: string | null, companyName?: string | null): string {
     const customerName = this.getCustomerName(order);
     const isWalkIn = this.isWalkInCustomer(order);
     const date = order.orderPlacedAt
@@ -317,12 +325,13 @@ export class Receipt80mmTemplate extends PrintTemplate {
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
     const paymentMethod = order.payments?.[0]?.method || 'N/A';
+    const name = companyName?.trim() || 'Your Company';
 
     let html = `
             <div class="print-template receipt-80mm">
                 <div class="receipt-header">
                     ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
-                    <h1 class="company-name">Your Company</h1>
+                    <h1 class="company-name">${name}</h1>
                     <p class="receipt-meta">
                         <span>Order: ${order.code}</span><br>
                         <span>Date: ${date}</span>
@@ -390,11 +399,11 @@ export class Receipt80mmTemplate extends PrintTemplate {
                 }
                 .receipt-80mm .company-logo {
                     max-width: 100%;
-                    max-height: 45mm;
+                    max-height: 20mm;
                     width: auto;
                     height: auto;
                     object-fit: contain;
-                    margin-bottom: 10px;
+                    margin-bottom: 8px;
                     display: block;
                     margin-left: auto;
                     margin-right: auto;
@@ -474,7 +483,7 @@ export class A4Template extends PrintTemplate {
   name = 'A4 Invoice';
   width = '210mm';
 
-  render(order: OrderData, companyLogo?: string | null): string {
+  render(order: OrderData, companyLogo?: string | null, companyName?: string | null): string {
     const customerName = this.getCustomerName(order);
     const isWalkIn = this.isWalkInCustomer(order);
     const date = order.orderPlacedAt
@@ -484,13 +493,14 @@ export class A4Template extends PrintTemplate {
     const paymentMethod = order.payments?.[0]?.method || 'N/A';
     const hasFulfillment = order.fulfillments && order.fulfillments.length > 0;
     const hasShipping = order.shippingAddress && !isWalkIn;
+    const name = companyName?.trim() || 'Your Company';
 
     let html = `
             <div class="print-template a4-invoice">
                 <div class="invoice-header">
                     <div class="company-info">
                         ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
-                        <h1 class="company-name">Your Company</h1>
+                        <h1 class="company-name">${name}</h1>
                         <p class="company-address">Your Company Address</p>
                     </div>
                     <div class="invoice-meta">
@@ -625,12 +635,12 @@ export class A4Template extends PrintTemplate {
                     line-height: 1.6;
                 }
                 .a4-invoice .company-logo {
-                    max-width: 80mm;
-                    max-height: 40mm;
+                    max-width: 70mm;
+                    max-height: 28mm;
                     width: auto;
                     height: auto;
                     object-fit: contain;
-                    margin-bottom: 12px;
+                    margin-bottom: 10px;
                     display: block;
                 }
                 .a4-invoice .invoice-header {
