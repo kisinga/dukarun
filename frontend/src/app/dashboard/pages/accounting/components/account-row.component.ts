@@ -8,6 +8,7 @@ import { AccountNode } from './accounts-tab.component';
   imports: [CommonModule],
   templateUrl: './account-row.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { style: 'display: contents' },
 })
 export class AccountRowComponent {
   account = input.required<AccountNode>();

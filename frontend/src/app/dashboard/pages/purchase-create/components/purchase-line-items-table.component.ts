@@ -114,14 +114,6 @@ import { PurchaseLineItem } from '../../../../core/services/purchase.service.typ
             }
           </div>
         }
-
-        <!-- Total -->
-        <div
-          class="flex justify-between items-center px-3 py-2 bg-base-300 rounded-lg font-semibold"
-        >
-          <span>Total ({{ lineItems().length }} items)</span>
-          <span>{{ formatCurrency(totalCost()) }}</span>
-        </div>
       </div>
     } @else {
       <div class="text-center py-6 text-base-content/50">
@@ -133,7 +125,6 @@ import { PurchaseLineItem } from '../../../../core/services/purchase.service.typ
 })
 export class PurchaseLineItemsTableComponent {
   readonly lineItems = input.required<PurchaseLineItem[]>();
-  readonly totalCost = input.required<number>();
 
   readonly lineItemUpdate = output<{ index: number; field: keyof PurchaseLineItem; value: any }>();
   readonly lineItemRemove = output<number>();
