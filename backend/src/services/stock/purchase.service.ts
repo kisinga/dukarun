@@ -27,6 +27,11 @@ export interface RecordPurchaseInput {
   notes?: string | null;
   lines: PurchaseLineInput[];
   isCreditPurchase?: boolean;
+  payment?: {
+    amount: number; // In smallest currency unit (cents)
+    debitAccountCode?: string;
+    reference?: string;
+  };
 }
 
 /**

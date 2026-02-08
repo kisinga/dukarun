@@ -27,6 +27,9 @@ export class PurchaseDraftService extends DraftBaseService<PurchaseDraft> {
       paymentStatus: 'pending',
       notes: '',
       lines: [],
+      paymentAmount: null,
+      paymentAccountCode: '',
+      paymentReference: '',
     };
     this.draftSignal.set(draft);
     this.persist();
@@ -58,6 +61,10 @@ export class PurchaseDraftService extends DraftBaseService<PurchaseDraft> {
       ...cached,
       purchaseDate:
         cached.purchaseDate instanceof Date ? cached.purchaseDate : new Date(cached.purchaseDate),
+      // Backward compatibility for cached drafts without payment fields
+      paymentAmount: cached.paymentAmount ?? null,
+      paymentAccountCode: cached.paymentAccountCode ?? '',
+      paymentReference: cached.paymentReference ?? '',
     };
   }
 

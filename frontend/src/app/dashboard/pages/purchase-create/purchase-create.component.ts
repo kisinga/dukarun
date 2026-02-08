@@ -1,7 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { DeepLinkService } from '../../../core/services/deep-link.service';
+import { LedgerService } from '../../../core/services/ledger/ledger.service';
 import {
   ProductSearchService,
   ProductVariant,
@@ -13,19 +15,9 @@ import { SupplierService } from '../../../core/services/supplier.service';
 import { PurchaseFormFieldsComponent } from './components/purchase-form-fields.component';
 import { PurchaseLineItemFormComponent } from './components/purchase-line-item-form.component';
 import { PurchaseLineItemsTableComponent } from './components/purchase-line-items-table.component';
+import { PurchasePaymentSectionComponent } from './components/purchase-payment-section.component';
 import { PurchaseSupplierSelectorComponent } from './components/purchase-supplier-selector.component';
 
-/**
- * Purchase Create Component
- *
- * Orchestrates purchase creation using composable child components.
- * Reuses existing PurchaseService draft infrastructure with caching.
- *
- * ARCHITECTURE:
- * - Thin orchestration layer
- * - Composable child components for each concern
- * - Draft caching handled by PurchaseService
- */
 @Component({
   selector: 'app-purchase-create',
   imports: [
@@ -34,6 +26,7 @@ import { PurchaseSupplierSelectorComponent } from './components/purchase-supplie
     PurchaseFormFieldsComponent,
     PurchaseLineItemFormComponent,
     PurchaseLineItemsTableComponent,
+    PurchasePaymentSectionComponent,
   ],
   template: `
     <div class="min-h-screen bg-base-100">
@@ -50,102 +43,124 @@ import { PurchaseSupplierSelectorComponent } from './components/purchase-supplie
               ></path>
             </svg>
           </button>
-          <h1 class="text-lg font-semibold">Create Purchase</h1>
+          <h1 class="text-lg font-semibold">Record Purchase</h1>
           <div class="w-10"></div>
         </div>
       </div>
 
       <!-- Content -->
-      <div class="p-4 space-y-4">
+      <div class="p-4 pb-28 space-y-3">
         <!-- Error Message -->
         @if (error()) {
-          <div class="alert alert-error">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
+          <div class="alert alert-error text-sm">
             <span>{{ error() }}</span>
-            <button (click)="clearError()" class="btn btn-ghost btn-sm">×</button>
+            <button (click)="clearError()" class="btn btn-ghost btn-xs">Dismiss</button>
           </div>
         }
 
         <!-- Success Message -->
         @if (showSuccessMessage()) {
-          <div class="alert alert-success">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
+          <div class="alert alert-success text-sm">
             <span>Purchase recorded successfully!</span>
           </div>
         }
 
         @if (purchaseDraft(); as draft) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body space-y-4">
-              <!-- Supplier Selection -->
+          <!-- Section 1: Supplier -->
+          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-lg">
+            <input type="checkbox" checked />
+            <div class="collapse-title text-sm font-semibold py-2 min-h-0">Supplier</div>
+            <div class="collapse-content px-4 pb-3">
               <app-purchase-supplier-selector
                 [suppliers]="suppliers()"
                 [selectedSupplierId]="draft.supplierId"
                 (supplierChange)="updateDraftField('supplierId', $event)"
               />
+            </div>
+          </div>
 
-              <!-- Purchase Form Fields -->
+          <!-- Section 2: Purchase Details -->
+          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-lg">
+            <input type="checkbox" checked />
+            <div class="collapse-title text-sm font-semibold py-2 min-h-0">Purchase Details</div>
+            <div class="collapse-content px-4 pb-3">
               <app-purchase-form-fields [draft]="draft" (fieldChange)="onFieldChange($event)" />
+            </div>
+          </div>
 
-              <!-- Line Items Section -->
-              <div class="form-control">
-                <label class="label">
-                  <span class="label-text font-semibold">📦 Items *</span>
-                </label>
+          <!-- Section 3: Items -->
+          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-lg">
+            <input type="checkbox" checked />
+            <div class="collapse-title text-sm font-semibold py-2 min-h-0">
+              Items
+              @if (draft.lines.length > 0) {
+                <span class="badge badge-sm badge-primary ml-2">{{ draft.lines.length }}</span>
+              }
+            </div>
+            <div class="collapse-content px-4 pb-3">
+              <!-- Add New Line Item Form -->
+              <app-purchase-line-item-form
+                [productSearchTerm]="productSearchTerm()"
+                [productSearchResults]="productSearchResults()"
+                [lineItem]="newLineItem()"
+                (productSearch)="handleProductSearch($event)"
+                (productSelect)="handleProductSelect($event)"
+                (lineItemFieldChange)="updateNewLineItem($event.field, $event.value)"
+                (addItem)="handleAddLineItem()"
+              />
 
-                <!-- Add New Line Item Form -->
-                <app-purchase-line-item-form
-                  [stockLocations]="stockLocations()"
-                  [productSearchTerm]="productSearchTerm()"
-                  [productSearchResults]="productSearchResults()"
-                  [lineItem]="newLineItem()"
-                  (productSearch)="handleProductSearch($event)"
-                  (productSelect)="handleProductSelect($event)"
-                  (lineItemFieldChange)="updateNewLineItem($event.field, $event.value)"
-                  (addItem)="handleAddLineItem()"
-                />
-
-                <!-- Line Items Table -->
+              <!-- Line Items -->
+              <div class="mt-3">
                 <app-purchase-line-items-table
                   [lineItems]="draft.lines"
-                  [stockLocations]="stockLocations()"
                   [totalCost]="totalCost()"
                   (lineItemUpdate)="updateLineItem($event.index, $event.field, $event.value)"
                   (lineItemRemove)="removeLineItem($event)"
                 />
               </div>
+            </div>
+          </div>
 
-              <!-- Submit Button -->
-              <div class="card-actions justify-end pt-4">
-                <button
-                  class="btn btn-primary"
-                  [disabled]="!draft.supplierId || draft.lines.length === 0 || isLoading()"
-                  (click)="handleSubmitPurchase()"
-                >
-                  @if (isLoading()) {
-                    <span class="loading loading-spinner loading-xs"></span>
-                  }
-                  💾 Record Purchase
-                </button>
-              </div>
+          <!-- Section 4: Payment -->
+          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-lg">
+            <input type="checkbox" checked />
+            <div class="collapse-title text-sm font-semibold py-2 min-h-0">Payment</div>
+            <div class="collapse-content px-4 pb-3">
+              <app-purchase-payment-section
+                [paymentStatus]="draft.paymentStatus"
+                [paymentAmount]="draft.paymentAmount"
+                [paymentAccountCode]="draft.paymentAccountCode"
+                [paymentReference]="draft.paymentReference"
+                [eligibleAccounts]="eligibleAccounts()"
+                [totalCost]="totalCost()"
+                (fieldChange)="onFieldChange($event)"
+              />
             </div>
           </div>
         }
       </div>
+
+      <!-- Sticky Submit Footer -->
+      @if (purchaseDraft(); as draft) {
+        <div
+          class="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 px-4 py-3 z-10"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold">Total</span>
+            <span class="text-lg font-bold">{{ formatCurrency(totalCost()) }}</span>
+          </div>
+          <button
+            class="btn btn-primary w-full"
+            [disabled]="!canSubmit(draft)"
+            (click)="handleSubmitPurchase()"
+          >
+            @if (isLoading()) {
+              <span class="loading loading-spinner loading-xs"></span>
+            }
+            Record Purchase
+          </button>
+        </div>
+      }
     </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -158,6 +173,7 @@ export class PurchaseCreateComponent implements OnInit {
   readonly supplierService = inject(SupplierService);
   readonly productSearchService = inject(ProductSearchService);
   readonly stockLocationService = inject(StockLocationService);
+  private readonly ledgerService = inject(LedgerService);
 
   // Service signals
   readonly purchaseDraft = this.purchaseService.purchaseDraft;
@@ -172,6 +188,7 @@ export class PurchaseCreateComponent implements OnInit {
   readonly productSearchResults = signal<ProductVariant[]>([]);
   readonly isSearchingProducts = signal<boolean>(false);
   readonly showSuccessMessage = signal<boolean>(false);
+  readonly eligibleAccounts = signal<{ code: string; name: string }[]>([]);
 
   // New line item form
   readonly newLineItem = signal<Partial<PurchaseLineItem>>({
@@ -182,11 +199,17 @@ export class PurchaseCreateComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    // Initialize draft (loads from cache if exists)
     this.purchaseService.initializeDraft();
-    // Load suppliers and stock locations
     this.supplierService.fetchSuppliers({ take: 100, skip: 0 });
     this.stockLocationService.fetchStockLocations();
+
+    // Load eligible debit accounts for payment source dropdown
+    try {
+      const accounts = await firstValueFrom(this.ledgerService.loadEligibleDebitAccounts());
+      this.eligibleAccounts.set(accounts.map((a) => ({ code: a.code, name: a.name })));
+    } catch {
+      this.eligibleAccounts.set([]);
+    }
 
     // Handle deep linking for variant pre-population
     await this.deepLinkService.processQueryParams(this.route, {
@@ -203,9 +226,6 @@ export class PurchaseCreateComponent implements OnInit {
     });
   }
 
-  /**
-   * Product search for line items
-   */
   async handleProductSearch(term: string): Promise<void> {
     this.productSearchTerm.set(term);
     const trimmed = term.trim();
@@ -241,13 +261,17 @@ export class PurchaseCreateComponent implements OnInit {
     this.productSearchResults.set([]);
   }
 
-  /**
-   * Add line item to draft
-   */
   handleAddLineItem(): void {
     const item = this.newLineItem();
-    if (!item.variantId || !item.stockLocationId || !item.quantity || !item.unitCost) {
+    if (!item.variantId || !item.quantity || !item.unitCost) {
       return;
+    }
+
+    // Auto-set stock location if not set
+    if (!item.stockLocationId) {
+      const defaultLocation = this.stockLocations()[0];
+      if (!defaultLocation) return;
+      item.stockLocationId = defaultLocation.id;
     }
 
     try {
@@ -263,37 +287,22 @@ export class PurchaseCreateComponent implements OnInit {
     }
   }
 
-  /**
-   * Remove line item
-   */
   removeLineItem(index: number): void {
     this.purchaseService.removePurchaseItemLocal(index);
   }
 
-  /**
-   * Update line item
-   */
   updateLineItem(index: number, field: keyof PurchaseLineItem, value: any): void {
     this.purchaseService.updatePurchaseItemLocal(index, { [field]: value });
   }
 
-  /**
-   * Update draft field
-   */
   onFieldChange(event: { field: keyof PurchaseDraft; value: any }): void {
     this.purchaseService.updateDraftField(event.field, event.value);
   }
 
-  /**
-   * Update draft field (for supplier selector)
-   */
   updateDraftField(field: keyof PurchaseDraft, value: any): void {
     this.purchaseService.updateDraftField(field, value);
   }
 
-  /**
-   * Update new line item field
-   */
   updateNewLineItem(field: keyof PurchaseLineItem, value: any): void {
     const current = this.newLineItem();
     this.newLineItem.set({
@@ -302,9 +311,10 @@ export class PurchaseCreateComponent implements OnInit {
     });
   }
 
-  /**
-   * Submit purchase
-   */
+  canSubmit(draft: PurchaseDraft): boolean {
+    return !!(draft.supplierId && draft.lines.length > 0 && !this.isLoading());
+  }
+
   async handleSubmitPurchase(): Promise<void> {
     try {
       await this.purchaseService.submitPurchase();
@@ -318,56 +328,48 @@ export class PurchaseCreateComponent implements OnInit {
     }
   }
 
-  /**
-   * Clear error state
-   */
   clearError(): void {
     this.purchaseService.clearError();
   }
 
-  /**
-   * Navigate back
-   */
   goBack(): void {
     this.router.navigate(['/dashboard/purchases']);
   }
 
-  /**
-   * Handle pre-population from variant ID (deep linking)
-   * Fetches variant data and adds it to the purchase draft
-   */
+  formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('en-KE', {
+      style: 'currency',
+      currency: 'KES',
+      minimumFractionDigits: 2,
+    }).format(amount);
+  }
+
   private async handlePrepopulationFromVariantId(variantId: string): Promise<void> {
     try {
-      // Fetch variant data
       const variant = await this.productSearchService.getVariantById(variantId);
 
       if (!variant) {
         console.warn(`Variant ${variantId} not found`);
-        // Optionally show error to user
         return;
       }
 
-      // Get default stock location
       const defaultLocation = this.stockLocations()[0];
       if (!defaultLocation) {
         console.warn('No stock locations available');
         return;
       }
 
-      // Create line item with variant data
       const lineItem: PurchaseLineItem = {
         variantId: variant.id,
         variant: variant,
-        quantity: 1, // Default quantity
-        unitCost: 0, // User needs to enter this
+        quantity: 1,
+        unitCost: 0,
         stockLocationId: defaultLocation.id,
       };
 
-      // Prepopulate the draft with the line item
       this.purchaseService.prepopulateItems([lineItem]);
     } catch (error) {
       console.error('Failed to pre-populate from variant ID:', error);
-      // Optionally show error to user
     }
   }
 }

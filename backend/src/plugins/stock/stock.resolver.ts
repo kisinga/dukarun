@@ -20,6 +20,11 @@ interface RecordPurchaseInput {
     stockLocationId: string;
   }>;
   isCreditPurchase?: boolean;
+  payment?: {
+    amount: number;
+    debitAccountCode?: string;
+    reference?: string;
+  };
 }
 
 interface RecordStockAdjustmentInput {

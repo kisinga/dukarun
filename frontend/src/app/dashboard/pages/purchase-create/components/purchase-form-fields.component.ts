@@ -5,66 +5,50 @@ import { PurchaseDraft } from '../../../../core/services/purchase.service.types'
 /**
  * Purchase Form Fields Component
  *
- * Reusable component for purchase metadata fields:
- * - Purchase date
- * - Reference number
- * - Payment status
- * - Notes
+ * Handles purchase metadata: date, reference number, notes.
+ * Payment status is handled by PurchasePaymentSectionComponent.
  */
 @Component({
   selector: 'app-purchase-form-fields',
   imports: [CommonModule],
   template: `
-    <!-- Purchase Date -->
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text font-semibold">📅 Purchase Date *</span>
-      </label>
-      <input
-        type="date"
-        class="input input-bordered w-full"
-        [value]="formatDateForInput(draft().purchaseDate)"
-        (change)="onDateChange($any($event.target).value)"
-      />
-    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <!-- Purchase Date -->
+      <div class="form-control">
+        <label class="label py-1">
+          <span class="label-text text-sm font-semibold">Purchase Date</span>
+        </label>
+        <input
+          type="date"
+          class="input input-bordered input-sm w-full"
+          [value]="formatDateForInput(draft().purchaseDate)"
+          (change)="onDateChange($any($event.target).value)"
+        />
+      </div>
 
-    <!-- Reference Number -->
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text font-semibold">🔖 Reference Number</span>
-      </label>
-      <input
-        type="text"
-        class="input input-bordered w-full"
-        placeholder="Invoice/Reference number (optional)"
-        [value]="draft().referenceNumber"
-        (input)="onFieldChange('referenceNumber', $any($event.target).value)"
-      />
-    </div>
-
-    <!-- Payment Status -->
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text font-semibold">💳 Payment Status *</span>
-      </label>
-      <select
-        class="select select-bordered w-full"
-        [value]="draft().paymentStatus"
-        (change)="onFieldChange('paymentStatus', $any($event.target).value)"
-      >
-        <option value="pending">Pending</option>
-        <option value="partial">Partial</option>
-        <option value="paid">Paid</option>
-      </select>
+      <!-- Reference Number -->
+      <div class="form-control">
+        <label class="label py-1">
+          <span class="label-text text-sm font-semibold">Invoice / Reference</span>
+        </label>
+        <input
+          type="text"
+          class="input input-bordered input-sm w-full"
+          placeholder="Invoice or reference number"
+          [value]="draft().referenceNumber"
+          (input)="onFieldChange('referenceNumber', $any($event.target).value)"
+        />
+      </div>
     </div>
 
     <!-- Notes -->
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text font-semibold">📝 Notes</span>
+    <div class="form-control mt-3">
+      <label class="label py-1">
+        <span class="label-text text-sm font-semibold">Notes</span>
       </label>
       <textarea
-        class="textarea textarea-bordered"
+        class="textarea textarea-bordered textarea-sm"
+        rows="2"
         placeholder="Additional notes (optional)"
         [value]="draft().notes"
         (input)="onFieldChange('notes', $any($event.target).value)"
