@@ -65,11 +65,12 @@ export class PrintService {
       return;
     }
 
-    // Get company logo if available
+    // Get company branding for print
     const companyLogo = this.companyService.companyLogoAsset()?.preview || null;
+    const companyName = this.companyService.activeCompany()?.code ?? 'Your Company';
 
     // Render the order
-    const html = template.render(order, companyLogo);
+    const html = template.render(order, companyLogo, companyName);
     const styles = template.getStyles();
 
     // Create or reuse hidden iframe for printing
