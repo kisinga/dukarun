@@ -1,19 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { environment } from '../../../../environments/environment';
 import { UPDATE_ADMIN_PROFILE } from '../../../core/graphql/operations.graphql';
 import { ApolloService } from '../../../core/services/apollo.service';
 import { AssetUploadService } from '../../../core/services/asset-upload.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
-
-// GraphQL query for checking identifier availability
-const CHECK_IDENTIFIER_AVAILABLE = `
-  query CheckIdentifierAvailable($identifier: String!) {
-    checkIdentifierAvailable(identifier: $identifier)
-  }
-`;
 
 @Component({
   selector: 'app-profile',
@@ -148,73 +140,20 @@ const CHECK_IDENTIFIER_AVAILABLE = `
               />
             </div>
 
-            <!-- Email with availability check -->
+            <!-- Email (read-only) -->
             <div class="form-control">
               <label class="label">
-                <span class="label-text">Email Address <span class="text-error">*</span></span>
+                <span class="label-text">Email Address</span>
               </label>
-              <label
-                class="input input-bordered w-full flex items-center gap-2"
-                [class.input-success]="emailStatus() === 'available'"
-                [class.input-error]="emailStatus() === 'taken'"
-              >
-                <input
-                  type="email"
-                  class="grow"
-                  [(ngModel)]="email"
-                  (blur)="onEmailBlur()"
-                  (input)="onEmailInput()"
-                  placeholder="your@email.com"
-                  [disabled]="isSaving()"
-                />
-                @switch (emailStatus()) {
-                  @case ('checking') {
-                    <span class="loading loading-spinner loading-sm text-base-content/50"></span>
-                  }
-                  @case ('available') {
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="size-5 text-success"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fill-rule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
-                  }
-                  @case ('taken') {
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="size-5 text-error"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fill-rule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
-                  }
-                }
+              <input type="email" class="input input-bordered w-full" [value]="email" disabled />
+              <label class="label">
+                <span class="label-text-alt text-base-content/60">
+                  Email is set during registration and cannot be changed here
+                </span>
               </label>
-              @if (emailStatus() === 'available') {
-                <label class="label py-1">
-                  <span class="label-text-alt text-success">✓ Email is available</span>
-                </label>
-              } @else if (emailStatus() === 'taken') {
-                <label class="label py-1">
-                  <span class="label-text-alt text-error"
-                    >This email is already used by another account</span
-                  >
-                </label>
-              }
             </div>
 
-            <!-- Phone Number (readonly - for display) -->
+            <!-- Phone Number (read-only) -->
             <div class="form-control">
               <label class="label">
                 <span class="label-text">Phone Number</span>
@@ -278,7 +217,6 @@ export class ProfileComponent {
   // Original values (for change detection)
   private originalFirstName = '';
   private originalLastName = '';
-  private originalEmail = '';
   private originalPhotoId: string | null = null;
 
   // Photo state
@@ -286,10 +224,6 @@ export class ProfileComponent {
   readonly currentPhotoUrl = signal<string | null>(null);
   private selectedFile: File | null = null;
   private photoMarkedForRemoval = false;
-
-  // Email validation status
-  readonly emailStatus = signal<'idle' | 'checking' | 'available' | 'taken'>('idle');
-  private lastCheckedEmail = '';
 
   // Loading state
   readonly isSaving = signal(false);
@@ -306,11 +240,8 @@ export class ProfileComponent {
       this.email = user.emailAddress || '';
       this.phoneNumber = user.user?.identifier || '';
 
-      // Store original values
       this.originalFirstName = this.firstName;
       this.originalLastName = this.lastName;
-      this.originalEmail = this.email;
-      this.lastCheckedEmail = this.email;
 
       // Load profile picture
       const customFields = (user as any).customFields;
@@ -324,67 +255,6 @@ export class ProfileComponent {
 
   getInitials(): string {
     return `${this.firstName.charAt(0)}${this.lastName.charAt(0)}`.toUpperCase();
-  }
-
-  // === Email validation (like signup pattern) ===
-
-  async onEmailBlur(): Promise<void> {
-    const trimmedEmail = this.email.trim();
-
-    // Skip if empty, same as original, or same as last check
-    if (!trimmedEmail || !trimmedEmail.includes('@')) {
-      return;
-    }
-
-    if (trimmedEmail === this.originalEmail) {
-      this.emailStatus.set('idle');
-      return;
-    }
-
-    if (trimmedEmail === this.lastCheckedEmail && this.emailStatus() !== 'idle') {
-      return;
-    }
-
-    this.emailStatus.set('checking');
-    this.lastCheckedEmail = trimmedEmail;
-
-    try {
-      const client = this.apolloService.getClient();
-      const result = await client.query({
-        query: { kind: 'Document', definitions: [] } as any, // Placeholder - actual query below
-        fetchPolicy: 'network-only',
-      });
-
-      // Use raw fetch for the query since we don't have generated types
-      const response = await fetch(environment.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.apolloService.getChannelToken()
-            ? { 'vendure-token': this.apolloService.getChannelToken()! }
-            : {}),
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          query: CHECK_IDENTIFIER_AVAILABLE,
-          variables: { identifier: trimmedEmail },
-        }),
-      });
-
-      const data = await response.json();
-      const isAvailable = data.data?.checkIdentifierAvailable ?? false;
-      this.emailStatus.set(isAvailable ? 'available' : 'taken');
-    } catch (error) {
-      console.error('Failed to check email availability:', error);
-      this.emailStatus.set('idle');
-    }
-  }
-
-  onEmailInput(): void {
-    // Reset status when user types
-    if (this.emailStatus() !== 'idle' && this.email.trim() !== this.lastCheckedEmail) {
-      this.emailStatus.set('idle');
-    }
   }
 
   // === Photo handling ===
@@ -407,7 +277,6 @@ export class ProfileComponent {
       this.selectedFile = file;
       this.photoMarkedForRemoval = false;
 
-      // Generate preview
       const reader = new FileReader();
       reader.onload = (e) => {
         this.photoPreview.set(e.target?.result as string);
@@ -430,31 +299,14 @@ export class ProfileComponent {
   hasChanges(): boolean {
     const nameChanged =
       this.firstName !== this.originalFirstName || this.lastName !== this.originalLastName;
-    const emailChanged = this.email.trim() !== this.originalEmail;
     const photoChanged = this.selectedFile !== null || this.photoMarkedForRemoval;
-    return nameChanged || emailChanged || photoChanged;
+    return nameChanged || photoChanged;
   }
 
   canSave(): boolean {
-    // Must have changes
     if (!this.hasChanges()) return false;
-
-    // Must not be saving
     if (this.isSaving()) return false;
-
-    // If email changed, must be validated as available
-    const emailChanged = this.email.trim() !== this.originalEmail;
-    if (emailChanged) {
-      if (this.emailStatus() === 'taken') return false;
-      if (this.emailStatus() === 'checking') return false;
-      // If email changed but not validated yet, can't save
-      if (this.emailStatus() === 'idle' && this.email.trim() !== this.lastCheckedEmail)
-        return false;
-    }
-
-    // Must have required fields
-    if (!this.firstName.trim() || !this.lastName.trim() || !this.email.trim()) return false;
-
+    if (!this.firstName.trim() || !this.lastName.trim()) return false;
     return true;
   }
 
@@ -463,7 +315,6 @@ export class ProfileComponent {
     this.selectedFile = null;
     this.photoPreview.set(null);
     this.photoMarkedForRemoval = false;
-    this.emailStatus.set('idle');
   }
 
   private async uploadPhoto(file: File): Promise<string | null> {
@@ -484,7 +335,6 @@ export class ProfileComponent {
       const input: any = {
         firstName: this.firstName.trim(),
         lastName: this.lastName.trim(),
-        email: this.email.trim(),
       };
 
       // Handle photo upload
@@ -515,7 +365,6 @@ export class ProfileComponent {
       this.selectedFile = null;
       this.photoPreview.set(null);
       this.photoMarkedForRemoval = false;
-      this.emailStatus.set('idle');
       this.loadUserData();
     } catch (error) {
       console.error('Failed to update profile:', error);

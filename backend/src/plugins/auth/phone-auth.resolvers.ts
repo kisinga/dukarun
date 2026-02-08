@@ -84,12 +84,11 @@ const adminSchemaDefs = `
   input UpdateAdminProfileInput {
     firstName: String!
     lastName: String!
-    email: String!
     profilePictureId: ID
   }
 
   extend type Mutation {
-    # Update admin profile without changing user identifier
+    # Update admin profile (name + photo only; email/phone require OTP flow)
     updateAdminProfile(input: UpdateAdminProfileInput!): Administrator!
   }
 `;
@@ -144,7 +143,6 @@ export const phoneAuthAdminSchema = gql`
   input UpdateAdminProfileInput {
     firstName: String!
     lastName: String!
-    email: String!
     profilePictureId: ID
   }
 
@@ -293,7 +291,7 @@ export class PhoneAuthAdminResolver {
   async updateAdminProfile(
     @Ctx() ctx: RequestContext,
     @Args('input')
-    input: { firstName: string; lastName: string; email: string; profilePictureId?: string }
+    input: { firstName: string; lastName: string; profilePictureId?: string }
   ) {
     return this.phoneAuthService.updateAdminProfile(ctx, input);
   }

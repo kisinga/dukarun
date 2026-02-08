@@ -167,7 +167,6 @@ export const UPDATE_ADMIN_PROFILE = graphql(`
       id
       firstName
       lastName
-      emailAddress
     }
   }
 `);

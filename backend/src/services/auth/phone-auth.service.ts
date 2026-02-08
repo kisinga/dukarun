@@ -662,7 +662,6 @@ export class PhoneAuthService {
     input: {
       firstName: string;
       lastName: string;
-      email: string;
       profilePictureId?: string;
     }
   ): Promise<Administrator> {
@@ -676,17 +675,8 @@ export class PhoneAuthService {
       throw new Error('Administrator not found');
     }
 
-    // Check if email is being changed and if it's available
-    if (input.email !== administrator.emailAddress) {
-      const isAvailable = await this.checkIdentifierAvailable(ctx, input.email);
-      if (!isAvailable) {
-        throw new Error('Email address is already in use by another account');
-      }
-    }
-
     administrator.firstName = input.firstName;
     administrator.lastName = input.lastName;
-    administrator.emailAddress = input.email;
 
     if (input.profilePictureId) {
       const asset = await this.connection.getEntityOrThrow(ctx, Asset, input.profilePictureId);
