@@ -12,18 +12,14 @@ import { PurchaseService } from '../../../core/services/purchase.service';
 import { PurchaseDraft, PurchaseLineItem } from '../../../core/services/purchase.service.types';
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { SupplierService } from '../../../core/services/supplier.service';
-import { PurchaseFormFieldsComponent } from './components/purchase-form-fields.component';
 import { PurchaseLineItemFormComponent } from './components/purchase-line-item-form.component';
 import { PurchaseLineItemsTableComponent } from './components/purchase-line-items-table.component';
 import { PurchasePaymentSectionComponent } from './components/purchase-payment-section.component';
-import { PurchaseSupplierSelectorComponent } from './components/purchase-supplier-selector.component';
 
 @Component({
   selector: 'app-purchase-create',
   imports: [
     CommonModule,
-    PurchaseSupplierSelectorComponent,
-    PurchaseFormFieldsComponent,
     PurchaseLineItemFormComponent,
     PurchaseLineItemsTableComponent,
     PurchasePaymentSectionComponent,
@@ -49,8 +45,8 @@ import { PurchaseSupplierSelectorComponent } from './components/purchase-supplie
       </div>
 
       <!-- Content -->
-      <div class="p-4 pb-28 space-y-3">
-        <!-- Error Message -->
+      <div class="p-4 pb-28 space-y-4">
+        <!-- Error -->
         @if (error()) {
           <div class="alert alert-error text-sm">
             <span>{{ error() }}</span>
@@ -58,7 +54,7 @@ import { PurchaseSupplierSelectorComponent } from './components/purchase-supplie
           </div>
         }
 
-        <!-- Success Message -->
+        <!-- Success -->
         @if (showSuccessMessage()) {
           <div class="alert alert-success text-sm">
             <span>Purchase recorded successfully!</span>
@@ -66,87 +62,104 @@ import { PurchaseSupplierSelectorComponent } from './components/purchase-supplie
         }
 
         @if (purchaseDraft(); as draft) {
-          <!-- Section 1: Supplier -->
-          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-lg">
-            <input type="checkbox" checked />
-            <div class="collapse-title text-sm font-semibold py-2 min-h-0">Supplier</div>
-            <div class="collapse-content px-4 pb-3">
-              <app-purchase-supplier-selector
-                [suppliers]="suppliers()"
-                [selectedSupplierId]="draft.supplierId"
-                (supplierChange)="updateDraftField('supplierId', $event)"
+          <!-- Supplier + Date + Reference (inline) -->
+          <div class="space-y-2">
+            <select
+              class="select select-bordered select-sm w-full"
+              [value]="draft.supplierId || ''"
+              (change)="updateDraftField('supplierId', $any($event.target).value || null)"
+            >
+              <option value="">Select supplier...</option>
+              @for (supplier of suppliers(); track supplier.id) {
+                <option [value]="supplier.id">
+                  {{ supplier.firstName }} {{ supplier.lastName }}
+                  @if (supplier.emailAddress) {
+                    ({{ supplier.emailAddress }})
+                  }
+                </option>
+              }
+            </select>
+            <div class="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                class="input input-bordered input-sm"
+                [value]="formatDateForInput(draft.purchaseDate)"
+                (change)="
+                  updateDraftField('purchaseDate', parseDateInput($any($event.target).value))
+                "
+              />
+              <input
+                type="text"
+                class="input input-bordered input-sm"
+                placeholder="Invoice / reference"
+                [value]="draft.referenceNumber"
+                (input)="updateDraftField('referenceNumber', $any($event.target).value)"
               />
             </div>
           </div>
 
-          <!-- Section 2: Purchase Details -->
-          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-lg">
-            <input type="checkbox" checked />
-            <div class="collapse-title text-sm font-semibold py-2 min-h-0">Purchase Details</div>
-            <div class="collapse-content px-4 pb-3">
-              <app-purchase-form-fields [draft]="draft" (fieldChange)="onFieldChange($event)" />
-            </div>
-          </div>
-
-          <!-- Section 3: Items -->
-          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-lg">
-            <input type="checkbox" checked />
-            <div class="collapse-title text-sm font-semibold py-2 min-h-0">
+          <!-- Items -->
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-wide text-base-content/50 mb-2">
               Items
               @if (draft.lines.length > 0) {
-                <span class="badge badge-sm badge-primary ml-2">{{ draft.lines.length }}</span>
+                <span class="badge badge-xs badge-primary ml-1">{{ draft.lines.length }}</span>
               }
             </div>
-            <div class="collapse-content px-4 pb-3">
-              <!-- Add New Line Item Form -->
-              <app-purchase-line-item-form
-                [productSearchTerm]="productSearchTerm()"
-                [productSearchResults]="productSearchResults()"
-                [lineItem]="newLineItem()"
-                (productSearch)="handleProductSearch($event)"
-                (productSelect)="handleProductSelect($event)"
-                (lineItemFieldChange)="updateNewLineItem($event.field, $event.value)"
-                (addItem)="handleAddLineItem()"
+            <app-purchase-line-item-form
+              [productSearchTerm]="productSearchTerm()"
+              [productSearchResults]="productSearchResults()"
+              [lineItem]="newLineItem()"
+              (productSearch)="handleProductSearch($event)"
+              (productSelect)="handleProductSelect($event)"
+              (lineItemFieldChange)="updateNewLineItem($event.field, $event.value)"
+              (addItem)="handleAddLineItem()"
+            />
+            <div class="mt-2">
+              <app-purchase-line-items-table
+                [lineItems]="draft.lines"
+                (lineItemUpdate)="updateLineItem($event.index, $event.field, $event.value)"
+                (lineItemRemove)="removeLineItem($event)"
               />
-
-              <!-- Line Items -->
-              <div class="mt-3">
-                <app-purchase-line-items-table
-                  [lineItems]="draft.lines"
-                  [totalCost]="totalCost()"
-                  (lineItemUpdate)="updateLineItem($event.index, $event.field, $event.value)"
-                  (lineItemRemove)="removeLineItem($event)"
-                />
-              </div>
             </div>
           </div>
 
-          <!-- Section 4: Payment -->
-          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-lg">
-            <input type="checkbox" checked />
-            <div class="collapse-title text-sm font-semibold py-2 min-h-0">Payment</div>
-            <div class="collapse-content px-4 pb-3">
-              <app-purchase-payment-section
-                [paymentStatus]="draft.paymentStatus"
-                [paymentAmount]="draft.paymentAmount"
-                [paymentAccountCode]="draft.paymentAccountCode"
-                [paymentReference]="draft.paymentReference"
-                [eligibleAccounts]="eligibleAccounts()"
-                [totalCost]="totalCost()"
-                (fieldChange)="onFieldChange($event)"
-              />
+          <!-- Notes -->
+          <textarea
+            class="textarea textarea-bordered textarea-sm w-full"
+            rows="2"
+            placeholder="Notes (optional)"
+            [value]="draft.notes"
+            (input)="updateDraftField('notes', $any($event.target).value)"
+          ></textarea>
+
+          <!-- Payment -->
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-wide text-base-content/50 mb-2">
+              Payment
             </div>
+            <app-purchase-payment-section
+              [paymentStatus]="draft.paymentStatus"
+              [paymentAmount]="draft.paymentAmount"
+              [paymentAccountCode]="draft.paymentAccountCode"
+              [paymentReference]="draft.paymentReference"
+              [eligibleAccounts]="eligibleAccounts()"
+              [totalCost]="totalCost()"
+              (fieldChange)="onFieldChange($event)"
+            />
           </div>
         }
       </div>
 
-      <!-- Sticky Submit Footer -->
+      <!-- Sticky Footer -->
       @if (purchaseDraft(); as draft) {
         <div
           class="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 px-4 py-3 z-10"
         >
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-semibold">Total</span>
+            <span class="text-sm text-base-content/70">
+              {{ draft.lines.length }} item{{ draft.lines.length !== 1 ? 's' : '' }}
+            </span>
             <span class="text-lg font-bold">{{ formatCurrency(totalCost()) }}</span>
           </div>
           <button
@@ -342,6 +355,14 @@ export class PurchaseCreateComponent implements OnInit {
       currency: 'KES',
       minimumFractionDigits: 2,
     }).format(amount);
+  }
+
+  formatDateForInput(date: Date): string {
+    return new Date(date).toISOString().split('T')[0];
+  }
+
+  parseDateInput(dateString: string): Date {
+    return new Date(dateString);
   }
 
   private async handlePrepopulationFromVariantId(variantId: string): Promise<void> {
