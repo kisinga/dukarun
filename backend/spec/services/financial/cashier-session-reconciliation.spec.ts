@@ -87,6 +87,11 @@ describe('CashierSessionService - Reconciliation Integration', () => {
 
     mockLedgerQueryService = {
       getCashierSessionTotals: jest.fn(),
+      getSessionBalance: (jest.fn() as any).mockResolvedValue({
+        accountCode: 'CASH_ON_HAND',
+        accountName: 'Cash on hand',
+        balance: 0,
+      }),
     } as any;
 
     mockReconciliationService = {
