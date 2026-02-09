@@ -8,6 +8,7 @@ export interface CustomerStats {
   totalCustomers: number;
   verifiedCustomers: number;
   creditApprovedCustomers: number;
+  frozenCustomers: number;
   recentCustomers: number;
 }
 
@@ -19,7 +20,13 @@ export interface Customer {
   customFields?: {
     isCreditApproved?: boolean;
   };
+  outstandingAmount?: number;
   createdAt: string;
+}
+
+/** Frozen = not approved and outstanding ≠ 0 (inferred, not stored). */
+export function isCustomerCreditFrozen(c: Customer): boolean {
+  return c.customFields?.isCreditApproved !== true && (c.outstandingAmount ?? 0) !== 0;
 }
 
 /**
@@ -33,6 +40,7 @@ export function calculateCustomerStats(customers: Customer[]): CustomerStats {
   const totalCustomers = customers.length;
   const verifiedCustomers = customers.filter((c) => c.user?.verified).length;
   const creditApprovedCustomers = customers.filter((c) => c.customFields?.isCreditApproved).length;
+  const frozenCustomers = customers.filter(isCustomerCreditFrozen).length;
 
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -42,5 +50,11 @@ export function calculateCustomerStats(customers: Customer[]): CustomerStats {
     return createdAt >= thirtyDaysAgo;
   }).length;
 
-  return { totalCustomers, verifiedCustomers, creditApprovedCustomers, recentCustomers };
+  return {
+    totalCustomers,
+    verifiedCustomers,
+    creditApprovedCustomers,
+    frozenCustomers,
+    recentCustomers,
+  };
 }

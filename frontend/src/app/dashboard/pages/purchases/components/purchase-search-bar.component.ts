@@ -17,11 +17,19 @@ export class PurchaseSearchBarComponent {
   readonly pendingPaymentsActive = input<boolean>(false);
   readonly clearPendingPayments = output<void>();
 
+  readonly supplierIdFilter = input<string | null>(null);
+  readonly supplierNameFilter = input<string | null>(null);
+  readonly clearSupplierFilter = output<void>();
+
   clearSearch(): void {
     this.searchQuery.set('');
   }
 
   onClearPendingPayments(): void {
     this.clearPendingPayments.emit();
+  }
+
+  onClearSupplierFilter(): void {
+    this.clearSupplierFilter.emit();
   }
 }

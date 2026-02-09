@@ -1534,6 +1534,7 @@ export type CreditSummary = {
   __typename?: 'CreditSummary';
   availableCredit: Scalars['Float']['output'];
   creditDuration: Scalars['Int']['output'];
+  creditFrozen: Scalars['Boolean']['output'];
   creditLimit: Scalars['Float']['output'];
   customerId: Scalars['ID']['output'];
   isCreditApproved: Scalars['Boolean']['output'];
@@ -1973,6 +1974,8 @@ export type Customer = Node & {
   orders: OrderList;
   outstandingAmount: Scalars['Float']['output'];
   phoneNumber?: Maybe<Scalars['String']['output']>;
+  /** Supplier balance (AP). Only non-zero when customer is a supplier. Cents. */
+  supplierOutstandingAmount: Scalars['Float']['output'];
   title?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['DateTime']['output'];
   user?: Maybe<User>;
@@ -2032,6 +2035,7 @@ export type CustomerFilterParameter = {
   supplierCreditLimit?: InputMaybe<NumberOperators>;
   supplierLastRepaymentAmount?: InputMaybe<NumberOperators>;
   supplierLastRepaymentDate?: InputMaybe<DateOperators>;
+  supplierOutstandingAmount?: InputMaybe<NumberOperators>;
   supplierType?: InputMaybe<StringOperators>;
   taxId?: InputMaybe<StringOperators>;
   title?: InputMaybe<StringOperators>;
@@ -2129,6 +2133,7 @@ export type CustomerSortParameter = {
   supplierCreditLimit?: InputMaybe<SortOrder>;
   supplierLastRepaymentAmount?: InputMaybe<SortOrder>;
   supplierLastRepaymentDate?: InputMaybe<SortOrder>;
+  supplierOutstandingAmount?: InputMaybe<SortOrder>;
   supplierType?: InputMaybe<SortOrder>;
   taxId?: InputMaybe<SortOrder>;
   title?: InputMaybe<SortOrder>;
@@ -2745,6 +2750,12 @@ export type InitiatePurchaseResult = {
   message?: Maybe<Scalars['String']['output']>;
   reference?: Maybe<Scalars['String']['output']>;
   success: Scalars['Boolean']['output'];
+};
+
+export type InlinePaymentInput = {
+  amount: Scalars['Int']['input'];
+  debitAccountCode?: InputMaybe<Scalars['String']['input']>;
+  reference?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** Returned when attempting to add more items to the Order than are available */
@@ -7076,6 +7087,7 @@ export type RecordPurchaseInput = {
   isCreditPurchase?: InputMaybe<Scalars['Boolean']['input']>;
   lines: Array<PurchaseLineInput>;
   notes?: InputMaybe<Scalars['String']['input']>;
+  payment?: InputMaybe<InlinePaymentInput>;
   paymentStatus: Scalars['String']['input'];
   purchaseDate: Scalars['DateTime']['input'];
   referenceNumber?: InputMaybe<Scalars['String']['input']>;
@@ -8292,7 +8304,6 @@ export type UpdateAddressInput = {
 };
 
 export type UpdateAdminProfileInput = {
-  email: Scalars['String']['input'];
   firstName: Scalars['String']['input'];
   lastName: Scalars['String']['input'];
   profilePictureId?: InputMaybe<Scalars['ID']['input']>;
@@ -9018,7 +9029,6 @@ export type UpdateAdminProfileMutation = {
     id: string;
     firstName: string;
     lastName: string;
-    emailAddress: string;
   };
 };
 
@@ -10642,6 +10652,7 @@ export type GetCreditSummaryQuery = {
     __typename?: 'CreditSummary';
     customerId: string;
     isCreditApproved: boolean;
+    creditFrozen: boolean;
     creditLimit: number;
     outstandingAmount: number;
     availableCredit: number;
@@ -10806,6 +10817,45 @@ export type PaySinglePurchaseMutation = {
   };
 };
 
+export type GetSupplierCreditSummaryQueryVariables = Exact<{
+  supplierId: Scalars['ID']['input'];
+}>;
+
+export type GetSupplierCreditSummaryQuery = {
+  __typename?: 'Query';
+  supplierCreditSummary: {
+    __typename?: 'SupplierCreditSummary';
+    supplierId: string;
+    isSupplierCreditApproved: boolean;
+    supplierCreditLimit: number;
+    outstandingAmount: number;
+    availableCredit: number;
+    lastRepaymentDate?: any | null;
+    lastRepaymentAmount: number;
+    supplierCreditDuration: number;
+  };
+};
+
+export type AllocateBulkSupplierPaymentMutationVariables = Exact<{
+  input: SupplierPaymentAllocationInput;
+}>;
+
+export type AllocateBulkSupplierPaymentMutation = {
+  __typename?: 'Mutation';
+  allocateBulkSupplierPayment: {
+    __typename?: 'SupplierPaymentAllocationResult';
+    remainingBalance: number;
+    totalAllocated: number;
+    excessPayment: number;
+    purchasesPaid: Array<{
+      __typename?: 'SupplierPurchasePayment';
+      purchaseId: string;
+      purchaseReference: string;
+      amountPaid: number;
+    }>;
+  };
+};
+
 export type SetOrderLineCustomPriceMutationVariables = Exact<{
   input: SetOrderLineCustomPriceInput;
 }>;
@@ -10847,6 +10897,7 @@ export type GetSuppliersQuery = {
       phoneNumber?: string | null;
       createdAt: any;
       updatedAt: any;
+      supplierOutstandingAmount: number;
       customFields?: {
         __typename?: 'CustomerCustomFields';
         isSupplier?: boolean | null;
@@ -10857,6 +10908,8 @@ export type GetSuppliersQuery = {
         notes?: string | null;
         isCreditApproved?: boolean | null;
         creditLimit?: number | null;
+        isSupplierCreditApproved?: boolean | null;
+        supplierCreditLimit?: number | null;
       } | null;
       addresses?: Array<{
         __typename?: 'Address';
@@ -12820,7 +12873,6 @@ export const UpdateAdminProfileDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
               ],
             },
           },
@@ -18208,6 +18260,7 @@ export const GetCreditSummaryDocument = {
               selections: [
                 { kind: 'Field', name: { kind: 'Name', value: 'customerId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'isCreditApproved' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'creditFrozen' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'creditLimit' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'outstandingAmount' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'availableCredit' } },
@@ -18653,6 +18706,117 @@ export const PaySinglePurchaseDocument = {
     },
   ],
 } as unknown as DocumentNode<PaySinglePurchaseMutation, PaySinglePurchaseMutationVariables>;
+export const GetSupplierCreditSummaryDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetSupplierCreditSummary' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'supplierId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'supplierCreditSummary' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'supplierId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'supplierId' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'isSupplierCreditApproved' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierCreditLimit' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'outstandingAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'availableCredit' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastRepaymentDate' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastRepaymentAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierCreditDuration' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetSupplierCreditSummaryQuery, GetSupplierCreditSummaryQueryVariables>;
+export const AllocateBulkSupplierPaymentDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'AllocateBulkSupplierPayment' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: { kind: 'Name', value: 'SupplierPaymentAllocationInput' },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'allocateBulkSupplierPayment' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'purchasesPaid' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'purchaseId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'purchaseReference' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'amountPaid' } },
+                    ],
+                  },
+                },
+                { kind: 'Field', name: { kind: 'Name', value: 'remainingBalance' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'totalAllocated' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'excessPayment' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  AllocateBulkSupplierPaymentMutation,
+  AllocateBulkSupplierPaymentMutationVariables
+>;
 export const SetOrderLineCustomPriceDocument = {
   kind: 'Document',
   definitions: [
@@ -18791,6 +18955,7 @@ export const GetSuppliersDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'phoneNumber' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'supplierOutstandingAmount' } },
                       {
                         kind: 'Field',
                         name: { kind: 'Name', value: 'customFields' },
@@ -18805,6 +18970,11 @@ export const GetSuppliersDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'isCreditApproved' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'creditLimit' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'isSupplierCreditApproved' },
+                            },
+                            { kind: 'Field', name: { kind: 'Name', value: 'supplierCreditLimit' } },
                           ],
                         },
                       },

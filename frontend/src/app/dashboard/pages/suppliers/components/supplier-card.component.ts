@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { EntityAvatarComponent } from '../../../components/shared/entity-avatar.component';
 import { StatusBadgeComponent } from '../../../components/shared/status-badge.component';
 
-export type SupplierAction = 'view' | 'edit' | 'delete';
+export type SupplierAction = 'view' | 'edit' | 'delete' | 'recordPayment';
 
 @Component({
   selector: 'app-supplier-card',

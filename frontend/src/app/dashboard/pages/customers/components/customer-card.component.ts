@@ -56,6 +56,11 @@ export class CustomerCardComponent {
     return Math.abs(this.getOutstandingAmount());
   }
 
+  /** Frozen = not approved and outstanding ≠ 0 (inferred). */
+  isCreditFrozen(): boolean {
+    return !this.isCreditApproved() && this.getOutstandingAmount() !== 0;
+  }
+
   formatCurrency(amountInCents: number): string {
     return this.currencyService.format(amountInCents);
   }

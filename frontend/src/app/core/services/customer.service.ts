@@ -15,7 +15,7 @@ export interface CustomerInput {
   emailAddress: string;
   phoneNumber?: string;
   password?: string;
-  // Credit fields (optional, requires permissions)
+  // Credit fields (optional, requires permissions). creditFrozen is inferred, not set.
   isCreditApproved?: boolean;
   creditLimit?: number;
   creditDuration?: number;
@@ -49,6 +49,7 @@ export interface CreditCustomerSummary {
   phone?: string;
   email?: string;
   isCreditApproved: boolean;
+  creditFrozen?: boolean;
   creditLimit: number;
   outstandingAmount: number; // From ledger (AR account balance)
   availableCredit: number; // Calculated by backend from ledger

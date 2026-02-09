@@ -100,12 +100,14 @@ export class CustomerCreditService {
         throw new Error('Credit summary unavailable');
       }
 
+      const s = summary as typeof summary & { creditFrozen?: boolean };
       return {
         id: summary.customerId,
         name: base?.name ?? '',
         phone: base?.phone,
         email: base?.email,
         isCreditApproved: summary.isCreditApproved,
+        creditFrozen: s.creditFrozen ?? false,
         creditLimit: summary.creditLimit,
         outstandingAmount: summary.outstandingAmount, // From ledger (AR account)
         availableCredit: summary.availableCredit, // Calculated by backend from ledger

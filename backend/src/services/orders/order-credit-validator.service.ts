@@ -20,12 +20,17 @@ export class OrderCreditValidatorService {
 
   /**
    * Validate credit sale eligibility
-   * Checks credit approval status
+   * Checks credit approval status and frozen account
    */
   async validateCreditApproval(ctx: RequestContext, customerId: string): Promise<void> {
     const summary = await this.creditService.getCreditSummary(ctx, customerId);
     if (!summary.isCreditApproved) {
       throw new UserInputError('Customer is not approved for credit sales.');
+    }
+    if (summary.creditFrozen) {
+      throw new UserInputError(
+        'Customer account is frozen. No new credit sales allowed; payments can still be recorded.'
+      );
     }
   }
 

@@ -7,14 +7,14 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { CustomerService, CreditCustomerSummary } from '../../../core/services/customer.service';
 
 @Component({
   selector: 'app-credit',
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   styleUrl: './credit.component.scss',
   template: `
     <div class="space-y-5 lg:space-y-6">
@@ -374,37 +374,15 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
                     </div>
                   </div>
 
-                  <div class="flex gap-2 mt-3">
-                    @if (customer.isCreditApproved) {
-                      <button
-                        class="btn btn-sm btn-outline flex-1"
-                        (click)="revoke(customer)"
-                        [disabled]="actionInProgress() === customer.id"
-                      >
-                        @if (actionInProgress() === customer.id) {
-                          <span class="loading loading-spinner loading-xs"></span>
-                        }
-                        Revoke
-                      </button>
-                    } @else {
-                      <button
-                        class="btn btn-sm btn-primary flex-1"
-                        (click)="approve(customer)"
-                        [disabled]="actionInProgress() === customer.id"
-                      >
-                        @if (actionInProgress() === customer.id) {
-                          <span class="loading loading-spinner loading-xs"></span>
-                        }
-                        Approve
-                      </button>
-                    }
-                    <button
-                      class="btn btn-sm btn-ghost"
-                      (click)="navigateToEditLimit(customer)"
-                      [disabled]="actionInProgress() === customer.id"
+                  <div class="mt-3 pt-3 border-t border-base-300">
+                    <a
+                      [routerLink]="['/dashboard/customers/edit', customer.id]"
+                      queryParamsHandling="merge"
+                      [queryParams]="{ expandCredit: 'true' }"
+                      class="btn btn-sm btn-primary w-full"
                     >
-                      Edit Limit
-                    </button>
+                      Manage
+                    </a>
                   </div>
                 </div>
               </div>
@@ -424,7 +402,7 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
                     <th class="text-right">Available</th>
                     <th>Duration</th>
                     <th>Status</th>
-                    <th class="text-right">Actions</th>
+                    <th class="text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -446,91 +424,14 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
                         }}</span>
                       </td>
                       <td class="text-right">
-                        @if (isEditingLimit(customer.id)) {
-                          <div class="flex flex-col items-end gap-2">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              class="input input-bordered input-sm w-28 text-right"
-                              [value]="editLimitValue()"
-                              (input)="editLimitValue.set($any($event.target).valueAsNumber ?? 0)"
-                            />
-                            <div class="flex gap-1">
-                              <button
-                                class="btn btn-xs btn-primary"
-                                (click)="saveLimit(customer)"
-                                [disabled]="actionInProgress() === customer.id"
-                              >
-                                Save
-                              </button>
-                              <button
-                                class="btn btn-xs btn-ghost"
-                                (click)="stopEditingLimit()"
-                                [disabled]="actionInProgress() === customer.id"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        } @else {
-                          <div class="flex items-center justify-end gap-2">
-                            <span>{{ currencyService.format(customer.creditLimit) }}</span>
-                            <button
-                              class="btn btn-ghost btn-xs"
-                              (click)="startEditingLimit(customer)"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        }
+                        {{ currencyService.format(customer.creditLimit) }}
                       </td>
                       <td class="text-right">
                         <span class="text-success font-medium">{{
                           currencyService.format(customer.availableCredit)
                         }}</span>
                       </td>
-                      <td>
-                        @if (isEditingDuration(customer.id)) {
-                          <div class="flex flex-col gap-2">
-                            <input
-                              type="number"
-                              min="1"
-                              class="input input-bordered input-sm w-20 text-right"
-                              [value]="editDurationValue()"
-                              (input)="
-                                editDurationValue.set($any($event.target).valueAsNumber ?? 1)
-                              "
-                            />
-                            <div class="flex gap-1">
-                              <button
-                                class="btn btn-xs btn-primary"
-                                (click)="saveDuration(customer)"
-                                [disabled]="actionInProgress() === customer.id"
-                              >
-                                Save
-                              </button>
-                              <button
-                                class="btn btn-xs btn-ghost"
-                                (click)="stopEditingDuration()"
-                                [disabled]="actionInProgress() === customer.id"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        } @else {
-                          <div class="flex items-center gap-2">
-                            <span>{{ customer.creditDuration }} days</span>
-                            <button
-                              class="btn btn-ghost btn-xs"
-                              (click)="startEditingDuration(customer)"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        }
-                      </td>
+                      <td>{{ customer.creditDuration }} days</td>
                       <td>
                         <span
                           class="badge badge-sm"
@@ -540,32 +441,15 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
                           {{ customer.isCreditApproved ? 'Approved' : 'Pending' }}
                         </span>
                       </td>
-                      <td>
-                        <div class="flex justify-end gap-2">
-                          @if (customer.isCreditApproved) {
-                            <button
-                              class="btn btn-xs btn-outline"
-                              (click)="revoke(customer)"
-                              [disabled]="actionInProgress() === customer.id"
-                            >
-                              @if (actionInProgress() === customer.id) {
-                                <span class="loading loading-spinner loading-xs"></span>
-                              }
-                              Revoke
-                            </button>
-                          } @else {
-                            <button
-                              class="btn btn-xs btn-primary"
-                              (click)="approve(customer)"
-                              [disabled]="actionInProgress() === customer.id"
-                            >
-                              @if (actionInProgress() === customer.id) {
-                                <span class="loading loading-spinner loading-xs"></span>
-                              }
-                              Approve
-                            </button>
-                          }
-                        </div>
+                      <td class="text-right">
+                        <a
+                          [routerLink]="['/dashboard/customers/edit', customer.id]"
+                          queryParamsHandling="merge"
+                          [queryParams]="{ expandCredit: 'true' }"
+                          class="btn btn-xs btn-primary"
+                        >
+                          Manage
+                        </a>
                       </td>
                     </tr>
                   }
@@ -582,20 +466,14 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
 export class CreditComponent implements OnInit {
   private readonly customerService = inject(CustomerService);
   private readonly authService = inject(AuthService);
-  private readonly router = inject(Router);
   readonly currencyService = inject(CurrencyService);
 
   readonly isLoading = signal(false);
-  readonly actionInProgress = signal<string | null>(null);
   readonly customers = signal<CreditCustomerSummary[]>([]);
   readonly searchTerm = signal('');
   readonly approvedFilter = signal(false);
   readonly outstandingFilter = signal(false);
   readonly activeFilterColors = signal<{ approved?: string; outstanding?: string }>({});
-  readonly editingLimitCustomerId = signal<string | null>(null);
-  readonly editingDurationCustomerId = signal<string | null>(null);
-  readonly editLimitValue = signal(0);
-  readonly editDurationValue = signal(30);
 
   readonly hasPermission = this.authService.hasCreditManagementPermission;
 
@@ -644,45 +522,6 @@ export class CreditComponent implements OnInit {
     }
   }
 
-  isEditingLimit(customerId: string): boolean {
-    return this.editingLimitCustomerId() === customerId;
-  }
-
-  isEditingDuration(customerId: string): boolean {
-    return this.editingDurationCustomerId() === customerId;
-  }
-
-  startEditingLimit(customer: CreditCustomerSummary): void {
-    this.editingLimitCustomerId.set(customer.id);
-    this.editLimitValue.set(customer.creditLimit / 100); // Display units for input
-    this.stopEditingDuration();
-  }
-
-  /**
-   * Navigate to customer edit page with credit section expanded
-   * Used on mobile for better UX
-   */
-  navigateToEditLimit(customer: CreditCustomerSummary): void {
-    // Navigate to customer edit page with query param to auto-expand credit section
-    this.router.navigate(['/dashboard/customers/edit', customer.id], {
-      queryParams: { expandCredit: 'true' },
-    });
-  }
-
-  stopEditingLimit(): void {
-    this.editingLimitCustomerId.set(null);
-  }
-
-  startEditingDuration(customer: CreditCustomerSummary): void {
-    this.editingDurationCustomerId.set(customer.id);
-    this.editDurationValue.set(customer.creditDuration);
-    this.stopEditingLimit();
-  }
-
-  stopEditingDuration(): void {
-    this.editingDurationCustomerId.set(null);
-  }
-
   async reloadCustomers(): Promise<void> {
     this.isLoading.set(true);
     try {
@@ -692,80 +531,6 @@ export class CreditComponent implements OnInit {
       console.error('Failed to load credit customers', error);
     } finally {
       this.isLoading.set(false);
-      this.actionInProgress.set(null);
-    }
-  }
-
-  async approve(customer: CreditCustomerSummary): Promise<void> {
-    this.actionInProgress.set(customer.id);
-    try {
-      const updated = await this.customerService.approveCustomerCredit(
-        customer.id,
-        true,
-        Math.max(customer.creditLimit, 0),
-        customer,
-        customer.creditDuration,
-      );
-      this.updateCustomer(updated);
-    } catch (error) {
-      console.error('Failed to approve customer credit', error);
-    } finally {
-      this.actionInProgress.set(null);
-    }
-  }
-
-  async revoke(customer: CreditCustomerSummary): Promise<void> {
-    this.actionInProgress.set(customer.id);
-    try {
-      const updated = await this.customerService.approveCustomerCredit(
-        customer.id,
-        false,
-        0,
-        customer,
-        customer.creditDuration,
-      );
-      this.updateCustomer(updated);
-    } catch (error) {
-      console.error('Failed to revoke customer credit', error);
-    } finally {
-      this.actionInProgress.set(null);
-    }
-  }
-
-  async saveLimit(customer: CreditCustomerSummary): Promise<void> {
-    const newLimit = Math.round(Math.max(this.editLimitValue(), 0) * 100); // Convert to cents
-    this.actionInProgress.set(customer.id);
-    try {
-      const updated = await this.customerService.updateCustomerCreditLimit(
-        customer.id,
-        newLimit,
-        customer,
-        customer.creditDuration,
-      );
-      this.updateCustomer(updated);
-      this.stopEditingLimit();
-    } catch (error) {
-      console.error('Failed to update credit limit', error);
-    } finally {
-      this.actionInProgress.set(null);
-    }
-  }
-
-  async saveDuration(customer: CreditCustomerSummary): Promise<void> {
-    const newDuration = Math.max(this.editDurationValue(), 1);
-    this.actionInProgress.set(customer.id);
-    try {
-      const updated = await this.customerService.updateCreditDuration(
-        customer.id,
-        newDuration,
-        customer,
-      );
-      this.updateCustomer(updated);
-      this.stopEditingDuration();
-    } catch (error) {
-      console.error('Failed to update credit duration', error);
-    } finally {
-      this.actionInProgress.set(null);
     }
   }
 
@@ -801,11 +566,5 @@ export class CreditComponent implements OnInit {
       this.outstandingFilter.set(false);
       this.activeFilterColors.set({ ...colors, outstanding: undefined });
     }
-  }
-
-  private updateCustomer(updated: CreditCustomerSummary): void {
-    this.customers.update((items) =>
-      items.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
-    );
   }
 }

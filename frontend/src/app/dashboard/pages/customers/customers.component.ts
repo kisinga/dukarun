@@ -10,11 +10,15 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { CustomerService } from '../../../core/services/customer.service';
-import { calculateCustomerStats } from '../../../core/services/stats/customer-stats.util';
+import {
+  calculateCustomerStats,
+  isCustomerCreditFrozen,
+} from '../../../core/services/stats/customer-stats.util';
 import { BulkPaymentModalComponent } from './components/bulk-payment-modal.component';
 import { CustomerAction, CustomerCardComponent } from './components/customer-card.component';
 import { CustomerSearchBarComponent } from './components/customer-search-bar.component';
-import { CustomerStats, CustomerStatsComponent } from './components/customer-stats.component';
+import type { CustomerStats } from '../../../core/services/stats/customer-stats.util';
+import { CustomerStatsComponent } from './components/customer-stats.component';
 import { CustomerTableRowComponent } from './components/customer-table-row.component';
 import { CustomerViewModalComponent } from './components/customer-view-modal.component';
 import {
@@ -68,10 +72,12 @@ export class CustomersComponent implements OnInit {
   readonly searchQuery = signal('');
   readonly verifiedFilter = signal(false);
   readonly creditApprovedFilter = signal(false);
+  readonly frozenFilter = signal(false);
   readonly recentFilter = signal(false);
   readonly activeFilterColors = signal<{
     verified?: string;
     creditApproved?: string;
+    frozen?: string;
     recent?: string;
   }>({});
   readonly currentPage = signal(1);
@@ -103,6 +109,11 @@ export class CustomersComponent implements OnInit {
     // Apply credit approved filter
     if (creditApproved) {
       allCustomers = allCustomers.filter((c) => c.customFields?.isCreditApproved);
+    }
+
+    // Apply frozen filter (inferred: not approved and outstanding ≠ 0)
+    if (this.frozenFilter()) {
+      allCustomers = allCustomers.filter(isCustomerCreditFrozen);
     }
 
     // Apply recent filter (last 30 days)
@@ -407,6 +418,10 @@ export class CustomersComponent implements OnInit {
       const newValue = !this.creditApprovedFilter();
       this.creditApprovedFilter.set(newValue);
       this.activeFilterColors.set({ ...colors, creditApproved: newValue ? color : undefined });
+    } else if (type === 'frozen') {
+      const newValue = !this.frozenFilter();
+      this.frozenFilter.set(newValue);
+      this.activeFilterColors.set({ ...colors, frozen: newValue ? color : undefined });
     } else if (type === 'recent') {
       const newValue = !this.recentFilter();
       this.recentFilter.set(newValue);
@@ -427,6 +442,9 @@ export class CustomersComponent implements OnInit {
     } else if (type === 'creditApproved') {
       this.creditApprovedFilter.set(false);
       this.activeFilterColors.set({ ...colors, creditApproved: undefined });
+    } else if (type === 'frozen') {
+      this.frozenFilter.set(false);
+      this.activeFilterColors.set({ ...colors, frozen: undefined });
     } else if (type === 'recent') {
       this.recentFilter.set(false);
       this.activeFilterColors.set({ ...colors, recent: undefined });
@@ -440,6 +458,7 @@ export class CustomersComponent implements OnInit {
   getFilterLabel(type: string): string {
     if (type === 'verified') return 'Verified';
     if (type === 'creditApproved') return 'Credit Approved';
+    if (type === 'frozen') return 'Frozen';
     if (type === 'recent') return 'Recent';
     return '';
   }

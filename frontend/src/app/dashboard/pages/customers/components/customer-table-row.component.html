@@ -17,6 +17,9 @@
     @if (isCreditApproved()) {
       <app-status-badge type="info" label="Credit" size="xs" />
     }
+    @if (isCreditFrozen()) {
+      <app-status-badge type="neutral" label="Frozen" size="xs" />
+    }
   </div>
 </td>
 <td class="text-right">
@@ -83,7 +86,7 @@
         />
       </svg>
     </button>
-    @if (isCreditApproved()) {
+    @if (isCreditApproved() || isCreditFrozen()) {
       <button (click)="onAction('recordPayment')" class="btn btn-ghost btn-xs" title="Payment">
         <svg
           xmlns="http://www.w3.org/2000/svg"

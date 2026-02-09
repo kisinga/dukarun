@@ -172,6 +172,21 @@ export class CustomerViewModalComponent {
     return Number(this.customer().customFields?.creditDuration ?? 0);
   }
 
+  /** Frozen = not approved and outstanding ≠ 0 (inferred, not stored). */
+  isCreditFrozen(): boolean {
+    return !this.isCreditApproved() && this.getOutstandingAmount() !== 0;
+  }
+
+  /** Whether to show the credit section at all. */
+  showCreditSection(): boolean {
+    return (
+      this.isCreditApproved() ||
+      this.getOutstandingAmount() !== 0 ||
+      this.getCreditLimit() > 0 ||
+      this.isCreditFrozen()
+    );
+  }
+
   /**
    * Get addresses
    */

@@ -30,6 +30,8 @@ export class SupplierViewModalComponent {
   // Outputs
   readonly editRequested = output<string>();
   readonly deleteRequested = output<string>();
+  readonly viewPurchasesRequested = output<string>();
+  readonly recordPaymentRequested = output<string>();
 
   // Modal reference
   readonly modalRef = viewChild<ElementRef<HTMLDialogElement>>('modal');
@@ -189,6 +191,21 @@ export class SupplierViewModalComponent {
 
   onDelete(): void {
     this.deleteRequested.emit(this.supplier().id);
+    this.hide();
+  }
+
+  /** Whether supplier has credit approval (show Record Payment) */
+  isSupplierCreditApproved(): boolean {
+    return Boolean(this.supplier().customFields?.isSupplierCreditApproved);
+  }
+
+  onViewPurchases(): void {
+    this.viewPurchasesRequested.emit(this.supplier().id);
+    this.hide();
+  }
+
+  onRecordPayment(): void {
+    this.recordPaymentRequested.emit(this.supplier().id);
     this.hide();
   }
 }

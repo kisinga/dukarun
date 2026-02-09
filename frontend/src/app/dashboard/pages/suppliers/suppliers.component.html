@@ -236,7 +236,8 @@
               <th>Contact</th>
               <th>Type</th>
               <th>Status</th>
-              <th>Addresses</th>
+              <th class="text-right">Balance</th>
+              <th class="text-right">Credit</th>
               <th class="text-right">Actions</th>
             </tr>
           </thead>
@@ -286,5 +287,18 @@
     [supplier]="supplierToView()!"
     (editRequested)="onEditRequested($event)"
     (deleteRequested)="onDeleteRequested($event)"
+    (viewPurchasesRequested)="onViewPurchasesRequested($event)"
+    (recordPaymentRequested)="onRecordPaymentRequested($event)"
+  />
+}
+
+<!-- Supplier Payment Modal -->
+@if (supplierForPayment()) {
+  <app-supplier-payment-modal
+    #supplierPaymentModal
+    [supplierId]="supplierForPayment()!.id"
+    [supplierName]="supplierForPayment()!.name"
+    (paymentRecorded)="onSupplierPaymentRecorded()"
+    (cancelled)="onSupplierPaymentCancelled()"
   />
 }

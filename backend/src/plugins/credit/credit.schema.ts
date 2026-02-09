@@ -4,6 +4,7 @@ export const CREDIT_ADMIN_SCHEMA = gql`
   type CreditSummary {
     customerId: ID!
     isCreditApproved: Boolean!
+    creditFrozen: Boolean!
     creditLimit: Float!
     outstandingAmount: Float!
     availableCredit: Float!

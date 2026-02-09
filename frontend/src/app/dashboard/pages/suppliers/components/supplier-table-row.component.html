@@ -18,13 +18,47 @@
   </div>
 </td>
 <td>
-  @if (isVerified()) {
-    <app-status-badge type="success" label="Verified" size="xs" />
+  <div class="flex flex-col gap-1">
+    @if (isVerified()) {
+      <app-status-badge type="success" label="Verified" size="xs" />
+    }
+    @if (isSupplierCreditApproved()) {
+      <app-status-badge type="info" label="Credit" size="xs" />
+    }
+    @if (isSupplierCreditFrozen()) {
+      <app-status-badge type="neutral" label="Frozen" size="xs" />
+    }
+    @if (!isVerified() && !isSupplierCreditApproved() && !isSupplierCreditFrozen()) {
+      <span class="text-sm text-base-content/50">—</span>
+    }
+  </div>
+</td>
+<td class="text-right">
+  @if (getSupplierOutstandingAmount() !== 0) {
+    <div
+      class="font-medium"
+      [class.text-warning]="getSupplierOutstandingAmount() < 0"
+      [class.text-success]="getSupplierOutstandingAmount() > 0"
+    >
+      {{ formatCurrency(Math.abs(getSupplierOutstandingAmount())) }}
+    </div>
+    <div class="text-xs text-base-content/60">
+      {{ getSupplierOutstandingAmount() < 0 ? 'owed' : 'credit' }}
+    </div>
   } @else {
     <span class="text-sm text-base-content/50">—</span>
   }
 </td>
-<td>{{ getAddressCount() }}</td>
+<td class="text-right">
+  @if (isSupplierCreditApproved() && getSupplierCreditLimit() > 0) {
+    <div class="font-medium">{{ formatCurrency(getSupplierAvailableCredit()) }}</div>
+    <div class="text-xs text-base-content/60">
+      of {{ formatCurrency(getSupplierCreditLimit()) }}
+    </div>
+  } @else {
+    <span class="text-sm text-base-content/50">—</span>
+  }
+</td>
 <td class="text-right" (click)="$event.stopPropagation()">
   <div class="flex justify-end gap-1">
     <button (click)="onAction('view')" class="btn btn-ghost btn-xs" title="View">
@@ -49,6 +83,24 @@
         />
       </svg>
     </button>
+    @if (isSupplierCreditApproved() || isSupplierCreditFrozen()) {
+      <button (click)="onAction('recordPayment')" class="btn btn-ghost btn-xs" title="Payment">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2h-2m-4-1V9a2 2 0 012-2h2a2 2 0 012 2v1m-4 0a2 2 0 01-2 2h-2a2 2 0 01-2-2"
+          />
+        </svg>
+      </button>
+    }
     <button (click)="onAction('edit')" class="btn btn-ghost btn-xs" title="Edit">
       <svg
         xmlns="http://www.w3.org/2000/svg"

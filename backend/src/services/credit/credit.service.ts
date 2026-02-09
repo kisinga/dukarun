@@ -1,3 +1,7 @@
+/**
+ * Credit service. Frozen = credit disabled and outstanding ≠ 0 (inferred).
+ * No new credit; payments accepted. Not stored.
+ */
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   Customer,
@@ -17,6 +21,7 @@ import { FinancialService } from '../financial/financial.service';
 export interface CreditSummary {
   customerId: ID;
   isCreditApproved: boolean;
+  creditFrozen: boolean;
   creditLimit: number;
   outstandingAmount: number;
   availableCredit: number;
@@ -250,9 +255,9 @@ export class CreditService {
   }
 
   private mapToSummary(customer: Customer, outstandingAmount: number): CreditSummary {
-    // Type assertion for custom fields - they are defined in vendure-config.ts
     const customFields = customer.customFields as any;
     const isCreditApproved = Boolean(customFields?.isCreditApproved);
+    const creditFrozen = !isCreditApproved && outstandingAmount !== 0;
     const creditLimit = Number(customFields?.creditLimit ?? 0);
     // outstandingAmount is now passed as parameter (calculated dynamically)
     const availableCredit = Math.max(creditLimit - Math.abs(outstandingAmount), 0);
@@ -265,6 +270,7 @@ export class CreditService {
     return {
       customerId: customer.id,
       isCreditApproved,
+      creditFrozen,
       creditLimit,
       outstandingAmount, // Now calculated dynamically
       availableCredit,

@@ -83,6 +83,7 @@
     [activeFilters]="{
       verified: verifiedFilter(),
       creditApproved: creditApprovedFilter(),
+      frozen: frozenFilter(),
       recent: recentFilter(),
     }"
     (filterClick)="onStatsFilterClick($event)"
@@ -95,6 +96,7 @@
     [activeFilters]="{
       verified: verifiedFilter(),
       creditApproved: creditApprovedFilter(),
+      frozen: frozenFilter(),
       recent: recentFilter(),
     }"
     [filterColors]="activeFilterColors()"

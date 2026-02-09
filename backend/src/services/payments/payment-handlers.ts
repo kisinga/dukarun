@@ -148,6 +148,11 @@ export function createCreditPaymentHandler(creditService: CreditService): Paymen
       if (!summary.isCreditApproved) {
         throw new UserInputError('Customer is not approved for credit purchases.');
       }
+      if (summary.creditFrozen) {
+        throw new UserInputError(
+          'Customer account is frozen. No new credit sales allowed; payments can still be recorded.'
+        );
+      }
 
       const orderTotal = order.total ?? 0;
       const amount =

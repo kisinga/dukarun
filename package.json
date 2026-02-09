@@ -18,6 +18,8 @@
     "dev:backend": "npm run dev -w @dukarun/backend",
     "dev:frontend": "npm start -w @dukarun/frontend",
     "dev:ml": "npm run dev -w @dukarun/ml-trainer",
+    "codegen": "npm run codegen -w @dukarun/frontend",
+    "codegen:watch": "npm run codegen:watch -w @dukarun/frontend",
     "services:up": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml up -d",
     "services:down": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml down",
     "test": "npm run test --workspaces --if-present",
