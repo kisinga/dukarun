@@ -160,6 +160,11 @@ type Documents = {
   '\n  mutation ExplainVariance($countId: ID!, $reason: String!) {\n    explainVariance(countId: $countId, reason: $reason) {\n      id\n      varianceReason\n    }\n  }\n': typeof types.ExplainVarianceDocument;
   '\n  mutation ReviewCashCount($countId: ID!, $notes: String) {\n    reviewCashCount(countId: $countId, notes: $notes) {\n      id\n      declaredCash\n      expectedCash\n      variance\n      varianceReason\n      reviewedByUserId\n      reviewedAt\n      reviewNotes\n    }\n  }\n': typeof types.ReviewCashCountDocument;
   '\n  mutation VerifyMpesaTransactions($input: VerifyMpesaInput!) {\n    verifyMpesaTransactions(input: $input) {\n      id\n      sessionId\n      verifiedAt\n      transactionCount\n      allConfirmed\n      flaggedTransactionIds\n      notes\n    }\n  }\n': typeof types.VerifyMpesaTransactionsDocument;
+  '\n  query GetApprovalRequests($options: ApprovalRequestListOptions) {\n    getApprovalRequests(options: $options) {\n      items {\n        id\n        channelId\n        type\n        status\n        requestedById\n        reviewedById\n        reviewedAt\n        message\n        metadata\n        entityType\n        entityId\n        createdAt\n        updatedAt\n      }\n      totalItems\n    }\n  }\n': typeof types.GetApprovalRequestsDocument;
+  '\n  query GetApprovalRequest($id: ID!) {\n    getApprovalRequest(id: $id) {\n      id\n      channelId\n      type\n      status\n      requestedById\n      reviewedById\n      reviewedAt\n      message\n      metadata\n      entityType\n      entityId\n      createdAt\n      updatedAt\n    }\n  }\n': typeof types.GetApprovalRequestDocument;
+  '\n  query GetMyApprovalRequests($options: ApprovalRequestListOptions) {\n    getMyApprovalRequests(options: $options) {\n      items {\n        id\n        channelId\n        type\n        status\n        requestedById\n        reviewedById\n        reviewedAt\n        message\n        metadata\n        entityType\n        entityId\n        createdAt\n        updatedAt\n      }\n      totalItems\n    }\n  }\n': typeof types.GetMyApprovalRequestsDocument;
+  '\n  mutation CreateApprovalRequest($input: CreateApprovalRequestInput!) {\n    createApprovalRequest(input: $input) {\n      id\n      type\n      status\n      createdAt\n    }\n  }\n': typeof types.CreateApprovalRequestDocument;
+  '\n  mutation ReviewApprovalRequest($input: ReviewApprovalRequestInput!) {\n    reviewApprovalRequest(input: $input) {\n      id\n      type\n      status\n      message\n      reviewedAt\n    }\n  }\n': typeof types.ReviewApprovalRequestDocument;
   '\n      mutation UpdateProductBasic($id: ID!, $name: String!, $slug: String!, $barcode: String) {\n        updateProduct(\n          input: {\n            id: $id\n            translations: [{ languageCode: en, name: $name, slug: $slug }]\n            customFields: { barcode: $barcode }\n          }\n        ) {\n          id\n          name\n          slug\n          customFields {\n            barcode\n          }\n        }\n      }\n    ': typeof types.UpdateProductBasicDocument;
   '\n      mutation UpdateProductWithFacets(\n        $id: ID!\n        $name: String!\n        $slug: String!\n        $barcode: String\n        $facetValueIds: [ID!]!\n      ) {\n        updateProduct(\n          input: {\n            id: $id\n            translations: [{ languageCode: en, name: $name, slug: $slug }]\n            customFields: { barcode: $barcode }\n            facetValueIds: $facetValueIds\n          }\n        ) {\n          id\n          name\n          slug\n          customFields {\n            barcode\n          }\n        }\n      }\n    ': typeof types.UpdateProductWithFacetsDocument;
 };
@@ -452,6 +457,16 @@ const documents: Documents = {
     types.ReviewCashCountDocument,
   '\n  mutation VerifyMpesaTransactions($input: VerifyMpesaInput!) {\n    verifyMpesaTransactions(input: $input) {\n      id\n      sessionId\n      verifiedAt\n      transactionCount\n      allConfirmed\n      flaggedTransactionIds\n      notes\n    }\n  }\n':
     types.VerifyMpesaTransactionsDocument,
+  '\n  query GetApprovalRequests($options: ApprovalRequestListOptions) {\n    getApprovalRequests(options: $options) {\n      items {\n        id\n        channelId\n        type\n        status\n        requestedById\n        reviewedById\n        reviewedAt\n        message\n        metadata\n        entityType\n        entityId\n        createdAt\n        updatedAt\n      }\n      totalItems\n    }\n  }\n':
+    types.GetApprovalRequestsDocument,
+  '\n  query GetApprovalRequest($id: ID!) {\n    getApprovalRequest(id: $id) {\n      id\n      channelId\n      type\n      status\n      requestedById\n      reviewedById\n      reviewedAt\n      message\n      metadata\n      entityType\n      entityId\n      createdAt\n      updatedAt\n    }\n  }\n':
+    types.GetApprovalRequestDocument,
+  '\n  query GetMyApprovalRequests($options: ApprovalRequestListOptions) {\n    getMyApprovalRequests(options: $options) {\n      items {\n        id\n        channelId\n        type\n        status\n        requestedById\n        reviewedById\n        reviewedAt\n        message\n        metadata\n        entityType\n        entityId\n        createdAt\n        updatedAt\n      }\n      totalItems\n    }\n  }\n':
+    types.GetMyApprovalRequestsDocument,
+  '\n  mutation CreateApprovalRequest($input: CreateApprovalRequestInput!) {\n    createApprovalRequest(input: $input) {\n      id\n      type\n      status\n      createdAt\n    }\n  }\n':
+    types.CreateApprovalRequestDocument,
+  '\n  mutation ReviewApprovalRequest($input: ReviewApprovalRequestInput!) {\n    reviewApprovalRequest(input: $input) {\n      id\n      type\n      status\n      message\n      reviewedAt\n    }\n  }\n':
+    types.ReviewApprovalRequestDocument,
   '\n      mutation UpdateProductBasic($id: ID!, $name: String!, $slug: String!, $barcode: String) {\n        updateProduct(\n          input: {\n            id: $id\n            translations: [{ languageCode: en, name: $name, slug: $slug }]\n            customFields: { barcode: $barcode }\n          }\n        ) {\n          id\n          name\n          slug\n          customFields {\n            barcode\n          }\n        }\n      }\n    ':
     types.UpdateProductBasicDocument,
   '\n      mutation UpdateProductWithFacets(\n        $id: ID!\n        $name: String!\n        $slug: String!\n        $barcode: String\n        $facetValueIds: [ID!]!\n      ) {\n        updateProduct(\n          input: {\n            id: $id\n            translations: [{ languageCode: en, name: $name, slug: $slug }]\n            customFields: { barcode: $barcode }\n            facetValueIds: $facetValueIds\n          }\n        ) {\n          id\n          name\n          slug\n          customFields {\n            barcode\n          }\n        }\n      }\n    ':
@@ -1348,6 +1363,36 @@ export function graphql(
 export function graphql(
   source: '\n  mutation VerifyMpesaTransactions($input: VerifyMpesaInput!) {\n    verifyMpesaTransactions(input: $input) {\n      id\n      sessionId\n      verifiedAt\n      transactionCount\n      allConfirmed\n      flaggedTransactionIds\n      notes\n    }\n  }\n',
 ): (typeof documents)['\n  mutation VerifyMpesaTransactions($input: VerifyMpesaInput!) {\n    verifyMpesaTransactions(input: $input) {\n      id\n      sessionId\n      verifiedAt\n      transactionCount\n      allConfirmed\n      flaggedTransactionIds\n      notes\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  query GetApprovalRequests($options: ApprovalRequestListOptions) {\n    getApprovalRequests(options: $options) {\n      items {\n        id\n        channelId\n        type\n        status\n        requestedById\n        reviewedById\n        reviewedAt\n        message\n        metadata\n        entityType\n        entityId\n        createdAt\n        updatedAt\n      }\n      totalItems\n    }\n  }\n',
+): (typeof documents)['\n  query GetApprovalRequests($options: ApprovalRequestListOptions) {\n    getApprovalRequests(options: $options) {\n      items {\n        id\n        channelId\n        type\n        status\n        requestedById\n        reviewedById\n        reviewedAt\n        message\n        metadata\n        entityType\n        entityId\n        createdAt\n        updatedAt\n      }\n      totalItems\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  query GetApprovalRequest($id: ID!) {\n    getApprovalRequest(id: $id) {\n      id\n      channelId\n      type\n      status\n      requestedById\n      reviewedById\n      reviewedAt\n      message\n      metadata\n      entityType\n      entityId\n      createdAt\n      updatedAt\n    }\n  }\n',
+): (typeof documents)['\n  query GetApprovalRequest($id: ID!) {\n    getApprovalRequest(id: $id) {\n      id\n      channelId\n      type\n      status\n      requestedById\n      reviewedById\n      reviewedAt\n      message\n      metadata\n      entityType\n      entityId\n      createdAt\n      updatedAt\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  query GetMyApprovalRequests($options: ApprovalRequestListOptions) {\n    getMyApprovalRequests(options: $options) {\n      items {\n        id\n        channelId\n        type\n        status\n        requestedById\n        reviewedById\n        reviewedAt\n        message\n        metadata\n        entityType\n        entityId\n        createdAt\n        updatedAt\n      }\n      totalItems\n    }\n  }\n',
+): (typeof documents)['\n  query GetMyApprovalRequests($options: ApprovalRequestListOptions) {\n    getMyApprovalRequests(options: $options) {\n      items {\n        id\n        channelId\n        type\n        status\n        requestedById\n        reviewedById\n        reviewedAt\n        message\n        metadata\n        entityType\n        entityId\n        createdAt\n        updatedAt\n      }\n      totalItems\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation CreateApprovalRequest($input: CreateApprovalRequestInput!) {\n    createApprovalRequest(input: $input) {\n      id\n      type\n      status\n      createdAt\n    }\n  }\n',
+): (typeof documents)['\n  mutation CreateApprovalRequest($input: CreateApprovalRequestInput!) {\n    createApprovalRequest(input: $input) {\n      id\n      type\n      status\n      createdAt\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation ReviewApprovalRequest($input: ReviewApprovalRequestInput!) {\n    reviewApprovalRequest(input: $input) {\n      id\n      type\n      status\n      message\n      reviewedAt\n    }\n  }\n',
+): (typeof documents)['\n  mutation ReviewApprovalRequest($input: ReviewApprovalRequestInput!) {\n    reviewApprovalRequest(input: $input) {\n      id\n      type\n      status\n      message\n      reviewedAt\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

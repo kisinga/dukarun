@@ -76,6 +76,7 @@ export const STOCK_ADMIN_SCHEMA = gql`
     lines: [PurchaseLineInput!]!
     isCreditPurchase: Boolean
     payment: InlinePaymentInput
+    approvalId: ID
   }
 
   input PurchaseLineInput {

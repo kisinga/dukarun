@@ -70,6 +70,8 @@ export class NotificationItemComponent {
         return '🤖';
       case 'PAYMENT':
         return '💳';
+      case 'APPROVAL':
+        return '📋';
       default:
         return 'ℹ️';
     }
@@ -86,6 +88,8 @@ export class NotificationItemComponent {
         return 'info';
       case 'PAYMENT':
         return 'success';
+      case 'APPROVAL':
+        return 'warning';
       default:
         return 'info';
     }
@@ -110,4 +114,3 @@ export class NotificationItemComponent {
     }
   };
 }
-

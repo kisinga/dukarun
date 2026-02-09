@@ -28,7 +28,8 @@ export class PurchaseCreditValidatorService {
 
   /**
    * Validate supplier credit limit with actual purchase total
-   * This is the final validation after purchase is fully calculated
+   * This is the final validation after purchase is fully calculated.
+   * All amounts are in the same unit (cents / smallest currency unit).
    */
   async validateSupplierCreditLimitWithPurchase(
     ctx: RequestContext,
@@ -36,23 +37,20 @@ export class PurchaseCreditValidatorService {
     purchaseTotal: number // In smallest currency unit (cents)
   ): Promise<void> {
     const summary = await this.supplierCreditService.getSupplierCreditSummary(ctx, supplierId);
+    // Both supplierCreditLimit and outstandingAmount are in cents
     const availableCredit = summary.supplierCreditLimit - summary.outstandingAmount;
 
-    // Convert purchase total from cents to base currency units (divide by 100)
-    // This matches the unit used for supplierCreditLimit and outstandingAmount (base currency units)
-    const purchaseTotalInBaseCurrency = purchaseTotal / 100;
-
-    if (purchaseTotalInBaseCurrency > availableCredit) {
+    if (purchaseTotal > availableCredit) {
       throw new UserInputError(
-        `Supplier credit limit exceeded. Available: ${availableCredit}, Required: ${purchaseTotalInBaseCurrency}. ` +
-          `Purchase would exceed credit limit by ${purchaseTotalInBaseCurrency - availableCredit}.`
+        `Supplier credit limit exceeded. Available: ${availableCredit}, Required: ${purchaseTotal}. ` +
+          `Purchase would exceed credit limit by ${purchaseTotal - availableCredit}.`
       );
     }
 
     this.logger.log(
       `Supplier credit validation passed for supplier ${supplierId}: ` +
-        `Available: ${availableCredit}, Purchase Total: ${purchaseTotalInBaseCurrency}, ` +
-        `Remaining: ${availableCredit - purchaseTotalInBaseCurrency}`
+        `Available: ${availableCredit}, Purchase Total: ${purchaseTotal}, ` +
+        `Remaining: ${availableCredit - purchaseTotal}`
     );
   }
 

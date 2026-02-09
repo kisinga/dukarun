@@ -95,6 +95,7 @@ export class DashboardLayoutComponent implements OnInit {
             route: '/dashboard/admin/accounting',
             visible: () => hasSettings,
           },
+          { label: 'Approvals', icon: 'approvals', route: '/dashboard/approvals' },
         ],
       },
       {
@@ -240,6 +241,27 @@ export class DashboardLayoutComponent implements OnInit {
       return;
     }
 
+    // Check if this is an approval notification and navigate accordingly
+    if (notification?.data?.approvalId) {
+      await this.notificationService.markAsRead(notificationId);
+      const navigateTo = notification.data.navigateTo;
+      if (navigateTo && typeof navigateTo === 'string') {
+        // Parse route and query params from navigateTo (e.g., "/dashboard/purchases/create?approvalId=xxx")
+        const [path, queryString] = navigateTo.split('?');
+        const queryParams: Record<string, string> = {};
+        if (queryString) {
+          for (const pair of queryString.split('&')) {
+            const [key, value] = pair.split('=');
+            if (key && value) queryParams[key] = decodeURIComponent(value);
+          }
+        }
+        await this.router.navigate([path], { queryParams });
+      } else {
+        await this.router.navigate(['/dashboard/approvals']);
+      }
+      return;
+    }
+
     // Regular notification - mark as read normally
     await this.notificationService.markAsRead(notificationId);
   }
@@ -326,6 +348,8 @@ export class DashboardLayoutComponent implements OnInit {
         return '🤖';
       case 'PAYMENT':
         return '💳';
+      case 'APPROVAL':
+        return '📋';
       default:
         return 'ℹ️';
     }
@@ -341,6 +365,8 @@ export class DashboardLayoutComponent implements OnInit {
         return 'info';
       case 'PAYMENT':
         return 'success';
+      case 'APPROVAL':
+        return 'warning';
       default:
         return 'info';
     }

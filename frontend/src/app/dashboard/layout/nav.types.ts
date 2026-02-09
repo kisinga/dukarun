@@ -12,7 +12,8 @@ export type NavIcon =
   | 'stock-adjustments'
   | 'settings'
   | 'admin'
-  | 'upgrade';
+  | 'upgrade'
+  | 'approvals';
 
 export interface NavItem {
   label: string;

@@ -22,6 +22,7 @@ export enum NotificationType {
   ML_TRAINING = 'ml_training',
   PAYMENT = 'payment',
   CASH_VARIANCE = 'cash_variance',
+  APPROVAL = 'approval',
 }
 
 /**

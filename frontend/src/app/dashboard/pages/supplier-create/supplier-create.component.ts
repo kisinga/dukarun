@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import {
+  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -20,8 +21,10 @@ import { AuthPermissionsService } from '../../../core/services/auth/auth-permiss
 import { CreditManagementFormComponent } from '../shared/components/credit-management-form.component';
 import { PageHeaderComponent } from '../shared/components/page-header.component';
 import { ErrorAlertComponent } from '../shared/components/error-alert.component';
+import { RejectionBannerComponent } from '../shared/components/rejection-banner.component';
 import { PersonBasicInfoFormComponent } from '../shared/components/person-basic-info-form.component';
 import { SupplierDetailsFormComponent } from '../shared/components/supplier-details-form.component';
+import { ApprovableFormBase } from '../shared/directives/approvable-form-base.directive';
 
 /**
  * Supplier Create/Edit Component
@@ -37,6 +40,7 @@ import { SupplierDetailsFormComponent } from '../shared/components/supplier-deta
     ReactiveFormsModule,
     PageHeaderComponent,
     ErrorAlertComponent,
+    RejectionBannerComponent,
     PersonBasicInfoFormComponent,
     SupplierDetailsFormComponent,
     CreditManagementFormComponent,
@@ -79,6 +83,7 @@ import { SupplierDetailsFormComponent } from '../shared/components/supplier-deta
       </div>
 
       <div class="p-4">
+        <app-rejection-banner [message]="rejectionMessage()" (dismiss)="dismissRejection()" />
         <app-error-alert [message]="error()" (dismiss)="clearError()" />
 
         @if (isEditMode() && isLoadingEdit()) {
@@ -149,9 +154,9 @@ import { SupplierDetailsFormComponent } from '../shared/components/supplier-deta
     </div>
   `,
 })
-export class SupplierCreateComponent implements OnInit {
+export class SupplierCreateComponent extends ApprovableFormBase implements OnInit, AfterViewInit {
   private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
+  private readonly activatedRoute = inject(ActivatedRoute);
   readonly supplierService = inject(SupplierService);
   private readonly supplierApiService = inject(SupplierApiService);
   private readonly authPermissionsService = inject(AuthPermissionsService);
@@ -221,6 +226,7 @@ export class SupplierCreateComponent implements OnInit {
   });
 
   constructor() {
+    super();
     // When edit data is loaded, patch basic form and details form once
     effect(() => {
       const data = this.loadedSupplierData();
@@ -250,8 +256,12 @@ export class SupplierCreateComponent implements OnInit {
     });
   }
 
+  override ngAfterViewInit(): void {
+    super.ngAfterViewInit();
+  }
+
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
+    const id = this.activatedRoute.snapshot.paramMap.get('id');
     if (id) {
       this.isEditMode.set(true);
       this.supplierId.set(id);
@@ -471,5 +481,48 @@ export class SupplierCreateComponent implements OnInit {
 
     const timestamp = Date.now().toString().slice(-6);
     return `noemail-${sanitizedName}-${timestamp}@dukarun.local`;
+  }
+
+  // ApprovableFormBase overrides
+  override isValid(): boolean {
+    const form = this.basicInfoForm();
+    if (!form) return false;
+    return form.getValidationStateSignal()() === 'valid';
+  }
+
+  override serializeFormState(): Record<string, any> {
+    const basicForm = this.basicInfoForm();
+    const detailsForm = this.supplierDetailsForm();
+    return {
+      basicInfo: basicForm?.getForm().value ?? {},
+      supplierDetails: detailsForm?.getForm().value ?? {},
+      creditData: this.creditData(),
+      step: this.step(),
+    };
+  }
+
+  override restoreFormState(data: Record<string, any>): void {
+    if (!data) return;
+    if (data['basicInfo']) {
+      const form = this.basicInfoForm();
+      if (form) {
+        form.getForm().patchValue(data['basicInfo']);
+      }
+    }
+    if (data['creditData']) {
+      this.creditData.set(data['creditData']);
+      this.creditInitials.set(data['creditData']);
+    }
+    if (data['step']) {
+      this.step.set(data['step']);
+    }
+    if (data['supplierDetails'] && this.step() === 2) {
+      requestAnimationFrame(() => {
+        const details = this.supplierDetailsForm();
+        if (details) {
+          details.getForm().patchValue(data['supplierDetails']);
+        }
+      });
+    }
   }
 }

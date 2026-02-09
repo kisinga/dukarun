@@ -4,6 +4,46 @@
   display: block;
 }
 
+// Duka Door logo: show light or dark by theme
+.duka-door-logo {
+  position: relative;
+  height: 1.75rem;
+
+  img {
+    height: 1.75rem;
+    width: auto;
+    max-width: 140px;
+    display: block;
+    object-fit: contain;
+    object-position: left center;
+  }
+
+  .duka-door-dark {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: none;
+  }
+}
+
+:host-context(html[data-theme='dark']) .duka-door-logo {
+  .duka-door-light {
+    display: none;
+  }
+
+  .duka-door-dark {
+    display: block;
+  }
+}
+
+.duka-door-logo-drawer {
+  height: 2rem;
+
+  img {
+    height: 2rem;
+  }
+}
+
 // Navbar - minimal on mobile, richer on desktop
 .navbar {
   // GPU-accelerated backdrop

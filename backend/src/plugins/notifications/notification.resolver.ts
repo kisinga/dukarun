@@ -11,6 +11,7 @@ export const notificationSchema = gql`
     ML_TRAINING
     PAYMENT
     CASH_VARIANCE
+    APPROVAL
   }
 
   type Notification {

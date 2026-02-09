@@ -138,6 +138,34 @@ export class StockAlertEvent extends DukaHubEvent {
 }
 
 /**
+ * Approval request events (created, approved, rejected)
+ * Used to notify admins of pending approvals and authors of decisions.
+ */
+export class ApprovalRequestEvent extends DukaHubEvent {
+  static readonly type = 'approval';
+
+  constructor(
+    ctx: RequestContext,
+    channelId: string,
+    public readonly approvalId: string,
+    public readonly approvalType: string,
+    public readonly action: 'created' | 'approved' | 'rejected',
+    public readonly requestedById: string,
+    public readonly reviewedById?: string,
+    data: Record<string, any> = {}
+  ) {
+    super(ctx, channelId, {
+      approvalId,
+      approvalType,
+      action,
+      requestedById,
+      reviewedById,
+      ...data,
+    });
+  }
+}
+
+/**
  * Company registration event
  * Fired when a new company completes registration
  * Used to notify platform admins for approval

@@ -17,6 +17,7 @@ import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
 import { Request, Response } from 'express';
 import path from 'path';
 import { env } from './infrastructure/config/environment.config';
+import { ApprovalPlugin } from './plugins/approval/approval.plugin';
 import { AuditPlugin } from './plugins/audit/audit.plugin';
 import { PhoneAuthPlugin } from './plugins/auth/phone-auth.plugin';
 import { ChannelEventsPlugin } from './plugins/channels/channel-events.plugin';
@@ -1447,6 +1448,7 @@ export const config: VendureConfig = {
     ChannelSettingsPlugin,
     FractionalQuantityPlugin,
     NotificationPlugin,
+    ApprovalPlugin,
     LedgerPlugin, // Load before CreditPlugin - provides PostingService
     StockPlugin, // Load before CreditPlugin so StockPurchase type is available
     CreditPlugin, // Depends on LedgerPlugin

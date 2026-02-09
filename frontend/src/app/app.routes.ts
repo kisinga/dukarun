@@ -175,6 +175,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'approvals',
+        loadComponent: () =>
+          import('./dashboard/pages/approvals/approvals.component').then(
+            (m) => m.ApprovalsComponent,
+          ),
+      },
+      {
         path: 'profile',
         loadChildren: () =>
           import('./dashboard/pages/profile/profile.routes').then((m) => m.PROFILE_ROUTES),
