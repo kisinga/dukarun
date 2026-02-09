@@ -34,8 +34,8 @@ import { CheckoutFabComponent } from './components/checkout-fab.component';
 import { CheckoutModalComponent } from './components/checkout-modal.component';
 import { Customer } from './components/customer-selector.component';
 import { ProductConfirmModalComponent } from './components/product-confirm-modal.component';
+import { ProductSearchViewComponent } from '../shared/components/product-search-view.component';
 import { ProductScannerComponent } from './components/product-scanner.component';
-import { SearchViewComponent } from './components/search-view.component';
 
 type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
 type PaymentMethodCode = string;
@@ -65,7 +65,7 @@ type PaymentMethodCode = string;
     ProductLabelComponent,
     VariantListComponent,
     ProductScannerComponent,
-    SearchViewComponent,
+    ProductSearchViewComponent,
     ProductConfirmModalComponent,
     CartComponent,
     CheckoutFabComponent,

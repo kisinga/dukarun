@@ -17,12 +17,16 @@ export class CustomerMapperService {
     const lastRepaymentAmount = extractCents(customer.customFields?.lastRepaymentAmount ?? 0);
     const creditDuration = Number(customer.customFields?.creditDuration ?? 30);
 
+    const isCreditApproved = Boolean(customer.customFields?.isCreditApproved);
+    const creditFrozen = !isCreditApproved && outstandingAmount !== 0;
+
     return {
       id: customer.id,
       name: extractDisplayName(customer.firstName, customer.lastName),
       phone: customer.phoneNumber ?? undefined,
       email: customer.emailAddress ?? undefined,
-      isCreditApproved: Boolean(customer.customFields?.isCreditApproved),
+      isCreditApproved,
+      creditFrozen,
       creditLimit,
       outstandingAmount,
       availableCredit,

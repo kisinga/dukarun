@@ -156,8 +156,8 @@ export const routes: Routes = [
       {
         path: 'suppliers/edit/:id',
         loadComponent: () =>
-          import('./dashboard/pages/supplier-edit/supplier-edit.component').then(
-            (m) => m.SupplierEditComponent,
+          import('./dashboard/pages/supplier-create/supplier-create.component').then(
+            (m) => m.SupplierCreateComponent,
           ),
       },
       {

@@ -63,6 +63,11 @@ export class CustomerTableRowComponent {
     return Number(this.customer().outstandingAmount ?? 0);
   }
 
+  /** Frozen = not approved and outstanding ≠ 0 (inferred). */
+  isCreditFrozen(): boolean {
+    return !this.isCreditApproved() && this.getOutstandingAmount() !== 0;
+  }
+
   /**
    * Available credit calculated locally for display purposes only
    * NOTE: This is calculated from snapshot data and may be stale

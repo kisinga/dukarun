@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { EntityAvatarComponent } from '../../../components/shared/entity-avatar.component';
 import { StatusBadgeComponent } from '../../../components/shared/status-badge.component';
+import { CurrencyService } from '../../../../core/services/currency.service';
 import { SupplierAction } from './supplier-card.component';
 
 @Component({
@@ -15,6 +16,7 @@ import { SupplierAction } from './supplier-card.component';
   },
 })
 export class SupplierTableRowComponent {
+  private readonly currencyService = inject(CurrencyService);
   supplier = input.required<any>();
   action = output<{ action: SupplierAction; supplierId: string }>();
 
@@ -46,4 +48,33 @@ export class SupplierTableRowComponent {
   getSupplierType(): string {
     return this.supplier().customFields?.supplierType || 'General';
   }
+
+  isSupplierCreditApproved(): boolean {
+    return Boolean(this.supplier().customFields?.isSupplierCreditApproved);
+  }
+
+  getSupplierOutstandingAmount(): number {
+    return Number(this.supplier().supplierOutstandingAmount ?? 0);
+  }
+
+  getSupplierCreditLimit(): number {
+    return Number(this.supplier().customFields?.supplierCreditLimit ?? 0);
+  }
+
+  getSupplierAvailableCredit(): number {
+    const limit = this.getSupplierCreditLimit();
+    const outstanding = Math.abs(this.getSupplierOutstandingAmount());
+    return Math.max(limit - outstanding, 0);
+  }
+
+  /** Frozen = not approved and balance ≠ 0 (inferred). */
+  isSupplierCreditFrozen(): boolean {
+    return !this.isSupplierCreditApproved() && this.getSupplierOutstandingAmount() !== 0;
+  }
+
+  formatCurrency(amountInCents: number): string {
+    return this.currencyService.format(amountInCents);
+  }
+
+  readonly Math = Math;
 }

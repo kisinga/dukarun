@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { DeepLinkService } from '../../../core/services/deep-link.service';
 import { LedgerService } from '../../../core/services/ledger/ledger.service';
 import {
+  ProductSearchResult,
   ProductSearchService,
   ProductVariant,
 } from '../../../core/services/product/product-search.service';
@@ -12,6 +13,7 @@ import { PurchaseService } from '../../../core/services/purchase.service';
 import { PurchaseDraft, PurchaseLineItem } from '../../../core/services/purchase.service.types';
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { SupplierService } from '../../../core/services/supplier.service';
+import { ProductSearchViewComponent } from '../shared/components/product-search-view.component';
 import { PurchaseLineItemFormComponent } from './components/purchase-line-item-form.component';
 import { PurchaseLineItemsTableComponent } from './components/purchase-line-items-table.component';
 import { PurchasePaymentSectionComponent } from './components/purchase-payment-section.component';
@@ -21,6 +23,7 @@ import { PurchaseVariantPickerModalComponent } from './components/purchase-varia
   selector: 'app-purchase-create',
   imports: [
     CommonModule,
+    ProductSearchViewComponent,
     PurchaseLineItemFormComponent,
     PurchaseLineItemsTableComponent,
     PurchasePaymentSectionComponent,
@@ -108,13 +111,16 @@ import { PurchaseVariantPickerModalComponent } from './components/purchase-varia
                 <span class="badge badge-xs badge-primary ml-1">{{ draft.lines.length }}</span>
               }
             </div>
+            <app-product-search-view
+              [searchResults]="productSearchResults()"
+              [isSearching]="isSearchingProducts()"
+              [placeholder]="'Search product by name or SKU...'"
+              [compact]="true"
+              (searchTermChange)="handleProductSearch($event)"
+              (productSelected)="onProductSelectedFromSearch($event)"
+            />
             <app-purchase-line-item-form
-              [productSearchTerm]="productSearchTerm()"
-              [productSearchResults]="productSearchResults()"
               [lineItem]="newLineItem()"
-              (productSearch)="handleProductSearch($event)"
-              (productSelect)="handleProductSelect($event)"
-              (openVariantPickerModal)="openVariantPickerModal()"
               (lineItemFieldChange)="updateNewLineItem($event.field, $event.value)"
               (addItem)="handleAddLineItem()"
             />
@@ -181,10 +187,10 @@ import { PurchaseVariantPickerModalComponent } from './components/purchase-varia
       <!-- Variant picker modal (scrollable list when many variants) -->
       <app-purchase-variant-picker-modal
         [isOpen]="showVariantPickerModal()"
-        [variants]="productSearchResults()"
+        [variants]="variantPickerProduct()?.variants ?? []"
         [searchTerm]="productSearchTerm()"
         (variantSelected)="onVariantSelectedFromModal($event)"
-        (close)="showVariantPickerModal.set(false)"
+        (close)="closeVariantPickerModal()"
       />
     </div>
   `,
@@ -210,7 +216,8 @@ export class PurchaseCreateComponent implements OnInit {
 
   // Local UI state
   readonly productSearchTerm = signal<string>('');
-  readonly productSearchResults = signal<ProductVariant[]>([]);
+  readonly productSearchResults = signal<ProductSearchResult[]>([]);
+  readonly variantPickerProduct = signal<ProductSearchResult | null>(null);
   readonly isSearchingProducts = signal<boolean>(false);
   readonly showSuccessMessage = signal<boolean>(false);
   readonly eligibleAccounts = signal<{ code: string; name: string }[]>([]);
@@ -264,8 +271,7 @@ export class PurchaseCreateComponent implements OnInit {
     this.isSearchingProducts.set(true);
     try {
       const results = await this.productSearchService.searchProducts(trimmed);
-      const variants = results.flatMap((r: any) => r.variants || []);
-      this.productSearchResults.set(variants);
+      this.productSearchResults.set(results);
     } catch (error) {
       console.error('Product search failed:', error);
       this.productSearchResults.set([]);
@@ -285,17 +291,34 @@ export class PurchaseCreateComponent implements OnInit {
       unitCost,
       stockLocationId: defaultLocation?.id || '',
     });
-    this.productSearchTerm.set('');
-    this.productSearchResults.set([]);
+    this.clearProductSearch();
   }
 
-  openVariantPickerModal(): void {
+  onProductSelectedFromSearch(product: ProductSearchResult): void {
+    const variants = product.variants ?? [];
+    if (variants.length === 0) return;
+    if (variants.length === 1) {
+      this.handleProductSelect(variants[0]);
+      return;
+    }
+    this.variantPickerProduct.set(product);
     this.showVariantPickerModal.set(true);
   }
 
   onVariantSelectedFromModal(variant: ProductVariant): void {
     this.handleProductSelect(variant);
+    this.closeVariantPickerModal();
+  }
+
+  closeVariantPickerModal(): void {
     this.showVariantPickerModal.set(false);
+    this.variantPickerProduct.set(null);
+    this.clearProductSearch();
+  }
+
+  private clearProductSearch(): void {
+    this.productSearchTerm.set('');
+    this.productSearchResults.set([]);
   }
 
   handleAddLineItem(): void {

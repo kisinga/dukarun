@@ -5,6 +5,7 @@ import {
   computed,
   effect,
   inject,
+  input,
   output,
   signal,
 } from '@angular/core';
@@ -15,16 +16,17 @@ import { ContactPickerService } from '../../../../core/services/contact-picker.s
 import { ValidationState } from './basic-info-form.types';
 import { BasicInfoFormHelper } from './basic-info-form.helper';
 
-// Re-export types for convenience
 export type { ValidationState };
 
 /**
- * Customer Basic Info Form Component
+ * Shared Person Basic Info Form Component
  *
- * Form for basic customer information with phone duplicate validation.
+ * Reusable form for basic person information (customers and suppliers).
+ * Same fields: business name, contact person, email, phone; contact picker and validation.
+ * Use entityType input only where labels must differ (e.g. section title).
  */
 @Component({
-  selector: 'app-customer-basic-info-form',
+  selector: 'app-person-basic-info-form',
   imports: [CommonModule, ReactiveFormsModule, EntityAvatarComponent, ContactPickerButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -172,14 +174,15 @@ export type { ValidationState };
     </div>
   `,
 })
-export class CustomerBasicInfoFormComponent {
+export class PersonBasicInfoFormComponent {
   private readonly fb = inject(FormBuilder);
   private readonly contactPickerService = inject(ContactPickerService);
 
-  // Outputs
+  /** Use where labels must differ (e.g. Customer vs Supplier). Default 'customer'. */
+  readonly entityType = input<'customer' | 'supplier'>('customer');
+
   readonly contactError = output<string | null>();
 
-  // Form
   readonly form: FormGroup;
   private readonly formValid = signal<boolean>(false);
 
@@ -187,40 +190,34 @@ export class CustomerBasicInfoFormComponent {
     this.form = this.fb.group({
       businessName: ['', [Validators.required, Validators.minLength(2)]],
       contactPerson: ['', [Validators.required, Validators.minLength(2)]],
-      emailAddress: ['', [Validators.email]], // Optional
+      emailAddress: ['', [Validators.email]],
       phoneNumber: ['', [Validators.required, Validators.pattern(/^07\d{8}$/)]],
     });
 
-    // Track form validity changes
     effect(() => {
-      const sub = this.form.statusChanges.subscribe(() => {
+      const statusSub = this.form.statusChanges.subscribe(() => {
+        this.formValid.set(this.form.valid);
+      });
+      const valueSub = this.form.valueChanges.subscribe(() => {
         this.formValid.set(this.form.valid);
       });
       this.formValid.set(this.form.valid);
-      return () => sub.unsubscribe();
+      return () => {
+        statusSub.unsubscribe();
+        valueSub.unsubscribe();
+      };
     });
   }
 
-  // Overall validation state
   readonly validationState = computed<ValidationState>(() => {
-    // Check form validity from signal
-    if (this.formValid()) {
-      return 'valid';
-    }
-
-    // Check for specific errors
+    if (this.formValid()) return 'valid';
     const businessName = this.form.get('businessName');
     const contactPerson = this.form.get('contactPerson');
     const phoneControl = this.form.get('phoneNumber');
-
     if (!businessName?.value || !contactPerson?.value || !phoneControl?.value) {
       return 'invalid_required';
     }
-
-    if (phoneControl?.hasError('pattern')) {
-      return 'invalid_format';
-    }
-
+    if (phoneControl?.hasError('pattern')) return 'invalid_format';
     return 'invalid_required';
   });
 

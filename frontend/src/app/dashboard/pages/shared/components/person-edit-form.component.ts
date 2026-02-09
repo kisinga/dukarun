@@ -95,21 +95,23 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
           }
         </div>
 
-        <!-- Submit Button -->
-        <div class="pt-4">
-          <button
-            type="submit"
-            [disabled]="form.invalid || isLoading()"
-            class="btn btn-primary w-full"
-          >
-            @if (isLoading()) {
-              <span class="loading loading-spinner loading-sm"></span>
-              Updating...
-            } @else {
-              {{ submitButtonText() }}
-            }
-          </button>
-        </div>
+        @if (showSubmitButton()) {
+          <!-- Submit Button -->
+          <div class="pt-4">
+            <button
+              type="submit"
+              [disabled]="form.invalid || isLoading()"
+              class="btn btn-primary w-full"
+            >
+              @if (isLoading()) {
+                <span class="loading loading-spinner loading-sm"></span>
+                Updating...
+              } @else {
+                {{ submitButtonText() }}
+              }
+            </button>
+          </div>
+        }
       </form>
     </div>
   `,
@@ -123,6 +125,7 @@ export class PersonEditFormComponent {
     phoneNumber?: string;
   }>({ businessName: '', contactPerson: '' });
   readonly submitButtonText = input<string>('Update');
+  readonly showSubmitButton = input<boolean>(true);
   readonly isLoading = input<boolean>(false);
 
   // Outputs

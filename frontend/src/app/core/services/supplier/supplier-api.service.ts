@@ -293,11 +293,12 @@ export class SupplierApiService {
     try {
       const client = this.apolloService.getClient();
 
-      // Prepare input with custom fields for supplier
-      // Normalize phone number to 07XXXXXXXX format if provided
+      // UpdateCustomerInput allows only id, firstName, lastName, emailAddress, phoneNumber, title, customFields
       const supplierInput = {
         id,
-        ...input,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        emailAddress: input.emailAddress,
         phoneNumber: input.phoneNumber ? formatPhoneNumber(input.phoneNumber) : input.phoneNumber,
         customFields: {
           isSupplier: true,
@@ -306,6 +307,9 @@ export class SupplierApiService {
           taxId: input.taxId,
           paymentTerms: input.paymentTerms,
           notes: input.notes,
+          isCreditApproved: input.isCreditApproved,
+          creditLimit: input.creditLimit,
+          creditDuration: input.creditDuration,
         },
       };
 

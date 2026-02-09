@@ -23,6 +23,9 @@
       @if (isVerified()) {
         <app-status-badge type="success" label="Verified" [showIcon]="true" />
       }
+      @if (isCreditFrozen()) {
+        <app-status-badge type="neutral" label="Frozen" [showIcon]="true" />
+      }
     </div>
 
     <!-- Quick Credit Status (if applicable) -->

@@ -89,6 +89,9 @@
     [(searchQuery)]="searchQuery"
     [pendingPaymentsActive]="pendingPaymentsFilter()"
     (clearPendingPayments)="clearPendingPaymentsFilter()"
+    [supplierIdFilter]="supplierIdFilter()"
+    [supplierNameFilter]="supplierNameFilter()"
+    (clearSupplierFilter)="clearSupplierFilter()"
   />
 
   <!-- Error Alert -->

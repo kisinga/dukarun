@@ -267,15 +267,30 @@ export class CustomerApiService {
     try {
       const client = this.apolloService.getClient();
 
-      // Normalize phone number to 07XXXXXXXX format if provided
-      const normalizedInput = {
-        ...input,
+      // UpdateCustomerInput allows only id, firstName, lastName, emailAddress, phoneNumber, title, customFields
+      const mutationInput = {
+        id,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        emailAddress: input.emailAddress,
         phoneNumber: input.phoneNumber ? formatPhoneNumber(input.phoneNumber) : input.phoneNumber,
+        customFields:
+          input.isCreditApproved !== undefined ||
+          input.creditLimit !== undefined ||
+          input.creditDuration !== undefined
+            ? {
+                ...(input.isCreditApproved !== undefined && {
+                  isCreditApproved: input.isCreditApproved,
+                }),
+                ...(input.creditLimit !== undefined && { creditLimit: input.creditLimit }),
+                ...(input.creditDuration !== undefined && { creditDuration: input.creditDuration }),
+              }
+            : undefined,
       };
 
       const result = await client.mutate<any>({
         mutation: UPDATE_CUSTOMER,
-        variables: { input: { id, ...normalizedInput } },
+        variables: { input: mutationInput },
       });
 
       const customer = result.data?.updateCustomer;

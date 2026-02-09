@@ -123,6 +123,7 @@ export class TeamService {
                 roles: admin.user.roles?.map((role) => ({
                   id: role.id,
                   code: role.code,
+                  permissions: role.permissions ?? [],
                   channels: role.channels ?? [],
                 })),
               }

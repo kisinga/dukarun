@@ -1,7 +1,12 @@
 <!-- Customer Search Bar -->
 <div class="flex flex-col gap-2 sm:gap-4">
   <!-- Active Filter Badges -->
-  @if (activeFilters.verified || activeFilters.creditApproved || activeFilters.recent) {
+  @if (
+    activeFilters.verified ||
+    activeFilters.creditApproved ||
+    activeFilters.frozen ||
+    activeFilters.recent
+  ) {
     <div class="flex flex-wrap gap-2">
       @if (activeFilters.verified) {
         <span [class]="'badge badge-' + (filterColors.verified || 'success') + ' gap-2'">
@@ -22,6 +27,19 @@
           <button
             class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
             (click)="onClearFilter('creditApproved')"
+            type="button"
+            aria-label="Clear filter"
+          >
+            ×
+          </button>
+        </span>
+      }
+      @if (activeFilters.frozen) {
+        <span [class]="'badge badge-' + (filterColors.frozen || 'neutral') + ' gap-2'">
+          {{ getFilterLabel('frozen') }}
+          <button
+            class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+            (click)="onClearFilter('frozen')"
             type="button"
             aria-label="Clear filter"
           >

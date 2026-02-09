@@ -21,6 +21,7 @@ import { SupplierSearchBarComponent } from './components/supplier-search-bar.com
 import { SupplierStats, SupplierStatsComponent } from './components/supplier-stats.component';
 import { SupplierTableRowComponent } from './components/supplier-table-row.component';
 import { SupplierViewModalComponent } from './components/supplier-view-modal.component';
+import { SupplierPaymentModalComponent } from './components/supplier-payment-modal.component';
 
 /**
  * Suppliers list page - similar to products and customers pages
@@ -42,6 +43,7 @@ import { SupplierViewModalComponent } from './components/supplier-view-modal.com
     PaginationComponent,
     DeleteConfirmationModalComponent,
     SupplierViewModalComponent,
+    SupplierPaymentModalComponent,
   ],
   templateUrl: './suppliers.component.html',
   styleUrl: './suppliers.component.scss',
@@ -54,6 +56,7 @@ export class SuppliersComponent implements OnInit {
   // View references
   readonly deleteModal = viewChild<DeleteConfirmationModalComponent>('deleteModal');
   readonly viewModal = viewChild<SupplierViewModalComponent>('viewModal');
+  readonly supplierPaymentModal = viewChild<SupplierPaymentModalComponent>('supplierPaymentModal');
 
   // State from service
   readonly suppliers = this.supplierService.suppliers;
@@ -77,6 +80,7 @@ export class SuppliersComponent implements OnInit {
   readonly deleteModalData = signal<DeleteConfirmationData>({ entityName: '', relatedCount: 0 });
   readonly supplierToDelete = signal<string | null>(null);
   readonly supplierToView = signal<any | null>(null);
+  readonly supplierForPayment = signal<{ id: string; name: string } | null>(null);
 
   // Computed: filtered suppliers
   readonly filteredSuppliers = computed(() => {
@@ -183,6 +187,10 @@ export class SuppliersComponent implements OnInit {
 
       case 'delete':
         this.confirmDeleteSupplier(supplierId);
+        break;
+
+      case 'recordPayment':
+        this.onRecordPaymentRequested(supplierId);
         break;
     }
   }
@@ -303,6 +311,38 @@ export class SuppliersComponent implements OnInit {
    */
   onDeleteRequested(supplierId: string): void {
     this.confirmDeleteSupplier(supplierId);
+  }
+
+  /**
+   * Handle view purchases from view modal: navigate to purchases filtered by supplier
+   */
+  onViewPurchasesRequested(supplierId: string): void {
+    this.router.navigate(['/dashboard/purchases'], { queryParams: { supplierId } });
+  }
+
+  /**
+   * Handle record payment from view modal: open supplier payment modal
+   */
+  onRecordPaymentRequested(supplierId: string): void {
+    const supplier = this.suppliers().find((s) => s.id === supplierId);
+    const name = supplier
+      ? `${supplier.firstName ?? ''} ${supplier.lastName ?? ''}`.trim() ||
+        supplier.emailAddress ||
+        'Supplier'
+      : 'Supplier';
+    this.supplierForPayment.set({ id: supplierId, name });
+    setTimeout(() => {
+      this.supplierPaymentModal()?.show();
+    }, 0);
+  }
+
+  onSupplierPaymentRecorded(): void {
+    this.supplierForPayment.set(null);
+    this.refreshSuppliers();
+  }
+
+  onSupplierPaymentCancelled(): void {
+    this.supplierForPayment.set(null);
   }
 
   /**

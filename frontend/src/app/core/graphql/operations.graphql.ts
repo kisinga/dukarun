@@ -1746,6 +1746,7 @@ export const GET_CREDIT_SUMMARY = graphql(`
     creditSummary(customerId: $customerId) {
       customerId
       isCreditApproved
+      creditFrozen
       creditLimit
       outstandingAmount
       availableCredit
@@ -1875,6 +1876,36 @@ export const PAY_SINGLE_PURCHASE = graphql(`
   }
 `);
 
+export const GET_SUPPLIER_CREDIT_SUMMARY = graphql(`
+  query GetSupplierCreditSummary($supplierId: ID!) {
+    supplierCreditSummary(supplierId: $supplierId) {
+      supplierId
+      isSupplierCreditApproved
+      supplierCreditLimit
+      outstandingAmount
+      availableCredit
+      lastRepaymentDate
+      lastRepaymentAmount
+      supplierCreditDuration
+    }
+  }
+`);
+
+export const ALLOCATE_BULK_SUPPLIER_PAYMENT = graphql(`
+  mutation AllocateBulkSupplierPayment($input: SupplierPaymentAllocationInput!) {
+    allocateBulkSupplierPayment(input: $input) {
+      purchasesPaid {
+        purchaseId
+        purchaseReference
+        amountPaid
+      }
+      remainingBalance
+      totalAllocated
+      excessPayment
+    }
+  }
+`);
+
 // ============================================================================
 // PRICE OVERRIDE OPERATIONS
 // ============================================================================
@@ -1921,6 +1952,7 @@ export const GET_SUPPLIERS = graphql(`
         phoneNumber
         createdAt
         updatedAt
+        supplierOutstandingAmount
         customFields {
           isSupplier
           supplierType
@@ -1930,6 +1962,8 @@ export const GET_SUPPLIERS = graphql(`
           notes
           isCreditApproved
           creditLimit
+          isSupplierCreditApproved
+          supplierCreditLimit
         }
         addresses {
           id
@@ -2189,6 +2223,7 @@ export const GET_ADMINISTRATORS = graphql(`
           roles {
             id
             code
+            permissions
             channels {
               id
             }

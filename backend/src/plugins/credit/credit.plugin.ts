@@ -46,6 +46,7 @@ const COMBINED_SCHEMA = gql`
   type CreditSummary {
     customerId: ID!
     isCreditApproved: Boolean!
+    creditFrozen: Boolean!
     creditLimit: Float!
     outstandingAmount: Float!
     availableCredit: Float!
@@ -139,6 +140,10 @@ const COMBINED_SCHEMA = gql`
 
   extend type Customer {
     outstandingAmount: Float!
+    """
+    Supplier balance (AP). Only non-zero when customer is a supplier. Cents.
+    """
+    supplierOutstandingAmount: Float!
   }
 
   extend type Query {

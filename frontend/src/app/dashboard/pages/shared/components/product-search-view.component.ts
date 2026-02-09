@@ -10,23 +10,26 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ProductSearchResult } from '../../../../core/services/product/product-search.service';
-import { ProductLabelComponent } from '../../shared/components/product-label.component';
-import { VariantListComponent } from '../../shared/components/variant-list.component';
+import { ProductLabelComponent } from './product-label.component';
+import { VariantListComponent } from './variant-list.component';
 
 /**
- * Unified search interface with integrated camera toggle
+ * Shared product search UI: card with search input, optional camera/action button,
+ * and a list of product results (image, label, variant count, expandable variants).
+ * Used on sell and purchase pages for consistent UX.
  */
 @Component({
-  selector: 'app-search-view',
+  selector: 'app-product-search-view',
+  standalone: true,
   imports: [CommonModule, FormsModule, ProductLabelComponent, VariantListComponent],
   template: `
     <div class="card bg-base-100 shadow-lg">
-      <div class="card-body p-3">
+      <div class="card-body" [class.p-3]="!compact()" [class.p-2]="compact()">
         <div class="flex items-center gap-2">
           <!-- Search Icon -->
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 opacity-60"
+            class="h-5 w-5 opacity-60 shrink-0"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -43,7 +46,7 @@ import { VariantListComponent } from '../../shared/components/variant-list.compo
           <input
             type="text"
             class="input input-ghost flex-1 text-base p-0 focus:outline-none min-h-0 h-auto"
-            placeholder="Search products..."
+            [placeholder]="placeholder()"
             [(ngModel)]="searchTerm"
             (ngModelChange)="searchTermChange.emit($event)"
           />
@@ -76,7 +79,11 @@ import { VariantListComponent } from '../../shared/components/variant-list.compo
 
         <!-- Search Results -->
         @if (searchResults().length > 0) {
-          <div class="mt-2 space-y-2 max-h-[60vh] overflow-y-auto">
+          <div
+            class="mt-2 space-y-2 overflow-y-auto"
+            [class.max-h-[60vh]]="!compact()"
+            [class.max-h-[40vh]]="compact()"
+          >
             @for (product of searchResults(); track product.id) {
               <div class="border border-base-300 rounded-lg overflow-hidden bg-base-100">
                 <button
@@ -88,10 +95,12 @@ import { VariantListComponent } from '../../shared/components/variant-list.compo
                     <img
                       [src]="product.featuredAsset.preview"
                       [alt]="product.name"
-                      class="w-10 h-10 rounded object-cover"
+                      class="w-10 h-10 rounded object-cover shrink-0"
                     />
                   } @else {
-                    <div class="w-10 h-10 rounded bg-base-300 flex items-center justify-center">
+                    <div
+                      class="w-10 h-10 rounded bg-base-300 flex items-center justify-center shrink-0"
+                    >
                       @if (isService(product)) {
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -148,7 +157,7 @@ import { VariantListComponent } from '../../shared/components/variant-list.compo
                   <!-- Add Icon -->
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    class="h-5 w-5 text-primary"
+                    class="h-5 w-5 text-primary shrink-0"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -186,29 +195,26 @@ import { VariantListComponent } from '../../shared/components/variant-list.compo
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SearchViewComponent implements OnDestroy {
-  // Inputs
+export class ProductSearchViewComponent implements OnDestroy {
   readonly searchResults = input.required<ProductSearchResult[]>();
   readonly isSearching = input<boolean>(false);
   readonly showCameraButton = input<boolean>(false);
+  readonly placeholder = input<string>('Search products...');
+  readonly compact = input<boolean>(false);
 
-  // Outputs
   readonly searchTermChange = output<string>();
   readonly productSelected = output<ProductSearchResult>();
   readonly cameraToggle = output<void>();
 
-  // Local state
   searchTerm = '';
   readonly isMobile = signal<boolean>(false);
   private resizeListener?: () => void;
 
-  // Computed: show camera button on mobile always, or when searching on desktop
   readonly shouldShowCameraButton = computed(() => {
     return this.isMobile() || this.showCameraButton();
   });
 
   constructor() {
-    // Check if mobile on initialization and window resize
     if (typeof window !== 'undefined') {
       this.checkMobile();
       this.resizeListener = () => this.checkMobile();
@@ -217,7 +223,6 @@ export class SearchViewComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // Clean up resize listener
     if (typeof window !== 'undefined' && this.resizeListener) {
       window.removeEventListener('resize', this.resizeListener);
     }
@@ -231,9 +236,5 @@ export class SearchViewComponent implements OnDestroy {
 
   isService(product: ProductSearchResult): boolean {
     return product.variants?.some((v) => v.trackInventory === false) || false;
-  }
-
-  onSearchChange(term: string): void {
-    this.searchTermChange.emit(term);
   }
 }

@@ -17,6 +17,9 @@
     @if (isCreditApproved()) {
       <app-status-badge type="info" label="Credit" size="xs" />
     }
+    @if (isCreditFrozen()) {
+      <app-status-badge type="neutral" label="Frozen" size="xs" />
+    }
   </div>
 </td>
 <td class="text-right">
@@ -43,30 +46,97 @@
     <span class="text-sm text-base-content/50">—</span>
   }
 </td>
-<td (click)="$event.stopPropagation()">
-  <details class="dropdown dropdown-end">
-    <summary class="btn btn-ghost btn-sm btn-square">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<td class="text-right" (click)="$event.stopPropagation()">
+  <div class="flex justify-end gap-1">
+    <button (click)="onAction('view')" class="btn btn-ghost btn-xs" title="View">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
         <path
           stroke-linecap="round"
           stroke-linejoin="round"
           stroke-width="2"
-          d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-        ></path>
+          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+        />
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+        />
       </svg>
-    </summary>
-    <ul
-      class="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-48 border border-base-300"
-    >
-      <li><a (click)="onAction('view')">View</a></li>
-      <li><a (click)="onAction('viewOrders')">Orders</a></li>
-      @if (isCreditApproved()) {
-        <li><a (click)="onAction('recordPayment')">Payment</a></li>
-      }
-      @if (!isWalkInCustomer()) {
-        <li><a (click)="onAction('edit')">Edit</a></li>
-      }
-      <li><a (click)="onAction('delete')" class="text-error">Delete</a></li>
-    </ul>
-  </details>
+    </button>
+    <button (click)="onAction('viewOrders')" class="btn btn-ghost btn-xs" title="Orders">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+        />
+      </svg>
+    </button>
+    @if (isCreditApproved() || isCreditFrozen()) {
+      <button (click)="onAction('recordPayment')" class="btn btn-ghost btn-xs" title="Payment">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2h-2m-4-1V9a2 2 0 012-2h2a2 2 0 012 2v1m-4 0a2 2 0 01-2 2h-2a2 2 0 01-2-2"
+          />
+        </svg>
+      </button>
+    }
+    @if (!isWalkInCustomer()) {
+      <button (click)="onAction('edit')" class="btn btn-ghost btn-xs" title="Edit">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+          />
+        </svg>
+      </button>
+    }
+    <button (click)="onAction('delete')" class="btn btn-error btn-ghost btn-xs" title="Delete">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+        />
+      </svg>
+    </button>
+  </div>
 </td>
