@@ -10,12 +10,22 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { TeamService, type Administrator, type RoleTemplate } from '../../../../core/services/team.service';
+import {
+  TeamService,
+  type Administrator,
+  type RoleTemplate,
+} from '../../../../core/services/team.service';
+import {
+  filterSuperAdminPermissions,
+  formatPermissionName,
+  groupPermissions,
+} from '../utils/permission-grouping';
 
 /**
  * Permission Editor Component
- * 
- * Allows editing permissions for a team member with grouped toggles
+ *
+ * Allows editing permissions for a team member with grouped toggles.
+ * Shows all assignable permissions (union of member's current + all role templates), filtered and grouped.
  */
 @Component({
   selector: 'app-permission-editor',
@@ -33,16 +43,19 @@ export class PermissionEditorComponent {
 
   readonly modalRef = viewChild<ElementRef<HTMLDialogElement>>('modal');
   readonly selectedPermissions = signal<Set<string>>(new Set());
+  readonly selectedTemplateCode = signal<string>('');
   readonly isSubmitting = signal(false);
   readonly error = signal<string | null>(null);
 
   open(member: Administrator | null): void {
     if (!member) return;
-    
+
     this.member = member;
     const permissions = member.user?.roles?.[0]?.permissions ?? [];
     this.selectedPermissions.set(new Set(permissions));
-    
+    this.selectedTemplateCode.set('');
+    this.error.set(null);
+
     const modal = this.modalRef()?.nativeElement;
     modal?.showModal();
   }
@@ -65,6 +78,45 @@ export class PermissionEditorComponent {
   hasPermission(permission: string): boolean {
     return this.selectedPermissions().has(permission);
   }
+
+  /**
+   * All permissions to display: union of member's current permissions and all role template permissions,
+   * with super-admin-only permissions filtered out.
+   */
+  getAllDisplayedPermissions(): string[] {
+    const memberPerms = this.member?.user?.roles?.[0]?.permissions ?? [];
+    const templatePerms = this.roleTemplates.flatMap((t) => t.permissions);
+    const union = Array.from(new Set([...memberPerms, ...templatePerms]));
+    return filterSuperAdminPermissions(union);
+  }
+
+  /**
+   * Grouped permissions for expansion panels (same categories as create-admin).
+   */
+  getGroupedDisplayedPermissions(): Record<string, string[]> {
+    return groupPermissions(this.getAllDisplayedPermissions());
+  }
+
+  applyTemplate(): void {
+    const code = this.selectedTemplateCode();
+    const template = this.roleTemplates.find((t) => t.code === code);
+    if (!template) return;
+    const filtered = filterSuperAdminPermissions(template.permissions);
+    this.selectedPermissions.set(new Set(filtered));
+  }
+
+  /**
+   * Called when the template dropdown selection changes. Updates the selected template code
+   * and immediately applies that template's permissions (auto-update).
+   */
+  onTemplateChange(code: string): void {
+    this.selectedTemplateCode.set(code);
+    if (code) {
+      this.applyTemplate();
+    }
+  }
+
+  formatPermissionName = formatPermissionName;
 
   async save(): Promise<void> {
     if (!this.member) return;
@@ -91,31 +143,5 @@ export class PermissionEditorComponent {
     }
   }
 
-  // Group permissions by category for better UX
-  getGroupedPermissions(): Record<string, string[]> {
-    const allPermissions = Array.from(this.selectedPermissions());
-    const grouped: Record<string, string[]> = {
-      'Catalog': [],
-      'Orders': [],
-      'Customers': [],
-      'Products': [],
-      'Settings': [],
-      'Custom': [],
-    };
-
-    allPermissions.forEach(perm => {
-      if (perm.includes('Catalog')) grouped['Catalog'].push(perm);
-      else if (perm.includes('Order')) grouped['Orders'].push(perm);
-      else if (perm.includes('Customer')) grouped['Customers'].push(perm);
-      else if (perm.includes('Product')) grouped['Products'].push(perm);
-      else if (perm.includes('Settings')) grouped['Settings'].push(perm);
-      else grouped['Custom'].push(perm);
-    });
-
-    return grouped;
-  }
-
-  // Expose Object for template use
   readonly Object = Object;
 }
-

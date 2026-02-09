@@ -11213,6 +11213,7 @@ export type GetAdministratorsQuery = {
           __typename?: 'Role';
           id: string;
           code: string;
+          permissions: Array<Permission>;
           channels: Array<{ __typename?: 'Channel'; id: string }>;
         }>;
       };
@@ -19830,6 +19831,7 @@ export const GetAdministratorsDocument = {
                                 selections: [
                                   { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                                   { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'permissions' } },
                                   {
                                     kind: 'Field',
                                     name: { kind: 'Name', value: 'channels' },

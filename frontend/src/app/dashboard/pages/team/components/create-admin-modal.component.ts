@@ -17,6 +17,11 @@ import {
 import { Subscription } from 'rxjs';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TeamService, type RoleTemplate } from '../../../../core/services/team.service';
+import {
+  filterSuperAdminPermissions,
+  formatPermissionName,
+  groupPermissions,
+} from '../utils/permission-grouping';
 
 /**
  * Multi-step modal for creating channel administrators
@@ -56,18 +61,6 @@ export class CreateAdminModalComponent implements OnInit, OnDestroy {
   readonly selectedPermissions = signal<Set<string>>(new Set());
 
   private formSubscriptions = new Subscription();
-
-  // Super-admin permissions to filter out
-  private readonly superAdminPermissions = new Set([
-    'CreateChannel',
-    'UpdateChannel',
-    'DeleteChannel',
-    'ReadChannel',
-    'CreateRole',
-    'UpdateRole',
-    'DeleteRole',
-    'ReadRole',
-  ]);
 
   constructor() {
     this.form = this.fb.group({
@@ -194,7 +187,7 @@ export class CreateAdminModalComponent implements OnInit, OnDestroy {
   onTemplateSelected(): void {
     const template = this.getSelectedTemplate();
     if (template) {
-      const filtered = this.filterSuperAdminPermissions(template.permissions);
+      const filtered = filterSuperAdminPermissions(template.permissions);
       this.selectedPermissions.set(new Set(filtered));
       this.updatePermissionOverrides();
     } else {
@@ -237,67 +230,6 @@ export class CreateAdminModalComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Filter out super-admin permissions from a list
-   */
-  private filterSuperAdminPermissions(permissions: string[]): string[] {
-    return permissions.filter((perm) => {
-      // Check if permission contains any super-admin permission string
-      return !Array.from(this.superAdminPermissions).some((superPerm) => perm.includes(superPerm));
-    });
-  }
-
-  /**
-   * Group permissions by category
-   */
-  private groupPermissions(permissions: string[]): Record<string, string[]> {
-    const groups: Record<string, string[]> = {
-      Assets: [],
-      Catalog: [],
-      Customers: [],
-      Orders: [],
-      Products: [],
-      Stock: [],
-      Administration: [],
-      Settings: [],
-      Custom: [],
-    };
-
-    permissions.forEach((perm) => {
-      const permUpper = perm.toUpperCase();
-
-      if (permUpper.includes('ASSET')) {
-        groups['Assets'].push(perm);
-      } else if (permUpper.includes('CATALOG')) {
-        groups['Catalog'].push(perm);
-      } else if (permUpper.includes('CUSTOMER')) {
-        groups['Customers'].push(perm);
-      } else if (permUpper.includes('ORDER')) {
-        groups['Orders'].push(perm);
-      } else if (permUpper.includes('PRODUCT')) {
-        groups['Products'].push(perm);
-      } else if (permUpper.includes('STOCKLOCATION') || permUpper.includes('STOCK')) {
-        groups['Stock'].push(perm);
-      } else if (permUpper.includes('ADMINISTRATOR') || permUpper.includes('ADMIN')) {
-        groups['Administration'].push(perm);
-      } else if (permUpper.includes('SETTINGS') || permUpper.includes('SETTING')) {
-        groups['Settings'].push(perm);
-      } else {
-        // Custom permissions (OverridePrice, ApproveCustomerCredit, etc.)
-        groups['Custom'].push(perm);
-      }
-    });
-
-    // Remove empty groups
-    Object.keys(groups).forEach((key) => {
-      if (groups[key].length === 0) {
-        delete groups[key];
-      }
-    });
-
-    return groups;
-  }
-
-  /**
    * Get filtered and grouped permissions from selected template
    */
   readonly groupedPermissions = computed(() => {
@@ -306,8 +238,8 @@ export class CreateAdminModalComponent implements OnInit, OnDestroy {
       return {};
     }
 
-    const filtered = this.filterSuperAdminPermissions(template.permissions);
-    return this.groupPermissions(filtered);
+    const filtered = filterSuperAdminPermissions(template.permissions);
+    return groupPermissions(filtered);
   });
 
   /**
@@ -318,7 +250,7 @@ export class CreateAdminModalComponent implements OnInit, OnDestroy {
     if (!template) {
       return [];
     }
-    return this.filterSuperAdminPermissions(template.permissions);
+    return filterSuperAdminPermissions(template.permissions);
   });
 
   async submit(): Promise<void> {
@@ -391,29 +323,7 @@ export class CreateAdminModalComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Format permission name for display
-   */
-  formatPermissionName(permission: string): string {
-    // Handle custom permissions (e.g., "OverridePricePermission")
-    if (permission.includes('Permission')) {
-      return permission
-        .replace(/Permission$/, '')
-        .replace(/([A-Z])/g, ' $1')
-        .trim();
-    }
-
-    // Handle standard permissions (e.g., "CreateAsset", "ReadCustomer")
-    const action = permission.match(/^(Create|Read|Update|Delete)/)?.[0] || '';
-    const resource = permission.replace(/^(Create|Read|Update|Delete)/, '');
-
-    if (action && resource) {
-      return `${action} ${resource.replace(/([A-Z])/g, ' $1').trim()}`;
-    }
-
-    // Fallback: just add spaces before capitals
-    return permission.replace(/([A-Z])/g, ' $1').trim();
-  }
+  formatPermissionName = formatPermissionName;
 
   // Expose Object for template use
   readonly Object = Object;

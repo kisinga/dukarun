@@ -2223,6 +2223,7 @@ export const GET_ADMINISTRATORS = graphql(`
           roles {
             id
             code
+            permissions
             channels {
               id
             }
