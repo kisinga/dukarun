@@ -15,7 +15,7 @@ import { AuthPermissionsService } from '../../../core/services/auth/auth-permiss
 import { CreditManagementFormComponent } from '../shared/components/credit-management-form.component';
 import { PageHeaderComponent } from '../shared/components/page-header.component';
 import { ErrorAlertComponent } from '../shared/components/error-alert.component';
-import { CustomerBasicInfoFormComponent } from '../shared/components/customer-basic-info-form.component';
+import { PersonBasicInfoFormComponent } from '../shared/components/person-basic-info-form.component';
 
 /**
  * Customer Create Component
@@ -30,7 +30,7 @@ import { CustomerBasicInfoFormComponent } from '../shared/components/customer-ba
     ReactiveFormsModule,
     PageHeaderComponent,
     ErrorAlertComponent,
-    CustomerBasicInfoFormComponent,
+    PersonBasicInfoFormComponent,
     CreditManagementFormComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -43,7 +43,11 @@ import { CustomerBasicInfoFormComponent } from '../shared/components/customer-ba
 
         <div class="space-y-4 max-w-md mx-auto">
           <!-- Basic Information Form -->
-          <app-customer-basic-info-form #basicInfoForm (contactError)="onContactError($event)" />
+          <app-person-basic-info-form
+            #basicInfoForm
+            entityType="customer"
+            (contactError)="onContactError($event)"
+          />
 
           <!-- Credit Management Section -->
           <app-credit-management-form
@@ -53,7 +57,6 @@ import { CustomerBasicInfoFormComponent } from '../shared/components/customer-ba
             [initialCreditDuration]="30"
             [initialIsCreditApproved]="false"
             [showSummary]="true"
-            [defaultExpanded]="false"
             (creditChange)="onCreditChange($event)"
           />
 
@@ -84,7 +87,7 @@ export class CustomerCreateComponent {
   private readonly customerApiService = inject(CustomerApiService);
   private readonly authPermissionsService = inject(AuthPermissionsService);
 
-  readonly basicInfoForm = viewChild<CustomerBasicInfoFormComponent>('basicInfoForm');
+  readonly basicInfoForm = viewChild<PersonBasicInfoFormComponent>('basicInfoForm');
 
   // Computed state for button disabled
   readonly isSubmitDisabled = computed(() => {

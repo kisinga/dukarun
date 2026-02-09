@@ -1,10 +1,18 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { CreditCustomerSummary, CustomerService } from '../../../core/services/customer.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { PageHeaderComponent } from '../shared/components/page-header.component';
 import { PersonEditFormComponent } from '../shared/components/person-edit-form.component';
 
 /**
@@ -17,29 +25,11 @@ import { PersonEditFormComponent } from '../shared/components/person-edit-form.c
  */
 @Component({
   selector: 'app-customer-edit',
-  imports: [CommonModule, PersonEditFormComponent],
+  imports: [CommonModule, PageHeaderComponent, PersonEditFormComponent],
   template: `
     <div class="min-h-screen bg-base-100">
-      <!-- Header -->
-      <div class="sticky top-0 z-10 bg-base-100 border-b border-base-200 px-4 py-3">
-        <div class="flex items-center justify-between">
-          <button (click)="goBack()" class="btn btn-ghost btn-sm btn-circle" aria-label="Go back">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 19l-7-7 7-7"
-              ></path>
-            </svg>
-          </button>
-          <h1 class="text-lg font-semibold">Edit Customer</h1>
-          <div class="w-10"></div>
-          <!-- Spacer for centering -->
-        </div>
-      </div>
+      <app-page-header title="Edit Customer" (backClick)="goBack()" />
 
-      <!-- Form -->
       <div class="p-4">
         @if (error()) {
           <div class="alert alert-warning mb-4" [class.alert-error]="!isWalkInCustomer()">
@@ -79,23 +69,27 @@ import { PersonEditFormComponent } from '../shared/components/person-edit-form.c
             </div>
           </div>
         } @else if (customerData()) {
-          <div class="space-y-6">
-            <!-- Basic Information -->
-            <app-person-edit-form
-              [initialData]="customerData()"
-              [submitButtonText]="'Update Customer'"
-              [isLoading]="customerService.isCreating()"
-              (formSubmit)="onUpdateCustomer($event)"
-            ></app-person-edit-form>
+          <div class="space-y-6 max-w-md mx-auto">
+            <!-- Basic Information (card-style for consistency) -->
+            <div class="card bg-base-100 border border-base-300 shadow-sm">
+              <div class="card-body p-5">
+                <h2 class="text-lg font-semibold mb-1">Basic Information</h2>
+                <p class="text-sm text-base-content/70 mb-4">Update business and contact details</p>
+                <app-person-edit-form
+                  #personFormRef
+                  [initialData]="customerData()"
+                  [showSubmitButton]="false"
+                  [isLoading]="customerService.isCreating()"
+                  (formSubmit)="onUpdateCustomer($event)"
+                />
+              </div>
+            </div>
 
-            <!-- Credit Settings -->
+            <!-- Credit Management (same card style as supplier) -->
             @if (hasCreditPermission()) {
-              <div class="collapse collapse-arrow bg-base-100 border border-base-300 shadow-sm">
-                <input type="checkbox" [checked]="shouldExpandCredit()" />
-                <div class="collapse-title text-lg font-semibold px-4 py-3">
-                  💳 Credit Management
-                </div>
-                <div class="collapse-content px-4 pb-4">
+              <div class="card bg-base-100 border border-base-300 shadow-sm">
+                <div class="card-body p-5">
+                  <h2 class="text-lg font-semibold mb-1">Credit Management</h2>
                   <p class="text-sm text-base-content/70 mb-4">
                     Manage customer credit approval, limits, and duration
                   </p>
@@ -296,6 +290,23 @@ import { PersonEditFormComponent } from '../shared/components/person-edit-form.c
                 </div>
               </div>
             }
+
+            <!-- Update Button (same position as supplier Update button) -->
+            <div class="form-control mt-6">
+              <button
+                type="button"
+                [disabled]="!isPersonFormValid() || customerService.isCreating()"
+                (click)="submitCustomer()"
+                class="btn btn-primary w-full"
+              >
+                @if (customerService.isCreating()) {
+                  <span class="loading loading-spinner loading-sm"></span>
+                  Updating Customer...
+                } @else {
+                  Update Customer
+                }
+              </button>
+            </div>
           </div>
         }
       </div>
@@ -311,6 +322,8 @@ export class CustomerEditComponent {
   readonly currencyService = inject(CurrencyService);
   private readonly toastService = inject(ToastService);
 
+  readonly personFormRef = viewChild<PersonEditFormComponent>('personFormRef');
+
   // State
   readonly error = signal<string | null>(null);
   readonly isLoading = signal<boolean>(true);
@@ -325,6 +338,11 @@ export class CustomerEditComponent {
   readonly isWalkInCustomer = signal<boolean>(false);
 
   readonly hasCreditPermission = computed(() => this.authService.hasCreditManagementPermission());
+
+  readonly isPersonFormValid = computed(() => {
+    const comp = this.personFormRef();
+    return comp?.form?.valid ?? false;
+  });
 
   constructor() {
     this.loadCustomer();
@@ -419,6 +437,18 @@ export class CustomerEditComponent {
       // Don't show error - credit info is optional
     } finally {
       this.isLoadingCredit.set(false);
+    }
+  }
+
+  /**
+   * Submit from bottom button (same position as supplier Update button)
+   */
+  submitCustomer(): void {
+    const form = this.personFormRef()?.form;
+    if (!form) return;
+    form.markAllAsTouched();
+    if (form.valid) {
+      this.onUpdateCustomer(form.value);
     }
   }
 

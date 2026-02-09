@@ -40,20 +40,6 @@ import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
             </select>
           </div>
 
-          <!-- Contact Person -->
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text font-semibold">Contact Person</span>
-              <span class="label-text-alt">Optional</span>
-            </label>
-            <input
-              type="text"
-              formControlName="contactPerson"
-              placeholder="Primary contact person"
-              class="input input-bordered w-full"
-            />
-          </div>
-
           <!-- Payment Terms -->
           <div class="form-control">
             <label class="label">
@@ -98,7 +84,6 @@ export class SupplierDetailsFormComponent {
   constructor() {
     this.form = this.fb.group({
       supplierType: [''],
-      contactPerson: [''],
       paymentTerms: [''],
       notes: [''],
     });

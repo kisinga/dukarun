@@ -20,16 +20,15 @@ import { CurrencyService } from '../../../../core/services/currency.service';
   selector: 'app-credit-management-form',
   imports: [CommonModule],
   template: `
-    <div class="collapse collapse-arrow bg-base-100 border border-base-300 shadow-sm">
-      <input
-        type="checkbox"
-        [checked]="isExpanded()"
-        (change)="isExpanded.set($any($event.target).checked)"
-      />
-      <div class="collapse-title text-lg font-semibold px-4 py-3">💳 Credit Management</div>
-      <div class="collapse-content px-4 pb-4">
+    <div class="card bg-base-100 border border-base-300 shadow-sm max-w-md mx-auto">
+      <div class="card-body p-5">
+        <h2 class="text-lg font-semibold mb-1">Credit Management</h2>
+        <p class="text-sm text-base-content/70 mb-4">
+          Configure credit approval, limits, and duration
+        </p>
+
         @if (!hasPermission()) {
-          <div class="alert alert-info mb-4">
+          <div class="alert alert-info">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-5 w-5 flex-shrink-0"
@@ -47,38 +46,32 @@ import { CurrencyService } from '../../../../core/services/currency.service';
             <span class="text-sm">Credit management requires appropriate permissions</span>
           </div>
         } @else {
-          <p class="text-sm text-base-content/70 mb-4">
-            Configure customer credit approval, limits, and duration
-          </p>
-        }
-
-        <div class="space-y-4">
-          <!-- Credit Approval Status -->
-          <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
-            <div class="flex-1 pr-3">
-              <div class="font-semibold text-sm">Credit Approval</div>
-              <div class="text-xs text-base-content/70 mt-0.5">
-                Allow customer to make credit purchases
+          <div class="space-y-4">
+            <!-- Credit Approval Status -->
+            <div class="form-control">
+              <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                <div class="flex-1 pr-3">
+                  <div class="font-semibold text-sm">Credit Approval</div>
+                  <div class="text-xs text-base-content/70 mt-0.5">Allow credit purchases</div>
+                </div>
+                <input
+                  type="checkbox"
+                  class="toggle toggle-primary"
+                  [checked]="isCreditApproved()"
+                  (change)="onCreditApprovalChange($any($event.target).checked)"
+                  [disabled]="!hasPermission() || isReadonly()"
+                />
               </div>
             </div>
-            <input
-              type="checkbox"
-              class="toggle toggle-primary"
-              [checked]="isCreditApproved()"
-              (change)="onCreditApprovalChange($any($event.target).checked)"
-              [disabled]="!hasPermission() || isReadonly()"
-            />
-          </div>
 
-          <!-- Credit Limit -->
-          <div class="space-y-2">
-            <label class="label py-1">
-              <span class="label-text font-semibold text-sm">Credit Limit</span>
-              @if (hasPermission() && !isReadonly()) {
-                <span class="label-text-alt text-xs">Optional</span>
-              }
-            </label>
-            <div class="relative">
+            <!-- Credit Limit -->
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-semibold">Credit Limit</span>
+                @if (hasPermission() && !isReadonly()) {
+                  <span class="label-text-alt">Optional</span>
+                }
+              </label>
               <input
                 type="number"
                 min="0"
@@ -96,47 +89,47 @@ import { CurrencyService } from '../../../../core/services/currency.service';
                 </div>
               }
             </div>
-          </div>
 
-          <!-- Credit Duration -->
-          <div class="space-y-2">
-            <label class="label py-1">
-              <span class="label-text font-semibold text-sm">Credit Duration</span>
-              @if (hasPermission() && !isReadonly()) {
-                <span class="label-text-alt text-xs">Days (default: 30)</span>
-              }
-            </label>
-            <input
-              type="number"
-              min="1"
-              class="input input-bordered w-full"
-              [class.input-disabled]="!hasPermission() || isReadonly()"
-              [value]="creditDuration()"
-              (input)="onCreditDurationChange($any($event.target).valueAsNumber || 30)"
-              [disabled]="!hasPermission() || isReadonly() || !isCreditApproved()"
-              placeholder="30"
-            />
-          </div>
-
-          <!-- Credit Summary (for display during creation) -->
-          @if (showSummary()) {
-            <div class="divider my-4"></div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="stat bg-base-200 rounded-lg p-3">
-                <div class="stat-title text-xs">Outstanding</div>
-                <div class="stat-value text-base text-warning">
-                  {{ currencyService.format(0) }}
-                </div>
-              </div>
-              <div class="stat bg-base-200 rounded-lg p-3">
-                <div class="stat-title text-xs">Available</div>
-                <div class="stat-value text-base text-success">
-                  {{ currencyService.format(isCreditApproved() ? creditLimit() : 0) }}
-                </div>
-              </div>
+            <!-- Credit Duration -->
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-semibold">Credit Duration</span>
+                @if (hasPermission() && !isReadonly()) {
+                  <span class="label-text-alt">Days (default: 30)</span>
+                }
+              </label>
+              <input
+                type="number"
+                min="1"
+                class="input input-bordered w-full"
+                [class.input-disabled]="!hasPermission() || isReadonly()"
+                [value]="creditDuration()"
+                (input)="onCreditDurationChange($any($event.target).valueAsNumber || 30)"
+                [disabled]="!hasPermission() || isReadonly() || !isCreditApproved()"
+                placeholder="30"
+              />
             </div>
-          }
-        </div>
+
+            <!-- Credit Summary -->
+            @if (showSummary()) {
+              <div class="divider my-2"></div>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="stat bg-base-200 rounded-lg p-3">
+                  <div class="stat-title text-xs">Outstanding</div>
+                  <div class="stat-value text-base text-warning">
+                    {{ currencyService.format(0) }}
+                  </div>
+                </div>
+                <div class="stat bg-base-200 rounded-lg p-3">
+                  <div class="stat-title text-xs">Available</div>
+                  <div class="stat-value text-base text-success">
+                    {{ currencyService.format(isCreditApproved() ? creditLimit() : 0) }}
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
       </div>
     </div>
   `,
@@ -152,10 +145,8 @@ export class CreditManagementFormComponent {
   readonly initialCreditDuration = input<number>(30);
   readonly initialIsCreditApproved = input<boolean>(false);
   readonly showSummary = input<boolean>(true);
-  readonly defaultExpanded = input<boolean>(false);
 
   // Internal state - creditLimit stored in cents
-  readonly isExpanded = signal(this.defaultExpanded());
   readonly creditLimit = signal(this.initialCreditLimit());
   readonly creditDuration = signal(this.initialCreditDuration());
   readonly isCreditApproved = signal(this.initialIsCreditApproved());
@@ -169,11 +160,6 @@ export class CreditManagementFormComponent {
     creditDuration: number;
     isCreditApproved: boolean;
   }>();
-
-  constructor() {
-    // Initialize expanded state
-    this.isExpanded.set(this.defaultExpanded());
-  }
 
   onCreditApprovalChange(approved: boolean): void {
     this.isCreditApproved.set(approved);

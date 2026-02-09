@@ -3,30 +3,32 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   EventEmitter,
   inject,
   input,
+  OnInit,
   Output,
   signal,
   viewChild,
 } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { SupplierService } from '../../../core/services/supplier.service';
 import { SupplierApiService } from '../../../core/services/supplier/supplier-api.service';
 import { AuthPermissionsService } from '../../../core/services/auth/auth-permissions.service';
 import { CreditManagementFormComponent } from '../shared/components/credit-management-form.component';
 import { PageHeaderComponent } from '../shared/components/page-header.component';
 import { ErrorAlertComponent } from '../shared/components/error-alert.component';
-import { SupplierBasicInfoFormComponent } from '../shared/components/supplier-basic-info-form.component';
+import { PersonBasicInfoFormComponent } from '../shared/components/person-basic-info-form.component';
 import { SupplierDetailsFormComponent } from '../shared/components/supplier-details-form.component';
 
 /**
- * Supplier Create Component
+ * Supplier Create/Edit Component
  *
- * Mobile-optimized supplier creation form.
- * Two-step form: Basic info + Supplier-specific info.
- * Uses composable components for clean separation of concerns.
+ * Same UI for create and edit (product pattern).
+ * Two-step form: Basic info + Supplier-specific info + credit.
+ * Edit mode: route has id, load supplier and show step 2 pre-filled.
  */
 @Component({
   selector: 'app-supplier-create',
@@ -35,14 +37,17 @@ import { SupplierDetailsFormComponent } from '../shared/components/supplier-deta
     ReactiveFormsModule,
     PageHeaderComponent,
     ErrorAlertComponent,
-    SupplierBasicInfoFormComponent,
+    PersonBasicInfoFormComponent,
     SupplierDetailsFormComponent,
     CreditManagementFormComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="min-h-screen bg-base-100">
-      <app-page-header title="Create Supplier" (backClick)="goBack()" />
+      <app-page-header
+        [title]="isEditMode() ? 'Edit Supplier' : 'Create Supplier'"
+        (backClick)="goBack()"
+      />
 
       <!-- Progress Indicator -->
       <div class="px-4 py-2 bg-base-200">
@@ -68,7 +73,7 @@ import { SupplierDetailsFormComponent } from '../shared/components/supplier-deta
             >
               2
             </div>
-            <span class="ml-1">Supplier Details</span>
+            <span class="ml-1">Details &amp; Credit</span>
           </div>
         </div>
       </div>
@@ -76,40 +81,51 @@ import { SupplierDetailsFormComponent } from '../shared/components/supplier-deta
       <div class="p-4">
         <app-error-alert [message]="error()" (dismiss)="clearError()" />
 
-        <!-- Basic Info Form - Always rendered but hidden in step 2 -->
-        <div [class.hidden]="step() !== 1" class="space-y-4 max-w-md mx-auto">
-          <app-supplier-basic-info-form #basicInfoForm (contactError)="onContactError($event)" />
-
-          <app-credit-management-form
-            [hasPermission]="hasCreditPermission()"
-            [isReadonly]="false"
-            [initialCreditLimit]="0"
-            [initialCreditDuration]="30"
-            [initialIsCreditApproved]="false"
-            [showSummary]="true"
-            [defaultExpanded]="false"
-            (creditChange)="onCreditChange($event)"
-          />
-
-          <!-- Next Button -->
-          <div class="sticky bottom-0 bg-base-100 pt-4 pb-2 border-t border-base-300 -mx-4 px-4">
-            <button
-              type="button"
-              [disabled]="isStep1Disabled()"
-              (click)="onBasicSubmit()"
-              class="btn btn-primary w-full"
-            >
-              Next: Supplier Details
-            </button>
+        @if (isEditMode() && isLoadingEdit()) {
+          <div class="flex justify-center items-center py-12">
+            <span class="loading loading-spinner loading-lg"></span>
           </div>
-        </div>
+        } @else {
+          <!-- Step 1: Basic Info only (contact person, business, email, phone) -->
+          <div [class.hidden]="step() !== 1" class="space-y-4 max-w-md mx-auto">
+            <app-person-basic-info-form
+              #basicInfoForm
+              entityType="supplier"
+              (contactError)="onContactError($event)"
+            />
 
-        <!-- Step 2: Supplier Details -->
-        @if (step() === 2) {
-          <app-supplier-details-form #supplierDetailsForm>
-            <button edit-button (click)="goToStep(1)" class="btn btn-ghost btn-sm">
-              Edit Basic Info
-            </button>
+            <!-- Next Button -->
+            <div class="sticky bottom-0 bg-base-100 pt-4 pb-2 border-t border-base-300 -mx-4 px-4">
+              <button
+                type="button"
+                [disabled]="isStep1Disabled()"
+                (click)="onBasicSubmit()"
+                class="btn btn-primary w-full"
+              >
+                Next: Details &amp; Credit
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 2: Supplier Details + Credit -->
+          @if (step() === 2) {
+            <div class="space-y-4 max-w-md mx-auto">
+              <app-supplier-details-form #supplierDetailsForm>
+                <button edit-button (click)="goToStep(1)" class="btn btn-ghost btn-sm">
+                  Edit Basic Info
+                </button>
+              </app-supplier-details-form>
+
+              <app-credit-management-form
+                [hasPermission]="hasCreditPermission()"
+                [isReadonly]="false"
+                [initialCreditLimit]="creditInitials().creditLimit"
+                [initialCreditDuration]="creditInitials().creditDuration"
+                [initialIsCreditApproved]="creditInitials().isCreditApproved"
+                [showSummary]="true"
+                (creditChange)="onCreditChange($event)"
+              />
+            </div>
 
             <!-- Submit Button -->
             <div class="form-control mt-6">
@@ -121,25 +137,26 @@ import { SupplierDetailsFormComponent } from '../shared/components/supplier-deta
               >
                 @if (supplierService.isCreating()) {
                   <span class="loading loading-spinner loading-sm"></span>
-                  Creating Supplier...
+                  {{ isEditMode() ? 'Updating Supplier...' : 'Creating Supplier...' }}
                 } @else {
-                  Create Supplier
+                  {{ isEditMode() ? 'Update Supplier' : 'Create Supplier' }}
                 }
               </button>
             </div>
-          </app-supplier-details-form>
+          }
         }
       </div>
     </div>
   `,
 })
-export class SupplierCreateComponent {
+export class SupplierCreateComponent implements OnInit {
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   readonly supplierService = inject(SupplierService);
   private readonly supplierApiService = inject(SupplierApiService);
   private readonly authPermissionsService = inject(AuthPermissionsService);
 
-  readonly basicInfoForm = viewChild<SupplierBasicInfoFormComponent>('basicInfoForm');
+  readonly basicInfoForm = viewChild<PersonBasicInfoFormComponent>('basicInfoForm');
   readonly supplierDetailsForm = viewChild<SupplierDetailsFormComponent>('supplierDetailsForm');
 
   // Inputs for composability
@@ -147,6 +164,19 @@ export class SupplierCreateComponent {
 
   // Output for modal usage
   @Output() supplierCreated = new EventEmitter<string>();
+
+  // Edit mode (same component for create and edit, like products)
+  readonly isEditMode = signal(false);
+  readonly supplierId = signal<string | null>(null);
+  readonly isLoadingEdit = signal(false);
+  readonly loadedSupplierData = signal<any>(null);
+  readonly creditInitials = signal<{
+    creditLimit: number;
+    creditDuration: number;
+    isCreditApproved: boolean;
+  }>({ creditLimit: 0, creditDuration: 30, isCreditApproved: false });
+  private readonly basicFormPatched = signal(false);
+  private readonly detailsFormPatched = signal(false);
 
   // Computed state for button disabled
   readonly isStep1Disabled = computed(() => {
@@ -189,6 +219,77 @@ export class SupplierCreateComponent {
     creditDuration: 30,
     isCreditApproved: false,
   });
+
+  constructor() {
+    // When edit data is loaded, patch basic form and details form once
+    effect(() => {
+      const data = this.loadedSupplierData();
+      if (!data) return;
+      const basic = this.basicInfoForm();
+      if (basic && !this.basicFormPatched()) {
+        basic.getForm().patchValue({
+          businessName: data.firstName || '',
+          contactPerson: data.lastName || data.customFields?.contactPerson || '',
+          emailAddress: data.emailAddress || '',
+          phoneNumber: data.phoneNumber || '',
+        });
+        this.basicFormPatched.set(true);
+      }
+      if (this.step() === 2) {
+        const details = this.supplierDetailsForm();
+        if (details && !this.detailsFormPatched()) {
+          const cf = data.customFields || {};
+          details.getForm().patchValue({
+            supplierType: cf.supplierType || '',
+            paymentTerms: cf.paymentTerms || '',
+            notes: cf.notes || '',
+          });
+          this.detailsFormPatched.set(true);
+        }
+      }
+    });
+  }
+
+  ngOnInit(): void {
+    const id = this.route.snapshot.paramMap.get('id');
+    if (id) {
+      this.isEditMode.set(true);
+      this.supplierId.set(id);
+      this.loadSupplierForEdit(id);
+    }
+  }
+
+  /**
+   * Load supplier for edit and pre-fill forms; show step 2
+   */
+  private async loadSupplierForEdit(id: string): Promise<void> {
+    this.isLoadingEdit.set(true);
+    this.clearError();
+    try {
+      const supplier = await this.supplierService.getSupplierById(id);
+      if (!supplier) {
+        this.error.set('Supplier not found');
+        return;
+      }
+      const cf = supplier.customFields || {};
+      this.creditInitials.set({
+        creditLimit: cf.creditLimit ?? 0,
+        creditDuration: cf.creditDuration ?? 30,
+        isCreditApproved: !!cf.isCreditApproved,
+      });
+      this.creditData.set({
+        creditLimit: cf.creditLimit ?? 0,
+        creditDuration: cf.creditDuration ?? 30,
+        isCreditApproved: !!cf.isCreditApproved,
+      });
+      this.loadedSupplierData.set(supplier);
+      this.step.set(2);
+    } catch (err: any) {
+      this.error.set(err?.message || 'Failed to load supplier');
+    } finally {
+      this.isLoadingEdit.set(false);
+    }
+  }
 
   /**
    * Check if user has credit management permission
@@ -236,7 +337,7 @@ export class SupplierCreateComponent {
   }
 
   /**
-   * Handle supplier details submission (Step 2)
+   * Handle supplier details submission (Step 2) – create or update
    */
   async onSupplierSubmit(): Promise<void> {
     const basicFormComponent = this.basicInfoForm();
@@ -248,62 +349,85 @@ export class SupplierCreateComponent {
 
     this.error.set(null);
 
+    const isEdit = this.isEditMode();
+    const id = this.supplierId();
+
     try {
-      // Check for duplicate phone number before creating
-      const phoneCheck = await this.supplierApiService.checkPhoneExists(
-        basicForm.value.phoneNumber,
-      );
-      if (phoneCheck.exists) {
-        this.error.set(
-          phoneCheck.customerName
-            ? `This phone number already belongs to: ${phoneCheck.customerName}`
-            : 'This phone number is already in use',
+      // Check for duplicate phone only when creating (or when editing and phone changed to another customer)
+      if (!isEdit) {
+        const phoneCheck = await this.supplierApiService.checkPhoneExists(
+          basicForm.value.phoneNumber,
         );
-        return;
+        if (phoneCheck.exists) {
+          this.error.set(
+            phoneCheck.customerName
+              ? `This phone number already belongs to: ${phoneCheck.customerName}`
+              : 'This phone number is already in use',
+          );
+          return;
+        }
+      } else if (id) {
+        const phoneCheck = await this.supplierApiService.checkPhoneExists(
+          basicForm.value.phoneNumber,
+        );
+        if (phoneCheck.exists && phoneCheck.customerId !== id) {
+          this.error.set(
+            phoneCheck.customerName
+              ? `This phone number already belongs to: ${phoneCheck.customerName}`
+              : 'This phone number is already in use',
+          );
+          return;
+        }
       }
 
-      // Map form data to backend format
+      // Map form data to backend format (contact person from basic info only)
       const supplierInput: any = {
         firstName: basicForm.value.businessName,
         lastName: basicForm.value.contactPerson,
         phoneNumber: basicForm.value.phoneNumber,
         supplierType: supplierForm.value.supplierType,
-        contactPerson: supplierForm.value.contactPerson,
+        contactPerson: basicForm.value.contactPerson,
         paymentTerms: supplierForm.value.paymentTerms,
         notes: supplierForm.value.notes,
       };
 
-      // Email is required by Vendure, use placeholder if not provided
       supplierInput.emailAddress =
         basicForm.value.emailAddress || this.generatePlaceholderEmail(basicForm.value.businessName);
 
-      // Add credit fields if user has permission and values are set
       if (this.hasCreditPermission()) {
         const credit = this.creditData();
         if (credit.isCreditApproved) {
           supplierInput.isCreditApproved = credit.isCreditApproved;
-          if (credit.creditLimit > 0) {
-            supplierInput.creditLimit = credit.creditLimit;
-          }
-          if (credit.creditDuration > 0) {
-            supplierInput.creditDuration = credit.creditDuration;
-          }
+          if (credit.creditLimit > 0) supplierInput.creditLimit = credit.creditLimit;
+          if (credit.creditDuration > 0) supplierInput.creditDuration = credit.creditDuration;
         }
       }
 
-      const supplierId = await this.supplierService.createSupplier(supplierInput);
-
-      if (supplierId) {
-        this.supplierCreated.emit(supplierId);
-
-        if (this.mode() === 'page') {
-          this.router.navigate(['/dashboard/suppliers']);
+      if (isEdit && id) {
+        const success = await this.supplierService.updateSupplier(id, supplierInput);
+        if (success) {
+          this.supplierCreated.emit(id);
+          if (this.mode() === 'page') {
+            this.router.navigate(['/dashboard/suppliers']);
+          }
+        } else {
+          this.error.set(this.supplierService.error() || 'Failed to update supplier');
         }
       } else {
-        this.error.set(this.supplierService.error() || 'Failed to create supplier');
+        const supplierId = await this.supplierService.createSupplier(supplierInput);
+        if (supplierId) {
+          this.supplierCreated.emit(supplierId);
+          if (this.mode() === 'page') {
+            this.router.navigate(['/dashboard/suppliers']);
+          }
+        } else {
+          this.error.set(this.supplierService.error() || 'Failed to create supplier');
+        }
       }
     } catch (err: any) {
-      this.error.set(err.message || 'Failed to create supplier');
+      this.error.set(
+        err.message || (isEdit ? 'Failed to update supplier' : 'Failed to create supplier'),
+      );
     }
   }
 
