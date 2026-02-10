@@ -2,6 +2,8 @@
 
 **Mobile-First. Simple. Consistent.**
 
+**Decisions follow [Design Language](docs/DESIGN-LANGUAGE.md)** — principles, tokens, and component rules. This doc is the detailed reference (examples, snippets, patterns).
+
 ---
 
 ## 🚀 Quick Start
@@ -420,6 +422,19 @@ animation: slideIn 0.3s ease-out;
 @use '../../styles/dashboard-animations' as *;
 ```
 
+### Mobile left drawer (sidebar)
+When the drawer opens on mobile, the left nav must read as a **solid panel**, not a transparent overlay.
+
+| Element | Pattern | Rationale |
+|--------|---------|-----------|
+| **Overlay (scrim)** | `bg-base-content/50 backdrop-blur-md` | Strong enough to dim content and focus attention on the drawer. Avoid `bg-base-content/20` (too transparent). |
+| **Drawer panel** | `bg-base-100` + `shadow-2xl` + `border-r border-base-300` | Solid surface (same as top navbar). Shadow reinforces depth; border clarifies edge. |
+| **Panel background (SCSS)** | `background: oklch(var(--b1));` | Ensures opaque base-100 so the panel never looks washed out in any theme. |
+
+- Use **base-100** for the panel so it matches the top bar and reads as a single “surface.”
+- Active/hover nav items use `bg-base-200` so they stay clearly visible on base-100.
+- Touch targets in the drawer: keep `min-h-[2.75rem]` on nav links.
+
 ### Page Color Mapping:
 | Page | Color | Variable |
 |------|-------|----------|
@@ -428,6 +443,13 @@ animation: slideIn 0.3s ease-out;
 | Payments | success | `--su` |
 | Customers | info | `--in` |
 | Suppliers | accent | `--a` |
+
+### Dashboard Overview Category Colors:
+| Category | Color | Variable | Rationale |
+|----------|-------|----------|-----------|
+| Sales | success | `--su` | Revenue = positive |
+| Purchases | info | `--in` | Stock purchases = neutral |
+| Expenses | error | `--er` | Costs = negative |
 
 ### Search Bar:
 

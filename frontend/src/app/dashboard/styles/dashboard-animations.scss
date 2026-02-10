@@ -1,11 +1,8 @@
 // Dashboard shared animations - Import this in dashboard page components
 // Usage: @use '../../styles/dashboard-animations' as *;
+// Durations/easing from design-system (Design Language: micro 150–200ms, entry 200–300ms)
 
-// ===========================================
-// CONSISTENT SECTION SPACING
-// ===========================================
-// Use space-y-5 lg:space-y-6 for main page content
-// This creates consistent vertical rhythm across all dashboard pages
+@use '../../../styles/design-system' as ds;
 
 :host {
   display: block;
@@ -27,17 +24,17 @@
   overflow: hidden;
 }
 
-// Smooth transitions for all interactive elements
+// Smooth transitions for all interactive elements (design-system easing)
 * {
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-timing-function: ds.$ease-in-out;
 }
 
-// Card animations
+// Card animations (micro: ds.$transition-base)
 .card {
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
+    transform ds.$transition-base,
+    box-shadow ds.$transition-base,
+    border-color ds.$transition-base;
 
   &:active {
     transform: scale(0.98);
@@ -47,17 +44,17 @@
 // Stats card hover effect
 .stats {
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+    transform ds.$transition-base,
+    box-shadow ds.$transition-base;
 
   &:hover {
     transform: translateY(-2px);
   }
 }
 
-// Button press effect
+// Button press effect (micro: ds.$transition-fast)
 .btn {
-  transition: all 0.15s ease;
+  transition: all ds.$transition-fast;
 
   &:active:not(:disabled) {
     transform: scale(0.96);
@@ -76,10 +73,10 @@
 }
 
 .badge-success .bg-success-content {
-  animation: badge-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: badge-pulse 2s ds.$ease-in-out infinite;
 }
 
-// Smooth fade-in for page content
+// Smooth fade-in for page content (entry: ds.$transition-slow)
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -93,7 +90,7 @@
 
 .space-y-4 > *,
 .space-y-5 > * {
-  animation: fade-in-up 0.4s ease-out backwards;
+  animation: fade-in-up ds.$transition-slow ds.$ease-in-out backwards;
 
   @for $i from 1 through 10 {
     &:nth-child(#{$i}) {
@@ -116,15 +113,15 @@
   }
 }
 
-// Input focus effect
+// Input focus effect (micro)
 .input:focus-within {
-  transition: all 0.2s ease;
+  transition: all ds.$transition-base ds.$ease-in-out;
   transform: translateY(-1px);
 }
 
-// Dropdown slide in
+// Dropdown slide in (micro)
 .dropdown-content {
-  animation: dropdown-slide 0.2s ease-out;
+  animation: dropdown-slide ds.$transition-base ds.$ease-in-out;
 }
 
 @keyframes dropdown-slide {
@@ -138,9 +135,9 @@
   }
 }
 
-// Alert slide in from top
+// Alert slide in from top (entry)
 .alert {
-  animation: alert-slide-in 0.3s ease-out;
+  animation: alert-slide-in ds.$transition-slow ds.$ease-in-out;
 }
 
 @keyframes alert-slide-in {
@@ -233,4 +230,3 @@ div {
   font-feature-settings: 'tnum';
   font-variant-numeric: tabular-nums;
 }
-

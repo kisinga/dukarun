@@ -3,6 +3,7 @@ export type NavIcon =
   | 'sell'
   | 'orders'
   | 'payments'
+  | 'expenses'
   | 'products'
   | 'credit'
   | 'customers'

@@ -10,18 +10,20 @@
 
   <!-- Tab nav: composable by permission -->
   @if (visibleTabs().length > 0) {
-    <div role="tablist" class="tabs tabs-box overflow-x-auto">
-      @for (tab of visibleTabs(); track tab.path) {
-        <a
-          [routerLink]="['/dashboard/admin', tab.path]"
-          routerLinkActive="tab-active"
-          [routerLinkActiveOptions]="{ exact: false }"
-          class="tab"
-          [attr.aria-label]="tab.label"
-        >
-          {{ tab.label }}
-        </a>
-      }
+    <div class="bg-base-200 rounded-lg overflow-x-auto p-1">
+      <div role="tablist" class="tabs tabs-box">
+        @for (tab of visibleTabs(); track tab.path) {
+          <a
+            [routerLink]="['/dashboard/admin', tab.path]"
+            routerLinkActive="tab-active"
+            [routerLinkActiveOptions]="{ exact: false }"
+            class="tab"
+            [attr.aria-label]="tab.label"
+          >
+            {{ tab.label }}
+          </a>
+        }
+      </div>
     </div>
   }
 

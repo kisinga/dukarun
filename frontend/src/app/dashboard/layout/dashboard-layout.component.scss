@@ -5,10 +5,86 @@
   display: block;
 }
 
-// Navbar - GPU-accelerated blur
+// Duka Door logo: show light or dark by theme — prominent in sidebar
+.duka-door-logo {
+  position: relative;
+  height: 2rem;
+
+  img {
+    height: 2rem;
+    width: auto;
+    max-width: 140px;
+    display: block;
+    object-fit: contain;
+    object-position: left center;
+  }
+
+  .duka-door-dark {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: none;
+  }
+}
+
+// Dark mode: show logo with light wordmark (duka-door-dark.svg)
+:host-context(html[data-theme='dark']) .duka-door-logo {
+  .duka-door-light {
+    display: none;
+  }
+
+  .duka-door-dark {
+    display: block;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :host .duka-door-logo {
+    .duka-door-light {
+      display: none;
+    }
+
+    .duka-door-dark {
+      display: block;
+    }
+  }
+}
+
+// Sidebar — solid surface (mobile drawer reads as opaque panel; desktop matches)
+// Use theme variable that exists (--color-base-100); --b1 may be unset with custom theme
+.drawer-side > .sidebar-aside {
+  background-color: var(--color-base-100, #fafafa);
+}
+
+// Navbar — solid white/base, no blur needed
 .navbar {
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: oklch(var(--b1));
+}
+
+// Ripple on link activation (sidebar + bottom nav)
+.nav-link-ripple {
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at center, oklch(var(--bc) / 0.12) 0%, transparent 65%);
+    opacity: 0;
+    transform: scale(0.8);
+    transition:
+      transform 0.35s ease-out,
+      opacity 0.2s ease-out;
+    pointer-events: none;
+  }
+
+  &:active::after {
+    opacity: 1;
+    transform: scale(1.8);
+    transition-duration: 0.08s;
+  }
 }
 
 // Sidebar navigation - Touch optimized
@@ -105,5 +181,9 @@ nav[role='navigation'] {
   .dropdown-content,
   .drawer-side aside {
     animation: none;
+  }
+
+  .nav-link-ripple::after {
+    display: none;
   }
 }

@@ -133,6 +133,11 @@ export const routes: Routes = [
           import('./dashboard/pages/payments/payments.component').then((m) => m.PaymentsComponent),
       },
       {
+        path: 'expenses',
+        loadComponent: () =>
+          import('./dashboard/pages/expenses/expenses.component').then((m) => m.ExpensesComponent),
+      },
+      {
         path: 'payments/:id',
         loadComponent: () =>
           import('./dashboard/pages/payments/payment-detail/payment-detail.component').then(

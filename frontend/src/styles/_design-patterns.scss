@@ -5,6 +5,19 @@
 @use 'design-system' as ds;
 
 // ============================================
+// CARD STANDARD (Design Language canonical)
+// ============================================
+// Use for content cards: daisyUI card + scale padding + theme border
+.card-standard {
+  @include ds.card;
+  padding: ds.$space-4;
+
+  @include ds.tablet {
+    padding: ds.$space-6;
+  }
+}
+
+// ============================================
 // STAT CARDS (Dashboard)
 // ============================================
 .stat-card {
