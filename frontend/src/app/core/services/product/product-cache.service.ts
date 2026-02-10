@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { PREFETCH_PRODUCTS } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
+import { parseSearchWords } from './product-search-term.util';
 import { ProductMapperService } from './product-mapper.service';
 import { ProductSearchResult, ProductVariant } from './product-search.service';
 
@@ -121,36 +122,34 @@ export class ProductCacheService {
   }
 
   /**
-   * Search products by name from cache (offline-capable)
+   * Search products by name and manufacturer from cache (offline-capable).
+   * Matches when all words appear somewhere in product name or manufacturer.
    */
   searchProducts(searchTerm: string): ProductSearchResult[] {
-    if (searchTerm.length < 2) {
+    const words = parseSearchWords(searchTerm);
+    if (words.length === 0 || (words.length === 1 && words[0]!.length < 2)) {
       return [];
     }
 
-    const normalized = searchTerm.toLowerCase();
     const results: ProductSearchResult[] = [];
-
-    // Search through cached products
-    for (const [name, products] of this.productsByName.entries()) {
-      if (name.includes(normalized)) {
-        results.push(...products);
-      }
-    }
-
-    // Also search by partial name match in all products
     for (const product of this.productsById.values()) {
-      const productName = product.name.toLowerCase();
-      if (productName.includes(normalized) && !results.includes(product)) {
+      const manufacturerNames =
+        product.facetValues
+          ?.filter((fv) => fv.facetCode === 'manufacturer')
+          .map((fv) => fv.name)
+          .join(' ') ?? '';
+      const searchable = `${product.name} ${manufacturerNames}`.toLowerCase();
+      if (words.every((w) => searchable.includes(w))) {
         results.push(product);
       }
     }
 
-    // Limit results and sort by relevance
+    const firstWord = words[0] ?? '';
     return results.slice(0, 10).sort((a, b) => {
-      // Exact match first
-      const aExact = a.name.toLowerCase().startsWith(normalized);
-      const bExact = b.name.toLowerCase().startsWith(normalized);
+      const aName = a.name.toLowerCase();
+      const bName = b.name.toLowerCase();
+      const aExact = aName.startsWith(firstWord);
+      const bExact = bName.startsWith(firstWord);
       if (aExact && !bExact) return -1;
       if (!aExact && bExact) return 1;
       return a.name.localeCompare(b.name);

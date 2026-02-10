@@ -2,8 +2,9 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
 /**
- * Product search and filter bar component
- * Provides search input with clear button and filter drawer toggle
+ * Product search and filter bar component.
+ * Provides search input with clear button and filter drawer toggle.
+ * Search matches when all words appear in product name or manufacturer.
  */
 @Component({
   selector: 'app-product-search-bar',
@@ -12,7 +13,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProductSearchBarComponent {
-  readonly placeholder = input<string>('Search by name, description, or SKU...');
+  readonly placeholder = input<string>('Search by name or manufacturer');
   readonly searchQuery = input<string>('');
   readonly searchQueryChange = output<string>();
 

@@ -17,6 +17,7 @@ import { VariantListComponent } from './variant-list.component';
  * Shared product search UI: card with search input, optional camera/action button,
  * and a list of product results (image, label, variant count, expandable variants).
  * Used on sell and purchase pages for consistent UX.
+ * Search matches when all words appear in product name or manufacturer.
  */
 @Component({
   selector: 'app-product-search-view',
@@ -47,6 +48,7 @@ import { VariantListComponent } from './variant-list.component';
             type="text"
             class="input input-ghost flex-1 text-base p-0 focus:outline-none min-h-0 h-auto"
             [placeholder]="placeholder()"
+            title="Search by name or manufacturer"
             [(ngModel)]="searchTerm"
             (ngModelChange)="searchTermChange.emit($event)"
           />
@@ -199,7 +201,7 @@ export class ProductSearchViewComponent implements OnDestroy {
   readonly searchResults = input.required<ProductSearchResult[]>();
   readonly isSearching = input<boolean>(false);
   readonly showCameraButton = input<boolean>(false);
-  readonly placeholder = input<string>('Search products...');
+  readonly placeholder = input<string>('Search by name or manufacturer');
   readonly compact = input<boolean>(false);
 
   readonly searchTermChange = output<string>();
