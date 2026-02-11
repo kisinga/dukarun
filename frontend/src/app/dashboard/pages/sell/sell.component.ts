@@ -158,14 +158,10 @@ export class SellComponent implements OnInit, OnDestroy {
   // Product list state (for quick selection)
   readonly recentProducts = signal<ProductSearchResult[]>([]);
   readonly isLoadingProducts = signal<boolean>(false);
-  readonly isQuickSelectExpanded = signal<boolean>(false); // Default collapsed
   readonly isMobile = signal<boolean>(false);
+  /** Checkbox-driven collapse: open on desktop by default, closed on mobile; user can toggle. */
+  readonly quickSelectOpen = signal<boolean>(false);
   private resizeListener?: () => void;
-
-  // Computed: Always expanded on desktop, use signal on mobile
-  readonly shouldExpandQuickSelect = computed(() => {
-    return !this.isMobile() || this.isQuickSelectExpanded();
-  });
 
   async ngOnInit(): Promise<void> {
     this.checkMobile();
@@ -184,6 +180,7 @@ export class SellComponent implements OnInit, OnDestroy {
     }
 
     await this.loadRecentProducts();
+    this.quickSelectOpen.set(!this.isMobile());
   }
 
   ngOnDestroy(): void {
@@ -194,10 +191,10 @@ export class SellComponent implements OnInit, OnDestroy {
 
   checkMobile(): void {
     this.isMobile.set(window.innerWidth < 768);
-    // Auto-expand on desktop
-    if (!this.isMobile()) {
-      this.isQuickSelectExpanded.set(true);
-    }
+  }
+
+  onQuickSelectToggle(checked: boolean): void {
+    this.quickSelectOpen.set(checked);
   }
 
   // Load recent products for quick selection
@@ -327,10 +324,6 @@ export class SellComponent implements OnInit, OnDestroy {
 
   formatPrice(priceInCents: number): string {
     return this.currencyService.format(priceInCents, true);
-  }
-
-  toggleQuickSelect(): void {
-    this.isQuickSelectExpanded.set(!this.isQuickSelectExpanded());
   }
 
   // Scanner Handlers

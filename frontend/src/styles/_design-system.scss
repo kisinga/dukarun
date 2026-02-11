@@ -1,8 +1,23 @@
 // ============================================
-// dukarun DESIGN SYSTEM
-// Mobile-First, Simple, Consistent
+// dukarun DESIGN SYSTEM — SINGLE SOURCE OF TRUTH
 // ============================================
-
+//
+// This file is the only design system source. It contains:
+// - Principles (below)
+// - Tokens (breakpoints, spacing, type, touch, radius, shadows, transitions, z-index, containers)
+// - Mixins (tablet, desktop, touch-target, card, focus-ring, truncate, line-clamp, etc.)
+// - Pattern classes (.card-standard, .list-item, .section-header, .text-secondary, .fade-in, etc.)
+//
+// PRINCIPLES — Design the entire app with mobile first:
+// 1. MOBILE FIRST — Default styles are for phones. Use @include tablet { } and @include desktop { }
+//    to enhance for larger screens. Test on narrow viewports first. No separate "desktop" design.
+// 2. ONE SPACING SCALE — 4px base ($space-1..$space-16). No arbitrary values in components.
+// 3. TOUCH TARGETS ≥ 44px on mobile — $touch-min (2.75rem); use touch-target mixin for tap areas.
+// 4. Colors from daisyUI theme only (--b1, --bc, --p, etc.); no hardcoded hex in patterns.
+//
+// Usage in component SCSS: @use 'path/to/styles/design-system' as ds; then ds.$space-4, @include ds.tablet, etc.
+// Pattern classes are global; use them in templates (e.g. class="card-standard list-item").
+//
 // ============================================
 // 1. BREAKPOINTS (Mobile First)
 // ============================================
@@ -34,6 +49,16 @@ $space-16: 4rem; // 64px - Hero spacing
 // 3. TYPOGRAPHY SCALE
 // ============================================
 // Mobile-first sizing with desktop enhancements
+
+// Font Families (single source of truth for app typography)
+$font-family-sans:
+  'Outfit',
+  system-ui,
+  -apple-system,
+  BlinkMacSystemFont,
+  'Segoe UI',
+  sans-serif;
+$font-family-mono: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
 
 // Font Sizes
 $text-xs: 0.625rem; // 10px - Tiny labels, timestamps
@@ -205,4 +230,272 @@ $container-2xl: 1536px; // Full width limit
   -webkit-line-clamp: $lines;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+// ============================================
+// PATTERN CLASSES (use in templates; all use tokens/mixins above)
+// ============================================
+
+.card-standard {
+  @include card;
+  padding: $space-4;
+  @include tablet {
+    padding: $space-6;
+  }
+}
+
+.stat-card {
+  @include card;
+  padding: $space-3;
+  cursor: pointer;
+  transition: all $transition-base;
+  @include tablet {
+    padding: $space-4;
+  }
+  &:active {
+    transform: scale(0.97);
+  }
+  @include touch-device {
+    @include touch-target;
+  }
+}
+
+.section-collapse {
+  @include card;
+  overflow: hidden;
+  .collapse-header {
+    @include touch-target;
+    & {
+      padding: $space-3 $space-4;
+      display: flex;
+      align-items: center;
+      gap: $space-3;
+      cursor: pointer;
+      transition: background-color $transition-fast;
+    }
+    &:hover {
+      background-color: oklch(var(--b2) / 0.5);
+    }
+    @include tablet {
+      padding: $space-4;
+    }
+  }
+  .collapse-content {
+    & {
+      padding: $space-3 $space-4 $space-4;
+    }
+    @include tablet {
+      padding: $space-4;
+    }
+  }
+}
+
+.action-button {
+  @include touch-target;
+  & {
+    font-weight: $font-semibold;
+    font-size: $text-base;
+    letter-spacing: $tracking-wide;
+    transition: all $transition-base;
+  }
+  @include tablet {
+    font-size: $text-lg;
+  }
+  &:active {
+    transform: scale(0.95);
+  }
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.list-item {
+  @include touch-target;
+  & {
+    padding: $space-3 $space-4;
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    transition: background-color $transition-fast;
+  }
+  &:hover {
+    background-color: oklch(var(--b2));
+  }
+  &:active {
+    background-color: oklch(var(--b3));
+  }
+  @include tablet {
+    padding: $space-4;
+    min-height: auto;
+  }
+}
+
+.form-field {
+  @include touch-target;
+  & {
+    padding: $space-3 $space-4;
+    border-radius: $radius-md;
+    font-size: $text-base;
+    transition: all $transition-fast;
+  }
+  &:focus {
+    @include focus-ring;
+  }
+  @include tablet {
+    padding: $space-3 $space-4;
+  }
+}
+
+.section-header {
+  margin-bottom: $space-4;
+  @include tablet {
+    margin-bottom: $space-6;
+  }
+  h2 {
+    font-size: $text-2xl;
+    font-weight: $font-bold;
+    letter-spacing: $tracking-tight;
+    line-height: $leading-tight;
+    margin-bottom: $space-2;
+    @include tablet {
+      font-size: $text-3xl;
+    }
+    @include desktop {
+      font-size: $text-4xl;
+    }
+  }
+  p {
+    font-size: $text-sm;
+    opacity: 0.7;
+    @include tablet {
+      font-size: $text-base;
+    }
+  }
+}
+
+.grid-responsive {
+  display: grid;
+  gap: $space-2;
+  @include tablet {
+    gap: $space-4;
+  }
+  @include desktop {
+    gap: $space-6;
+  }
+}
+
+.grid-1-col {
+  grid-template-columns: 1fr;
+}
+
+.grid-2-col {
+  grid-template-columns: repeat(2, 1fr);
+  @include tablet {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.grid-3-col {
+  grid-template-columns: repeat(3, 1fr);
+  @include tablet {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.grid-auto-fit {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.progress-bar {
+  height: $space-1;
+  background: oklch(var(--b3));
+  border-radius: $radius-full;
+  overflow: hidden;
+  .progress-fill {
+    height: 100%;
+    border-radius: $radius-full;
+    transition: width $transition-slow;
+  }
+}
+
+.status-dot {
+  width: $space-2;
+  height: $space-2;
+  border-radius: $radius-full;
+  &.pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.text-secondary {
+  color: oklch(var(--bc) / 0.7);
+}
+
+.text-tertiary {
+  color: oklch(var(--bc) / 0.5);
+}
+
+.badge-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  padding: $space-1 $space-2;
+  font-size: $text-xs;
+  font-weight: $font-semibold;
+  letter-spacing: $tracking-wide;
+  text-transform: uppercase;
+  border-radius: $radius-full;
+}
+
+.fade-in {
+  animation: fadeIn $transition-slow $ease-in-out;
+}
+
+.slide-up {
+  animation: slideUp $transition-slow $ease-in-out;
+}
+
+.scale-in {
+  animation: scaleIn $transition-base $ease-spring;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

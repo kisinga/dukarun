@@ -75,7 +75,7 @@ export interface QuantityInputData {
       <div class="px-6 py-4">
         <!-- Product Info -->
         <div class="bg-base-200 rounded-lg p-4 mb-4">
-          <div class="text-sm font-medium text-base-content/80 mb-1">Product</div>
+          <div class="text-sm font-medium text-base-content/70 mb-1">Product</div>
           <div class="font-medium">{{ data()?.variantName || 'Product' }}</div>
           <div class="text-sm text-base-content/60">
             @{{ getFormattedPrice() }} per {{ data()?.variantName || 'unit' }}
@@ -115,7 +115,7 @@ export interface QuantityInputData {
         <!-- Quick Actions -->
         @if (data()?.allowFractionalQuantity) {
           <div class="mb-6">
-            <div class="text-sm font-medium text-base-content/80 mb-2">Quick Select</div>
+            <div class="text-sm font-medium text-base-content/70 mb-2">Quick Select</div>
             <div class="grid grid-cols-4 gap-2">
               @for (quickValue of quickValues(); track quickValue) {
                 <button

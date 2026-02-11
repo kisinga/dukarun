@@ -70,7 +70,7 @@ import {
                   [productName]="product()!.name"
                   [facetValues]="product()!.facetValues ?? []"
                 />
-                <p class="text-xs opacity-60 mt-0.5">
+                <p class="text-xs text-base-content/70 mt-0.5">
                   {{ product()!.variants.length }} variant{{
                     product()!.variants.length > 1 ? 's' : ''
                   }}
@@ -81,7 +81,7 @@ import {
             <!-- Variant Selection -->
             @if (product()!.variants.length > 1) {
               <div class="space-y-1">
-                <p class="text-xs font-medium opacity-60 px-1 mb-1">Select variant:</p>
+                <p class="text-xs font-medium text-base-content/70 px-1 mb-1">Select variant:</p>
                 @for (variant of product()!.variants; track variant.id) {
                   <button
                     class="w-full flex items-center justify-between gap-2 p-3 rounded-lg transition-all border-2"
@@ -100,7 +100,7 @@ import {
                   >
                     <div class="text-left min-w-0 flex-1">
                       <div class="font-semibold text-sm truncate">{{ variant.name }}</div>
-                      <div class="text-xs opacity-60">{{ variant.sku }}</div>
+                      <div class="text-xs text-base-content/70">{{ variant.sku }}</div>
                       @if (variant.stockLevel === 'OUT_OF_STOCK') {
                         <div class="text-xs text-error font-medium mt-1">Out of Stock</div>
                       }
@@ -213,7 +213,7 @@ import {
                 <div class="flex justify-between items-center">
                   <div class="min-w-0 flex-1">
                     <div class="font-semibold text-sm">{{ product()!.variants[0].name }}</div>
-                    <div class="text-xs opacity-60">{{ product()!.variants[0].sku }}</div>
+                    <div class="text-xs text-base-content/70">{{ product()!.variants[0].sku }}</div>
                     @if (product()!.variants[0].stockLevel === 'OUT_OF_STOCK') {
                       <div class="text-xs text-error font-medium mt-1">Out of Stock</div>
                     }

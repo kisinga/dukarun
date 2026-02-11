@@ -47,11 +47,11 @@ export interface CartItemData {
   imports: [CommonModule, ProductLabelComponent, QuantityInputSheetComponent],
   template: `
     <div class="card bg-base-100 shadow-sm border border-base-300">
-      <div class="card-body p-2">
+      <div class="card-body p-3">
         <!-- Flex container that wraps on small screens -->
-        <div class="flex items-center gap-2 text-sm flex-wrap sm:flex-nowrap">
+        <div class="flex items-center gap-3 text-sm flex-wrap sm:flex-nowrap min-h-11">
           <!-- First Line: Product Info + Remove (on small screens) -->
-          <div class="flex items-center gap-2 w-full sm:w-auto">
+          <div class="flex items-center gap-3 w-full sm:w-auto">
             <!-- Remove Button -->
             <button
               class="btn btn-circle btn-ghost btn-xs flex-shrink-0 text-error hover:bg-error/10"
@@ -81,7 +81,7 @@ export interface CartItemData {
                 [facetValues]="item().facetValues ?? []"
               />
               @if (item().variant.name !== item().variant.productName) {
-                <div class="text-xs text-base-content/60 leading-tight truncate">
+                <div class="text-xs text-base-content/70 leading-tight truncate">
                   {{ item().variant.name }}
                 </div>
               }
@@ -89,7 +89,7 @@ export interface CartItemData {
           </div>
 
           <!-- Second Line: All Controls (on small screens) -->
-          <div class="flex items-center gap-2 flex-1 sm:flex-none">
+          <div class="flex items-center gap-3 flex-1 sm:flex-none">
             <!-- Quantity Controls -->
             @if (allowsFractionalQuantity()) {
               <!-- Fractional Quantity Input -->
