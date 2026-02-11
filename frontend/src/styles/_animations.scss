@@ -1,0 +1,81 @@
+// ============================================
+// ANIMATIONS — Single source of truth
+// All animation utilities respect prefers-reduced-motion
+// ============================================
+
+@use 'design-system' as ds;
+
+// -----------------------------------------------------------------------------
+// KEYFRAMES
+// -----------------------------------------------------------------------------
+
+@keyframes anim-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes anim-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes anim-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes anim-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// ANIMATION UTILITY CLASSES
+// Only apply when user has NOT requested reduced motion
+// -----------------------------------------------------------------------------
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-stagger-children > * {
+    animation: anim-fade-in-up ds.$transition-slow ds.$ease-in-out backwards;
+
+    @for $i from 1 through 10 {
+      &:nth-child(#{$i}) {
+        animation-delay: #{$i * 0.05}s;
+      }
+    }
+  }
+
+  .animate-fade-in {
+    animation: anim-fade-in ds.$transition-slow ds.$ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: anim-slide-up ds.$transition-slow ds.$ease-in-out;
+  }
+
+  .animate-scale-in {
+    animation: anim-scale-in ds.$transition-base ds.$ease-spring;
+  }
+}

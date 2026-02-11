@@ -76,6 +76,14 @@ export class AuthPermissionsService {
     return hasPermission;
   });
 
+  readonly hasCreateInterAccountTransferPermission = computed(() => {
+    const user = this.sessionService.user();
+    if (!user?.user?.roles) return false;
+    return user.user.roles.some((role) =>
+      role.permissions.includes('CreateInterAccountTransfer' as any),
+    );
+  });
+
   /**
    * Check if user has a specific role (extend as needed)
    */

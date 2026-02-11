@@ -1,30 +1,12 @@
-// Product Create Component Styles - KISS Edition
-// Simplified, compact, mobile-first
+// Product Create - page-specific styles only (dashboard patterns from global)
 
 @use '../../../../styles/design-system' as ds;
 
-// ============================================
-// HEADER
-// ============================================
 .sticky {
   backdrop-filter: blur(8px);
   transition: backdrop-filter ds.$transition-fast;
 }
 
-// ============================================
-// CARDS (Compact)
-// ============================================
-.card {
-  transition: transform ds.$transition-fast;
-
-  &:active {
-    transform: scale(0.99);
-  }
-}
-
-// ============================================
-// COLLAPSIBLE SECTIONS (Minimal)
-// ============================================
 .collapse {
   .collapse-content {
     padding-top: ds.$space-2;
@@ -35,9 +17,6 @@
   }
 }
 
-// ============================================
-// FORM FIELDS (Touch-Optimized)
-// ============================================
 .input,
 .select,
 .textarea {
@@ -48,41 +27,7 @@
   }
 }
 
-// ============================================
-// ANIMATIONS (Subtle & Polished)
-// ============================================
-
-// Staggered slide-up entrance for sections
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-// Apply staggered animation to stage content children
-.space-y-3 > *,
-.space-y-4 > * {
-  animation: slideUp 0.25s ds.$ease-in-out both;
-
-  @for $i from 1 through 8 {
-    &:nth-child(#{$i}) {
-      animation-delay: #{$i * 40}ms;
-    }
-  }
-}
-
-// Fade in for alerts
-.alert {
-  animation: slideUp 0.2s ds.$ease-in-out;
-}
-
-// Expand animation for template section
-@keyframes expandIn {
+@keyframes product-create-expandIn {
   from {
     opacity: 0;
     max-height: 0;
@@ -97,38 +42,21 @@
 }
 
 .animate-in {
-  animation: expandIn 0.2s ds.$ease-in-out forwards;
+  animation: product-create-expandIn 0.2s ds.$ease-in-out forwards;
   overflow: hidden;
 }
 
-// ============================================
-// PROGRESS STEPS - Now using daisyUI classes in template
-// ============================================
-
-// ============================================
-// ACTION BAR
-// ============================================
 .fixed.bottom-0 {
   padding-bottom: env(safe-area-inset-bottom);
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.1);
 }
 
-// ============================================
-// BUTTONS (Simple)
-// ============================================
-.btn {
-  &:active:not(:disabled) {
-    transform: scale(0.98);
-  }
-
-  // Subtle glow on primary button when enabled
-  &.btn-primary:not(:disabled) {
-    box-shadow: 0 0 0 2px oklch(var(--p) / 0.3);
-    animation: subtleGlow 2s ease-in-out infinite;
-  }
+.btn.btn-primary:not(:disabled) {
+  box-shadow: 0 0 0 2px oklch(var(--p) / 0.3);
+  animation: product-create-subtleGlow 2s ease-in-out infinite;
 }
 
-@keyframes subtleGlow {
+@keyframes product-create-subtleGlow {
   0%,
   100% {
     box-shadow: 0 0 0 2px oklch(var(--p) / 0.3);
@@ -138,24 +66,7 @@
   }
 }
 
-// ============================================
-// TOOLTIPS
-// ============================================
-.tooltip {
-  &::before {
-    font-size: ds.$text-xs;
-    max-width: 200px;
-  }
-}
-
-// ============================================
-// ACCESSIBILITY
-// ============================================
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
+.tooltip::before {
+  font-size: ds.$text-xs;
+  max-width: 200px;
 }

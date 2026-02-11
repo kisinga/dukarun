@@ -17,6 +17,7 @@ import { VariantListComponent } from './variant-list.component';
  * Shared product search UI: card with search input, optional camera/action button,
  * and a list of product results (image, label, variant count, expandable variants).
  * Used on sell and purchase pages for consistent UX.
+ * Search matches when all words appear in product name or manufacturer.
  */
 @Component({
   selector: 'app-product-search-view',
@@ -24,12 +25,17 @@ import { VariantListComponent } from './variant-list.component';
   imports: [CommonModule, FormsModule, ProductLabelComponent, VariantListComponent],
   template: `
     <div class="card bg-base-100 shadow-lg">
-      <div class="card-body" [class.p-3]="!compact()" [class.p-2]="compact()">
+      <div
+        class="card-body"
+        [class.p-3]="!compact()"
+        [class.md:p-4]="!compact()"
+        [class.p-2]="compact()"
+      >
         <div class="flex items-center gap-2">
           <!-- Search Icon -->
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 opacity-60 shrink-0"
+            class="h-5 w-5 text-base-content/70 shrink-0"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -47,6 +53,7 @@ import { VariantListComponent } from './variant-list.component';
             type="text"
             class="input input-ghost flex-1 text-base p-0 focus:outline-none min-h-0 h-auto"
             [placeholder]="placeholder()"
+            title="Search by name or manufacturer"
             [(ngModel)]="searchTerm"
             (ngModelChange)="searchTermChange.emit($event)"
           />
@@ -80,14 +87,14 @@ import { VariantListComponent } from './variant-list.component';
         <!-- Search Results -->
         @if (searchResults().length > 0) {
           <div
-            class="mt-2 space-y-2 overflow-y-auto"
+            class="mt-3 space-y-3 overflow-y-auto"
             [class.max-h-[60vh]]="!compact()"
             [class.max-h-[40vh]]="compact()"
           >
             @for (product of searchResults(); track product.id) {
               <div class="border border-base-300 rounded-lg overflow-hidden bg-base-100">
                 <button
-                  class="w-full flex items-center gap-2 p-2 bg-base-200 hover:bg-base-300 transition-colors"
+                  class="w-full flex items-center gap-3 p-3 min-h-11 bg-base-200 hover:bg-base-300 transition-colors"
                   (click)="productSelected.emit(product)"
                 >
                   <!-- Product Image -->
@@ -147,7 +154,7 @@ import { VariantListComponent } from './variant-list.component';
                       [productName]="product.name"
                       [facetValues]="product.facetValues ?? []"
                     />
-                    <div class="text-xs opacity-60">
+                    <div class="text-xs text-base-content/70">
                       {{ product.variants.length }} variant{{
                         product.variants.length > 1 ? 's' : ''
                       }}
@@ -177,7 +184,7 @@ import { VariantListComponent } from './variant-list.component';
                     [attr.open]="product.variants.length <= 3"
                   >
                     <summary
-                      class="collapse-title min-h-0 py-1 pl-6 pr-2 text-xs opacity-70 cursor-pointer"
+                      class="collapse-title min-h-0 py-1 pl-6 pr-2 text-xs text-base-content/70 cursor-pointer"
                     >
                       <span class="sr-only">Toggle variants</span>
                     </summary>
@@ -199,7 +206,7 @@ export class ProductSearchViewComponent implements OnDestroy {
   readonly searchResults = input.required<ProductSearchResult[]>();
   readonly isSearching = input<boolean>(false);
   readonly showCameraButton = input<boolean>(false);
-  readonly placeholder = input<string>('Search products...');
+  readonly placeholder = input<string>('Search by name or manufacturer');
   readonly compact = input<boolean>(false);
 
   readonly searchTermChange = output<string>();

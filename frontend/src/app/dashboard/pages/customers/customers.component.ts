@@ -50,7 +50,6 @@ import { PaginationComponent } from '../../components/shared/pagination.componen
     CustomerViewModalComponent,
   ],
   templateUrl: './customers.component.html',
-  styleUrl: './customers.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomersComponent implements OnInit {

@@ -3,17 +3,102 @@
    Mobile-First Design System
    ============================================ */
 
-// Import Design System (must come first)
+// Import Design System — single source of truth (tokens, mixins, pattern classes)
 @use 'styles/design-system' as ds;
-@use 'styles/design-patterns';
+
+// Animation utilities (animate-stagger-children, animate-fade-in, etc.)
+@use 'styles/animations';
+
+// Dashboard layout + page styles (scoped under app-dashboard-layout and .dashboard-main)
+@use 'styles/dashboard';
 
 // Import Tailwind & daisyUI
 @use 'tailwindcss';
+
+@theme {
+  --font-sans: #{ds.$font-family-sans};
+  --font-mono: #{ds.$font-family-mono};
+}
+
 @plugin "daisyui" {
-  themes:
-    light --default,
-    dark --prefersdark;
+  themes: false;
   logs: false;
+}
+
+// Warm & Bold (light) — default theme; soft gray anchors, orange accents
+@plugin "daisyui/theme" {
+  name: light;
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: #fafafa;
+  --color-base-200: #ebebeb;
+  --color-base-300: #dedede;
+  --color-base-content: #2b2b2f;
+  --color-primary: #e85d2f;
+  --color-primary-content: #ffffff;
+  --color-secondary: #5a5a5a;
+  --color-secondary-content: #fafafa;
+  --color-accent: #f17a54;
+  --color-accent-content: #ffffff;
+  --color-neutral: #2b2b2f;
+  --color-neutral-content: #fafafa;
+  --color-info: #3b82f6;
+  --color-info-content: #ffffff;
+  --color-success: #22c55e;
+  --color-success-content: #ffffff;
+  --color-warning: #eab308;
+  --color-warning-content: #1a1a1a;
+  --color-error: #ef4444;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 0.375rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+// Dark — prefers-color-scheme: dark (slightly softened)
+@plugin "daisyui/theme" {
+  name: dark;
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: #131316;
+  --color-base-200: #1c1c1f;
+  --color-base-300: #2a2a2e;
+  --color-base-content: #e8e8e6;
+  --color-primary: #e85d2f;
+  --color-primary-content: #ffffff;
+  --color-secondary: #71717a;
+  --color-secondary-content: #f4f4f2;
+  --color-accent: #f17a54;
+  --color-accent-content: #ffffff;
+  --color-neutral: #3f3f46;
+  --color-neutral-content: #f4f4f2;
+  --color-info: #3b82f6;
+  --color-info-content: #ffffff;
+  --color-success: #22c55e;
+  --color-success-content: #ffffff;
+  --color-warning: #eab308;
+  --color-warning-content: #1a1a1a;
+  --color-error: #ef4444;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 0.375rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
 }
 
 /* ============================================
@@ -44,16 +129,7 @@
    ============================================ */
 
 body {
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    sans-serif;
+  font-family: ds.$font-family-sans;
   font-size: ds.$text-base;
   line-height: ds.$leading-normal;
   @include ds.text-smooth;
@@ -159,8 +235,11 @@ p {
   margin-right: auto;
   padding-left: var(--content-padding);
   padding-right: var(--content-padding);
-  // Prevent horizontal overflow on mobile
   box-sizing: border-box;
+}
+
+.container-app--narrow {
+  max-width: 1024px;
 }
 
 // Section spacing
@@ -174,13 +253,11 @@ p {
    ============================================ */
 
 @media (hover: none) and (pointer: coarse) {
-  // Remove tap highlights
   * {
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
 
-  // Ensure all interactive elements are touch-friendly
   button,
   a,
   input,
@@ -189,6 +266,14 @@ p {
   [role='button'] {
     min-height: ds.$touch-min;
     min-width: ds.$touch-min;
+  }
+}
+
+@media (max-width: 640px) {
+  .input,
+  .select,
+  .textarea {
+    font-size: 16px;
   }
 }
 

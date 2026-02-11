@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import {
+  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -15,7 +16,9 @@ import { AuthPermissionsService } from '../../../core/services/auth/auth-permiss
 import { CreditManagementFormComponent } from '../shared/components/credit-management-form.component';
 import { PageHeaderComponent } from '../shared/components/page-header.component';
 import { ErrorAlertComponent } from '../shared/components/error-alert.component';
+import { RejectionBannerComponent } from '../shared/components/rejection-banner.component';
 import { PersonBasicInfoFormComponent } from '../shared/components/person-basic-info-form.component';
+import { ApprovableFormBase } from '../shared/directives/approvable-form-base.directive';
 
 /**
  * Customer Create Component
@@ -30,6 +33,7 @@ import { PersonBasicInfoFormComponent } from '../shared/components/person-basic-
     ReactiveFormsModule,
     PageHeaderComponent,
     ErrorAlertComponent,
+    RejectionBannerComponent,
     PersonBasicInfoFormComponent,
     CreditManagementFormComponent,
   ],
@@ -39,6 +43,7 @@ import { PersonBasicInfoFormComponent } from '../shared/components/person-basic-
       <app-page-header title="Create Customer" (backClick)="goBack()" />
 
       <div class="p-4">
+        <app-rejection-banner [message]="rejectionMessage()" (dismiss)="dismissRejection()" />
         <app-error-alert [message]="error()" (dismiss)="clearError()" />
 
         <div class="space-y-4 max-w-md mx-auto">
@@ -81,13 +86,17 @@ import { PersonBasicInfoFormComponent } from '../shared/components/person-basic-
     </div>
   `,
 })
-export class CustomerCreateComponent {
+export class CustomerCreateComponent extends ApprovableFormBase implements AfterViewInit {
   private readonly router = inject(Router);
   readonly customerService = inject(CustomerService);
   private readonly customerApiService = inject(CustomerApiService);
   private readonly authPermissionsService = inject(AuthPermissionsService);
 
   readonly basicInfoForm = viewChild<PersonBasicInfoFormComponent>('basicInfoForm');
+
+  override ngAfterViewInit(): void {
+    super.ngAfterViewInit();
+  }
 
   // Computed state for button disabled
   readonly isSubmitDisabled = computed(() => {
@@ -232,5 +241,33 @@ export class CustomerCreateComponent {
 
     const timestamp = Date.now().toString().slice(-6);
     return `noemail-${sanitizedName}-${timestamp}@dukarun.local`;
+  }
+
+  // ApprovableFormBase overrides
+  override isValid(): boolean {
+    const form = this.basicInfoForm();
+    if (!form) return false;
+    return form.getValidationStateSignal()() === 'valid';
+  }
+
+  override serializeFormState(): Record<string, any> {
+    const form = this.basicInfoForm();
+    return {
+      basicInfo: form?.getForm().value ?? {},
+      creditData: this.creditData(),
+    };
+  }
+
+  override restoreFormState(data: Record<string, any>): void {
+    if (!data) return;
+    if (data['basicInfo']) {
+      const form = this.basicInfoForm();
+      if (form) {
+        form.getForm().patchValue(data['basicInfo']);
+      }
+    }
+    if (data['creditData']) {
+      this.creditData.set(data['creditData']);
+    }
   }
 }

@@ -8,14 +8,18 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { TeamService, type Administrator, type RoleTemplate } from '../../../core/services/team.service';
+import {
+  TeamService,
+  type Administrator,
+  type RoleTemplate,
+} from '../../../core/services/team.service';
 import { CreateAdminModalComponent } from './components/create-admin-modal.component';
 import { PermissionEditorComponent } from './components/permission-editor.component';
 import { TeamMemberRowComponent } from './components/team-member-row.component';
 
 /**
  * Team management page
- * 
+ *
  * Displays list of channel administrators with ability to:
  * - View team members
  * - Create new admins with role templates
@@ -31,7 +35,6 @@ import { TeamMemberRowComponent } from './components/team-member-row.component';
     PermissionEditorComponent,
   ],
   templateUrl: './team.component.html',
-  styleUrl: './team.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TeamComponent implements OnInit {
@@ -73,12 +76,15 @@ export class TeamComponent implements OnInit {
     const allMembers = this.members();
     return {
       total: allMembers.length,
-      verified: allMembers.filter(m => m.user?.verified).length,
-      byRole: allMembers.reduce((acc, member) => {
-        const roleCode = member.user?.roles?.[0]?.code ?? 'unknown';
-        acc[roleCode] = (acc[roleCode] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
+      verified: allMembers.filter((m) => m.user?.verified).length,
+      byRole: allMembers.reduce(
+        (acc, member) => {
+          const roleCode = member.user?.roles?.[0]?.code ?? 'unknown';
+          acc[roleCode] = (acc[roleCode] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
     };
   });
 
@@ -86,10 +92,7 @@ export class TeamComponent implements OnInit {
   readonly Object = Object;
 
   async ngOnInit(): Promise<void> {
-    await Promise.all([
-      this.teamService.loadRoleTemplates(),
-      this.teamService.loadMembers(),
-    ]);
+    await Promise.all([this.teamService.loadRoleTemplates(), this.teamService.loadMembers()]);
   }
 
   onSearch(query: string): void {
@@ -125,4 +128,3 @@ export class TeamComponent implements OnInit {
     this.memberToEdit.set(null);
   }
 }
-

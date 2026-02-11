@@ -239,6 +239,36 @@ export type ApplyCouponCodeResult =
   | CouponCodeLimitError
   | Order;
 
+export type ApprovalRequest = {
+  __typename?: 'ApprovalRequest';
+  channelId: Scalars['ID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  entityId?: Maybe<Scalars['String']['output']>;
+  entityType?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  message?: Maybe<Scalars['String']['output']>;
+  metadata?: Maybe<Scalars['JSON']['output']>;
+  requestedById: Scalars['ID']['output'];
+  reviewedAt?: Maybe<Scalars['DateTime']['output']>;
+  reviewedById?: Maybe<Scalars['ID']['output']>;
+  status: Scalars['String']['output'];
+  type: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type ApprovalRequestList = {
+  __typename?: 'ApprovalRequestList';
+  items: Array<ApprovalRequest>;
+  totalItems: Scalars['Int']['output'];
+};
+
+export type ApprovalRequestListOptions = {
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
+  type?: InputMaybe<Scalars['String']['input']>;
+};
+
 export type ApproveCustomerCreditInput = {
   approved: Scalars['Boolean']['input'];
   creditDuration?: InputMaybe<Scalars['Int']['input']>;
@@ -1144,6 +1174,13 @@ export type CreateAdministratorInput = {
   lastName: Scalars['String']['input'];
   password: Scalars['String']['input'];
   roleIds: Array<Scalars['ID']['input']>;
+};
+
+export type CreateApprovalRequestInput = {
+  entityId?: InputMaybe<Scalars['String']['input']>;
+  entityType?: InputMaybe<Scalars['String']['input']>;
+  metadata?: InputMaybe<Scalars['JSON']['input']>;
+  type: Scalars['String']['input'];
 };
 
 export type CreateAssetInput = {
@@ -3657,6 +3694,7 @@ export type Mutation = {
   completeTraining: Scalars['Boolean']['output'];
   /** Create a new Administrator */
   createAdministrator: Administrator;
+  createApprovalRequest: ApprovalRequest;
   /** Create a new Asset */
   createAssets: Array<CreateAssetResult>;
   createCashierSessionReconciliation: Reconciliation;
@@ -3886,6 +3924,7 @@ export type Mutation = {
   requestLoginOTP: OtpResponse;
   requestRegistrationOTP: OtpResponse;
   requestUpdateOTP: OtpResponse;
+  reviewApprovalRequest: ApprovalRequest;
   reviewCashCount: CashDrawerCount;
   runPendingSearchIndexUpdates: Success;
   runScheduledTask: Success;
@@ -4153,6 +4192,10 @@ export type MutationCompleteTrainingArgs = {
 
 export type MutationCreateAdministratorArgs = {
   input: CreateAdministratorInput;
+};
+
+export type MutationCreateApprovalRequestArgs = {
+  input: CreateApprovalRequestInput;
 };
 
 export type MutationCreateAssetsArgs = {
@@ -4661,6 +4704,10 @@ export type MutationRequestUpdateOtpArgs = {
   identifier: Scalars['String']['input'];
 };
 
+export type MutationReviewApprovalRequestArgs = {
+  input: ReviewApprovalRequestInput;
+};
+
 export type MutationReviewCashCountArgs = {
   countId: Scalars['ID']['input'];
   notes?: InputMaybe<Scalars['String']['input']>;
@@ -5058,6 +5105,7 @@ export type NotificationListOptions = {
 };
 
 export enum NotificationType {
+  APPROVAL = 'APPROVAL',
   CASH_VARIANCE = 'CASH_VARIANCE',
   ML_TRAINING = 'ML_TRAINING',
   ORDER = 'ORDER',
@@ -5788,6 +5836,8 @@ export enum Permission {
   DeleteTaxRate = 'DeleteTaxRate',
   /** Grants permission to delete Zone */
   DeleteZone = 'DeleteZone',
+  /** Allows reviewing (approving/rejecting) approval requests */
+  ManageApprovals = 'ManageApprovals',
   /** Allows setting and adjusting customer credit limits. */
   ManageCustomerCreditLimit = 'ManageCustomerCreditLimit',
   /** Allows creating and verifying reconciliations for all scopes. */
@@ -6496,8 +6546,11 @@ export type Query = {
   facetValues: FacetValueList;
   facets: FacetList;
   fulfillmentHandlers: Array<ConfigurableOperationDefinition>;
+  getApprovalRequest?: Maybe<ApprovalRequest>;
+  getApprovalRequests: ApprovalRequestList;
   /** Get current channel's subscription details */
   getChannelSubscription: ChannelSubscription;
+  getMyApprovalRequests: ApprovalRequestList;
   /** Get value for a specific key (automatically scoped based on field configuration) */
   getSettingsStoreValue?: Maybe<Scalars['JSON']['output']>;
   /** Get multiple key-value pairs (each automatically scoped) */
@@ -6739,8 +6792,20 @@ export type QueryFacetsArgs = {
   options?: InputMaybe<FacetListOptions>;
 };
 
+export type QueryGetApprovalRequestArgs = {
+  id: Scalars['ID']['input'];
+};
+
+export type QueryGetApprovalRequestsArgs = {
+  options?: InputMaybe<ApprovalRequestListOptions>;
+};
+
 export type QueryGetChannelSubscriptionArgs = {
   channelId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+export type QueryGetMyApprovalRequestsArgs = {
+  options?: InputMaybe<ApprovalRequestListOptions>;
 };
 
 export type QueryGetSettingsStoreValueArgs = {
@@ -7084,6 +7149,7 @@ export type RecordExpenseResult = {
 };
 
 export type RecordPurchaseInput = {
+  approvalId?: InputMaybe<Scalars['ID']['input']>;
   isCreditPurchase?: InputMaybe<Scalars['Boolean']['input']>;
   lines: Array<PurchaseLineInput>;
   notes?: InputMaybe<Scalars['String']['input']>;
@@ -7315,6 +7381,12 @@ export type Return = Node &
     type: StockMovementType;
     updatedAt: Scalars['DateTime']['output'];
   };
+
+export type ReviewApprovalRequestInput = {
+  action: Scalars['String']['input'];
+  id: Scalars['ID']['input'];
+  message?: InputMaybe<Scalars['String']['input']>;
+};
 
 export type Role = Node & {
   __typename?: 'Role';
@@ -11634,6 +11706,32 @@ export type RecordExpenseMutation = {
   recordExpense: { __typename?: 'RecordExpenseResult'; sourceId: string };
 };
 
+export type CreateInterAccountTransferMutationVariables = Exact<{
+  input: InterAccountTransferInput;
+}>;
+
+export type CreateInterAccountTransferMutation = {
+  __typename?: 'Mutation';
+  createInterAccountTransfer: {
+    __typename?: 'JournalEntry';
+    id: string;
+    entryDate: string;
+    postedAt: any;
+    sourceType: string;
+    sourceId: string;
+    memo?: string | null;
+    lines: Array<{
+      __typename?: 'JournalLine';
+      id: string;
+      accountCode: string;
+      accountName: string;
+      debit: number;
+      credit: number;
+      meta?: any | null;
+    }>;
+  };
+};
+
 export type GetJournalEntriesQueryVariables = Exact<{
   options?: InputMaybe<JournalEntriesOptions>;
 }>;
@@ -12075,6 +12173,117 @@ export type VerifyMpesaTransactionsMutation = {
     allConfirmed: boolean;
     flaggedTransactionIds?: Array<string> | null;
     notes?: string | null;
+  };
+};
+
+export type GetApprovalRequestsQueryVariables = Exact<{
+  options?: InputMaybe<ApprovalRequestListOptions>;
+}>;
+
+export type GetApprovalRequestsQuery = {
+  __typename?: 'Query';
+  getApprovalRequests: {
+    __typename?: 'ApprovalRequestList';
+    totalItems: number;
+    items: Array<{
+      __typename?: 'ApprovalRequest';
+      id: string;
+      channelId: string;
+      type: string;
+      status: string;
+      requestedById: string;
+      reviewedById?: string | null;
+      reviewedAt?: any | null;
+      message?: string | null;
+      metadata?: any | null;
+      entityType?: string | null;
+      entityId?: string | null;
+      createdAt: any;
+      updatedAt: any;
+    }>;
+  };
+};
+
+export type GetApprovalRequestQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+export type GetApprovalRequestQuery = {
+  __typename?: 'Query';
+  getApprovalRequest?: {
+    __typename?: 'ApprovalRequest';
+    id: string;
+    channelId: string;
+    type: string;
+    status: string;
+    requestedById: string;
+    reviewedById?: string | null;
+    reviewedAt?: any | null;
+    message?: string | null;
+    metadata?: any | null;
+    entityType?: string | null;
+    entityId?: string | null;
+    createdAt: any;
+    updatedAt: any;
+  } | null;
+};
+
+export type GetMyApprovalRequestsQueryVariables = Exact<{
+  options?: InputMaybe<ApprovalRequestListOptions>;
+}>;
+
+export type GetMyApprovalRequestsQuery = {
+  __typename?: 'Query';
+  getMyApprovalRequests: {
+    __typename?: 'ApprovalRequestList';
+    totalItems: number;
+    items: Array<{
+      __typename?: 'ApprovalRequest';
+      id: string;
+      channelId: string;
+      type: string;
+      status: string;
+      requestedById: string;
+      reviewedById?: string | null;
+      reviewedAt?: any | null;
+      message?: string | null;
+      metadata?: any | null;
+      entityType?: string | null;
+      entityId?: string | null;
+      createdAt: any;
+      updatedAt: any;
+    }>;
+  };
+};
+
+export type CreateApprovalRequestMutationVariables = Exact<{
+  input: CreateApprovalRequestInput;
+}>;
+
+export type CreateApprovalRequestMutation = {
+  __typename?: 'Mutation';
+  createApprovalRequest: {
+    __typename?: 'ApprovalRequest';
+    id: string;
+    type: string;
+    status: string;
+    createdAt: any;
+  };
+};
+
+export type ReviewApprovalRequestMutationVariables = Exact<{
+  input: ReviewApprovalRequestInput;
+}>;
+
+export type ReviewApprovalRequestMutation = {
+  __typename?: 'Mutation';
+  reviewApprovalRequest: {
+    __typename?: 'ApprovalRequest';
+    id: string;
+    type: string;
+    status: string;
+    message?: string | null;
+    reviewedAt?: any | null;
   };
 };
 
@@ -21047,6 +21256,71 @@ export const RecordExpenseDocument = {
     },
   ],
 } as unknown as DocumentNode<RecordExpenseMutation, RecordExpenseMutationVariables>;
+export const CreateInterAccountTransferDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'CreateInterAccountTransfer' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'InterAccountTransferInput' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'createInterAccountTransfer' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'entryDate' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'postedAt' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'sourceType' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'sourceId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'memo' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'lines' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'accountCode' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'accountName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'debit' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'credit' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'meta' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  CreateInterAccountTransferMutation,
+  CreateInterAccountTransferMutationVariables
+>;
 export const GetJournalEntriesDocument = {
   kind: 'Document',
   definitions: [
@@ -22257,6 +22531,279 @@ export const VerifyMpesaTransactionsDocument = {
   VerifyMpesaTransactionsMutation,
   VerifyMpesaTransactionsMutationVariables
 >;
+export const GetApprovalRequestsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetApprovalRequests' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'ApprovalRequestListOptions' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'getApprovalRequests' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'options' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'items' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'type' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'requestedById' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'reviewedById' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'reviewedAt' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'message' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'metadata' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'entityType' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'entityId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
+                    ],
+                  },
+                },
+                { kind: 'Field', name: { kind: 'Name', value: 'totalItems' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetApprovalRequestsQuery, GetApprovalRequestsQueryVariables>;
+export const GetApprovalRequestDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetApprovalRequest' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'getApprovalRequest' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'id' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'type' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'requestedById' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'reviewedById' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'reviewedAt' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'message' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'metadata' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'entityType' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'entityId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetApprovalRequestQuery, GetApprovalRequestQueryVariables>;
+export const GetMyApprovalRequestsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetMyApprovalRequests' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'ApprovalRequestListOptions' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'getMyApprovalRequests' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'options' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'items' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'type' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'requestedById' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'reviewedById' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'reviewedAt' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'message' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'metadata' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'entityType' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'entityId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
+                    ],
+                  },
+                },
+                { kind: 'Field', name: { kind: 'Name', value: 'totalItems' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetMyApprovalRequestsQuery, GetMyApprovalRequestsQueryVariables>;
+export const CreateApprovalRequestDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'CreateApprovalRequest' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: { kind: 'Name', value: 'CreateApprovalRequestInput' },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'createApprovalRequest' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'type' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<CreateApprovalRequestMutation, CreateApprovalRequestMutationVariables>;
+export const ReviewApprovalRequestDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'ReviewApprovalRequest' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: { kind: 'Name', value: 'ReviewApprovalRequestInput' },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'reviewApprovalRequest' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'type' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'message' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'reviewedAt' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<ReviewApprovalRequestMutation, ReviewApprovalRequestMutationVariables>;
 export const UpdateProductBasicDocument = {
   kind: 'Document',
   definitions: [

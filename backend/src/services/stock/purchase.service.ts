@@ -32,6 +32,7 @@ export interface RecordPurchaseInput {
     debitAccountCode?: string;
     reference?: string;
   };
+  approvalId?: string;
 }
 
 /**

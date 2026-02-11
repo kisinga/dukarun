@@ -132,6 +132,7 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./dashboard/pages/payments/payments.component').then((m) => m.PaymentsComponent),
       },
+      { path: 'expenses', redirectTo: 'accounting/expenses', pathMatch: 'full' },
       {
         path: 'payments/:id',
         loadComponent: () =>
@@ -175,11 +176,52 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'approvals',
+        loadComponent: () =>
+          import('./dashboard/pages/approvals/approvals.component').then(
+            (m) => m.ApprovalsComponent,
+          ),
+      },
+      {
         path: 'profile',
         loadChildren: () =>
           import('./dashboard/pages/profile/profile.routes').then((m) => m.PROFILE_ROUTES),
       },
-      { path: 'accounting', redirectTo: 'admin/accounting', pathMatch: 'full' },
+      {
+        path: 'accounting',
+        canActivate: [settingsGuard],
+        loadComponent: () =>
+          import('./dashboard/pages/accounting/accounting-layout.component').then(
+            (m) => m.AccountingLayoutComponent,
+          ),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'ledger' },
+          {
+            path: 'ledger',
+            canActivate: [settingsGuard],
+            loadComponent: () =>
+              import('./dashboard/pages/accounting/accounting.component').then(
+                (m) => m.AccountingComponent,
+              ),
+          },
+          {
+            path: 'expenses',
+            canActivate: [settingsGuard],
+            loadComponent: () =>
+              import('./dashboard/pages/expenses/expenses.component').then(
+                (m) => m.ExpensesComponent,
+              ),
+          },
+          {
+            path: 'transfers',
+            canActivate: [settingsGuard],
+            loadComponent: () =>
+              import('./dashboard/pages/accounting/transfers.component').then(
+                (m) => m.TransfersComponent,
+              ),
+          },
+        ],
+      },
       {
         path: 'stock-adjustments',
         canActivate: [stockAdjustmentGuard],
@@ -244,14 +286,6 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./dashboard/pages/settings/components/audit-trail/audit-trail.component').then(
                 (m) => m.AuditTrailComponent,
-              ),
-          },
-          {
-            path: 'accounting',
-            canActivate: [settingsGuard],
-            loadComponent: () =>
-              import('./dashboard/pages/accounting/accounting.component').then(
-                (m) => m.AccountingComponent,
               ),
           },
           {

@@ -1,11 +1,13 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { ID, RequestContext, TransactionalConnection } from '@vendure/core';
+import { ID, RequestContext, TransactionalConnection, UserInputError } from '@vendure/core';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { InventoryReconciliationService } from '../inventory/inventory-reconciliation.service';
 import { InventoryConfigurationService } from '../inventory/inventory-configuration.service';
 import { FinancialService } from '../financial/financial.service';
 import { PAYMENT_METHOD_CODES } from '../payments/payment-method-codes.constants';
+import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
+import { ApprovalService } from '../approval/approval.service';
 import { StockPurchase } from './entities/purchase.entity';
 import { PurchasePayment } from './entities/purchase-payment.entity';
 import { InventoryStockAdjustment } from './entities/stock-adjustment.entity';
@@ -41,6 +43,7 @@ export class StockManagementService {
     private readonly validationService: StockValidationService,
     private readonly financialService: FinancialService,
     @Optional() private readonly purchaseCreditValidator?: PurchaseCreditValidatorService,
+    @Optional() private readonly approvalService?: ApprovalService,
     @Optional() private readonly auditService?: AuditService,
     @Optional() private readonly inventoryService?: InventoryService,
     @Optional() private readonly inventoryConfig?: InventoryConfigurationService,
@@ -57,40 +60,72 @@ export class StockManagementService {
         // 1. Validate input
         this.validationService.validatePurchaseInput(input);
 
-        // 1b. Force credit purchase path when inline payment is provided
-        // This ensures the purchase goes through AP so the payment can clear it properly.
-        // Without this, a cash purchase would directly credit Cash On Hand, and we
-        // wouldn't be able to record a payment from a different source (e.g., M-Pesa).
-        if (input.payment && input.payment.amount > 0) {
-          input.isCreditPurchase = true;
-        } else if (input.paymentStatus === 'pending') {
-          input.isCreditPurchase = true;
-        }
+        // 1b. All purchases route through AP (Accounts Payable) for proper double-entry accounting.
+        // The purchase creates a liability (AP), and the inline payment clears it.
+        // This allows payments from any source (cash, M-Pesa, bank) to settle the liability.
+        input.isCreditPurchase = true;
 
-        // 2. Validate supplier credit if this is a credit purchase
-        if (input.isCreditPurchase) {
+        // 2. Calculate total cost upfront (needed for credit validation and overdraft check)
+        const totalCost = input.lines.reduce((sum, line) => sum + line.quantity * line.unitCost, 0);
+
+        // 3. Validate supplier credit ONLY when there's actual unpaid exposure
+        // Fully-paid purchases don't extend credit, so no credit check needed.
+        const paymentAmount = input.payment?.amount ?? 0;
+        const unpaidAmount = totalCost - paymentAmount;
+
+        if (unpaidAmount > 0) {
           if (!this.purchaseCreditValidator) {
             throw new Error(
               'PurchaseCreditValidatorService is required for credit purchases but was not provided.'
             );
           }
-          // Validate supplier credit approval
+          // Validate supplier is approved for credit
           await this.purchaseCreditValidator.validateSupplierCreditApproval(
             transactionCtx,
             String(input.supplierId)
           );
-        }
-
-        // 3. Create purchase record (calculate total first for validation)
-        const totalCost = input.lines.reduce((sum, line) => sum + line.quantity * line.unitCost, 0);
-
-        // 4. Validate credit limit with actual purchase total (if credit purchase)
-        if (input.isCreditPurchase && this.purchaseCreditValidator) {
+          // Validate credit limit covers the unpaid portion only
           await this.purchaseCreditValidator.validateSupplierCreditLimitWithPurchase(
             transactionCtx,
             String(input.supplierId),
-            totalCost
+            unpaidAmount
           );
+        }
+
+        // 4. Check account balance for overdraft (when payment provided)
+        if (input.payment && input.payment.amount > 0) {
+          const accountCode = input.payment.debitAccountCode?.trim() || ACCOUNT_CODES.CASH_ON_HAND;
+          const accountBalance = await this.financialService.getAccountBalance(
+            transactionCtx,
+            accountCode
+          );
+
+          if (input.payment.amount > accountBalance) {
+            // Check if an approved overdraft approval exists
+            if (input.approvalId && this.approvalService) {
+              await this.approvalService.validateApproval(
+                transactionCtx,
+                input.approvalId,
+                'overdraft'
+              );
+              this.logger.log(
+                `Overdraft approved for purchase: approval=${input.approvalId}, ` +
+                  `account=${accountCode}, balance=${accountBalance}, payment=${input.payment.amount}`
+              );
+            } else {
+              throw new UserInputError(
+                `Insufficient balance in account ${accountCode}. ` +
+                  `Available: ${accountBalance}, Required: ${input.payment.amount}. ` +
+                  `Request overdraft approval to proceed.`,
+                {
+                  code: 'INSUFFICIENT_BALANCE',
+                  availableBalance: accountBalance,
+                  requiredAmount: input.payment.amount,
+                  accountCode,
+                } as any
+              );
+            }
+          }
         }
 
         // 5. Create purchase record

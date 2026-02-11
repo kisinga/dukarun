@@ -64,7 +64,6 @@ import { TransactionsTabComponent } from './components/transactions-tab.componen
     ReconciliationTabComponent,
   ],
   templateUrl: './accounting.component.html',
-  styleUrl: './accounting.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AccountingComponent implements OnInit {
@@ -190,7 +189,7 @@ export class AccountingComponent implements OnInit {
   goToTransactionsTab(account: LedgerAccount) {
     this.listState.setSelectedAccount(account);
     this.loadData();
-    this.router.navigate(['/dashboard/admin/accounting'], {
+    this.router.navigate(['/dashboard/accounting/ledger'], {
       queryParams: { tab: 'transactions' },
       queryParamsHandling: 'merge',
     });

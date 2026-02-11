@@ -1,48 +1,63 @@
-// Overview - Mobile-first, performance optimized
 @use '../../styles/dashboard-animations' as *;
+@use '../../../../styles/design-system' as ds;
 
 :host {
   display: block;
 }
 
-// Touch optimizations
 button,
 a,
 [role='button'] {
   -webkit-tap-highlight-color: transparent;
 }
 
-// Minimal touch targets (for items that need them)
 button:not(.btn-xs):not(.btn-square):not(.badge),
 a:not(.badge) {
   min-height: 40px;
 }
 
-// Scrollbar hide utility
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
-}
-
-// Quick transitions on mobile
-@media (max-width: 639px) {
-  * {
-    transition-duration: 0.1s !important;
-  }
-}
-
-// Chevron rotation
 .rotate-180 {
   transform: rotate(180deg);
 }
 
-// Reduced motion
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation: none !important;
-    transition-duration: 0.01ms !important;
+// Header card — thin primary accent on top
+.overview-header {
+  border-top: 3px solid oklch(var(--p));
+}
+
+// Stat card tinted backgrounds — each category has its own subtle wash
+.stat-card-overview {
+  background: oklch(var(--b1));
+  border-color: oklch(var(--b3));
+
+  &:hover {
+    border-color: oklch(var(--bc) / 0.15);
+  }
+}
+
+.stat-card-sales {
+  background: oklch(var(--su) / 0.04);
+  border-left-color: oklch(var(--su));
+
+  &:hover {
+    background: oklch(var(--su) / 0.07);
+  }
+}
+
+.stat-card-purchases {
+  background: oklch(var(--in) / 0.04);
+  border-left-color: oklch(var(--in));
+
+  &:hover {
+    background: oklch(var(--in) / 0.07);
+  }
+}
+
+.stat-card-expenses {
+  background: oklch(var(--er) / 0.04);
+  border-left-color: oklch(var(--er));
+
+  &:hover {
+    background: oklch(var(--er) / 0.07);
   }
 }

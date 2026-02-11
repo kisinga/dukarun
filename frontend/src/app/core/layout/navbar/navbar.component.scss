@@ -4,12 +4,59 @@
   display: block;
 }
 
-// Navbar - minimal on mobile, richer on desktop
-.navbar {
-  // GPU-accelerated backdrop
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+// Duka Door logo: show light or dark by theme
+.duka-door-logo {
+  position: relative;
+  height: 1.75rem;
+
+  img {
+    height: 1.75rem;
+    width: auto;
+    max-width: 140px;
+    display: block;
+    object-fit: contain;
+    object-position: left center;
+  }
+
+  .dukarun-withtext-dark {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: none;
+  }
 }
+
+:host-context(html[data-theme='dark']) .duka-door-logo {
+  .dukarun-withtext-light {
+    display: none;
+  }
+
+  .dukarun-withtext-dark {
+    display: block;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :host .duka-door-logo {
+    .dukarun-withtext-light {
+      display: none;
+    }
+
+    .dukarun-withtext-dark {
+      display: block;
+    }
+  }
+}
+
+.duka-door-logo-drawer {
+  height: 2rem;
+
+  img {
+    height: 2rem;
+  }
+}
+
+// Navbar: solid bg-base-100 (no backdrop-filter / translucency)
 
 // Desktop-only enhancements (no extra overhead on mobile)
 @media (min-width: 1024px) {

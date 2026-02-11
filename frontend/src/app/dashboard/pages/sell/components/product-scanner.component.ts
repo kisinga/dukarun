@@ -50,7 +50,9 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
               <div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
               <span class="font-semibold text-sm">Scanning...</span>
               @if (activeDetectors().length > 0) {
-                <span class="text-xs opacity-60">({{ activeDetectors().join(', ') }})</span>
+                <span class="text-xs text-base-content/70"
+                  >({{ activeDetectors().join(', ') }})</span
+                >
               }
             </div>
             <button class="btn btn-sm btn-error" (click)="stopScanner()">Stop</button>
@@ -73,7 +75,9 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
           </div>
 
           <!-- Status Footer -->
-          <div class="text-center text-xs opacity-60 mt-2">Point camera at product or barcode</div>
+          <div class="text-center text-xs text-base-content/70 mt-2">
+            Point camera at product or barcode
+          </div>
 
           <!-- Barcode Not Found Feedback -->
           @if (barcodeNotFoundMessage()) {

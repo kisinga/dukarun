@@ -6,6 +6,7 @@ import {
   GetLedgerAccountsDocument,
   GetJournalEntriesDocument,
   GetJournalEntryDocument,
+  CreateInterAccountTransferDocument,
 } from '../../graphql/generated/graphql';
 
 const GetEligibleDebitAccountsDocument = gql`
@@ -64,6 +65,17 @@ export interface JournalEntriesOptions {
   sourceType?: string;
   take?: number;
   skip?: number;
+}
+
+export interface CreateInterAccountTransferParams {
+  channelId: number;
+  fromAccountCode: string;
+  toAccountCode: string;
+  amount: number;
+  entryDate: string;
+  memo?: string;
+  feeAmount?: number;
+  expenseTag?: string;
 }
 
 @Injectable({
@@ -176,5 +188,39 @@ export class LedgerService {
         return of(null);
       }),
     );
+  }
+
+  /**
+   * Create an inter-account transfer. Generates transferId (UUID) for idempotency.
+   * Amounts are in smallest currency unit (e.g. cents).
+   */
+  async createInterAccountTransfer(
+    params: CreateInterAccountTransferParams,
+  ): Promise<JournalEntry> {
+    const transferId = crypto.randomUUID();
+    const input = {
+      channelId: params.channelId,
+      transferId,
+      fromAccountCode: params.fromAccountCode.trim(),
+      toAccountCode: params.toAccountCode.trim(),
+      amount: String(params.amount),
+      entryDate: params.entryDate,
+      memo: params.memo?.trim() || undefined,
+      feeAmount: params.feeAmount != null ? String(params.feeAmount) : undefined,
+      expenseTag: params.expenseTag?.trim() || undefined,
+    };
+    const client = this.apolloService.getClient();
+    const result = await client.mutate({
+      mutation: CreateInterAccountTransferDocument,
+      variables: { input },
+    });
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+    const entry = result.data?.createInterAccountTransfer;
+    if (!entry) {
+      throw new Error('No journal entry returned');
+    }
+    return entry as JournalEntry;
   }
 }

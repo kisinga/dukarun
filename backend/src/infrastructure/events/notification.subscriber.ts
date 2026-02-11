@@ -8,6 +8,7 @@ import {
 import { AdminNotificationService } from '../../services/notifications/admin-notification.service';
 import {
   AdminActionEvent,
+  ApprovalRequestEvent,
   ChannelStatusEvent,
   CompanyRegisteredEvent,
   CustomerNotificationEvent,
@@ -47,6 +48,7 @@ export class NotificationSubscriber implements OnModuleInit {
     this.eventBus.ofType(ChannelStatusEvent).subscribe(e => this.handleChannelStatus(e));
     this.eventBus.ofType(StockAlertEvent).subscribe(e => this.handleStockAlert(e));
     this.eventBus.ofType(CompanyRegisteredEvent).subscribe(e => this.handleCompanyRegistered(e));
+    this.eventBus.ofType(ApprovalRequestEvent).subscribe(e => this.handleApprovalRequest(e));
 
     this.logger.log('NotificationSubscriber initialized');
   }
@@ -226,6 +228,80 @@ export class NotificationSubscriber implements OnModuleInit {
     } catch (error) {
       this.logError('StockAlertEvent', error);
     }
+  }
+
+  private async handleApprovalRequest(event: ApprovalRequestEvent): Promise<void> {
+    try {
+      const typeLabels: Record<string, string> = {
+        overdraft: 'Overdraft',
+        customer_credit: 'Customer Credit',
+        below_wholesale: 'Below Wholesale Price',
+        order_reversal: 'Order Reversal',
+      };
+      const typeLabel = typeLabels[event.approvalType] || event.approvalType;
+
+      if (event.action === 'created') {
+        // Notify all admins except the requester
+        const adminIds = await this.getChannelAdmins(event.ctx, event.channelId);
+        const targetIds = adminIds.filter(id => id !== event.requestedById);
+
+        for (const userId of targetIds) {
+          await this.notificationService.createNotificationIfEnabled(event.ctx, {
+            userId,
+            channelId: event.channelId,
+            type: NotificationType.APPROVAL,
+            title: `${typeLabel} Approval Needed`,
+            message: `A ${typeLabel.toLowerCase()} approval has been requested. Review it on the Approvals page.`,
+            data: {
+              approvalId: event.approvalId,
+              approvalType: event.approvalType,
+              action: event.action,
+              navigateTo: '/dashboard/approvals',
+            },
+          });
+        }
+      } else {
+        // Approved or rejected - notify the requester
+        const statusLabel = event.action === 'approved' ? 'approved' : 'rejected';
+        const message = event.data.message
+          ? `Your ${typeLabel.toLowerCase()} request was ${statusLabel}: ${event.data.message}`
+          : `Your ${typeLabel.toLowerCase()} request was ${statusLabel}.`;
+
+        // Determine where to navigate the author (back to the originating form)
+        const navigateTo = this.getApprovalSourceRoute(event);
+
+        await this.notificationService.createNotificationIfEnabled(event.ctx, {
+          userId: event.requestedById,
+          channelId: event.channelId,
+          type: NotificationType.APPROVAL,
+          title: `${typeLabel} Request ${event.action === 'approved' ? 'Approved' : 'Rejected'}`,
+          message,
+          data: {
+            approvalId: event.approvalId,
+            approvalType: event.approvalType,
+            action: event.action,
+            isAuthorNotification: true,
+            navigateTo,
+          },
+        });
+      }
+    } catch (error) {
+      this.logError('ApprovalRequestEvent', error);
+    }
+  }
+
+  /**
+   * Determine the navigation route for approval author notifications.
+   */
+  private getApprovalSourceRoute(event: ApprovalRequestEvent): string {
+    const routes: Record<string, string> = {
+      overdraft: '/dashboard/purchases/create',
+      customer_credit: '/dashboard/customers/create',
+      below_wholesale: '/dashboard/sell',
+      order_reversal: '/dashboard/orders',
+    };
+    const base = routes[event.approvalType] || '/dashboard/approvals';
+    return `${base}?approvalId=${event.approvalId}`;
   }
 
   // ============================================================================

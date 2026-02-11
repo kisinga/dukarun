@@ -26,6 +26,7 @@ import { ManageStockAdjustmentsPermission } from '../../../plugins/stock/permiss
 import {
   ManageReconciliationPermission,
   CloseAccountingPeriodPermission,
+  CreateInterAccountTransferPermission,
 } from '../../../plugins/ledger/permissions';
 import { ManageSupplierCreditPurchasesPermission } from '../../../plugins/credit/supplier-credit.permissions';
 
@@ -93,6 +94,7 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
       ManageStockAdjustmentsPermission.Permission as Permission,
       ManageReconciliationPermission.Permission as Permission,
       CloseAccountingPeriodPermission.Permission as Permission,
+      CreateInterAccountTransferPermission.Permission as Permission,
       ManageSupplierCreditPurchasesPermission.Permission as Permission,
     ],
   },
@@ -230,6 +232,7 @@ export class RoleProvisionerService {
     ManageStockAdjustmentsPermission.Permission as Permission,
     ManageReconciliationPermission.Permission as Permission,
     CloseAccountingPeriodPermission.Permission as Permission,
+    CreateInterAccountTransferPermission.Permission as Permission,
     ManageSupplierCreditPurchasesPermission.Permission as Permission,
   ];
 

@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext, TransactionalConnection } from '@vendure/core';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 import { CashDrawerCount, CashCountType } from '../../domain/cashier/cash-drawer-count.entity';
 import { CashierSession } from '../../domain/cashier/cashier-session.entity';
 import { MpesaVerification } from '../../domain/cashier/mpesa-verification.entity';
@@ -60,7 +61,8 @@ export class PeriodManagementResolver {
     private readonly periodLockService: PeriodLockService,
     private readonly reconciliationValidatorService: ReconciliationValidatorService,
     private readonly chartOfAccountsService: ChartOfAccountsService,
-    private readonly financialService: FinancialService
+    private readonly financialService: FinancialService,
+    private readonly auditService: AuditService
   ) {}
 
   @Query()
@@ -206,6 +208,12 @@ export class PeriodManagementResolver {
     await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, input.fromAccountCode);
     await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, input.toAccountCode);
 
+    const fromCode = (input.fromAccountCode && String(input.fromAccountCode)).trim();
+    const toCode = (input.toAccountCode && String(input.toAccountCode)).trim();
+    if (fromCode.toLowerCase() === toCode.toLowerCase()) {
+      throw new Error('From account and to account must be different.');
+    }
+
     const session = await this.cashierSessionService.requireOpenSession(ctx, input.channelId);
     const sessionMeta = { openSessionId: session.id };
 
@@ -250,12 +258,29 @@ export class PeriodManagementResolver {
       );
     }
 
-    return this.postingService.post(ctx, 'inter-account-transfer', sourceId, {
+    const entry = await this.postingService.post(ctx, 'inter-account-transfer', sourceId, {
       channelId: input.channelId,
       entryDate: input.entryDate,
       memo: input.memo || 'Inter-account transfer for reconciliation',
       lines,
     });
+
+    this.auditService
+      .log(ctx, 'inter_account_transfer.created', {
+        entityType: 'JournalEntry',
+        entityId: entry.id,
+        data: {
+          fromAccountCode: input.fromAccountCode,
+          toAccountCode: input.toAccountCode,
+          amount: input.amount,
+          feeAmount: input.feeAmount ?? undefined,
+          memo: input.memo ?? undefined,
+          transferId: sourceId,
+        },
+      })
+      .catch(() => {});
+
+    return entry;
   }
 
   // ============================================================================

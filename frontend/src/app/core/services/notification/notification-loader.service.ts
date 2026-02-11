@@ -62,7 +62,7 @@ export class NotificationLoaderService {
             id: item.id,
             userId: item.userId,
             channelId: item.channelId,
-            type: item.type,
+            type: item.type as Notification['type'],
             title: item.title,
             message: item.message,
             data: item.data,

@@ -7,7 +7,11 @@ import type { ProductListOptions, ProductFilterParameter } from '../../graphql/g
  * Single source of truth for "what the user selected" before building API options.
  */
 export interface ProductListFilterState {
-  /** Search across name, description, slug, sku */
+  /**
+   * Search across name, description, slug, sku.
+   * When manufacturerIdsMatchingSearch is provided (by caller), products whose manufacturer
+   * facet matches the search phrase are also included.
+   */
   searchTerm?: string;
   /** Selected facet value IDs per facet code (AND across facets, OR within) */
   facetValueIds?: Partial<Record<FacetCode, string[]>>;
@@ -23,25 +27,38 @@ export interface ProductListPagination {
 }
 
 /**
+ * Optional extra inputs when building product list options.
+ * Caller supplies resolved IDs (e.g. from FacetService.getManufacturerIdsMatchingName).
+ */
+export interface BuildProductListOptionsExtra {
+  /** When provided, products whose manufacturer facet matches the search phrase are included in the text-search OR. */
+  manufacturerIdsMatchingSearch?: string[];
+}
+
+/**
  * Builds ProductListOptions from filter state and pagination.
  * Pure function: no services, no side effects. Reusable by products page and any future list consumer.
  */
 export function buildProductListOptions(
   state: ProductListFilterState,
-  pagination: ProductListPagination
+  pagination: ProductListPagination,
+  extra?: BuildProductListOptionsExtra,
 ): ProductListOptions {
   const conditions: ProductFilterParameter[] = [];
 
   const term = (state.searchTerm ?? '').trim();
   if (term.length > 0) {
-    conditions.push({
-      _or: [
-        { name: { contains: term } },
-        { description: { contains: term } },
-        { slug: { contains: term } },
-        { sku: { contains: term } },
-      ],
-    });
+    const searchOr: ProductFilterParameter[] = [
+      { name: { contains: term } },
+      { description: { contains: term } },
+      { slug: { contains: term } },
+      { sku: { contains: term } },
+    ];
+    const manufacturerIds = extra?.manufacturerIdsMatchingSearch?.filter(Boolean) ?? [];
+    if (manufacturerIds.length > 0) {
+      searchOr.push({ facetValueId: { in: manufacturerIds } });
+    }
+    conditions.push({ _or: searchOr });
   }
 
   const facetIds = state.facetValueIds ?? {};
@@ -56,7 +73,11 @@ export function buildProductListOptions(
   }
 
   const filter: ProductFilterParameter | undefined =
-    conditions.length === 0 ? undefined : conditions.length === 1 ? conditions[0]! : { _and: conditions };
+    conditions.length === 0
+      ? undefined
+      : conditions.length === 1
+        ? conditions[0]!
+        : { _and: conditions };
 
   const sort =
     state.sort?.name !== undefined

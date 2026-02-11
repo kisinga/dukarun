@@ -1,6 +1,7 @@
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { gql } from 'graphql-tag';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
+import { AuditCorePlugin } from '../audit/audit-core.plugin';
 import { CashDrawerCount } from '../../domain/cashier/cash-drawer-count.entity';
 import { CashierSession } from '../../domain/cashier/cashier-session.entity';
 import { MpesaVerification } from '../../domain/cashier/mpesa-verification.entity';
@@ -49,7 +50,7 @@ const COMBINED_SCHEMA = gql`
 `;
 
 @VendurePlugin({
-  imports: [PluginCommonModule],
+  imports: [PluginCommonModule, AuditCorePlugin],
   entities: [
     Account,
     JournalEntry,

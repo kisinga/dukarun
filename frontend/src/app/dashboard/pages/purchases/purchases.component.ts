@@ -49,7 +49,6 @@ import { PurchaseDetailComponent } from './purchase-detail/purchase-detail.compo
     PurchaseDetailComponent,
   ],
   templateUrl: './purchases.component.html',
-  styleUrl: './purchases.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PurchasesComponent implements OnInit {

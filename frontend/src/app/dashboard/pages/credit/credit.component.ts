@@ -15,7 +15,6 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
 @Component({
   selector: 'app-credit',
   imports: [CommonModule, RouterLink],
-  styleUrl: './credit.component.scss',
   template: `
     <div class="space-y-5 lg:space-y-6">
       <!-- Header -->
