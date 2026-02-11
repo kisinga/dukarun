@@ -18,7 +18,7 @@
     object-position: left center;
   }
 
-  .duka-door-dark {
+  .dukarun-withtext-dark {
     position: absolute;
     left: 0;
     top: 0;
@@ -27,22 +27,22 @@
 }
 
 :host-context(html[data-theme='dark']) .duka-door-logo {
-  .duka-door-light {
+  .dukarun-withtext-light {
     display: none;
   }
 
-  .duka-door-dark {
+  .dukarun-withtext-dark {
     display: block;
   }
 }
 
 @media (prefers-color-scheme: dark) {
   :host .duka-door-logo {
-    .duka-door-light {
+    .dukarun-withtext-light {
       display: none;
     }
 
-    .duka-door-dark {
+    .dukarun-withtext-dark {
       display: block;
     }
   }
