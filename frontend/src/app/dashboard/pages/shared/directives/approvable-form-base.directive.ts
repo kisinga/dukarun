@@ -103,10 +103,10 @@ export abstract class ApprovableFormBase implements AfterViewInit {
         this.rejectionMessage.set(approval.message);
       }
 
-      if (approval.metadata?.formState) {
+      if (approval.metadata?.['formState']) {
         // Use requestAnimationFrame to ensure child views are ready
         requestAnimationFrame(() => {
-          this.restoreFormState(approval.metadata.formState);
+          this.restoreFormState(approval.metadata['formState']);
         });
       }
     } catch (err) {

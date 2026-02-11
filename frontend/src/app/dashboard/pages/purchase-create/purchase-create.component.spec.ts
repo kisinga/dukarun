@@ -99,7 +99,12 @@ describe('PurchaseCreateComponent', () => {
         { provide: Router, useValue: { navigate: jasmine.createSpy() } },
         {
           provide: ActivatedRoute,
-          useValue: { queryParams: of({}) },
+          useValue: {
+            queryParams: of({}),
+            snapshot: {
+              queryParamMap: { get: () => null },
+            },
+          },
         },
         {
           provide: DeepLinkService,
