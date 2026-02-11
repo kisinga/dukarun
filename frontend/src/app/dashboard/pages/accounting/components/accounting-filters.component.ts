@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { LedgerAccount } from '../../../../core/services/ledger/ledger.service';
+import { sourceTypeLabel } from '../utils/accounting-formatting';
 
 export interface AccountingFilters {
   searchTerm: string;
@@ -21,6 +22,7 @@ export interface AccountingFilters {
 })
 export class AccountingFiltersComponent {
   filters = input.required<AccountingFilters>();
+  sourceTypeLabel = sourceTypeLabel;
 
   searchTermChange = output<string>();
   accountChange = output<string>();

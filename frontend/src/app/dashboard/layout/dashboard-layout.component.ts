@@ -104,7 +104,6 @@ export class DashboardLayoutComponent implements OnInit {
         label: 'Finance',
         items: [
           { label: 'Payments', icon: 'payments', route: '/dashboard/payments' },
-          { label: 'Expenses', icon: 'expenses', route: '/dashboard/expenses' },
           {
             label: 'Credit',
             icon: 'credit',
@@ -114,7 +113,7 @@ export class DashboardLayoutComponent implements OnInit {
           {
             label: 'Accounting',
             icon: 'accounting',
-            route: '/dashboard/admin/accounting',
+            route: '/dashboard/accounting',
             visible: () => hasSettings,
           },
           // { label: 'Approvals', icon: 'approvals', route: '/dashboard/approvals' },

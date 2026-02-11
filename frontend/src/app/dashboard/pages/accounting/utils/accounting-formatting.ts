@@ -40,3 +40,12 @@ const ACCOUNT_TYPE_LABELS: Record<string, string> = {
 export function getAccountTypeLabel(type: string): string {
   return ACCOUNT_TYPE_LABELS[type] ?? type;
 }
+
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  'inter-account-transfer': 'Inter-account transfer',
+  Expense: 'Expense',
+};
+
+export function sourceTypeLabel(sourceType: string): string {
+  return SOURCE_TYPE_LABELS[sourceType] ?? sourceType;
+}

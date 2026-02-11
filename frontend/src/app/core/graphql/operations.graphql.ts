@@ -2616,6 +2616,27 @@ export const RECORD_EXPENSE = graphql(`
   }
 `);
 
+export const CREATE_INTER_ACCOUNT_TRANSFER = graphql(`
+  mutation CreateInterAccountTransfer($input: InterAccountTransferInput!) {
+    createInterAccountTransfer(input: $input) {
+      id
+      entryDate
+      postedAt
+      sourceType
+      sourceId
+      memo
+      lines {
+        id
+        accountCode
+        accountName
+        debit
+        credit
+        meta
+      }
+    }
+  }
+`);
+
 export const GET_JOURNAL_ENTRIES = graphql(`
   query GetJournalEntries($options: JournalEntriesOptions) {
     journalEntries(options: $options) {

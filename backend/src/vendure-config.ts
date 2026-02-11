@@ -18,6 +18,7 @@ import { Request, Response } from 'express';
 import path from 'path';
 import { env } from './infrastructure/config/environment.config';
 import { ApprovalPlugin } from './plugins/approval/approval.plugin';
+import { AuditCorePlugin } from './plugins/audit/audit-core.plugin';
 import { AuditPlugin } from './plugins/audit/audit.plugin';
 import { PhoneAuthPlugin } from './plugins/auth/phone-auth.plugin';
 import { ChannelEventsPlugin } from './plugins/channels/channel-events.plugin';
@@ -1449,13 +1450,14 @@ export const config: VendureConfig = {
     FractionalQuantityPlugin,
     NotificationPlugin,
     ApprovalPlugin,
+    AuditCorePlugin, // AuditService only (no GraphQL). Required by LedgerPlugin and AuditPlugin.
     LedgerPlugin, // Load before CreditPlugin - provides PostingService
     StockPlugin, // Load before CreditPlugin so StockPurchase type is available
     CreditPlugin, // Depends on LedgerPlugin
     CustomerPlugin, // Customer duplicate prevention
     SubscriptionPlugin,
     ChannelEventsPlugin,
-    AuditPlugin,
+    AuditPlugin, // Adds auditLogs query and event subscriber
     // PhoneAuthPlugin must be registered early so its strategy can be added to adminAuthenticationStrategy
     PhoneAuthPlugin,
     AssetServerPlugin.init({

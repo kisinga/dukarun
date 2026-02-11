@@ -139,6 +139,7 @@ type Documents = {
   '\n  query GetLedgerAccounts {\n    ledgerAccounts {\n      items {\n        id\n        code\n        name\n        type\n        isActive\n        balance\n        parentAccountId\n        isParent\n      }\n    }\n  }\n': typeof types.GetLedgerAccountsDocument;
   '\n  query GetEligibleDebitAccounts {\n    eligibleDebitAccounts {\n      items {\n        id\n        code\n        name\n        type\n        isActive\n        balance\n        parentAccountId\n        isParent\n      }\n    }\n  }\n': typeof types.GetEligibleDebitAccountsDocument;
   '\n  mutation RecordExpense($input: RecordExpenseInput!) {\n    recordExpense(input: $input) {\n      sourceId\n    }\n  }\n': typeof types.RecordExpenseDocument;
+  '\n  mutation CreateInterAccountTransfer($input: InterAccountTransferInput!) {\n    createInterAccountTransfer(input: $input) {\n      id\n      entryDate\n      postedAt\n      sourceType\n      sourceId\n      memo\n      lines {\n        id\n        accountCode\n        accountName\n        debit\n        credit\n        meta\n      }\n    }\n  }\n': typeof types.CreateInterAccountTransferDocument;
   '\n  query GetJournalEntries($options: JournalEntriesOptions) {\n    journalEntries(options: $options) {\n      items {\n        id\n        entryDate\n        postedAt\n        sourceType\n        sourceId\n        memo\n        lines {\n          id\n          accountCode\n          accountName\n          debit\n          credit\n          meta\n        }\n      }\n      totalItems\n    }\n  }\n': typeof types.GetJournalEntriesDocument;
   '\n  query GetJournalEntry($id: ID!) {\n    journalEntry(id: $id) {\n      id\n      entryDate\n      postedAt\n      sourceType\n      sourceId\n      memo\n      lines {\n        id\n        accountCode\n        accountName\n        debit\n        credit\n        meta\n      }\n    }\n  }\n': typeof types.GetJournalEntryDocument;
   '\n  query GetChannelReconciliationConfig($channelId: Int!) {\n    channelReconciliationConfig(channelId: $channelId) {\n      paymentMethodId\n      paymentMethodCode\n      reconciliationType\n      ledgerAccountCode\n      isCashierControlled\n      requiresReconciliation\n    }\n  }\n': typeof types.GetChannelReconciliationConfigDocument;
@@ -415,6 +416,8 @@ const documents: Documents = {
     types.GetEligibleDebitAccountsDocument,
   '\n  mutation RecordExpense($input: RecordExpenseInput!) {\n    recordExpense(input: $input) {\n      sourceId\n    }\n  }\n':
     types.RecordExpenseDocument,
+  '\n  mutation CreateInterAccountTransfer($input: InterAccountTransferInput!) {\n    createInterAccountTransfer(input: $input) {\n      id\n      entryDate\n      postedAt\n      sourceType\n      sourceId\n      memo\n      lines {\n        id\n        accountCode\n        accountName\n        debit\n        credit\n        meta\n      }\n    }\n  }\n':
+    types.CreateInterAccountTransferDocument,
   '\n  query GetJournalEntries($options: JournalEntriesOptions) {\n    journalEntries(options: $options) {\n      items {\n        id\n        entryDate\n        postedAt\n        sourceType\n        sourceId\n        memo\n        lines {\n          id\n          accountCode\n          accountName\n          debit\n          credit\n          meta\n        }\n      }\n      totalItems\n    }\n  }\n':
     types.GetJournalEntriesDocument,
   '\n  query GetJournalEntry($id: ID!) {\n    journalEntry(id: $id) {\n      id\n      entryDate\n      postedAt\n      sourceType\n      sourceId\n      memo\n      lines {\n        id\n        accountCode\n        accountName\n        debit\n        credit\n        meta\n      }\n    }\n  }\n':
@@ -1237,6 +1240,12 @@ export function graphql(
 export function graphql(
   source: '\n  mutation RecordExpense($input: RecordExpenseInput!) {\n    recordExpense(input: $input) {\n      sourceId\n    }\n  }\n',
 ): (typeof documents)['\n  mutation RecordExpense($input: RecordExpenseInput!) {\n    recordExpense(input: $input) {\n      sourceId\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation CreateInterAccountTransfer($input: InterAccountTransferInput!) {\n    createInterAccountTransfer(input: $input) {\n      id\n      entryDate\n      postedAt\n      sourceType\n      sourceId\n      memo\n      lines {\n        id\n        accountCode\n        accountName\n        debit\n        credit\n        meta\n      }\n    }\n  }\n',
+): (typeof documents)['\n  mutation CreateInterAccountTransfer($input: InterAccountTransferInput!) {\n    createInterAccountTransfer(input: $input) {\n      id\n      entryDate\n      postedAt\n      sourceType\n      sourceId\n      memo\n      lines {\n        id\n        accountCode\n        accountName\n        debit\n        credit\n        meta\n      }\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

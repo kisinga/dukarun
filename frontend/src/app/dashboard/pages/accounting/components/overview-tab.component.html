@@ -54,7 +54,7 @@
                 <tr>
                   <td>{{ context().formatDate(entry.entryDate) }}</td>
                   <td>
-                    <div class="badge badge-outline">{{ entry.sourceType }}</div>
+                    <div class="badge badge-outline">{{ sourceTypeLabel(entry.sourceType) }}</div>
                   </td>
                   <td>{{ entry.memo || entry.sourceId }}</td>
                   <td>

@@ -190,7 +190,7 @@ export class AccountingComponent implements OnInit {
   goToTransactionsTab(account: LedgerAccount) {
     this.listState.setSelectedAccount(account);
     this.loadData();
-    this.router.navigate(['/dashboard/admin/accounting'], {
+    this.router.navigate(['/dashboard/accounting/ledger'], {
       queryParams: { tab: 'transactions' },
       queryParamsHandling: 'merge',
     });

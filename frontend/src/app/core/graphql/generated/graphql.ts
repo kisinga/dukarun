@@ -11706,6 +11706,32 @@ export type RecordExpenseMutation = {
   recordExpense: { __typename?: 'RecordExpenseResult'; sourceId: string };
 };
 
+export type CreateInterAccountTransferMutationVariables = Exact<{
+  input: InterAccountTransferInput;
+}>;
+
+export type CreateInterAccountTransferMutation = {
+  __typename?: 'Mutation';
+  createInterAccountTransfer: {
+    __typename?: 'JournalEntry';
+    id: string;
+    entryDate: string;
+    postedAt: any;
+    sourceType: string;
+    sourceId: string;
+    memo?: string | null;
+    lines: Array<{
+      __typename?: 'JournalLine';
+      id: string;
+      accountCode: string;
+      accountName: string;
+      debit: number;
+      credit: number;
+      meta?: any | null;
+    }>;
+  };
+};
+
 export type GetJournalEntriesQueryVariables = Exact<{
   options?: InputMaybe<JournalEntriesOptions>;
 }>;
@@ -21230,6 +21256,71 @@ export const RecordExpenseDocument = {
     },
   ],
 } as unknown as DocumentNode<RecordExpenseMutation, RecordExpenseMutationVariables>;
+export const CreateInterAccountTransferDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'CreateInterAccountTransfer' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'InterAccountTransferInput' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'createInterAccountTransfer' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'entryDate' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'postedAt' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'sourceType' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'sourceId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'memo' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'lines' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'accountCode' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'accountName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'debit' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'credit' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'meta' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  CreateInterAccountTransferMutation,
+  CreateInterAccountTransferMutationVariables
+>;
 export const GetJournalEntriesDocument = {
   kind: 'Document',
   definitions: [

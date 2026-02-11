@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { JournalEntry } from '../../../../core/services/ledger/ledger.service';
 import type { TransactionsTabContext } from '../accounting-context';
+import { sourceTypeLabel } from '../utils/accounting-formatting';
 
 @Component({
   selector: 'app-transactions-tab',
@@ -12,6 +13,7 @@ import type { TransactionsTabContext } from '../accounting-context';
 })
 export class TransactionsTabComponent {
   context = input.required<TransactionsTabContext>();
+  sourceTypeLabel = sourceTypeLabel;
 
   entryToggle = output<string>();
   entryView = output<JournalEntry>();

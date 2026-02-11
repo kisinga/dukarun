@@ -3,7 +3,7 @@
     @for (tab of tabs; track tab.path) {
       <a
         role="tab"
-        [routerLink]="['/dashboard/admin/accounting']"
+        [routerLink]="['/dashboard/accounting/ledger']"
         [queryParams]="{ tab: tab.path }"
         [class.tab-active]="isTabActive(tab.path)"
         class="tab"
