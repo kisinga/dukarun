@@ -6,6 +6,12 @@
 // Import Design System — single source of truth (tokens, mixins, pattern classes)
 @use 'styles/design-system' as ds;
 
+// Animation utilities (animate-stagger-children, animate-fade-in, etc.)
+@use 'styles/animations';
+
+// Dashboard layout + page styles (scoped under app-dashboard-layout and .dashboard-main)
+@use 'styles/dashboard';
+
 // Import Tailwind & daisyUI
 @use 'tailwindcss';
 
@@ -229,8 +235,11 @@ p {
   margin-right: auto;
   padding-left: var(--content-padding);
   padding-right: var(--content-padding);
-  // Prevent horizontal overflow on mobile
   box-sizing: border-box;
+}
+
+.container-app--narrow {
+  max-width: 1024px;
 }
 
 // Section spacing
@@ -244,13 +253,11 @@ p {
    ============================================ */
 
 @media (hover: none) and (pointer: coarse) {
-  // Remove tap highlights
   * {
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
 
-  // Ensure all interactive elements are touch-friendly
   button,
   a,
   input,
@@ -259,6 +266,14 @@ p {
   [role='button'] {
     min-height: ds.$touch-min;
     min-width: ds.$touch-min;
+  }
+}
+
+@media (max-width: 640px) {
+  .input,
+  .select,
+  .textarea {
+    font-size: 16px;
   }
 }
 

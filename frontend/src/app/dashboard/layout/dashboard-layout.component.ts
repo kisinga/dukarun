@@ -47,7 +47,6 @@ import type { NavItem, NavSection } from './nav.types';
     UserAvatarButtonComponent,
   ],
   templateUrl: './dashboard-layout.component.html',
-  styleUrl: './dashboard-layout.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DashboardLayoutComponent implements OnInit {

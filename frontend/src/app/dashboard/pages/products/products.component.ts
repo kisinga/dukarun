@@ -56,7 +56,6 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
     PageHeaderComponent,
   ],
   templateUrl: './products.component.html',
-  styleUrl: './products.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProductsComponent implements OnInit {

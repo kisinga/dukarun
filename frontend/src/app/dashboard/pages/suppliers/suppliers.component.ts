@@ -46,7 +46,6 @@ import { SupplierPaymentModalComponent } from './components/supplier-payment-mod
     SupplierPaymentModalComponent,
   ],
   templateUrl: './suppliers.component.html',
-  styleUrl: './suppliers.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SuppliersComponent implements OnInit {

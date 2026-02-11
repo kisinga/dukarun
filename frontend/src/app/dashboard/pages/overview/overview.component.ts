@@ -49,7 +49,6 @@ interface RecentActivity {
   selector: 'app-overview',
   imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './overview.component.html',
-  styleUrl: './overview.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class OverviewComponent implements OnInit, OnDestroy {

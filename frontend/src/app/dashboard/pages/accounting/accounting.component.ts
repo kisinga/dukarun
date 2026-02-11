@@ -64,7 +64,6 @@ import { TransactionsTabComponent } from './components/transactions-tab.componen
     ReconciliationTabComponent,
   ],
   templateUrl: './accounting.component.html',
-  styleUrl: './accounting.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AccountingComponent implements OnInit {

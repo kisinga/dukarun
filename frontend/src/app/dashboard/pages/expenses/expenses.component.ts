@@ -27,7 +27,6 @@ const EXPENSE_SOURCE_TYPE = 'Expense';
   selector: 'app-expenses',
   imports: [CommonModule, PageHeaderComponent, RecordExpenseModalComponent],
   templateUrl: './expenses.component.html',
-  styleUrl: './expenses.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ExpensesComponent implements OnInit {

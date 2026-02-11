@@ -33,7 +33,6 @@ export interface TransferFromTo {
     TransactionDetailModalComponent,
   ],
   templateUrl: './transfers.component.html',
-  styleUrl: './transfers.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TransfersComponent implements OnInit {

@@ -260,6 +260,46 @@ $container-2xl: 1536px; // Full width limit
   }
 }
 
+.stat-card-overview {
+  @extend .stat-card;
+  background: oklch(var(--b1));
+  border-color: oklch(var(--b3));
+
+  &:hover {
+    border-color: oklch(var(--bc) / 0.15);
+  }
+}
+
+.stat-card-sales {
+  @extend .stat-card;
+  background: oklch(var(--su) / 0.04);
+  border-left-color: oklch(var(--su));
+
+  &:hover {
+    background: oklch(var(--su) / 0.07);
+  }
+}
+
+.stat-card-purchases {
+  @extend .stat-card;
+  background: oklch(var(--in) / 0.04);
+  border-left-color: oklch(var(--in));
+
+  &:hover {
+    background: oklch(var(--in) / 0.07);
+  }
+}
+
+.stat-card-expenses {
+  @extend .stat-card;
+  background: oklch(var(--er) / 0.04);
+  border-left-color: oklch(var(--er));
+
+  &:hover {
+    background: oklch(var(--er) / 0.07);
+  }
+}
+
 .section-collapse {
   @include card;
   overflow: hidden;

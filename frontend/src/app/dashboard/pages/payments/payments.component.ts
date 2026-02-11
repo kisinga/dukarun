@@ -37,7 +37,6 @@ import { PaymentTableRowComponent } from './components/payment-table-row.compone
     OrderDetailComponent,
   ],
   templateUrl: './payments.component.html',
-  styleUrl: './payments.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PaymentsComponent implements OnInit {

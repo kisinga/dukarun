@@ -24,7 +24,7 @@
   </button>
 </div>
 
-<div class="space-y-4 sm:space-y-5 lg:space-y-6">
+<div class="space-y-4 sm:space-y-5 lg:space-y-6 animate-stagger-children">
   <app-page-header title="Inter-account transfers" subtitle="Move funds between accounts">
     <div actions class="flex items-center gap-1">
       <button
@@ -89,7 +89,6 @@
         </div>
       </div>
     </div>
-
   } @else if (entries().length === 0 && !error()) {
     <div class="card bg-base-100 shadow">
       <div class="card-body">
@@ -148,7 +147,6 @@
         </div>
       </div>
     </div>
-
   } @else if (entries().length > 0) {
     <div class="card bg-base-100 shadow">
       <div class="card-body p-0">

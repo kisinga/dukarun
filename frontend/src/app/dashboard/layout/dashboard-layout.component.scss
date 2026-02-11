@@ -175,15 +175,3 @@ nav[role='navigation'] {
     border-radius: 3px;
   }
 }
-
-// Reduce motion
-@media (prefers-reduced-motion: reduce) {
-  .dropdown-content,
-  .drawer-side aside {
-    animation: none;
-  }
-
-  .nav-link-ripple::after {
-    display: none;
-  }
-}
