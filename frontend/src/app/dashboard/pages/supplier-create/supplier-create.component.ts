@@ -17,7 +17,9 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { SupplierService } from '../../../core/services/supplier.service';
 import { SupplierApiService } from '../../../core/services/supplier/supplier-api.service';
+import { CustomerService } from '../../../core/services/customer.service';
 import { AuthPermissionsService } from '../../../core/services/auth/auth-permissions.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { CreditManagementFormComponent } from '../shared/components/credit-management-form.component';
 import { PageHeaderComponent } from '../shared/components/page-header.component';
 import { ErrorAlertComponent } from '../shared/components/error-alert.component';
@@ -29,9 +31,8 @@ import { ApprovableFormBase } from '../shared/directives/approvable-form-base.di
 /**
  * Supplier Create/Edit Component
  *
- * Same UI for create and edit (product pattern).
- * Two-step form: Basic info + Supplier-specific info + credit.
- * Edit mode: route has id, load supplier and show step 2 pre-filled.
+ * Single-page form (same pattern as customer create/edit): Basic info, Supplier details, Credit management.
+ * Edit mode: route has id, load supplier and pre-fill all sections.
  */
 @Component({
   selector: 'app-supplier-create',
@@ -53,35 +54,6 @@ import { ApprovableFormBase } from '../shared/directives/approvable-form-base.di
         (backClick)="goBack()"
       />
 
-      <!-- Progress Indicator -->
-      <div class="px-4 py-2 bg-base-200">
-        <div class="flex items-center justify-center space-x-2 text-sm">
-          <div class="flex items-center">
-            <div
-              [class]="
-                'w-6 h-6 rounded-full flex items-center justify-center text-xs ' +
-                (step() >= 1 ? 'bg-primary text-primary-content' : 'bg-base-300')
-              "
-            >
-              1
-            </div>
-            <span class="ml-1">Basic Info</span>
-          </div>
-          <div class="w-8 h-px bg-base-300"></div>
-          <div class="flex items-center">
-            <div
-              [class]="
-                'w-6 h-6 rounded-full flex items-center justify-center text-xs ' +
-                (step() >= 2 ? 'bg-primary text-primary-content' : 'bg-base-300')
-              "
-            >
-              2
-            </div>
-            <span class="ml-1">Details &amp; Credit</span>
-          </div>
-        </div>
-      </div>
-
       <div class="p-4">
         <app-rejection-banner [message]="rejectionMessage()" (dismiss)="dismissRejection()" />
         <app-error-alert [message]="error()" (dismiss)="clearError()" />
@@ -91,52 +63,33 @@ import { ApprovableFormBase } from '../shared/directives/approvable-form-base.di
             <span class="loading loading-spinner loading-lg"></span>
           </div>
         } @else {
-          <!-- Step 1: Basic Info only (contact person, business, email, phone) -->
-          <div [class.hidden]="step() !== 1" class="space-y-4 max-w-md mx-auto">
+          <div class="space-y-4 max-w-md mx-auto">
+            <!-- Basic Information (same layout as customer create) -->
             <app-person-basic-info-form
               #basicInfoForm
               entityType="supplier"
               (contactError)="onContactError($event)"
             />
 
-            <!-- Next Button -->
+            <!-- Supplier type (single optional field, inline) -->
+            <app-supplier-details-form #supplierDetailsForm />
+
+            <!-- Credit Management -->
+            <app-credit-management-form
+              [hasPermission]="hasCreditPermission()"
+              [isReadonly]="false"
+              [initialCreditLimit]="creditInitials().creditLimit"
+              [initialCreditDuration]="creditInitials().creditDuration"
+              [initialIsCreditApproved]="creditInitials().isCreditApproved"
+              [showSummary]="true"
+              (creditChange)="onCreditChange($event)"
+            />
+
+            <!-- Submit Button -->
             <div class="sticky bottom-0 bg-base-100 pt-4 pb-2 border-t border-base-300 -mx-4 px-4">
               <button
                 type="button"
-                [disabled]="isStep1Disabled()"
-                (click)="onBasicSubmit()"
-                class="btn btn-primary w-full"
-              >
-                Next: Details &amp; Credit
-              </button>
-            </div>
-          </div>
-
-          <!-- Step 2: Supplier Details + Credit -->
-          @if (step() === 2) {
-            <div class="space-y-4 max-w-md mx-auto">
-              <app-supplier-details-form #supplierDetailsForm>
-                <button edit-button (click)="goToStep(1)" class="btn btn-ghost btn-sm">
-                  Edit Basic Info
-                </button>
-              </app-supplier-details-form>
-
-              <app-credit-management-form
-                [hasPermission]="hasCreditPermission()"
-                [isReadonly]="false"
-                [initialCreditLimit]="creditInitials().creditLimit"
-                [initialCreditDuration]="creditInitials().creditDuration"
-                [initialIsCreditApproved]="creditInitials().isCreditApproved"
-                [showSummary]="true"
-                (creditChange)="onCreditChange($event)"
-              />
-            </div>
-
-            <!-- Submit Button -->
-            <div class="form-control mt-6">
-              <button
-                type="button"
-                [disabled]="isStep2Disabled()"
+                [disabled]="isSubmitDisabled()"
                 (click)="onSupplierSubmit()"
                 class="btn btn-primary w-full"
               >
@@ -148,7 +101,7 @@ import { ApprovableFormBase } from '../shared/directives/approvable-form-base.di
                 }
               </button>
             </div>
-          }
+          </div>
         }
       </div>
     </div>
@@ -159,7 +112,9 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
   private readonly activatedRoute = inject(ActivatedRoute);
   readonly supplierService = inject(SupplierService);
   private readonly supplierApiService = inject(SupplierApiService);
+  private readonly customerService = inject(CustomerService);
   private readonly authPermissionsService = inject(AuthPermissionsService);
+  private readonly toastService = inject(ToastService);
 
   readonly basicInfoForm = viewChild<PersonBasicInfoFormComponent>('basicInfoForm');
   readonly supplierDetailsForm = viewChild<SupplierDetailsFormComponent>('supplierDetailsForm');
@@ -183,37 +138,15 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
   private readonly basicFormPatched = signal(false);
   private readonly detailsFormPatched = signal(false);
 
-  // Computed state for button disabled
-  readonly isStep1Disabled = computed(() => {
+  // Submit disabled when basic form invalid or creating (same as customer create)
+  readonly isSubmitDisabled = computed(() => {
     const form = this.basicInfoForm();
     if (!form) return true;
-
-    // Read validation state signal directly to ensure reactivity
-    const state = form.getValidationStateSignal()();
-
-    // Disable if not valid
-    return state !== 'valid';
-  });
-
-  readonly isStep2Disabled = computed(() => {
-    const basicForm = this.basicInfoForm();
-    if (!basicForm) return true;
-
-    // Disable if service is creating
     if (this.supplierService.isCreating()) return true;
-
-    // Read validation state signal directly to ensure reactivity
-    const state = basicForm.getValidationStateSignal()();
-    return (
-      state === 'checking' ||
-      state === 'invalid_duplicate' ||
-      state === 'invalid_format' ||
-      state === 'invalid_required'
-    );
+    return form.getValidationStateSignal()() !== 'valid';
   });
 
   // State
-  readonly step = signal<number>(1);
   readonly error = signal<string | null>(null);
   readonly creditData = signal<{
     creditLimit: number;
@@ -241,17 +174,13 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
         });
         this.basicFormPatched.set(true);
       }
-      if (this.step() === 2) {
-        const details = this.supplierDetailsForm();
-        if (details && !this.detailsFormPatched()) {
-          const cf = data.customFields || {};
-          details.getForm().patchValue({
-            supplierType: cf.supplierType || '',
-            paymentTerms: cf.paymentTerms || '',
-            notes: cf.notes || '',
-          });
-          this.detailsFormPatched.set(true);
-        }
+      const details = this.supplierDetailsForm();
+      if (details && !this.detailsFormPatched()) {
+        const cf = data.customFields || {};
+        details.getForm().patchValue({
+          supplierType: cf.supplierType || '',
+        });
+        this.detailsFormPatched.set(true);
       }
     });
   }
@@ -270,7 +199,7 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
   }
 
   /**
-   * Load supplier for edit and pre-fill forms; show step 2
+   * Load supplier for edit and pre-fill all form sections (single-page).
    */
   private async loadSupplierForEdit(id: string): Promise<void> {
     this.isLoadingEdit.set(true);
@@ -293,7 +222,6 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
         isCreditApproved: !!cf.isCreditApproved,
       });
       this.loadedSupplierData.set(supplier);
-      this.step.set(2);
     } catch (err: any) {
       this.error.set(err?.message || 'Failed to load supplier');
     } finally {
@@ -329,25 +257,7 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
   }
 
   /**
-   * Handle basic info submission (Step 1)
-   */
-  onBasicSubmit(): void {
-    const formComponent = this.basicInfoForm();
-    if (!formComponent) return;
-    const form = formComponent.getForm();
-
-    if (form.valid) {
-      this.goToStep(2);
-    } else {
-      // Mark all fields as touched to show validation errors
-      Object.keys(form.controls).forEach((key) => {
-        form.get(key)?.markAsTouched();
-      });
-    }
-  }
-
-  /**
-   * Handle supplier details submission (Step 2) – create or update
+   * Handle form submit – create or update supplier
    */
   async onSupplierSubmit(): Promise<void> {
     const basicFormComponent = this.basicInfoForm();
@@ -390,15 +300,13 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
         }
       }
 
-      // Map form data to backend format (contact person from basic info only)
+      // Map form data to backend format (contact person from basic info only; payment terms removed in favor of credit duration)
       const supplierInput: any = {
         firstName: basicForm.value.businessName,
         lastName: basicForm.value.contactPerson,
         phoneNumber: basicForm.value.phoneNumber,
         supplierType: supplierForm.value.supplierType,
         contactPerson: basicForm.value.contactPerson,
-        paymentTerms: supplierForm.value.paymentTerms,
-        notes: supplierForm.value.notes,
       };
 
       supplierInput.emailAddress =
@@ -406,32 +314,67 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
 
       if (this.hasCreditPermission()) {
         const credit = this.creditData();
-        if (credit.isCreditApproved) {
+        if (isEdit) {
+          // Always send full credit state on update so backend persists it
           supplierInput.isCreditApproved = credit.isCreditApproved;
-          if (credit.creditLimit > 0) supplierInput.creditLimit = credit.creditLimit;
-          if (credit.creditDuration > 0) supplierInput.creditDuration = credit.creditDuration;
+          supplierInput.creditLimit = credit.creditLimit ?? 0;
+          supplierInput.creditDuration = credit.creditDuration ?? 30;
+        } else {
+          if (credit.isCreditApproved) {
+            supplierInput.isCreditApproved = credit.isCreditApproved;
+            if (credit.creditLimit > 0) supplierInput.creditLimit = credit.creditLimit;
+            if (credit.creditDuration > 0) supplierInput.creditDuration = credit.creditDuration;
+          }
         }
       }
 
       if (isEdit && id) {
         const success = await this.supplierService.updateSupplier(id, supplierInput);
         if (success) {
+          // Persist credit via credit plugin (updateCustomer does not persist customFields reliably)
+          if (this.hasCreditPermission()) {
+            const credit = this.creditData();
+            try {
+              await this.customerService.approveCustomerCredit(
+                id,
+                credit.isCreditApproved,
+                credit.creditLimit ?? 0,
+                undefined,
+                credit.creditDuration ?? 30,
+              );
+            } catch (err: any) {
+              console.error('Supplier credit update failed:', err);
+              this.toastService.show(
+                'Credit',
+                err?.message || 'Supplier saved but credit update failed',
+                'error',
+              );
+            }
+          }
+          this.clearError();
+          this.toastService.show('Success', 'Supplier updated', 'success');
           this.supplierCreated.emit(id);
           if (this.mode() === 'page') {
             this.router.navigate(['/dashboard/suppliers']);
           }
         } else {
-          this.error.set(this.supplierService.error() || 'Failed to update supplier');
+          const errMsg = this.supplierService.error() || 'Failed to update supplier';
+          this.error.set(errMsg);
+          this.toastService.show('Error', errMsg, 'error');
         }
       } else {
         const supplierId = await this.supplierService.createSupplier(supplierInput);
         if (supplierId) {
+          this.clearError();
+          this.toastService.show('Success', 'Supplier created', 'success');
           this.supplierCreated.emit(supplierId);
           if (this.mode() === 'page') {
             this.router.navigate(['/dashboard/suppliers']);
           }
         } else {
-          this.error.set(this.supplierService.error() || 'Failed to create supplier');
+          const errMsg = this.supplierService.error() || 'Failed to create supplier';
+          this.error.set(errMsg);
+          this.toastService.show('Error', errMsg, 'error');
         }
       }
     } catch (err: any) {
@@ -439,14 +382,6 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
         err.message || (isEdit ? 'Failed to update supplier' : 'Failed to create supplier'),
       );
     }
-  }
-
-  /**
-   * Navigate between steps
-   */
-  goToStep(stepNumber: number): void {
-    this.step.set(stepNumber);
-    this.clearError();
   }
 
   /**
@@ -461,12 +396,8 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
    * Navigate back
    */
   goBack(): void {
-    if (this.step() === 2) {
-      this.goToStep(1);
-    } else {
-      if (this.mode() === 'page') {
-        this.router.navigate(['/dashboard/suppliers']);
-      }
+    if (this.mode() === 'page') {
+      this.router.navigate(['/dashboard/suppliers']);
     }
   }
 
@@ -497,7 +428,6 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
       basicInfo: basicForm?.getForm().value ?? {},
       supplierDetails: detailsForm?.getForm().value ?? {},
       creditData: this.creditData(),
-      step: this.step(),
     };
   }
 
@@ -513,10 +443,7 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
       this.creditData.set(data['creditData']);
       this.creditInitials.set(data['creditData']);
     }
-    if (data['step']) {
-      this.step.set(data['step']);
-    }
-    if (data['supplierDetails'] && this.step() === 2) {
+    if (data['supplierDetails']) {
       requestAnimationFrame(() => {
         const details = this.supplierDetailsForm();
         if (details) {

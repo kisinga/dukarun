@@ -5,8 +5,6 @@
  * when customers don't provide an email address.
  */
 
-import { formatPhoneNumber } from './phone.utils';
-
 /**
  * Check if an email address appears to be auto-generated
  *

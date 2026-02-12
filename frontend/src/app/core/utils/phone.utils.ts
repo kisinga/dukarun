@@ -1,22 +1,32 @@
+import type { ValidatorFn } from '@angular/forms';
+
+/**
+ * Kenyan phone format: 0XXXXXXXXX (10 digits).
+ * Leading 0 is trunk prefix mapping to +254 internationally.
+ * Accepts mobile (07xx) and landlines (01xx, 02xx, etc.).
+ */
+export const PHONE_PATTERN = /^0\d{9}$/;
+
 /**
  * Phone number utilities for Kenyan phone numbers
  *
- * Standard format: 07XXXXXXXX (10 digits starting with 07)
- * - Input can accept: 07XXXXXXXX, +2547XXXXXXXX, 2547XXXXXXXX, 7XXXXXXXX
- * - Storage/Output: Always normalized to 07XXXXXXXX
+ * Standard format: 0XXXXXXXXX (10 digits starting with 0)
+ * - Input can accept: 0XXXXXXXXX, +254XXXXXXXXX, 254XXXXXXXXX, XXXXXXXXX
+ * - Storage/Output: Always normalized to 0XXXXXXXXX
+ * - Accepts mobile (07xx) and landlines (01xx, 02xx, etc.)
  */
 
 /**
- * Normalize a phone number to standard format: 07XXXXXXXX
+ * Normalize a phone number to standard format: 0XXXXXXXXX
  *
  * Accepts various input formats:
- * - 07XXXXXXXX (already correct)
- * - +2547XXXXXXXX (international format)
- * - 2547XXXXXXXX (international without +)
- * - 7XXXXXXXX (missing leading 0)
+ * - 0XXXXXXXXX (already correct)
+ * - +254XXXXXXXXX (international format)
+ * - 254XXXXXXXXX (international without +)
+ * - XXXXXXXXX (9 digits, missing leading 0)
  *
  * @param phoneNumber - Phone number in any format
- * @returns Normalized phone number in format 07XXXXXXXX
+ * @returns Normalized phone number in format 0XXXXXXXXX
  * @throws Error if phone number cannot be normalized
  */
 export function formatPhoneNumber(phoneNumber: string): string {
@@ -24,42 +34,31 @@ export function formatPhoneNumber(phoneNumber: string): string {
     throw new Error('Phone number is required');
   }
 
-  // Remove all whitespace and non-digit characters except + at the start
-  let cleaned = phoneNumber.trim().replace(/[\s-]/g, '');
-
-  // Remove leading + if present
-  if (cleaned.startsWith('+')) {
-    cleaned = cleaned.substring(1);
-  }
+  // Remove all whitespace and non-digit characters
+  let cleaned = phoneNumber.trim().replace(/\D/g, '');
 
   // Handle different formats:
-  // +2547XXXXXXXX or 2547XXXXXXXX -> 07XXXXXXXX
+  // 254XXXXXXXXX (12 digits) -> 0XXXXXXXXX
   if (cleaned.startsWith('254') && cleaned.length === 12) {
     cleaned = '0' + cleaned.substring(3);
   }
-  // 7XXXXXXXX -> 07XXXXXXXX (if missing leading 0)
-  else if (cleaned.startsWith('7') && cleaned.length === 9) {
+  // XXXXXXXXX (9 digits starting with 1-9) -> 0XXXXXXXXX
+  else if (cleaned.length === 9 && /^[1-9]/.test(cleaned)) {
     cleaned = '0' + cleaned;
   }
-  // 07XXXXXXXX -> already correct
-  else if (cleaned.startsWith('07') && cleaned.length === 10) {
+  // 0XXXXXXXXX (10 digits) -> already correct
+  else if (cleaned.startsWith('0') && cleaned.length === 10) {
     // Already in correct format
-  }
-  // If already 10 digits but doesn't start with 07, try to fix
-  else if (cleaned.length === 10 && !cleaned.startsWith('07')) {
-    throw new Error(`Phone number must start with 07. Received: ${phoneNumber}`);
-  }
-  // Invalid length
-  else {
+  } else {
     throw new Error(
-      `Invalid phone number format. Expected 07XXXXXXXX (10 digits). Received: ${phoneNumber}`,
+      `Invalid phone number format. Expected 0XXXXXXXXX (10 digits, mobile or landline). Received: ${phoneNumber}`,
     );
   }
 
-  // Final validation: must be exactly 10 digits starting with 07
-  if (!/^07\d{8}$/.test(cleaned)) {
+  // Final validation: must be exactly 10 digits starting with 0
+  if (!PHONE_PATTERN.test(cleaned)) {
     throw new Error(
-      `Phone number must be in format 07XXXXXXXX (10 digits starting with 07). Received: ${phoneNumber}`,
+      `Phone number must be in format 0XXXXXXXXX (10 digits starting with 0). Received: ${phoneNumber}`,
     );
   }
 
@@ -67,7 +66,21 @@ export function formatPhoneNumber(phoneNumber: string): string {
 }
 
 /**
- * Validate if a phone number is in the correct format: 07XXXXXXXX
+ * Format phone number, returning null instead of throwing on invalid input.
+ *
+ * @param phoneNumber - Phone number in any format
+ * @returns Normalized phone number or null if invalid
+ */
+export function formatPhoneNumberOrNull(phoneNumber: string): string | null {
+  try {
+    return formatPhoneNumber(phoneNumber);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validate if a phone number is in the correct format: 0XXXXXXXXX
  *
  * @param phoneNumber - Phone number to validate
  * @returns true if valid, false otherwise
@@ -79,11 +92,23 @@ export function validatePhoneNumber(phoneNumber: string): boolean {
 
   try {
     const normalized = formatPhoneNumber(phoneNumber);
-    return /^07\d{8}$/.test(normalized);
+    return PHONE_PATTERN.test(normalized);
   } catch {
     return false;
   }
 }
+
+/**
+ * Angular ValidatorFn for phone number format.
+ * Use in Reactive Forms: Validators.compose([Validators.required, phoneValidator])
+ */
+export const phoneValidator: ValidatorFn = (control) => {
+  const value = control.value;
+  if (value == null || value === '') {
+    return null; // Let Validators.required handle empty
+  }
+  return validatePhoneNumber(value) ? null : { phoneFormat: true };
+};
 
 /**
  * Generate a random alphanumeric string
@@ -109,7 +134,7 @@ function generateRandomString(length: number = 4): string {
  */
 export function generateCompanyCode(
   companyName: string,
-  includeRandomSuffix: boolean = true
+  includeRandomSuffix: boolean = true,
 ): string {
   const sanitized = companyName
     .toLowerCase()

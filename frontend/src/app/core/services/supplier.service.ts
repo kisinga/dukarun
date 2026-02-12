@@ -12,11 +12,10 @@ export interface SupplierInput {
   emailAddress: string;
   phoneNumber?: string;
   password?: string;
-  // Supplier-specific custom fields
+  // Supplier-specific custom fields (payment terms removed in favor of credit duration)
   supplierType?: string;
   contactPerson?: string;
   taxId?: string;
-  paymentTerms?: string;
   notes?: string;
   // Credit fields (optional, requires permissions)
   isCreditApproved?: boolean;

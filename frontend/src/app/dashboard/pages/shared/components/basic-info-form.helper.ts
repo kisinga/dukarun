@@ -33,12 +33,8 @@ export class BasicInfoFormHelper {
       const formattedPhone = contactPickerService.formatPhoneNumber(data.phone);
       if (formattedPhone) {
         form.patchValue({ phoneNumber: formattedPhone });
-      } else {
-        // If formatting fails, still set the value but it will show validation error
-        form.patchValue({
-          phoneNumber: data.phone.replace(/\D/g, '').substring(0, 10),
-        });
       }
+      // If formatting fails, do not patch - leave field untouched so validation shows
     }
   }
 }
