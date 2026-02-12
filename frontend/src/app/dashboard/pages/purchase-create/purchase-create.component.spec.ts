@@ -1,8 +1,8 @@
 /**
- * PurchaseCreateComponent tests
+ * PurchaseCreateComponent tests.
  *
- * Prefill: handleProductSelect sets quantity 1 and unitCost from wholesale (cents to units).
- * Modal: onVariantSelectedFromModal calls handleProductSelect and closes modal.
+ * Composition: product/variant selection and prefill (qty, unitCost from wholesale) live in
+ * PurchaseItemEntryModalComponent. This component wires search → modal open and modal itemAdded → add line.
  */
 
 import { provideZonelessChangeDetection, signal } from '@angular/core';
@@ -12,6 +12,7 @@ import { of } from 'rxjs';
 import { DeepLinkService } from '../../../core/services/deep-link.service';
 import { LedgerService } from '../../../core/services/ledger/ledger.service';
 import {
+  ProductSearchResult,
   ProductSearchService,
   ProductVariant,
 } from '../../../core/services/product/product-search.service';
@@ -33,10 +34,32 @@ function makeVariant(overrides: Partial<ProductVariant> = {}): ProductVariant {
   };
 }
 
+function makeProduct(variants: ProductVariant[] = [makeVariant()]): ProductSearchResult {
+  return {
+    id: 'p1',
+    name: 'Product One',
+    slug: 'product-one',
+    variants: variants.length > 0 ? variants : undefined,
+  } as ProductSearchResult;
+}
+
 describe('PurchaseCreateComponent', () => {
   let component: PurchaseCreateComponent;
   let fixture: ComponentFixture<PurchaseCreateComponent>;
-  let purchaseService: jasmine.SpyObj<Pick<PurchaseService, 'initializeDraft' | 'purchaseDraft'>>;
+  let purchaseService: jasmine.SpyObj<
+    Pick<
+      PurchaseService,
+      | 'initializeDraft'
+      | 'purchaseDraft'
+      | 'addPurchaseItemLocal'
+      | 'removePurchaseItemLocal'
+      | 'updatePurchaseItemLocal'
+      | 'updateDraftField'
+      | 'submitPurchase'
+      | 'clearError'
+      | 'prepopulateItems'
+    >
+  >;
   let stockLocationService: {
     locations: ReturnType<typeof signal>;
     fetchStockLocations: jasmine.Spy;
@@ -118,37 +141,50 @@ describe('PurchaseCreateComponent', () => {
     fixture.detectChanges();
   });
 
-  describe('handleProductSelect (form prefill)', () => {
-    it('should set quantity to 1 and unitCost from wholesalePrice (cents to units)', () => {
-      const variant = makeVariant({
-        id: 'v1',
-        customFields: { wholesalePrice: 500 },
-      });
-      component.handleProductSelect(variant);
-      const item = component.newLineItem();
-      expect(item.quantity).toBe(1);
-      expect(item.unitCost).toBe(5);
-      expect(item.variantId).toBe('v1');
-      expect(item.stockLocationId).toBe('loc1');
-    });
+  describe('onVariantSelectedFromSearch', () => {
+    it('should open item entry modal with product and variant set', () => {
+      const product = makeProduct([makeVariant({ id: 'v1' })]);
+      const variant = makeVariant({ id: 'v1' });
 
-    it('should set unitCost to 0 when wholesalePrice is not present', () => {
-      const variant = makeVariant({ id: 'v2', customFields: undefined });
-      component.handleProductSelect(variant);
-      const item = component.newLineItem();
-      expect(item.quantity).toBe(1);
-      expect(item.unitCost).toBe(0);
+      component.onVariantSelectedFromSearch({ product, variant });
+
+      expect(component.showItemEntryModal()).toBe(true);
+      expect(component.itemEntryProduct()).toBe(product);
+      expect(component.itemEntryVariant()).toBe(variant);
     });
   });
 
-  describe('onVariantSelectedFromModal', () => {
-    it('should call handleProductSelect and close modal', () => {
-      const variant = makeVariant({ id: 'v1', customFields: { wholesalePrice: 1000 } });
-      component.showVariantPickerModal.set(true);
-      component.onVariantSelectedFromModal(variant);
-      expect(component.showVariantPickerModal()).toBe(false);
-      expect(component.newLineItem().variantId).toBe('v1');
-      expect(component.newLineItem().unitCost).toBe(10);
+  describe('onItemAddedFromModal', () => {
+    it('should add line via purchaseService and close modal', () => {
+      const variant = makeVariant({ id: 'v1' });
+      component.onItemAddedFromModal({ variant, quantity: 1, unitCost: 10 });
+
+      expect(purchaseService.addPurchaseItemLocal).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({
+          variantId: 'v1',
+          quantity: 1,
+          unitCost: 10,
+          stockLocationId: 'loc1',
+        }),
+      );
+      expect(component.showItemEntryModal()).toBe(false);
+      expect(component.itemEntryProduct()).toBeNull();
+      expect(component.itemEntryVariant()).toBeNull();
+    });
+  });
+
+  describe('closeItemEntryModal', () => {
+    it('should clear modal state', () => {
+      const product = makeProduct();
+      component.itemEntryProduct.set(product);
+      component.itemEntryVariant.set(makeVariant());
+      component.showItemEntryModal.set(true);
+
+      component.closeItemEntryModal();
+
+      expect(component.showItemEntryModal()).toBe(false);
+      expect(component.itemEntryProduct()).toBeNull();
+      expect(component.itemEntryVariant()).toBeNull();
     });
   });
 });

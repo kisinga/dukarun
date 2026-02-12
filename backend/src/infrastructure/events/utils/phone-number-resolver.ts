@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RequestContext, User, UserService, Customer, CustomerService } from '@vendure/core';
-import { validatePhoneNumber } from '../../../utils/phone.utils';
+import { formatPhoneNumber, validatePhoneNumber } from '../../../utils/phone.utils';
 
 /**
  * Phone Number Resolver
@@ -43,7 +43,7 @@ export class PhoneNumberResolver {
     if (data?.phoneNumber) {
       const phoneNumber = data.phoneNumber;
       if (validatePhoneNumber(phoneNumber)) {
-        return phoneNumber;
+        return formatPhoneNumber(phoneNumber);
       } else {
         this.logger.warn(`Invalid phone number in event data: ${phoneNumber}`);
         return null;

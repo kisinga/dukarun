@@ -36,6 +36,7 @@
     [showCameraButton]="isManualSearchActive()"
     (searchTermChange)="handleSearchTermChange($event)"
     (productSelected)="handleProductSelected($event)"
+    (variantSelected)="handleVariantSelectedFromSearch($event)"
     (cameraToggle)="handleClearSearch()"
   />
 

@@ -1,34 +1,29 @@
 /**
- * Credit service. Frozen = credit disabled and outstanding ≠ 0 (inferred).
- * No new credit; payments accepted. Not stored.
+ * Unified Credit Service.
+ *
+ * Handles credit approval, limits, and repayment tracking for both
+ * customers and suppliers via CreditPartyType field mapping.
+ *
+ * Outstanding balances are derived from the ledger (single source of truth).
+ * Frozen = credit disabled AND outstanding ≠ 0 (inferred, not stored).
  */
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   Customer,
   ID,
-  Order,
-  OrderService,
-  Payment,
   RequestContext,
   TransactionalConnection,
   UserInputError,
 } from '@vendure/core';
-import { In } from 'typeorm';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { ChannelCommunicationService } from '../channels/channel-communication.service';
 import { FinancialService } from '../financial/financial.service';
-
-export interface CreditSummary {
-  customerId: ID;
-  isCreditApproved: boolean;
-  creditFrozen: boolean;
-  creditLimit: number;
-  outstandingAmount: number;
-  availableCredit: number;
-  lastRepaymentDate?: Date | null;
-  lastRepaymentAmount: number;
-  creditDuration: number;
-}
+import {
+  CreditFieldMap,
+  CreditPartyType,
+  CreditSummary,
+  CREDIT_FIELD_MAPS,
+} from './credit-party.types';
 
 @Injectable()
 export class CreditService {
@@ -36,191 +31,171 @@ export class CreditService {
 
   constructor(
     private readonly connection: TransactionalConnection,
-    private readonly orderService: OrderService,
     private readonly financialService: FinancialService,
-    @Optional() private readonly communicationService?: ChannelCommunicationService, // Optional to avoid circular dependency
-    @Optional() private readonly auditService?: AuditService // Optional to avoid circular dependency
+    @Optional() private readonly communicationService?: ChannelCommunicationService,
+    @Optional() private readonly auditService?: AuditService
   ) {}
 
-  async getCreditSummary(ctx: RequestContext, customerId: ID): Promise<CreditSummary> {
-    const customer = await this.getCustomerOrThrow(ctx, customerId);
-    // Get outstanding amount from ledger (single source of truth)
-    const outstandingAmount = await this.financialService.getCustomerBalance(
-      ctx,
-      customerId.toString()
-    );
-    return this.mapToSummary(customer, outstandingAmount);
+  async getCreditSummary(
+    ctx: RequestContext,
+    entityId: ID,
+    partyType: CreditPartyType
+  ): Promise<CreditSummary> {
+    const customer = await this.getEntityOrThrow(ctx, entityId, partyType);
+    const outstandingAmount = await this.getBalance(ctx, entityId, partyType);
+    return this.mapToSummary(customer, outstandingAmount, partyType);
   }
 
-  async approveCustomerCredit(
+  async approveCredit(
     ctx: RequestContext,
-    customerId: ID,
+    entityId: ID,
+    partyType: CreditPartyType,
     approved: boolean,
     creditLimit?: number,
     creditDuration?: number
   ): Promise<CreditSummary> {
-    const customer = await this.getCustomerOrThrow(ctx, customerId);
+    const customer = await this.getEntityOrThrow(ctx, entityId, partyType);
+    const fields = CREDIT_FIELD_MAPS[partyType];
     const customFields = customer.customFields as any;
 
     customer.customFields = {
       ...customFields,
-      isCreditApproved: approved,
-      creditLimit: creditLimit ?? customFields?.creditLimit ?? 0,
-      creditDuration: creditDuration ?? customFields?.creditDuration ?? 30,
-    } as any;
-
-    // Update custom field for user tracking
-    customer.customFields = {
-      ...customer.customFields,
-      creditApprovedByUserId: ctx.activeUserId,
+      [fields.isApproved]: approved,
+      [fields.creditLimit]: creditLimit ?? customFields?.[fields.creditLimit] ?? 0,
+      [fields.creditDuration]: creditDuration ?? customFields?.[fields.creditDuration] ?? 30,
+      [fields.approvedByUserId]: ctx.activeUserId,
     } as any;
 
     await this.connection.getRepository(ctx, Customer).save(customer);
     this.logger.log(
-      `Updated credit approval for customer ${customerId}: approved=${approved} limit=${(customer.customFields as any).creditLimit} duration=${(customer.customFields as any).creditDuration}`
+      `Updated ${partyType} credit approval for ${entityId}: approved=${approved} ` +
+        `limit=${(customer.customFields as any)[fields.creditLimit]} ` +
+        `duration=${(customer.customFields as any)[fields.creditDuration]}`
     );
 
-    // Log audit event
     if (this.auditService) {
-      await this.auditService.log(ctx, 'customer.credit.approved', {
+      await this.auditService.log(ctx, `${partyType}.credit.approved`, {
         entityType: 'Customer',
-        entityId: customerId.toString(),
+        entityId: entityId.toString(),
         data: {
           approved,
-          creditLimit: (customer.customFields as any).creditLimit,
-          creditDuration: (customer.customFields as any).creditDuration,
+          creditLimit: (customer.customFields as any)[fields.creditLimit],
+          creditDuration: (customer.customFields as any)[fields.creditDuration],
         },
       });
     }
 
-    const outstandingAmount = await this.financialService.getCustomerBalance(
-      ctx,
-      customerId.toString()
-    );
-    return this.mapToSummary(customer, outstandingAmount);
+    const outstandingAmount = await this.getBalance(ctx, entityId, partyType);
+    return this.mapToSummary(customer, outstandingAmount, partyType);
   }
 
-  async updateCustomerCreditLimit(
+  async updateCreditLimit(
     ctx: RequestContext,
-    customerId: ID,
+    entityId: ID,
+    partyType: CreditPartyType,
     creditLimit: number,
     creditDuration?: number
   ): Promise<CreditSummary> {
     if (creditLimit < 0) {
       throw new UserInputError('Credit limit must be zero or positive.');
     }
-
     if (creditDuration !== undefined && creditDuration < 1) {
       throw new UserInputError('Credit duration must be at least 1 day.');
     }
 
-    const customer = await this.getCustomerOrThrow(ctx, customerId);
+    const customer = await this.getEntityOrThrow(ctx, entityId, partyType);
+    const fields = CREDIT_FIELD_MAPS[partyType];
     const customFields = customer.customFields as any;
+
     customer.customFields = {
       ...customFields,
-      creditLimit,
-      ...(creditDuration !== undefined && { creditDuration }),
+      [fields.creditLimit]: creditLimit,
+      ...(creditDuration !== undefined && { [fields.creditDuration]: creditDuration }),
     } as any;
 
     await this.connection.getRepository(ctx, Customer).save(customer);
     this.logger.log(
-      `Updated credit limit for customer ${customerId} to ${creditLimit}${creditDuration !== undefined ? `, duration: ${creditDuration}` : ''}`
+      `Updated ${partyType} credit limit for ${entityId} to ${creditLimit}` +
+        (creditDuration !== undefined ? `, duration: ${creditDuration}` : '')
     );
 
-    // Log audit event
     if (this.auditService) {
-      await this.auditService.log(ctx, 'customer.credit.limit_changed', {
+      await this.auditService.log(ctx, `${partyType}.credit.limit_changed`, {
         entityType: 'Customer',
-        entityId: customerId.toString(),
-        data: {
-          creditLimit,
-          creditDuration,
-        },
+        entityId: entityId.toString(),
+        data: { creditLimit, creditDuration },
       });
     }
 
-    const outstandingAmount = await this.financialService.getCustomerBalance(
-      ctx,
-      customerId.toString()
-    );
-    return this.mapToSummary(customer, outstandingAmount);
+    const outstandingAmount = await this.getBalance(ctx, entityId, partyType);
+    return this.mapToSummary(customer, outstandingAmount, partyType);
   }
 
   async updateCreditDuration(
     ctx: RequestContext,
-    customerId: ID,
+    entityId: ID,
+    partyType: CreditPartyType,
     creditDuration: number
   ): Promise<CreditSummary> {
     if (creditDuration < 1) {
       throw new UserInputError('Credit duration must be at least 1 day.');
     }
 
-    const customer = await this.getCustomerOrThrow(ctx, customerId);
+    const customer = await this.getEntityOrThrow(ctx, entityId, partyType);
+    const fields = CREDIT_FIELD_MAPS[partyType];
     const customFields = customer.customFields as any;
+
     customer.customFields = {
       ...customFields,
-      creditDuration,
+      [fields.creditDuration]: creditDuration,
     } as any;
 
     await this.connection.getRepository(ctx, Customer).save(customer);
-    this.logger.log(`Updated credit duration for customer ${customerId} to ${creditDuration} days`);
-
-    const outstandingAmount = await this.financialService.getCustomerBalance(
-      ctx,
-      customerId.toString()
+    this.logger.log(
+      `Updated ${partyType} credit duration for ${entityId} to ${creditDuration} days`
     );
-    return this.mapToSummary(customer, outstandingAmount);
+
+    const outstandingAmount = await this.getBalance(ctx, entityId, partyType);
+    return this.mapToSummary(customer, outstandingAmount, partyType);
   }
 
   /**
-   * @deprecated Outstanding balance is derived from the ledger.
-   * This method is kept for backward compatibility but does nothing.
+   * Record repayment tracking (last date + amount).
+   * Called after a payment is allocated to orders/purchases.
    */
-  async applyCreditCharge(ctx: RequestContext, customerId: ID, amount: number): Promise<void> {
-    // No-op: Outstanding balance is now calculated dynamically from orders
-    this.logger.debug(
-      `applyCreditCharge called for customer ${customerId} with amount ${amount}. This is a no-op as outstanding balance is calculated dynamically.`
-    );
-  }
-
-  /**
-   * @deprecated Outstanding balance is derived from the ledger.
-   * This method is kept for backward compatibility but updates lastRepaymentDate and lastRepaymentAmount.
-   */
-  async releaseCreditCharge(ctx: RequestContext, customerId: ID, amount: number): Promise<void> {
+  async recordRepayment(
+    ctx: RequestContext,
+    entityId: ID,
+    partyType: CreditPartyType,
+    amount: number
+  ): Promise<void> {
     if (amount <= 0) {
       return;
     }
 
-    // Update last repayment tracking fields (these are still stored)
-    const customer = await this.getCustomerOrThrow(ctx, customerId);
+    const customer = await this.getEntityOrThrow(ctx, entityId, partyType);
+    const fields = CREDIT_FIELD_MAPS[partyType];
     const customFields = customer.customFields as any;
     const now = new Date();
 
     customer.customFields = {
       ...customFields,
-      lastRepaymentDate: now,
-      lastRepaymentAmount: amount,
+      [fields.lastRepaymentDate]: now,
+      [fields.lastRepaymentAmount]: amount,
     } as any;
 
     await this.connection.getRepository(ctx, Customer).save(customer);
     this.logger.log(
-      `Recorded repayment tracking for customer ${customerId}. Amount: ${amount}, Date: ${now}`
+      `Recorded ${partyType} repayment for ${entityId}. Amount: ${amount}, Date: ${now}`
     );
 
-    // Notify about balance change (outstanding balance is calculated from ledger)
     if (this.communicationService) {
-      const currentOutstanding = await this.financialService.getCustomerBalance(
-        ctx,
-        customerId.toString()
-      );
-      // Note: We can't calculate the previous outstanding without the old stored value,
-      // so we'll just notify with the current value
+      const currentOutstanding = await this.getBalance(ctx, entityId, partyType);
       await this.communicationService
         .sendBalanceChangeNotification(
           ctx,
-          String(customerId),
-          currentOutstanding + amount, // Estimate previous balance
+          String(entityId),
+          currentOutstanding + amount,
           currentOutstanding
         )
         .catch(error => {
@@ -231,51 +206,67 @@ export class CreditService {
     }
   }
 
-  async markPaymentMetadata(
-    ctx: RequestContext,
-    paymentId: ID,
-    metadata: Record<string, unknown>
-  ): Promise<void> {
-    await this.connection.getRepository(ctx, Payment).save({
-      id: paymentId,
-      metadata,
-    } as Payment);
-  }
+  // ── Private helpers ──────────────────────────────────────────────
 
-  private async getCustomerOrThrow(ctx: RequestContext, customerId: ID): Promise<Customer> {
+  private async getEntityOrThrow(
+    ctx: RequestContext,
+    entityId: ID,
+    partyType: CreditPartyType
+  ): Promise<Customer> {
     const customer = await this.connection.getRepository(ctx, Customer).findOne({
-      where: { id: customerId },
+      where: { id: entityId },
     });
 
     if (!customer) {
-      throw new UserInputError(`Customer ${customerId} not found`);
+      const label = partyType === 'supplier' ? 'Supplier' : 'Customer';
+      throw new UserInputError(`${label} ${entityId} not found`);
+    }
+
+    if (partyType === 'supplier') {
+      const customFields = customer.customFields as any;
+      if (!customFields?.isSupplier) {
+        throw new UserInputError(`Customer ${entityId} is not marked as a supplier.`);
+      }
     }
 
     return customer;
   }
 
-  private mapToSummary(customer: Customer, outstandingAmount: number): CreditSummary {
-    const customFields = customer.customFields as any;
-    const isCreditApproved = Boolean(customFields?.isCreditApproved);
+  private async getBalance(
+    ctx: RequestContext,
+    entityId: ID,
+    partyType: CreditPartyType
+  ): Promise<number> {
+    return partyType === 'supplier'
+      ? this.financialService.getSupplierBalance(ctx, entityId.toString())
+      : this.financialService.getCustomerBalance(ctx, entityId.toString());
+  }
+
+  private mapToSummary(
+    customer: Customer,
+    outstandingAmount: number,
+    partyType: CreditPartyType
+  ): CreditSummary {
+    const fields = CREDIT_FIELD_MAPS[partyType];
+    const cf = customer.customFields as any;
+    const isCreditApproved = Boolean(cf?.[fields.isApproved]);
+    const creditLimit = Number(cf?.[fields.creditLimit] ?? 0);
+    const creditDuration = Number(cf?.[fields.creditDuration] ?? 30);
     const creditFrozen = !isCreditApproved && outstandingAmount !== 0;
-    const creditLimit = Number(customFields?.creditLimit ?? 0);
-    // outstandingAmount is now passed as parameter (calculated dynamically)
     const availableCredit = Math.max(creditLimit - Math.abs(outstandingAmount), 0);
-    const lastRepaymentDate = customFields?.lastRepaymentDate
-      ? new Date(customFields.lastRepaymentDate)
-      : null;
-    const lastRepaymentAmount = Number(customFields?.lastRepaymentAmount ?? 0);
-    const creditDuration = Number(customFields?.creditDuration ?? 30);
 
     return {
-      customerId: customer.id,
+      entityId: customer.id,
+      partyType,
       isCreditApproved,
       creditFrozen,
       creditLimit,
-      outstandingAmount, // Now calculated dynamically
+      outstandingAmount,
       availableCredit,
-      lastRepaymentDate,
-      lastRepaymentAmount,
+      lastRepaymentDate: cf?.[fields.lastRepaymentDate]
+        ? new Date(cf[fields.lastRepaymentDate])
+        : null,
+      lastRepaymentAmount: Number(cf?.[fields.lastRepaymentAmount] ?? 0),
       creditDuration,
     };
   }

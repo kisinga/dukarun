@@ -21,6 +21,7 @@ import { CommunicationService } from '../../infrastructure/communication/communi
 import { RoleTemplate } from '../../domain/role-template/role-template.entity';
 import { RoleTemplateAssignment } from '../../domain/role-template/role-template-assignment.entity';
 import { RoleTemplateService } from './role-template.service';
+import { formatPhoneNumber } from '../../utils/phone.utils';
 
 export interface InviteAdministratorInput {
   emailAddress?: string;
@@ -100,6 +101,15 @@ export class ChannelAdminService {
     }
 
     const cleanInput = normalizedInput;
+    try {
+      cleanInput.phoneNumber = formatPhoneNumber(cleanInput.phoneNumber);
+    } catch (e) {
+      throw new BadRequestException(
+        e instanceof Error
+          ? e.message
+          : 'Invalid phone number format. Expected 0XXXXXXXXX (10 digits starting with 0).'
+      );
+    }
 
     const existingUser = await this.findExistingUserByPhone(ctx, cleanInput.phoneNumber);
 

@@ -3,7 +3,7 @@ import { RequestContext, TransactionalConnection, UserInputError } from '@vendur
 import { In } from 'typeorm';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { ChartOfAccountsService } from '../financial/chart-of-accounts.service';
-import { SupplierCreditService } from '../credit/supplier-credit.service';
+import { CreditService } from '../credit/credit.service';
 import { FinancialService } from '../financial/financial.service';
 import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
 import { StockPurchase } from '../stock/entities/purchase.entity';
@@ -38,7 +38,7 @@ export class SupplierPaymentAllocationService {
 
   constructor(
     private readonly connection: TransactionalConnection,
-    private readonly supplierCreditService: SupplierCreditService,
+    private readonly creditService: CreditService,
     private readonly financialService: FinancialService,
     private readonly chartOfAccountsService: ChartOfAccountsService,
     @Optional() private readonly auditService?: AuditService
@@ -212,9 +212,10 @@ export class SupplierPaymentAllocationService {
 
         // 7. Record repayment tracking if any payment was made
         if (calculation.totalAllocated > 0) {
-          await this.supplierCreditService.recordSupplierRepayment(
+          await this.creditService.recordRepayment(
             transactionCtx,
             input.supplierId,
+            'supplier',
             calculation.totalAllocated
           );
         }

@@ -31,10 +31,7 @@ import { CurrencyService } from '../../../../../core/services/currency.service';
             @for (line of lines(); track line.id) {
               <tr>
                 <td>
-                  <div class="font-medium">{{ line.variant?.name || 'Unknown Product' }}</div>
-                  @if (line.variant?.sku) {
-                    <div class="text-sm text-base-content/60">SKU: {{ line.variant?.sku }}</div>
-                  }
+                  <div class="font-medium">{{ getLineItemName(line) }}</div>
                 </td>
                 <td class="text-right">
                   {{ line.stockLocation?.name || 'N/A' }}
@@ -56,11 +53,8 @@ import { CurrencyService } from '../../../../../core/services/currency.service';
               <div class="flex justify-between items-start mb-2">
                 <div class="flex-1 min-w-0">
                   <h4 class="font-semibold text-base text-base-content">
-                    {{ line.variant?.name || 'Unknown Product' }}
+                    {{ getLineItemName(line) }}
                   </h4>
-                  @if (line.variant?.sku) {
-                    <p class="text-xs text-base-content/60 mt-1">SKU: {{ line.variant?.sku }}</p>
-                  }
                   @if (line.stockLocation?.name) {
                     <p class="text-xs text-base-content/60 mt-1">
                       Location: {{ line.stockLocation?.name }}
@@ -97,7 +91,7 @@ export class PurchaseItemsTableComponent {
       variant?: {
         id: string;
         name: string;
-        sku?: string;
+        product?: { id: string; name: string } | null;
       };
       quantity: number;
       unitCost: number;
@@ -109,6 +103,17 @@ export class PurchaseItemsTableComponent {
       };
     }>
   >();
+
+  getLineItemName(line: { variant?: { name: string; product?: { name: string } | null } }): string {
+    const v = line.variant;
+    if (!v) return 'Unknown Product';
+    const productName = v.product?.name;
+    const variantName = v.name;
+    if (productName && variantName !== productName) {
+      return `${productName} – ${variantName}`;
+    }
+    return variantName;
+  }
 
   formatCurrency(amount: number): string {
     return this.currencyService.format(amount, false);

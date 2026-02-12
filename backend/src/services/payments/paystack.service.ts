@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import crypto from 'crypto';
+import { formatPhoneNumber, toInternationalFormat } from '../../utils/phone.utils';
 
 export interface PaystackTransactionResponse {
   status: boolean;
@@ -92,7 +93,8 @@ export class PaystackService {
   ): Promise<T> {
     // Validate secret key before making request
     if (!this.secretKey || this.secretKey.trim() === '') {
-      const errorMessage = 'PAYSTACK_SECRET_KEY is not set or is empty. Please configure the Paystack secret key in your environment variables.';
+      const errorMessage =
+        'PAYSTACK_SECRET_KEY is not set or is empty. Please configure the Paystack secret key in your environment variables.';
       this.logger.error(errorMessage);
       throw new Error(errorMessage);
     }
@@ -180,7 +182,7 @@ export class PaystackService {
   }
 
   /**
-   * Charge mobile money via STK push
+   * Charge mobile money via STK push (mobile 07XXXXXXXX only; landlines not valid)
    */
   async chargeMobile(
     amount: number,
@@ -189,37 +191,8 @@ export class PaystackService {
     reference: string,
     metadata?: Record<string, any>
   ): Promise<PaystackChargeResponse> {
-    // Convert phone number to international format for Paystack
-    // Paystack expects: +254712345678 (with + sign) for mobile_money object
-    // Input might be: 07XXXXXXXX (local format)
-    let formattedPhone = phone.trim();
-
-    // Remove leading + if present (we'll add it back)
-    if (formattedPhone.startsWith('+')) {
-      formattedPhone = formattedPhone.substring(1);
-    }
-
-    // Convert 07XXXXXXXX to 2547XXXXXXXX
-    if (formattedPhone.startsWith('07') && formattedPhone.length === 10) {
-      formattedPhone = '254' + formattedPhone.substring(1);
-    }
-
-    // Ensure it starts with 254 for Kenya
-    if (!formattedPhone.startsWith('254')) {
-      throw new Error(
-        `Invalid phone number format for Paystack: ${phone}. Expected format: 07XXXXXXXX or +2547XXXXXXXX or 2547XXXXXXXX`
-      );
-    }
-
-    // Validate: should be 12 digits (254 + 9 digits starting with 7)
-    if (!/^2547\d{8}$/.test(formattedPhone)) {
-      throw new Error(
-        `Invalid phone number format for Paystack: ${phone}. Expected format: 07XXXXXXXX or +2547XXXXXXXX or 2547XXXXXXXX`
-      );
-    }
-
-    // Paystack mobile_money requires phone with + sign: +254712345678
-    const mobileMoneyPhone = '+' + formattedPhone;
+    const normalized = formatPhoneNumber(phone);
+    const mobileMoneyPhone = '+' + toInternationalFormat(normalized);
 
     const body = {
       amount: amount * 100, // Convert to kobo/cents

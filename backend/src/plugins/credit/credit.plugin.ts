@@ -5,7 +5,7 @@ import { LedgerPlugin } from '../ledger/ledger.plugin';
 import { gql } from 'graphql-tag';
 
 import { CreditService } from '../../services/credit/credit.service';
-import { SupplierCreditService } from '../../services/credit/supplier-credit.service';
+import { CreditValidatorService } from '../../services/credit/credit-validator.service';
 import { ChartOfAccountsService } from '../../services/financial/chart-of-accounts.service';
 import { FinancialService } from '../../services/financial/financial.service';
 import { LedgerPostingService } from '../../services/financial/ledger-posting.service';
@@ -15,7 +15,6 @@ import { PurchasePostingStrategy } from '../../services/financial/strategies/pur
 import { SalePostingStrategy } from '../../services/financial/strategies/sale-posting.strategy';
 import { OrderAddressService } from '../../services/orders/order-address.service';
 import { OrderCreationService } from '../../services/orders/order-creation.service';
-import { OrderCreditValidatorService } from '../../services/orders/order-credit-validator.service';
 import { OrderFulfillmentService } from '../../services/orders/order-fulfillment.service';
 import { OrderItemService } from '../../services/orders/order-item.service';
 import { OrderPaymentService } from '../../services/orders/order-payment.service';
@@ -25,7 +24,6 @@ import { PaymentAllocationService } from '../../services/payments/payment-alloca
 import { PaymentEventsAdapter } from '../../services/payments/payment-events.adapter';
 import { createCreditPaymentHandler } from '../../services/payments/payment-handlers';
 import { SupplierPaymentAllocationService } from '../../services/payments/supplier-payment-allocation.service';
-import { PurchaseCreditValidatorService } from '../../services/stock/purchase-credit-validator.service';
 import { CreditPaymentSubscriber } from './credit-payment.subscriber';
 import { CreditResolver } from './credit.resolver';
 import { CustomerFieldResolver } from './customer.resolver';
@@ -255,12 +253,11 @@ const COMBINED_SCHEMA = gql`
     ChartOfAccountsService,
     // Credit services
     CreditService,
-    SupplierCreditService,
+    CreditValidatorService,
     // Order services
     OrderCreationService,
     PriceOverrideService,
     OrderAddressService,
-    OrderCreditValidatorService,
     OrderFulfillmentService,
     OrderItemService,
     OrderPaymentService,
@@ -268,8 +265,6 @@ const COMBINED_SCHEMA = gql`
     // Payment services
     PaymentAllocationService,
     SupplierPaymentAllocationService,
-    // Stock services
-    PurchaseCreditValidatorService,
     // Resolvers and subscribers
     CreditResolver,
     CustomerFieldResolver,
@@ -280,9 +275,11 @@ const COMBINED_SCHEMA = gql`
     PaymentEventsAdapter, // Moved from LedgerPlugin - needs FinancialService
   ],
   exports: [
-    // Export FinancialService for use by other plugins
+    // Export for use by other plugins (StockPlugin, etc.)
     FinancialService,
     ChartOfAccountsService,
+    CreditService,
+    CreditValidatorService,
   ],
   configuration: config => {
     // Register custom permissions

@@ -10,12 +10,12 @@ import {
   signal,
 } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ContactPickerService } from '../../../../core/services/contact-picker.service';
 import { phoneValidator } from '../../../../core/utils/phone.utils';
 import { EntityAvatarComponent } from '../../../components/shared/entity-avatar.component';
-import { ContactPickerButtonComponent } from './contact-picker-button.component';
-import { ContactPickerService } from '../../../../core/services/contact-picker.service';
-import { ValidationState } from './basic-info-form.types';
 import { BasicInfoFormHelper } from './basic-info-form.helper';
+import { ValidationState } from './basic-info-form.types';
+import { ContactPickerButtonComponent } from './contact-picker-button.component';
 
 export type { ValidationState };
 

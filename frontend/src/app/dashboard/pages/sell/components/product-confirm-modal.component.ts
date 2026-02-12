@@ -1,9 +1,11 @@
 import { CommonModule } from '@angular/common';
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   effect,
   inject,
+  Injector,
   input,
   output,
   signal,
@@ -108,50 +110,77 @@ import {
                     <div class="text-right flex items-center gap-2">
                       @if (canOverridePrices() && variant.stockLevel === 'IN_STOCK') {
                         <!-- Price Controls -->
-                        <div class="flex items-center gap-1">
-                          <button
-                            class="btn btn-square btn-xs btn-ghost"
-                            (click)="decreaseVariantPrice(variant)"
-                            aria-label="Decrease price by 3%"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              class="h-3.5 w-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
+                        <div class="flex items-center gap-1" (click)="$event.stopPropagation()">
+                          @if (editingPriceVariantId() !== variant.id) {
+                            <button
+                              class="btn btn-square btn-xs btn-ghost"
+                              (click)="decreaseVariantPrice(variant)"
+                              aria-label="Decrease price by 3%"
                             >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M19 9l-7 7-7-7"
-                              />
-                            </svg>
-                          </button>
-                          <div class="text-base font-bold text-tabular min-w-[4rem] text-center">
-                            {{ getVariantPrice(variant) }}
-                          </div>
-                          <button
-                            class="btn btn-square btn-xs btn-ghost"
-                            (click)="increaseVariantPrice(variant)"
-                            aria-label="Increase price by 3%"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              class="h-3.5 w-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="h-3.5 w-3.5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M19 9l-7 7-7-7"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              class="text-base font-bold text-tabular min-w-[4rem] text-center cursor-pointer hover:underline"
+                              (click)="enterPriceEdit(variant)"
+                              aria-label="Edit price"
                             >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 15l7-7 7 7"
-                              />
-                            </svg>
-                          </button>
+                              {{ getVariantPrice(variant) }}
+                            </button>
+                            <button
+                              class="btn btn-square btn-xs btn-ghost"
+                              (click)="increaseVariantPrice(variant)"
+                              aria-label="Increase price by 3%"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="h-3.5 w-3.5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M5 15l7-7 7 7"
+                                />
+                              </svg>
+                            </button>
+                          } @else {
+                            <input
+                              type="text"
+                              inputmode="decimal"
+                              class="input input-xs input-bordered text-base font-bold text-tabular min-w-[4rem] text-center price-edit-input"
+                              [value]="priceEditInputValue()"
+                              (input)="priceEditInputValue.set($any($event.target).value)"
+                              (blur)="commitPriceEdit(variant)"
+                              (keydown.enter)="commitPriceEdit(variant)"
+                              (keydown.escape)="cancelPriceEdit()"
+                              aria-label="Price"
+                            />
+                            <button
+                              type="button"
+                              class="btn btn-ghost btn-xs"
+                              (click)="resetPriceEdit(variant)"
+                              aria-label="Reset price to default"
+                            >
+                              Reset
+                            </button>
+                          }
                         </div>
                       } @else {
                         <div class="text-base font-bold text-tabular">
@@ -222,51 +251,76 @@ import {
                     @if (canOverridePrices() && product()!.variants[0].stockLevel === 'IN_STOCK') {
                       <!-- Price Controls -->
                       <div class="flex items-center gap-1">
-                        <button
-                          class="btn btn-square btn-xs btn-ghost"
-                          (click)="decreaseSingleVariantPrice()"
-                          aria-label="Decrease price by 3%"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-3.5 w-3.5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
+                        @if (editingPriceVariantId() !== product()!.variants[0].id) {
+                          <button
+                            class="btn btn-square btn-xs btn-ghost"
+                            (click)="decreaseSingleVariantPrice()"
+                            aria-label="Decrease price by 3%"
                           >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
-                        </button>
-                        <div
-                          class="text-xl font-bold text-primary text-tabular min-w-[5rem] text-center"
-                        >
-                          {{ getSingleVariantPrice() }}
-                        </div>
-                        <button
-                          class="btn btn-square btn-xs btn-ghost"
-                          (click)="increaseSingleVariantPrice()"
-                          aria-label="Increase price by 3%"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-3.5 w-3.5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              class="h-3.5 w-3.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M19 9l-7 7-7-7"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            class="text-xl font-bold text-primary text-tabular min-w-[5rem] text-center cursor-pointer hover:underline"
+                            (click)="enterPriceEdit(product()!.variants[0])"
+                            aria-label="Edit price"
                           >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M5 15l7-7 7 7"
-                            />
-                          </svg>
-                        </button>
+                            {{ getSingleVariantPrice() }}
+                          </button>
+                          <button
+                            class="btn btn-square btn-xs btn-ghost"
+                            (click)="increaseSingleVariantPrice()"
+                            aria-label="Increase price by 3%"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              class="h-3.5 w-3.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 15l7-7 7 7"
+                              />
+                            </svg>
+                          </button>
+                        } @else {
+                          <input
+                            type="text"
+                            inputmode="decimal"
+                            class="input input-xs input-bordered text-xl font-bold text-primary text-tabular min-w-[5rem] text-center price-edit-input"
+                            [value]="priceEditInputValue()"
+                            (input)="priceEditInputValue.set($any($event.target).value)"
+                            (blur)="commitPriceEdit(product()!.variants[0])"
+                            (keydown.enter)="commitPriceEdit(product()!.variants[0])"
+                            (keydown.escape)="cancelPriceEdit()"
+                            aria-label="Price"
+                          />
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-xs"
+                            (click)="resetPriceEdit(product()!.variants[0])"
+                            aria-label="Reset price to default"
+                          >
+                            Reset
+                          </button>
+                        }
                       </div>
                     } @else {
                       <div class="text-xl font-bold text-primary text-tabular">
@@ -459,6 +513,7 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProductConfirmModalComponent {
+  private readonly injector = inject(Injector);
   readonly currencyService = inject(CurrencyService);
   readonly priceModificationService = inject(PriceModificationService);
 
@@ -476,6 +531,11 @@ export class ProductConfirmModalComponent {
 
   /** Bumped after each price change so template re-reads from service */
   private readonly priceVersion = signal(0);
+
+  /** Variant id when price is in direct-edit mode; null otherwise */
+  readonly editingPriceVariantId = signal<string | null>(null);
+  /** Current input value while editing price (numeric string, currency units) */
+  readonly priceEditInputValue = signal('');
 
   constructor() {
     effect(() => {
@@ -535,6 +595,38 @@ export class ProductConfirmModalComponent {
     if (variant) {
       this.decreaseVariantPrice(variant);
     }
+  }
+
+  enterPriceEdit(variant: ProductVariant): void {
+    this.editingPriceVariantId.set(variant.id);
+    this.priceEditInputValue.set(this.getVariantPrice(variant));
+    afterNextRender(() => document.querySelector<HTMLInputElement>('.price-edit-input')?.focus(), {
+      injector: this.injector,
+    });
+  }
+
+  commitPriceEdit(variant: ProductVariant): void {
+    const raw = this.priceEditInputValue().trim();
+    const units = parseFloat(raw);
+    if (Number.isNaN(units) || units < 0) {
+      this.editingPriceVariantId.set(null);
+      return;
+    }
+    const base = Math.round(variant.priceWithTax);
+    const parsedCents = Math.round(units * 100);
+    this.priceModificationService.setCustomPrice(variant.id, 'unit', base, parsedCents);
+    this.editingPriceVariantId.set(null);
+    this.priceVersion.update((v) => v + 1);
+  }
+
+  resetPriceEdit(variant: ProductVariant): void {
+    this.priceModificationService.clearStacks(variant.id);
+    this.editingPriceVariantId.set(null);
+    this.priceVersion.update((v) => v + 1);
+  }
+
+  cancelPriceEdit(): void {
+    this.editingPriceVariantId.set(null);
   }
 
   handleVariantClick(variant: ProductVariant): void {

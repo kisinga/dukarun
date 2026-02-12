@@ -120,7 +120,7 @@ export class RegistrationService {
       // Strict phone number validation
       const formatted = formatPhoneNumber(info.phoneNumber);
       if (!validatePhoneNumber(formatted)) {
-        errors.push('Please enter a valid Kenyan phone number (e.g., 07XXXXXXXXX)');
+        errors.push('Please enter a valid Kenyan phone number (e.g., 0XXXXXXXXX)');
       }
     }
 

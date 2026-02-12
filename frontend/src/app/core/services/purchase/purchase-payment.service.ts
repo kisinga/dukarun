@@ -3,6 +3,9 @@ import {
   PAY_SINGLE_PURCHASE,
   GET_SUPPLIER_CREDIT_SUMMARY,
   ALLOCATE_BULK_SUPPLIER_PAYMENT,
+  APPROVE_SUPPLIER_CREDIT,
+  UPDATE_SUPPLIER_CREDIT_LIMIT,
+  UPDATE_SUPPLIER_CREDIT_DURATION,
 } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 
@@ -141,6 +144,95 @@ export class PurchasePaymentService {
       return data;
     } catch (error: any) {
       console.error('Allocate bulk supplier payment error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Approve or revoke supplier credit
+   */
+  async approveSupplierCredit(
+    supplierId: string,
+    approved: boolean,
+    supplierCreditLimit?: number,
+    supplierCreditDuration?: number,
+  ): Promise<SupplierCreditSummary | null> {
+    try {
+      const client = this.apolloService.getClient();
+      const input: Record<string, unknown> = { supplierId, approved };
+      if (supplierCreditLimit !== undefined) input['supplierCreditLimit'] = supplierCreditLimit;
+      if (supplierCreditDuration !== undefined)
+        input['supplierCreditDuration'] = supplierCreditDuration;
+
+      const result = await client.mutate<{ approveSupplierCredit: SupplierCreditSummary }>({
+        mutation: APPROVE_SUPPLIER_CREDIT as any,
+        variables: { input },
+      });
+
+      if (result.error) {
+        console.error('Approve supplier credit error:', result.error);
+        return null;
+      }
+      return result.data?.approveSupplierCredit ?? null;
+    } catch (error: any) {
+      console.error('Approve supplier credit error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update supplier credit limit
+   */
+  async updateSupplierCreditLimit(
+    supplierId: string,
+    supplierCreditLimit: number,
+    supplierCreditDuration?: number,
+  ): Promise<SupplierCreditSummary | null> {
+    try {
+      const client = this.apolloService.getClient();
+      const input: Record<string, unknown> = { supplierId, supplierCreditLimit };
+      if (supplierCreditDuration !== undefined)
+        input['supplierCreditDuration'] = supplierCreditDuration;
+
+      const result = await client.mutate<{ updateSupplierCreditLimit: SupplierCreditSummary }>({
+        mutation: UPDATE_SUPPLIER_CREDIT_LIMIT as any,
+        variables: { input },
+      });
+
+      if (result.error) {
+        console.error('Update supplier credit limit error:', result.error);
+        return null;
+      }
+      return result.data?.updateSupplierCreditLimit ?? null;
+    } catch (error: any) {
+      console.error('Update supplier credit limit error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update supplier credit duration
+   */
+  async updateSupplierCreditDuration(
+    supplierId: string,
+    supplierCreditDuration: number,
+  ): Promise<SupplierCreditSummary | null> {
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.mutate<{
+        updateSupplierCreditDuration: SupplierCreditSummary;
+      }>({
+        mutation: UPDATE_SUPPLIER_CREDIT_DURATION as any,
+        variables: { input: { supplierId, supplierCreditDuration } },
+      });
+
+      if (result.error) {
+        console.error('Update supplier credit duration error:', result.error);
+        return null;
+      }
+      return result.data?.updateSupplierCreditDuration ?? null;
+    } catch (error: any) {
+      console.error('Update supplier credit duration error:', error);
       return null;
     }
   }

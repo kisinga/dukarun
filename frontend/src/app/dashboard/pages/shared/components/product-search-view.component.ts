@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  inject,
   OnDestroy,
   computed,
   input,
@@ -9,20 +10,30 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ProductSearchResult } from '../../../../core/services/product/product-search.service';
+import {
+  ProductSearchResult,
+  ProductVariant,
+} from '../../../../core/services/product/product-search.service';
+import { CurrencyService } from '../../../../core/services/currency.service';
 import { ProductLabelComponent } from './product-label.component';
-import { VariantListComponent } from './variant-list.component';
 
 /**
  * Shared product search UI: card with search input, optional camera/action button,
  * and a list of product results (image, label, variant count, expandable variants).
  * Used on sell and purchase pages for consistent UX.
  * Search matches when all words appear in product name or manufacturer.
+ *
+ * Variant selection guard (contract):
+ * - `restrictVariantSelectionToInStock`: when true (default), out-of-stock variants are
+ *   disabled (preventive toggle); when false, all variants are selectable (e.g. purchase/restock).
+ *   The "Out of stock" indicator is always shown for OOS variants for information; only the
+ *   ability to select them is controlled by this input. Set to false on purchase page so
+ *   OOS items can be selected.
  */
 @Component({
   selector: 'app-product-search-view',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProductLabelComponent, VariantListComponent],
+  imports: [CommonModule, FormsModule, ProductLabelComponent],
   template: `
     <div class="card bg-base-100 shadow-lg">
       <div
@@ -177,7 +188,7 @@ import { VariantListComponent } from './variant-list.component';
                     />
                   </svg>
                 </button>
-                @if (!isMobile() && product.variants.length > 1) {
+                @if (product.variants.length > 1) {
                   <details
                     class="collapse collapse-arrow border-t border-base-300 bg-base-200/60"
                     [class.collapse-open]="product.variants.length <= 3"
@@ -189,7 +200,37 @@ import { VariantListComponent } from './variant-list.component';
                       <span class="sr-only">Toggle variants</span>
                     </summary>
                     <div class="collapse-content pl-6 pr-2 pb-1.5 pt-0">
-                      <app-variant-list [variants]="product.variants" />
+                      <ul class="list list-none p-0 m-0 text-sm">
+                        @for (variant of product.variants; track variant.id) {
+                          <li class="border-b border-base-300 last:border-b-0 min-w-0">
+                            @let isOutOfStock = variant.stockLevel === 'OUT_OF_STOCK';
+                            @let isDisabled = restrictVariantSelectionToInStock() && isOutOfStock;
+                            <button
+                              type="button"
+                              class="w-full flex items-center gap-x-3 px-2 py-1.5 text-left min-w-0 transition-colors"
+                              [class.hover:bg-base-300]="!isDisabled"
+                              [class.cursor-pointer]="!isDisabled"
+                              [class.cursor-not-allowed]="isDisabled"
+                              [class.opacity-60]="isDisabled"
+                              [disabled]="isDisabled"
+                              (click)="onVariantRowClick($event, product, variant)"
+                            >
+                              <span class="font-medium truncate min-w-0 flex-1">{{
+                                variant.name
+                              }}</span>
+                              <span class="text-base-content/60 text-xs truncate w-24 shrink-0">{{
+                                variant.sku
+                              }}</span>
+                              <span class="font-mono text-right w-20 shrink-0">{{
+                                currencyService.format(variant.priceWithTax, false)
+                              }}</span>
+                              @if (isOutOfStock) {
+                                <span class="text-xs text-error shrink-0">Out of stock</span>
+                              }
+                            </button>
+                          </li>
+                        }
+                      </ul>
                     </div>
                   </details>
                 }
@@ -208,11 +249,18 @@ export class ProductSearchViewComponent implements OnDestroy {
   readonly showCameraButton = input<boolean>(false);
   readonly placeholder = input<string>('Search by name or manufacturer');
   readonly compact = input<boolean>(false);
+  /**
+   * When true (default), out-of-stock variants are disabled and show "Out of stock".
+   * When false, all variants are selectable (e.g. purchase page).
+   */
+  readonly restrictVariantSelectionToInStock = input<boolean>(true);
 
   readonly searchTermChange = output<string>();
   readonly productSelected = output<ProductSearchResult>();
+  readonly variantSelected = output<{ product: ProductSearchResult; variant: ProductVariant }>();
   readonly cameraToggle = output<void>();
 
+  readonly currencyService = inject(CurrencyService);
   searchTerm = '';
   readonly isMobile = signal<boolean>(false);
   private resizeListener?: () => void;
@@ -243,5 +291,14 @@ export class ProductSearchViewComponent implements OnDestroy {
 
   isService(product: ProductSearchResult): boolean {
     return product.variants?.some((v) => v.trackInventory === false) || false;
+  }
+
+  onVariantRowClick(event: Event, product: ProductSearchResult, variant: ProductVariant): void {
+    event.stopPropagation();
+    const allowSelect =
+      variant.stockLevel === 'IN_STOCK' || !this.restrictVariantSelectionToInStock();
+    if (allowSelect) {
+      this.variantSelected.emit({ product, variant });
+    }
   }
 }

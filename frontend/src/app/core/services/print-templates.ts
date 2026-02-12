@@ -30,7 +30,7 @@ export interface OrderData {
     productVariant: {
       id: string;
       name: string;
-      sku: string;
+      product?: { id: string; name: string };
     };
   }>;
   payments?: Array<{
@@ -140,6 +140,19 @@ export abstract class PrintTemplate {
     const firstName = order.customer.firstName?.toLowerCase() || '';
     return email === 'walkin@pos.local' || firstName === 'walk-in';
   }
+
+  /**
+   * Display name for a line item: product name and variant when they differ, otherwise variant name.
+   */
+  protected getLineItemName(line: OrderData['lines'][number]): string {
+    const v = line.productVariant;
+    const productName = v.product?.name;
+    const variantName = v.name;
+    if (productName && variantName !== productName) {
+      return `${productName} – ${variantName}`;
+    }
+    return variantName;
+  }
 }
 
 /**
@@ -184,7 +197,7 @@ export class Receipt52mmTemplate extends PrintTemplate {
         `;
 
     order.lines.forEach((line) => {
-      const itemName = line.productVariant.name;
+      const itemName = this.getLineItemName(line);
       const quantity = line.quantity;
       const price = this.formatCurrency(line.linePriceWithTax, order.currencyCode);
       html += `
@@ -351,7 +364,7 @@ export class Receipt80mmTemplate extends PrintTemplate {
         `;
 
     order.lines.forEach((line) => {
-      const itemName = line.productVariant.name;
+      const itemName = this.getLineItemName(line);
       const quantity = line.quantity;
       const price = this.formatCurrency(line.linePriceWithTax, order.currencyCode);
       html += `
@@ -551,7 +564,6 @@ export class A4Template extends PrintTemplate {
                             <thead>
                                 <tr>
                                     <th>Item</th>
-                                    <th>SKU</th>
                                     <th class="text-right">Quantity</th>
                                     <th class="text-right">Unit Price</th>
                                     <th class="text-right">Total</th>
@@ -561,15 +573,13 @@ export class A4Template extends PrintTemplate {
         `;
 
     order.lines.forEach((line) => {
-      const itemName = line.productVariant.name;
-      const sku = line.productVariant.sku;
+      const itemName = this.getLineItemName(line);
       const quantity = line.quantity;
       const unitPrice = line.linePriceWithTax / line.quantity;
       const lineTotal = line.linePriceWithTax;
       html += `
                                 <tr>
                                     <td>${itemName}</td>
-                                    <td>${sku}</td>
                                     <td class="text-right">${quantity}</td>
                                     <td class="text-right">${this.formatCurrency(unitPrice, order.currencyCode)}</td>
                                     <td class="text-right">${this.formatCurrency(lineTotal, order.currencyCode)}</td>

@@ -66,6 +66,13 @@ export class PurchasesComponent implements OnInit {
   readonly error = this.purchaseService.errorList;
   readonly totalItems = this.purchaseService.totalItems;
 
+  // Draft state (for pending purchase banner)
+  readonly hasPendingDraft = computed(() => {
+    const draft = this.purchaseService.purchaseDraft();
+    return draft !== null && draft.lines.length > 0;
+  });
+  readonly draftLineCount = this.purchaseService.lineCount;
+
   // Local UI state
   readonly searchQuery = signal('');
   readonly pendingPaymentsFilter = signal(false);
@@ -173,6 +180,7 @@ export class PurchasesComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.purchaseService.initializeDraft();
     this.loadPurchases();
   }
 

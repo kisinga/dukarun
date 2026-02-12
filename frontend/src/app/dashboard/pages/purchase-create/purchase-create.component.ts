@@ -24,20 +24,18 @@ import { SupplierService } from '../../../core/services/supplier.service';
 import { ProductSearchViewComponent } from '../shared/components/product-search-view.component';
 import { RejectionBannerComponent } from '../shared/components/rejection-banner.component';
 import { ApprovableFormBase } from '../shared/directives/approvable-form-base.directive';
-import { PurchaseLineItemFormComponent } from './components/purchase-line-item-form.component';
+import { PurchaseItemEntryModalComponent } from './components/purchase-item-entry-modal.component';
 import { PurchaseLineItemsTableComponent } from './components/purchase-line-items-table.component';
 import { PurchasePaymentSectionComponent } from './components/purchase-payment-section.component';
-import { PurchaseVariantPickerModalComponent } from './components/purchase-variant-picker-modal.component';
 
 @Component({
   selector: 'app-purchase-create',
   imports: [
     CommonModule,
     ProductSearchViewComponent,
-    PurchaseLineItemFormComponent,
+    PurchaseItemEntryModalComponent,
     PurchaseLineItemsTableComponent,
     PurchasePaymentSectionComponent,
-    PurchaseVariantPickerModalComponent,
     RejectionBannerComponent,
   ],
   template: `
@@ -169,13 +167,10 @@ import { PurchaseVariantPickerModalComponent } from './components/purchase-varia
               [isSearching]="isSearchingProducts()"
               [placeholder]="'Search product by name or SKU...'"
               [compact]="true"
+              [restrictVariantSelectionToInStock]="false"
               (searchTermChange)="handleProductSearch($event)"
               (productSelected)="onProductSelectedFromSearch($event)"
-            />
-            <app-purchase-line-item-form
-              [lineItem]="newLineItem()"
-              (lineItemFieldChange)="updateNewLineItem($event.field, $event.value)"
-              (addItem)="handleAddLineItem()"
+              (variantSelected)="onVariantSelectedFromSearch($event)"
             />
             <div class="mt-2">
               <app-purchase-line-items-table
@@ -237,13 +232,13 @@ import { PurchaseVariantPickerModalComponent } from './components/purchase-varia
         </div>
       }
 
-      <!-- Variant picker modal (scrollable list when many variants) -->
-      <app-purchase-variant-picker-modal
-        [isOpen]="showVariantPickerModal()"
-        [variants]="variantPickerProduct()?.variants ?? []"
-        [searchTerm]="productSearchTerm()"
-        (variantSelected)="onVariantSelectedFromModal($event)"
-        (close)="closeVariantPickerModal()"
+      <!-- Item entry modal (variant selection + qty/cost) -->
+      <app-purchase-item-entry-modal
+        [isOpen]="showItemEntryModal()"
+        [product]="itemEntryProduct()"
+        [variant]="itemEntryVariant()"
+        (itemAdded)="onItemAddedFromModal($event)"
+        (closeModal)="closeItemEntryModal()"
       />
     </div>
   `,
@@ -271,24 +266,19 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
   // Local UI state
   readonly productSearchTerm = signal<string>('');
   readonly productSearchResults = signal<ProductSearchResult[]>([]);
-  readonly variantPickerProduct = signal<ProductSearchResult | null>(null);
   readonly isSearchingProducts = signal<boolean>(false);
   readonly showSuccessMessage = signal<boolean>(false);
   readonly eligibleAccounts = signal<{ code: string; name: string }[]>([]);
-  readonly showVariantPickerModal = signal<boolean>(false);
+
+  // Item entry modal state
+  readonly showItemEntryModal = signal<boolean>(false);
+  readonly itemEntryProduct = signal<ProductSearchResult | null>(null);
+  readonly itemEntryVariant = signal<ProductVariant | null>(null);
 
   // Overdraft approval UI state
   readonly showOverdraftConfirm = signal<boolean>(false);
   readonly isRequestingApproval = signal<boolean>(false);
   readonly showApprovalRequestedMessage = signal<boolean>(false);
-
-  // New line item form
-  readonly newLineItem = signal<Partial<PurchaseLineItem>>({
-    variantId: '',
-    quantity: 0,
-    unitCost: 0,
-    stockLocationId: '',
-  });
 
   override ngAfterViewInit(): void {
     super.ngAfterViewInit();
@@ -343,71 +333,52 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
     }
   }
 
-  handleProductSelect(variant: ProductVariant): void {
-    const defaultLocation = this.stockLocations()[0];
-    const unitCost =
-      variant.customFields?.wholesalePrice != null ? variant.customFields.wholesalePrice / 100 : 0;
-    this.newLineItem.set({
-      variantId: variant.id,
-      variant: variant,
-      quantity: 1,
-      unitCost,
-      stockLocationId: defaultLocation?.id || '',
-    });
-    this.clearProductSearch();
-  }
-
   onProductSelectedFromSearch(product: ProductSearchResult): void {
     const variants = product.variants ?? [];
     if (variants.length === 0) return;
-    if (variants.length === 1) {
-      this.handleProductSelect(variants[0]);
-      return;
-    }
-    this.variantPickerProduct.set(product);
-    this.showVariantPickerModal.set(true);
-  }
-
-  onVariantSelectedFromModal(variant: ProductVariant): void {
-    this.handleProductSelect(variant);
-    this.closeVariantPickerModal();
-  }
-
-  closeVariantPickerModal(): void {
-    this.showVariantPickerModal.set(false);
-    this.variantPickerProduct.set(null);
+    this.itemEntryProduct.set(product);
+    this.itemEntryVariant.set(variants.length === 1 ? variants[0] : null);
+    this.showItemEntryModal.set(true);
     this.clearProductSearch();
+  }
+
+  onVariantSelectedFromSearch(event: {
+    product: ProductSearchResult;
+    variant: ProductVariant;
+  }): void {
+    this.itemEntryProduct.set(event.product);
+    this.itemEntryVariant.set(event.variant);
+    this.showItemEntryModal.set(true);
+    this.clearProductSearch();
+  }
+
+  onItemAddedFromModal(event: {
+    variant: ProductVariant;
+    quantity: number;
+    unitCost: number;
+  }): void {
+    const defaultLocation = this.stockLocations()[0];
+    if (!defaultLocation) return;
+    const lineItem: PurchaseLineItem = {
+      variantId: event.variant.id,
+      variant: event.variant,
+      quantity: event.quantity,
+      unitCost: event.unitCost,
+      stockLocationId: defaultLocation.id,
+    };
+    this.purchaseService.addPurchaseItemLocal(lineItem);
+    this.closeItemEntryModal();
+  }
+
+  closeItemEntryModal(): void {
+    this.showItemEntryModal.set(false);
+    this.itemEntryProduct.set(null);
+    this.itemEntryVariant.set(null);
   }
 
   private clearProductSearch(): void {
     this.productSearchTerm.set('');
     this.productSearchResults.set([]);
-  }
-
-  handleAddLineItem(): void {
-    const item = this.newLineItem();
-    if (!item.variantId || !item.quantity || !item.unitCost) {
-      return;
-    }
-
-    // Auto-set stock location if not set
-    if (!item.stockLocationId) {
-      const defaultLocation = this.stockLocations()[0];
-      if (!defaultLocation) return;
-      item.stockLocationId = defaultLocation.id;
-    }
-
-    try {
-      this.purchaseService.addPurchaseItemLocal(item as PurchaseLineItem);
-      this.newLineItem.set({
-        variantId: '',
-        quantity: 0,
-        unitCost: 0,
-        stockLocationId: '',
-      });
-    } catch (error: any) {
-      console.error('Failed to add item:', error);
-    }
   }
 
   removeLineItem(index: number): void {
@@ -424,14 +395,6 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
 
   updateDraftField(field: keyof PurchaseDraft, value: any): void {
     this.purchaseService.updateDraftField(field, value);
-  }
-
-  updateNewLineItem(field: keyof PurchaseLineItem, value: any): void {
-    const current = this.newLineItem();
-    this.newLineItem.set({
-      ...current,
-      [field]: value,
-    });
   }
 
   canSubmit(draft: PurchaseDraft): boolean {

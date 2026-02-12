@@ -130,6 +130,21 @@ export class PriceModificationService {
     this.stacks.delete(this.getStackKey(variantId, 'line'));
   }
 
+  /**
+   * Set a custom price (e.g. from direct user input). Replaces the stack with [base, custom]
+   * so getCurrentPrice returns the custom value and up/down continue from it.
+   */
+  setCustomPrice(
+    variantId: string,
+    context: 'unit' | 'line',
+    basePriceCents: number,
+    customPriceCents: number,
+  ): void {
+    const cents = Math.max(1, Math.round(customPriceCents));
+    const stackKey = this.getStackKey(variantId, context);
+    this.stacks.set(stackKey, [basePriceCents, cents]);
+  }
+
   isAtLowestPrice(
     currentPriceCents: number,
     quantity: number,

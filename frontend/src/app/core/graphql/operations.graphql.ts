@@ -1401,7 +1401,10 @@ export const GET_ORDER_FULL = graphql(`
         productVariant {
           id
           name
-          sku
+          product {
+            id
+            name
+          }
         }
       }
       payments {
@@ -1879,6 +1882,51 @@ export const PAY_SINGLE_PURCHASE = graphql(`
 export const GET_SUPPLIER_CREDIT_SUMMARY = graphql(`
   query GetSupplierCreditSummary($supplierId: ID!) {
     supplierCreditSummary(supplierId: $supplierId) {
+      supplierId
+      isSupplierCreditApproved
+      supplierCreditLimit
+      outstandingAmount
+      availableCredit
+      lastRepaymentDate
+      lastRepaymentAmount
+      supplierCreditDuration
+    }
+  }
+`);
+
+export const APPROVE_SUPPLIER_CREDIT = graphql(`
+  mutation ApproveSupplierCredit($input: ApproveSupplierCreditInput!) {
+    approveSupplierCredit(input: $input) {
+      supplierId
+      isSupplierCreditApproved
+      supplierCreditLimit
+      outstandingAmount
+      availableCredit
+      lastRepaymentDate
+      lastRepaymentAmount
+      supplierCreditDuration
+    }
+  }
+`);
+
+export const UPDATE_SUPPLIER_CREDIT_LIMIT = graphql(`
+  mutation UpdateSupplierCreditLimit($input: UpdateSupplierCreditLimitInput!) {
+    updateSupplierCreditLimit(input: $input) {
+      supplierId
+      isSupplierCreditApproved
+      supplierCreditLimit
+      outstandingAmount
+      availableCredit
+      lastRepaymentDate
+      lastRepaymentAmount
+      supplierCreditDuration
+    }
+  }
+`);
+
+export const UPDATE_SUPPLIER_CREDIT_DURATION = graphql(`
+  mutation UpdateSupplierCreditDuration($input: UpdateSupplierCreditDurationInput!) {
+    updateSupplierCreditDuration(input: $input) {
       supplierId
       isSupplierCreditApproved
       supplierCreditLimit
@@ -2507,7 +2555,10 @@ export const GET_PURCHASES = graphql(`
           variant {
             id
             name
-            sku
+            product {
+              id
+              name
+            }
           }
           quantity
           unitCost

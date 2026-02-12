@@ -143,7 +143,7 @@ export function createCreditPaymentHandler(creditService: CreditService): Paymen
       }
 
       // Get credit summary via injected service
-      const summary = await creditService.getCreditSummary(ctx, customerId);
+      const summary = await creditService.getCreditSummary(ctx, customerId, 'customer');
 
       if (!summary.isCreditApproved) {
         throw new UserInputError('Customer is not approved for credit purchases.');
