@@ -169,8 +169,10 @@ import { PurchaseVariantPickerModalComponent } from './components/purchase-varia
               [isSearching]="isSearchingProducts()"
               [placeholder]="'Search product by name or SKU...'"
               [compact]="true"
+              [restrictVariantSelectionToInStock]="false"
               (searchTermChange)="handleProductSearch($event)"
               (productSelected)="onProductSelectedFromSearch($event)"
+              (variantSelected)="onVariantSelectedFromSearch($event)"
             />
             <app-purchase-line-item-form
               [lineItem]="newLineItem()"
@@ -366,6 +368,14 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
     }
     this.variantPickerProduct.set(product);
     this.showVariantPickerModal.set(true);
+  }
+
+  onVariantSelectedFromSearch(event: {
+    product: ProductSearchResult;
+    variant: ProductVariant;
+  }): void {
+    this.handleProductSelect(event.variant);
+    this.clearProductSearch();
   }
 
   onVariantSelectedFromModal(variant: ProductVariant): void {

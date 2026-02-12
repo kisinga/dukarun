@@ -322,6 +322,19 @@ export class SellComponent implements OnInit, OnDestroy {
     }
   }
 
+  handleVariantSelectedFromSearch(event: {
+    product: ProductSearchResult;
+    variant: ProductVariant;
+  }): void {
+    const facetValues = event.product.facetValues?.map((fv) => ({
+      name: fv.name,
+      facetCode: fv.facetCode,
+      facet: fv.facetCode ? { code: fv.facetCode } : undefined,
+    }));
+    this.addToCart(event.variant, 1, { facetValues });
+    this.showNotification(`${event.product.name} added to cart`, 'success');
+  }
+
   formatPrice(priceInCents: number): string {
     return this.currencyService.format(priceInCents, true);
   }
