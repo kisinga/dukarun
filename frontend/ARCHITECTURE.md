@@ -1185,7 +1185,7 @@ dashboard/pages/
 **Validation:**
 
 ```typescript
-// Phone format validation: 0XXXXXXXXX (Kenya mobile format)
+// Phone format validation: 0XXXXXXXXX (Kenya mobile + landlines)
 phonePattern = /^0[0-9]{9}$/;
 
 // Email validation (optional)
@@ -1282,11 +1282,11 @@ emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 **Phone Number Format:**
 
 ```typescript
-// Kenya mobile format: 0XXXXXXXXX
+// Kenya mobile + landline format: 0XXXXXXXXX
 phonePattern = /^0[0-9]{9}$/;
 
 // Validation message
-('Phone must be 10 digits starting with 0 (e.g., 0123456789)');
+('Phone must be 10 digits starting with 0 (e.g. 07XXXXXXXX or 01XXXXXXXX)');
 ```
 
 **Email Format:**
