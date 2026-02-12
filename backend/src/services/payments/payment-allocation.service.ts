@@ -238,10 +238,11 @@ export class PaymentAllocationService {
 
         // 9. Record repayment tracking if any payment was made
         if (calculation.totalAllocated > 0) {
-          await this.creditService.releaseCreditCharge(
+          await this.creditService.recordRepayment(
             transactionCtx,
             input.customerId,
-            totalAllocated // Amount in cents
+            'customer',
+            totalAllocated
           );
         }
 

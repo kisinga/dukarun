@@ -14,7 +14,7 @@ import { LedgerTransactionService } from '../financial/ledger-transaction.servic
 import { TracingService } from '../../infrastructure/observability/tracing.service';
 import { MetricsService } from '../../infrastructure/observability/metrics.service';
 import { OrderAddressService } from './order-address.service';
-import { OrderCreditValidatorService } from './order-credit-validator.service';
+import { CreditValidatorService } from '../credit/credit-validator.service';
 import { OrderFulfillmentService } from './order-fulfillment.service';
 import { OrderItemService } from './order-item.service';
 import { OrderPaymentService } from './order-payment.service';
@@ -49,7 +49,7 @@ export class OrderCreationService {
   constructor(
     private readonly connection: TransactionalConnection,
     private readonly orderService: OrderService,
-    private readonly orderCreditValidator: OrderCreditValidatorService,
+    private readonly creditValidator: CreditValidatorService,
     private readonly orderItemService: OrderItemService,
     private readonly orderAddressService: OrderAddressService,
     private readonly orderStateService: OrderStateService,
@@ -84,7 +84,11 @@ export class OrderCreationService {
           // 2. Validate credit approval (basic check)
           const customerId = await this.ensureCustomer(transactionCtx, input.customerId);
           if (input.isCreditSale) {
-            await this.orderCreditValidator.validateCreditApproval(transactionCtx, customerId);
+            await this.creditValidator.validateCreditApproval(
+              transactionCtx,
+              customerId,
+              'customer'
+            );
           }
 
           // 3. Create draft order
@@ -117,10 +121,11 @@ export class OrderCreationService {
           // 9. Validate credit limit with actual order total (after taxes, shipping, etc.)
           // This is the final validation - order total is now known
           if (input.isCreditSale) {
-            await this.orderCreditValidator.validateCreditLimitWithOrder(
+            await this.creditValidator.validateCreditLimit(
               transactionCtx,
               customerId,
-              order
+              'customer',
+              order.totalWithTax || order.total
             );
           }
 

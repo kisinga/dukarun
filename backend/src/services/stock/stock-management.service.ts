@@ -15,7 +15,7 @@ import { PurchaseService, RecordPurchaseInput } from './purchase.service';
 import { StockAdjustmentService, RecordStockAdjustmentInput } from './stock-adjustment.service';
 import { StockMovementService } from './stock-movement.service';
 import { StockValidationService } from './stock-validation.service';
-import { PurchaseCreditValidatorService } from './purchase-credit-validator.service';
+import { CreditValidatorService } from '../credit/credit-validator.service';
 
 /**
  * Stock Management Service
@@ -42,7 +42,7 @@ export class StockManagementService {
     private readonly stockMovementService: StockMovementService,
     private readonly validationService: StockValidationService,
     private readonly financialService: FinancialService,
-    @Optional() private readonly purchaseCreditValidator?: PurchaseCreditValidatorService,
+    @Optional() private readonly creditValidator?: CreditValidatorService,
     @Optional() private readonly approvalService?: ApprovalService,
     @Optional() private readonly auditService?: AuditService,
     @Optional() private readonly inventoryService?: InventoryService,
@@ -74,20 +74,22 @@ export class StockManagementService {
         const unpaidAmount = totalCost - paymentAmount;
 
         if (unpaidAmount > 0) {
-          if (!this.purchaseCreditValidator) {
+          if (!this.creditValidator) {
             throw new Error(
-              'PurchaseCreditValidatorService is required for credit purchases but was not provided.'
+              'CreditValidatorService is required for credit purchases but was not provided.'
             );
           }
           // Validate supplier is approved for credit
-          await this.purchaseCreditValidator.validateSupplierCreditApproval(
-            transactionCtx,
-            String(input.supplierId)
-          );
-          // Validate credit limit covers the unpaid portion only
-          await this.purchaseCreditValidator.validateSupplierCreditLimitWithPurchase(
+          await this.creditValidator.validateCreditApproval(
             transactionCtx,
             String(input.supplierId),
+            'supplier'
+          );
+          // Validate credit limit covers the unpaid portion only
+          await this.creditValidator.validateCreditLimit(
+            transactionCtx,
+            String(input.supplierId),
+            'supplier',
             unpaidAmount
           );
         }

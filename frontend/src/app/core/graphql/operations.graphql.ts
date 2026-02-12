@@ -1894,6 +1894,51 @@ export const GET_SUPPLIER_CREDIT_SUMMARY = graphql(`
   }
 `);
 
+export const APPROVE_SUPPLIER_CREDIT = graphql(`
+  mutation ApproveSupplierCredit($input: ApproveSupplierCreditInput!) {
+    approveSupplierCredit(input: $input) {
+      supplierId
+      isSupplierCreditApproved
+      supplierCreditLimit
+      outstandingAmount
+      availableCredit
+      lastRepaymentDate
+      lastRepaymentAmount
+      supplierCreditDuration
+    }
+  }
+`);
+
+export const UPDATE_SUPPLIER_CREDIT_LIMIT = graphql(`
+  mutation UpdateSupplierCreditLimit($input: UpdateSupplierCreditLimitInput!) {
+    updateSupplierCreditLimit(input: $input) {
+      supplierId
+      isSupplierCreditApproved
+      supplierCreditLimit
+      outstandingAmount
+      availableCredit
+      lastRepaymentDate
+      lastRepaymentAmount
+      supplierCreditDuration
+    }
+  }
+`);
+
+export const UPDATE_SUPPLIER_CREDIT_DURATION = graphql(`
+  mutation UpdateSupplierCreditDuration($input: UpdateSupplierCreditDurationInput!) {
+    updateSupplierCreditDuration(input: $input) {
+      supplierId
+      isSupplierCreditApproved
+      supplierCreditLimit
+      outstandingAmount
+      availableCredit
+      lastRepaymentDate
+      lastRepaymentAmount
+      supplierCreditDuration
+    }
+  }
+`);
+
 export const ALLOCATE_BULK_SUPPLIER_PAYMENT = graphql(`
   mutation AllocateBulkSupplierPayment($input: SupplierPaymentAllocationInput!) {
     allocateBulkSupplierPayment(input: $input) {

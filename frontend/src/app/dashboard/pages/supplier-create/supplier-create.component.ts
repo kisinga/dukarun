@@ -17,7 +17,7 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { SupplierService } from '../../../core/services/supplier.service';
 import { SupplierApiService } from '../../../core/services/supplier/supplier-api.service';
-import { CustomerService } from '../../../core/services/customer.service';
+import { PurchasePaymentService } from '../../../core/services/purchase/purchase-payment.service';
 import { AuthPermissionsService } from '../../../core/services/auth/auth-permissions.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { CreditManagementFormComponent } from '../shared/components/credit-management-form.component';
@@ -112,7 +112,7 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
   private readonly activatedRoute = inject(ActivatedRoute);
   readonly supplierService = inject(SupplierService);
   private readonly supplierApiService = inject(SupplierApiService);
-  private readonly customerService = inject(CustomerService);
+  private readonly purchasePaymentService = inject(PurchasePaymentService);
   private readonly authPermissionsService = inject(AuthPermissionsService);
   private readonly toastService = inject(ToastService);
 
@@ -335,11 +335,10 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
           if (this.hasCreditPermission()) {
             const credit = this.creditData();
             try {
-              await this.customerService.approveCustomerCredit(
+              await this.purchasePaymentService.approveSupplierCredit(
                 id,
                 credit.isCreditApproved,
                 credit.creditLimit ?? 0,
-                undefined,
                 credit.creditDuration ?? 30,
               );
             } catch (err: any) {

@@ -160,15 +160,15 @@ export class SupplierApiService {
         notes: input.notes,
       };
 
-      // Add credit fields if provided
+      // Add supplier credit fields if provided
       if (input.isCreditApproved !== undefined) {
-        customFields.isCreditApproved = input.isCreditApproved;
+        customFields.isSupplierCreditApproved = input.isCreditApproved;
       }
       if (input.creditLimit !== undefined && input.creditLimit > 0) {
-        customFields.creditLimit = input.creditLimit;
+        customFields.supplierCreditLimit = input.creditLimit;
       }
       if (input.creditDuration !== undefined && input.creditDuration > 0) {
-        customFields.creditDuration = input.creditDuration;
+        customFields.supplierCreditDuration = input.creditDuration;
       }
 
       // Prepare input with only basic customer fields at top level, supplier fields in customFields

@@ -35,9 +35,7 @@ export class CreditPaymentSubscriber implements OnModuleInit {
 
     // Handle payment cancellation/decline/error
     if (toState === 'Cancelled' || toState === 'Declined' || toState === 'Error') {
-      // Note: releaseCreditCharge now only updates lastRepaymentDate/lastRepaymentAmount
-      // Outstanding balance is calculated dynamically
-      await this.creditService.releaseCreditCharge(ctx, customerId, payment.amount);
+      await this.creditService.recordRepayment(ctx, customerId, 'customer', payment.amount);
     }
 
     // Prevent auto-settlement of credit payments during order creation

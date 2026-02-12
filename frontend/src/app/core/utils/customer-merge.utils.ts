@@ -71,29 +71,30 @@ export function mergeSupplierCapability(
     notes: supplierData.notes?.trim() || existingCustomFields.notes || null,
   };
 
-  // Merge credit fields: use new values if provided, otherwise preserve existing
+  // Merge supplier credit fields: use new values if provided, otherwise preserve existing
   const mergedCreditFields: any = {};
   if (supplierData.isCreditApproved !== undefined) {
-    mergedCreditFields.isCreditApproved = supplierData.isCreditApproved;
-  } else if (existingCustomFields.isCreditApproved !== undefined) {
-    mergedCreditFields.isCreditApproved = existingCustomFields.isCreditApproved;
+    mergedCreditFields.isSupplierCreditApproved = supplierData.isCreditApproved;
+  } else if (existingCustomFields.isSupplierCreditApproved !== undefined) {
+    mergedCreditFields.isSupplierCreditApproved = existingCustomFields.isSupplierCreditApproved;
   }
   if (supplierData.creditLimit !== undefined && supplierData.creditLimit > 0) {
-    mergedCreditFields.creditLimit = supplierData.creditLimit;
-  } else if (existingCustomFields.creditLimit !== undefined) {
-    mergedCreditFields.creditLimit = existingCustomFields.creditLimit;
+    mergedCreditFields.supplierCreditLimit = supplierData.creditLimit;
+  } else if (existingCustomFields.supplierCreditLimit !== undefined) {
+    mergedCreditFields.supplierCreditLimit = existingCustomFields.supplierCreditLimit;
   }
   if (supplierData.creditDuration !== undefined && supplierData.creditDuration > 0) {
-    mergedCreditFields.creditDuration = supplierData.creditDuration;
-  } else if (existingCustomFields.creditDuration !== undefined) {
-    mergedCreditFields.creditDuration = existingCustomFields.creditDuration;
+    mergedCreditFields.supplierCreditDuration = supplierData.creditDuration;
+  } else if (existingCustomFields.supplierCreditDuration !== undefined) {
+    mergedCreditFields.supplierCreditDuration = existingCustomFields.supplierCreditDuration;
   }
-  // Always preserve repayment tracking fields (these are system-managed)
-  if (existingCustomFields.lastRepaymentDate !== undefined) {
-    mergedCreditFields.lastRepaymentDate = existingCustomFields.lastRepaymentDate;
+  // Always preserve supplier repayment tracking fields (these are system-managed)
+  if (existingCustomFields.supplierLastRepaymentDate !== undefined) {
+    mergedCreditFields.supplierLastRepaymentDate = existingCustomFields.supplierLastRepaymentDate;
   }
-  if (existingCustomFields.lastRepaymentAmount !== undefined) {
-    mergedCreditFields.lastRepaymentAmount = existingCustomFields.lastRepaymentAmount;
+  if (existingCustomFields.supplierLastRepaymentAmount !== undefined) {
+    mergedCreditFields.supplierLastRepaymentAmount =
+      existingCustomFields.supplierLastRepaymentAmount;
   }
 
   // Strip GraphQL metadata from customFields before returning

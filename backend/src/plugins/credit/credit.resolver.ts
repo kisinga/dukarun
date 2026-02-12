@@ -1,14 +1,15 @@
 import { Logger, Optional } from '@nestjs/common';
-import { Args, Mutation, Parent, Query, Resolver } from '@nestjs/graphql';
-import { Allow, Ctx, Customer, Permission, RequestContext, Order } from '@vendure/core';
+import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Allow, Ctx, Permission, RequestContext, Order } from '@vendure/core';
 
 import { ChannelCommunicationService } from '../../services/channels/channel-communication.service';
-import { CreditService, CreditSummary } from '../../services/credit/credit.service';
+import { CreditService } from '../../services/credit/credit.service';
+import { CreditSummary } from '../../services/credit/credit-party.types';
+import { CreditValidatorService } from '../../services/credit/credit-validator.service';
 import {
   OrderCreationService,
   CreateOrderInput,
 } from '../../services/orders/order-creation.service';
-import { OrderCreditValidatorService } from '../../services/orders/order-credit-validator.service';
 import {
   ApproveCustomerCreditPermission,
   ManageCustomerCreditLimitPermission,
@@ -45,6 +46,21 @@ interface CreditValidationResult {
   wouldExceedLimit: boolean;
 }
 
+/** Maps unified CreditSummary to the customer-specific GraphQL shape */
+function toCustomerGraphQL(s: CreditSummary) {
+  return {
+    customerId: s.entityId,
+    isCreditApproved: s.isCreditApproved,
+    creditFrozen: s.creditFrozen,
+    creditLimit: s.creditLimit,
+    outstandingAmount: s.outstandingAmount,
+    availableCredit: s.availableCredit,
+    lastRepaymentDate: s.lastRepaymentDate,
+    lastRepaymentAmount: s.lastRepaymentAmount,
+    creditDuration: s.creditDuration,
+  };
+}
+
 @Resolver('CreditSummary')
 export class CreditResolver {
   private readonly logger = new Logger(CreditResolver.name);
@@ -52,17 +68,15 @@ export class CreditResolver {
   constructor(
     private readonly creditService: CreditService,
     private readonly orderCreationService: OrderCreationService,
-    private readonly orderCreditValidator: OrderCreditValidatorService,
-    @Optional() private readonly communicationService?: ChannelCommunicationService // Optional to avoid circular dependency
+    private readonly creditValidator: CreditValidatorService,
+    @Optional() private readonly communicationService?: ChannelCommunicationService
   ) {}
 
   @Query()
   @Allow(Permission.ReadCustomer)
-  async creditSummary(
-    @Ctx() ctx: RequestContext,
-    @Args('customerId') customerId: string
-  ): Promise<CreditSummary> {
-    return this.creditService.getCreditSummary(ctx, customerId);
+  async creditSummary(@Ctx() ctx: RequestContext, @Args('customerId') customerId: string) {
+    const summary = await this.creditService.getCreditSummary(ctx, customerId, 'customer');
+    return toCustomerGraphQL(summary);
   }
 
   @Query()
@@ -72,10 +86,8 @@ export class CreditResolver {
     @Args('input') input: ValidateCreditInput
   ): Promise<CreditValidationResult> {
     try {
-      // Get credit summary
-      const summary = await this.creditService.getCreditSummary(ctx, input.customerId);
+      const summary = await this.creditService.getCreditSummary(ctx, input.customerId, 'customer');
 
-      // Check approval
       if (!summary.isCreditApproved) {
         return {
           isValid: false,
@@ -86,7 +98,6 @@ export class CreditResolver {
         };
       }
 
-      // Check credit limit
       const availableCredit = summary.creditLimit - summary.outstandingAmount;
       const wouldExceedLimit = input.estimatedOrderTotal > availableCredit;
 
@@ -122,16 +133,16 @@ export class CreditResolver {
   async approveCustomerCredit(
     @Ctx() ctx: RequestContext,
     @Args('input') input: ApproveCustomerCreditInput
-  ): Promise<CreditSummary> {
-    const result = await this.creditService.approveCustomerCredit(
+  ) {
+    const result = await this.creditService.approveCredit(
       ctx,
       input.customerId,
+      'customer',
       input.approved,
       input.creditLimit,
       input.creditDuration
     );
 
-    // Send approval notification if approved
     if (input.approved && this.communicationService) {
       await this.communicationService
         .sendAccountApprovedNotification(
@@ -141,14 +152,13 @@ export class CreditResolver {
           input.creditDuration
         )
         .catch(error => {
-          // Log but don't fail the mutation
           this.logger.warn(
             `Failed to send approval notification: ${error instanceof Error ? error.message : String(error)}`
           );
         });
     }
 
-    return result;
+    return toCustomerGraphQL(result);
   }
 
   @Mutation()
@@ -156,13 +166,15 @@ export class CreditResolver {
   async updateCustomerCreditLimit(
     @Ctx() ctx: RequestContext,
     @Args('input') input: UpdateCustomerCreditLimitInput
-  ): Promise<CreditSummary> {
-    return this.creditService.updateCustomerCreditLimit(
+  ) {
+    const result = await this.creditService.updateCreditLimit(
       ctx,
       input.customerId,
+      'customer',
       input.creditLimit,
       input.creditDuration
     );
+    return toCustomerGraphQL(result);
   }
 
   @Mutation()
@@ -170,8 +182,14 @@ export class CreditResolver {
   async updateCreditDuration(
     @Ctx() ctx: RequestContext,
     @Args('input') input: UpdateCreditDurationInput
-  ): Promise<CreditSummary> {
-    return this.creditService.updateCreditDuration(ctx, input.customerId, input.creditDuration);
+  ) {
+    const result = await this.creditService.updateCreditDuration(
+      ctx,
+      input.customerId,
+      'customer',
+      input.creditDuration
+    );
+    return toCustomerGraphQL(result);
   }
 
   @Mutation()
