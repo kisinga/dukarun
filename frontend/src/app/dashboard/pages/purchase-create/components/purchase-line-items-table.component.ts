@@ -18,9 +18,40 @@ import { PurchaseLineItem } from '../../../../core/services/purchase.service.typ
         @for (line of lineItems(); track $index) {
           <div class="card bg-base-200 p-3">
             <div class="flex items-start justify-between gap-2">
-              <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium truncate">
-                  {{ getVariantDisplayName(line.variant) || line.variantId }}
+              <div class="flex gap-2 flex-1 min-w-0">
+                @if (line.variant?.featuredAsset) {
+                  <img
+                    [src]="line.variant!.featuredAsset!.preview"
+                    [alt]="getVariantDisplayName(line.variant)"
+                    class="w-10 h-10 rounded object-cover shrink-0"
+                  />
+                } @else {
+                  <div
+                    class="w-10 h-10 rounded bg-base-300 flex items-center justify-center shrink-0"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-5 w-5 text-primary"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                      />
+                    </svg>
+                  </div>
+                }
+                <div class="min-w-0">
+                  <div class="text-sm font-medium truncate">
+                    {{ getVariantDisplayName(line.variant) || line.variantId }}
+                  </div>
+                  @if (line.variant?.sku) {
+                    <div class="text-xs text-base-content/50">{{ line.variant!.sku }}</div>
+                  }
                 </div>
               </div>
               <button
