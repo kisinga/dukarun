@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import {
+  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -12,10 +13,13 @@ import { Router } from '@angular/router';
 import { CustomerService } from '../../../core/services/customer.service';
 import { CustomerApiService } from '../../../core/services/customer/customer-api.service';
 import { AuthPermissionsService } from '../../../core/services/auth/auth-permissions.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { CreditManagementFormComponent } from '../shared/components/credit-management-form.component';
 import { PageHeaderComponent } from '../shared/components/page-header.component';
 import { ErrorAlertComponent } from '../shared/components/error-alert.component';
+import { RejectionBannerComponent } from '../shared/components/rejection-banner.component';
 import { PersonBasicInfoFormComponent } from '../shared/components/person-basic-info-form.component';
+import { ApprovableFormBase } from '../shared/directives/approvable-form-base.directive';
 
 /**
  * Customer Create Component
@@ -30,6 +34,7 @@ import { PersonBasicInfoFormComponent } from '../shared/components/person-basic-
     ReactiveFormsModule,
     PageHeaderComponent,
     ErrorAlertComponent,
+    RejectionBannerComponent,
     PersonBasicInfoFormComponent,
     CreditManagementFormComponent,
   ],
@@ -39,6 +44,7 @@ import { PersonBasicInfoFormComponent } from '../shared/components/person-basic-
       <app-page-header title="Create Customer" (backClick)="goBack()" />
 
       <div class="p-4">
+        <app-rejection-banner [message]="rejectionMessage()" (dismiss)="dismissRejection()" />
         <app-error-alert [message]="error()" (dismiss)="clearError()" />
 
         <div class="space-y-4 max-w-md mx-auto">
@@ -81,13 +87,18 @@ import { PersonBasicInfoFormComponent } from '../shared/components/person-basic-
     </div>
   `,
 })
-export class CustomerCreateComponent {
+export class CustomerCreateComponent extends ApprovableFormBase implements AfterViewInit {
   private readonly router = inject(Router);
   readonly customerService = inject(CustomerService);
   private readonly customerApiService = inject(CustomerApiService);
   private readonly authPermissionsService = inject(AuthPermissionsService);
+  private readonly toastService = inject(ToastService);
 
   readonly basicInfoForm = viewChild<PersonBasicInfoFormComponent>('basicInfoForm');
+
+  override ngAfterViewInit(): void {
+    super.ngAfterViewInit();
+  }
 
   // Computed state for button disabled
   readonly isSubmitDisabled = computed(() => {
@@ -174,7 +185,7 @@ export class CustomerCreateComponent {
           phoneNumber: form.value.phoneNumber,
         };
 
-        // Add credit fields if user has permission and values are set
+        // Add credit fields if user has permission (default credit duration 30 when approved)
         if (this.hasCreditPermission()) {
           const credit = this.creditData();
           if (credit.isCreditApproved) {
@@ -182,18 +193,20 @@ export class CustomerCreateComponent {
             if (credit.creditLimit > 0) {
               customerData.creditLimit = credit.creditLimit;
             }
-            if (credit.creditDuration > 0) {
-              customerData.creditDuration = credit.creditDuration;
-            }
+            customerData.creditDuration = credit.creditDuration ?? 30;
           }
         }
 
         const customerId = await this.customerService.createCustomer(customerData);
 
         if (customerId) {
+          this.clearError();
+          this.toastService.show('Success', 'Customer created', 'success');
           this.router.navigate(['/dashboard/customers']);
         } else {
-          this.error.set(this.customerService.error() || 'Failed to create customer');
+          const errMsg = this.customerService.error() || 'Failed to create customer';
+          this.error.set(errMsg);
+          this.toastService.show('Error', errMsg, 'error');
         }
       } catch (err: any) {
         this.error.set(err.message || 'Failed to create customer');
@@ -232,5 +245,33 @@ export class CustomerCreateComponent {
 
     const timestamp = Date.now().toString().slice(-6);
     return `noemail-${sanitizedName}-${timestamp}@dukarun.local`;
+  }
+
+  // ApprovableFormBase overrides
+  override isValid(): boolean {
+    const form = this.basicInfoForm();
+    if (!form) return false;
+    return form.getValidationStateSignal()() === 'valid';
+  }
+
+  override serializeFormState(): Record<string, any> {
+    const form = this.basicInfoForm();
+    return {
+      basicInfo: form?.getForm().value ?? {},
+      creditData: this.creditData(),
+    };
+  }
+
+  override restoreFormState(data: Record<string, any>): void {
+    if (!data) return;
+    if (data['basicInfo']) {
+      const form = this.basicInfoForm();
+      if (form) {
+        form.getForm().patchValue(data['basicInfo']);
+      }
+    }
+    if (data['creditData']) {
+      this.creditData.set(data['creditData']);
+    }
   }
 }

@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
+import { validatePhoneNumber } from '../../../../core/utils/phone.utils';
 
 export interface Customer {
   id: string;
@@ -169,7 +170,7 @@ export interface Customer {
             <input
               type="tel"
               class="input input-bordered text-base"
-              placeholder="+254712345678"
+              placeholder="0XXXXXXXXX"
               [value]="newPhone()"
               (input)="newPhone.set($any($event.target).value)"
             />
@@ -316,7 +317,9 @@ export class CustomerSelectorComponent {
   readonly newEmail = signal('');
 
   readonly canCreate = () => {
-    return this.newName().trim().length > 0 && this.newPhone().trim().length > 0;
+    const name = this.newName().trim();
+    const phone = this.newPhone().trim();
+    return name.length > 0 && phone.length > 0 && validatePhoneNumber(phone);
   };
 
   onSearchInput(value: string): void {

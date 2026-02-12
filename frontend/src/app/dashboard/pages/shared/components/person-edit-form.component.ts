@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, effect, input, output } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { phoneValidator } from '../../../../core/utils/phone.utils';
 
 /**
  * Shared Person Edit Form Component
@@ -86,7 +87,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
           <input
             type="tel"
             formControlName="phoneNumber"
-            placeholder="0XXXXXXXXX (required)"
+            placeholder="0XXXXXXXXX"
             class="input input-bordered w-full"
             [class.input-error]="hasError('phoneNumber')"
           />
@@ -144,7 +145,7 @@ export class PersonEditFormComponent {
       businessName: ['', [Validators.required, Validators.minLength(2)]],
       contactPerson: ['', [Validators.required, Validators.minLength(2)]],
       emailAddress: ['', [Validators.email]],
-      phoneNumber: ['', [Validators.required, Validators.pattern(/^0\d{9}$/)]],
+      phoneNumber: ['', [Validators.required, phoneValidator]],
     });
 
     // Watch for initial data changes using effect
@@ -196,7 +197,8 @@ export class PersonEditFormComponent {
       return `Minimum ${errors['minlength'].requiredLength} characters required`;
     }
     if (errors['email']) return 'Please enter a valid email address';
-    if (errors['pattern']) return 'Phone must be in format 0XXXXXXXXX (10 digits starting with 0)';
+    if (errors['phoneFormat'])
+      return 'Phone must be 0XXXXXXXXX (10 digits starting with 0, mobile or landline)';
 
     return 'Invalid value';
   }

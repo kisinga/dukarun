@@ -3,33 +3,54 @@
 
   <!-- Main Content -->
   <div class="drawer-content flex flex-col min-h-screen">
-    <!-- Navbar - Enhanced contrast and readability -->
+    <!-- Top Navbar — clean white, contrasts with tinted sidebar -->
     <div
-      class="navbar bg-base-100/95 border-b border-base-300 sticky top-0 z-40 px-2 sm:px-4 min-h-14 sm:min-h-16 backdrop-blur-xl"
+      class="navbar bg-base-100 border-b border-base-300 sticky top-0 z-40 px-4 sm:px-4 lg:px-6 min-h-16"
     >
       <!-- Mobile: Menu Button -->
       <div class="flex-none lg:hidden">
         <app-menu-toggle-button for="dashboard-drawer" />
       </div>
 
-      <!-- Company Branding - Enhanced text size -->
+      <!-- Company Branding -->
       <div class="flex-1 min-w-0 px-1.5 sm:px-2 flex items-center">
-        <div class="flex items-center gap-2 sm:gap-2.5">
+        <div class="flex items-center gap-2.5">
           <div class="avatar">
-            <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg ring-1 ring-base-300/50">
+            <div class="w-8 h-8 rounded-lg ring-1 ring-base-300/50">
               <img [src]="logoUrl()" [alt]="companyDisplayName()" />
             </div>
           </div>
-          <div class="flex flex-col min-w-0">
-            <span class="font-bold text-sm sm:text-base truncate max-w-[120px] sm:max-w-[160px]">{{
-              companyDisplayName()
-            }}</span>
-          </div>
+          <span class="font-bold text-sm truncate max-w-[140px] sm:max-w-[180px]">{{
+            companyDisplayName()
+          }}</span>
         </div>
       </div>
 
-      <!-- Right side actions - Compact -->
-      <div class="flex-none flex items-center gap-0.5 sm:gap-1.5">
+      <!-- Right side actions -->
+      <div class="flex-none flex items-center gap-1.5 sm:gap-2">
+        <!-- Shift Status — click opens close/open shift modal -->
+        <button
+          type="button"
+          (click)="openShiftModalFromBadge()"
+          class="badge badge-md gap-1.5 font-semibold cursor-pointer transition-all py-2 px-3 min-h-0 border-0 shadow-sm"
+          [class.badge-success]="shiftOpen()"
+          [class.badge-soft]="shiftOpen()"
+          [class.badge-ghost]="!shiftOpen()"
+          [class.hover:brightness-95]="shiftOpen()"
+          [class.hover:bg-base-200]="!shiftOpen()"
+          [attr.aria-label]="
+            shiftOpen() ? 'Shift open — click to close shift' : 'Shift closed — click to open shift'
+          "
+        >
+          @if (shiftOpen()) {
+            <span class="w-2 h-2 bg-success rounded-full animate-pulse"></span>
+            open
+          } @else {
+            <span class="w-2 h-2 bg-base-content/30 rounded-full"></span>
+            closed
+          }
+        </button>
+
         <!-- Offline Indicator -->
         @if (!isOnline()) {
           <button type="button" class="btn btn-ghost btn-square btn-sm indicator" title="Offline">
@@ -67,12 +88,10 @@
             class="dropdown-content bg-base-100 rounded-xl z-50 mt-1.5 w-64 sm:w-72 shadow-xl border border-base-300/50 overflow-hidden"
           >
             <!-- User Info Header -->
-            <div
-              class="bg-gradient-to-br from-primary/10 to-transparent px-3 py-3 border-b border-base-300/50"
-            >
+            <div class="bg-base-200 px-3 py-3 border-b border-base-300/50">
               <div class="flex items-center gap-2.5">
                 <div class="avatar">
-                  <div class="w-11 h-11 rounded-xl ring-2 ring-primary/20">
+                  <div class="w-11 h-11 rounded-xl ring-2 ring-base-300">
                     <img [src]="userAvatar()" [alt]="fullName()" />
                   </div>
                 </div>
@@ -195,8 +214,10 @@
       </div>
     </div>
 
-    <!-- Page Content - Tighter padding on mobile -->
-    <main class="flex-1 overflow-auto bg-base-200/40 p-2.5 sm:p-4 lg:p-6 pb-20 lg:pb-6">
+    <!-- Page Content -->
+    <main
+      class="dashboard-main flex-1 overflow-auto bg-base-200/40 px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-6 pb-20 lg:pb-6"
+    >
       <router-outlet />
     </main>
 
@@ -211,7 +232,7 @@
           routerLink="/dashboard/products"
           routerLinkActive="text-primary"
           #productsLink="routerLinkActive"
-          class="flex flex-col items-center justify-center gap-0.5 py-2 px-4 min-w-[64px] transition-colors"
+          class="nav-link-ripple flex flex-col items-center justify-center gap-0.5 py-2 px-4 min-w-[64px] transition-colors rounded-lg"
         >
           <div class="relative">
             @if (productsLink.isActive) {
@@ -250,7 +271,7 @@
           routerLinkActive="text-primary"
           [routerLinkActiveOptions]="{ exact: true }"
           #homeLink="routerLinkActive"
-          class="flex flex-col items-center justify-center gap-0.5 py-2 px-4 min-w-[64px] transition-colors"
+          class="nav-link-ripple flex flex-col items-center justify-center gap-0.5 py-2 px-4 min-w-[64px] transition-colors rounded-lg"
         >
           <div class="relative">
             @if (homeLink.isActive) {
@@ -288,7 +309,7 @@
           routerLink="/dashboard/sell"
           routerLinkActive="text-primary"
           #sellLink="routerLinkActive"
-          class="flex flex-col items-center justify-center gap-0.5 py-2 px-4 min-w-[64px] transition-colors"
+          class="nav-link-ripple flex flex-col items-center justify-center gap-0.5 py-2 px-4 min-w-[64px] transition-colors rounded-lg"
         >
           <div class="relative">
             @if (sellLink.isActive) {
@@ -322,26 +343,105 @@
         </a>
       </div>
     </nav>
+
+    <!-- Open / Close shift modal (triggered from navbar badge or overview) -->
+    @if (dayModalMode()) {
+      <dialog class="modal modal-open">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg">
+            {{ dayModalMode() === 'open' ? 'Open shift' : 'Close shift' }}
+          </h3>
+          @if (cashierSessionService.error()) {
+            <div role="alert" class="alert alert-error text-sm mt-2">
+              <span>{{ cashierSessionService.error() }}</span>
+            </div>
+          }
+          <p class="py-2 text-sm text-base-content/70">
+            {{
+              dayModalMode() === 'open' ? 'Enter opening balance' : 'Enter closing declared amount'
+            }}
+            for each cashier-controlled account
+          </p>
+          @for (acc of dayModalConfig(); track acc.ledgerAccountCode) {
+            <label class="label">
+              <span class="label-text">{{ acc.paymentMethodName || acc.paymentMethodCode }}</span>
+              <span class="label-text-alt text-base-content/60">sh</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              class="input input-bordered w-full"
+              [ngModel]="dayModalBalances()[acc.ledgerAccountCode] || ''"
+              (ngModelChange)="setDayModalBalance(acc.ledgerAccountCode, $event)"
+              placeholder="0.00"
+              [attr.aria-label]="
+                (dayModalMode() === 'open' ? 'Opening balance' : 'Closing declared') +
+                ' in shillings'
+              "
+            />
+          }
+          @if (dayModalConfig().length === 0) {
+            <p class="text-sm text-base-content/70 py-2">Loading accounts...</p>
+          }
+          @if (dayModalMode() === 'close') {
+            <label class="label">
+              <span class="label-text">Notes (optional)</span>
+            </label>
+            <textarea
+              class="textarea textarea-bordered w-full"
+              [ngModel]="dayModalNotes()"
+              (ngModelChange)="dayModalNotes.set($event)"
+              placeholder="Optional notes"
+              rows="2"
+            ></textarea>
+          }
+          <div class="modal-action">
+            <button type="button" class="btn btn-ghost" (click)="closeDayModal()">Cancel</button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              (click)="submitDayModal()"
+              [disabled]="dayModalConfig().length === 0"
+            >
+              {{ dayModalMode() === 'open' ? 'Open' : 'Close' }}
+            </button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="submit" (click)="closeDayModal()">close</button>
+        </form>
+      </dialog>
+    }
   </div>
 
-  <!-- Sidebar - Compact, scannable -->
+  <!-- Sidebar - Mobile: solid panel + strong scrim; Desktop: always open -->
   <div class="drawer-side z-50">
     <label
       for="dashboard-drawer"
-      class="drawer-overlay bg-base-content/20 backdrop-blur-sm"
+      class="drawer-overlay bg-base-content/50 backdrop-blur-md"
       aria-label="Close menu"
     ></label>
     <aside
-      class="bg-base-100 text-base-content min-h-screen w-64 flex flex-col border-r border-base-300/50"
+      class="sidebar-aside bg-base-100 text-base-content min-h-screen w-64 flex flex-col border-r border-base-300 shadow-2xl"
     >
-      <!-- Sidebar Header -->
-      <div
-        class="flex items-center gap-2.5 p-3 border-b border-base-300/50 bg-gradient-to-r from-primary/8 to-transparent"
-      >
-        <img src="favicon.svg" alt="dukarun" class="h-8 w-8 flex-shrink-0" />
-        <div class="flex-1 min-w-0">
-          <h2 class="text-base font-bold text-primary leading-tight">dukarun</h2>
-          <p class="text-[9px] text-base-content/40 uppercase tracking-wider">Dashboard</p>
+      <!-- Sidebar Header — aligned with top nav height -->
+      <div class="flex items-center px-4 border-b border-base-300 min-h-16">
+        <div class="duka-door-logo flex-shrink-0">
+          <img
+            class="dukarun-withtext-light"
+            src="assets/logo/dukarun-withtext-light.svg"
+            alt="dukarun"
+            height="32"
+            width="140"
+          />
+          <img
+            class="dukarun-withtext-dark"
+            src="assets/logo/dukarun-withtext-dark.svg"
+            alt="dukarun"
+            height="32"
+            width="140"
+          />
         </div>
       </div>
 
@@ -351,13 +451,13 @@
           <!-- Overview -->
           <a
             [routerLink]="overviewItem.route"
-            routerLinkActive="bg-primary/15 text-primary font-bold border-l-2 border-primary"
+            routerLinkActive="bg-base-200 text-primary font-bold border-l-2 border-primary"
             [routerLinkActiveOptions]="{ exact: true }"
             (click)="closeDrawer()"
-            class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-base-content min-h-[2.75rem] active:bg-base-200 transition-colors"
+            class="nav-link-ripple flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-base-content min-h-[2.75rem] active:bg-base-200 transition-colors"
           >
             <span
-              class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-base-200 text-base-content/80"
+              class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-base-100 text-base-content/70"
             >
               <app-nav-icon [name]="overviewItem.icon" />
             </span>
@@ -377,13 +477,13 @@
                 <a
                   [routerLink]="item.route"
                   [queryParams]="item.queryParams"
-                  routerLinkActive="bg-primary/15 text-primary font-bold border-l-2 border-primary"
+                  routerLinkActive="bg-base-200 text-primary font-bold border-l-2 border-primary"
                   [routerLinkActiveOptions]="{ exact: false }"
                   (click)="closeDrawer()"
-                  class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-base-content min-h-[2.75rem] active:bg-base-200 transition-colors"
+                  class="nav-link-ripple flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-base-content min-h-[2.75rem] active:bg-base-200 transition-colors"
                 >
                   <span
-                    class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-base-200 text-base-content/80"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-base-100 text-base-content/70"
                   >
                     <app-nav-icon [name]="item.icon" />
                   </span>
@@ -395,18 +495,18 @@
         </nav>
       </div>
 
-      <!-- Sidebar Footer - Settings segregated with company selector -->
-      <div class="border-t border-base-300/50 p-2 space-y-2 bg-base-200/20">
+      <!-- Sidebar Footer -->
+      <div class="border-t border-base-300 p-2 space-y-1">
         @if (hasSettingsForFooter()) {
           <a
             routerLink="/dashboard/settings"
-            routerLinkActive="bg-primary/15 text-primary font-bold"
+            routerLinkActive="bg-base-200 text-primary font-bold"
             [routerLinkActiveOptions]="{ exact: false }"
             (click)="closeDrawer()"
-            class="flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold text-base-content hover:bg-base-200 transition-colors"
+            class="nav-link-ripple flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold text-base-content hover:bg-base-200 transition-colors"
           >
             <span
-              class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-base-200 text-base-content/80"
+              class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-base-100 text-base-content/70"
             >
               <app-nav-icon name="settings" />
             </span>
@@ -481,7 +581,7 @@
         }
 
         <a
-          class="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-base-content/50 active:bg-base-200 transition-colors cursor-pointer"
+          class="nav-link-ripple flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-base-content/50 active:bg-base-200 transition-colors cursor-pointer"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

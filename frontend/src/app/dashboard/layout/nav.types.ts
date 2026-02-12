@@ -3,6 +3,7 @@ export type NavIcon =
   | 'sell'
   | 'orders'
   | 'payments'
+  | 'expenses'
   | 'products'
   | 'credit'
   | 'customers'
@@ -12,7 +13,8 @@ export type NavIcon =
   | 'stock-adjustments'
   | 'settings'
   | 'admin'
-  | 'upgrade';
+  | 'upgrade'
+  | 'approvals';
 
 export interface NavItem {
   label: string;

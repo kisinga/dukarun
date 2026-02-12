@@ -1,7 +1,13 @@
 import { Injectable, inject } from '@angular/core';
-import { GET_PRODUCT, SEARCH_BY_BARCODE, SEARCH_PRODUCTS } from '../../graphql/operations.graphql';
+import {
+  GET_PRODUCT,
+  GET_PRODUCTS,
+  SEARCH_BY_BARCODE,
+  SEARCH_PRODUCTS,
+} from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { isBarcodeIgnored } from './barcode.util';
+import { FacetService } from './facet.service';
 import { ProductCacheService } from './product-cache.service';
 import { ProductMapperService } from './product-mapper.service';
 
@@ -56,10 +62,12 @@ export interface ProductSearchResult {
 export class ProductSearchService {
   private readonly apolloService = inject(ApolloService);
   private readonly cacheService = inject(ProductCacheService);
+  private readonly facetService = inject(FacetService);
   private readonly mapper = inject(ProductMapperService);
 
   /**
-   * Search products by name, SKU, or barcode (cache-first for offline support)
+   * Search products by name, manufacturer, SKU, or barcode (cache-first for offline support).
+   * Matches when all words appear in product name or manufacturer.
    */
   async searchProducts(searchTerm: string): Promise<ProductSearchResult[]> {
     // Try cache first if available
@@ -73,7 +81,6 @@ export class ProductSearchService {
 
     try {
       // First, try barcode search if the search term looks like a barcode (numeric, typically 8+ digits)
-      // Barcodes are typically numeric and longer
       const isLikelyBarcode = /^\d{8,}$/.test(searchTerm.trim());
       if (isLikelyBarcode) {
         const barcodeVariant = await this.searchByBarcode(searchTerm.trim());
@@ -89,15 +96,33 @@ export class ProductSearchService {
         }
       }
 
-      // Fall back to name/SKU search
+      // Name/manufacturer search via GET_PRODUCTS with _or filter
+      const term = searchTerm.trim();
+      const searchOr: Array<{
+        name?: { contains: string };
+        description?: { contains: string };
+        slug?: { contains: string };
+        sku?: { contains: string };
+        facetValueId?: { in: string[] };
+      }> = [
+        { name: { contains: term } },
+        { description: { contains: term } },
+        { slug: { contains: term } },
+        { sku: { contains: term } },
+      ];
+      const manufacturerIds = await this.facetService.getManufacturerIdsMatchingName(term);
+      if (manufacturerIds.length > 0) {
+        searchOr.push({ facetValueId: { in: manufacturerIds } });
+      }
+
       const client = this.apolloService.getClient();
       const result = await client.query<{
-        products: {
-          items: any[];
-        };
+        products: { items: any[] };
       }>({
-        query: SEARCH_PRODUCTS,
-        variables: { term: searchTerm },
+        query: GET_PRODUCTS,
+        variables: {
+          options: { filter: { _or: searchOr }, take: 5 },
+        },
         fetchPolicy: 'network-only',
       });
 

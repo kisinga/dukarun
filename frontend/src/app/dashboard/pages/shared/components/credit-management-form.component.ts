@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
   output,
@@ -146,10 +147,18 @@ export class CreditManagementFormComponent {
   readonly initialIsCreditApproved = input<boolean>(false);
   readonly showSummary = input<boolean>(true);
 
-  // Internal state - creditLimit stored in cents
+  // Internal state - creditLimit stored in cents (synced from inputs when they change, e.g. edit load)
   readonly creditLimit = signal(this.initialCreditLimit());
   readonly creditDuration = signal(this.initialCreditDuration());
   readonly isCreditApproved = signal(this.initialIsCreditApproved());
+
+  constructor() {
+    effect(() => {
+      this.creditLimit.set(this.initialCreditLimit());
+      this.creditDuration.set(this.initialCreditDuration());
+      this.isCreditApproved.set(this.initialIsCreditApproved());
+    });
+  }
 
   /** Credit limit in display units (sh) for input field */
   readonly creditLimitInDisplayUnits = computed(() => this.creditLimit() / 100);

@@ -1,78 +1,77 @@
-<div class="space-y-4 sm:space-y-5 lg:space-y-6">
-  <!-- Header -->
-  <div class="flex items-start justify-between gap-3">
-    <div class="flex-1 min-w-0">
-      <div class="flex flex-wrap items-center gap-2 mb-1.5">
-        <h1 class="text-2xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Dashboard</h1>
+<div class="space-y-3 sm:space-y-4 animate-stagger-children">
+  <!-- Header — greeting + shift toolbar -->
+  <div class="overview-header rounded-lg border border-base-300 bg-base-100 overflow-hidden">
+    <div class="p-3 sm:p-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div class="flex-1 min-w-0">
+          <h1 class="text-xl sm:text-2xl font-bold tracking-tight">{{ getGreeting() }}</h1>
+          <p class="text-xs text-base-content/50">{{ getCurrentDate() }}</p>
+        </div>
 
-        @if (sessionOpen()) {
-          <span class="badge badge-success badge-soft badge-sm gap-1 font-semibold shrink-0">
-            <span class="w-1.5 h-1.5 bg-success rounded-full animate-pulse"></span>
-            Open
-          </span>
-          <div class="flex items-center gap-2 shrink-0">
+        <!-- Shift controls — open shift when closed -->
+        <div class="flex items-center gap-2 flex-wrap">
+          @if (!sessionOpen()) {
+            <span class="badge badge-ghost badge-sm font-semibold">Closed</span>
             <button
               type="button"
               class="btn btn-primary btn-sm font-semibold"
-              (click)="openCloseDayModal()"
+              (click)="shiftModalTrigger.openOpenModal()"
             >
-              Close shift
+              Open shift
             </button>
-            <button
-              type="button"
-              class="btn btn-primary btn-sm btn-outline font-semibold"
-              (click)="openRecordExpense()"
-            >
-              Record expense
-            </button>
-          </div>
-        }
-        @if (!sessionOpen()) {
-          <span class="badge badge-ghost badge-sm shrink-0">Closed</span>
+          }
+
           <button
-            type="button"
-            class="btn btn-primary btn-sm font-semibold"
-            (click)="openOpenDayModal()"
+            class="btn btn-ghost btn-sm btn-square touch-manipulation"
+            (click)="refresh()"
+            [class.loading]="isLoading()"
+            [disabled]="isLoading()"
+            title="Refresh"
           >
-            Open shift
+            @if (!isLoading()) {
+              <svg
+                class="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            }
           </button>
-        }
+        </div>
       </div>
-
-      <p class="text-xs sm:text-sm text-base-content/60 font-medium">{{ getCurrentDate() }}</p>
     </div>
-
-    <button
-      class="btn btn-ghost btn-sm btn-square shrink-0 touch-manipulation"
-      (click)="refresh()"
-      [class.loading]="isLoading()"
-      [disabled]="isLoading()"
-      title="Refresh"
+    <!-- Quick Stats inline in header -->
+    <div
+      class="flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2 text-xs text-base-content/50 border-t border-base-300/50 bg-base-200/30"
     >
-      @if (!isLoading()) {
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-          />
-        </svg>
-      }
-    </button>
+      <span
+        ><span class="font-bold text-base-content tabular-nums">{{ productCount() }}</span>
+        products</span
+      >
+      <span class="w-px h-3 bg-base-300"></span>
+      <span
+        ><span class="font-bold text-base-content tabular-nums">{{ activeUsers() }}</span>
+        users</span
+      >
+      <span class="w-px h-3 bg-base-300"></span>
+      <span
+        >Avg sale
+        <span class="font-bold text-base-content tabular-nums">{{ averageSale() }}</span></span
+      >
+    </div>
   </div>
 
   <!-- Error -->
   @if (error()) {
-    <div role="alert" class="alert alert-error alert-sm py-2.5 px-3 rounded-xl shadow-sm">
+    <div role="alert" class="alert alert-error alert-sm py-2.5 px-3 rounded-lg">
       <svg
-        xmlns="http://www.w3.org/2000/svg"
         class="h-4 w-4 shrink-0"
         fill="none"
         viewBox="0 0 24 24"
@@ -85,123 +84,60 @@
           d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
         />
       </svg>
-
       <span class="text-xs font-medium flex-1">{{ error() }}</span>
       <button class="btn btn-error btn-xs touch-manipulation" (click)="refresh()">Retry</button>
     </div>
   }
 
-  <!-- SECTION LABEL -->
-  <div
-    class="pt-2 pb-2 text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-base-content/50"
-  >
-    Overview
+  <!-- Period Selector -->
+  <div class="bg-base-200 rounded-lg overflow-x-auto">
+    <div role="tablist" class="tabs tabs-box">
+      @for (period of periods; track period.key) {
+        <button
+          role="tab"
+          class="tab font-semibold text-sm"
+          [class.tab-active]="selectedPeriod() === period.key"
+          (click)="selectPeriod(period.key)"
+        >
+          {{ period.label }}
+        </button>
+      }
+    </div>
   </div>
 
-  <!-- Hero Stats -->
+  <!-- Stat Cards -->
   <div class="grid grid-cols-3 gap-2 sm:gap-3">
     @for (category of categories(); track category.type) {
       <button
         type="button"
-        class="relative overflow-hidden rounded-xl p-3 sm:p-4 text-left transition-all duration-200 active:scale-[0.96] touch-manipulation shadow-sm border border-base-300/20 bg-base-200/50 sm:bg-gradient-to-br backdrop-blur-sm"
-        [class.from-primary/25]="category.type === 'purchases'"
-        [class.to-primary/10]="category.type === 'purchases'"
-        [class.from-success/25]="category.type === 'sales'"
-        [class.to-success/10]="category.type === 'sales'"
-        [class.from-error/25]="category.type === 'expenses'"
-        [class.to-error/10]="category.type === 'expenses'"
-        [class.ring-2]="expandedCategory() === category.type"
-        [class.ring-primary]="expandedCategory() === category.type && category.type === 'purchases'"
-        [class.ring-success]="expandedCategory() === category.type && category.type === 'sales'"
-        [class.ring-error]="expandedCategory() === category.type && category.type === 'expenses'"
-        (click)="category.type !== 'expenses' && toggleCategory(category.type)"
+        class="stat-card-overview text-left rounded-lg p-3 sm:p-4 border transition-all duration-150 touch-manipulation"
+        [class.border-l-4]="true"
+        [class.stat-card-sales]="category.type === 'sales'"
+        [class.stat-card-purchases]="category.type === 'purchases'"
+        [class.stat-card-expenses]="category.type === 'expenses'"
+        [class.ring-1]="expandedCategory() === category.type"
+        [class.ring-base-content/10]="expandedCategory() === category.type"
+        (click)="toggleCategory(category.type)"
       >
-        @if (category.type === 'expenses') {
-          <span
-            class="absolute top-1.5 right-1.5 badge badge-warning badge-soft text-[8px] px-1.5 py-0.5 font-semibold"
-          >
-            Soon
-          </span>
-        }
+        <span
+          class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-base-content/50 block mb-1"
+        >
+          {{ category.name }}
+        </span>
 
-        <div class="flex items-center gap-2">
-          <div
-            class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
-            [class.bg-primary/20]="category.type === 'purchases'"
-            [class.bg-success/20]="category.type === 'sales'"
-            [class.bg-error/20]="category.type === 'expenses'"
-          >
-            @if (category.type === 'purchases') {
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4 sm:h-5 sm:w-5 text-primary"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-            }
-            @if (category.type === 'sales') {
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4 sm:h-5 sm:w-5 text-success"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            }
-            @if (category.type === 'expenses') {
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4 sm:h-5 sm:w-5 text-error"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-            }
-          </div>
+        <p
+          class="text-lg sm:text-xl lg:text-2xl font-bold tabular-nums leading-tight"
+          [class.text-success]="category.type === 'sales'"
+          [class.text-info]="category.type === 'purchases'"
+          [class.text-error]="category.type === 'expenses'"
+        >
+          {{ getAmountForPeriod(category) }}
+        </p>
 
-          <div class="flex-1 min-w-0">
-            <p
-              class="text-lg sm:text-xl font-extrabold tabular-nums leading-tight mb-0.5"
-              [class.text-primary]="category.type === 'purchases'"
-              [class.text-success]="category.type === 'sales'"
-              [class.text-error]="category.type === 'expenses'"
-            >
-              {{ formatCompactValue(category.stats[0].amount) }}
-            </p>
-
-            <span class="text-[10px] sm:text-xs text-base-content/60 font-medium truncate block">
-              {{ category.name }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Hide secondary stats on mobile -->
-        <div class="hidden sm:flex flex-wrap gap-1 mt-2">
-          @for (stat of category.stats.slice(1); track stat.period) {
-            <span class="text-[9px] px-1.5 py-0.5 rounded bg-base-100/60 tabular-nums">
-              {{ stat.period }}: {{ formatCompactValue(stat.amount) }}
+        <div class="hidden sm:flex flex-wrap gap-x-3 gap-y-0.5 mt-2">
+          @for (stat of getSecondaryStats(category); track stat.period) {
+            <span class="text-[10px] text-base-content/40 tabular-nums">
+              {{ stat.label }} {{ stat.amount }}
             </span>
           }
         </div>
@@ -212,17 +148,12 @@
   <!-- Expanded Breakdown -->
   @if (expandedCategory(); as expanded) {
     @for (category of categories(); track category.type) {
-      @if (category && category.type === expanded && category.accounts.length > 0) {
-        <div
-          class="rounded-xl overflow-hidden border border-base-300/30 bg-base-200/40 sm:bg-gradient-to-br shadow-sm"
-        >
-          <div
-            class="flex items-center justify-between px-3 py-2.5 border-b border-base-300/40 bg-base-200/30"
-          >
-            <span class="text-xs sm:text-sm font-bold text-base-content/90">
-              {{ category.name }} Breakdown
+      @if (category.type === expanded && category.accounts.length > 0) {
+        <div class="rounded-lg overflow-hidden border border-base-300 bg-base-100">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-base-300">
+            <span class="text-sm font-bold text-base-content/70">
+              {{ category.name }} breakdown
             </span>
-
             <button
               class="btn btn-ghost btn-xs btn-square touch-manipulation"
               (click)="toggleCategory(category.type)"
@@ -239,22 +170,31 @@
             </button>
           </div>
 
-          <div class="grid grid-cols-3 sm:grid-cols-4 gap-2 p-3">
+          <div class="divide-y divide-base-300/50">
             @for (account of category.accounts; track account.label) {
-              <div
-                class="rounded-lg p-2.5 sm:p-3 text-center bg-base-100/80 shadow-inner border border-base-300/20"
-              >
-                <span class="text-lg sm:text-xl block mb-1">{{ account.icon }}</span>
-                <p class="text-[9px] sm:text-[10px] text-base-content/60 truncate mb-1 font-medium">
-                  {{ account.label }}
-                </p>
-                <p
-                  class="font-bold text-xs sm:text-sm tabular-nums"
-                  [class.text-primary]="category.type === 'purchases'"
+              <div class="flex items-center justify-between px-4 py-3">
+                <div class="flex items-center gap-2.5">
+                  <span
+                    class="w-7 h-7 rounded-lg text-[10px] font-bold flex items-center justify-center shrink-0"
+                    [class.bg-success/10]="category.type === 'sales'"
+                    [class.text-success]="category.type === 'sales'"
+                    [class.bg-info/10]="category.type === 'purchases'"
+                    [class.text-info]="category.type === 'purchases'"
+                    [class.bg-error/10]="category.type === 'expenses'"
+                    [class.text-error]="category.type === 'expenses'"
+                  >
+                    {{ account.label[0] }}
+                  </span>
+                  <span class="text-sm text-base-content/70">{{ account.label }}</span>
+                </div>
+                <span
+                  class="font-bold text-sm tabular-nums"
                   [class.text-success]="category.type === 'sales'"
+                  [class.text-info]="category.type === 'purchases'"
+                  [class.text-error]="category.type === 'expenses'"
                 >
-                  {{ formatCompactValue(account.value) }}
-                </p>
+                  {{ account.value }}
+                </span>
               </div>
             }
           </div>
@@ -263,142 +203,55 @@
     }
   }
 
-  <!-- SECTION -->
+  <!-- Low Stock Alert -->
   @if (lowStockCount() > 0) {
-    <div
-      class="pt-3 pb-2 text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-base-content/50"
-    >
-      Alerts
-    </div>
-
-    <!-- Low Stock -->
     <button
-      class="w-full flex items-center gap-3 p-3 rounded-xl bg-warning/15 border-l-4 border-warning active:scale-[0.98] transition-all duration-200 touch-manipulation shadow-sm hover:bg-warning/20"
+      class="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-warning/10 border border-warning/30 transition-colors touch-manipulation hover:bg-warning/15"
       (click)="navigateToInventory()"
     >
-      <div
-        class="w-9 h-9 rounded-lg bg-warning/20 flex items-center justify-center shrink-0 shadow-sm"
+      <svg
+        class="h-5 w-5 text-warning shrink-0"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
       >
-        <svg
-          class="h-5 w-5 text-warning"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-          />
-        </svg>
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+        />
+      </svg>
+      <div class="flex-1 min-w-0 text-left">
+        <p class="font-semibold text-sm">{{ lowStockCount() }} items low on stock</p>
       </div>
-
-      <div class="flex-1 min-w-0">
-        <p class="font-bold text-sm sm:text-base mb-0.5">Low Stock</p>
-        <p class="text-xs sm:text-sm text-base-content/70">{{ lowStockCount() }} items low</p>
-      </div>
-
-      <span class="badge badge-warning badge-soft badge-sm font-bold shrink-0">
-        {{ lowStockCount() }}
-      </span>
+      <svg
+        class="h-4 w-4 text-base-content/30 shrink-0"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+      </svg>
     </button>
   }
 
-  <!-- SECTION -->
-  <div
-    class="pt-3 pb-2 text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-base-content/50"
-  >
-    System Stats
-  </div>
-
-  <!-- Stats Row -->
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-    <div class="bg-base-200/60 rounded-xl p-3 sm:p-4 border border-base-300/20 shadow-sm">
-      <span
-        class="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-base-content/60 block mb-1.5 py-1.5"
-      >
-        Products
-      </span>
-      <p class="text-2xl sm:text-3xl font-extrabold text-primary tabular-nums leading-none">
-        {{ productCount() }}
-      </p>
-    </div>
-
-    <div class="bg-base-200/60 rounded-xl p-3 sm:p-4 border border-base-300/20 shadow-sm">
-      <span
-        class="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-base-content/60 block mb-1.5 py-1.5"
-      >
-        Users
-      </span>
-      <p class="text-2xl sm:text-3xl font-extrabold text-success tabular-nums leading-none">
-        {{ activeUsers() }}
-      </p>
-    </div>
-
-    <div class="bg-base-200/60 rounded-xl p-3 sm:p-4 border border-base-300/20 shadow-sm">
-      <span
-        class="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-base-content/60 block mb-1.5 py-1.5"
-      >
-        Avg Sale
-      </span>
-      <p class="text-xl sm:text-2xl font-extrabold text-info tabular-nums leading-none">
-        {{ averageSale() }}
-      </p>
-    </div>
-
-    <div class="bg-base-200/60 rounded-xl p-3 sm:p-4 border border-base-300/20 shadow-sm">
-      <span
-        class="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-base-content/60 block mb-1.5"
-      >
-        Margin <span class="badge badge-warning badge-soft text-[7px] px-0 py-0"> Soon </span>
-      </span>
-      <p class="text-2xl sm:text-3xl font-extrabold text-accent tabular-nums leading-none">
-        {{ profitMargin() }}%
-      </p>
-    </div>
-  </div>
-
-  <!-- SECTION -->
-  <div
-    class="pt-3 pb-2 text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-base-content/50"
-  >
-    Activity
-  </div>
-
   <!-- Recent Activity -->
   @if (recentActivity().length > 0) {
-    <div class="rounded-xl border border-base-300/30 overflow-hidden bg-base-100 shadow-sm">
+    <div class="rounded-lg border border-base-300 overflow-hidden bg-base-100">
       <button
-        class="w-full flex items-center justify-between px-3 py-2.5 hover:bg-base-200/30 transition-colors touch-manipulation"
+        class="w-full flex items-center justify-between px-4 py-3 hover:bg-base-200/50 transition-colors touch-manipulation"
         (click)="toggleRecentActivity()"
       >
-        <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <svg
-              class="h-4 w-4 text-primary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-
-          <span class="font-bold text-sm">Recent Activity</span>
-        </div>
+        <span class="font-bold text-sm text-base-content/70">Recent activity</span>
 
         <div class="flex items-center gap-2">
-          <span class="badge badge-primary badge-soft badge-xs font-bold">
-            {{ recentActivity().length }}
-          </span>
+          <span class="text-xs text-base-content/40 tabular-nums">{{
+            recentActivity().length
+          }}</span>
           <svg
-            class="h-4 w-4 text-base-content/40 transition-transform duration-200"
+            class="h-4 w-4 text-base-content/30 transition-transform duration-200"
             [class.rotate-180]="showRecentActivity()"
             fill="none"
             viewBox="0 0 24 24"
@@ -411,47 +264,36 @@
       </button>
 
       @if (showRecentActivity()) {
-        <div class="border-t border-base-300/30">
-          @for (
-            activity of recentActivity().slice(0, 5);
-            track activity.id;
-            let isLast = $last;
-            let i = $index
-          ) {
+        <div class="border-t border-base-300">
+          @for (activity of recentActivity().slice(0, 8); track activity.id; let isLast = $last) {
             <div
-              class="flex items-center justify-between px-3 py-2.5"
-              [class.bg-base-200/30]="i % 2 === 0"
+              class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-base-200/30"
               [class.border-b]="!isLast"
-              [class.border-base-300/20]="!isLast"
+              [class.border-base-300/50]="!isLast"
             >
               <div class="flex items-center gap-2.5 flex-1 min-w-0">
-                <div
-                  class="w-6 h-6 rounded-lg text-[10px] font-bold flex items-center justify-center shrink-0 shadow-sm"
-                  [class.bg-primary/20]="activity.type === 'Purchase'"
-                  [class.text-primary]="activity.type === 'Purchase'"
-                  [class.bg-success/20]="activity.type === 'Sale'"
+                <span
+                  class="w-7 h-7 rounded-lg text-[10px] font-bold flex items-center justify-center shrink-0"
+                  [class.bg-success/10]="activity.type === 'Sale'"
                   [class.text-success]="activity.type === 'Sale'"
-                  [class.bg-error/20]="activity.type === 'Expense'"
+                  [class.bg-info/10]="activity.type === 'Purchase'"
+                  [class.text-info]="activity.type === 'Purchase'"
+                  [class.bg-error/10]="activity.type === 'Expense'"
                   [class.text-error]="activity.type === 'Expense'"
                 >
                   {{ activity.type[0] }}
-                </div>
+                </span>
 
                 <div class="min-w-0 flex-1">
-                  <span
-                    class="text-xs sm:text-sm font-medium truncate block text-base-content/80 mb-0.5"
-                  >
+                  <span class="text-xs sm:text-sm font-medium truncate block text-base-content/80">
                     {{ activity.description }}
                   </span>
-
-                  <span class="text-[10px] text-base-content/50">
-                    {{ activity.time }}
-                  </span>
+                  <span class="text-[10px] text-base-content/40">{{ activity.time }}</span>
                 </div>
               </div>
 
               <span
-                class="font-bold tabular-nums text-xs sm:text-sm shrink-0 ml-2"
+                class="font-bold tabular-nums text-xs sm:text-sm shrink-0 ml-3"
                 [class.text-success]="activity.amount.startsWith('+')"
                 [class.text-error]="activity.amount.startsWith('-')"
               >
@@ -459,92 +301,8 @@
               </span>
             </div>
           }
-
-          @if (recentActivity().length > 5) {
-            <div class="px-3 py-2 border-t border-base-300/30 bg-base-200/20">
-              <button
-                class="btn btn-ghost btn-xs btn-block text-primary font-semibold touch-manipulation"
-              >
-                View all {{ recentActivity().length }}
-              </button>
-            </div>
-          }
         </div>
       }
     </div>
   }
-
-  <!-- Open / Close shift modal (same view for both) -->
-  @if (dayModalMode()) {
-    <dialog class="modal modal-open">
-      <div class="modal-box">
-        <h3 class="font-bold text-lg">
-          {{ dayModalMode() === 'open' ? 'Open shift' : 'Close shift' }}
-        </h3>
-        @if (cashierSessionService.error()) {
-          <div role="alert" class="alert alert-error text-sm mt-2">
-            <span>{{ cashierSessionService.error() }}</span>
-          </div>
-        }
-        <p class="py-2 text-sm text-base-content/70">
-          {{
-            dayModalMode() === 'open' ? 'Enter opening balance' : 'Enter closing declared amount'
-          }}
-          for each cashier-controlled account
-        </p>
-        @for (acc of dayModalConfig(); track acc.ledgerAccountCode) {
-          <label class="label">
-            <span class="label-text">{{ acc.paymentMethodName || acc.paymentMethodCode }}</span>
-            <span class="label-text-alt text-base-content/60">sh</span>
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            class="input input-bordered w-full"
-            [ngModel]="dayModalBalances()[acc.ledgerAccountCode] || ''"
-            (ngModelChange)="setDayModalBalance(acc.ledgerAccountCode, $event)"
-            placeholder="0.00"
-            [attr.aria-label]="
-              (dayModalMode() === 'open' ? 'Opening balance' : 'Closing declared') + ' in shillings'
-            "
-          />
-        }
-        @if (dayModalConfig().length === 0) {
-          <p class="text-sm text-base-content/70 py-2">Loading accounts…</p>
-        }
-        @if (dayModalMode() === 'close') {
-          <label class="label">
-            <span class="label-text">Notes (optional)</span>
-          </label>
-          <textarea
-            class="textarea textarea-bordered w-full"
-            [ngModel]="dayModalNotes()"
-            (ngModelChange)="dayModalNotes.set($event)"
-            placeholder="Optional notes"
-            rows="2"
-          ></textarea>
-        }
-        <div class="modal-action">
-          <button type="button" class="btn btn-ghost" (click)="closeDayModal()">Cancel</button>
-          <button
-            type="button"
-            class="btn btn-primary"
-            (click)="submitDayModal()"
-            [disabled]="dayModalConfig().length === 0"
-          >
-            {{ dayModalMode() === 'open' ? 'Open' : 'Close' }}
-          </button>
-        </div>
-      </div>
-      <form method="dialog" class="modal-backdrop">
-        <button type="submit" (click)="closeDayModal()">close</button>
-      </form>
-    </dialog>
-  }
-
-  <app-record-expense-modal
-    (recorded)="onExpenseRecorded()"
-    (cancelled)="onExpenseCancelled()"
-  ></app-record-expense-modal>
 </div>

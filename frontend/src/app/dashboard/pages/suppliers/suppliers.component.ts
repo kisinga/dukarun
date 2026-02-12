@@ -2,13 +2,15 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  OnDestroy,
   OnInit,
   computed,
   inject,
   signal,
   viewChild,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter } from 'rxjs';
 import { SupplierService } from '../../../core/services/supplier.service';
 import { calculateSupplierStats } from '../../../core/services/stats/supplier-stats.util';
 import {
@@ -46,12 +48,20 @@ import { SupplierPaymentModalComponent } from './components/supplier-payment-mod
     SupplierPaymentModalComponent,
   ],
   templateUrl: './suppliers.component.html',
-  styleUrl: './suppliers.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SuppliersComponent implements OnInit {
+export class SuppliersComponent implements OnInit, OnDestroy {
   private readonly supplierService = inject(SupplierService);
   readonly router = inject(Router);
+  private readonly routerEventsSub = this.router.events
+    .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+    .subscribe((e) => {
+      if (
+        e.urlAfterRedirects?.startsWith('/dashboard/suppliers') &&
+        !e.urlAfterRedirects.includes('/edit')
+      )
+        this.loadSuppliers();
+    });
 
   // View references
   readonly deleteModal = viewChild<DeleteConfirmationModalComponent>('deleteModal');
@@ -157,6 +167,10 @@ export class SuppliersComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadSuppliers();
+  }
+
+  ngOnDestroy(): void {
+    this.routerEventsSub.unsubscribe();
   }
 
   async loadSuppliers(): Promise<void> {

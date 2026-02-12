@@ -1,10 +1,19 @@
+import type { ValidatorFn } from '@angular/forms';
+
+/**
+ * Kenyan phone format: 0XXXXXXXXX (10 digits).
+ * Leading 0 is trunk prefix mapping to +254 internationally.
+ * Accepts mobile (07xx) and landlines (01xx, 02xx, etc.).
+ */
+export const PHONE_PATTERN = /^0\d{9}$/;
+
 /**
  * Phone number utilities for Kenyan phone numbers
  *
  * Standard format: 0XXXXXXXXX (10 digits starting with 0)
- * - Mobile (07...) and landlines (020..., 041..., etc.) are valid
- * - Input can accept: 0XXXXXXXXX, +254XXXXXXXX (254+9 digits), 254XXXXXXXX, 7XXXXXXXX (→ 07XXXXXXXX)
+ * - Input can accept: 0XXXXXXXXX, +254XXXXXXXXX, 254XXXXXXXXX, XXXXXXXXX
  * - Storage/Output: Always normalized to 0XXXXXXXXX
+ * - Accepts mobile (07xx) and landlines (01xx, 02xx, etc.)
  */
 
 /**
@@ -12,8 +21,9 @@
  *
  * Accepts various input formats:
  * - 0XXXXXXXXX (already correct)
- * - +254XXXXXXXX or 254XXXXXXXX (254 + 9 digits → 0 + 9 digits)
- * - 7XXXXXXXX (missing leading 0, mobile only → 07XXXXXXXX)
+ * - +254XXXXXXXXX (international format)
+ * - 254XXXXXXXXX (international without +)
+ * - XXXXXXXXX (9 digits, missing leading 0)
  *
  * @param phoneNumber - Phone number in any format
  * @returns Normalized phone number in format 0XXXXXXXXX
@@ -24,39 +34,49 @@ export function formatPhoneNumber(phoneNumber: string): string {
     throw new Error('Phone number is required');
   }
 
-  // Remove all whitespace and non-digit characters except + at the start
-  let cleaned = phoneNumber.trim().replace(/[\s-]/g, '');
+  // Remove all whitespace and non-digit characters
+  let cleaned = phoneNumber.trim().replace(/\D/g, '');
 
-  // Remove leading + if present
-  if (cleaned.startsWith('+')) {
-    cleaned = cleaned.substring(1);
-  }
-
-  // 254 + 9 digits (11 or 12 chars) → 0 + 9 digits
-  if (cleaned.startsWith('254') && (cleaned.length === 11 || cleaned.length === 12)) {
+  // Handle different formats:
+  // 254XXXXXXXXX (12 digits) -> 0XXXXXXXXX
+  if (cleaned.startsWith('254') && cleaned.length === 12) {
     cleaned = '0' + cleaned.substring(3);
   }
-  // 7XXXXXXXX (9 digits, mobile) → 07XXXXXXXX
-  else if (cleaned.startsWith('7') && cleaned.length === 9) {
+  // XXXXXXXXX (9 digits starting with 1-9) -> 0XXXXXXXXX
+  else if (cleaned.length === 9 && /^[1-9]/.test(cleaned)) {
     cleaned = '0' + cleaned;
   }
-  // 0XXXXXXXXX (10 digits) → already correct
+  // 0XXXXXXXXX (10 digits) -> already correct
   else if (cleaned.startsWith('0') && cleaned.length === 10) {
     // Already in correct format
   } else {
     throw new Error(
-      `Invalid phone number format. Expected 0XXXXXXXXX (10 digits starting with 0). Received: ${phoneNumber}`,
+      `Invalid phone number format. Expected 0XXXXXXXXX (10 digits, mobile or landline). Received: ${phoneNumber}`,
     );
   }
 
   // Final validation: must be exactly 10 digits starting with 0
-  if (!/^0\d{9}$/.test(cleaned)) {
+  if (!PHONE_PATTERN.test(cleaned)) {
     throw new Error(
       `Phone number must be in format 0XXXXXXXXX (10 digits starting with 0). Received: ${phoneNumber}`,
     );
   }
 
   return cleaned;
+}
+
+/**
+ * Format phone number, returning null instead of throwing on invalid input.
+ *
+ * @param phoneNumber - Phone number in any format
+ * @returns Normalized phone number or null if invalid
+ */
+export function formatPhoneNumberOrNull(phoneNumber: string): string | null {
+  try {
+    return formatPhoneNumber(phoneNumber);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -72,11 +92,23 @@ export function validatePhoneNumber(phoneNumber: string): boolean {
 
   try {
     const normalized = formatPhoneNumber(phoneNumber);
-    return /^0\d{9}$/.test(normalized);
+    return PHONE_PATTERN.test(normalized);
   } catch {
     return false;
   }
 }
+
+/**
+ * Angular ValidatorFn for phone number format.
+ * Use in Reactive Forms: Validators.compose([Validators.required, phoneValidator])
+ */
+export const phoneValidator: ValidatorFn = (control) => {
+  const value = control.value;
+  if (value == null || value === '') {
+    return null; // Let Validators.required handle empty
+  }
+  return validatePhoneNumber(value) ? null : { phoneFormat: true };
+};
 
 /**
  * Generate a random alphanumeric string

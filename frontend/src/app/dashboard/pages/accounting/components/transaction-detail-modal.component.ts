@@ -10,6 +10,7 @@ import {
   ElementRef,
 } from '@angular/core';
 import { JournalEntry } from '../../../../core/services/ledger/ledger.service';
+import { sourceTypeLabel } from '../utils/accounting-formatting';
 
 @Component({
   selector: 'app-transaction-detail-modal',
@@ -21,6 +22,7 @@ import { JournalEntry } from '../../../../core/services/ledger/ledger.service';
 export class TransactionDetailModalComponent {
   entry = input<JournalEntry | null>(null);
   closed = output<void>();
+  sourceTypeLabel = sourceTypeLabel;
 
   readonly dialogRef = viewChild<ElementRef<HTMLDialogElement>>('dialog');
 

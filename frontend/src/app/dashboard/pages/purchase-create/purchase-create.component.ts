@@ -1,7 +1,15 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  inject,
+  signal,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { ApprovalService } from '../../../core/services/approval.service';
 import { DeepLinkService } from '../../../core/services/deep-link.service';
 import { LedgerService } from '../../../core/services/ledger/ledger.service';
 import {
@@ -14,6 +22,8 @@ import { PurchaseDraft, PurchaseLineItem } from '../../../core/services/purchase
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { SupplierService } from '../../../core/services/supplier.service';
 import { ProductSearchViewComponent } from '../shared/components/product-search-view.component';
+import { RejectionBannerComponent } from '../shared/components/rejection-banner.component';
+import { ApprovableFormBase } from '../shared/directives/approvable-form-base.directive';
 import { PurchaseLineItemFormComponent } from './components/purchase-line-item-form.component';
 import { PurchaseLineItemsTableComponent } from './components/purchase-line-items-table.component';
 import { PurchasePaymentSectionComponent } from './components/purchase-payment-section.component';
@@ -28,6 +38,7 @@ import { PurchaseVariantPickerModalComponent } from './components/purchase-varia
     PurchaseLineItemsTableComponent,
     PurchasePaymentSectionComponent,
     PurchaseVariantPickerModalComponent,
+    RejectionBannerComponent,
   ],
   template: `
     <div class="min-h-screen bg-base-100">
@@ -51,11 +62,53 @@ import { PurchaseVariantPickerModalComponent } from './components/purchase-varia
 
       <!-- Content -->
       <div class="p-4 pb-28 space-y-4">
+        <!-- Rejection banner (from rejected approval) -->
+        <app-rejection-banner [message]="rejectionMessage()" (dismiss)="dismissRejection()" />
+
+        <!-- Approval success banner -->
+        @if (approvalStatus() === 'approved') {
+          <div class="alert alert-success text-sm mb-4">
+            <span>Overdraft approved. You may proceed with the purchase.</span>
+          </div>
+        }
+
         <!-- Error -->
         @if (error()) {
           <div class="alert alert-error text-sm">
             <span>{{ error() }}</span>
             <button (click)="clearError()" class="btn btn-ghost btn-xs">Dismiss</button>
+          </div>
+        }
+
+        <!-- Overdraft confirmation -->
+        @if (showOverdraftConfirm()) {
+          <div class="alert alert-warning text-sm">
+            <div class="flex-1">
+              <p class="font-semibold">Insufficient account balance</p>
+              <p>Would you like to request overdraft approval to proceed?</p>
+            </div>
+            <div class="flex gap-2">
+              <button
+                class="btn btn-warning btn-sm"
+                (click)="requestOverdraftApproval()"
+                [disabled]="isRequestingApproval()"
+              >
+                @if (isRequestingApproval()) {
+                  <span class="loading loading-spinner loading-xs"></span>
+                }
+                Request Approval
+              </button>
+              <button class="btn btn-ghost btn-sm" (click)="cancelOverdraftRequest()">
+                Cancel
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Approval requested success -->
+        @if (showApprovalRequestedMessage()) {
+          <div class="alert alert-info text-sm">
+            <span>Overdraft approval requested. You'll be notified when it's reviewed.</span>
           </div>
         }
 
@@ -196,10 +249,11 @@ import { PurchaseVariantPickerModalComponent } from './components/purchase-varia
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PurchaseCreateComponent implements OnInit {
+export class PurchaseCreateComponent extends ApprovableFormBase implements OnInit, AfterViewInit {
   private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute);
+  private readonly activatedRoute = inject(ActivatedRoute);
   private readonly deepLinkService = inject(DeepLinkService);
+  private readonly approvalServiceLocal = inject(ApprovalService);
   readonly purchaseService = inject(PurchaseService);
   readonly supplierService = inject(SupplierService);
   readonly productSearchService = inject(ProductSearchService);
@@ -223,6 +277,11 @@ export class PurchaseCreateComponent implements OnInit {
   readonly eligibleAccounts = signal<{ code: string; name: string }[]>([]);
   readonly showVariantPickerModal = signal<boolean>(false);
 
+  // Overdraft approval UI state
+  readonly showOverdraftConfirm = signal<boolean>(false);
+  readonly isRequestingApproval = signal<boolean>(false);
+  readonly showApprovalRequestedMessage = signal<boolean>(false);
+
   // New line item form
   readonly newLineItem = signal<Partial<PurchaseLineItem>>({
     variantId: '',
@@ -230,6 +289,10 @@ export class PurchaseCreateComponent implements OnInit {
     unitCost: 0,
     stockLocationId: '',
   });
+
+  override ngAfterViewInit(): void {
+    super.ngAfterViewInit();
+  }
 
   async ngOnInit(): Promise<void> {
     this.purchaseService.initializeDraft();
@@ -245,7 +308,7 @@ export class PurchaseCreateComponent implements OnInit {
     }
 
     // Handle deep linking for variant pre-population
-    await this.deepLinkService.processQueryParams(this.route, {
+    await this.deepLinkService.processQueryParams(this.activatedRoute, {
       params: {
         variantId: { type: 'string', required: false },
       },
@@ -376,6 +439,11 @@ export class PurchaseCreateComponent implements OnInit {
   }
 
   async handleSubmitPurchase(): Promise<void> {
+    // If we have a valid approval, set it on the draft before submitting
+    if (this.approvalId() && this.approvalStatus() === 'approved') {
+      this.purchaseService.updateDraftField('approvalId', this.approvalId()!);
+    }
+
     try {
       await this.purchaseService.submitPurchase();
       this.showSuccessMessage.set(true);
@@ -384,12 +452,55 @@ export class PurchaseCreateComponent implements OnInit {
         this.router.navigate(['/dashboard/purchases']);
       }, 2000);
     } catch (error: any) {
-      console.error('Purchase submission failed:', error);
+      const msg = error?.message || '';
+      if (msg.includes('Insufficient balance')) {
+        // Show overdraft confirmation instead of raw error
+        this.purchaseService.clearError();
+        this.showOverdraftConfirm.set(true);
+      } else {
+        console.error('Purchase submission failed:', error);
+      }
     }
+  }
+
+  async requestOverdraftApproval(): Promise<void> {
+    this.isRequestingApproval.set(true);
+    try {
+      const draft = this.purchaseDraft();
+      if (!draft) return;
+
+      await this.approvalServiceLocal.createApprovalRequest({
+        type: 'overdraft',
+        metadata: {
+          formState: this.serializeFormState(),
+          accountCode: draft.paymentAccountCode || 'CASH_ON_HAND',
+          requiredAmount:
+            draft.paymentAmount != null
+              ? Math.round(draft.paymentAmount * 100)
+              : Math.round(this.totalCost() * 100),
+        },
+        entityType: 'purchase',
+      });
+
+      this.showOverdraftConfirm.set(false);
+      this.showApprovalRequestedMessage.set(true);
+      setTimeout(() => this.showApprovalRequestedMessage.set(false), 5000);
+    } catch (err: any) {
+      this.purchaseService.clearError();
+      this.purchaseService.updateDraftField('notes', this.purchaseDraft()?.notes || '');
+      console.error('Failed to create approval request:', err);
+    } finally {
+      this.isRequestingApproval.set(false);
+    }
+  }
+
+  cancelOverdraftRequest(): void {
+    this.showOverdraftConfirm.set(false);
   }
 
   clearError(): void {
     this.purchaseService.clearError();
+    this.showOverdraftConfirm.set(false);
   }
 
   goBack(): void {
@@ -410,6 +521,59 @@ export class PurchaseCreateComponent implements OnInit {
 
   parseDateInput(dateString: string): Date {
     return new Date(dateString);
+  }
+
+  // ApprovableFormBase overrides
+  override isValid(): boolean {
+    const draft = this.purchaseDraft();
+    return !!draft && this.canSubmit(draft);
+  }
+
+  override serializeFormState(): Record<string, any> {
+    const draft = this.purchaseDraft();
+    if (!draft) return {};
+    return {
+      supplierId: draft.supplierId,
+      purchaseDate: draft.purchaseDate.toISOString(),
+      referenceNumber: draft.referenceNumber,
+      paymentStatus: draft.paymentStatus,
+      notes: draft.notes,
+      paymentAmount: draft.paymentAmount,
+      paymentAccountCode: draft.paymentAccountCode,
+      paymentReference: draft.paymentReference,
+      lines: draft.lines.map((l) => ({
+        variantId: l.variantId,
+        quantity: l.quantity,
+        unitCost: l.unitCost,
+        stockLocationId: l.stockLocationId,
+      })),
+    };
+  }
+
+  override restoreFormState(data: Record<string, any>): void {
+    if (!data) return;
+    this.purchaseService.initializeDraft();
+
+    if (data['supplierId']) this.purchaseService.updateDraftField('supplierId', data['supplierId']);
+    if (data['purchaseDate'])
+      this.purchaseService.updateDraftField('purchaseDate', new Date(data['purchaseDate']));
+    if (data['referenceNumber'])
+      this.purchaseService.updateDraftField('referenceNumber', data['referenceNumber']);
+    if (data['paymentStatus'])
+      this.purchaseService.updateDraftField('paymentStatus', data['paymentStatus']);
+    if (data['notes']) this.purchaseService.updateDraftField('notes', data['notes']);
+    if (data['paymentAmount'] != null)
+      this.purchaseService.updateDraftField('paymentAmount', data['paymentAmount']);
+    if (data['paymentAccountCode'])
+      this.purchaseService.updateDraftField('paymentAccountCode', data['paymentAccountCode']);
+    if (data['paymentReference'])
+      this.purchaseService.updateDraftField('paymentReference', data['paymentReference']);
+
+    if (Array.isArray(data['lines'])) {
+      for (const line of data['lines']) {
+        this.purchaseService.addPurchaseItemLocal(line as PurchaseLineItem);
+      }
+    }
   }
 
   private async handlePrepopulationFromVariantId(variantId: string): Promise<void> {

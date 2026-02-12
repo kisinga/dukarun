@@ -103,7 +103,6 @@ export class SupplierApiService {
             supplierType: input.supplierType,
             contactPerson: input.contactPerson,
             taxId: input.taxId,
-            paymentTerms: input.paymentTerms,
             notes: input.notes,
             isCreditApproved: input.isCreditApproved,
             creditLimit: input.creditLimit,
@@ -152,13 +151,12 @@ export class SupplierApiService {
 
       const emailToSend = emailAddress || '';
 
-      // Build customFields with supplier and credit fields
+      // Build customFields with supplier and credit fields (payment terms removed in favor of credit duration)
       const customFields: any = {
         isSupplier: true,
         supplierType: input.supplierType,
         contactPerson: input.contactPerson,
         taxId: input.taxId,
-        paymentTerms: input.paymentTerms,
         notes: input.notes,
       };
 
@@ -187,7 +185,7 @@ export class SupplierApiService {
         variables: { input: supplierInput },
       });
 
-      const supplier = result.data?.createCustomer;
+      const supplier = result.data?.createCustomerSafe;
       if (supplier?.id) {
         console.log('✅ Supplier created:', supplier.id);
         return supplier.id;
@@ -305,7 +303,6 @@ export class SupplierApiService {
           supplierType: input.supplierType,
           contactPerson: input.contactPerson,
           taxId: input.taxId,
-          paymentTerms: input.paymentTerms,
           notes: input.notes,
           isCreditApproved: input.isCreditApproved,
           creditLimit: input.creditLimit,

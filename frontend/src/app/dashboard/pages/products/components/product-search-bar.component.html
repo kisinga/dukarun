@@ -19,6 +19,7 @@
     [placeholder]="placeholder()"
     [value]="searchQuery()"
     (input)="onSearchChange($any($event.target).value)"
+    title="Search by name or manufacturer"
   />
   @if (searchQuery()) {
     <button (click)="clearSearch()" class="btn btn-ghost btn-sm btn-circle" type="button">

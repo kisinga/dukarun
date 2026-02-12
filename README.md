@@ -1,5 +1,9 @@
 # Dukarun
 
+<p align="center">
+  <img src="./assets/logo/dukarun-withtext-light.svg" alt="Dukarun logo" width="280" />
+</p>
+
 > **AI-powered point-of-sale system for modern small businesses**
 
 Dukarun helps shopkeepers ditch manual data entry and expensive barcode scanners. Use your phone's camera to instantly recognize products, process sales, and manage inventory—all powered by custom AI trained on your products.
@@ -66,6 +70,7 @@ npm run setup
 
 ```
 dukarun/
+├── assets/           # Brand assets (logos in assets/logo/)
 ├── backend/          # Vendure server & worker
 ├── frontend/         # Angular SPA
 ├── configs/          # Shared configuration

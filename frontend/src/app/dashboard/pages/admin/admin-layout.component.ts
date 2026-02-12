@@ -16,7 +16,6 @@ const ADMIN_TABS: AdminTab[] = [
   { path: 'general', label: 'General', permission: null },
   { path: 'shifts', label: 'Shifts', permission: null },
   { path: 'audit-trail', label: 'Audit Trail', permission: null },
-  { path: 'accounting', label: 'Accounting', permission: null },
   { path: 'subscription', label: 'Subscription', permission: null },
   { path: 'ml-model', label: 'ML Model', permission: null },
   { path: 'payment-methods', label: 'Payment Methods', permission: null },

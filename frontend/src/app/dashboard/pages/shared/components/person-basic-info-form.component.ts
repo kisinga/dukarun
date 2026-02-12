@@ -10,11 +10,12 @@ import {
   signal,
 } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { EntityAvatarComponent } from '../../../components/shared/entity-avatar.component';
-import { ContactPickerButtonComponent } from './contact-picker-button.component';
 import { ContactPickerService } from '../../../../core/services/contact-picker.service';
-import { ValidationState } from './basic-info-form.types';
+import { phoneValidator } from '../../../../core/utils/phone.utils';
+import { EntityAvatarComponent } from '../../../components/shared/entity-avatar.component';
 import { BasicInfoFormHelper } from './basic-info-form.helper';
+import { ValidationState } from './basic-info-form.types';
+import { ContactPickerButtonComponent } from './contact-picker-button.component';
 
 export type { ValidationState };
 
@@ -153,7 +154,7 @@ export type { ValidationState };
             <input
               type="tel"
               formControlName="phoneNumber"
-              placeholder="07XXXXXXXX"
+              placeholder="0XXXXXXXXX"
               class="input input-bordered w-full"
               [class.input-error]="
                 form.get('phoneNumber')?.invalid &&
@@ -191,7 +192,7 @@ export class PersonBasicInfoFormComponent {
       businessName: ['', [Validators.required, Validators.minLength(2)]],
       contactPerson: ['', [Validators.required, Validators.minLength(2)]],
       emailAddress: ['', [Validators.email]],
-      phoneNumber: ['', [Validators.required, Validators.pattern(/^0\d{9}$/)]],
+      phoneNumber: ['', [Validators.required, phoneValidator]],
     });
 
     effect(() => {
@@ -217,7 +218,7 @@ export class PersonBasicInfoFormComponent {
     if (!businessName?.value || !contactPerson?.value || !phoneControl?.value) {
       return 'invalid_required';
     }
-    if (phoneControl?.hasError('pattern')) return 'invalid_format';
+    if (phoneControl?.hasError('phoneFormat')) return 'invalid_format';
     return 'invalid_required';
   });
 
@@ -225,8 +226,8 @@ export class PersonBasicInfoFormComponent {
     const control = this.form.get('phoneNumber');
     if (!control?.errors) return '';
     if (control.hasError('required')) return 'This field is required';
-    if (control.hasError('pattern')) {
-      return 'Phone must be in format 0XXXXXXXXX (10 digits starting with 0)';
+    if (control.hasError('phoneFormat')) {
+      return 'Phone must be 0XXXXXXXXX (10 digits starting with 0, mobile or landline)';
     }
     return '';
   }

@@ -7,7 +7,12 @@ import {
 } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import type { FacetValueSummary } from './facet.types';
-import { FACET_CODES, FACET_DISPLAY_NAMES, type FacetCode } from './facet.types';
+import {
+  FACET_CODES,
+  FACET_CODE_MANUFACTURER,
+  FACET_DISPLAY_NAMES,
+  type FacetCode,
+} from './facet.types';
 
 export interface FacetInfo {
   id: string;
@@ -65,6 +70,18 @@ export class FacetService {
     if (!created) throw new Error('Failed to create facet');
     this.facetCache.set(code, created);
     return created;
+  }
+
+  /**
+   * Returns manufacturer facet value IDs whose name contains the given term.
+   * Used to build product filters that match "name or manufacturer" from a single search phrase.
+   */
+  async getManufacturerIdsMatchingName(term: string): Promise<string[]> {
+    const trimmed = term?.trim();
+    if (!trimmed) return [];
+    const facet = await this.getFacetByCode(FACET_CODE_MANUFACTURER);
+    const values = await this.searchFacetValues(facet.id, trimmed);
+    return values.map((v) => v.id);
   }
 
   /**

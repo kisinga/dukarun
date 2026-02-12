@@ -41,6 +41,11 @@ export class PurchaseApiService {
       })),
     };
 
+    // Include approval ID if present (for overdraft-approved purchases)
+    if (draft.approvalId) {
+      input.approvalId = draft.approvalId;
+    }
+
     // Include inline payment for paid/partial purchases
     if (draft.paymentStatus !== 'pending') {
       input.payment = {

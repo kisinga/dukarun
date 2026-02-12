@@ -27,6 +27,8 @@ export interface PurchaseDraft {
   paymentAccountCode: string;
   /** External payment reference (M-Pesa code, bank ref, receipt #). */
   paymentReference: string;
+  /** Approval ID for overdraft-approved purchases. */
+  approvalId?: string;
 }
 
 /**

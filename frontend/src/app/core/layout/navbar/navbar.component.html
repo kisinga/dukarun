@@ -9,7 +9,7 @@
   <div class="drawer-content flex flex-col">
     <!-- Navbar - Mobile optimized: compact height, tighter spacing -->
     <div
-      class="navbar bg-base-100/95 border-b border-base-300/40 w-full sticky top-0 z-30 backdrop-blur-xl min-h-14 sm:min-h-16 px-2 sm:px-4"
+      class="navbar bg-base-100 border-b border-base-300 w-full sticky top-0 z-30 min-h-14 sm:min-h-16 px-2 sm:px-4"
     >
       <div class="navbar-start gap-1">
         <label
@@ -32,9 +32,23 @@
             />
           </svg>
         </label>
-        <a routerLink="/" class="flex items-center gap-2 px-1 sm:px-2">
-          <img src="favicon.svg" alt="dukarun" class="h-7 w-7 sm:h-8 sm:w-8" />
-          <span class="font-bold text-primary text-base sm:text-lg tracking-tight">dukarun</span>
+        <a routerLink="/" class="flex items-center gap-2 px-1 sm:px-2 min-h-[2.75rem]">
+          <div class="duka-door-logo flex-shrink-0">
+            <img
+              class="dukarun-withtext-light"
+              src="assets/logo/dukarun-withtext-light.svg"
+              alt="dukarun"
+              height="28"
+              width="132"
+            />
+            <img
+              class="dukarun-withtext-dark"
+              src="assets/logo/dukarun-withtext-dark.svg"
+              alt="dukarun"
+              height="28"
+              width="140"
+            />
+          </div>
         </a>
       </div>
 
@@ -97,14 +111,26 @@
     ></label>
     <div class="bg-base-100 min-h-full w-72 flex flex-col">
       <!-- Drawer Header - Compact -->
-      <div
-        class="flex items-center justify-between p-3 border-b border-base-300/50 bg-gradient-to-r from-primary/8 to-transparent"
-      >
-        <div class="flex items-center gap-2.5">
-          <img src="favicon.svg" alt="dukarun" class="h-8 w-8" />
-          <div>
-            <span class="text-lg font-bold text-primary block leading-tight">dukarun</span>
-            <span class="text-[9px] text-base-content/40 uppercase tracking-wider font-medium"
+      <div class="flex items-center justify-between p-3 border-b border-base-300/50 bg-base-200">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="duka-door-logo duka-door-logo-drawer flex-shrink-0">
+            <img
+              class="dukarun-withtext-light"
+              src="assets/logo/dukarun-withtext-light.svg"
+              alt="dukarun"
+              height="32"
+              width="150"
+            />
+            <img
+              class="dukarun-withtext-dark"
+              src="assets/logo/dukarun-withtext-dark.svg"
+              alt="dukarun"
+              height="28"
+              width="140"
+            />
+          </div>
+          <div class="min-w-0">
+            <span class="text-[9px] text-base-content/40 uppercase tracking-wider font-medium block"
               >Point & Sell</span
             >
           </div>

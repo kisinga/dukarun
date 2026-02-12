@@ -1,5 +1,4 @@
 import { FormGroup } from '@angular/forms';
-import { formatPhoneNumber } from '../../../../core/utils/phone.utils';
 import { ContactPickerService } from '../../../../core/services/contact-picker.service';
 
 /**
@@ -31,11 +30,11 @@ export class BasicInfoFormHelper {
     }
 
     if (data.phone) {
-      try {
-        form.patchValue({ phoneNumber: formatPhoneNumber(data.phone) });
-      } catch {
-        form.patchValue({ phoneNumber: data.phone });
+      const formattedPhone = contactPickerService.formatPhoneNumber(data.phone);
+      if (formattedPhone) {
+        form.patchValue({ phoneNumber: formattedPhone });
       }
+      // If formatting fails, do not patch - leave field untouched so validation shows
     }
   }
 }

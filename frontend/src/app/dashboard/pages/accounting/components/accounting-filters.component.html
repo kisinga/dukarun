@@ -35,7 +35,7 @@
         >
           <option value="">All Source Types</option>
           @for (sourceType of filters().sourceTypes; track sourceType) {
-            <option [value]="sourceType">{{ sourceType }}</option>
+            <option [value]="sourceType">{{ sourceTypeLabel(sourceType) }}</option>
           }
         </select>
       </div>

@@ -1,0 +1,233 @@
+<!-- FAB for Record Expense - Mobile Only -->
+@if (sessionOpen()) {
+  <div class="fixed bottom-24 right-4 z-40 lg:hidden">
+    <button
+      type="button"
+      class="btn btn-lg btn-circle btn-primary shadow-xl"
+      (click)="openRecordExpense()"
+      aria-label="Record expense"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+        />
+      </svg>
+    </button>
+  </div>
+}
+
+<div class="space-y-4 sm:space-y-5 lg:space-y-6 animate-stagger-children">
+  <!-- Header -->
+  <app-page-header title="Expenses" subtitle="Track operating costs">
+    <div actions class="flex items-center gap-1">
+      <button
+        class="btn btn-ghost btn-sm btn-square shrink-0 touch-manipulation"
+        (click)="refresh()"
+        [class.loading]="isLoading()"
+        [disabled]="isLoading()"
+        title="Refresh"
+      >
+        @if (!isLoading()) {
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+        }
+      </button>
+      @if (sessionOpen()) {
+        <button
+          type="button"
+          class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
+          (click)="openRecordExpense()"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          Record expense
+        </button>
+      }
+    </div>
+  </app-page-header>
+
+  <!-- Stats Cards -->
+  <div class="grid grid-cols-3 gap-2 sm:gap-3">
+    <div class="rounded-lg border border-base-300 bg-base-100 p-3 sm:p-4">
+      <span
+        class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-base-content/50 block mb-1"
+      >
+        Today
+      </span>
+      <p class="text-lg sm:text-xl font-bold tabular-nums text-error">
+        {{ formatCurrency(expenseStats().today) }}
+      </p>
+    </div>
+    <div class="rounded-lg border border-base-300 bg-base-100 p-3 sm:p-4">
+      <span
+        class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-base-content/50 block mb-1"
+      >
+        This week
+      </span>
+      <p class="text-lg sm:text-xl font-bold tabular-nums text-error">
+        {{ formatCurrency(expenseStats().week) }}
+      </p>
+    </div>
+    <div class="rounded-lg border border-base-300 bg-base-100 p-3 sm:p-4">
+      <span
+        class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-base-content/50 block mb-1"
+      >
+        This month
+      </span>
+      <p class="text-lg sm:text-xl font-bold tabular-nums text-error">
+        {{ formatCurrency(expenseStats().month) }}
+      </p>
+    </div>
+  </div>
+
+  <!-- Error Alert -->
+  @if (error()) {
+    <div role="alert" class="alert alert-error">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-5 w-5 shrink-0"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      <span class="flex-1">{{ error() }}</span>
+      <button (click)="refresh()" class="btn btn-sm">Retry</button>
+    </div>
+  }
+
+  <!-- Loading State -->
+  @if (isLoading()) {
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <div class="flex flex-col items-center justify-center py-16">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+          <p class="text-sm text-base-content/60 mt-4">Loading expenses...</p>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Empty State -->
+  @else if (entries().length === 0 && !error()) {
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <div class="text-center py-12 lg:py-16 px-4">
+          <div
+            class="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-8 w-8 lg:h-10 lg:w-10 text-base-content/30"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold">No expenses recorded</h3>
+          <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
+            Record your first expense to start tracking operating costs.
+          </p>
+          @if (sessionOpen()) {
+            <button (click)="openRecordExpense()" class="btn btn-primary btn-sm mt-6 gap-2">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                />
+              </svg>
+              Record expense
+            </button>
+          } @else {
+            <p class="text-sm text-base-content/50 mt-4">Open a shift to record expenses.</p>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Expenses List -->
+  @else if (entries().length > 0) {
+    <div class="card bg-base-100 shadow">
+      <div class="card-body p-0">
+        <div class="overflow-x-auto">
+          <table class="table table-zebra">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Memo</th>
+                <th class="text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (entry of entries(); track entry.id) {
+                <tr>
+                  <td>{{ formatDate(entry.entryDate) }}</td>
+                  <td>{{ entry.memo || '-' }}</td>
+                  <td class="text-right font-semibold text-error tabular-nums">
+                    {{ formatCurrency(getEntryAmount(entry)) }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+</div>
+
+<app-record-expense-modal
+  (recorded)="onExpenseRecorded()"
+  (cancelled)="onExpenseCancelled()"
+></app-record-expense-modal>

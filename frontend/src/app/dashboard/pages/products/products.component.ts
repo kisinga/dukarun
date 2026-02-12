@@ -14,6 +14,7 @@ import {
   buildProductListOptions,
   type ProductListFilterState,
 } from '../../../core/services/product/product-list-filter.model';
+import { FacetService } from '../../../core/services/product/facet.service';
 import { FACET_CODES, type FacetCode } from '../../../core/services/product/facet.types';
 import { ProductService } from '../../../core/services/product.service';
 import { calculateProductStats } from '../../../core/services/stats/product-stats.util';
@@ -55,11 +56,11 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
     PageHeaderComponent,
   ],
   templateUrl: './products.component.html',
-  styleUrl: './products.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProductsComponent implements OnInit {
   private readonly productService = inject(ProductService);
+  private readonly facetService = inject(FacetService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -183,9 +184,16 @@ export class ProductsComponent implements OnInit {
     const state = this.filterState();
     const perPage = this.itemsPerPage();
     const page = this.currentPage();
-    const options = buildProductListOptions(state, {
-      take: perPage,
-      skip: (page - 1) * perPage,
+    const pagination = { take: perPage, skip: (page - 1) * perPage };
+    let manufacturerIdsMatchingSearch: string[] = [];
+    if (state.searchTerm?.trim()) {
+      manufacturerIdsMatchingSearch = await this.facetService.getManufacturerIdsMatchingName(
+        state.searchTerm.trim(),
+      );
+    }
+    const options = buildProductListOptions(state, pagination, {
+      manufacturerIdsMatchingSearch:
+        manufacturerIdsMatchingSearch.length > 0 ? manufacturerIdsMatchingSearch : undefined,
     });
     await this.productService.fetchProducts(options);
   }

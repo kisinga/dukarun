@@ -1,11 +1,16 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   OnInit,
   computed,
   effect,
   inject,
+  signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AppInitService } from '../../core/services/app-init.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -14,6 +19,11 @@ import { NetworkService } from '../../core/services/network.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { NotificationStateService } from '../../core/services/notification/notification-state.service';
 import { SubscriptionService } from '../../core/services/subscription.service';
+import {
+  CashierSessionService,
+  type PaymentMethodReconciliationConfig,
+} from '../../core/services/cashier-session/cashier-session.service';
+import { ShiftModalTriggerService } from '../../core/services/cashier-session/shift-modal-trigger.service';
 import type { Notification } from '../../core/graphql/notification.types';
 import {
   MenuToggleButtonComponent,
@@ -26,6 +36,8 @@ import type { NavItem, NavSection } from './nav.types';
 @Component({
   selector: 'app-dashboard-layout',
   imports: [
+    CommonModule,
+    FormsModule,
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
@@ -35,7 +47,6 @@ import type { NavItem, NavSection } from './nav.types';
     UserAvatarButtonComponent,
   ],
   templateUrl: './dashboard-layout.component.html',
-  styleUrl: './dashboard-layout.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DashboardLayoutComponent implements OnInit {
@@ -47,7 +58,16 @@ export class DashboardLayoutComponent implements OnInit {
   private readonly subscriptionService = inject(SubscriptionService);
   private readonly router = inject(Router);
   private readonly networkService = inject(NetworkService);
+  protected readonly cashierSessionService = inject(CashierSessionService);
+  private readonly shiftModalTrigger = inject(ShiftModalTriggerService);
+  private readonly destroyRef = inject(DestroyRef);
   private lastCompanyId: string | null = null;
+
+  /** Open/close shift modal state (hosted in layout so it works from navbar badge). */
+  protected readonly dayModalMode = signal<'open' | 'close' | null>(null);
+  protected readonly dayModalConfig = signal<PaymentMethodReconciliationConfig[]>([]);
+  protected readonly dayModalBalances = signal<Record<string, string>>({});
+  protected readonly dayModalNotes = signal('');
 
   /** Standalone overview link (always first). */
   protected readonly overviewItem: NavItem = {
@@ -69,7 +89,7 @@ export class DashboardLayoutComponent implements OnInit {
         items: [
           { label: 'Sell', icon: 'sell', route: '/dashboard/sell' },
           { label: 'Products', icon: 'products', route: '/dashboard/products' },
-          { label: 'Orders', icon: 'orders', route: '/dashboard/orders' },
+          { label: 'Sales', icon: 'orders', route: '/dashboard/orders' },
           { label: 'Purchases', icon: 'purchases', route: '/dashboard/purchases' },
           {
             label: 'Stock Adjustments',
@@ -92,9 +112,10 @@ export class DashboardLayoutComponent implements OnInit {
           {
             label: 'Accounting',
             icon: 'accounting',
-            route: '/dashboard/admin/accounting',
+            route: '/dashboard/accounting',
             visible: () => hasSettings,
           },
+          // { label: 'Approvals', icon: 'approvals', route: '/dashboard/approvals' },
         ],
       },
       {
@@ -152,6 +173,9 @@ export class DashboardLayoutComponent implements OnInit {
   // Network status
   protected readonly isOnline = this.networkService.isOnline;
 
+  // Shift status
+  protected readonly shiftOpen = this.cashierSessionService.hasActiveSession;
+
   protected readonly userAvatar = computed(() => {
     const user = this.user();
     // Check for profile picture in customFields first
@@ -187,6 +211,12 @@ export class DashboardLayoutComponent implements OnInit {
           this.appInitService.initializeDashboard(companyId);
         }
       }
+    });
+
+    // Open shift modal when triggered from navbar badge or overview
+    this.shiftModalTrigger.open$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((mode) => {
+      if (mode === 'open') this.openOpenDayModal();
+      else this.openCloseDayModal();
     });
   }
 
@@ -237,6 +267,27 @@ export class DashboardLayoutComponent implements OnInit {
       }
 
       await this.router.navigate(['/dashboard/admin/subscription']);
+      return;
+    }
+
+    // Check if this is an approval notification and navigate accordingly
+    if (notification?.data?.approvalId) {
+      await this.notificationService.markAsRead(notificationId);
+      const navigateTo = notification.data.navigateTo;
+      if (navigateTo && typeof navigateTo === 'string') {
+        // Parse route and query params from navigateTo (e.g., "/dashboard/purchases/create?approvalId=xxx")
+        const [path, queryString] = navigateTo.split('?');
+        const queryParams: Record<string, string> = {};
+        if (queryString) {
+          for (const pair of queryString.split('&')) {
+            const [key, value] = pair.split('=');
+            if (key && value) queryParams[key] = decodeURIComponent(value);
+          }
+        }
+        await this.router.navigate([path], { queryParams });
+      } else {
+        await this.router.navigate(['/dashboard/approvals']);
+      }
       return;
     }
 
@@ -316,6 +367,122 @@ export class DashboardLayoutComponent implements OnInit {
     await this.notificationService.markAllAsRead();
   }
 
+  /** Open the shift modal in "open shift" mode. */
+  openOpenDayModal(): void {
+    const companyId = this.companyService.activeCompanyId();
+    if (!companyId) return;
+    const channelId = parseInt(companyId, 10);
+    if (isNaN(channelId)) return;
+    this.cashierSessionService.error.set(null);
+    this.dayModalMode.set('open');
+    this.dayModalBalances.set({});
+    this.dayModalNotes.set('');
+    this.cashierSessionService.getChannelReconciliationConfig(channelId).subscribe((config) => {
+      const cashierControlled = config.filter((c) => c.isCashierControlled);
+      this.dayModalConfig.set(cashierControlled);
+      const balances: Record<string, string> = {};
+      cashierControlled.forEach((c) => (balances[c.ledgerAccountCode] = ''));
+      this.dayModalBalances.set(balances);
+    });
+  }
+
+  /** Open the shift modal in "close shift" mode. */
+  openCloseDayModal(): void {
+    const session = this.cashierSessionService.currentSession();
+    if (!session) return;
+    this.cashierSessionService.error.set(null);
+    const channelId =
+      typeof session.channelId === 'number'
+        ? session.channelId
+        : parseInt(String(session.channelId), 10);
+    this.dayModalMode.set('close');
+    this.dayModalBalances.set({});
+    this.dayModalNotes.set('');
+    this.cashierSessionService.getChannelReconciliationConfig(channelId).subscribe((config) => {
+      const cashierControlled = config.filter((c) => c.isCashierControlled);
+      this.dayModalConfig.set(cashierControlled);
+      const balances: Record<string, string> = {};
+      cashierControlled.forEach((c) => (balances[c.ledgerAccountCode] = ''));
+      this.dayModalBalances.set(balances);
+    });
+  }
+
+  closeDayModal(): void {
+    this.dayModalMode.set(null);
+    this.dayModalConfig.set([]);
+    this.dayModalBalances.set({});
+    this.cashierSessionService.error.set(null);
+  }
+
+  setDayModalBalance(accountCode: string, value: string | number): void {
+    const str = value != null && value !== '' ? String(value) : '';
+    this.dayModalBalances.update((prev) => ({ ...prev, [accountCode]: str }));
+  }
+
+  async submitDayModal(): Promise<void> {
+    const mode = this.dayModalMode();
+    const config = this.dayModalConfig();
+    const balances = this.dayModalBalances();
+    if (!mode || config.length === 0) return;
+
+    if (mode === 'open') {
+      const companyId = this.companyService.activeCompanyId();
+      if (!companyId) return;
+      const channelId = parseInt(companyId, 10);
+      if (isNaN(channelId)) return;
+      const openingBalances: { accountCode: string; amountCents: number }[] = [];
+      for (const c of config) {
+        const raw = balances[c.ledgerAccountCode];
+        const str = (raw != null ? String(raw) : '').trim();
+        const amountCents = Math.round(parseFloat(str || '0') * 100);
+        if (isNaN(amountCents) || amountCents < 0) return;
+        openingBalances.push({ accountCode: c.ledgerAccountCode, amountCents });
+      }
+      this.cashierSessionService.openSession(channelId, openingBalances).subscribe((session) => {
+        if (session) this.closeDayModal();
+      });
+      return;
+    }
+
+    const session = this.cashierSessionService.currentSession();
+    if (!session) return;
+    const id = typeof session.id === 'string' ? session.id.trim() : '';
+    if (!id || id === '-1') return;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) return;
+    const closingBalances: Array<{ accountCode: string; amountCents: number }> = [];
+    for (const c of config) {
+      const raw = balances[c.ledgerAccountCode];
+      const str = (raw != null ? String(raw) : '').trim();
+      const amountCents = Math.round(parseFloat(str || '0') * 100);
+      if (isNaN(amountCents) || amountCents < 0) return;
+      closingBalances.push({ accountCode: c.ledgerAccountCode, amountCents });
+    }
+    const channelId =
+      typeof session.channelId === 'number'
+        ? session.channelId
+        : parseInt(String(session.channelId), 10);
+    this.cashierSessionService
+      .closeSession(
+        id,
+        closingBalances,
+        this.dayModalNotes().trim() || undefined,
+        Number.isNaN(channelId) ? undefined : channelId,
+      )
+      .subscribe((summary) => {
+        if (summary) this.closeDayModal();
+      });
+  }
+
+  /** Open shift modal from navbar: close when open, open when closed. */
+  openShiftModalFromBadge(): void {
+    if (this.shiftOpen()) {
+      this.shiftModalTrigger.openCloseModal();
+    } else {
+      this.shiftModalTrigger.openOpenModal();
+    }
+  }
+
   getNotificationIcon(type: string): string {
     switch (type) {
       case 'ORDER':
@@ -326,6 +493,8 @@ export class DashboardLayoutComponent implements OnInit {
         return '🤖';
       case 'PAYMENT':
         return '💳';
+      case 'APPROVAL':
+        return '📋';
       default:
         return 'ℹ️';
     }
@@ -341,6 +510,8 @@ export class DashboardLayoutComponent implements OnInit {
         return 'info';
       case 'PAYMENT':
         return 'success';
+      case 'APPROVAL':
+        return 'warning';
       default:
         return 'info';
     }

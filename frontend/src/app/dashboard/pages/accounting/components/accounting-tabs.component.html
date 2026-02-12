@@ -1,13 +1,15 @@
-<div role="tablist" class="tabs tabs-boxed bg-base-200">
-  @for (tab of tabs; track tab.path) {
-    <a
-      role="tab"
-      [routerLink]="['/dashboard/admin/accounting']"
-      [queryParams]="{ tab: tab.path }"
-      [class.tab-active]="isTabActive(tab.path)"
-      class="tab"
-    >
-      {{ tab.label }}
-    </a>
-  }
+<div class="bg-base-200 rounded-lg overflow-x-auto p-1">
+  <div role="tablist" class="tabs tabs-box">
+    @for (tab of tabs; track tab.path) {
+      <a
+        role="tab"
+        [routerLink]="['/dashboard/accounting/ledger']"
+        [queryParams]="{ tab: tab.path }"
+        [class.tab-active]="isTabActive(tab.path)"
+        class="tab"
+      >
+        {{ tab.label }}
+      </a>
+    }
+  </div>
 </div>

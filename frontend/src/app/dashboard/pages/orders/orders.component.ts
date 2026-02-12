@@ -42,7 +42,6 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
     PageHeaderComponent,
   ],
   templateUrl: './orders.component.html',
-  styleUrl: './orders.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class OrdersComponent implements OnInit {

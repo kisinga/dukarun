@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { formatPhoneNumber as normalizePhone } from '../utils/phone.utils';
+import { formatPhoneNumberOrNull } from '../utils/phone.utils';
 
 export interface ContactData {
   name: string;
@@ -69,14 +69,11 @@ export class ContactPickerService {
   }
 
   /**
-   * Format phone number to match validation pattern (0XXXXXXXXX). Uses shared phone util.
+   * Format phone number to match validation pattern (0XXXXXXXXX).
+   * Delegates to phone.utils. Handles Kenyan mobile and landline formats.
    */
   formatPhoneNumber(phone: string): string | null {
-    try {
-      return normalizePhone(phone);
-    } catch {
-      return null;
-    }
+    return formatPhoneNumberOrNull(phone);
   }
 
   /**
