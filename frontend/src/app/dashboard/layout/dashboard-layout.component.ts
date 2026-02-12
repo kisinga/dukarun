@@ -229,7 +229,7 @@ export class DashboardLayoutComponent implements OnInit {
     });
   }
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
     // Initialization is handled by the effect in constructor
     // Notifications are loaded via AppInitService during dashboard initialization
 
@@ -237,8 +237,8 @@ export class DashboardLayoutComponent implements OnInit {
     this.notificationService.promptPermissionIfNeeded();
 
     // Check subscription status and create trial notification if needed
-    // Do this after notifications are loaded (via AppInitService) so we can check for existing ones
-    await this.checkAndCreateTrialNotification();
+    // Fire-and-forget: don't block rendering for a non-critical notification
+    this.checkAndCreateTrialNotification();
   }
 
   closeDrawer(): void {

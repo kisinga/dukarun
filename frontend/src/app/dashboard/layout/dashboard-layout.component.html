@@ -539,8 +539,8 @@
                       min="0"
                       step="0.01"
                       class="input input-bordered w-full tabular-nums"
-                      [ngModel]="dayModalBalances()[acc.ledgerAccountCode] || ''"
-                      (ngModelChange)="setDayModalBalance(acc.ledgerAccountCode, $event)"
+                      [value]="dayModalBalances()[acc.ledgerAccountCode] || ''"
+                      (input)="setDayModalBalance(acc.ledgerAccountCode, $any($event.target).value)"
                       placeholder="0.00"
                       [attr.aria-label]="
                         (dayModalMode() === 'open' ? 'Opening balance' : 'Closing declared') +
