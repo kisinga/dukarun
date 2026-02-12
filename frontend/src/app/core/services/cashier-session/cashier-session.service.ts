@@ -10,6 +10,8 @@ import {
   GET_CHANNEL_RECONCILIATION_CONFIG,
   GET_RECONCILIATIONS,
   GET_RECONCILIATION_DETAILS,
+  GET_LAST_CLOSED_SESSION_CLOSING_BALANCES,
+  GET_EXPECTED_SESSION_CLOSING_BALANCES,
   OPEN_CASHIER_SESSION,
   CLOSE_CASHIER_SESSION,
   CREATE_CASHIER_SESSION_RECONCILIATION,
@@ -122,6 +124,18 @@ export interface ReconciliationAccountDetail {
   declaredAmountCents: string | null;
   expectedBalanceCents: string | null;
   varianceCents: string | null;
+}
+
+export interface LastClosingBalance {
+  accountCode: string;
+  accountName: string;
+  balanceCents: string;
+}
+
+export interface ExpectedClosingBalance {
+  accountCode: string;
+  accountName: string;
+  expectedBalanceCents: string;
 }
 
 export interface CashierSessionListOptions {
@@ -508,6 +522,51 @@ export class CashierSessionService {
         this.error.set(err.message || 'Failed to create reconciliation');
         this.isLoading.set(false);
         return of(null);
+      }),
+    );
+  }
+
+  /**
+   * Get per-account closing balances from the last closed session for this channel.
+   * Used to pre-fill opening balances for the next session.
+   */
+  getLastClosingBalances(channelId: number) {
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{ lastClosedSessionClosingBalances: LastClosingBalance[] }>({
+        query: GET_LAST_CLOSED_SESSION_CLOSING_BALANCES as any,
+        variables: { channelId },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => result.data?.lastClosedSessionClosingBalances ?? []),
+      catchError((err) => {
+        console.warn('[CashierSession] getLastClosingBalances failed', err);
+        return of([]);
+      }),
+    );
+  }
+
+  /**
+   * Get expected closing balances for an open session (per cashier-controlled account).
+   * Expected = opening declared + session ledger balance.
+   */
+  getExpectedClosingBalances(sessionId: string) {
+    if (!CashierSessionService.isValidSessionId(sessionId)) {
+      return of([]);
+    }
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{ expectedSessionClosingBalances: ExpectedClosingBalance[] }>({
+        query: GET_EXPECTED_SESSION_CLOSING_BALANCES as any,
+        variables: { sessionId },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => result.data?.expectedSessionClosingBalances ?? []),
+      catchError((err) => {
+        console.warn('[CashierSession] getExpectedClosingBalances failed', err);
+        return of([]);
       }),
     );
   }

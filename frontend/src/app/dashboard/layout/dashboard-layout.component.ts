@@ -22,6 +22,8 @@ import { SubscriptionService } from '../../core/services/subscription.service';
 import {
   CashierSessionService,
   type PaymentMethodReconciliationConfig,
+  type LastClosingBalance,
+  type ExpectedClosingBalance,
 } from '../../core/services/cashier-session/cashier-session.service';
 import { ShiftModalTriggerService } from '../../core/services/cashier-session/shift-modal-trigger.service';
 import type { Notification } from '../../core/graphql/notification.types';
@@ -68,6 +70,13 @@ export class DashboardLayoutComponent implements OnInit {
   protected readonly dayModalConfig = signal<PaymentMethodReconciliationConfig[]>([]);
   protected readonly dayModalBalances = signal<Record<string, string>>({});
   protected readonly dayModalNotes = signal('');
+
+  /** Previous closing balances (for opening modal autofill). */
+  protected readonly dayModalPreviousClosing = signal<LastClosingBalance[]>([]);
+  /** Expected closing balances (for closing modal variance display). */
+  protected readonly dayModalExpectedClosing = signal<ExpectedClosingBalance[]>([]);
+  /** Whether the closing confirmation modal is showing (variance acknowledgement). */
+  protected readonly dayModalConfirmStep = signal(false);
 
   /** Standalone overview link (always first). */
   protected readonly overviewItem: NavItem = {
@@ -377,12 +386,33 @@ export class DashboardLayoutComponent implements OnInit {
     this.dayModalMode.set('open');
     this.dayModalBalances.set({});
     this.dayModalNotes.set('');
+    this.dayModalPreviousClosing.set([]);
+    this.dayModalExpectedClosing.set([]);
+    this.dayModalConfirmStep.set(false);
     this.cashierSessionService.getChannelReconciliationConfig(channelId).subscribe((config) => {
       const cashierControlled = config.filter((c) => c.isCashierControlled);
       this.dayModalConfig.set(cashierControlled);
       const balances: Record<string, string> = {};
       cashierControlled.forEach((c) => (balances[c.ledgerAccountCode] = ''));
       this.dayModalBalances.set(balances);
+
+      // Fetch previous closing balances and autofill
+      this.cashierSessionService.getLastClosingBalances(channelId).subscribe((prev) => {
+        this.dayModalPreviousClosing.set(prev);
+        if (prev.length > 0) {
+          const autofilled: Record<string, string> = {};
+          for (const c of cashierControlled) {
+            const match = prev.find((p) => p.accountCode === c.ledgerAccountCode);
+            if (match) {
+              const cents = parseInt(match.balanceCents, 10);
+              autofilled[c.ledgerAccountCode] = isNaN(cents) ? '' : (cents / 100).toFixed(2);
+            } else {
+              autofilled[c.ledgerAccountCode] = '';
+            }
+          }
+          this.dayModalBalances.set(autofilled);
+        }
+      });
     });
   }
 
@@ -398,12 +428,23 @@ export class DashboardLayoutComponent implements OnInit {
     this.dayModalMode.set('close');
     this.dayModalBalances.set({});
     this.dayModalNotes.set('');
+    this.dayModalPreviousClosing.set([]);
+    this.dayModalExpectedClosing.set([]);
+    this.dayModalConfirmStep.set(false);
     this.cashierSessionService.getChannelReconciliationConfig(channelId).subscribe((config) => {
       const cashierControlled = config.filter((c) => c.isCashierControlled);
       this.dayModalConfig.set(cashierControlled);
       const balances: Record<string, string> = {};
       cashierControlled.forEach((c) => (balances[c.ledgerAccountCode] = ''));
       this.dayModalBalances.set(balances);
+
+      // Fetch expected closing balances for variance display
+      const sessionId = typeof session.id === 'string' ? session.id.trim() : '';
+      if (sessionId) {
+        this.cashierSessionService.getExpectedClosingBalances(sessionId).subscribe((expected) => {
+          this.dayModalExpectedClosing.set(expected);
+        });
+      }
     });
   }
 
@@ -411,12 +452,109 @@ export class DashboardLayoutComponent implements OnInit {
     this.dayModalMode.set(null);
     this.dayModalConfig.set([]);
     this.dayModalBalances.set({});
+    this.dayModalPreviousClosing.set([]);
+    this.dayModalExpectedClosing.set([]);
+    this.dayModalConfirmStep.set(false);
     this.cashierSessionService.error.set(null);
   }
 
   setDayModalBalance(accountCode: string, value: string | number): void {
     const str = value != null && value !== '' ? String(value) : '';
     this.dayModalBalances.update((prev) => ({ ...prev, [accountCode]: str }));
+  }
+
+  /** Check if the opening modal has any variance from previous closing. */
+  hasOpeningVariance(): boolean {
+    const prev = this.dayModalPreviousClosing();
+    const balances = this.dayModalBalances();
+    if (prev.length === 0) return false;
+    for (const p of prev) {
+      const raw = balances[p.accountCode];
+      const declaredCents = Math.round(parseFloat((raw ?? '').trim() || '0') * 100);
+      const prevCents = parseInt(p.balanceCents, 10) || 0;
+      if (declaredCents !== prevCents) return true;
+    }
+    return false;
+  }
+
+  /** Get per-account opening variances (declared - previous closing, in cents). */
+  getOpeningVariances(): Array<{
+    accountCode: string;
+    accountName: string;
+    varianceCents: number;
+    previousCents: number;
+    declaredCents: number;
+  }> {
+    const prev = this.dayModalPreviousClosing();
+    const balances = this.dayModalBalances();
+    return prev.map((p) => {
+      const raw = balances[p.accountCode];
+      const declaredCents = Math.round(parseFloat((raw ?? '').trim() || '0') * 100);
+      const previousCents = parseInt(p.balanceCents, 10) || 0;
+      return {
+        accountCode: p.accountCode,
+        accountName: p.accountName,
+        varianceCents: declaredCents - previousCents,
+        previousCents,
+        declaredCents,
+      };
+    });
+  }
+
+  /** Check if the closing modal has any variance from expected. */
+  hasClosingVariance(): boolean {
+    const expected = this.dayModalExpectedClosing();
+    const balances = this.dayModalBalances();
+    if (expected.length === 0) return false;
+    for (const e of expected) {
+      const raw = balances[e.accountCode];
+      const declaredCents = Math.round(parseFloat((raw ?? '').trim() || '0') * 100);
+      const expectedCents = parseInt(e.expectedBalanceCents, 10) || 0;
+      if (declaredCents !== expectedCents) return true;
+    }
+    return false;
+  }
+
+  /** Get per-account closing variances (declared - expected, in cents). */
+  getClosingVariances(): Array<{
+    accountCode: string;
+    accountName: string;
+    varianceCents: number;
+    expectedCents: number;
+    declaredCents: number;
+  }> {
+    const expected = this.dayModalExpectedClosing();
+    const balances = this.dayModalBalances();
+    return expected.map((e) => {
+      const raw = balances[e.accountCode];
+      const declaredCents = Math.round(parseFloat((raw ?? '').trim() || '0') * 100);
+      const expectedCents = parseInt(e.expectedBalanceCents, 10) || 0;
+      return {
+        accountCode: e.accountCode,
+        accountName: e.accountName,
+        varianceCents: declaredCents - expectedCents,
+        expectedCents,
+        declaredCents,
+      };
+    });
+  }
+
+  /** Format cents as display string (e.g. 12345 → "123.45"). */
+  formatCentsDisplay(cents: number): string {
+    return (cents / 100).toLocaleString('en-KE', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  /** Show confirmation step for closing with variance. */
+  requestCloseConfirmation(): void {
+    this.dayModalConfirmStep.set(true);
+  }
+
+  /** Cancel the confirmation step. */
+  cancelCloseConfirmation(): void {
+    this.dayModalConfirmStep.set(false);
   }
 
   async submitDayModal(): Promise<void> {
@@ -441,6 +579,12 @@ export class DashboardLayoutComponent implements OnInit {
       this.cashierSessionService.openSession(channelId, openingBalances).subscribe((session) => {
         if (session) this.closeDayModal();
       });
+      return;
+    }
+
+    // Close mode: require confirmation if there is a variance
+    if (this.hasClosingVariance() && !this.dayModalConfirmStep()) {
+      this.requestCloseConfirmation();
       return;
     }
 

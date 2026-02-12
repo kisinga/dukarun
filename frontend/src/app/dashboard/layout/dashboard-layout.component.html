@@ -347,66 +347,368 @@
     <!-- Open / Close shift modal (triggered from navbar badge or overview) -->
     @if (dayModalMode()) {
       <dialog class="modal modal-open">
-        <div class="modal-box">
-          <h3 class="font-bold text-lg">
-            {{ dayModalMode() === 'open' ? 'Open shift' : 'Close shift' }}
-          </h3>
+        <div class="modal-box max-w-lg">
+          <!-- Header -->
+          <div class="flex items-center justify-between pb-3 border-b border-base-300">
+            <div class="flex items-center gap-2.5">
+              <div
+                class="w-9 h-9 rounded-xl flex items-center justify-center"
+                [class.bg-success/15]="dayModalMode() === 'open'"
+                [class.bg-error/15]="dayModalMode() === 'close'"
+              >
+                @if (dayModalMode() === 'open') {
+                  <svg
+                    class="w-5 h-5 text-success"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                    />
+                  </svg>
+                } @else {
+                  <svg
+                    class="w-5 h-5 text-error"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                }
+              </div>
+              <div>
+                <h3 class="font-bold text-base">
+                  {{ dayModalMode() === 'open' ? 'Open shift' : 'Close shift' }}
+                </h3>
+                <p class="text-xs text-base-content/50">
+                  {{
+                    dayModalMode() === 'open'
+                      ? 'Declare opening balances'
+                      : 'Declare closing balances'
+                  }}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="btn btn-sm btn-circle btn-ghost"
+              (click)="closeDayModal()"
+              aria-label="Close"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
           @if (cashierSessionService.error()) {
-            <div role="alert" class="alert alert-error text-sm mt-2">
+            <div role="alert" class="alert alert-error text-sm mt-3">
+              <svg
+                class="w-4 h-4 shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+                />
+              </svg>
               <span>{{ cashierSessionService.error() }}</span>
             </div>
           }
-          <p class="py-2 text-sm text-base-content/70">
-            {{
-              dayModalMode() === 'open' ? 'Enter opening balance' : 'Enter closing declared amount'
-            }}
-            for each cashier-controlled account
-          </p>
-          @for (acc of dayModalConfig(); track acc.ledgerAccountCode) {
-            <label class="label">
-              <span class="label-text">{{ acc.paymentMethodName || acc.paymentMethodCode }}</span>
-              <span class="label-text-alt text-base-content/60">sh</span>
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              class="input input-bordered w-full"
-              [ngModel]="dayModalBalances()[acc.ledgerAccountCode] || ''"
-              (ngModelChange)="setDayModalBalance(acc.ledgerAccountCode, $event)"
-              placeholder="0.00"
-              [attr.aria-label]="
-                (dayModalMode() === 'open' ? 'Opening balance' : 'Closing declared') +
-                ' in shillings'
-              "
-            />
+
+          <!-- Confirmation step overlay for closing with variance -->
+          @if (dayModalConfirmStep()) {
+            <div class="mt-4 space-y-4">
+              <div class="bg-error/5 border border-error/20 rounded-xl p-4">
+                <div class="flex gap-3">
+                  <div
+                    class="w-10 h-10 rounded-full bg-error/15 flex items-center justify-center shrink-0"
+                  >
+                    <svg
+                      class="w-5 h-5 text-error"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-sm text-error">Variance detected</h4>
+                    <p class="text-sm text-base-content/70 mt-1">
+                      Your declared amounts don't match the expected balances (opening + sales
+                      during this shift). This variance will be recorded and flagged for review.
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Variance breakdown -->
+                <div class="mt-3 overflow-x-auto">
+                  <table class="table table-xs">
+                    <thead>
+                      <tr class="text-base-content/60">
+                        <th>Account</th>
+                        <th class="text-right">Expected</th>
+                        <th class="text-right">Declared</th>
+                        <th class="text-right">Variance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (v of getClosingVariances(); track v.accountCode) {
+                        <tr [class.text-error]="v.varianceCents !== 0">
+                          <td class="font-medium">{{ v.accountName }}</td>
+                          <td class="text-right tabular-nums">
+                            {{ formatCentsDisplay(v.expectedCents) }}
+                          </td>
+                          <td class="text-right tabular-nums">
+                            {{ formatCentsDisplay(v.declaredCents) }}
+                          </td>
+                          <td class="text-right tabular-nums font-semibold">
+                            @if (v.varianceCents !== 0) {
+                              <span class="text-error"
+                                >{{ v.varianceCents > 0 ? '+' : ''
+                                }}{{ formatCentsDisplay(v.varianceCents) }}</span
+                              >
+                            } @else {
+                              <span class="text-success">0.00</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <p class="text-xs text-base-content/50 text-center">
+                Are you sure you want to close the shift with this variance?
+              </p>
+
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  class="btn btn-ghost flex-1"
+                  (click)="cancelCloseConfirmation()"
+                >
+                  Go back
+                </button>
+                <button type="button" class="btn btn-error flex-1" (click)="submitDayModal()">
+                  Close with variance
+                </button>
+              </div>
+            </div>
+          } @else {
+            <!-- Main form content -->
+            <div class="mt-4 space-y-4">
+              @if (dayModalConfig().length === 0) {
+                <div class="flex items-center justify-center py-8 gap-2 text-base-content/50">
+                  <span class="loading loading-spinner loading-sm"></span>
+                  <span class="text-sm">Loading accounts...</span>
+                </div>
+              } @else {
+                @for (acc of dayModalConfig(); track acc.ledgerAccountCode) {
+                  <div class="form-control">
+                    <label class="label pb-1">
+                      <span class="label-text font-medium">{{
+                        acc.paymentMethodName || acc.paymentMethodCode
+                      }}</span>
+                      <span class="label-text-alt text-base-content/40 text-xs">KES</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="input input-bordered w-full tabular-nums"
+                      [ngModel]="dayModalBalances()[acc.ledgerAccountCode] || ''"
+                      (ngModelChange)="setDayModalBalance(acc.ledgerAccountCode, $event)"
+                      placeholder="0.00"
+                      [attr.aria-label]="
+                        (dayModalMode() === 'open' ? 'Opening balance' : 'Closing declared') +
+                        ' for ' +
+                        (acc.paymentMethodName || acc.paymentMethodCode)
+                      "
+                    />
+
+                    <!-- Opening mode: show previous closing as reference -->
+                    @if (dayModalMode() === 'open') {
+                      @for (p of dayModalPreviousClosing(); track p.accountCode) {
+                        @if (p.accountCode === acc.ledgerAccountCode) {
+                          <div class="flex items-center justify-between mt-1.5 px-1">
+                            <span class="text-xs text-base-content/50">Previous closing</span>
+                            <span class="text-xs font-mono text-base-content/60">{{
+                              formatCentsDisplay(+(p.balanceCents || '0'))
+                            }}</span>
+                          </div>
+                        }
+                      }
+                    }
+
+                    <!-- Closing mode: show expected balance as reference -->
+                    @if (dayModalMode() === 'close') {
+                      @for (e of dayModalExpectedClosing(); track e.accountCode) {
+                        @if (e.accountCode === acc.ledgerAccountCode) {
+                          <div class="flex items-center justify-between mt-1.5 px-1">
+                            <span class="text-xs text-base-content/50"
+                              >Expected (opening + sales)</span
+                            >
+                            <span class="text-xs font-mono text-base-content/60">{{
+                              formatCentsDisplay(+(e.expectedBalanceCents || '0'))
+                            }}</span>
+                          </div>
+                        }
+                      }
+                    }
+                  </div>
+                }
+              }
+
+              <!-- Opening: variance warning -->
+              @if (dayModalMode() === 'open' && hasOpeningVariance()) {
+                <div class="bg-warning/5 border border-warning/20 rounded-xl p-3">
+                  <div class="flex gap-2.5">
+                    <svg
+                      class="w-5 h-5 text-warning shrink-0 mt-0.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                      />
+                    </svg>
+                    <div>
+                      <p class="text-sm font-medium text-warning">
+                        Opening balance differs from previous closing
+                      </p>
+                      <p class="text-xs text-base-content/60 mt-0.5">
+                        Please record the related expense or account transfer, otherwise this will
+                        be flagged.
+                      </p>
+                      <!-- Variance breakdown -->
+                      <div class="mt-2 space-y-1">
+                        @for (v of getOpeningVariances(); track v.accountCode) {
+                          @if (v.varianceCents !== 0) {
+                            <div class="flex items-center justify-between text-xs">
+                              <span class="text-base-content/70">{{ v.accountName }}</span>
+                              <span class="font-mono font-semibold text-warning">
+                                {{ v.varianceCents > 0 ? '+' : ''
+                                }}{{ formatCentsDisplay(v.varianceCents) }}
+                              </span>
+                            </div>
+                          }
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              <!-- Closing: live variance display -->
+              @if (dayModalMode() === 'close' && hasClosingVariance()) {
+                <div class="bg-error/5 border border-error/20 rounded-xl p-3">
+                  <div class="flex gap-2.5">
+                    <svg
+                      class="w-5 h-5 text-error shrink-0 mt-0.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                      />
+                    </svg>
+                    <div class="flex-1">
+                      <p class="text-sm font-medium text-error">
+                        Closing balance doesn't match expected
+                      </p>
+                      <p class="text-xs text-base-content/60 mt-0.5">
+                        Expected amounts include opening balance plus all sales and transactions
+                        during this shift. You will need to confirm submission.
+                      </p>
+                      <div class="mt-2 space-y-1">
+                        @for (v of getClosingVariances(); track v.accountCode) {
+                          @if (v.varianceCents !== 0) {
+                            <div class="flex items-center justify-between text-xs">
+                              <span class="text-base-content/70">{{ v.accountName }}</span>
+                              <span class="font-mono font-semibold text-error">
+                                {{ v.varianceCents > 0 ? '+' : ''
+                                }}{{ formatCentsDisplay(v.varianceCents) }}
+                              </span>
+                            </div>
+                          }
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              @if (dayModalMode() === 'close') {
+                <div class="form-control">
+                  <label class="label pb-1">
+                    <span class="label-text text-sm">Notes</span>
+                    <span class="label-text-alt text-base-content/40 text-xs">Optional</span>
+                  </label>
+                  <textarea
+                    class="textarea textarea-bordered w-full text-sm"
+                    [ngModel]="dayModalNotes()"
+                    (ngModelChange)="dayModalNotes.set($event)"
+                    placeholder="Add shift notes..."
+                    rows="2"
+                  ></textarea>
+                </div>
+              }
+
+              <!-- Actions -->
+              <div class="flex gap-2 pt-2">
+                <button type="button" class="btn btn-ghost flex-1" (click)="closeDayModal()">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  class="btn flex-1"
+                  [class.btn-success]="dayModalMode() === 'open'"
+                  [class.btn-error]="dayModalMode() === 'close'"
+                  (click)="submitDayModal()"
+                  [disabled]="dayModalConfig().length === 0"
+                >
+                  @if (dayModalMode() === 'open') {
+                    Open shift
+                  } @else if (hasClosingVariance()) {
+                    Review & close
+                  } @else {
+                    Close shift
+                  }
+                </button>
+              </div>
+            </div>
           }
-          @if (dayModalConfig().length === 0) {
-            <p class="text-sm text-base-content/70 py-2">Loading accounts...</p>
-          }
-          @if (dayModalMode() === 'close') {
-            <label class="label">
-              <span class="label-text">Notes (optional)</span>
-            </label>
-            <textarea
-              class="textarea textarea-bordered w-full"
-              [ngModel]="dayModalNotes()"
-              (ngModelChange)="dayModalNotes.set($event)"
-              placeholder="Optional notes"
-              rows="2"
-            ></textarea>
-          }
-          <div class="modal-action">
-            <button type="button" class="btn btn-ghost" (click)="closeDayModal()">Cancel</button>
-            <button
-              type="button"
-              class="btn btn-primary"
-              (click)="submitDayModal()"
-              [disabled]="dayModalConfig().length === 0"
-            >
-              {{ dayModalMode() === 'open' ? 'Open' : 'Close' }}
-            </button>
-          </div>
         </div>
         <form method="dialog" class="modal-backdrop">
           <button type="submit" (click)="closeDayModal()">close</button>

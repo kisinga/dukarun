@@ -1052,6 +1052,68 @@ export class OpenSessionService {
   }
 
   /**
+   * Get per-account closing balances from the last closed session for this channel.
+   * Used to pre-fill opening balances for the next session.
+   */
+  async getLastClosedSessionClosingBalances(
+    ctx: RequestContext,
+    channelId: number
+  ): Promise<Array<{ accountCode: string; accountName: string; balanceCents: string }>> {
+    const sessionRepo = this.connection.getRepository(ctx, CashierSession);
+    const lastClosed = await sessionRepo.findOne({
+      where: { channelId, status: 'closed' },
+      order: { closedAt: 'DESC' },
+    });
+    if (!lastClosed) return [];
+
+    const details = await this.reconciliationService.getSessionReconciliationDetails(
+      ctx,
+      lastClosed.id,
+      'closing'
+    );
+    return details.map(d => ({
+      accountCode: d.accountCode,
+      accountName: d.accountName,
+      balanceCents: d.declaredAmountCents ?? '0',
+    }));
+  }
+
+  /**
+   * Get expected closing balances for an open session (per cashier-controlled account).
+   * Expected = opening declared + session ledger balance for that account.
+   */
+  async getExpectedClosingBalances(
+    ctx: RequestContext,
+    sessionId: string
+  ): Promise<Array<{ accountCode: string; accountName: string; expectedBalanceCents: string }>> {
+    const sessionRepo = this.connection.getRepository(ctx, CashierSession);
+    const session = await sessionRepo.findOne({ where: { id: sessionId } });
+    if (!session) throw new Error(`Session ${sessionId} not found`);
+
+    const requirements = await this.getChannelReconciliationRequirements(ctx, session.channelId);
+    const results: Array<{
+      accountCode: string;
+      accountName: string;
+      expectedBalanceCents: string;
+    }> = [];
+
+    for (const pm of requirements.paymentMethods) {
+      const opening = await this.getOpeningBalanceForAccount(ctx, sessionId, pm.ledgerAccountCode);
+      const sessionBalance = await this.ledgerQueryService.getSessionBalance(
+        session.channelId,
+        pm.ledgerAccountCode,
+        sessionId
+      );
+      results.push({
+        accountCode: pm.ledgerAccountCode,
+        accountName: pm.paymentMethodName || pm.paymentMethodCode,
+        expectedBalanceCents: String(opening + sessionBalance.balance),
+      });
+    }
+    return results;
+  }
+
+  /**
    * Get reconciliation requirements for a channel (not session-specific)
    */
   async getChannelReconciliationRequirements(
