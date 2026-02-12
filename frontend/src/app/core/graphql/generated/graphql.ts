@@ -10284,7 +10284,12 @@ export type GetOrderFullQuery = {
       quantity: number;
       linePrice: number;
       linePriceWithTax: number;
-      productVariant: { __typename?: 'ProductVariant'; id: string; name: string; sku: string };
+      productVariant: {
+        __typename?: 'ProductVariant';
+        id: string;
+        name: string;
+        product?: { __typename?: 'Product'; id: string; name: string } | null;
+      };
     }>;
     payments?: Array<{
       __typename?: 'Payment';
@@ -11522,7 +11527,12 @@ export type GetPurchasesQuery = {
         unitCost: number;
         totalCost: number;
         stockLocationId: string;
-        variant?: { __typename?: 'ProductVariant'; id: string; name: string; sku: string } | null;
+        variant?: {
+          __typename?: 'ProductVariant';
+          id: string;
+          name: string;
+          product?: { __typename?: 'Product'; id: string; name: string } | null;
+        } | null;
         stockLocation?: { __typename?: 'StockLocation'; id: string; name: string } | null;
       }>;
     }>;
@@ -17162,7 +17172,17 @@ export const GetOrderFullDocument = {
                           selections: [
                             { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'name' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'sku' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'product' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                                ],
+                              },
+                            },
                           ],
                         },
                       },
@@ -20755,7 +20775,17 @@ export const GetPurchasesDocument = {
                                 selections: [
                                   { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                                   { kind: 'Field', name: { kind: 'Name', value: 'name' } },
-                                  { kind: 'Field', name: { kind: 'Name', value: 'sku' } },
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: 'product' },
+                                    selectionSet: {
+                                      kind: 'SelectionSet',
+                                      selections: [
+                                        { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                        { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                                      ],
+                                    },
+                                  },
                                 ],
                               },
                             },

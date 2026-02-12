@@ -191,7 +191,7 @@ export class PersonBasicInfoFormComponent {
       businessName: ['', [Validators.required, Validators.minLength(2)]],
       contactPerson: ['', [Validators.required, Validators.minLength(2)]],
       emailAddress: ['', [Validators.email]],
-      phoneNumber: ['', [Validators.required, Validators.pattern(/^07\d{8}$/)]],
+      phoneNumber: ['', [Validators.required, Validators.pattern(/^0\d{9}$/)]],
     });
 
     effect(() => {
@@ -226,7 +226,7 @@ export class PersonBasicInfoFormComponent {
     if (!control?.errors) return '';
     if (control.hasError('required')) return 'This field is required';
     if (control.hasError('pattern')) {
-      return 'Phone must be in format 07XXXXXXXX (10 digits starting with 07)';
+      return 'Phone must be in format 0XXXXXXXXX (10 digits starting with 0)';
     }
     return '';
   }

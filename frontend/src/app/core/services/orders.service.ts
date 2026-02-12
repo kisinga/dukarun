@@ -6,7 +6,8 @@ import type {
   GetOrderFullQueryVariables,
   OrderListOptions,
 } from '../graphql/generated/graphql';
-import { GET_ORDERS, GET_ORDER_FULL } from '../graphql/operations.graphql';
+import { GetOrderFullDocument } from '../graphql/generated/graphql';
+import { GET_ORDERS } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
 
 /**
@@ -89,7 +90,7 @@ export class OrdersService {
     try {
       const client = this.apolloService.getClient();
       const result = await client.query<GetOrderFullQuery, GetOrderFullQueryVariables>({
-        query: GET_ORDER_FULL,
+        query: GetOrderFullDocument,
         variables: { id },
         fetchPolicy: 'network-only',
       });

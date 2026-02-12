@@ -9,7 +9,7 @@ import {
 } from './purchase.service.types';
 import { PartialPaymentService } from './payments/partial-payment.service';
 import { ApolloService } from './apollo.service';
-import { GET_PURCHASES } from '../graphql/operations.graphql';
+import { GetPurchasesDocument } from '../graphql/generated/graphql';
 
 /**
  * Purchase Service
@@ -175,8 +175,8 @@ export class PurchaseService {
     try {
       const client = this.apolloService.getClient();
 
-      const result = await client.query<any>({
-        query: GET_PURCHASES,
+      const result = await client.query({
+        query: GetPurchasesDocument,
         variables: {
           options: options || {
             take: 100,

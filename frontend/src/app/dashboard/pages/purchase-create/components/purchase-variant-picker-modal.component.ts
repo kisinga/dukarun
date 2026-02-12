@@ -56,12 +56,8 @@ import { ProductVariant } from '../../../../core/services/product/product-search
                   >
                     <div class="flex flex-col gap-0.5 w-full min-w-0">
                       <span class="text-sm font-medium truncate">
-                        {{ variant.productName || variant.name || variant.sku }}
+                        {{ getVariantDisplayName(variant) || variant.sku }}
                       </span>
-                      @if (variant.name && variant.name !== variant.productName) {
-                        <span class="text-xs opacity-70 truncate">{{ variant.name }}</span>
-                      }
-                      <span class="text-xs opacity-50">SKU: {{ variant.sku }}</span>
                     </div>
                   </button>
                 </li>
@@ -82,4 +78,13 @@ export class PurchaseVariantPickerModalComponent {
 
   readonly variantSelected = output<ProductVariant>();
   readonly close = output<void>();
+
+  getVariantDisplayName(v: ProductVariant): string {
+    const productName = v.productName?.trim();
+    const variantName = v.name?.trim();
+    if (productName && variantName && variantName !== productName) {
+      return `${productName} – ${variantName}`;
+    }
+    return productName || variantName || '';
+  }
 }

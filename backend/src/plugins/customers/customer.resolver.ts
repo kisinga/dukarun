@@ -94,7 +94,9 @@ export class CustomerResolver {
     }
 
     // No existing customer found, proceed with normal creation
-    // Use Vendure's built-in createCustomer which handles email uniqueness
+    if (normalizedPhone) {
+      input.phoneNumber = normalizedPhone;
+    }
     const result = await this.customerService.create(ctx, input);
 
     // Handle error result (e.g., EmailAddressConflictError)

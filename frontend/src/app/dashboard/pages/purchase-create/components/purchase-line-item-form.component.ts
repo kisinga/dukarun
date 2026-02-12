@@ -20,9 +20,7 @@ import { PurchaseLineItem } from '../../../../core/services/purchase.service.typ
       @if (lineItem().variantId) {
         <div class="flex items-end gap-2">
           <div class="flex-1 text-sm truncate">
-            <span class="font-medium">{{
-              lineItem().variant?.productName || lineItem().variant?.name
-            }}</span>
+            <span class="font-medium">{{ getVariantDisplayName(lineItem().variant) }}</span>
           </div>
           <div class="w-24">
             <label class="label py-0">
@@ -87,6 +85,16 @@ export class PurchaseLineItemFormComponent {
   canAddItem(): boolean {
     const item = this.lineItem();
     return !!(item.variantId && item.quantity && item.unitCost);
+  }
+
+  getVariantDisplayName(v: { name?: string; productName?: string } | null | undefined): string {
+    if (!v) return '';
+    const productName = v.productName?.trim();
+    const variantName = v.name?.trim();
+    if (productName && variantName && variantName !== productName) {
+      return `${productName} – ${variantName}`;
+    }
+    return productName || variantName || '';
   }
 
   parseFloat(value: string | number): number {

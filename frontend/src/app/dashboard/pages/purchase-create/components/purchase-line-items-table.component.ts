@@ -20,11 +20,8 @@ import { PurchaseLineItem } from '../../../../core/services/purchase.service.typ
             <div class="flex items-start justify-between gap-2">
               <div class="flex-1 min-w-0">
                 <div class="text-sm font-medium truncate">
-                  {{ line.variant?.productName || line.variant?.name || line.variantId }}
+                  {{ getVariantDisplayName(line.variant) || line.variantId }}
                 </div>
-                @if (line.variant?.sku) {
-                  <div class="text-xs opacity-50">{{ line.variant?.sku }}</div>
-                }
               </div>
               <button
                 type="button"
@@ -155,6 +152,16 @@ export class PurchaseLineItemsTableComponent {
     const rp = line.variant?.priceWithTax;
     if (rp == null || rp <= 0) return null;
     return rp / 100;
+  }
+
+  getVariantDisplayName(v: { name?: string; productName?: string } | null | undefined): string {
+    if (!v) return '';
+    const productName = v.productName?.trim();
+    const variantName = v.name?.trim();
+    if (productName && variantName && variantName !== productName) {
+      return `${productName} – ${variantName}`;
+    }
+    return productName || variantName || '';
   }
 
   /**

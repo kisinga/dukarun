@@ -134,7 +134,7 @@ describe('ChannelAdminService', () => {
     const createUserWithChannel = (channelId: string | number): User =>
       ({
         id: 100,
-        identifier: '+254712345678',
+        identifier: '0712345678',
         verified: true,
         roles: [
           {

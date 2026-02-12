@@ -1401,7 +1401,10 @@ export const GET_ORDER_FULL = graphql(`
         productVariant {
           id
           name
-          sku
+          product {
+            id
+            name
+          }
         }
       }
       payments {
@@ -2506,7 +2509,10 @@ export const GET_PURCHASES = graphql(`
           variant {
             id
             name
-            sku
+            product {
+              id
+              name
+            }
           }
           quantity
           unitCost

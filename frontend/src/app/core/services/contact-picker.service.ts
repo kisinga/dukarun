@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { formatPhoneNumber as normalizePhone } from '../utils/phone.utils';
 
 export interface ContactData {
   name: string;
@@ -24,7 +25,7 @@ export class ContactPickerService {
   isSupported(): boolean {
     if (this._isSupported === null) {
       this._isSupported = 'contacts' in navigator && 'select' in (navigator as any).contacts;
-      
+
       // Debug message for contact picker support status
       console.log('📱 Contact Picker API Support:', {
         supported: this._isSupported,
@@ -68,35 +69,14 @@ export class ContactPickerService {
   }
 
   /**
-   * Format phone number to match validation pattern (07XXXXXXXX)
-   * Handles Kenyan phone number formats
+   * Format phone number to match validation pattern (0XXXXXXXXX). Uses shared phone util.
    */
   formatPhoneNumber(phone: string): string | null {
-    // Remove all non-digit characters
-    const digits = phone.replace(/\D/g, '');
-
-    // Handle Kenyan phone numbers
-    // +254712345678 -> 0712345678
-    // 254712345678 -> 0712345678
-    // 712345678 -> 0712345678
-    // 0712345678 -> 0712345678
-
-    if (digits.startsWith('254')) {
-      // Remove country code
-      const withoutCountry = digits.substring(3);
-      if (withoutCountry.length === 9 && withoutCountry.startsWith('7')) {
-        return '0' + withoutCountry;
-      }
-    } else if (digits.startsWith('7') && digits.length === 9) {
-      // Add leading 0
-      return '0' + digits;
-    } else if (digits.startsWith('0') && digits.length === 10) {
-      // Already formatted
-      return digits;
+    try {
+      return normalizePhone(phone);
+    } catch {
+      return null;
     }
-
-    // If we can't format it, return null to show validation error
-    return null;
   }
 
   /**
@@ -109,4 +89,3 @@ export class ContactPickerService {
     return { firstName, lastName };
   }
 }
-

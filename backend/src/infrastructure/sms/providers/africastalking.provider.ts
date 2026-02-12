@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { toInternationalFormat } from '../../../utils/phone.utils';
 import { ISmsProvider, SmsResult } from '../interfaces/sms-provider.interface';
 import { env } from '../../config/environment.config';
 
@@ -200,31 +201,6 @@ export class AfricasTalkingProvider implements ISmsProvider {
     return `Failed to send SMS (statusCode: ${statusCode})`;
   }
 
-  /**
-   * Convert phone number from 07XXXXXXXX to +2547XXXXXXXX format
-   * AfricasTalking expects format: +254xxxxxxxxx (with +)
-   */
-  private formatPhoneForAfricasTalking(phoneNumber: string): string {
-    let cleanPhone = phoneNumber.trim();
-
-    // Remove leading + if present (we'll add it back)
-    if (cleanPhone.startsWith('+')) {
-      cleanPhone = cleanPhone.substring(1);
-    }
-
-    // Convert 07XXXXXXXX to 2547XXXXXXXX
-    if (cleanPhone.startsWith('07')) {
-      cleanPhone = '254' + cleanPhone.substring(1);
-    } else if (!cleanPhone.startsWith('254')) {
-      throw new Error(
-        `Invalid phone number format for AfricasTalking SMS: ${phoneNumber}. Expected format: 07XXXXXXXX or 2547XXXXXXXX`
-      );
-    }
-
-    // Add + prefix
-    return '+' + cleanPhone;
-  }
-
   async sendSms(phoneNumber: string, message: string, isOtp?: boolean): Promise<SmsResult> {
     const config = this.getConfig();
 
@@ -237,8 +213,7 @@ export class AfricasTalkingProvider implements ISmsProvider {
     }
 
     try {
-      // Format phone number for AfricasTalking API
-      const formattedPhone = this.formatPhoneForAfricasTalking(phoneNumber);
+      const formattedPhone = '+' + toInternationalFormat(phoneNumber);
 
       // Prepare request body
       // AfricasTalking accepts both URL-encoded form data and JSON

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { toInternationalFormat } from '../../../utils/phone.utils';
 import { ISmsProvider, SmsResult } from '../interfaces/sms-provider.interface';
 import { env } from '../../config/environment.config';
 
@@ -103,37 +104,6 @@ export class TextsmsProvider implements ISmsProvider {
   }
 
   /**
-   * Convert phone number from 07XXXXXXXX to 2547XXXXXXXX format
-   * TextSMS expects format: 2547XXXXXXXX (international format without +)
-   */
-  private formatPhoneForTextSMS(phoneNumber: string): string {
-    let cleanPhone = phoneNumber.trim();
-
-    // Remove leading + if present
-    if (cleanPhone.startsWith('+')) {
-      cleanPhone = cleanPhone.substring(1);
-    }
-
-    // Convert 07XXXXXXXX to 2547XXXXXXXX
-    if (cleanPhone.startsWith('07')) {
-      cleanPhone = '254' + cleanPhone.substring(1);
-    } else if (!cleanPhone.startsWith('254')) {
-      throw new Error(
-        `Invalid phone number format for TextSMS: ${phoneNumber}. Expected format: 07XXXXXXXX or 2547XXXXXXXX`
-      );
-    }
-
-    // Validate format: should be 12 digits (254 + 9 digits)
-    if (!/^2547\d{8}$/.test(cleanPhone)) {
-      throw new Error(
-        `Invalid phone number format for TextSMS: ${phoneNumber}. Expected format: 07XXXXXXXX or 2547XXXXXXXX`
-      );
-    }
-
-    return cleanPhone;
-  }
-
-  /**
    * Get user-friendly error message based on response code
    * Reference: https://textsms.co.ke/bulk-sms-api/
    */
@@ -185,8 +155,7 @@ export class TextsmsProvider implements ISmsProvider {
     }
 
     try {
-      // Format phone number for TextSMS API
-      const formattedPhone = this.formatPhoneForTextSMS(phoneNumber);
+      const formattedPhone = toInternationalFormat(phoneNumber);
 
       // Prepare request body
       const requestBody = {

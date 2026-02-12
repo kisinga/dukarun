@@ -1,22 +1,22 @@
 /**
  * Phone number utilities for Kenyan phone numbers
  *
- * Standard format: 07XXXXXXXX (10 digits starting with 07)
- * - Input can accept: 07XXXXXXXX, +2547XXXXXXXX, 2547XXXXXXXX, 7XXXXXXXX
- * - Storage/Output: Always normalized to 07XXXXXXXX
+ * Standard format: 0XXXXXXXXX (10 digits starting with 0)
+ * - Mobile (07...) and landlines (020..., 041..., etc.) are valid
+ * - Input can accept: 0XXXXXXXXX, +254XXXXXXXX (254+9 digits), 254XXXXXXXX, 7XXXXXXXX (→ 07XXXXXXXX)
+ * - Storage/Output: Always normalized to 0XXXXXXXXX
  */
 
 /**
- * Normalize a phone number to standard format: 07XXXXXXXX
+ * Normalize a phone number to standard format: 0XXXXXXXXX
  *
  * Accepts various input formats:
- * - 07XXXXXXXX (already correct)
- * - +2547XXXXXXXX (international format)
- * - 2547XXXXXXXX (international without +)
- * - 7XXXXXXXX (missing leading 0)
+ * - 0XXXXXXXXX (already correct)
+ * - +254XXXXXXXX or 254XXXXXXXX (254 + 9 digits → 0 + 9 digits)
+ * - 7XXXXXXXX (missing leading 0, mobile only → 07XXXXXXXX)
  *
  * @param phoneNumber - Phone number in any format
- * @returns Normalized phone number in format 07XXXXXXXX
+ * @returns Normalized phone number in format 0XXXXXXXXX
  * @throws Error if phone number cannot be normalized
  */
 export function formatPhoneNumber(phoneNumber: string): string {
@@ -32,34 +32,27 @@ export function formatPhoneNumber(phoneNumber: string): string {
     cleaned = cleaned.substring(1);
   }
 
-  // Handle different formats:
-  // +2547XXXXXXXX or 2547XXXXXXXX -> 07XXXXXXXX
-  if (cleaned.startsWith('254') && cleaned.length === 12) {
+  // 254 + 9 digits (11 or 12 chars) → 0 + 9 digits
+  if (cleaned.startsWith('254') && (cleaned.length === 11 || cleaned.length === 12)) {
     cleaned = '0' + cleaned.substring(3);
   }
-  // 7XXXXXXXX -> 07XXXXXXXX (if missing leading 0)
+  // 7XXXXXXXX (9 digits, mobile) → 07XXXXXXXX
   else if (cleaned.startsWith('7') && cleaned.length === 9) {
     cleaned = '0' + cleaned;
   }
-  // 07XXXXXXXX -> already correct
-  else if (cleaned.startsWith('07') && cleaned.length === 10) {
+  // 0XXXXXXXXX (10 digits) → already correct
+  else if (cleaned.startsWith('0') && cleaned.length === 10) {
     // Already in correct format
-  }
-  // If already 10 digits but doesn't start with 07, try to fix
-  else if (cleaned.length === 10 && !cleaned.startsWith('07')) {
-    throw new Error(`Phone number must start with 07. Received: ${phoneNumber}`);
-  }
-  // Invalid length
-  else {
+  } else {
     throw new Error(
-      `Invalid phone number format. Expected 07XXXXXXXX (10 digits). Received: ${phoneNumber}`,
+      `Invalid phone number format. Expected 0XXXXXXXXX (10 digits starting with 0). Received: ${phoneNumber}`,
     );
   }
 
-  // Final validation: must be exactly 10 digits starting with 07
-  if (!/^07\d{8}$/.test(cleaned)) {
+  // Final validation: must be exactly 10 digits starting with 0
+  if (!/^0\d{9}$/.test(cleaned)) {
     throw new Error(
-      `Phone number must be in format 07XXXXXXXX (10 digits starting with 07). Received: ${phoneNumber}`,
+      `Phone number must be in format 0XXXXXXXXX (10 digits starting with 0). Received: ${phoneNumber}`,
     );
   }
 
@@ -67,7 +60,7 @@ export function formatPhoneNumber(phoneNumber: string): string {
 }
 
 /**
- * Validate if a phone number is in the correct format: 07XXXXXXXX
+ * Validate if a phone number is in the correct format: 0XXXXXXXXX
  *
  * @param phoneNumber - Phone number to validate
  * @returns true if valid, false otherwise
@@ -79,7 +72,7 @@ export function validatePhoneNumber(phoneNumber: string): boolean {
 
   try {
     const normalized = formatPhoneNumber(phoneNumber);
-    return /^07\d{8}$/.test(normalized);
+    return /^0\d{9}$/.test(normalized);
   } catch {
     return false;
   }
@@ -109,7 +102,7 @@ function generateRandomString(length: number = 4): string {
  */
 export function generateCompanyCode(
   companyName: string,
-  includeRandomSuffix: boolean = true
+  includeRandomSuffix: boolean = true,
 ): string {
   const sanitized = companyName
     .toLowerCase()
