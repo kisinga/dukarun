@@ -56,6 +56,7 @@ export class CustomerCreditService {
 
     const items = result.data?.customers?.items ?? [];
     return items
+      .filter((customer) => !customer.customFields?.isSupplier)
       .filter((customer) => Boolean(customer.customFields?.isCreditApproved))
       .map((customer) => this.mapper.toCreditSummary(customer))
       .filter((customer) => {
@@ -202,7 +203,9 @@ export class CustomerCreditService {
     });
 
     const items = result.data?.customers?.items ?? [];
-    return items.map((customer) => this.mapper.toCreditSummary(customer));
+    return items
+      .filter((customer) => !customer.customFields?.isSupplier)
+      .map((customer) => this.mapper.toCreditSummary(customer));
   }
 
   async approveCustomerCredit(

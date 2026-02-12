@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ChannelService, EventBus, RequestContext } from '@vendure/core';
 import { SubscriptionAlertEvent } from '../../infrastructure/events/custom-events';
-import {
-  NotificationService,
-  NotificationType,
-} from '../../services/notifications/notification.service';
+import { NotificationService } from '../../services/notifications/notification.service';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
 import { WorkerBackgroundTaskBase } from '../../infrastructure/utils/worker-background-task.base';
 import { WorkerContextService } from '../../infrastructure/utils/worker-context.service';
@@ -78,49 +75,27 @@ export class SubscriptionExpirySubscriber extends WorkerBackgroundTaskBase {
 
         const channelId = channel.id.toString();
 
-        const hasPrefsEnabled =
-          await this.notificationService.hasAnyAdminWithPaymentNotificationsEnabled(ctx, channelId);
-
         // Check if expired
         if (expiresAt <= now) {
-          if (hasPrefsEnabled) {
-            // Normal flow: 7-day throttle
-            const shouldSend = await this.subscriptionService.shouldSendExpiredReminder(
-              ctx,
-              channelId
-            );
-            if (!shouldSend) continue;
-            this.eventBus.publish(
-              new SubscriptionAlertEvent(ctx, channelId, 'expired', {
-                expiresAt: expiresAt.toISOString(),
-              })
-            );
-            await this.subscriptionService.markExpiredReminderSent(ctx, channelId);
-          } else {
-            // One-time bypass: all admins have notifications disabled; send exactly one
-            const alreadySent = await this.subscriptionService.hasEverSentExpiredReminder(
-              ctx,
-              channelId
-            );
-            if (alreadySent) continue;
-            const adminIds = await this.notificationService.getChannelUsers(channelId);
-            if (adminIds.length > 0) {
-              await this.notificationService.createNotification(ctx, {
-                userId: adminIds[0],
-                channelId,
-                type: NotificationType.PAYMENT,
-                title: 'Subscription Expired',
-                message: 'Your subscription has expired. Please renew to continue.',
-                data: { expiresAt: expiresAt.toISOString() },
-              });
-              await this.subscriptionService.markExpiredReminderSent(ctx, channelId);
-            }
-          }
+          // Send exactly one "expired" notification, then never again
+          const alreadySent = await this.subscriptionService.hasEverSentExpiredReminder(
+            ctx,
+            channelId
+          );
+          if (alreadySent) continue;
+          this.eventBus.publish(
+            new SubscriptionAlertEvent(ctx, channelId, 'expired', {
+              expiresAt: expiresAt.toISOString(),
+            })
+          );
+          await this.subscriptionService.markExpiredReminderSent(ctx, channelId);
           notifiedCount++;
           continue;
         }
 
         // Check if expiring soon (1, 3, or 7 days)
+        const hasPrefsEnabled =
+          await this.notificationService.hasAnyAdminWithPaymentNotificationsEnabled(ctx, channelId);
         if (!hasPrefsEnabled) continue;
 
         const daysRemaining = Math.ceil(

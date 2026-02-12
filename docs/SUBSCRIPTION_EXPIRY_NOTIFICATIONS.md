@@ -11,45 +11,30 @@ The expiry checker runs daily (worker process only). It finds channels with tria
 | Type           | When                          | Title                    |
 |----------------|-------------------------------|--------------------------|
 | `expiring_soon`| 7, 3, or 1 days before expiry | Subscription Expiring Soon |
-| `expired`      | After expiry date passes      | Subscription Expired     |
+| `expired`      | Once, when expiry date passes | Subscription Expired     |
 | `renewed`      | After successful payment      | Subscription Renewed     |
 
 ## Stop Conditions (No Duplicate Spam)
 
-### 1. Preference check (before any emit)
+### 1. Expired — one-time only, never repeats
 
-Before emitting subscription expiry events, we check whether **any** channel admin has in-app PAYMENT notifications enabled.
+When a subscription expires:
 
-- **If at least one admin has them enabled:** Continue with normal flow.
-- **If no admin has them enabled:**
-  - For **expiring_soon:** Skip emitting entirely.
-  - For **expired:** Use the one-time bypass (see below).
-
-### 2. Expired reminders — 7-day throttle
-
-When admins have PAYMENT notifications enabled:
-
-- Emit `expired` only if no reminder was sent in the last 7 days.
+- Send **exactly one** `expired` event the first time the expiry is detected.
 - After emitting, update `subscriptionExpiredReminderSentAt` on the channel.
-- `SubscriptionService.shouldSendExpiredReminder()` enforces this.
+- On subsequent checks, `hasEverSentExpiredReminder()` returns true and the channel is skipped.
+- **No reminders are ever sent after the subscription has expired.** The single notification informs the admin; no nagging.
+- The event flows through `NotificationSubscriber.handleSubscription` which respects user notification preferences via `createNotificationIfEnabled`.
 
-### 3. Expired — one-time bypass (notifications disabled)
-
-When **no** admin has PAYMENT notifications enabled and the subscription is expired:
-
-- Send **exactly one** in-app notification to the first channel admin.
-- Bypass the usual preference check for this single notification.
-- Mark `subscriptionExpiredReminderSentAt` so we never send again for this expiry.
-- Rationale: Expiry is critical; one notification is acceptable even if they opted out of routine reminders.
-
-### 4. Expiring soon — once per threshold
+### 2. Expiring soon — once per threshold
 
 - Emit `expiring_soon` only when `daysRemaining` is 1, 3, or 7.
-- Use **notification history** to infer what we’ve already sent.
+- Use **notification history** to infer what we've already sent.
 - Query the notification table for recent "Subscription Expiring Soon" PAYMENT notifications for this channel.
 - Take the **minimum** `daysRemaining` stored in those notifications.
 - Emit only if `current daysRemaining < that minimum` (or no such notifications exist).
 - Example: Sent at 7 days → min=7; at 3 days we emit (3<7); sent at 3 → min=3; at 1 we emit (1<3). Never send twice for the same threshold.
+- Only emitted if at least one admin has in-app PAYMENT notifications enabled.
 
 No extra channel fields or migrations are used for expiring_soon; the notification table is the source of truth.
 
@@ -57,32 +42,29 @@ No extra channel fields or migrations are used for expiring_soon; the notificati
 
 | Source                      | Purpose                                              |
 |-----------------------------|------------------------------------------------------|
-| Channel `subscriptionExpiredReminderSentAt` | Throttle expired reminders; mark one-time bypass sent |
+| Channel `subscriptionExpiredReminderSentAt` | Track whether the one-time expired notification was sent |
 | Notification table (PAYMENT, title "Subscription Expiring Soon") | Infer last expiring-soon threshold          |
-| User `notificationPreferences.inApp.PAYMENT` | Decide whether to emit and use preference bypass     |
+| User `notificationPreferences.inApp.PAYMENT` | Decide whether to emit expiring_soon events     |
 
 ## Flow Summary
 
 ```
 For each trial/active channel with expiry date:
-  hasPrefsEnabled = any admin has inApp.PAYMENT !== false
 
   if expired:
-    if hasPrefsEnabled:
-      if shouldSendExpiredReminder (7-day throttle): emit event, mark sent
-    else:
-      if !hasEverSentExpiredReminder: send one notification to first admin, mark sent
+    if hasEverSentExpiredReminder: skip (already notified once)
+    else: emit expired event, mark sent
 
   if expiring soon (1, 3, or 7 days):
-    if !hasPrefsEnabled: skip
+    if no admin has inApp.PAYMENT enabled: skip
     lastThreshold = min(daysRemaining) from recent expiring_soon notifications
     if lastThreshold null or daysRemaining < lastThreshold: emit event
 ```
 
 ## Related Code
 
-- `SubscriptionExpirySubscriber` — daily check, emits events, handles one-time bypass
-- `NotificationSubscriber.handleSubscription` — creates notifications from events (respects preferences except for one-time bypass, which bypasses it)
+- `SubscriptionExpirySubscriber` — daily check, emits events
+- `NotificationSubscriber.handleSubscription` — creates notifications from events (respects preferences)
 - `NotificationService.hasAnyAdminWithPaymentNotificationsEnabled`
 - `NotificationService.getLastExpiringSoonThreshold`
-- `SubscriptionService.shouldSendExpiredReminder`, `markExpiredReminderSent`, `hasEverSentExpiredReminder`
+- `SubscriptionService.markExpiredReminderSent`, `hasEverSentExpiredReminder`
