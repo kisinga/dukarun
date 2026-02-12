@@ -194,9 +194,8 @@ export class SupplierViewModalComponent {
     this.hide();
   }
 
-  /** Whether supplier has credit approval (customer credit fields - same as edit form). */
   isSupplierCreditApproved(): boolean {
-    return Boolean(this.supplier().customFields?.isCreditApproved);
+    return Boolean(this.supplier().customFields?.isSupplierCreditApproved);
   }
 
   onViewPurchases(): void {

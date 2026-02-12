@@ -646,31 +646,6 @@ export class SubscriptionService {
   }
 
   /**
-   * Check if expired reminder should be sent
-   * Returns false if reminder was sent within the last 7 days
-   */
-  async shouldSendExpiredReminder(ctx: RequestContext, channelId: string): Promise<boolean> {
-    const channel = await this.channelService.findOne(ctx, channelId);
-    if (!channel) {
-      return false;
-    }
-
-    const customFields = channel.customFields as any;
-    const lastSentAt = customFields.subscriptionExpiredReminderSentAt
-      ? new Date(customFields.subscriptionExpiredReminderSentAt)
-      : null;
-
-    // If never sent, allow sending
-    if (!lastSentAt) {
-      return true;
-    }
-
-    // Check if 7 days have passed since last reminder
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    return lastSentAt < sevenDaysAgo;
-  }
-
-  /**
    * Mark expired reminder as sent
    */
   async markExpiredReminderSent(ctx: RequestContext, channelId: string): Promise<void> {

@@ -499,6 +499,24 @@ export class PeriodManagementResolver {
   }
 
   @Query()
+  @Allow(Permission.ReadOrder)
+  async lastClosedSessionClosingBalances(
+    @Ctx() ctx: RequestContext,
+    @Args('channelId') channelId: number
+  ) {
+    return this.cashierSessionService.getLastClosedSessionClosingBalances(ctx, channelId);
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async expectedSessionClosingBalances(
+    @Ctx() ctx: RequestContext,
+    @Args('sessionId') sessionId: string
+  ) {
+    return this.cashierSessionService.getExpectedClosingBalances(ctx, sessionId);
+  }
+
+  @Query()
   @Allow(ManageReconciliationPermission.Permission)
   async closedSessionsMissingReconciliation(
     @Ctx() ctx: RequestContext,

@@ -2931,6 +2931,26 @@ export const GET_ACCOUNT_BALANCES_AS_OF = graphql(`
   }
 `);
 
+export const GET_LAST_CLOSED_SESSION_CLOSING_BALANCES = graphql(`
+  query GetLastClosedSessionClosingBalances($channelId: Int!) {
+    lastClosedSessionClosingBalances(channelId: $channelId) {
+      accountCode
+      accountName
+      balanceCents
+    }
+  }
+`);
+
+export const GET_EXPECTED_SESSION_CLOSING_BALANCES = graphql(`
+  query GetExpectedSessionClosingBalances($sessionId: ID!) {
+    expectedSessionClosingBalances(sessionId: $sessionId) {
+      accountCode
+      accountName
+      expectedBalanceCents
+    }
+  }
+`);
+
 // ============================================================================
 // CASH CONTROL OPERATIONS
 // ============================================================================

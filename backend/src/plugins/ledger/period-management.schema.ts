@@ -227,6 +227,18 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     balanceCents: String!
   }
 
+  type LastClosingBalance {
+    accountCode: String!
+    accountName: String!
+    balanceCents: String!
+  }
+
+  type ExpectedClosingBalance {
+    accountCode: String!
+    accountName: String!
+    expectedBalanceCents: String!
+  }
+
   input AccountDeclaredAmountInput {
     accountId: ID!
     amountCents: String!
@@ -288,6 +300,8 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     reconciliationDetails(reconciliationId: ID!): [ReconciliationAccountDetail!]!
     sessionReconciliationDetails(sessionId: ID!, kind: String): [ReconciliationAccountDetail!]!
     accountBalancesAsOf(channelId: Int!, asOfDate: String!): [AccountBalanceAsOfItem!]!
+    lastClosedSessionClosingBalances(channelId: Int!): [LastClosingBalance!]!
+    expectedSessionClosingBalances(sessionId: ID!): [ExpectedClosingBalance!]!
     closedSessionsMissingReconciliation(
       channelId: Int!
       startDate: DateTime

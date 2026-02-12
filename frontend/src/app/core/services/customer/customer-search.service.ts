@@ -61,7 +61,7 @@ export class CustomerSearchService {
   }
 
   /**
-   * Search for customers (including suppliers)
+   * Search for customers (excludes suppliers)
    */
   async searchCustomers(term: string, take = 50): Promise<any[]> {
     const trimmed = term.trim();
@@ -85,7 +85,8 @@ export class CustomerSearchService {
         fetchPolicy: 'network-only',
       });
 
-      return result.data?.customers?.items || [];
+      const items = result.data?.customers?.items || [];
+      return items.filter((customer: any) => !customer.customFields?.isSupplier);
     } catch (error) {
       console.error('Failed to search customers:', error);
       return [];
