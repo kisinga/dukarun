@@ -49,18 +49,16 @@ export class SupplierTableRowComponent {
     return this.supplier().customFields?.supplierType || 'General';
   }
 
-  /** Supplier credit uses Customer entity fields (isCreditApproved, creditLimit) - same as edit form. */
   isSupplierCreditApproved(): boolean {
-    return Boolean(this.supplier().customFields?.isCreditApproved);
+    return Boolean(this.supplier().customFields?.isSupplierCreditApproved);
   }
 
   getSupplierOutstandingAmount(): number {
     return Number(this.supplier().supplierOutstandingAmount ?? 0);
   }
 
-  /** Credit limit from customer customFields (cents) - matches supplier edit form. */
   getSupplierCreditLimit(): number {
-    return Number(this.supplier().customFields?.creditLimit ?? 0);
+    return Number(this.supplier().customFields?.supplierCreditLimit ?? 0);
   }
 
   getSupplierAvailableCredit(): number {

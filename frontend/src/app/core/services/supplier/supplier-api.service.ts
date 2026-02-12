@@ -283,6 +283,11 @@ export class SupplierApiService {
 
   /**
    * Update an existing supplier
+   *
+   * Uses fetch-then-merge pattern to preserve existing custom fields.
+   * Fetches the current entity first, then merges updated fields using
+   * mergeSupplierCapability() to ensure no custom field data is lost.
+   *
    * @param id - Supplier ID
    * @param input - Updated supplier information
    * @returns true if successful, false otherwise
@@ -291,28 +296,37 @@ export class SupplierApiService {
     try {
       const client = this.apolloService.getClient();
 
-      // UpdateCustomerInput allows only id, firstName, lastName, emailAddress, phoneNumber, title, customFields
-      const supplierInput = {
-        id,
+      // Fetch current supplier to preserve existing custom fields
+      const currentResult = await client.query<any>({
+        query: GET_CUSTOMER,
+        variables: { id },
+        fetchPolicy: 'network-only',
+      });
+
+      const existing = currentResult.data?.customer;
+      if (!existing) {
+        this.stateService.setError('Supplier not found');
+        return false;
+      }
+
+      // Merge updated fields with existing data (preserves all custom fields)
+      const updateInput = mergeSupplierCapability(existing, {
         firstName: input.firstName,
         lastName: input.lastName,
         emailAddress: input.emailAddress,
         phoneNumber: input.phoneNumber ? formatPhoneNumber(input.phoneNumber) : input.phoneNumber,
-        customFields: {
-          isSupplier: true,
-          supplierType: input.supplierType,
-          contactPerson: input.contactPerson,
-          taxId: input.taxId,
-          notes: input.notes,
-          isCreditApproved: input.isCreditApproved,
-          creditLimit: input.creditLimit,
-          creditDuration: input.creditDuration,
-        },
-      };
+        supplierType: input.supplierType,
+        contactPerson: input.contactPerson,
+        taxId: input.taxId,
+        notes: input.notes,
+        isCreditApproved: input.isCreditApproved,
+        creditLimit: input.creditLimit,
+        creditDuration: input.creditDuration,
+      });
 
       const result = await client.mutate<any>({
         mutation: UPDATE_SUPPLIER,
-        variables: { input: supplierInput },
+        variables: { input: updateInput },
       });
 
       const supplier = result.data?.updateCustomer;

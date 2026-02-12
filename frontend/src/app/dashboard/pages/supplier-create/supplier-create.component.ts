@@ -212,14 +212,14 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
       }
       const cf = supplier.customFields || {};
       this.creditInitials.set({
-        creditLimit: cf.creditLimit ?? 0,
-        creditDuration: cf.creditDuration ?? 30,
-        isCreditApproved: !!cf.isCreditApproved,
+        creditLimit: cf.supplierCreditLimit ?? 0,
+        creditDuration: cf.supplierCreditDuration ?? 30,
+        isCreditApproved: !!cf.isSupplierCreditApproved,
       });
       this.creditData.set({
-        creditLimit: cf.creditLimit ?? 0,
-        creditDuration: cf.creditDuration ?? 30,
-        isCreditApproved: !!cf.isCreditApproved,
+        creditLimit: cf.supplierCreditLimit ?? 0,
+        creditDuration: cf.supplierCreditDuration ?? 30,
+        isCreditApproved: !!cf.isSupplierCreditApproved,
       });
       this.loadedSupplierData.set(supplier);
     } catch (err: any) {
