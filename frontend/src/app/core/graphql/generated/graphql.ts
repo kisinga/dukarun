@@ -10980,6 +10980,7 @@ export type GetSuppliersQuery = {
         notes?: string | null;
         isCreditApproved?: boolean | null;
         creditLimit?: number | null;
+        creditDuration?: number | null;
         isSupplierCreditApproved?: boolean | null;
         supplierCreditLimit?: number | null;
       } | null;
@@ -19180,6 +19181,7 @@ export const GetSuppliersDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'isCreditApproved' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'creditLimit' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'creditDuration' } },
                             {
                               kind: 'Field',
                               name: { kind: 'Name', value: 'isSupplierCreditApproved' },

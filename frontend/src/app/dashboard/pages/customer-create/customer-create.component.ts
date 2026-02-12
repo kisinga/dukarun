@@ -13,6 +13,7 @@ import { Router } from '@angular/router';
 import { CustomerService } from '../../../core/services/customer.service';
 import { CustomerApiService } from '../../../core/services/customer/customer-api.service';
 import { AuthPermissionsService } from '../../../core/services/auth/auth-permissions.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { CreditManagementFormComponent } from '../shared/components/credit-management-form.component';
 import { PageHeaderComponent } from '../shared/components/page-header.component';
 import { ErrorAlertComponent } from '../shared/components/error-alert.component';
@@ -91,6 +92,7 @@ export class CustomerCreateComponent extends ApprovableFormBase implements After
   readonly customerService = inject(CustomerService);
   private readonly customerApiService = inject(CustomerApiService);
   private readonly authPermissionsService = inject(AuthPermissionsService);
+  private readonly toastService = inject(ToastService);
 
   readonly basicInfoForm = viewChild<PersonBasicInfoFormComponent>('basicInfoForm');
 
@@ -183,7 +185,7 @@ export class CustomerCreateComponent extends ApprovableFormBase implements After
           phoneNumber: form.value.phoneNumber,
         };
 
-        // Add credit fields if user has permission and values are set
+        // Add credit fields if user has permission (default credit duration 30 when approved)
         if (this.hasCreditPermission()) {
           const credit = this.creditData();
           if (credit.isCreditApproved) {
@@ -191,18 +193,20 @@ export class CustomerCreateComponent extends ApprovableFormBase implements After
             if (credit.creditLimit > 0) {
               customerData.creditLimit = credit.creditLimit;
             }
-            if (credit.creditDuration > 0) {
-              customerData.creditDuration = credit.creditDuration;
-            }
+            customerData.creditDuration = credit.creditDuration ?? 30;
           }
         }
 
         const customerId = await this.customerService.createCustomer(customerData);
 
         if (customerId) {
+          this.clearError();
+          this.toastService.show('Success', 'Customer created', 'success');
           this.router.navigate(['/dashboard/customers']);
         } else {
-          this.error.set(this.customerService.error() || 'Failed to create customer');
+          const errMsg = this.customerService.error() || 'Failed to create customer';
+          this.error.set(errMsg);
+          this.toastService.show('Error', errMsg, 'error');
         }
       } catch (err: any) {
         this.error.set(err.message || 'Failed to create customer');

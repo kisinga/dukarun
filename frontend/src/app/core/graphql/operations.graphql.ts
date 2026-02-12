@@ -1962,6 +1962,7 @@ export const GET_SUPPLIERS = graphql(`
           notes
           isCreditApproved
           creditLimit
+          creditDuration
           isSupplierCreditApproved
           supplierCreditLimit
         }

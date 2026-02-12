@@ -42,7 +42,6 @@ export function mergeSupplierCapability(
     supplierType?: string;
     contactPerson?: string;
     taxId?: string;
-    paymentTerms?: string;
     notes?: string;
     isCreditApproved?: boolean;
     creditLimit?: number;
@@ -65,11 +64,10 @@ export function mergeSupplierCapability(
   const mergedSupplierFields: any = {
     // Always set isSupplier to true when adding supplier capability
     isSupplier: true,
-    // Update supplier-specific fields if provided, otherwise preserve existing
+    // Update supplier-specific fields if provided, otherwise preserve existing (payment terms removed in favor of credit duration)
     supplierType: supplierData.supplierType?.trim() || existingCustomFields.supplierType || null,
     contactPerson: supplierData.contactPerson?.trim() || existingCustomFields.contactPerson || null,
     taxId: supplierData.taxId?.trim() || existingCustomFields.taxId || null,
-    paymentTerms: supplierData.paymentTerms?.trim() || existingCustomFields.paymentTerms || null,
     notes: supplierData.notes?.trim() || existingCustomFields.notes || null,
   };
 

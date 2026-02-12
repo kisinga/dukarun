@@ -161,7 +161,7 @@ export class CustomerApiService {
         variables: { input: normalizedInput },
       });
 
-      const customer = result.data?.createCustomer;
+      const customer = result.data?.createCustomerSafe;
       if (customer?.id) {
         console.log('✅ Customer created:', customer.id);
         return customer.id;
