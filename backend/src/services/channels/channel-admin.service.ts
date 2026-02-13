@@ -442,6 +442,13 @@ export class ChannelAdminService {
         channelIds: [channel.id],
       })
     );
+    await this.auditService
+      .log(ctx, 'role.created', {
+        entityType: 'Role',
+        entityId: savedRole.id.toString(),
+        data: { templateCode: template.code, roleCode },
+      })
+      .catch(() => {});
     return savedRole;
   }
 
@@ -477,6 +484,13 @@ export class ChannelAdminService {
         channelIds: [channel.id],
       })
     );
+    await this.auditService
+      .log(ctx, 'role.created', {
+        entityType: 'Role',
+        entityId: savedRole.id.toString(),
+        data: { templateCode: template.code, roleCode },
+      })
+      .catch(() => {});
     return savedRole;
   }
 

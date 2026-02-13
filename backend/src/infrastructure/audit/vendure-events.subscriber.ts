@@ -1,11 +1,15 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
+  AdministratorEvent,
+  AssetEvent,
   EventBus,
   FulfillmentStateTransitionEvent,
   Order,
   OrderStateTransitionEvent,
   Payment,
   PaymentStateTransitionEvent,
+  ProductEvent,
+  StockMovementEvent,
   TransactionalConnection,
 } from '@vendure/core';
 import { AuditService } from './audit.service';
@@ -286,6 +290,105 @@ export class VendureEventAuditSubscriber implements OnModuleInit {
       } catch (error) {
         this.logger.error(
           `Failed to log FulfillmentStateTransitionEvent: ${error instanceof Error ? error.message : String(error)}`,
+          error instanceof Error ? error.stack : undefined
+        );
+      }
+    });
+
+    // Subscribe to product lifecycle events
+    this.eventBus.ofType(ProductEvent).subscribe(async event => {
+      try {
+        const product = event.entity;
+        if (!product) return;
+        const productId = product.id?.toString();
+        if (!productId) return;
+        const channelId = event.ctx.channelId;
+        if (!channelId) return;
+        await this.auditService.logSystemEvent(
+          event.ctx,
+          `product.${event.type}`,
+          'Product',
+          productId,
+          { productName: product.name }
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to log ProductEvent: ${error instanceof Error ? error.message : String(error)}`,
+          error instanceof Error ? error.stack : undefined
+        );
+      }
+    });
+
+    // Subscribe to asset lifecycle events
+    this.eventBus.ofType(AssetEvent).subscribe(async event => {
+      try {
+        const asset = event.entity;
+        if (!asset) return;
+        const assetId = asset.id?.toString();
+        if (!assetId) return;
+        const channelId = event.ctx.channelId;
+        if (!channelId) return;
+        await this.auditService.logSystemEvent(
+          event.ctx,
+          `asset.${event.type}`,
+          'Asset',
+          assetId,
+          {}
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to log AssetEvent: ${error instanceof Error ? error.message : String(error)}`,
+          error instanceof Error ? error.stack : undefined
+        );
+      }
+    });
+
+    // Subscribe to stock movement events
+    this.eventBus.ofType(StockMovementEvent).subscribe(async event => {
+      try {
+        const movement = (event as any).stockMovement;
+        if (!movement) return;
+        const movementId = movement.id?.toString();
+        if (!movementId) return;
+        const channelId = event.ctx.channelId;
+        if (!channelId) return;
+        await this.auditService.logSystemEvent(
+          event.ctx,
+          'stock.movement',
+          'StockMovement',
+          movementId,
+          {
+            type: (event as any).type,
+            quantity: movement.quantity,
+          }
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to log StockMovementEvent: ${error instanceof Error ? error.message : String(error)}`,
+          error instanceof Error ? error.stack : undefined
+        );
+      }
+    });
+
+    // Subscribe to administrator lifecycle events
+    this.eventBus.ofType(AdministratorEvent).subscribe(async event => {
+      try {
+        const admin = (event as any).administrator ?? (event as any).entity;
+        if (!admin) return;
+        const adminId = admin.id?.toString();
+        if (!adminId) return;
+        const channelId = event.ctx.channelId;
+        if (!channelId) return;
+        await this.auditService.logSystemEvent(
+          event.ctx,
+          `administrator.${event.type}`,
+          'Administrator',
+          adminId,
+          {}
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to log AdministratorEvent: ${error instanceof Error ? error.message : String(error)}`,
           error instanceof Error ? error.stack : undefined
         );
       }

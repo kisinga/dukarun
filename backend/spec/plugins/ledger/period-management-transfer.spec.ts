@@ -62,8 +62,7 @@ describe('PeriodManagementResolver.createInterAccountTransfer', () => {
       mockPeriodLockService,
       {} as any,
       mockChartOfAccountsService,
-      mockFinancialService,
-      { log: jest.fn().mockReturnValue(Promise.resolve()) } as any
+      mockFinancialService
     );
   });
 

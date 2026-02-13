@@ -285,8 +285,7 @@ describe('Cashier-ledger flows', () => {
         mockPeriodLockService,
         {} as any,
         mockChartOfAccountsService,
-        mockFinancialService,
-        { log: jest.fn().mockReturnValue(Promise.resolve()) } as any
+        mockFinancialService
       );
 
       const result = await resolver.createInterAccountTransfer(ctx1, {
@@ -346,8 +345,7 @@ describe('Cashier-ledger flows', () => {
         mockPeriodLockService,
         {} as any,
         mockChartOfAccountsService,
-        mockFinancialServiceFlowD,
-        { log: jest.fn().mockReturnValue(Promise.resolve()) } as any
+        mockFinancialServiceFlowD
       );
 
       const input = {

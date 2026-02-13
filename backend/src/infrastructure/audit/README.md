@@ -19,6 +19,8 @@ The audit system provides comprehensive, channel-scoped logging of all sensitive
 3. **AuditService** - Simple service with intuitive API for logging events
 4. **UserContextResolver** - Helper to resolve user context from RequestContext or entity custom fields
 5. **VendureEventAuditSubscriber** - Subscribes to Vendure events and logs them
+6. **AuditLogInterceptor** - Automatically logs mutations decorated with `@AuditLog`
+7. **MutationAuditGuard** - Fallback: logs all mutations without `@AuditLog` (including Vendure built-ins)
 
 ### Database
 
@@ -38,7 +40,41 @@ The audit system provides comprehensive, channel-scoped logging of all sensitive
 
 ## Usage
 
-### Basic Pattern
+### Declarative: @AuditLog Decorator (Preferred for Resolvers)
+
+For GraphQL mutations, use the `@AuditLog` decorator to declare audit requirements. The interceptor automatically logs after successful execution.
+
+```typescript
+import { AuditLog as AuditLogDecorator } from '../../infrastructure/audit/audit-log.decorator';
+import { AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
+
+@Mutation()
+@Allow(SomePermission.Permission)
+@AuditLogDecorator({
+  eventType: AUDIT_EVENTS.MY_EVENT,
+  entityType: 'MyEntity',
+  extractEntityId: (result, args) => result?.id ?? args?.input?.id ?? null,
+})
+async myMutation(@Ctx() ctx: RequestContext, @Args('input') input: MyInput): Promise<MyResult> {
+  return this.myService.doWork(ctx, input);
+}
+```
+
+**Decorator options:**
+- `eventType` (required) - Use constants from `AUDIT_EVENTS` catalog for type safety
+- `entityType` (optional) - Entity type for filtering (e.g. 'Order', 'Reconciliation')
+- `extractEntityId` (optional) - `(result, args) => string | null` - extracts entity ID from mutation result/args
+- `includeArgs` (optional) - Include mutation args in audit data
+- `includeResult` (optional) - Include mutation result in audit data
+
+**Enforcement:**
+- Mutations with `@AuditLog` are logged by `AuditLogInterceptor` after success
+- Mutations without `@AuditLog` are logged by `MutationAuditGuard` with a generic `mutation.{name}` event
+- This guarantees every mutation is audited
+
+### Manual: AuditService.log() (For Services)
+
+When audit logging cannot be done at the resolver level (e.g. service methods called from multiple places):
 
 ```typescript
 @Injectable()
@@ -103,21 +139,25 @@ await this.auditService.log(ctx, 'order.created', {
 
 ## Event Types
 
-Use string-based event types with namespaces:
+Use the `AUDIT_EVENTS` catalog for type-safe event types:
 
+```typescript
+import { AUDIT_EVENTS } from './audit-events.catalog';
+
+await this.auditService.log(ctx, AUDIT_EVENTS.ORDER_CREATED, { ... });
+```
+
+**Convention:** `{entity}.{action}` or `{entity}.{category}.{action}` (e.g. `order.created`, `customer.credit.approved`)
+
+**Examples:**
 - `order.created` - Order creation
-- `order.payment.added` - Payment addition
 - `order.state_changed` - Order state transition
 - `customer.credit.approved` - Credit approval
 - `customer.credit.limit_changed` - Credit limit change
-- `user.created` - User creation
-- `admin.created` - Admin creation
 - `admin.invited` - Admin invitation
 - `channel.settings.updated` - Channel settings change
-- `channel.payment_method.created` - Payment method creation
-- `channel.payment_method.updated` - Payment method update
 
-Convention: `{entity}.{action}` or `{entity}.{category}.{action}`
+See `audit-events.catalog.ts` for the full list.
 
 ## Querying Audit Log
 
@@ -212,12 +252,19 @@ await this.auditService.log(ctx, 'order.created', {
 
 ## Best Practices
 
-1. **Log Immediately:** Log right after the action, not later
-2. **Include Context:** Store all relevant data in the `data` field
-3. **Use Descriptive Event Types:** Follow the `entity.action` convention
-4. **Update Custom Fields:** For Order, Payment, Customer - update custom fields for quick lookups
-5. **Non-Blocking:** Never let audit logging failures break operations
-6. **Channel-Scoped:** Always ensure `channelId` is available in RequestContext
+1. **Prefer @AuditLog for Resolvers:** Use the decorator on mutations for automatic, consistent logging
+2. **Use AUDIT_EVENTS Catalog:** Import from `audit-events.catalog.ts` for type safety
+3. **Log Immediately:** For manual logging, log right after the action
+4. **Include Context:** Store all relevant data in the `data` field (minimal metadata for sensitive data)
+5. **Use Descriptive Event Types:** Follow the `entity.action` convention
+6. **Update Custom Fields:** For Order, Payment, Customer - update custom fields for quick lookups
+7. **Non-Blocking:** Never let audit logging failures break operations
+8. **Channel-Scoped:** Always ensure `channelId` is available in RequestContext
+
+### When to Use Decorator vs Manual
+
+- **@AuditLog decorator:** Resolver mutations that perform a single identifiable action
+- **Manual AuditService.log():** Service methods called from multiple resolvers; operations that bypass resolvers (e.g. background jobs)
 
 ## Entity Custom Fields
 
