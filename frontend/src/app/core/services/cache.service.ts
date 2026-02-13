@@ -343,11 +343,12 @@ export const CACHE_CONFIGS = {
     channelSpecific: true,
   },
 
-  // Product cache - channel-specific, persistent
+  // Product cache - channel-specific, persistent (24h TTL for catalog/prices)
   PRODUCTS: {
     storage: 'localStorage' as const,
     keyPrefix: 'dukarun_products',
     channelSpecific: true,
+    ttl: 24 * 60 * 60 * 1000, // 24h
   },
 
   // Session cache - global, persistent

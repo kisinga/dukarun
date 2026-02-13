@@ -10,28 +10,30 @@
 />
 
 <!-- FAB for Create Product - Mobile Only -->
-<div class="fixed bottom-24 right-4 z-40 lg:hidden">
-  <a
-    routerLink="/dashboard/products/create"
-    class="btn btn-lg btn-circle btn-primary shadow-xl"
-    aria-label="Create new product"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      class="h-6 w-6"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
+@if (canEditProduct()) {
+  <div class="fixed bottom-24 right-4 z-40 lg:hidden">
+    <a
+      routerLink="/dashboard/products/create"
+      class="btn btn-lg btn-circle btn-primary shadow-xl"
+      aria-label="Create new product"
     >
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-      />
-    </svg>
-  </a>
-</div>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-6 w-6"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+        />
+      </svg>
+    </a>
+  </div>
+}
 
 <div class="space-y-4 sm:space-y-5 lg:space-y-6 animate-stagger-children">
   <!-- Header -->
@@ -42,23 +44,25 @@
     refreshTitle="Refresh products"
     (refresh)="refreshProducts()"
   >
-    <a
-      actions
-      routerLink="/dashboard/products/create"
-      class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-4 w-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        stroke-width="2"
+    @if (canEditProduct()) {
+      <a
+        actions
+        routerLink="/dashboard/products/create"
+        class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
       >
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-      </svg>
-      Add Product
-    </a>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        Add Product
+      </a>
+    }
   </app-page-header>
 
   <!-- Statistics Cards -->
@@ -271,23 +275,25 @@
             <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
               Start building your inventory by adding your first product
             </p>
-            <a routerLink="/dashboard/products/create" class="btn btn-primary btn-sm mt-6 gap-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
-              Create First Product
-            </a>
+            @if (canEditProduct()) {
+              <a routerLink="/dashboard/products/create" class="btn btn-primary btn-sm mt-6 gap-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                  />
+                </svg>
+                Create First Product
+              </a>
+            }
           }
         </div>
       </div>
@@ -299,7 +305,11 @@
     <!-- Mobile: Card View -->
     <div class="lg:hidden space-y-4">
       @for (product of displayedProducts(); track trackByProductId($index, product)) {
-        <app-product-card [product]="product" (action)="onProductAction($event)" />
+        <app-product-card
+          [product]="product"
+          [canEdit]="canEditProduct()"
+          (action)="onProductAction($event)"
+        />
       }
     </div>
 
@@ -323,6 +333,7 @@
               <tr
                 app-product-table-row
                 [product]="product"
+                [canEdit]="canEditProduct()"
                 [expanded]="isExpanded(product.id)"
                 (toggleExpand)="toggleExpand(product.id)"
                 (action)="onProductAction($event)"

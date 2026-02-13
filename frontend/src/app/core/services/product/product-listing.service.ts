@@ -1,3 +1,4 @@
+import type { FetchPolicy } from '@apollo/client/core';
 import { inject, Injectable } from '@angular/core';
 import type { ProductListOptions } from '../../graphql/generated/graphql';
 import { extractCents } from '../../utils/data-extractors';
@@ -7,6 +8,13 @@ import { ProductMapperService } from './product-mapper.service';
 import { ProductStateService } from './product-state.service';
 
 const DEFAULT_OPTIONS: ProductListOptions = { take: 50, skip: 0 };
+
+/** Allowed fetch policy for product list queries (cache-first default for resilience; network-only after mutations). */
+export type ProductQueryFetchPolicy = 'cache-first' | 'network-only';
+
+export interface ProductQueryOptions {
+  fetchPolicy?: ProductQueryFetchPolicy;
+}
 
 /**
  * Product Listing Service
@@ -25,10 +33,16 @@ export class ProductListingService {
   /**
    * Fetch products with the given list options (filter, sort, pagination).
    * @param options - ProductListOptions from buildProductListOptions or equivalent
+   * @param queryOptions - Optional fetch policy; default cache-first for resilience; use network-only after mutations
    */
-  async fetchProducts(options?: ProductListOptions): Promise<void> {
+  async fetchProducts(
+    options?: ProductListOptions,
+    queryOptions?: ProductQueryOptions,
+  ): Promise<void> {
     this.stateService.setIsLoading(true);
     this.stateService.setError(null);
+
+    const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
 
     try {
       const client = this.apolloService.getClient();
@@ -37,7 +51,7 @@ export class ProductListingService {
         variables: {
           options: options ?? DEFAULT_OPTIONS,
         },
-        fetchPolicy: 'network-only',
+        fetchPolicy,
       });
 
       const items = result.data?.products?.items || [];

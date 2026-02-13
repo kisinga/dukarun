@@ -8,7 +8,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CustomerService } from '../../../core/services/customer.service';
 import {
   calculateCustomerStats,
@@ -57,6 +57,7 @@ import { PaginationComponent } from '../../components/shared/pagination.componen
 export class CustomersComponent implements OnInit {
   private readonly customerService = inject(CustomerService);
   readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   // View references
   readonly deleteModal = viewChild<DeleteConfirmationModalComponent>('deleteModal');
@@ -174,15 +175,24 @@ export class CustomersComponent implements OnInit {
     this.loadCustomers();
   }
 
-  async loadCustomers(): Promise<void> {
-    await this.customerService.fetchCustomers({
-      take: 100,
-      skip: 0,
-    });
+  async loadCustomers(forceRefresh?: boolean): Promise<void> {
+    const useNetworkOnly =
+      forceRefresh === true || this.route.snapshot.queryParams['refresh'] === '1';
+    await this.customerService.fetchCustomers(
+      { take: 100, skip: 0 },
+      useNetworkOnly ? { fetchPolicy: 'network-only' } : undefined,
+    );
+    if (this.route.snapshot.queryParams['refresh'] === '1') {
+      this.router.navigate([], {
+        queryParams: { refresh: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
   }
 
   async refreshCustomers(): Promise<void> {
-    await this.loadCustomers();
+    await this.loadCustomers(true);
   }
 
   /**

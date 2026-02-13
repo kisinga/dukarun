@@ -3,7 +3,7 @@ import { CustomerAddressService } from './customer/customer-address.service';
 import { CustomerApiService } from './customer/customer-api.service';
 import { CustomerCreditService } from './customer/customer-credit.service';
 import { CustomerPaymentService } from './customer/customer-payment.service';
-import { CustomerSearchService } from './customer/customer-search.service';
+import { CustomerQueryOptions, CustomerSearchService } from './customer/customer-search.service';
 import { CustomerStateService } from './customer/customer-state.service';
 
 /**
@@ -183,18 +183,22 @@ export class CustomerService {
   }
 
   /**
-   * Fetch all customers with optional pagination
-   * @param options - Optional pagination and filter options
+   * Fetch all customers with optional pagination.
+   * @param queryOptions - Optional fetch policy (default cache-first; use network-only after mutations)
    */
-  async fetchCustomers(options?: any): Promise<void> {
-    return this.searchService.fetchCustomers(options);
+  async fetchCustomers(options?: any, queryOptions?: CustomerQueryOptions): Promise<void> {
+    return this.searchService.fetchCustomers(options, queryOptions);
   }
 
   /**
    * Search for customers (including suppliers)
    */
-  async searchCustomers(term: string, take = 50): Promise<any[]> {
-    return this.searchService.searchCustomers(term, take);
+  async searchCustomers(
+    term: string,
+    take = 50,
+    queryOptions?: CustomerQueryOptions,
+  ): Promise<any[]> {
+    return this.searchService.searchCustomers(term, take, queryOptions);
   }
 
   /**

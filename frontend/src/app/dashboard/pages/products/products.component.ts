@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { AuthService } from '../../../core/services/auth.service';
 import {
   buildProductListOptions,
   type ProductListFilterState,
@@ -61,8 +62,11 @@ import { ListSearchBarComponent } from '../../components/shared/list-search-bar.
 export class ProductsComponent implements OnInit {
   private readonly productService = inject(ProductService);
   private readonly facetService = inject(FacetService);
+  private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
+  readonly canEditProduct = this.authService.hasUpdateProductPermission;
 
   // View references
   readonly deleteModal = viewChild<DeleteConfirmationModalComponent>('deleteModal');
@@ -180,7 +184,10 @@ export class ProductsComponent implements OnInit {
     });
   }
 
-  async loadProducts(): Promise<void> {
+  /**
+   * Load product list. Uses cache-first unless forceRefresh or route has ?refresh=1 (e.g. after create/edit).
+   */
+  async loadProducts(forceRefresh?: boolean): Promise<void> {
     const state = this.filterState();
     const perPage = this.itemsPerPage();
     const page = this.currentPage();
@@ -195,11 +202,26 @@ export class ProductsComponent implements OnInit {
       manufacturerIdsMatchingSearch:
         manufacturerIdsMatchingSearch.length > 0 ? manufacturerIdsMatchingSearch : undefined,
     });
-    await this.productService.fetchProducts(options);
+
+    const refreshParam = this.route.snapshot.queryParams['refresh'] === '1';
+    const useNetworkOnly = forceRefresh === true || refreshParam;
+
+    await this.productService.fetchProducts(
+      options,
+      useNetworkOnly ? { fetchPolicy: 'network-only' } : undefined,
+    );
+
+    if (refreshParam) {
+      await this.router.navigate([], {
+        queryParams: { refresh: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
   }
 
   async refreshProducts(): Promise<void> {
-    await this.loadProducts();
+    await this.loadProducts(true);
   }
 
   /**

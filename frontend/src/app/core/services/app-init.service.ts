@@ -6,6 +6,7 @@ import type { MlModelService } from './ml-model/ml-model.service';
 import { ModelErrorType } from './ml-model/model-error.util';
 import { NotificationService } from './notification.service';
 import { ProductCacheService } from './product/product-cache.service';
+import { SalesSyncGuardService } from './sales-sync-guard.service';
 import { StockLocationService } from './stock-location.service';
 
 /**
@@ -31,6 +32,7 @@ export class AppInitService {
   private readonly apolloService = inject(ApolloService);
   private readonly companyService = inject(CompanyService);
   private readonly productCacheService = inject(ProductCacheService);
+  private readonly salesSyncGuard = inject(SalesSyncGuardService);
   private readonly stockLocationService = inject(StockLocationService);
   private readonly notificationService = inject(NotificationService);
   private readonly injector = inject(Injector);
@@ -199,7 +201,8 @@ export class AppInitService {
    */
   clearCache(): void {
     this.apolloService.clearCache();
-    this.productCacheService.clearCache();
+    this.productCacheService.clearCache(this.lastInitChannelId() ?? undefined);
+    this.salesSyncGuard.markSynced();
     this.mlModelService?.unloadModel();
     this.stockLocationService.clearLocations();
     this.isInitializingSignal.set(false);

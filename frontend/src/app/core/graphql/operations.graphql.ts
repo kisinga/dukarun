@@ -316,6 +316,15 @@ export const CREATE_PRODUCT_VARIANTS = graphql(`
   }
 `);
 
+export const DELETE_PRODUCT_VARIANTS = graphql(`
+  mutation DeleteProductVariants($ids: [ID!]!) {
+    deleteProductVariants(ids: $ids) {
+      result
+      message
+    }
+  }
+`);
+
 export const CREATE_ASSETS = graphql(`
   mutation CreateAssets($input: [CreateAssetInput!]!) {
     createAssets(input: $input) {

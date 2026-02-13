@@ -1,9 +1,17 @@
 import { Injectable, inject, signal } from '@angular/core';
+import { CACHE_CONFIGS, CacheService } from '../cache.service';
 import { PREFETCH_PRODUCTS } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { parseSearchWords } from './product-search-term.util';
 import { ProductMapperService } from './product-mapper.service';
+import { SalesSyncGuardService } from '../sales-sync-guard.service';
 import { ProductSearchResult, ProductVariant } from './product-search.service';
+
+/** Persisted shape for product list cache */
+interface ProductCachePayload {
+  products: ProductSearchResult[];
+  lastSync: number;
+}
 
 /**
  * Product cache status
@@ -25,6 +33,8 @@ export interface CacheStatus {
 })
 export class ProductCacheService {
   private readonly apolloService = inject(ApolloService);
+  private readonly cacheService = inject(CacheService);
+  private readonly salesSyncGuard = inject(SalesSyncGuardService);
   private readonly mapper = inject(ProductMapperService);
 
   // Signals for cache status
@@ -43,27 +53,63 @@ export class ProductCacheService {
   readonly status = this.statusSignal.asReadonly();
 
   /**
-   * Pre-fetch all products for the channel on boot
-   * Stores in Apollo cache + in-memory for offline access
+   * Pre-fetch all products for the channel on boot.
+   * Uses persisted cache when valid (stale-while-revalidate), then updates from network.
    */
   async prefetchChannelProducts(channelId: string): Promise<boolean> {
-    console.log(`📦 Pre-fetching products for channel ${channelId}...`);
-
     this.statusSignal.update((s) => ({ ...s, isLoading: true, error: null }));
+
+    // Try hydrate from localStorage first (resilient to poor connection / instant boot)
+    const stored = this.cacheService.get<ProductCachePayload>(
+      CACHE_CONFIGS.PRODUCTS,
+      'list',
+      channelId,
+    );
+    if (stored?.products?.length) {
+      this.hydrateFromPayload(stored);
+      console.log(`📦 Hydrated ${stored.products.length} products from cache`);
+      this.statusSignal.update((s) => ({
+        ...s,
+        isInitialized: true,
+        isLoading: false,
+        productCount: stored.products.length,
+        lastSync: stored.lastSync ? new Date(stored.lastSync) : null,
+        error: null,
+      }));
+      // Revalidate in background (stale-while-revalidate)
+      this.prefetchFromNetwork(channelId).catch(() => {
+        // Keep existing cache on failure
+      });
+      return true;
+    }
+
+    // No valid cache: fetch from network
+    return this.prefetchFromNetwork(channelId);
+  }
+
+  private hydrateFromPayload(payload: ProductCachePayload): void {
+    this.productsById.clear();
+    this.productsByName.clear();
+    for (const product of payload.products) {
+      this.productsById.set(product.id, product);
+      const normalizedName = product.name.toLowerCase();
+      const existing = this.productsByName.get(normalizedName) || [];
+      existing.push(product);
+      this.productsByName.set(normalizedName, existing);
+    }
+  }
+
+  private async prefetchFromNetwork(channelId: string): Promise<boolean> {
+    console.log(`📦 Pre-fetching products for channel ${channelId}...`);
 
     try {
       const client = this.apolloService.getClient();
-
-      // Fetch all products (adjust take limit as needed)
       const result = await client.query<{
-        products: {
-          totalItems: number;
-          items: any[];
-        };
+        products: { totalItems: number; items: any[] };
       }>({
         query: PREFETCH_PRODUCTS,
-        variables: { take: 100 }, // Limited to prevent list-query-limit-exceeded errors
-        fetchPolicy: 'network-only', // Force fresh fetch on boot
+        variables: { take: 100 },
+        fetchPolicy: 'network-only',
       });
 
       if (!result.data?.products?.items) {
@@ -74,23 +120,17 @@ export class ProductCacheService {
         this.mapper.toProductSearchResult(p),
       );
 
-      // Build in-memory indexes
-      this.productsById.clear();
-      this.productsByName.clear();
+      this.hydrateFromPayload({ products, lastSync: Date.now() });
 
-      products.forEach((product: ProductSearchResult) => {
-        // Index by ID for ML detection lookup
-        this.productsById.set(product.id, product);
+      // Persist for next boot and poor-connection resilience
+      this.cacheService.set(
+        CACHE_CONFIGS.PRODUCTS,
+        'list',
+        { products, lastSync: Date.now() },
+        channelId,
+      );
 
-        // Index by name for search (normalized)
-        const normalizedName = product.name.toLowerCase();
-        const existing = this.productsByName.get(normalizedName) || [];
-        existing.push(product);
-        this.productsByName.set(normalizedName, existing);
-      });
-      // console.log(products);
       console.log(`✅ Cached ${products.length} products locally`);
-
       this.statusSignal.update((s) => ({
         ...s,
         isInitialized: true,
@@ -99,17 +139,15 @@ export class ProductCacheService {
         lastSync: new Date(),
         error: null,
       }));
-
+      this.salesSyncGuard.markSynced();
       return true;
     } catch (error: any) {
       console.error('❌ Failed to prefetch products:', error);
-
       this.statusSignal.update((s) => ({
         ...s,
         isLoading: false,
         error: error.message || 'Failed to load products',
       }));
-
       return false;
     }
   }
@@ -164,6 +202,14 @@ export class ProductCacheService {
   }
 
   /**
+   * Get first N products from cache (e.g. for "recent" or quick-select).
+   * Shared across Sell and other components to avoid duplicate GET_PRODUCTS.
+   */
+  getRecentProducts(limit: number): ProductSearchResult[] {
+    return Array.from(this.productsById.values()).slice(0, limit);
+  }
+
+  /**
    * Get variant by ID from cache
    * @param variantId - Variant ID to lookup
    * @returns ProductVariant if found, null otherwise
@@ -181,11 +227,15 @@ export class ProductCacheService {
   }
 
   /**
-   * Clear cache
+   * Clear cache (memory and persisted for current channel).
+   * Caller should pass channelId when known so persisted cache is cleared.
    */
-  clearCache(): void {
+  clearCache(channelId?: string): void {
     this.productsById.clear();
     this.productsByName.clear();
+    if (channelId) {
+      this.cacheService.remove(CACHE_CONFIGS.PRODUCTS, 'list', channelId);
+    }
     this.statusSignal.set({
       isInitialized: false,
       isLoading: false,
