@@ -24,58 +24,31 @@
 
 <div class="space-y-5 lg:space-y-6 animate-stagger-children">
   <!-- Header -->
-  <div class="flex items-start justify-between gap-4">
-    <div class="flex-1 min-w-0">
-      <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Purchases</h1>
-      <p class="text-sm text-base-content/60 mt-1">Manage your purchase records</p>
-    </div>
-
-    <div class="flex gap-2 shrink-0">
-      <button
-        (click)="refreshPurchases()"
-        class="btn btn-ghost btn-square btn-sm lg:btn-md"
-        [class.loading]="isLoading()"
-        title="Refresh purchases"
+  <app-page-header
+    title="Purchases"
+    subtitle="Manage your purchase records"
+    [isLoading]="isLoading()"
+    refreshTitle="Refresh purchases"
+    (refresh)="refreshPurchases()"
+  >
+    <button
+      actions
+      (click)="router.navigate(['/dashboard/purchases/create'])"
+      class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
       >
-        @if (!isLoading()) {
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-        }
-      </button>
-      <button
-        (click)="router.navigate(['/dashboard/purchases/create'])"
-        class="btn btn-primary btn-sm lg:btn-md gap-2 hidden lg:flex"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-          />
-        </svg>
-        Create Purchase
-      </button>
-    </div>
-  </div>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+      </svg>
+      Create Purchase
+    </button>
+  </app-page-header>
 
   <!-- Pending Draft Banner -->
   @if (hasPendingDraft()) {
@@ -117,14 +90,36 @@
   />
 
   <!-- Search & Filter Bar -->
-  <app-purchase-search-bar
-    [(searchQuery)]="searchQuery"
-    [pendingPaymentsActive]="pendingPaymentsFilter()"
-    (clearPendingPayments)="clearPendingPaymentsFilter()"
-    [supplierIdFilter]="supplierIdFilter()"
-    [supplierNameFilter]="supplierNameFilter()"
-    (clearSupplierFilter)="clearSupplierFilter()"
-  />
+  <app-list-search-bar [(searchQuery)]="searchQuery" placeholder="Search by supplier, reference...">
+    @if (supplierIdFilter() || pendingPaymentsFilter()) {
+      <div badges class="flex flex-wrap gap-2">
+        @if (supplierIdFilter()) {
+          <span class="badge badge-primary gap-1.5">
+            Supplier: {{ supplierNameFilter() || 'Unknown' }}
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="clearSupplierFilter()"
+              type="button"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (pendingPaymentsFilter()) {
+          <span class="badge badge-warning gap-1.5">
+            Pending Payments
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="clearPendingPaymentsFilter()"
+              type="button"
+            >
+              &times;
+            </button>
+          </span>
+        }
+      </div>
+    }
+  </app-list-search-bar>
 
   <!-- Error Alert -->
   @if (error()) {
@@ -223,27 +218,6 @@
 
   <!-- Purchases List -->
   @else {
-    <!-- List Controls -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1">
-      <div class="text-sm text-base-content/60">
-        Showing {{ (currentPage() - 1) * itemsPerPage() + 1 }} to {{ endItem() }} of
-        {{ filteredPurchases().length }} purchases
-      </div>
-
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-base-content/60">Per page:</span>
-        <select
-          class="select select-sm select-bordered"
-          [value]="itemsPerPage()"
-          (change)="changeItemsPerPage(+$any($event.target).value)"
-        >
-          @for (option of pageOptions; track option) {
-            <option [value]="option">{{ option }}</option>
-          }
-        </select>
-      </div>
-    </div>
-
     <!-- Mobile: Card View -->
     <div class="lg:hidden space-y-4">
       @for (purchase of paginatedPurchases(); track trackByPurchaseId($index, purchase)) {
@@ -284,8 +258,11 @@
       [totalPages]="totalPages()"
       [totalItems]="filteredPurchases().length"
       [itemsPerPage]="itemsPerPage()"
-      [itemLabel]="'purchases'"
+      [pageOptions]="pageOptions"
+      [showItemsPerPage]="true"
+      itemLabel="purchases"
       (pageChange)="goToPage($event)"
+      (itemsPerPageChange)="changeItemsPerPage($event)"
     />
   }
 </div>

@@ -27,27 +27,12 @@ import type { FacetValueSummary } from '../../../../core/services/product/facet.
   template: `
     <details class="dropdown" [class.dropdown-open]="isOpen()">
       <summary
-        class="btn btn-sm btn-outline justify-between min-h-9 gap-2"
-        [class.btn-active]="selectedIds().length > 0"
+        class="select select-bordered select-sm w-full flex items-center gap-1 cursor-pointer pr-7"
+        [class.select-primary]="selectedIds().length > 0"
         (click)="toggle($event)"
         role="button"
       >
-        <span class="truncate">{{ displayLabel() }}: {{ summaryText() }}</span>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4 shrink-0 transition-transform"
-          [class.rotate-180]="isOpen()"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        <span class="truncate text-sm">{{ displayLabel() }}: {{ summaryText() }}</span>
       </summary>
       <ul
         class="dropdown-content menu z-[100] mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-base-300 bg-base-100 p-2 shadow-xl"

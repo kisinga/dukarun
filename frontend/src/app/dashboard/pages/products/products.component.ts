@@ -25,11 +25,11 @@ import {
 import { PaginationComponent } from '../../components/shared/pagination.component';
 import { ProductAction, ProductCardComponent } from './components/product-card.component';
 import { ProductListFacetSelectorComponent } from './components/product-list-facet-selector.component';
-import { ProductSearchBarComponent } from './components/product-search-bar.component';
 import { ProductStats, ProductStatsComponent } from './components/product-stats.component';
 import { ProductTableRowComponent } from './components/product-table-row.component';
 import { VariantListComponent } from '../shared/components/variant-list.component';
-import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
+import { PageHeaderComponent } from '../../components/shared/page-header.component';
+import { ListSearchBarComponent } from '../../components/shared/list-search-bar.component';
 
 /**
  * Products list page - refactored with composable components
@@ -48,8 +48,8 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
     ProductCardComponent,
     ProductListFacetSelectorComponent,
     ProductStatsComponent,
-    ProductSearchBarComponent,
     ProductTableRowComponent,
+    ListSearchBarComponent,
     VariantListComponent,
     PaginationComponent,
     DeleteConfirmationModalComponent,

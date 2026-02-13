@@ -98,7 +98,7 @@ export class DashboardLayoutComponent implements OnInit {
         items: [
           { label: 'Sell', icon: 'sell', route: '/dashboard/sell' },
           { label: 'Products', icon: 'products', route: '/dashboard/products' },
-          { label: 'Sales', icon: 'orders', route: '/dashboard/orders' },
+          { label: 'Sales', icon: 'sales', route: '/dashboard/orders' },
           { label: 'Purchases', icon: 'purchases', route: '/dashboard/purchases' },
           {
             label: 'Stock Adjustments',

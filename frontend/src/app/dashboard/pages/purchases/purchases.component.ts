@@ -15,8 +15,9 @@ import { PurchaseService } from '../../../core/services/purchase.service';
 import { calculatePurchaseStats } from '../../../core/services/stats/purchase-stats.util';
 import { PaginationComponent } from '../../components/shared/pagination.component';
 import { PurchaseCardComponent } from './components/purchase-card.component';
-import { PurchaseSearchBarComponent } from './components/purchase-search-bar.component';
 import { PurchaseStats, PurchaseStatsComponent } from './components/purchase-stats.component';
+import { PageHeaderComponent } from '../../components/shared/page-header.component';
+import { ListSearchBarComponent } from '../../components/shared/list-search-bar.component';
 import {
   PayPurchaseModalComponent,
   PayPurchaseModalData,
@@ -41,8 +42,9 @@ import { PurchaseDetailComponent } from './purchase-detail/purchase-detail.compo
   imports: [
     CommonModule,
     PurchaseStatsComponent,
-    PurchaseSearchBarComponent,
     PurchaseCardComponent,
+    PageHeaderComponent,
+    ListSearchBarComponent,
     PurchaseTableRowComponent,
     PayPurchaseModalComponent,
     PaginationComponent,

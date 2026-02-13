@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
 export interface ProductStats {
@@ -10,11 +9,10 @@ export interface ProductStats {
 
 /**
  * Product statistics cards component
- * Displays key metrics in a responsive grid
+ * Compact label-first stats cards with colored left border accent.
  */
 @Component({
   selector: 'app-product-stats',
-  imports: [CommonModule],
   templateUrl: './product-stats.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

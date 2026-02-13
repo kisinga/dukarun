@@ -1,133 +1,55 @@
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
   <!-- Total Purchases -->
-  <div
-    class="card bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
-  >
-    <div class="card-body p-3 lg:p-4">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 text-primary"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-            />
-          </svg>
-        </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-xs text-base-content/60 truncate">Total Purchases</p>
-          <p class="text-xl lg:text-2xl font-bold text-primary tracking-tight">
-            {{ stats().totalPurchases }}
-          </p>
-        </div>
-      </div>
-    </div>
+  <div class="rounded-xl p-2.5 sm:p-3 bg-primary/5 border-l-[3px] border-primary shadow-sm">
+    <span
+      class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-base-content/50 block mb-0.5"
+    >
+      Purchases
+    </span>
+    <p class="text-lg sm:text-xl font-bold text-primary tabular-nums leading-none">
+      {{ stats().totalPurchases }}
+    </p>
   </div>
 
   <!-- Total Value -->
-  <div
-    class="card bg-gradient-to-br from-secondary/10 to-secondary/5 border border-secondary/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
-  >
-    <div class="card-body p-3 lg:p-4">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 text-secondary"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-xs text-base-content/60 truncate">Total Value</p>
-          <p class="text-lg lg:text-xl font-bold text-secondary tracking-tight">
-            {{ formatCurrency(stats().totalValue) }}
-          </p>
-        </div>
-      </div>
-    </div>
+  <div class="rounded-xl p-2.5 sm:p-3 bg-secondary/5 border-l-[3px] border-secondary shadow-sm">
+    <span
+      class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-base-content/50 block mb-0.5"
+    >
+      Total Value
+    </span>
+    <p class="text-base sm:text-lg font-bold text-secondary tabular-nums leading-none">
+      {{ formatCurrency(stats().totalValue) }}
+    </p>
   </div>
 
   <!-- This Month -->
-  <div
-    class="card bg-gradient-to-br from-success/10 to-success/5 border border-success/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
-  >
-    <div class="card-body p-3 lg:p-4">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 text-success"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-        </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-xs text-base-content/60 truncate">This Month</p>
-          <p class="text-xl lg:text-2xl font-bold text-success tracking-tight">
-            {{ stats().thisMonth }}
-          </p>
-        </div>
-      </div>
-    </div>
+  <div class="rounded-xl p-2.5 sm:p-3 bg-success/5 border-l-[3px] border-success shadow-sm">
+    <span
+      class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-base-content/50 block mb-0.5"
+    >
+      This Month
+    </span>
+    <p class="text-lg sm:text-xl font-bold text-success tabular-nums leading-none">
+      {{ stats().thisMonth }}
+    </p>
   </div>
 
   <!-- Pending Payments -->
-  <div
-    class="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+  <button
+    type="button"
+    class="rounded-xl p-2.5 sm:p-3 text-left bg-warning/5 border-l-[3px] border-warning shadow-sm hover:shadow-md active:scale-[0.97] transition-all touch-manipulation"
     [class.ring-2]="pendingPaymentsActive()"
-    [class.ring-primary]="pendingPaymentsActive()"
-    [class.bg-primary/20]="pendingPaymentsActive()"
+    [class.ring-warning]="pendingPaymentsActive()"
     (click)="onPendingPaymentsClick()"
   >
-    <div class="card-body p-3 lg:p-4">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 text-warning"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-xs text-base-content/60 truncate">Pending Payments</p>
-          <p class="text-xl lg:text-2xl font-bold text-warning tracking-tight">
-            {{ stats().pendingPayments }}
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
+    <span
+      class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-base-content/50 block mb-0.5"
+    >
+      Pending
+    </span>
+    <p class="text-lg sm:text-xl font-bold text-warning tabular-nums leading-none">
+      {{ stats().pendingPayments }}
+    </p>
+  </button>
 </div>

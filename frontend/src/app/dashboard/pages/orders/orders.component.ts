@@ -15,10 +15,10 @@ import { OrdersService } from '../../../core/services/orders.service';
 import { PaginationComponent } from '../../components/shared/pagination.component';
 import { OrderAction, OrderCardComponent } from './components/order-card.component';
 import { PayOrderModalComponent, PayOrderModalData } from './components/pay-order-modal.component';
-import { OrderSearchBarComponent } from './components/order-search-bar.component';
 import { OrderStats, OrderStatsComponent } from './components/order-stats.component';
 import { OrderTableRowComponent } from './components/order-table-row.component';
-import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
+import { PageHeaderComponent } from '../../components/shared/page-header.component';
+import { ListSearchBarComponent } from '../../components/shared/list-search-bar.component';
 
 /**
  * Orders list page - refactored with composable components
@@ -35,11 +35,11 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
     CommonModule,
     OrderCardComponent,
     OrderStatsComponent,
-    OrderSearchBarComponent,
     OrderTableRowComponent,
     PaginationComponent,
     PayOrderModalComponent,
     PageHeaderComponent,
+    ListSearchBarComponent,
   ],
   templateUrl: './orders.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

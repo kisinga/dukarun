@@ -10,23 +10,21 @@ export interface OrderStats {
 /**
  * Order Statistics Component
  *
- * Displays order statistics in compact gradient cards.
- * Uses secondary color theme for Orders page identity.
+ * Compact label-first stats cards with colored left border accent.
  */
 @Component({
   selector: 'app-order-stats',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <!-- Stats - Label-first design for mobile readability -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
       <!-- Total Orders -->
-      <div class="rounded-xl p-2.5 sm:p-3 bg-base-200/60 border border-base-300/20 shadow-sm">
+      <div class="rounded-xl p-2.5 sm:p-3 bg-secondary/5 border-l-[3px] border-secondary shadow-sm">
         <span
-          class="text-[9px] sm:text-[10px] text-secondary font-bold uppercase tracking-wide text-base-content/50 block mb-1"
+          class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-base-content/50 block mb-0.5"
         >
           Total
         </span>
-        <p class="text-xl sm:text-2xl font-extrabold text-secondary tabular-nums leading-none">
+        <p class="text-lg sm:text-xl font-bold text-secondary tabular-nums leading-none">
           {{ stats().totalOrders }}
         </p>
       </div>
@@ -34,17 +32,17 @@ export interface OrderStats {
       <!-- Draft Orders -->
       <button
         type="button"
-        class="rounded-xl p-2.5 sm:p-3 text-left bg-base-200/60 border border-base-300/20 shadow-sm active:scale-[0.97] transition-transform touch-manipulation"
+        class="rounded-xl p-2.5 sm:p-3 text-left bg-info/5 border-l-[3px] border-info shadow-sm hover:shadow-md active:scale-[0.97] transition-all touch-manipulation"
         [class.ring-2]="activeStateFilter() === 'Draft'"
         [class.ring-info]="activeStateFilter() === 'Draft'"
         (click)="onFilterClick('Draft')"
       >
         <span
-          class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-info block mb-1"
+          class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-base-content/50 block mb-0.5"
         >
           Draft
         </span>
-        <p class="text-xl sm:text-2xl font-extrabold text-info tabular-nums leading-none">
+        <p class="text-lg sm:text-xl font-bold text-info tabular-nums leading-none">
           {{ stats().draftOrders }}
         </p>
       </button>
@@ -52,17 +50,17 @@ export interface OrderStats {
       <!-- Unpaid Orders -->
       <button
         type="button"
-        class="rounded-xl p-2.5 sm:p-3 text-left bg-warning/10 border border-warning/20 shadow-sm active:scale-[0.97] transition-transform touch-manipulation"
+        class="rounded-xl p-2.5 sm:p-3 text-left bg-warning/5 border-l-[3px] border-warning shadow-sm hover:shadow-md active:scale-[0.97] transition-all touch-manipulation"
         [class.ring-2]="activeStateFilter() === 'ArrangingPayment'"
         [class.ring-warning]="activeStateFilter() === 'ArrangingPayment'"
         (click)="onFilterClick('ArrangingPayment')"
       >
         <span
-          class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-warning block mb-1"
+          class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-base-content/50 block mb-0.5"
         >
           Unpaid
         </span>
-        <p class="text-xl sm:text-2xl font-extrabold text-warning tabular-nums leading-none">
+        <p class="text-lg sm:text-xl font-bold text-warning tabular-nums leading-none">
           {{ stats().unpaidOrders }}
         </p>
       </button>
@@ -70,17 +68,17 @@ export interface OrderStats {
       <!-- Paid Orders -->
       <button
         type="button"
-        class="rounded-xl p-2.5 sm:p-3 text-left bg-success/10 border border-success/20 shadow-sm active:scale-[0.97] transition-transform touch-manipulation"
+        class="rounded-xl p-2.5 sm:p-3 text-left bg-success/5 border-l-[3px] border-success shadow-sm hover:shadow-md active:scale-[0.97] transition-all touch-manipulation"
         [class.ring-2]="activeStateFilter() === 'PaymentSettled'"
         [class.ring-success]="activeStateFilter() === 'PaymentSettled'"
         (click)="onFilterClick('PaymentSettled')"
       >
         <span
-          class="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-success block mb-1"
+          class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-base-content/50 block mb-0.5"
         >
           Paid
         </span>
-        <p class="text-xl sm:text-2xl font-extrabold text-success tabular-nums leading-none">
+        <p class="text-lg sm:text-xl font-bold text-success tabular-nums leading-none">
           {{ stats().paidOrders }}
         </p>
       </button>
@@ -93,7 +91,6 @@ export class OrderStatsComponent {
   readonly filterClick = output<{ type: string; value: string; color: string }>();
 
   onFilterClick(value: string): void {
-    // Map filter values to their badge colors
     const colorMap: Record<string, string> = {
       Draft: 'neutral',
       ArrangingPayment: 'warning',

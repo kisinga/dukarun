@@ -1,7 +1,7 @@
 export type NavIcon =
   | 'overview'
   | 'sell'
-  | 'orders'
+  | 'sales'
   | 'payments'
   | 'expenses'
   | 'products'
