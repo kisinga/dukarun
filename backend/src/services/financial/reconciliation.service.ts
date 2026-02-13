@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { In } from 'typeorm';
 import { RequestContext, TransactionalConnection } from '@vendure/core';
-import { Reconciliation, ReconciliationScope } from '../../domain/recon/reconciliation.entity';
+import { In } from 'typeorm';
 import { ReconciliationAccount } from '../../domain/recon/reconciliation-account.entity';
+import { Reconciliation, ReconciliationScope } from '../../domain/recon/reconciliation.entity';
 import { Account } from '../../ledger/account.entity';
 import { AccountBalanceService } from './account-balance.service';
 import { FinancialService } from './financial.service';
@@ -173,6 +173,7 @@ export class ReconciliationService {
     ctx: RequestContext,
     input: CreateReconciliationInput
   ): Promise<Reconciliation> {
+    this.logger.log(`createReconciliation input.accountIds=${JSON.stringify(input?.accountIds)}`);
     const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
     const expectedBalance = input.expectedBalance ? BigInt(input.expectedBalance) : BigInt(0);
     const actualBalance = BigInt(input.actualBalance);

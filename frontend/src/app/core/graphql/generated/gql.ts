@@ -33,6 +33,7 @@ type Documents = {
   '\n  query CheckBarcodeExists($barcode: String!) {\n    products(options: { filter: { barcode: { eq: $barcode } }, take: 1 }) {\n      items {\n        id\n        name\n        customFields {\n          barcode\n        }\n      }\n    }\n  }\n': typeof types.CheckBarcodeExistsDocument;
   '\n  mutation CreateProduct($input: CreateProductInput!) {\n    createProduct(input: $input) {\n      id\n      name\n      slug\n      description\n      enabled\n      featuredAsset {\n        id\n        preview\n      }\n      variants {\n        id\n        name\n        sku\n        price\n        stockOnHand\n        customFields {\n          wholesalePrice\n          allowFractionalQuantity\n        }\n      }\n    }\n  }\n': typeof types.CreateProductDocument;
   '\n  mutation CreateProductVariants($input: [CreateProductVariantInput!]!) {\n    createProductVariants(input: $input) {\n      id\n      name\n      sku\n      price\n      priceWithTax\n      stockOnHand\n      product {\n        id\n        name\n      }\n    }\n  }\n': typeof types.CreateProductVariantsDocument;
+  '\n  mutation DeleteProductVariants($ids: [ID!]!) {\n    deleteProductVariants(ids: $ids) {\n      result\n      message\n    }\n  }\n': typeof types.DeleteProductVariantsDocument;
   '\n  mutation CreateAssets($input: [CreateAssetInput!]!) {\n    createAssets(input: $input) {\n      ... on Asset {\n        id\n        name\n        preview\n        source\n      }\n    }\n  }\n': typeof types.CreateAssetsDocument;
   '\n  mutation AssignAssetsToProduct($productId: ID!, $assetIds: [ID!]!, $featuredAssetId: ID) {\n    updateProduct(\n      input: { id: $productId, assetIds: $assetIds, featuredAssetId: $featuredAssetId }\n    ) {\n      id\n      assets {\n        id\n        name\n        preview\n      }\n      featuredAsset {\n        id\n        preview\n      }\n    }\n  }\n': typeof types.AssignAssetsToProductDocument;
   '\n  mutation AssignAssetsToChannel($assetIds: [ID!]!, $channelId: ID!) {\n    assignAssetsToChannel(input: { assetIds: $assetIds, channelId: $channelId }) {\n      id\n      name\n    }\n  }\n': typeof types.AssignAssetsToChannelDocument;
@@ -120,6 +121,7 @@ type Documents = {
   '\n  mutation DisableChannelAdmin($id: ID!) {\n    disableChannelAdmin(id: $id) {\n      success\n      message\n    }\n  }\n': typeof types.DisableChannelAdminDocument;
   '\n  query GetAdministrators($options: AdministratorListOptions) {\n    administrators(options: $options) {\n      items {\n        id\n        firstName\n        lastName\n        emailAddress\n        user {\n          id\n          identifier\n          verified\n          roles {\n            id\n            code\n            permissions\n            channels {\n              id\n            }\n          }\n        }\n      }\n    }\n  }\n': typeof types.GetAdministratorsDocument;
   '\n  query GetAdministratorById($id: ID!) {\n    administrator(id: $id) {\n      id\n      firstName\n      lastName\n      emailAddress\n      createdAt\n      updatedAt\n      user {\n        id\n        identifier\n        verified\n        lastLogin\n        roles {\n          id\n          code\n          description\n          permissions\n          channels {\n            id\n            code\n            token\n          }\n        }\n      }\n    }\n  }\n': typeof types.GetAdministratorByIdDocument;
+  '\n  query GetAdministratorByUserId($userId: ID!) {\n    administratorByUserId(userId: $userId) {\n      id\n      firstName\n      lastName\n      emailAddress\n      createdAt\n      updatedAt\n      user {\n        id\n        identifier\n        verified\n        lastLogin\n        roles {\n          id\n          code\n          description\n          permissions\n          channels {\n            id\n            code\n            token\n          }\n        }\n      }\n    }\n  }\n': typeof types.GetAdministratorByUserIdDocument;
   '\n  mutation CreateChannelPaymentMethod($input: CreatePaymentMethodInput!) {\n    createChannelPaymentMethod(input: $input) {\n      id\n      code\n      name\n    }\n  }\n': typeof types.CreateChannelPaymentMethodDocument;
   '\n  mutation UpdateChannelPaymentMethod($input: UpdatePaymentMethodInput!) {\n    updateChannelPaymentMethod(input: $input) {\n      id\n      code\n      name\n      customFields {\n        imageAsset {\n          id\n          preview\n        }\n        isActive\n      }\n    }\n  }\n': typeof types.UpdateChannelPaymentMethodDocument;
   '\n  query GetAuditLogs($options: AuditLogOptions) {\n    auditLogs(options: $options) {\n      id\n      timestamp\n      channelId\n      eventType\n      entityType\n      entityId\n      userId\n      data\n      source\n    }\n  }\n': typeof types.GetAuditLogsDocument;
@@ -213,6 +215,8 @@ const documents: Documents = {
     types.CreateProductDocument,
   '\n  mutation CreateProductVariants($input: [CreateProductVariantInput!]!) {\n    createProductVariants(input: $input) {\n      id\n      name\n      sku\n      price\n      priceWithTax\n      stockOnHand\n      product {\n        id\n        name\n      }\n    }\n  }\n':
     types.CreateProductVariantsDocument,
+  '\n  mutation DeleteProductVariants($ids: [ID!]!) {\n    deleteProductVariants(ids: $ids) {\n      result\n      message\n    }\n  }\n':
+    types.DeleteProductVariantsDocument,
   '\n  mutation CreateAssets($input: [CreateAssetInput!]!) {\n    createAssets(input: $input) {\n      ... on Asset {\n        id\n        name\n        preview\n        source\n      }\n    }\n  }\n':
     types.CreateAssetsDocument,
   '\n  mutation AssignAssetsToProduct($productId: ID!, $assetIds: [ID!]!, $featuredAssetId: ID) {\n    updateProduct(\n      input: { id: $productId, assetIds: $assetIds, featuredAssetId: $featuredAssetId }\n    ) {\n      id\n      assets {\n        id\n        name\n        preview\n      }\n      featuredAsset {\n        id\n        preview\n      }\n    }\n  }\n':
@@ -387,6 +391,8 @@ const documents: Documents = {
     types.GetAdministratorsDocument,
   '\n  query GetAdministratorById($id: ID!) {\n    administrator(id: $id) {\n      id\n      firstName\n      lastName\n      emailAddress\n      createdAt\n      updatedAt\n      user {\n        id\n        identifier\n        verified\n        lastLogin\n        roles {\n          id\n          code\n          description\n          permissions\n          channels {\n            id\n            code\n            token\n          }\n        }\n      }\n    }\n  }\n':
     types.GetAdministratorByIdDocument,
+  '\n  query GetAdministratorByUserId($userId: ID!) {\n    administratorByUserId(userId: $userId) {\n      id\n      firstName\n      lastName\n      emailAddress\n      createdAt\n      updatedAt\n      user {\n        id\n        identifier\n        verified\n        lastLogin\n        roles {\n          id\n          code\n          description\n          permissions\n          channels {\n            id\n            code\n            token\n          }\n        }\n      }\n    }\n  }\n':
+    types.GetAdministratorByUserIdDocument,
   '\n  mutation CreateChannelPaymentMethod($input: CreatePaymentMethodInput!) {\n    createChannelPaymentMethod(input: $input) {\n      id\n      code\n      name\n    }\n  }\n':
     types.CreateChannelPaymentMethodDocument,
   '\n  mutation UpdateChannelPaymentMethod($input: UpdatePaymentMethodInput!) {\n    updateChannelPaymentMethod(input: $input) {\n      id\n      code\n      name\n      customFields {\n        imageAsset {\n          id\n          preview\n        }\n        isActive\n      }\n    }\n  }\n':
@@ -622,6 +628,12 @@ export function graphql(
 export function graphql(
   source: '\n  mutation CreateProductVariants($input: [CreateProductVariantInput!]!) {\n    createProductVariants(input: $input) {\n      id\n      name\n      sku\n      price\n      priceWithTax\n      stockOnHand\n      product {\n        id\n        name\n      }\n    }\n  }\n',
 ): (typeof documents)['\n  mutation CreateProductVariants($input: [CreateProductVariantInput!]!) {\n    createProductVariants(input: $input) {\n      id\n      name\n      sku\n      price\n      priceWithTax\n      stockOnHand\n      product {\n        id\n        name\n      }\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation DeleteProductVariants($ids: [ID!]!) {\n    deleteProductVariants(ids: $ids) {\n      result\n      message\n    }\n  }\n',
+): (typeof documents)['\n  mutation DeleteProductVariants($ids: [ID!]!) {\n    deleteProductVariants(ids: $ids) {\n      result\n      message\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -1144,6 +1156,12 @@ export function graphql(
 export function graphql(
   source: '\n  query GetAdministratorById($id: ID!) {\n    administrator(id: $id) {\n      id\n      firstName\n      lastName\n      emailAddress\n      createdAt\n      updatedAt\n      user {\n        id\n        identifier\n        verified\n        lastLogin\n        roles {\n          id\n          code\n          description\n          permissions\n          channels {\n            id\n            code\n            token\n          }\n        }\n      }\n    }\n  }\n',
 ): (typeof documents)['\n  query GetAdministratorById($id: ID!) {\n    administrator(id: $id) {\n      id\n      firstName\n      lastName\n      emailAddress\n      createdAt\n      updatedAt\n      user {\n        id\n        identifier\n        verified\n        lastLogin\n        roles {\n          id\n          code\n          description\n          permissions\n          channels {\n            id\n            code\n            token\n          }\n        }\n      }\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  query GetAdministratorByUserId($userId: ID!) {\n    administratorByUserId(userId: $userId) {\n      id\n      firstName\n      lastName\n      emailAddress\n      createdAt\n      updatedAt\n      user {\n        id\n        identifier\n        verified\n        lastLogin\n        roles {\n          id\n          code\n          description\n          permissions\n          channels {\n            id\n            code\n            token\n          }\n        }\n      }\n    }\n  }\n',
+): (typeof documents)['\n  query GetAdministratorByUserId($userId: ID!) {\n    administratorByUserId(userId: $userId) {\n      id\n      firstName\n      lastName\n      emailAddress\n      createdAt\n      updatedAt\n      user {\n        id\n        identifier\n        verified\n        lastLogin\n        roles {\n          id\n          code\n          description\n          permissions\n          channels {\n            id\n            code\n            token\n          }\n        }\n      }\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

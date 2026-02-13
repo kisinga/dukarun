@@ -3,8 +3,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  ElementRef,
   effect,
+  ElementRef,
   inject,
   input,
   OnInit,
@@ -55,7 +55,7 @@ export class UserDetailsModalComponent implements OnInit {
     effect(() => {
       const id = this.userId();
       if (id) {
-        this.usersService.fetchAdministratorById(id);
+        this.usersService.fetchAdministratorByUserId(id);
       } else {
         this.usersService.clearCurrentUser();
       }
@@ -77,7 +77,7 @@ export class UserDetailsModalComponent implements OnInit {
   ngOnInit(): void {
     const id = this.userId();
     if (id) {
-      this.usersService.fetchAdministratorById(id);
+      this.usersService.fetchAdministratorByUserId(id);
     }
   }
 
@@ -87,6 +87,7 @@ export class UserDetailsModalComponent implements OnInit {
 
   close(): void {
     this.modalRef()?.nativeElement?.close();
+    this.usersService.clearError();
     this.closed.emit();
   }
 
