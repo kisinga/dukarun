@@ -23,7 +23,6 @@ describe('Session gate (requireOpenSession)', () => {
   function createService(requireOpenSessionImpl: () => Promise<any>) {
     mockOrderService = {
       findOne: jest.fn(),
-      addManualPaymentToOrder: jest.fn(),
     };
     mockFinancialService = {
       recordPaymentAllocation: jest.fn().mockImplementation(() => Promise.resolve()),
@@ -44,10 +43,23 @@ describe('Session gate (requireOpenSession)', () => {
     mockCashierSessionService = {
       requireOpenSession: jest.fn().mockImplementation(requireOpenSessionImpl),
     } as any;
+    const payment = {
+      id: 'pay-1',
+      method: 'credit',
+      amount: 5000,
+      state: 'Authorized',
+      metadata: { allocatedAmount: 5000 },
+      createdAt: new Date(),
+    };
     return new PaymentAllocationService(
       mockConnection,
       mockOrderService,
-      { settlePayment: jest.fn().mockImplementation(() => Promise.resolve()) } as any,
+      {
+        createPayment: jest.fn().mockImplementation(() => Promise.resolve(payment)),
+        settlePayment: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve({ ...payment, state: 'Settled' })),
+      } as any,
       mockFinancialService,
       {} as any,
       mockChartOfAccountsService,
@@ -99,18 +111,7 @@ describe('Session gate (requireOpenSession)', () => {
         payments: [],
         customer: { id: 'cust-1' },
       };
-      const payment = {
-        id: 'pay-1',
-        method: 'credit',
-        amount: 5000,
-        state: 'Authorized',
-        metadata: { allocatedAmount: 5000 },
-        createdAt: new Date(),
-      };
-      mockOrderService.findOne
-        .mockResolvedValueOnce(order)
-        .mockResolvedValueOnce({ ...order, payments: [payment] });
-      mockOrderService.addManualPaymentToOrder.mockResolvedValue({ id: order.id });
+      mockOrderService.findOne.mockResolvedValue(order);
 
       const ctx = { channelId: 1, activeUserId: '1' } as RequestContext;
       const result = await paymentAllocationService.paySingleOrder(ctx, 'order-1', 5000);

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { In } from 'typeorm';
 import { RequestContext, TransactionalConnection } from '@vendure/core';
 import { Reconciliation, ReconciliationScope } from '../../domain/recon/reconciliation.entity';
 import { ReconciliationAccount } from '../../domain/recon/reconciliation-account.entity';
@@ -147,6 +148,48 @@ export class ReconciliationService {
       periodEndDate,
       scopes,
     };
+  }
+
+  /**
+   * Get ledger balance (in cents) for each of the given account codes as of a date.
+   * Used by shift modal prefill (clearing accounts).
+   */
+  async getAccountBalancesForCodes(
+    ctx: RequestContext,
+    channelId: number,
+    accountCodes: string[],
+    asOfDate?: string
+  ): Promise<Array<{ accountCode: string; accountName: string; balanceCents: string }>> {
+    if (accountCodes.length === 0) return [];
+
+    const accountRepo = this.connection.getRepository(ctx, Account);
+    const accounts = await accountRepo.find({
+      where: { channelId, code: In(accountCodes), isActive: true },
+    });
+
+    const result: Array<{ accountCode: string; accountName: string; balanceCents: string }> = [];
+    for (const account of accounts) {
+      try {
+        const balance = await this.accountBalanceService.getAccountBalance(
+          ctx,
+          account.code,
+          channelId,
+          asOfDate
+        );
+        result.push({
+          accountCode: account.code,
+          accountName: account.name,
+          balanceCents: String(balance.balance),
+        });
+      } catch {
+        result.push({
+          accountCode: account.code,
+          accountName: account.name,
+          balanceCents: '0',
+        });
+      }
+    }
+    return result;
   }
 
   /**

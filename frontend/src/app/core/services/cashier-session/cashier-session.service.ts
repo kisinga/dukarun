@@ -8,6 +8,7 @@ import {
   GET_CASHIER_SESSION,
   GET_CASHIER_SESSIONS,
   GET_CHANNEL_RECONCILIATION_CONFIG,
+  GET_SHIFT_MODAL_PREFILL_DATA,
   GET_RECONCILIATIONS,
   GET_RECONCILIATION_DETAILS,
   GET_LAST_CLOSED_SESSION_CLOSING_BALANCES,
@@ -130,6 +131,11 @@ export interface LastClosingBalance {
   accountCode: string;
   accountName: string;
   balanceCents: string;
+}
+
+export interface ShiftModalPrefillData {
+  config: PaymentMethodReconciliationConfig[];
+  balances: LastClosingBalance[];
 }
 
 export interface ExpectedClosingBalance {
@@ -289,6 +295,24 @@ export class CashierSessionService {
     ).pipe(
       map((result) => result.data?.channelReconciliationConfig ?? []),
       catchError(() => of([])),
+    );
+  }
+
+  /**
+   * Get shift modal prefill data: config + ledger balances for clearing accounts.
+   * Single API call for both opening and closing modals.
+   */
+  getShiftModalPrefillData(channelId: number) {
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{ shiftModalPrefillData: ShiftModalPrefillData }>({
+        query: GET_SHIFT_MODAL_PREFILL_DATA as any,
+        variables: { channelId },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => result.data?.shiftModalPrefillData ?? { config: [], balances: [] }),
+      catchError(() => of({ config: [], balances: [] })),
     );
   }
 

@@ -5,8 +5,10 @@ import {
   UserInputError,
   Order,
   OrderService,
+  Payment,
   PaymentService,
   ID,
+  isGraphQlErrorResult,
 } from '@vendure/core';
 import { In } from 'typeorm';
 import { AuditService } from '../../infrastructure/audit/audit.service';
@@ -156,48 +158,28 @@ export class PaymentAllocationService {
           const amountToAllocate = allocation.amountToAllocate;
           paymentAllocationsByOrderId.set(allocation.itemId, amountToAllocate);
 
-          // Add payment to order using OrderService.addManualPaymentToOrder
-          const paymentResult = await this.orderService.addManualPaymentToOrder(transactionCtx, {
-            orderId: order.id,
-            method: PAYMENT_METHOD_CODES.CREDIT,
-            metadata: {
+          const payment = await this.addAllocatedPaymentToOrder(
+            transactionCtx,
+            order,
+            amountToAllocate,
+            PAYMENT_METHOD_CODES.CREDIT,
+            {
               paymentType: 'credit',
               customerId: input.customerId,
               allocatedAmount: amountToAllocate,
-            },
-          });
-
-          if (paymentResult && 'errorCode' in paymentResult) {
-            throw new UserInputError(
-              `Failed to add payment: ${paymentResult.message || paymentResult.errorCode}`
-            );
-          }
-
-          // Get the payment from the order to settle it
-          const updatedOrder = await this.orderService.findOne(transactionCtx, order.id);
-          if (updatedOrder && updatedOrder.payments) {
-            const payment = updatedOrder.payments.find(
-              p =>
-                p.metadata?.paymentType === 'credit' &&
-                p.metadata?.allocatedAmount === amountToAllocate &&
-                p.state !== 'Settled'
-            );
-            if (payment) {
-              await this.paymentService.settlePayment(transactionCtx, payment.id);
-              // Post to ledger via FinancialService (single source of truth)
-              await this.financialService.recordPaymentAllocation(
-                transactionCtx,
-                payment.id.toString(),
-                updatedOrder,
-                PAYMENT_METHOD_CODES.CREDIT,
-                amountToAllocate,
-                input.debitAccountCode?.trim(),
-                session.id
-              );
             }
-          }
+          );
 
-          // Update order custom fields for user tracking
+          await this.financialService.recordPaymentAllocation(
+            transactionCtx,
+            payment.id.toString(),
+            order,
+            PAYMENT_METHOD_CODES.CREDIT,
+            amountToAllocate,
+            input.debitAccountCode?.trim(),
+            session.id
+          );
+
           await this.updateOrderCustomFields(transactionCtx, order.id, {
             lastModifiedByUserId: transactionCtx.activeUserId || undefined,
           });
@@ -364,114 +346,21 @@ export class PaymentAllocationService {
       metadata.referenceNumber = referenceNumber;
     }
 
-    // Use the existing bulk payment method with single order, but we need to pass payment method
-    // Since allocatePaymentToOrders doesn't accept payment method, we'll handle it directly here
     return this.connection.withTransaction(ctx, async transactionCtx => {
       const paymentAmountInCents = actualPaymentAmount;
 
-      // Add payment to order using OrderService.addManualPaymentToOrder
-      const paymentResult = await this.orderService.addManualPaymentToOrder(transactionCtx, {
-        orderId: order.id,
-        method: actualPaymentMethodCode,
-        metadata,
-      });
-
-      if (paymentResult && 'errorCode' in paymentResult) {
-        throw new UserInputError(
-          `Failed to add payment: ${paymentResult.message || paymentResult.errorCode}`
-        );
-      }
-
-      // Use the order from the result if available, otherwise fetch it
-      // The result should contain the order with payments
-      let updatedOrder = paymentResult && 'id' in paymentResult ? paymentResult : null;
-
-      // Always fetch fresh order with payments to ensure we have the latest state
-      // The paymentResult might not have payments loaded
-      updatedOrder =
-        (await this.orderService.findOne(transactionCtx, order.id, ['payments'])) || null;
-
-      if (!updatedOrder) {
-        this.logger.error(`Order ${order.code} (${order.id}) not found after adding payment`);
-        throw new UserInputError('Failed to retrieve order after payment creation');
-      }
-
-      if (!updatedOrder.payments) {
-        this.logger.error(
-          `Order ${order.code} (${order.id}) has no payments array after adding payment`
-        );
-        throw new UserInputError('Failed to retrieve payments after creation');
-      }
-
-      if (updatedOrder.payments.length === 0) {
-        this.logger.error(
-          `Order ${order.code} (${order.id}) has empty payments array after adding payment`
-        );
-        throw new UserInputError('No payments found after creation');
-      }
-
-      // Find the payment that was just added
-      // Cash payments are created as "Settled" immediately, so we need to handle both settled and unsettled payments
-      // Try multiple strategies to find the payment:
-      // 1. Match by method, amount, and metadata (most specific) - allow settled for cash
-      // 2. Match by method and amount (fallback) - allow settled for cash
-      // 3. Match by method and most recent (last resort) - allow settled for cash
-      let payment = updatedOrder.payments.find(
-        p =>
-          p.method === actualPaymentMethodCode &&
-          p.amount === paymentAmountInCents &&
-          p.metadata?.allocatedAmount === paymentAmountInCents
+      const payment = await this.addAllocatedPaymentToOrder(
+        transactionCtx,
+        order,
+        paymentAmountInCents,
+        actualPaymentMethodCode,
+        metadata
       );
 
-      if (!payment) {
-        // Fallback: match by method and amount (allow settled for cash payments)
-        payment = updatedOrder.payments.find(
-          p => p.method === actualPaymentMethodCode && p.amount === paymentAmountInCents
-        );
-      }
-
-      if (!payment) {
-        // Last resort: find most recent payment with matching method
-        // Sort by createdAt descending and take the first match
-        const matchingPayments = updatedOrder.payments
-          .filter(p => p.method === actualPaymentMethodCode)
-          .sort((a, b) => {
-            const aTime = a.createdAt?.getTime() || 0;
-            const bTime = b.createdAt?.getTime() || 0;
-            return bTime - aTime; // Most recent first
-          });
-        payment = matchingPayments[0];
-      }
-
-      if (!payment) {
-        this.logger.error(
-          `Payment not found after creation. Order: ${order.code}, Method: ${actualPaymentMethodCode}, Amount: ${paymentAmountInCents}`
-        );
-        this.logger.error(
-          `Available payments: ${JSON.stringify(
-            updatedOrder.payments.map(p => ({
-              id: p.id,
-              method: p.method,
-              amount: p.amount,
-              state: p.state,
-              metadata: p.metadata,
-            }))
-          )}`
-        );
-        throw new UserInputError('Payment not found after creation');
-      }
-
-      // Settle the payment only if it's not already settled
-      // Cash payments are already settled when created
-      if (payment.state !== 'Settled') {
-        await this.paymentService.settlePayment(transactionCtx, payment.id);
-      }
-
-      // Post to ledger via FinancialService
       await this.financialService.recordPaymentAllocation(
         transactionCtx,
         payment.id.toString(),
-        updatedOrder,
+        order,
         actualPaymentMethodCode,
         paymentAmountInCents,
         debitAccountCode?.trim(),
@@ -547,6 +436,38 @@ export class PaymentAllocationService {
         excessPayment: 0,
       };
     });
+  }
+
+  /**
+   * Create a payment with the allocated amount (via handler) and settle it if needed.
+   * Uses PaymentService.createPayment so the handler runs and Payment.amount is correct (e.g. partial).
+   */
+  private async addAllocatedPaymentToOrder(
+    ctx: RequestContext,
+    order: Order,
+    amount: number,
+    method: string,
+    metadata: Record<string, unknown>
+  ): Promise<Payment> {
+    const result = await this.paymentService.createPayment(ctx, order, amount, method, metadata);
+    if (isGraphQlErrorResult(result)) {
+      throw new UserInputError(
+        result.message || (result as { errorCode?: string }).errorCode || 'Failed to add payment'
+      );
+    }
+    let payment = result as Payment;
+    if (payment.state !== 'Settled') {
+      const settleResult = await this.paymentService.settlePayment(ctx, payment.id);
+      if (isGraphQlErrorResult(settleResult)) {
+        throw new UserInputError(
+          settleResult.message ||
+            (settleResult as { errorCode?: string }).errorCode ||
+            'Failed to settle payment'
+        );
+      }
+      payment = settleResult as Payment;
+    }
+    return payment;
   }
 
   /**

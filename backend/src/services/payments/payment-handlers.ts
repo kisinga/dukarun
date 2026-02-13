@@ -13,7 +13,7 @@ import { CreditService } from '../credit/credit.service';
  * - If metadata.allocatedAmount is present and valid (number, > 0, <= order.total), use it (enables partial payments).
  * - Otherwise use order.total.
  * - We do NOT use the amount parameter passed by Vendure to createPayment; callers must set metadata.allocatedAmount when they want a specific amount.
- * - Validation of allocatedAmount vs outstanding is done by the caller (e.g. paySingleOrder, allocation loop) before calling addManualPaymentToOrder.
+ * - Validation of allocatedAmount vs outstanding is done by the caller (allocation flow) before calling createPayment.
  */
 
 /**

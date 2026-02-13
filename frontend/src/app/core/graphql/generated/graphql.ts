@@ -2397,6 +2397,13 @@ export type ErrorResult = {
   message: Scalars['String']['output'];
 };
 
+export type ExpectedClosingBalance = {
+  __typename?: 'ExpectedClosingBalance';
+  accountCode: Scalars['String']['output'];
+  accountName: Scalars['String']['output'];
+  expectedBalanceCents: Scalars['String']['output'];
+};
+
 export type Facet = Node & {
   __typename?: 'Facet';
   code: Scalars['String']['output'];
@@ -3395,6 +3402,13 @@ export type LanguageNotAvailableError = ErrorResult & {
   errorCode: ErrorCode;
   languageCode: Scalars['String']['output'];
   message: Scalars['String']['output'];
+};
+
+export type LastClosingBalance = {
+  __typename?: 'LastClosingBalance';
+  accountCode: Scalars['String']['output'];
+  accountName: Scalars['String']['output'];
+  balanceCents: Scalars['String']['output'];
 };
 
 export type LedgerAccount = {
@@ -6541,6 +6555,7 @@ export type Query = {
   eligibleShippingMethodsForDraftOrder: Array<ShippingMethodQuote>;
   /** Returns all configured EntityDuplicators. */
   entityDuplicators: Array<EntityDuplicatorDefinition>;
+  expectedSessionClosingBalances: Array<ExpectedClosingBalance>;
   facet?: Maybe<Facet>;
   facetValue?: Maybe<FacetValue>;
   facetValues: FacetValueList;
@@ -6568,6 +6583,7 @@ export type Query = {
   jobsById: Array<Job>;
   journalEntries: JournalEntriesResult;
   journalEntry?: Maybe<JournalEntry>;
+  lastClosedSessionClosingBalances: Array<LastClosingBalance>;
   ledgerAccounts: LedgerAccountsResult;
   me?: Maybe<CurrentUser>;
   /** Get metrics for the given interval and metric types. */
@@ -6621,6 +6637,7 @@ export type Query = {
   sessionMpesaVerifications: Array<MpesaVerification>;
   sessionReconciliationDetails: Array<ReconciliationAccountDetail>;
   sessionReconciliationRequirements: SessionReconciliationRequirements;
+  shiftModalPrefillData: ShiftModalPrefillData;
   shippingCalculators: Array<ConfigurableOperationDefinition>;
   shippingEligibilityCheckers: Array<ConfigurableOperationDefinition>;
   shippingMethod?: Maybe<ShippingMethod>;
@@ -6776,6 +6793,10 @@ export type QueryEligibleShippingMethodsForDraftOrderArgs = {
   orderId: Scalars['ID']['input'];
 };
 
+export type QueryExpectedSessionClosingBalancesArgs = {
+  sessionId: Scalars['ID']['input'];
+};
+
 export type QueryFacetArgs = {
   id: Scalars['ID']['input'];
 };
@@ -6848,6 +6869,10 @@ export type QueryJournalEntriesArgs = {
 
 export type QueryJournalEntryArgs = {
   id: Scalars['ID']['input'];
+};
+
+export type QueryLastClosedSessionClosingBalancesArgs = {
+  channelId: Scalars['Int']['input'];
 };
 
 export type QueryMetricSummaryArgs = {
@@ -6995,6 +7020,10 @@ export type QuerySessionReconciliationDetailsArgs = {
 
 export type QuerySessionReconciliationRequirementsArgs = {
   sessionId: Scalars['ID']['input'];
+};
+
+export type QueryShiftModalPrefillDataArgs = {
+  channelId: Scalars['Int']['input'];
 };
 
 export type QueryShippingMethodArgs = {
@@ -7663,6 +7692,12 @@ export type SettleRefundInput = {
 };
 
 export type SettleRefundResult = Refund | RefundStateTransitionError;
+
+export type ShiftModalPrefillData = {
+  __typename?: 'ShiftModalPrefillData';
+  balances: Array<LastClosingBalance>;
+  config: Array<PaymentMethodReconciliationConfig>;
+};
 
 export type ShippingLine = {
   __typename?: 'ShippingLine';
@@ -10360,7 +10395,7 @@ export type GetOrderFullQuery = {
         __typename?: 'ProductVariant';
         id: string;
         name: string;
-        product?: { __typename?: 'Product'; id: string; name: string } | null;
+        product: { __typename?: 'Product'; id: string; name: string };
       };
     }>;
     payments?: Array<{
@@ -10901,6 +10936,63 @@ export type GetSupplierCreditSummaryQueryVariables = Exact<{
 export type GetSupplierCreditSummaryQuery = {
   __typename?: 'Query';
   supplierCreditSummary: {
+    __typename?: 'SupplierCreditSummary';
+    supplierId: string;
+    isSupplierCreditApproved: boolean;
+    supplierCreditLimit: number;
+    outstandingAmount: number;
+    availableCredit: number;
+    lastRepaymentDate?: any | null;
+    lastRepaymentAmount: number;
+    supplierCreditDuration: number;
+  };
+};
+
+export type ApproveSupplierCreditMutationVariables = Exact<{
+  input: ApproveSupplierCreditInput;
+}>;
+
+export type ApproveSupplierCreditMutation = {
+  __typename?: 'Mutation';
+  approveSupplierCredit: {
+    __typename?: 'SupplierCreditSummary';
+    supplierId: string;
+    isSupplierCreditApproved: boolean;
+    supplierCreditLimit: number;
+    outstandingAmount: number;
+    availableCredit: number;
+    lastRepaymentDate?: any | null;
+    lastRepaymentAmount: number;
+    supplierCreditDuration: number;
+  };
+};
+
+export type UpdateSupplierCreditLimitMutationVariables = Exact<{
+  input: UpdateSupplierCreditLimitInput;
+}>;
+
+export type UpdateSupplierCreditLimitMutation = {
+  __typename?: 'Mutation';
+  updateSupplierCreditLimit: {
+    __typename?: 'SupplierCreditSummary';
+    supplierId: string;
+    isSupplierCreditApproved: boolean;
+    supplierCreditLimit: number;
+    outstandingAmount: number;
+    availableCredit: number;
+    lastRepaymentDate?: any | null;
+    lastRepaymentAmount: number;
+    supplierCreditDuration: number;
+  };
+};
+
+export type UpdateSupplierCreditDurationMutationVariables = Exact<{
+  input: UpdateSupplierCreditDurationInput;
+}>;
+
+export type UpdateSupplierCreditDurationMutation = {
+  __typename?: 'Mutation';
+  updateSupplierCreditDuration: {
     __typename?: 'SupplierCreditSummary';
     supplierId: string;
     isSupplierCreditApproved: boolean;
@@ -11604,7 +11696,7 @@ export type GetPurchasesQuery = {
           __typename?: 'ProductVariant';
           id: string;
           name: string;
-          product?: { __typename?: 'Product'; id: string; name: string } | null;
+          product: { __typename?: 'Product'; id: string; name: string };
         } | null;
         stockLocation?: { __typename?: 'StockLocation'; id: string; name: string } | null;
       }>;
@@ -11814,6 +11906,32 @@ export type GetChannelReconciliationConfigQuery = {
     isCashierControlled: boolean;
     requiresReconciliation: boolean;
   }>;
+};
+
+export type GetShiftModalPrefillDataQueryVariables = Exact<{
+  channelId: Scalars['Int']['input'];
+}>;
+
+export type GetShiftModalPrefillDataQuery = {
+  __typename?: 'Query';
+  shiftModalPrefillData: {
+    __typename?: 'ShiftModalPrefillData';
+    config: Array<{
+      __typename?: 'PaymentMethodReconciliationConfig';
+      paymentMethodId: string;
+      paymentMethodCode: string;
+      reconciliationType: string;
+      ledgerAccountCode: string;
+      isCashierControlled: boolean;
+      requiresReconciliation: boolean;
+    }>;
+    balances: Array<{
+      __typename?: 'LastClosingBalance';
+      accountCode: string;
+      accountName: string;
+      balanceCents: string;
+    }>;
+  };
 };
 
 export type GetCurrentCashierSessionQueryVariables = Exact<{
@@ -12046,6 +12164,34 @@ export type GetAccountBalancesAsOfQuery = {
     accountCode: string;
     accountName: string;
     balanceCents: string;
+  }>;
+};
+
+export type GetLastClosedSessionClosingBalancesQueryVariables = Exact<{
+  channelId: Scalars['Int']['input'];
+}>;
+
+export type GetLastClosedSessionClosingBalancesQuery = {
+  __typename?: 'Query';
+  lastClosedSessionClosingBalances: Array<{
+    __typename?: 'LastClosingBalance';
+    accountCode: string;
+    accountName: string;
+    balanceCents: string;
+  }>;
+};
+
+export type GetExpectedSessionClosingBalancesQueryVariables = Exact<{
+  sessionId: Scalars['ID']['input'];
+}>;
+
+export type GetExpectedSessionClosingBalancesQuery = {
+  __typename?: 'Query';
+  expectedSessionClosingBalances: Array<{
+    __typename?: 'ExpectedClosingBalance';
+    accountCode: string;
+    accountName: string;
+    expectedBalanceCents: string;
   }>;
 };
 
@@ -18986,6 +19132,168 @@ export const GetSupplierCreditSummaryDocument = {
     },
   ],
 } as unknown as DocumentNode<GetSupplierCreditSummaryQuery, GetSupplierCreditSummaryQueryVariables>;
+export const ApproveSupplierCreditDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'ApproveSupplierCredit' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: { kind: 'Name', value: 'ApproveSupplierCreditInput' },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'approveSupplierCredit' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'isSupplierCreditApproved' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierCreditLimit' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'outstandingAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'availableCredit' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastRepaymentDate' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastRepaymentAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierCreditDuration' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<ApproveSupplierCreditMutation, ApproveSupplierCreditMutationVariables>;
+export const UpdateSupplierCreditLimitDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateSupplierCreditLimit' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: { kind: 'Name', value: 'UpdateSupplierCreditLimitInput' },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateSupplierCreditLimit' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'isSupplierCreditApproved' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierCreditLimit' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'outstandingAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'availableCredit' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastRepaymentDate' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastRepaymentAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierCreditDuration' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  UpdateSupplierCreditLimitMutation,
+  UpdateSupplierCreditLimitMutationVariables
+>;
+export const UpdateSupplierCreditDurationDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateSupplierCreditDuration' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: { kind: 'Name', value: 'UpdateSupplierCreditDurationInput' },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateSupplierCreditDuration' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'isSupplierCreditApproved' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierCreditLimit' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'outstandingAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'availableCredit' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastRepaymentDate' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastRepaymentAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierCreditDuration' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  UpdateSupplierCreditDurationMutation,
+  UpdateSupplierCreditDurationMutationVariables
+>;
 export const AllocateBulkSupplierPaymentDocument = {
   kind: 'Document',
   definitions: [
@@ -21534,6 +21842,74 @@ export const GetChannelReconciliationConfigDocument = {
   GetChannelReconciliationConfigQuery,
   GetChannelReconciliationConfigQueryVariables
 >;
+export const GetShiftModalPrefillDataDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetShiftModalPrefillData' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'shiftModalPrefillData' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'channelId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'config' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'paymentMethodId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'paymentMethodCode' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'reconciliationType' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'ledgerAccountCode' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isCashierControlled' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'requiresReconciliation' } },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'balances' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'accountCode' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'accountName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'balanceCents' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetShiftModalPrefillDataQuery, GetShiftModalPrefillDataQueryVariables>;
 export const GetCurrentCashierSessionDocument = {
   kind: 'Document',
   definitions: [
@@ -22175,6 +22551,100 @@ export const GetAccountBalancesAsOfDocument = {
     },
   ],
 } as unknown as DocumentNode<GetAccountBalancesAsOfQuery, GetAccountBalancesAsOfQueryVariables>;
+export const GetLastClosedSessionClosingBalancesDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetLastClosedSessionClosingBalances' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'lastClosedSessionClosingBalances' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'channelId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'accountCode' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'accountName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'balanceCents' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  GetLastClosedSessionClosingBalancesQuery,
+  GetLastClosedSessionClosingBalancesQueryVariables
+>;
+export const GetExpectedSessionClosingBalancesDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetExpectedSessionClosingBalances' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'sessionId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'expectedSessionClosingBalances' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'sessionId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'sessionId' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'accountCode' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'accountName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'expectedBalanceCents' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  GetExpectedSessionClosingBalancesQuery,
+  GetExpectedSessionClosingBalancesQueryVariables
+>;
 export const GetSessionCashCountsDocument = {
   kind: 'Document',
   definitions: [

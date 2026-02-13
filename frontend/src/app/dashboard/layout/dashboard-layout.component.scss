@@ -56,9 +56,9 @@
   background-color: var(--color-base-100, #fafafa);
 }
 
-// Navbar — solid white/base, no blur needed
+// Navbar — solid base (same as sidebar; --color-base-100 is set by theme)
 .navbar {
-  background: oklch(var(--b1));
+  background-color: var(--color-base-100, #fafafa);
 }
 
 // Ripple on link activation (sidebar + bottom nav)

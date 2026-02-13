@@ -479,6 +479,36 @@ export class PeriodManagementResolver {
 
   @Query()
   @Allow(Permission.ReadOrder)
+  async shiftModalPrefillData(
+    @Ctx() ctx: RequestContext,
+    @Args('channelId') channelId: number
+  ): Promise<{
+    config: PaymentMethodReconciliationConfig[];
+    balances: Array<{ accountCode: string; accountName: string; balanceCents: string }>;
+  }> {
+    const config = await this.reconciliationValidatorService.getChannelReconciliationConfig(
+      ctx,
+      channelId
+    );
+    const cashierControlled = config.filter(c => c.isCashierControlled);
+    const accountCodes = [...new Set(cashierControlled.map(c => c.ledgerAccountCode))];
+    const today = new Date().toISOString().slice(0, 10);
+
+    const balances = await this.reconciliationService.getAccountBalancesForCodes(
+      ctx,
+      channelId,
+      accountCodes,
+      today
+    );
+
+    return {
+      config,
+      balances,
+    };
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
   async reconciliations(
     @Ctx() ctx: RequestContext,
     @Args('channelId') channelId: number,

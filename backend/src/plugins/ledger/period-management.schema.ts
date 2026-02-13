@@ -239,6 +239,11 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     expectedBalanceCents: String!
   }
 
+  type ShiftModalPrefillData {
+    config: [PaymentMethodReconciliationConfig!]!
+    balances: [LastClosingBalance!]!
+  }
+
   input AccountDeclaredAmountInput {
     accountId: ID!
     amountCents: String!
@@ -296,6 +301,7 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     # Reconciliation Config Queries (driven by PaymentMethod custom fields)
     sessionReconciliationRequirements(sessionId: ID!): SessionReconciliationRequirements!
     channelReconciliationConfig(channelId: Int!): [PaymentMethodReconciliationConfig!]!
+    shiftModalPrefillData(channelId: Int!): ShiftModalPrefillData!
     reconciliations(channelId: Int!, options: ReconciliationListOptions): ReconciliationList!
     reconciliationDetails(reconciliationId: ID!): [ReconciliationAccountDetail!]!
     sessionReconciliationDetails(sessionId: ID!, kind: String): [ReconciliationAccountDetail!]!

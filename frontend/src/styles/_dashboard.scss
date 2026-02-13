@@ -65,7 +65,7 @@ app-dashboard-layout .drawer-side > .sidebar-aside {
 }
 
 app-dashboard-layout .navbar {
-  background: oklch(var(--b1));
+  background-color: var(--color-base-100, #fafafa);
 }
 
 app-dashboard-layout .nav-link-ripple {

@@ -1,5 +1,21 @@
 # Payment allocation flow – validation and polish
 
+## Implementation status
+
+- **Partial payment fix (customer orders):** Implemented. `PaymentAllocationService` now uses a private helper `addAllocatedPaymentToOrder` that calls `PaymentService.createPayment` (so the handler runs and `Payment.amount` equals the allocated amount), then settles if needed. Both `allocatePaymentToOrders` and `paySingleOrder` use this helper. Specs updated (debit-account-and-payments, session-gate, cashier-ledger-flows) to mock `createPayment`/`settlePayment`; all 23 tests pass.
+
+## Current system (post-fix)
+
+**Customer orders (sales):**
+
+- **allocatePaymentToOrders:** Uses private helper `addAllocatedPaymentToOrder`, which calls `PaymentService.createPayment(ctx, order, amount, method, metadata)` so the payment handler runs and the created `Payment` has `amount` equal to the allocated amount. Then settles if not already Settled, then `financialService.recordPaymentAllocation(..., amountToAllocate, ...)` and `creditService.recordRepayment(ctx, customerId, 'customer', totalAllocated)`.
+- **paySingleOrder:** Same helper: `addAllocatedPaymentToOrder` then `recordPaymentAllocation`. No more find-payment-by-metadata or fallbacks.
+
+**Important (post-fix):** The handler (cash/credit/mpesa) is invoked via `createPayment` and uses `metadata?.allocatedAmount` when valid, so partial payments create a Payment with the correct amount and the order stays in ArrangingPayment until fully paid.
+**Supplier purchases:** Unchanged: `allocatePaymentToPurchases` writes `PurchasePayment` rows and updates `paymentStatus`; `paySinglePurchase` delegates to it with `purchaseIds: [id]`. No Vendure Payment involved; partial payments work.
+
+---
+
 ## Flow validation summary
 
 ### What works
@@ -11,11 +27,7 @@
 
 ### What’s wrong or inconsistent
 
-1. **Partial payment bug (customer orders)**  
-   Both `allocatePaymentToOrders` and `paySingleOrder` use `OrderService.addManualPaymentToOrder`. That path calls `PaymentService.createManualPayment`, which **does not run the payment handler** and sets `Payment.amount` to the full outstanding (Vendure computes it as `order.totalWithTax - totalCoveredByPayments(order)`). So:
-   - The **ledger** is correct (we pass `amountToAllocate` to `recordPaymentAllocation`).
-   - The **order** is wrong: the created Payment has full amount, so `orderTotalIsCovered(order, 'Settled')` becomes true and the order moves to PaymentSettled even when the user only paid a partial amount.  
-   **Fix:** Use the handler so the Payment gets the allocated amount. Create payments via `PaymentService.createPayment` (so the handler runs and respects `metadata.allocatedAmount`), then settle if needed. That implies reintroducing an `addAllocatedPaymentToOrder`-style helper used by both allocation and (until removed) paySingleOrder.
+1. ~~**Partial payment bug (customer orders)**~~ **Fixed.** Both paths now use `addAllocatedPaymentToOrder` → `createPayment` (handler runs) → settle → `recordPaymentAllocation`. Payment amount equals allocated amount; order stays in ArrangingPayment until fully paid.
 
 2. **Reference number never persisted in bulk flow**  
    `CustomerPaymentService.recordBulkPayment` accepts `referenceNumber` but never adds it to the `input` sent to `allocateBulkPayment`. The schema `PaymentAllocationInput` also has no `referenceNumber`. So the bulk-payment modal’s reference is never stored.  
@@ -41,7 +53,7 @@
 
 ## Recommended order of work
 
-1. **Fix partial payment (customer orders):** Use `createPayment` + settle (e.g. `addAllocatedPaymentToOrder`) in both `allocatePaymentToOrders` and `paySingleOrder` so Payment amount equals allocated amount. No schema or frontend change required for this fix.
+1. **Fix partial payment (customer orders):** Done. Both paths use `addAllocatedPaymentToOrder` (createPayment + settle) so Payment amount equals allocated amount.
 2. **Persist reference (and optional debit) in bulk:** Add `referenceNumber` (and `debitAccountCode` if not already in input) to `PaymentAllocationInput`, pass from `recordBulkPayment`, and store reference in payment metadata in the allocation loop.
 3. **Unify on one allocation hook (optional):** Extend input with `paymentMethodCode?`/`referenceNumber?`, use in allocation only, remove `paySingleOrder`/`paySinglePurchase`, and have all UIs call the single allocation mutation with the appropriate id list.
 

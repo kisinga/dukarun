@@ -2751,6 +2751,26 @@ export const GET_CHANNEL_RECONCILIATION_CONFIG = graphql(`
   }
 `);
 
+export const GET_SHIFT_MODAL_PREFILL_DATA = graphql(`
+  query GetShiftModalPrefillData($channelId: Int!) {
+    shiftModalPrefillData(channelId: $channelId) {
+      config {
+        paymentMethodId
+        paymentMethodCode
+        reconciliationType
+        ledgerAccountCode
+        isCashierControlled
+        requiresReconciliation
+      }
+      balances {
+        accountCode
+        accountName
+        balanceCents
+      }
+    }
+  }
+`);
+
 export const GET_CURRENT_CASHIER_SESSION = graphql(`
   query GetCurrentCashierSession($channelId: Int!) {
     currentCashierSession(channelId: $channelId) {
