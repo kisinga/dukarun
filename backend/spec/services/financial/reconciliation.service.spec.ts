@@ -9,6 +9,7 @@ import { RequestContext, TransactionalConnection } from '@vendure/core';
 import { ReconciliationService } from '../../../src/services/financial/reconciliation.service';
 import { Reconciliation } from '../../../src/domain/recon/reconciliation.entity';
 import { AccountBalanceService } from '../../../src/services/financial/account-balance.service';
+import { FinancialService } from '../../../src/services/financial/financial.service';
 
 describe('ReconciliationService', () => {
   const ctx = {
@@ -20,6 +21,7 @@ describe('ReconciliationService', () => {
   let mockConnection: jest.Mocked<TransactionalConnection>;
   let mockReconciliationRepo: any;
   let mockAccountBalanceService: jest.Mocked<AccountBalanceService>;
+  let mockFinancialService: any;
 
   beforeEach(() => {
     mockReconciliationRepo = {
@@ -30,17 +32,28 @@ describe('ReconciliationService', () => {
     };
 
     mockConnection = {
-      getRepository: jest.fn((ctx, entity) => {
+      getRepository: jest.fn((_ctx: RequestContext, entity: any) => {
         if (entity === Reconciliation) return mockReconciliationRepo;
         return {};
       }),
+      withTransaction: jest.fn(
+        (_ctx: RequestContext, fn: (txCtx: RequestContext) => Promise<any>) => fn(_ctx)
+      ),
     } as any;
 
     mockAccountBalanceService = {
       getAccountBalance: jest.fn(),
     } as any;
 
-    service = new ReconciliationService(mockConnection, mockAccountBalanceService);
+    mockFinancialService = {
+      postVarianceAdjustment: jest.fn().mockImplementation(() => Promise.resolve()),
+    } as any;
+
+    service = new ReconciliationService(
+      mockConnection,
+      mockAccountBalanceService,
+      mockFinancialService
+    );
   });
 
   describe('createReconciliation', () => {

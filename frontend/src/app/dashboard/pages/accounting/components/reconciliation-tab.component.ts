@@ -33,7 +33,9 @@ export class ReconciliationTabComponent {
 
   /** Per-account declared amount (shillings) for manual reconciliation form; converted to cents on submit */
   manualDeclaredAmounts = signal<Record<string, number>>({});
-  /** Reconciliation date (as-of). Non-editable, always current date at component init. */
+  /** Accounts the user has unlocked for editing; only these are included when submitting. */
+  manualEditedAccountIds = signal<Record<string, boolean>>({});
+  /** Reconciliation date (as-of). Always today for manual; read-only. */
   reconciliationDate = signal<string>(ReconciliationTabComponent.getTodayIsoDate());
   manualNotes = signal<string>('');
   manualSubmitting = signal(false);
@@ -64,6 +66,13 @@ export class ReconciliationTabComponent {
   });
 
   tableAccounts = computed(() => this.context().reconciliationTableAccounts);
+
+  /** At least one non-system account is unlocked for editing. */
+  hasEditedAccounts = computed(() => {
+    const edited = this.manualEditedAccountIds();
+    const accounts = this.tableAccounts();
+    return accounts.some((acc) => !acc.isSystemAccount && edited[acc.id]);
+  });
 
   static getTodayIsoDate(): string {
     return new Date().toISOString().slice(0, 10);
@@ -168,18 +177,25 @@ export class ReconciliationTabComponent {
     return this.manualDeclaredAmounts()[accountId] ?? 0;
   }
 
+  /** Unlock an account for editing; only unlocked accounts are submitted and posted. */
+  unlockAccountForEdit(accountId: string): void {
+    this.manualEditedAccountIds.update((m) => ({ ...m, [accountId]: true }));
+  }
+
+  /** Whether the user has unlocked this account for editing. */
+  isAccountUnlocked(accountId: string): boolean {
+    return !!this.manualEditedAccountIds()[accountId];
+  }
+
   submitManualReconciliation() {
     const channelId = this.context().channelId;
-    const asOfDate = this.reconciliationDate();
+    const today = ReconciliationTabComponent.getTodayIsoDate();
     const accounts = this.tableAccounts();
     const amounts = this.manualDeclaredAmounts();
+    const edited = this.manualEditedAccountIds();
 
-    if (!asOfDate) {
-      this.manualError.set('Reconciliation date is required.');
-      return;
-    }
     if (accounts.length === 0) {
-      this.manualError.set('No cash accounts available. Load accounting data first.');
+      this.manualError.set('No accounts available. Load accounting data first.');
       return;
     }
 
@@ -187,7 +203,7 @@ export class ReconciliationTabComponent {
     const accountDeclaredAmounts: { accountId: string; amountCents: string }[] = [];
     let totalCents = 0;
     for (const acc of accounts) {
-      if (acc.isSystemAccount) continue;
+      if (acc.isSystemAccount || !edited[acc.id]) continue;
       const shillings = amounts[acc.id] ?? 0;
       const cents = Math.round(Number(shillings) * 100);
       accountIds.push(acc.id);
@@ -195,19 +211,27 @@ export class ReconciliationTabComponent {
       totalCents += cents;
     }
 
-    const scopeRefId = `${asOfDate}-manual-${Date.now()}`;
+    if (accountIds.length === 0) {
+      this.manualError.set('Unlock and enter declared amounts for at least one account.');
+      return;
+    }
+
+    const scopeRefId = `manual-${Date.now()}`;
     this.manualSubmitting.set(true);
     this.manualError.set(null);
+
+    const rangeStart = `${today}T00:00:00.000Z`;
+    const rangeEnd = `${today}T23:59:59.999Z`;
 
     this.cashierSessionService
       .createManualReconciliation({
         channelId,
         scope: 'manual',
         scopeRefId,
-        rangeStart: asOfDate,
-        rangeEnd: asOfDate,
+        rangeStart,
+        rangeEnd,
         actualBalance: String(totalCents),
-        notes: this.manualNotes() || `Manual reconciliation as of ${asOfDate}`,
+        notes: this.manualNotes() || `Manual reconciliation as of ${today}`,
         accountIds,
         accountDeclaredAmounts,
       })
@@ -216,6 +240,7 @@ export class ReconciliationTabComponent {
           this.manualSubmitting.set(false);
           if (recon) {
             this.manualDeclaredAmounts.set({});
+            this.manualEditedAccountIds.set({});
             this.manualNotes.set('');
             this.reconciliationCreated.emit();
           } else {
