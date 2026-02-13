@@ -1,14 +1,22 @@
-import { Args, Query, Resolver } from '@nestjs/graphql';
-import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
-import { gql } from 'graphql-tag';
 import { Logger } from '@nestjs/common';
+import { Args, Query, Resolver } from '@nestjs/graphql';
+import {
+  Administrator,
+  Allow,
+  Ctx,
+  Permission,
+  RequestContext,
+  TransactionalConnection,
+} from '@vendure/core';
+import { gql } from 'graphql-tag';
+import { AuditLog } from '../../infrastructure/audit/audit-log.entity';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { AuditTrailFilters } from '../../infrastructure/audit/audit.types';
-import { AuditLog } from '../../infrastructure/audit/audit-log.entity';
 
 export const auditSchema = gql`
   extend type Query {
     auditLogs(options: AuditLogOptions): [AuditLog!]!
+    administratorByUserId(userId: ID): Administrator
   }
 
   type AuditLog {
@@ -40,7 +48,10 @@ export const auditSchema = gql`
 export class AuditResolver {
   private readonly logger = new Logger(AuditResolver.name);
 
-  constructor(private readonly auditService: AuditService) {}
+  constructor(
+    private readonly auditService: AuditService,
+    private readonly connection: TransactionalConnection
+  ) {}
 
   @Query()
   @Allow(Permission.ReadSettings, Permission.ReadOrder) // Allow both settings and order permissions
@@ -104,5 +115,19 @@ export class AuditResolver {
     const logs = await this.auditService.getAuditTrail(ctx, filters);
     this.logger.log(`auditLogs query returning ${logs.length} logs for channelId: ${channelId}`);
     return logs;
+  }
+
+  @Query()
+  @Allow(Permission.ReadSettings, Permission.ReadOrder)
+  async administratorByUserId(
+    @Ctx() ctx: RequestContext,
+    @Args('userId') userId: string
+  ): Promise<Administrator | null> {
+    if (!userId) return null;
+    const administrator = await this.connection.getRepository(ctx, Administrator).findOne({
+      where: { user: { id: userId } },
+      relations: ['user', 'user.roles', 'user.roles.channels'],
+    });
+    return administrator ?? null;
   }
 }

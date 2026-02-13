@@ -316,6 +316,15 @@ export const CREATE_PRODUCT_VARIANTS = graphql(`
   }
 `);
 
+export const DELETE_PRODUCT_VARIANTS = graphql(`
+  mutation DeleteProductVariants($ids: [ID!]!) {
+    deleteProductVariants(ids: $ids) {
+      result
+      message
+    }
+  }
+`);
+
 export const CREATE_ASSETS = graphql(`
   mutation CreateAssets($input: [CreateAssetInput!]!) {
     createAssets(input: $input) {
@@ -2286,6 +2295,36 @@ export const GET_ADMINISTRATORS = graphql(`
 export const GET_ADMINISTRATOR_BY_ID = graphql(`
   query GetAdministratorById($id: ID!) {
     administrator(id: $id) {
+      id
+      firstName
+      lastName
+      emailAddress
+      createdAt
+      updatedAt
+      user {
+        id
+        identifier
+        verified
+        lastLogin
+        roles {
+          id
+          code
+          description
+          permissions
+          channels {
+            id
+            code
+            token
+          }
+        }
+      }
+    }
+  }
+`);
+
+export const GET_ADMINISTRATOR_BY_USER_ID = graphql(`
+  query GetAdministratorByUserId($userId: ID!) {
+    administratorByUserId(userId: $userId) {
       id
       firstName
       lastName

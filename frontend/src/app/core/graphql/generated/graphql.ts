@@ -48,11 +48,6 @@ export type AccountBreakdown = {
   value: Scalars['Float']['output'];
 };
 
-export type AccountDeclaredAmountInput = {
-  accountId: Scalars['ID']['input'];
-  amountCents: Scalars['String']['input'];
-};
-
 export type AccountingPeriod = {
   __typename?: 'AccountingPeriod';
   channelId: Scalars['Int']['output'];
@@ -1503,10 +1498,9 @@ export type CreateProvinceInput = {
 };
 
 export type CreateReconciliationInput = {
-  accountDeclaredAmounts?: InputMaybe<Array<AccountDeclaredAmountInput>>;
-  accountIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   actualBalance: Scalars['String']['input'];
   channelId: Scalars['Int']['input'];
+  declaredAmounts: Array<DeclaredAmountInput>;
   expectedBalance?: InputMaybe<Scalars['String']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
   rangeEnd: Scalars['DateTime']['input'];
@@ -2243,6 +2237,11 @@ export type DateTimeStructFieldConfig = StructField & {
   step?: Maybe<Scalars['Int']['output']>;
   type: Scalars['String']['output'];
   ui?: Maybe<Scalars['JSON']['output']>;
+};
+
+export type DeclaredAmountInput = {
+  accountCode: Scalars['String']['input'];
+  amountCents: Scalars['String']['input'];
 };
 
 export type DeleteAssetInput = {
@@ -6538,6 +6537,7 @@ export type Query = {
   activeAdministrator?: Maybe<Administrator>;
   activeChannel: Channel;
   administrator?: Maybe<Administrator>;
+  administratorByUserId?: Maybe<Administrator>;
   administrators: AdministratorList;
   /** Get a single Asset by id */
   asset?: Maybe<Asset>;
@@ -6691,6 +6691,10 @@ export type QueryAccountBalancesAsOfArgs = {
 
 export type QueryAdministratorArgs = {
   id: Scalars['ID']['input'];
+};
+
+export type QueryAdministratorByUserIdArgs = {
+  userId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type QueryAdministratorsArgs = {
@@ -9297,6 +9301,19 @@ export type CreateProductVariantsMutation = {
   } | null>;
 };
 
+export type DeleteProductVariantsMutationVariables = Exact<{
+  ids: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
+}>;
+
+export type DeleteProductVariantsMutation = {
+  __typename?: 'Mutation';
+  deleteProductVariants: Array<{
+    __typename?: 'DeletionResponse';
+    result: DeletionResult;
+    message?: string | null;
+  }>;
+};
+
 export type CreateAssetsMutationVariables = Exact<{
   input: Array<CreateAssetInput> | CreateAssetInput;
 }>;
@@ -11421,6 +11438,38 @@ export type GetAdministratorByIdQueryVariables = Exact<{
 export type GetAdministratorByIdQuery = {
   __typename?: 'Query';
   administrator?: {
+    __typename?: 'Administrator';
+    id: string;
+    firstName: string;
+    lastName: string;
+    emailAddress: string;
+    createdAt: any;
+    updatedAt: any;
+    user: {
+      __typename?: 'User';
+      id: string;
+      identifier: string;
+      verified: boolean;
+      lastLogin?: any | null;
+      roles: Array<{
+        __typename?: 'Role';
+        id: string;
+        code: string;
+        description: string;
+        permissions: Array<Permission>;
+        channels: Array<{ __typename?: 'Channel'; id: string; code: string; token: string }>;
+      }>;
+    };
+  } | null;
+};
+
+export type GetAdministratorByUserIdQueryVariables = Exact<{
+  userId: Scalars['ID']['input'];
+}>;
+
+export type GetAdministratorByUserIdQuery = {
+  __typename?: 'Query';
+  administratorByUserId?: {
     __typename?: 'Administrator';
     id: string;
     firstName: string;
@@ -13802,6 +13851,55 @@ export const CreateProductVariantsDocument = {
     },
   ],
 } as unknown as DocumentNode<CreateProductVariantsMutation, CreateProductVariantsMutationVariables>;
+export const DeleteProductVariantsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'DeleteProductVariants' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'ids' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'ListType',
+              type: {
+                kind: 'NonNullType',
+                type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+              },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'deleteProductVariants' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'ids' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'ids' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'result' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'message' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<DeleteProductVariantsMutation, DeleteProductVariantsMutationVariables>;
 export const CreateAssetsDocument = {
   kind: 'Document',
   definitions: [
@@ -20514,6 +20612,91 @@ export const GetAdministratorByIdDocument = {
     },
   ],
 } as unknown as DocumentNode<GetAdministratorByIdQuery, GetAdministratorByIdQueryVariables>;
+export const GetAdministratorByUserIdDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetAdministratorByUserId' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'userId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'administratorByUserId' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'userId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'userId' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'user' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'identifier' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'verified' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'lastLogin' } },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'roles' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'description' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'permissions' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'channels' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'token' } },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetAdministratorByUserIdQuery, GetAdministratorByUserIdQueryVariables>;
 export const CreateChannelPaymentMethodDocument = {
   kind: 'Document',
   definitions: [

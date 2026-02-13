@@ -38,6 +38,7 @@ export type ProductAction = 'view' | 'edit' | 'purchase' | 'delete';
 export class ProductCardComponent {
   private readonly currencyService = inject(CurrencyService);
   readonly product = input.required<ProductCardData>();
+  readonly canEdit = input<boolean>(true);
   readonly action = output<{ action: ProductAction; productId: string }>();
 
   variantCount(): number {

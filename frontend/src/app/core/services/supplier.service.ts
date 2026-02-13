@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { SupplierApiService } from './supplier/supplier-api.service';
-import { SupplierSearchService } from './supplier/supplier-search.service';
+import { SupplierQueryOptions, SupplierSearchService } from './supplier/supplier-search.service';
 import { SupplierStateService } from './supplier/supplier-state.service';
 
 /**
@@ -84,11 +84,11 @@ export class SupplierService {
   }
 
   /**
-   * Fetch all suppliers with optional pagination
-   * @param options - Optional pagination and filter options
+   * Fetch all suppliers with optional pagination.
+   * @param queryOptions - Optional fetch policy (default cache-first; use network-only after mutations)
    */
-  async fetchSuppliers(options?: any): Promise<void> {
-    return this.searchService.fetchSuppliers(options);
+  async fetchSuppliers(options?: any, queryOptions?: SupplierQueryOptions): Promise<void> {
+    return this.searchService.fetchSuppliers(options, queryOptions);
   }
 
   /**

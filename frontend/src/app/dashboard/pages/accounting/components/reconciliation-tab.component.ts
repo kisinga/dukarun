@@ -143,6 +143,7 @@ export class ReconciliationTabComponent {
   }
 
   toggleExpand(r: Reconciliation): void {
+    if (!r?.id || r.id === '-1') return;
     const current = this.expandedRowId();
     if (current === r.id) {
       this.expandedRowId.set(null);
@@ -199,19 +200,17 @@ export class ReconciliationTabComponent {
       return;
     }
 
-    const accountIds: string[] = [];
-    const accountDeclaredAmounts: { accountId: string; amountCents: string }[] = [];
+    const declaredAmounts: { accountCode: string; amountCents: string }[] = [];
     let totalCents = 0;
     for (const acc of accounts) {
       if (acc.isSystemAccount || !edited[acc.id]) continue;
       const shillings = amounts[acc.id] ?? 0;
       const cents = Math.round(Number(shillings) * 100);
-      accountIds.push(acc.id);
-      accountDeclaredAmounts.push({ accountId: acc.id, amountCents: String(cents) });
+      declaredAmounts.push({ accountCode: acc.code, amountCents: String(cents) });
       totalCents += cents;
     }
 
-    if (accountIds.length === 0) {
+    if (declaredAmounts.length === 0) {
       this.manualError.set('Unlock and enter declared amounts for at least one account.');
       return;
     }
@@ -220,20 +219,14 @@ export class ReconciliationTabComponent {
     this.manualSubmitting.set(true);
     this.manualError.set(null);
 
-    const rangeStart = `${today}T00:00:00.000Z`;
-    const rangeEnd = `${today}T23:59:59.999Z`;
-
     this.cashierSessionService
       .createManualReconciliation({
         channelId,
         scope: 'manual',
         scopeRefId,
-        rangeStart,
-        rangeEnd,
         actualBalance: String(totalCents),
         notes: this.manualNotes() || `Manual reconciliation as of ${today}`,
-        accountIds,
-        accountDeclaredAmounts,
+        declaredAmounts,
       })
       .subscribe({
         next: (recon) => {

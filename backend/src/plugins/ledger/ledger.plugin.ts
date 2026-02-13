@@ -34,6 +34,7 @@ import { DashboardStatsResolver } from './dashboard-stats.resolver';
 import { DASHBOARD_STATS_SCHEMA } from './dashboard-stats.schema';
 import { LedgerViewerResolver } from './ledger-viewer.resolver';
 import { LEDGER_VIEWER_SCHEMA } from './ledger-viewer.schema';
+import { ReconciliationResolver } from './reconciliation.resolver';
 import { PeriodManagementResolver } from './period-management.resolver';
 import { PERIOD_MANAGEMENT_SCHEMA } from './period-management.schema';
 import {
@@ -71,6 +72,7 @@ const COMBINED_SCHEMA = gql`
     ChannelPaymentMethodService,
     DashboardStatsResolver,
     LedgerViewerResolver,
+    ReconciliationResolver,
     PeriodManagementResolver,
     LedgerQueryService,
     AccountBalanceService,
@@ -99,11 +101,21 @@ const COMBINED_SCHEMA = gql`
   },
   adminApiExtensions: {
     schema: COMBINED_SCHEMA,
-    resolvers: [DashboardStatsResolver, LedgerViewerResolver, PeriodManagementResolver],
+    resolvers: [
+      DashboardStatsResolver,
+      LedgerViewerResolver,
+      ReconciliationResolver,
+      PeriodManagementResolver,
+    ],
   },
   shopApiExtensions: {
     schema: COMBINED_SCHEMA,
-    resolvers: [DashboardStatsResolver, LedgerViewerResolver, PeriodManagementResolver],
+    resolvers: [
+      DashboardStatsResolver,
+      LedgerViewerResolver,
+      ReconciliationResolver,
+      PeriodManagementResolver,
+    ],
   },
   compatibility: VENDURE_COMPATIBILITY_VERSION,
 })

@@ -5,7 +5,11 @@ import type {
   UpdateProductVariantMutation,
   UpdateProductVariantMutationVariables,
 } from '../../graphql/generated/graphql';
-import { CREATE_PRODUCT_VARIANTS, UPDATE_PRODUCT_VARIANT } from '../../graphql/operations.graphql';
+import {
+  CREATE_PRODUCT_VARIANTS,
+  DELETE_PRODUCT_VARIANTS,
+  UPDATE_PRODUCT_VARIANT,
+} from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { VariantInput } from '../product.service';
 import { ProductStateService } from './product-state.service';
@@ -111,10 +115,12 @@ export class ProductVariantService {
 
         console.log(`🔧 Variant ${i + 1} result:`, result);
 
-        // Check for errors in the result
+        // Check for errors in the result (GraphQL errors may be on result.errors; Apollo also has result.error)
         if (!result.data?.createProductVariants) {
-          console.error(`❌ No variant returned for variant ${i + 1}`);
-          throw new Error(`Mutation returned no data for variant ${i + 1}`);
+          const gqlErrors = (result as { errors?: Array<{ message?: string }> }).errors;
+          const msg = gqlErrors?.[0]?.message ?? `Mutation returned no data for variant ${i + 1}`;
+          console.error(`❌ No variant returned for variant ${i + 1}:`, gqlErrors ?? result.error);
+          throw new Error(msg);
         }
 
         const variantResult = result.data.createProductVariants[0];
@@ -144,6 +150,39 @@ export class ProductVariantService {
         extraInfo: error.extraInfo,
       });
       throw error;
+    }
+  }
+
+  /**
+   * Delete variants by ID. Used for full-overwrite product edit (delete then recreate).
+   */
+  async deleteVariants(variantIds: string[]): Promise<boolean> {
+    if (variantIds.length === 0) return true;
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.mutate<{
+        deleteProductVariants: Array<{ result: string; message?: string | null }>;
+      }>({
+        mutation: DELETE_PRODUCT_VARIANTS as any,
+        variables: { ids: variantIds },
+      });
+      if (result.error) {
+        console.error('❌ deleteProductVariants failed:', result.error);
+        this.stateService.setError(result.error.message ?? 'Failed to delete variants');
+        return false;
+      }
+      const responses = result.data?.deleteProductVariants ?? [];
+      const failed = responses.some((r) => r.result !== 'DELETED');
+      if (failed) {
+        console.error('❌ Some variants were not deleted:', responses);
+        this.stateService.setError('Failed to delete one or more variants');
+        return false;
+      }
+      return true;
+    } catch (error: any) {
+      console.error('❌ deleteVariants failed:', error);
+      this.stateService.setError(error.message ?? 'Failed to delete variants');
+      return false;
     }
   }
 

@@ -244,8 +244,8 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     balances: [LastClosingBalance!]!
   }
 
-  input AccountDeclaredAmountInput {
-    accountId: ID!
+  input DeclaredAmountInput {
+    accountCode: String!
     amountCents: String!
   }
 
@@ -253,13 +253,10 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     channelId: Int!
     scope: String!
     scopeRefId: String!
-    rangeStart: DateTime!
-    rangeEnd: DateTime!
     expectedBalance: String
     actualBalance: String!
     notes: String
-    accountIds: [ID!]
-    accountDeclaredAmounts: [AccountDeclaredAmountInput!]
+    declaredAmounts: [DeclaredAmountInput!]!
   }
 
   input CreateInventoryReconciliationInput {

@@ -202,7 +202,9 @@ export class CustomerCreateComponent extends ApprovableFormBase implements After
         if (customerId) {
           this.clearError();
           this.toastService.show('Success', 'Customer created', 'success');
-          this.router.navigate(['/dashboard/customers']);
+          this.router.navigate(['/dashboard/customers'], {
+            queryParams: { refresh: '1' },
+          });
         } else {
           const errMsg = this.customerService.error() || 'Failed to create customer';
           this.error.set(errMsg);

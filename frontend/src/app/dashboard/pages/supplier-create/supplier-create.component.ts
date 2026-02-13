@@ -354,7 +354,9 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
           this.toastService.show('Success', 'Supplier updated', 'success');
           this.supplierCreated.emit(id);
           if (this.mode() === 'page') {
-            this.router.navigate(['/dashboard/suppliers']);
+            this.router.navigate(['/dashboard/suppliers'], {
+              queryParams: { refresh: '1' },
+            });
           }
         } else {
           const errMsg = this.supplierService.error() || 'Failed to update supplier';
@@ -368,7 +370,9 @@ export class SupplierCreateComponent extends ApprovableFormBase implements OnIni
           this.toastService.show('Success', 'Supplier created', 'success');
           this.supplierCreated.emit(supplierId);
           if (this.mode() === 'page') {
-            this.router.navigate(['/dashboard/suppliers']);
+            this.router.navigate(['/dashboard/suppliers'], {
+              queryParams: { refresh: '1' },
+            });
           }
         } else {
           const errMsg = this.supplierService.error() || 'Failed to create supplier';

@@ -1,3 +1,4 @@
+import type { FetchPolicy } from '@apollo/client/core';
 import { Injectable, inject } from '@angular/core';
 import {
   GET_PRODUCT,
@@ -8,6 +9,7 @@ import {
 import { ApolloService } from '../apollo.service';
 import { isBarcodeIgnored } from './barcode.util';
 import { FacetService } from './facet.service';
+import type { ProductQueryOptions } from './product-listing.service';
 import { ProductCacheService } from './product-cache.service';
 import { ProductMapperService } from './product-mapper.service';
 
@@ -68,8 +70,12 @@ export class ProductSearchService {
   /**
    * Search products by name, manufacturer, SKU, or barcode (cache-first for offline support).
    * Matches when all words appear in product name or manufacturer.
+   * @param queryOptions - Optional fetch policy; default cache-first; use network-only after mutations if needed
    */
-  async searchProducts(searchTerm: string): Promise<ProductSearchResult[]> {
+  async searchProducts(
+    searchTerm: string,
+    queryOptions?: ProductQueryOptions,
+  ): Promise<ProductSearchResult[]> {
     // Try cache first if available
     if (this.cacheService.isCacheReady()) {
       const cachedResults = this.cacheService.searchProducts(searchTerm);
@@ -115,6 +121,7 @@ export class ProductSearchService {
         searchOr.push({ facetValueId: { in: manufacturerIds } });
       }
 
+      const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
       const client = this.apolloService.getClient();
       const result = await client.query<{
         products: { items: any[] };
@@ -123,7 +130,7 @@ export class ProductSearchService {
         variables: {
           options: { filter: { _or: searchOr }, take: 5 },
         },
-        fetchPolicy: 'network-only',
+        fetchPolicy,
       });
 
       return (
@@ -136,9 +143,13 @@ export class ProductSearchService {
   }
 
   /**
-   * Get product by ID (cache-first for offline ML detection)
+   * Get product by ID (cache-first for offline ML detection).
+   * @param queryOptions - Optional fetch policy for network fallback
    */
-  async getProductById(productId: string): Promise<ProductSearchResult | null> {
+  async getProductById(
+    productId: string,
+    queryOptions?: ProductQueryOptions,
+  ): Promise<ProductSearchResult | null> {
     // CRITICAL: Try cache first for ML detection (offline support)
     const cachedProduct = this.cacheService.getProductById(productId);
     if (cachedProduct) {
@@ -150,12 +161,14 @@ export class ProductSearchService {
     console.log(`🌐 Fetching product ${productId} from network...`);
 
     try {
+      const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
       const client = this.apolloService.getClient();
       const result = await client.query<{
         product: any | null;
       }>({
         query: GET_PRODUCT,
         variables: { id: productId },
+        fetchPolicy,
       });
 
       if (!result.data?.product) {
@@ -207,9 +220,13 @@ export class ProductSearchService {
    * Get variant by ID
    * Searches through cached products first, then falls back to network
    * @param variantId - Variant ID to lookup
+   * @param queryOptions - Optional fetch policy for network fallback
    * @returns ProductVariant if found, null otherwise
    */
-  async getVariantById(variantId: string): Promise<ProductVariant | null> {
+  async getVariantById(
+    variantId: string,
+    queryOptions?: ProductQueryOptions,
+  ): Promise<ProductVariant | null> {
     // Try cache first if available
     if (this.cacheService.isCacheReady()) {
       const cachedVariant = this.cacheService.getVariantById(variantId);
@@ -226,6 +243,7 @@ export class ProductSearchService {
     try {
       // Search for products and find the variant
       // This is a workaround - ideally we'd have a direct variant lookup query
+      const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
       const client = this.apolloService.getClient();
       const result = await client.query<{
         products: {
@@ -234,7 +252,7 @@ export class ProductSearchService {
       }>({
         query: SEARCH_PRODUCTS,
         variables: { term: '' }, // Empty search to get all products (may need pagination)
-        fetchPolicy: 'network-only',
+        fetchPolicy,
       });
 
       if (!result.data?.products?.items) {

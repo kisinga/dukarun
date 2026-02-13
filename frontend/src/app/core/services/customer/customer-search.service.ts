@@ -1,3 +1,4 @@
+import type { FetchPolicy } from '@apollo/client/core';
 import { inject, Injectable } from '@angular/core';
 import { GET_CUSTOMERS } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
@@ -5,6 +6,11 @@ import { CustomerInput } from '../customer.service';
 import { CustomerApiService } from './customer-api.service';
 import { CustomerStateService } from './customer-state.service';
 import { formatPhoneNumber } from '../../utils/phone.utils';
+
+/** Fetch policy for customer list/search; default cache-first for resilience; network-only after mutations. */
+export interface CustomerQueryOptions {
+  fetchPolicy?: 'cache-first' | 'network-only';
+}
 
 /**
  * Customer Search Service
@@ -21,12 +27,15 @@ export class CustomerSearchService {
   private readonly apiService = inject(CustomerApiService);
 
   /**
-   * Fetch all customers with optional pagination
+   * Fetch all customers with optional pagination.
    * @param options - Optional pagination and filter options
+   * @param queryOptions - Optional fetch policy; default cache-first; use network-only after mutations
    */
-  async fetchCustomers(options?: any): Promise<void> {
+  async fetchCustomers(options?: any, queryOptions?: CustomerQueryOptions): Promise<void> {
     this.stateService.setIsLoading(true);
     this.stateService.setError(null);
+
+    const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
 
     try {
       const client = this.apolloService.getClient();
@@ -39,7 +48,7 @@ export class CustomerSearchService {
             skip: 0,
           },
         },
-        fetchPolicy: 'network-only',
+        fetchPolicy,
       });
 
       const allItems = result.data?.customers?.items || [];
@@ -61,13 +70,20 @@ export class CustomerSearchService {
   }
 
   /**
-   * Search for customers (excludes suppliers)
+   * Search for customers (excludes suppliers).
+   * @param queryOptions - Optional fetch policy; default cache-first
    */
-  async searchCustomers(term: string, take = 50): Promise<any[]> {
+  async searchCustomers(
+    term: string,
+    take = 50,
+    queryOptions?: CustomerQueryOptions,
+  ): Promise<any[]> {
     const trimmed = term.trim();
     if (trimmed.length === 0) {
       return [];
     }
+
+    const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
 
     try {
       const client = this.apolloService.getClient();
@@ -82,7 +98,7 @@ export class CustomerSearchService {
             },
           },
         },
-        fetchPolicy: 'network-only',
+        fetchPolicy,
       });
 
       const items = result.data?.customers?.items || [];
@@ -120,7 +136,7 @@ export class CustomerSearchService {
             },
           },
         },
-        fetchPolicy: 'network-only',
+        fetchPolicy: 'cache-first' as FetchPolicy,
       });
 
       const items = result.data?.customers?.items || [];

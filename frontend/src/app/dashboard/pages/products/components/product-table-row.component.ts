@@ -21,6 +21,7 @@ export class ProductTableRowComponent {
   private readonly currencyService = inject(CurrencyService);
 
   readonly product = input.required<ProductCardData>();
+  readonly canEdit = input<boolean>(true);
   readonly expanded = input<boolean>(false);
   readonly action = output<{ action: ProductAction; productId: string }>();
   readonly toggleExpand = output<void>();

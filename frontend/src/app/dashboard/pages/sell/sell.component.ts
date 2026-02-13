@@ -21,11 +21,13 @@ import { OrderService } from '../../../core/services/order.service';
 import { OrdersService } from '../../../core/services/orders.service';
 import { PrintPreferencesService } from '../../../core/services/print-preferences.service';
 import { PrintService } from '../../../core/services/print.service';
+import { ProductCacheService } from '../../../core/services/product/product-cache.service';
 import {
   ProductSearchResult,
   ProductSearchService,
   ProductVariant,
 } from '../../../core/services/product/product-search.service';
+import { SalesSyncGuardService } from '../../../core/services/sales-sync-guard.service';
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { ProductLabelComponent } from '../shared/components/product-label.component';
 import { VariantListComponent } from '../shared/components/variant-list.component';
@@ -77,6 +79,7 @@ type PaymentMethodCode = string;
 })
 export class SellComponent implements OnInit, OnDestroy {
   private readonly productSearchService = inject(ProductSearchService);
+  private readonly productCacheService = inject(ProductCacheService);
   private readonly companyService = inject(CompanyService);
   private readonly stockLocationService = inject(StockLocationService);
   private readonly orderService = inject(OrderService);
@@ -89,6 +92,7 @@ export class SellComponent implements OnInit, OnDestroy {
   private readonly currencyService = inject(CurrencyService);
   private readonly printService = inject(PrintService);
   private readonly printPreferences = inject(PrintPreferencesService);
+  private readonly salesSyncGuard = inject(SalesSyncGuardService);
 
   // Configuration
   readonly channelId = computed(() => this.companyService.activeCompanyId() || 'T_1');
@@ -197,24 +201,24 @@ export class SellComponent implements OnInit, OnDestroy {
     this.quickSelectOpen.set(checked);
   }
 
-  // Load recent products for quick selection
+  // Load recent products for quick selection (uses shared product cache when ready)
   async loadRecentProducts(): Promise<void> {
+    if (this.productCacheService.isCacheReady()) {
+      this.recentProducts.set(this.productCacheService.getRecentProducts(10));
+      return;
+    }
+
     this.isLoadingProducts.set(true);
     try {
       const client = this.apolloService.getClient();
       const result = await client.query<{
-        products: {
-          items: any[];
-        };
+        products: { items: any[] };
       }>({
         query: GET_PRODUCTS,
         variables: {
-          options: {
-            take: 10,
-            skip: 0,
-          },
+          options: { take: 10, skip: 0 },
         },
-        fetchPolicy: 'network-only',
+        fetchPolicy: 'cache-first' as import('@apollo/client/core').FetchPolicy,
       });
 
       const products = (result.data?.products?.items || []).map((product: any) => ({
@@ -701,6 +705,12 @@ export class SellComponent implements OnInit, OnDestroy {
    * Send to Cashier - Creates order with cash payment and approval metadata
    */
   async handleCompleteCashier(): Promise<void> {
+    if (!this.salesSyncGuard.canSell()) {
+      this.checkoutError.set(
+        "Sync required. You've made 3 sales since last sync. Please check your connection and refresh the page, or wait for sync to complete.",
+      );
+      return;
+    }
     this.isProcessingCheckout.set(true);
     this.checkoutError.set(null);
 
@@ -720,6 +730,7 @@ export class SellComponent implements OnInit, OnDestroy {
       });
 
       console.log('✅ Order sent to cashier:', order.code);
+      this.salesSyncGuard.recordSale();
 
       // Show success animation first, then close modal after delay
       this.showNotification(`Order ${order.code} sent to cashier`, 'success');
@@ -748,6 +759,12 @@ export class SellComponent implements OnInit, OnDestroy {
   }
 
   private async processCreditSale(shouldPrint: boolean): Promise<void> {
+    if (!this.salesSyncGuard.canSell()) {
+      this.checkoutError.set(
+        "Sync required. You've made 3 sales since last sync. Please check your connection and refresh the page, or wait for sync to complete.",
+      );
+      return;
+    }
     if (!this.selectedCustomer()) {
       this.checkoutError.set('Please select or create a customer');
       return;
@@ -805,6 +822,7 @@ export class SellComponent implements OnInit, OnDestroy {
       });
 
       console.log('✅ Credit sale created:', order.code);
+      this.salesSyncGuard.recordSale();
 
       // Refresh credit summary to show updated outstanding amount
       try {
@@ -872,6 +890,12 @@ export class SellComponent implements OnInit, OnDestroy {
   }
 
   private async processCashSale(shouldPrint: boolean): Promise<void> {
+    if (!this.salesSyncGuard.canSell()) {
+      this.checkoutError.set(
+        "Sync required. You've made 3 sales since last sync. Please check your connection and refresh the page, or wait for sync to complete.",
+      );
+      return;
+    }
     if (!this.selectedPaymentMethod()) {
       this.checkoutError.set('Please select a payment method');
       return;
@@ -902,6 +926,7 @@ export class SellComponent implements OnInit, OnDestroy {
       });
 
       console.log('✅ Order created:', order.code);
+      this.salesSyncGuard.recordSale();
 
       // Trigger success animation
       // We don't have easy access to payment method name here, so just use the code

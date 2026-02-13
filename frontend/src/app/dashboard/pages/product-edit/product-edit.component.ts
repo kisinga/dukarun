@@ -283,7 +283,7 @@ export class ProductEditComponent implements OnInit {
       if (ok) {
         this.submitSuccess.set(true);
         setTimeout(() => {
-          this.router.navigate(['/dashboard/products']);
+          this.router.navigate(['/dashboard/products'], { queryParams: { refresh: '1' } });
         }, 1500);
       } else {
         const errorMsg = this.productService.error();
@@ -301,7 +301,7 @@ export class ProductEditComponent implements OnInit {
    * Cancel and go back
    */
   cancel(): void {
-    this.router.navigate(['/dashboard/products']);
+    this.router.navigate(['/dashboard/products'], { queryParams: { refresh: '1' } });
   }
 
   /**

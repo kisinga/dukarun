@@ -9,7 +9,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { NavigationEnd, Router } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
 import { SupplierService } from '../../../core/services/supplier.service';
 import { calculateSupplierStats } from '../../../core/services/stats/supplier-stats.util';
@@ -55,6 +55,7 @@ import { SupplierPaymentModalComponent } from './components/supplier-payment-mod
 export class SuppliersComponent implements OnInit, OnDestroy {
   private readonly supplierService = inject(SupplierService);
   readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly routerEventsSub = this.router.events
     .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
     .subscribe((e) => {
@@ -175,15 +176,24 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     this.routerEventsSub.unsubscribe();
   }
 
-  async loadSuppliers(): Promise<void> {
-    await this.supplierService.fetchSuppliers({
-      take: 100,
-      skip: 0,
-    });
+  async loadSuppliers(forceRefresh?: boolean): Promise<void> {
+    const useNetworkOnly =
+      forceRefresh === true || this.route.snapshot.queryParams['refresh'] === '1';
+    await this.supplierService.fetchSuppliers(
+      { take: 100, skip: 0 },
+      useNetworkOnly ? { fetchPolicy: 'network-only' } : undefined,
+    );
+    if (this.route.snapshot.queryParams['refresh'] === '1') {
+      this.router.navigate([], {
+        queryParams: { refresh: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
   }
 
   async refreshSuppliers(): Promise<void> {
-    await this.loadSuppliers();
+    await this.loadSuppliers(true);
   }
 
   /**

@@ -62,17 +62,18 @@ describe('ReconciliationService', () => {
         channelId: 1,
         scope: 'method' as const,
         scopeRefId: 'CASH_ON_HAND',
-        rangeStart: '2024-01-01',
-        rangeEnd: '2024-01-31',
         expectedBalance: '1000',
         actualBalance: '950',
         notes: 'Test reconciliation',
+        declaredAmounts: [] as Array<{ accountCode: string; amountCents: string }>,
       };
 
       const createdReconciliation: Reconciliation = {
         id: 'recon-1',
         ...input,
-        status: 'draft',
+        rangeStart: new Date().toISOString().slice(0, 10),
+        rangeEnd: new Date().toISOString().slice(0, 10),
+        status: 'verified',
         varianceAmount: '50', // 1000 - 950
         createdBy: 1,
       } as Reconciliation;
@@ -84,7 +85,7 @@ describe('ReconciliationService', () => {
 
       expect(result).toEqual(createdReconciliation);
       expect(result.varianceAmount).toBe('50');
-      expect(result.status).toBe('draft');
+      expect(result.status).toBe('verified');
       expect(mockReconciliationRepo.create).toHaveBeenCalled();
       expect(mockReconciliationRepo.save).toHaveBeenCalled();
     });
@@ -94,16 +95,17 @@ describe('ReconciliationService', () => {
         channelId: 1,
         scope: 'method' as const,
         scopeRefId: 'CASH_ON_HAND',
-        rangeStart: '2024-01-01',
-        rangeEnd: '2024-01-31',
         expectedBalance: '1000',
         actualBalance: '1050',
+        declaredAmounts: [] as Array<{ accountCode: string; amountCents: string }>,
       };
 
       const createdReconciliation: Reconciliation = {
         id: 'recon-1',
         ...input,
-        status: 'draft',
+        rangeStart: new Date().toISOString().slice(0, 10),
+        rangeEnd: new Date().toISOString().slice(0, 10),
+        status: 'verified',
         varianceAmount: '-50', // 1000 - 1050
         createdBy: 1,
       } as Reconciliation;
@@ -114,6 +116,7 @@ describe('ReconciliationService', () => {
       const result = await service.createReconciliation(ctx, input);
 
       expect(result.varianceAmount).toBe('-50');
+      expect(result.status).toBe('verified');
     });
   });
 

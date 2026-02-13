@@ -32,7 +32,6 @@ import { FacetService } from '../../../core/services/product/facet.service';
 import { normalizeBarcodeForApi } from '../../../core/services/product/barcode.util';
 import { ProductService } from '../../../core/services/product.service';
 import { ProductValidationService } from '../../../core/services/product/product-validation.service';
-import { ProductVariantService } from '../../../core/services/product/product-variant.service';
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { HowSoldSelectorComponent } from './components/how-sold-selector.component';
 import { IdentificationSelectorComponent } from './components/identification-selector.component';
@@ -104,7 +103,6 @@ export class ProductCreateComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly productService = inject(ProductService);
-  private readonly variantService = inject(ProductVariantService);
   private readonly stockLocationService = inject(StockLocationService);
   private readonly appInitService = inject(AppInitService);
   private readonly validationService = inject(ProductValidationService);
@@ -124,6 +122,8 @@ export class ProductCreateComponent implements OnInit {
   // Edit mode
   readonly isEditMode = signal(false);
   readonly productId = signal<string | null>(null);
+  /** Variant IDs at load; used for full overwrite (delete then create). */
+  readonly existingVariantIdsForOverwrite = signal<string[]>([]);
 
   // New model: Item type, product type and how it's sold (2-stage flow)
   readonly itemType = signal<ItemType>('product');
@@ -911,6 +911,9 @@ export class ProductCreateComponent implements OnInit {
           }
         }
 
+        // Store variant IDs for full overwrite on submit (delete then create)
+        this.existingVariantIdsForOverwrite.set(product.variants.map((variant: any) => variant.id));
+
         // Restore all SKUs with variant IDs
         product.variants.forEach((variant: any) => {
           // Convert price from cents to decimal
@@ -1051,7 +1054,7 @@ export class ProductCreateComponent implements OnInit {
           sku: sku.sku.trim().toUpperCase(),
           name: sku.name.trim(),
           price: Number(sku.price),
-          trackInventory: true, // Products: track stock
+          trackInventory: this.itemType() === 'product',
           stockOnHand: Number(sku.stockOnHand),
           stockLocationId: stockLocationId!,
           customFields: {
@@ -1068,81 +1071,27 @@ export class ProductCreateComponent implements OnInit {
 
       // Handle edit mode vs create mode
       if (this.isEditMode() && this.productId()) {
-        // EDIT MODE: Update existing product
+        // EDIT MODE: Full overwrite (update product base, delete existing variants, create all from form)
         const productId = this.productId()!;
-
-        // Separate existing variants (with variantId) from new variants (without variantId)
-        const existingVariants = formValue.skus
-          .filter((sku: any) => sku.variantId)
-          .map((sku: any) => ({
-            id: sku.variantId,
-            name: sku.name.trim(),
-            price: Number(sku.price),
-            wholesalePrice:
-              sku.wholesalePrice && Number(sku.wholesalePrice) > 0
-                ? Number(sku.wholesalePrice)
-                : null, // Keep in decimal for updateVariantDetails
-          }));
-
-        const newVariants = formValue.skus
-          .filter((sku: any) => !sku.variantId)
-          .map((sku: any) => {
-            const wholesalePriceCents =
-              sku.wholesalePrice && Number(sku.wholesalePrice) > 0
-                ? Math.round(Number(sku.wholesalePrice) * 100)
-                : null;
-            return {
-              sku: sku.sku.trim().toUpperCase(),
-              name: sku.name.trim(),
-              price: Number(sku.price),
-              trackInventory: this.itemType() === 'product', // true for products, false for services
-              stockOnHand: Number(sku.stockOnHand),
-              stockLocationId: stockLocationId!,
-              customFields: {
-                wholesalePrice: wholesalePriceCents,
-                allowFractionalQuantity: Boolean(sku.allowFractionalQuantity),
-              },
-            };
-          });
-
-        // Update product name, barcode, and facets (full replacement)
-        const updated = await this.productService.updateProductWithVariants(
+        const productBase = {
+          name: productInput.name,
+          barcode: productInput.barcode,
+          facetValueIds: productInput.facetValueIds,
+        };
+        const updated = await this.productService.updateProductFullOverwrite(
           productId,
-          productInput.name,
-          existingVariants,
-          productInput.barcode,
-          productInput.facetValueIds,
+          productBase,
+          this.existingVariantIdsForOverwrite(),
+          variantInputs,
         );
-
         if (!updated) {
           const error = this.productService.error();
           this.submitError.set(error || 'Failed to update product');
           return;
         }
-
-        // Create new variants if any
-        if (newVariants.length > 0) {
-          console.log('Creating new variants for existing product:', newVariants.length);
-          const createdVariants = await this.variantService.createVariants(productId, newVariants);
-          if (!createdVariants || createdVariants.length === 0) {
-            this.submitError.set('Product updated, but failed to create new variants');
-            return;
-          }
-          console.log(`Created ${createdVariants.length} new variant(s)`);
-        }
-
-        console.log('Product update complete');
-
-        // Note: Audit trail entries are automatically created by the backend
-        // when product updates occur via the updateProduct mutation.
-        // The backend tracks: eventType, entityType, entityId, and changed data.
-        console.log('Audit trail: Product update logged automatically by backend');
-
         this.submitSuccess.set(true);
-
-        // Navigate after a delay
         setTimeout(() => {
-          this.router.navigate(['/dashboard/products']);
+          this.router.navigate(['/dashboard/products'], { queryParams: { refresh: '1' } });
         }, 1500);
       } else {
         // CREATE MODE: Create new product
@@ -1196,7 +1145,7 @@ export class ProductCreateComponent implements OnInit {
 
           // Navigate after a delay to show success/warning message
           setTimeout(() => {
-            this.router.navigate(['/dashboard/products']);
+            this.router.navigate(['/dashboard/products'], { queryParams: { refresh: '1' } });
           }, 1500);
         } else {
           const error = this.productService.error();
@@ -1222,7 +1171,7 @@ export class ProductCreateComponent implements OnInit {
    * Cancel and go back to products list
    */
   cancel(): void {
-    this.router.navigate(['/dashboard/products']);
+    this.router.navigate(['/dashboard/products'], { queryParams: { refresh: '1' } });
   }
 
   // --- Validation Helper Methods ---

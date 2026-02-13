@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { ProductApiService } from './product/product-api.service';
 import { ProductAssetService } from './product/product-asset.service';
-import { ProductListingService } from './product/product-listing.service';
+import { ProductListingService, ProductQueryOptions } from './product/product-listing.service';
 import { ProductOptionService } from './product/product-option.service';
 import { ProductStateService } from './product/product-state.service';
 import { ProductValidationService } from './product/product-validation.service';
@@ -259,6 +259,42 @@ export class ProductService {
   }
 
   /**
+   * Full overwrite for product edit: update product base, delete all existing variants, create all from form.
+   * Single orchestration for edit flow; component calls this only (no updateProductWithVariants + createVariants).
+   */
+  async updateProductFullOverwrite(
+    productId: string,
+    productBase: { name: string; barcode?: string; facetValueIds?: string[] },
+    existingVariantIds: string[],
+    variantInputs: VariantInput[],
+  ): Promise<boolean> {
+    try {
+      const productUpdated = await this.apiService.updateProduct(productId, productBase);
+      if (!productUpdated) {
+        return false;
+      }
+      if (existingVariantIds.length > 0) {
+        const deleted = await this.variantService.deleteVariants(existingVariantIds);
+        if (!deleted) {
+          return false;
+        }
+      }
+      if (variantInputs.length > 0) {
+        const created = await this.variantService.createVariants(productId, variantInputs);
+        if (!created || created.length === 0) {
+          this.stateService.setError('Failed to create variants');
+          return false;
+        }
+      }
+      return true;
+    } catch (error: any) {
+      console.error('Failed to update product (full overwrite):', error);
+      this.stateService.setError(error.message || 'Failed to update product');
+      return false;
+    }
+  }
+
+  /**
    * Update product base data (name, barcode, optional facetValueIds) and variant details.
    * When facetValueIds is provided (e.g. from product-create), facets are fully replaced.
    * When omitted (e.g. from product-edit), existing facets are left unchanged.
@@ -297,10 +333,11 @@ export class ProductService {
   }
 
   /**
-   * Fetch all products with optional pagination
+   * Fetch all products with optional pagination.
    * @param options - Optional pagination and filter options
+   * @param queryOptions - Optional fetch policy (default cache-first; use network-only after mutations)
    */
-  async fetchProducts(options?: any): Promise<void> {
-    return this.listingService.fetchProducts(options);
+  async fetchProducts(options?: any, queryOptions?: ProductQueryOptions): Promise<void> {
+    return this.listingService.fetchProducts(options, queryOptions);
   }
 }

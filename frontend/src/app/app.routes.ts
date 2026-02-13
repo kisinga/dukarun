@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard, noAuthGuard } from './core/guards/auth.guard';
 import { creditGuard } from './core/guards/credit.guard';
+import { productGuard } from './core/guards/product.guard';
 import { settingsGuard } from './core/guards/settings.guard';
 import { stockAdjustmentGuard } from './core/guards/stock-adjustment.guard';
 
@@ -76,6 +77,7 @@ export const routes: Routes = [
       },
       {
         path: 'products/create',
+        canActivate: [productGuard],
         loadComponent: () =>
           import('./dashboard/pages/product-create/product-create.component').then(
             (m) => m.ProductCreateComponent,
@@ -83,6 +85,7 @@ export const routes: Routes = [
       },
       {
         path: 'products/edit/:id',
+        canActivate: [productGuard],
         loadComponent: () =>
           import('./dashboard/pages/product-create/product-create.component').then(
             (m) => m.ProductCreateComponent,

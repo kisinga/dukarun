@@ -1,8 +1,13 @@
+import type { FetchPolicy } from '@apollo/client/core';
 import { inject, Injectable } from '@angular/core';
 import { GET_SUPPLIERS, GET_CUSTOMERS } from '../../graphql/operations.graphql';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 import { ApolloService } from '../apollo.service';
 import { SupplierStateService } from './supplier-state.service';
+
+export type SupplierQueryOptions = {
+  fetchPolicy?: 'cache-first' | 'network-only';
+};
 
 /**
  * Supplier Search Service
@@ -18,15 +23,16 @@ export class SupplierSearchService {
   private readonly stateService = inject(SupplierStateService);
 
   /**
-   * Fetch all suppliers with optional pagination
-   * @param options - Optional pagination and filter options
+   * Fetch all suppliers with optional pagination.
+   * @param queryOptions - Optional fetch policy (default cache-first; use network-only after mutations)
    */
-  async fetchSuppliers(options?: any): Promise<void> {
+  async fetchSuppliers(options?: any, queryOptions?: SupplierQueryOptions): Promise<void> {
     this.stateService.setIsLoading(true);
     this.stateService.setError(null);
 
     try {
       const client = this.apolloService.getClient();
+      const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
 
       const result = await client.query<any>({
         query: GET_SUPPLIERS,
@@ -36,7 +42,7 @@ export class SupplierSearchService {
             skip: 0,
           },
         },
-        fetchPolicy: 'network-only',
+        fetchPolicy,
       });
 
       const allItems = result.data?.customers?.items || [];
@@ -63,9 +69,13 @@ export class SupplierSearchService {
    * Find a supplier (or customer) by phone number
    *
    * @param phone - Phone number (will be normalized)
+   * @param queryOptions - Optional fetch policy (default cache-first)
    * @returns Customer/Supplier if found, null otherwise
    */
-  async findSupplierByPhone(phone: string): Promise<any | null> {
+  async findSupplierByPhone(
+    phone: string,
+    queryOptions?: SupplierQueryOptions,
+  ): Promise<any | null> {
     if (!phone || typeof phone !== 'string') {
       return null;
     }
@@ -73,6 +83,7 @@ export class SupplierSearchService {
     try {
       // Normalize phone number for consistent lookup
       const normalizedPhone = formatPhoneNumber(phone);
+      const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
 
       const client = this.apolloService.getClient();
       const result = await client.query<any>({
@@ -86,7 +97,7 @@ export class SupplierSearchService {
             },
           },
         },
-        fetchPolicy: 'network-only',
+        fetchPolicy,
       });
 
       const items = result.data?.customers?.items || [];
