@@ -19,8 +19,9 @@ import {
 } from '../../components/shared/delete-confirmation-modal.component';
 import { PaginationComponent } from '../../components/shared/pagination.component';
 import { SupplierAction, SupplierCardComponent } from './components/supplier-card.component';
-import { SupplierSearchBarComponent } from './components/supplier-search-bar.component';
 import { SupplierStats, SupplierStatsComponent } from './components/supplier-stats.component';
+import { PageHeaderComponent } from '../../components/shared/page-header.component';
+import { ListSearchBarComponent } from '../../components/shared/list-search-bar.component';
 import { SupplierTableRowComponent } from './components/supplier-table-row.component';
 import { SupplierViewModalComponent } from './components/supplier-view-modal.component';
 import { SupplierPaymentModalComponent } from './components/supplier-payment-modal.component';
@@ -40,7 +41,8 @@ import { SupplierPaymentModalComponent } from './components/supplier-payment-mod
     CommonModule,
     SupplierCardComponent,
     SupplierStatsComponent,
-    SupplierSearchBarComponent,
+    PageHeaderComponent,
+    ListSearchBarComponent,
     SupplierTableRowComponent,
     PaginationComponent,
     DeleteConfirmationModalComponent,

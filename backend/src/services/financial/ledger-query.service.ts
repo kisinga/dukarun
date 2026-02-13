@@ -587,6 +587,42 @@ export class LedgerQueryService {
     };
   }
 
+  /**
+   * Get order ledger footprint: net debit/credit per account for all entries that reference this order.
+   * Excludes the OrderReversal entry for this order (so we never reverse the reversal).
+   * Used to build a single reversal entry that offsets the order's net effect.
+   */
+  async getOrderLedgerFootprint(
+    channelId: number,
+    orderId: string
+  ): Promise<Array<{ accountCode: string; debit: number; credit: number }>> {
+    const lineRepo = this.dataSource.getRepository(JournalLine);
+    const reversalSourceId = `${orderId}-reversal`;
+    const orderFilter = JSON.stringify({ orderId });
+
+    const rows = await lineRepo
+      .createQueryBuilder('line')
+      .innerJoin('line.entry', 'entry')
+      .innerJoin('line.account', 'account')
+      .where('line.channelId = :channelId', { channelId })
+      .andWhere('line.meta @> :orderFilter', { orderFilter })
+      .andWhere('NOT (entry.sourceType = :reversalType AND entry.sourceId = :reversalSourceId)', {
+        reversalType: 'OrderReversal',
+        reversalSourceId,
+      })
+      .groupBy('account.code')
+      .select('account.code', 'accountCode')
+      .addSelect('SUM(CAST(line.debit AS BIGINT))', 'debitTotal')
+      .addSelect('SUM(CAST(line.credit AS BIGINT))', 'creditTotal')
+      .getRawMany<{ accountCode: string; debitTotal: string; creditTotal: string }>();
+
+    return rows.map(r => ({
+      accountCode: r.accountCode,
+      debit: parseInt(r.debitTotal || '0', 10),
+      credit: parseInt(r.creditTotal || '0', 10),
+    }));
+  }
+
   private getCacheKey(query: BalanceQuery): string {
     return `${query.channelId}:${query.accountCode}:${query.startDate || ''}:${query.endDate || ''}:${query.customerId || ''}:${query.supplierId || ''}:${query.orderId || ''}:${query.openSessionId || ''}`;
   }

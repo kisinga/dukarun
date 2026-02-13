@@ -155,6 +155,14 @@ export class CreditService {
       `Updated ${partyType} credit duration for ${entityId} to ${creditDuration} days`
     );
 
+    if (this.auditService) {
+      await this.auditService.log(ctx, `${partyType}.credit.duration_changed`, {
+        entityType: 'Customer',
+        entityId: entityId.toString(),
+        data: { creditDuration },
+      });
+    }
+
     const outstandingAmount = await this.getBalance(ctx, entityId, partyType);
     return this.mapToSummary(customer, outstandingAmount, partyType);
   }

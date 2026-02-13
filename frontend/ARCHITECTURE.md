@@ -603,6 +603,10 @@ Dashboard is **channel-specific** by default. Users with multi-company access ca
 - Location switcher dropdown (no longer needed)
 - Location-based filtering options
 
+**Fixed bottom bars (dashboard):**
+
+- Pages that use a fixed bottom bar (e.g. primary CTA like "Record Purchase") must use the `.dashboard-fixed-bottom` utility (see `styles/_dashboard.scss`) so the bar respects the layout: on desktop it does not extend under the left sidebar (`w-64`), and on mobile it sits above the bottom nav (`h-14`). Use this class for any sticky/fixed footer inside the dashboard main content to keep the design language consistent.
+
 ### Component Architecture
 
 **DashboardLayoutComponent:**

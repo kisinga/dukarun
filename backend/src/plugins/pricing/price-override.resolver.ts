@@ -1,5 +1,7 @@
 import { Args, Mutation, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, RequestContext } from '@vendure/core';
+import { AuditLog as AuditLogDecorator } from '../../infrastructure/audit/audit-log.decorator';
+import { AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
 import { OverridePricePermission } from './price-override.permission';
 import {
   PriceOverrideService,
@@ -12,6 +14,11 @@ export class PriceOverrideResolver {
 
   @Mutation()
   @Allow(OverridePricePermission.Permission)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.PRICE_OVERRIDE_APPLIED,
+    entityType: 'OrderLine',
+    extractEntityId: (_result, args) => args.input?.orderLineId ?? null,
+  })
   async setOrderLineCustomPrice(
     @Ctx() ctx: RequestContext,
     @Args('input') input: SetOrderLineCustomPriceInput

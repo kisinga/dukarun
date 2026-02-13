@@ -6,6 +6,7 @@ import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import { Account } from '../../ledger/account.entity';
 import { JournalLine } from '../../ledger/journal-line.entity';
 import { PostingPayload, PostingService } from '../../ledger/posting.service';
+import { LedgerQueryService } from './ledger-query.service';
 import {
   ExpensePostingContext,
   InventoryPurchasePostingContext,
@@ -28,6 +29,15 @@ import {
   createSupplierPurchaseEntry,
 } from './posting-policy';
 
+/** Context for posting an order reversal entry (date, memo, meta for lines). */
+export interface OrderReversalPostingContext {
+  orderId: string;
+  orderCode: string;
+  customerId?: string;
+  /** Reversal date (YYYY-MM-DD). Defaults to today. */
+  reversalDate?: string;
+}
+
 @Injectable()
 export class LedgerPostingService {
   private readonly logger = new Logger(LedgerPostingService.name);
@@ -35,6 +45,7 @@ export class LedgerPostingService {
   constructor(
     private readonly postingService: PostingService,
     private readonly connection: TransactionalConnection,
+    private readonly ledgerQueryService: LedgerQueryService,
     @Optional() private readonly tracingService?: TracingService,
     @Optional() private readonly metricsService?: MetricsService
   ) {}
@@ -159,6 +170,65 @@ export class LedgerPostingService {
     this.logger.log(
       `Posted payment allocation entry for payment ${sourceId}, order ${context.orderCode}`
     );
+  }
+
+  /**
+   * Post a single order reversal journal entry.
+   * Aggregates the order's ledger footprint (CreditSale + PaymentAllocation or Payment entries), then posts the opposite of each net per account.
+   * Idempotent: sourceId = `${orderId}-reversal` so re-posting returns existing entry.
+   */
+  async postOrderReversal(
+    ctx: RequestContext,
+    orderId: string,
+    context: OrderReversalPostingContext
+  ): Promise<void> {
+    const channelId = ctx.channelId as number;
+    const footprint = await this.ledgerQueryService.getOrderLedgerFootprint(channelId, orderId);
+    if (footprint.length === 0) {
+      throw new Error(
+        `Order ${context.orderCode} has no ledger entries to reverse. Ensure the order has been posted (credit sale or payments).`
+      );
+    }
+
+    const reversalDate = context.reversalDate ?? new Date().toISOString().slice(0, 10);
+    const baseMeta: Record<string, string> = {
+      orderId: context.orderId,
+      orderCode: context.orderCode,
+    };
+    if (context.customerId) {
+      baseMeta.customerId = context.customerId;
+    }
+
+    const lines = footprint
+      .map(({ accountCode, debit, credit }) => ({
+        accountCode,
+        debit: credit,
+        credit: debit,
+        meta: baseMeta,
+      }))
+      .filter(l => (l.debit ?? 0) > 0 || (l.credit ?? 0) > 0);
+
+    if (lines.length === 0) {
+      throw new Error(`Order ${context.orderCode} footprint has no net amounts to reverse.`);
+    }
+
+    const accountCodes = lines.map(l => l.accountCode);
+    await this.ensureAccountsExist(ctx, accountCodes);
+
+    const payload: PostingPayload = {
+      channelId,
+      entryDate: reversalDate,
+      memo: `Order reversal for order ${context.orderCode}`,
+      lines,
+    };
+
+    const sourceId = `${orderId}-reversal`;
+    await this.postingService.post(ctx, 'OrderReversal', sourceId, payload);
+
+    for (const code of accountCodes) {
+      this.ledgerQueryService.invalidateCache(channelId, code);
+    }
+    this.logger.log(`Posted order reversal entry for order ${context.orderCode}`);
   }
 
   /**

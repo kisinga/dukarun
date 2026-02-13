@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { In } from 'typeorm';
 import { RequestContext, TransactionalConnection } from '@vendure/core';
 import { Reconciliation, ReconciliationScope } from '../../domain/recon/reconciliation.entity';
 import { ReconciliationAccount } from '../../domain/recon/reconciliation-account.entity';
 import { Account } from '../../ledger/account.entity';
 import { AccountBalanceService } from './account-balance.service';
+import { FinancialService } from './financial.service';
 import {
   ReconciliationStatus,
   ScopeReconciliationStatus,
@@ -39,23 +41,142 @@ export class ReconciliationService {
 
   constructor(
     private readonly connection: TransactionalConnection,
-    private readonly accountBalanceService: AccountBalanceService
+    private readonly accountBalanceService: AccountBalanceService,
+    private readonly financialService: FinancialService
   ) {}
 
   /**
-   * Create reconciliation record
+   * Create reconciliation record.
+   * For scope=manual: forces range to today, runs in one transaction, and posts variance to the ledger per account.
    */
   async createReconciliation(
     ctx: RequestContext,
     input: CreateReconciliationInput
   ): Promise<Reconciliation> {
-    const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
+    if (input.scope === 'manual') {
+      return this.createManualReconciliationWithPosting(ctx, input);
+    }
+    return this.createReconciliationRecordOnly(ctx, input);
+  }
 
-    // Calculate variance
+  /**
+   * Manual reconciliation: snapshot as of today, post variance so ledger matches declared.
+   */
+  private async createManualReconciliationWithPosting(
+    ctx: RequestContext,
+    input: CreateReconciliationInput
+  ): Promise<Reconciliation> {
+    const today = new Date().toISOString().slice(0, 10);
+    return this.connection.withTransaction(ctx, async txCtx => {
+      const accountRepo = this.connection.getRepository(txCtx, Account);
+      const declared = input.accountDeclaredAmounts ?? {};
+      const accountIds = input.accountIds ?? [];
+
+      if (accountIds.length === 0) {
+        return this.createReconciliationRecordOnly(txCtx, {
+          ...input,
+          rangeStart: today,
+          rangeEnd: today,
+          actualBalance: '0',
+        });
+      }
+
+      const accounts = await accountRepo.find({
+        where: { id: In(accountIds) },
+        select: ['id', 'code'],
+      });
+      const accountById = new Map(accounts.map(a => [a.id, a]));
+
+      let expectedSum = 0;
+      let actualSum = 0;
+      const perAccount: Array<{
+        accountId: string;
+        code: string;
+        expectedCents: number;
+        declaredCents: number;
+        varianceCents: number;
+      }> = [];
+
+      for (const accountId of accountIds) {
+        const account = accountById.get(accountId);
+        if (!account) continue;
+        const balance = await this.accountBalanceService.getAccountBalance(
+          txCtx,
+          account.code,
+          input.channelId,
+          today
+        );
+        const expectedCents = balance.balance;
+        const declaredCents = parseInt(declared[accountId] ?? '0', 10) || 0;
+        const varianceCents = declaredCents - expectedCents;
+        expectedSum += expectedCents;
+        actualSum += declaredCents;
+        perAccount.push({
+          accountId,
+          code: account.code,
+          expectedCents,
+          declaredCents,
+          varianceCents,
+        });
+      }
+
+      const reconciliationRepo = this.connection.getRepository(txCtx, Reconciliation);
+      const createdBy = txCtx.activeUserId ? parseInt(txCtx.activeUserId.toString(), 10) : 0;
+      const varianceAmount = (expectedSum - actualSum).toString();
+
+      const reconciliation = reconciliationRepo.create({
+        channelId: input.channelId,
+        scope: 'manual',
+        scopeRefId: input.scopeRefId,
+        rangeStart: today,
+        rangeEnd: today,
+        status: 'draft',
+        expectedBalance: String(expectedSum),
+        actualBalance: String(actualSum),
+        varianceAmount,
+        notes: input.notes || null,
+        createdBy,
+      });
+      const saved = await reconciliationRepo.save(reconciliation);
+
+      const junctionRepo = this.connection.getRepository(txCtx, ReconciliationAccount);
+      const rows = accountIds.map(id =>
+        junctionRepo.create({
+          reconciliationId: saved.id,
+          accountId: id,
+          declaredAmountCents: declared[id] ?? null,
+        })
+      );
+      await junctionRepo.save(rows);
+
+      for (const { code, varianceCents } of perAccount) {
+        if (varianceCents !== 0) {
+          await this.financialService.postVarianceAdjustment(
+            txCtx,
+            'manual',
+            code,
+            varianceCents,
+            'Manual reconciliation',
+            saved.id
+          );
+        }
+      }
+
+      return saved;
+    });
+  }
+
+  /**
+   * Create reconciliation record only (no ledger posting). Used for non-manual scopes.
+   */
+  private async createReconciliationRecordOnly(
+    ctx: RequestContext,
+    input: CreateReconciliationInput
+  ): Promise<Reconciliation> {
+    const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
     const expectedBalance = input.expectedBalance ? BigInt(input.expectedBalance) : BigInt(0);
     const actualBalance = BigInt(input.actualBalance);
     const varianceAmount = (expectedBalance - actualBalance).toString();
-
     const createdBy = ctx.activeUserId ? parseInt(ctx.activeUserId.toString(), 10) : 0;
 
     const reconciliation = reconciliationRepo.create({
@@ -71,7 +192,6 @@ export class ReconciliationService {
       notes: input.notes || null,
       createdBy,
     });
-
     const saved = await reconciliationRepo.save(reconciliation);
 
     if (input.accountIds?.length) {
@@ -147,6 +267,48 @@ export class ReconciliationService {
       periodEndDate,
       scopes,
     };
+  }
+
+  /**
+   * Get ledger balance (in cents) for each of the given account codes as of a date.
+   * Used by shift modal prefill (clearing accounts).
+   */
+  async getAccountBalancesForCodes(
+    ctx: RequestContext,
+    channelId: number,
+    accountCodes: string[],
+    asOfDate?: string
+  ): Promise<Array<{ accountCode: string; accountName: string; balanceCents: string }>> {
+    if (accountCodes.length === 0) return [];
+
+    const accountRepo = this.connection.getRepository(ctx, Account);
+    const accounts = await accountRepo.find({
+      where: { channelId, code: In(accountCodes), isActive: true },
+    });
+
+    const result: Array<{ accountCode: string; accountName: string; balanceCents: string }> = [];
+    for (const account of accounts) {
+      try {
+        const balance = await this.accountBalanceService.getAccountBalance(
+          ctx,
+          account.code,
+          channelId,
+          asOfDate
+        );
+        result.push({
+          accountCode: account.code,
+          accountName: account.name,
+          balanceCents: String(balance.balance),
+        });
+      } catch {
+        result.push({
+          accountCode: account.code,
+          accountName: account.name,
+          balanceCents: '0',
+        });
+      }
+    }
+    return result;
   }
 
   /**

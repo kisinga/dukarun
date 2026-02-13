@@ -186,9 +186,9 @@ describe('PaymentAllocationService.paySingleOrder', () => {
     } as any;
     mockOrderService = {
       findOne: jest.fn(),
-      addManualPaymentToOrder: jest.fn(),
     };
     mockPaymentService = {
+      createPayment: jest.fn(),
       settlePayment: jest.fn(),
     };
     mockFinancialService = {
@@ -300,11 +300,9 @@ describe('PaymentAllocationService.paySingleOrder', () => {
       metadata: { allocatedAmount: 5000 },
       createdAt: new Date(),
     };
-    mockOrderService.findOne
-      .mockResolvedValueOnce(order)
-      .mockResolvedValueOnce({ ...order, payments: [payment] });
-    mockOrderService.addManualPaymentToOrder.mockResolvedValue({ id: order.id });
-    mockPaymentService.settlePayment.mockResolvedValue(undefined);
+    mockOrderService.findOne.mockResolvedValue(order);
+    mockPaymentService.createPayment.mockResolvedValue(payment);
+    mockPaymentService.settlePayment.mockResolvedValue({ ...payment, state: 'Settled' });
     mockFinancialService.recordPaymentAllocation.mockResolvedValue(undefined);
 
     await service.paySingleOrder(ctx, 'order-1', 5000, undefined, undefined, 'CASH_ON_HAND');
@@ -312,6 +310,13 @@ describe('PaymentAllocationService.paySingleOrder', () => {
     expect(mockChartOfAccountsService.validatePaymentSourceAccount).toHaveBeenCalledWith(
       ctx,
       'CASH_ON_HAND'
+    );
+    expect(mockPaymentService.createPayment).toHaveBeenCalledWith(
+      ctx,
+      order,
+      5000,
+      expect.any(String),
+      expect.objectContaining({ allocatedAmount: 5000 })
     );
     expect(mockFinancialService.recordPaymentAllocation).toHaveBeenCalled();
     const recordCall = mockFinancialService.recordPaymentAllocation.mock.calls[0];
@@ -330,11 +335,9 @@ describe('PaymentAllocationService.paySingleOrder', () => {
       metadata: { allocatedAmount: 5000 },
       createdAt: new Date(),
     };
-    mockOrderService.findOne
-      .mockResolvedValueOnce(order)
-      .mockResolvedValueOnce({ ...order, payments: [payment] });
-    mockOrderService.addManualPaymentToOrder.mockResolvedValue({ id: order.id });
-    mockPaymentService.settlePayment.mockResolvedValue(undefined);
+    mockOrderService.findOne.mockResolvedValue(order);
+    mockPaymentService.createPayment.mockResolvedValue(payment);
+    mockPaymentService.settlePayment.mockResolvedValue({ ...payment, state: 'Settled' });
     mockFinancialService.recordPaymentAllocation.mockResolvedValue(undefined);
 
     await service.paySingleOrder(ctx, 'order-1', 5000);

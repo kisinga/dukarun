@@ -1,5 +1,7 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext, Order } from '@vendure/core';
+import { AuditLog as AuditLogDecorator } from '../../infrastructure/audit/audit-log.decorator';
+import { AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
 import {
   PaymentAllocationService,
   PaymentAllocationInput,
@@ -29,6 +31,10 @@ export class PaymentAllocationResolver {
 
   @Mutation()
   @Allow(Permission.UpdateOrder)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.PAYMENT_ALLOCATED,
+    extractEntityId: (_result, args) => args.input?.customerId ?? null,
+  })
   async allocateBulkPayment(
     @Ctx() ctx: RequestContext,
     @Args('input') input: PaymentAllocationInput
@@ -38,6 +44,11 @@ export class PaymentAllocationResolver {
 
   @Mutation()
   @Allow(Permission.UpdateOrder)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.PAYMENT_SINGLE_ORDER,
+    entityType: 'Order',
+    extractEntityId: (_result, args) => args.input?.orderId ?? null,
+  })
   async paySingleOrder(
     @Ctx() ctx: RequestContext,
     @Args('input') input: PaySingleOrderInput

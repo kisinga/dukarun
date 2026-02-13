@@ -98,7 +98,7 @@ export class DashboardLayoutComponent implements OnInit {
         items: [
           { label: 'Sell', icon: 'sell', route: '/dashboard/sell' },
           { label: 'Products', icon: 'products', route: '/dashboard/products' },
-          { label: 'Sales', icon: 'orders', route: '/dashboard/orders' },
+          { label: 'Sales', icon: 'sales', route: '/dashboard/orders' },
           { label: 'Purchases', icon: 'purchases', route: '/dashboard/purchases' },
           {
             label: 'Stock Adjustments',
@@ -389,30 +389,22 @@ export class DashboardLayoutComponent implements OnInit {
     this.dayModalPreviousClosing.set([]);
     this.dayModalExpectedClosing.set([]);
     this.dayModalConfirmStep.set(false);
-    this.cashierSessionService.getChannelReconciliationConfig(channelId).subscribe((config) => {
-      const cashierControlled = config.filter((c) => c.isCashierControlled);
+    this.cashierSessionService.getShiftModalPrefillData(channelId).subscribe((data) => {
+      const cashierControlled = data.config.filter((c) => c.isCashierControlled);
       this.dayModalConfig.set(cashierControlled);
-      const balances: Record<string, string> = {};
-      cashierControlled.forEach((c) => (balances[c.ledgerAccountCode] = ''));
-      this.dayModalBalances.set(balances);
+      this.dayModalPreviousClosing.set(data.balances);
 
-      // Fetch previous closing balances and autofill
-      this.cashierSessionService.getLastClosingBalances(channelId).subscribe((prev) => {
-        this.dayModalPreviousClosing.set(prev);
-        if (prev.length > 0) {
-          const autofilled: Record<string, string> = {};
-          for (const c of cashierControlled) {
-            const match = prev.find((p) => p.accountCode === c.ledgerAccountCode);
-            if (match) {
-              const cents = parseInt(match.balanceCents, 10);
-              autofilled[c.ledgerAccountCode] = isNaN(cents) ? '' : (cents / 100).toFixed(2);
-            } else {
-              autofilled[c.ledgerAccountCode] = '';
-            }
-          }
-          this.dayModalBalances.set(autofilled);
+      const autofilled: Record<string, string> = {};
+      for (const c of cashierControlled) {
+        const match = data.balances.find((b) => b.accountCode === c.ledgerAccountCode);
+        if (match) {
+          const cents = parseInt(match.balanceCents, 10);
+          autofilled[c.ledgerAccountCode] = isNaN(cents) ? '' : (cents / 100).toFixed(2);
+        } else {
+          autofilled[c.ledgerAccountCode] = '';
         }
-      });
+      }
+      this.dayModalBalances.set(autofilled);
     });
   }
 
@@ -431,20 +423,28 @@ export class DashboardLayoutComponent implements OnInit {
     this.dayModalPreviousClosing.set([]);
     this.dayModalExpectedClosing.set([]);
     this.dayModalConfirmStep.set(false);
-    this.cashierSessionService.getChannelReconciliationConfig(channelId).subscribe((config) => {
-      const cashierControlled = config.filter((c) => c.isCashierControlled);
+    this.cashierSessionService.getShiftModalPrefillData(channelId).subscribe((data) => {
+      const cashierControlled = data.config.filter((c) => c.isCashierControlled);
       this.dayModalConfig.set(cashierControlled);
-      const balances: Record<string, string> = {};
-      cashierControlled.forEach((c) => (balances[c.ledgerAccountCode] = ''));
-      this.dayModalBalances.set(balances);
+      this.dayModalExpectedClosing.set(
+        data.balances.map((b) => ({
+          accountCode: b.accountCode,
+          accountName: b.accountName,
+          expectedBalanceCents: b.balanceCents,
+        })),
+      );
 
-      // Fetch expected closing balances for variance display
-      const sessionId = typeof session.id === 'string' ? session.id.trim() : '';
-      if (sessionId) {
-        this.cashierSessionService.getExpectedClosingBalances(sessionId).subscribe((expected) => {
-          this.dayModalExpectedClosing.set(expected);
-        });
+      const autofilled: Record<string, string> = {};
+      for (const c of cashierControlled) {
+        const match = data.balances.find((b) => b.accountCode === c.ledgerAccountCode);
+        if (match) {
+          const cents = parseInt(match.balanceCents, 10);
+          autofilled[c.ledgerAccountCode] = isNaN(cents) ? '' : (cents / 100).toFixed(2);
+        } else {
+          autofilled[c.ledgerAccountCode] = '';
+        }
       }
+      this.dayModalBalances.set(autofilled);
     });
   }
 

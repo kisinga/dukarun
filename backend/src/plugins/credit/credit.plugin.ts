@@ -18,6 +18,7 @@ import { OrderCreationService } from '../../services/orders/order-creation.servi
 import { OrderFulfillmentService } from '../../services/orders/order-fulfillment.service';
 import { OrderItemService } from '../../services/orders/order-item.service';
 import { OrderPaymentService } from '../../services/orders/order-payment.service';
+import { OrderReversalService } from '../../services/orders/order-reversal.service';
 import { OrderStateService } from '../../services/orders/order-state.service';
 import { PriceOverrideService } from '../../services/orders/price-override.service';
 import { PaymentAllocationService } from '../../services/payments/payment-allocation.service';
@@ -31,7 +32,10 @@ import { PaymentAllocationResolver } from './payment-allocation.resolver';
 import {
   ApproveCustomerCreditPermission,
   ManageCustomerCreditLimitPermission,
+  ReverseOrderPermission,
 } from './permissions';
+import { OrderReversalApprovalSubscriber } from './order-reversal-approval.subscriber';
+import { OrderReversalResolver } from './order-reversal.resolver';
 import { ManageSupplierCreditPurchasesPermission } from './supplier-credit.permissions';
 import { SupplierCreditResolver } from './supplier-credit.resolver';
 import { SupplierPaymentAllocationResolver } from './supplier-payment-allocation.resolver';
@@ -150,6 +154,14 @@ const COMBINED_SCHEMA = gql`
     validateCredit(input: ValidateCreditInput!): CreditValidationResult!
   }
 
+  type OrderReversalResult {
+    order: Order!
+    """
+    True if the order had settled payments before reversal (refund is not automatic).
+    """
+    hadPayments: Boolean!
+  }
+
   extend type Mutation {
     approveCustomerCredit(input: ApproveCustomerCreditInput!): CreditSummary!
     updateCustomerCreditLimit(input: UpdateCustomerCreditLimitInput!): CreditSummary!
@@ -157,6 +169,7 @@ const COMBINED_SCHEMA = gql`
     createOrder(input: CreateOrderInput!): Order!
     allocateBulkPayment(input: PaymentAllocationInput!): PaymentAllocationResult!
     paySingleOrder(input: PaySingleOrderInput!): PaymentAllocationResult!
+    reverseOrder(orderId: ID!): OrderReversalResult!
   }
 
   """
@@ -261,6 +274,7 @@ const COMBINED_SCHEMA = gql`
     OrderFulfillmentService,
     OrderItemService,
     OrderPaymentService,
+    OrderReversalService,
     OrderStateService,
     // Payment services
     PaymentAllocationService,
@@ -269,6 +283,7 @@ const COMBINED_SCHEMA = gql`
     CreditResolver,
     CustomerFieldResolver,
     CreditPaymentSubscriber,
+    OrderReversalApprovalSubscriber,
     PaymentAllocationResolver,
     SupplierCreditResolver,
     SupplierPaymentAllocationResolver,
@@ -288,6 +303,7 @@ const COMBINED_SCHEMA = gql`
       ApproveCustomerCreditPermission,
       ManageCustomerCreditLimitPermission,
       ManageSupplierCreditPurchasesPermission,
+      ReverseOrderPermission,
     ];
 
     // Replace the placeholder credit payment handler with a DI-backed instance.
@@ -306,6 +322,7 @@ const COMBINED_SCHEMA = gql`
     resolvers: [
       CreditResolver,
       CustomerFieldResolver,
+      OrderReversalResolver,
       PaymentAllocationResolver,
       SupplierCreditResolver,
       SupplierPaymentAllocationResolver,

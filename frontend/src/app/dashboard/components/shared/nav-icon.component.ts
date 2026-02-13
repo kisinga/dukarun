@@ -38,7 +38,7 @@ import type { NavIcon } from '../../layout/nav.types';
           />
         </svg>
       }
-      @case ('orders') {
+      @case ('sales') {
         <svg
           xmlns="http://www.w3.org/2000/svg"
           class="h-5 w-5 shrink-0"

@@ -184,15 +184,19 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
                 </div>
               </div>
 
-              <!-- Quantity -->
-              <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-sm font-medium">Quantity</span>
-                  <div class="flex items-center gap-2">
+              <!-- Qty, Unit cost, Total — one row -->
+              <div
+                class="flex flex-wrap items-end gap-3 rounded-lg bg-base-100 p-3 border border-base-300"
+              >
+                <div class="flex flex-col gap-1 min-w-0">
+                  <span class="text-xs font-medium text-base-content/70">Qty</span>
+                  <div class="flex items-center gap-1">
                     <button
                       class="btn btn-sm btn-circle btn-ghost"
                       (click)="decrementQty()"
                       [disabled]="quantity() <= (allowFractional() ? 0.5 : 1)"
+                      type="button"
+                      aria-label="Decrease quantity"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -213,7 +217,12 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
                       class="input input-sm input-bordered text-center text-tabular w-20"
                       (input)="quantity.set(parseNum($any($event.target).value) || 1)"
                     />
-                    <button class="btn btn-sm btn-circle btn-ghost" (click)="incrementQty()">
+                    <button
+                      class="btn btn-sm btn-circle btn-ghost"
+                      (click)="incrementQty()"
+                      type="button"
+                      aria-label="Increase quantity"
+                    >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         class="h-4 w-4"
@@ -227,12 +236,8 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
                     </button>
                   </div>
                 </div>
-              </div>
-
-              <!-- Unit Cost -->
-              <div class="bg-base-100 rounded-lg p-3 border border-base-300">
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-sm font-medium">Unit Cost (KES)</span>
+                <div class="flex flex-col gap-1 min-w-0">
+                  <span class="text-xs font-medium text-base-content/70">Unit cost (KES)</span>
                   <input
                     type="number"
                     [value]="unitCost()"
@@ -242,12 +247,12 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
                     (input)="unitCost.set(parseNum($any($event.target).value) || 0)"
                   />
                 </div>
-              </div>
-
-              <!-- Line Total -->
-              <div class="flex items-center justify-between px-1">
-                <span class="text-sm text-base-content/70">Line Total</span>
-                <span class="text-lg font-bold">{{ formatCurrency(lineTotal()) }}</span>
+                <div class="flex flex-col gap-1 min-w-0 flex-1 sm:flex-initial">
+                  <span class="text-xs font-medium text-base-content/70">Total</span>
+                  <span class="text-lg font-bold text-tabular">{{
+                    formatCurrency(lineTotal())
+                  }}</span>
+                </div>
               </div>
 
               <!-- Add Button -->

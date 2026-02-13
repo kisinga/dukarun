@@ -1,7 +1,8 @@
 import { Logger } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext, TransactionalConnection } from '@vendure/core';
-import { AuditService } from '../../infrastructure/audit/audit.service';
+import { AuditLog as AuditLogDecorator } from '../../infrastructure/audit/audit-log.decorator';
+import { AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
 import { CashDrawerCount, CashCountType } from '../../domain/cashier/cash-drawer-count.entity';
 import { CashierSession } from '../../domain/cashier/cashier-session.entity';
 import { MpesaVerification } from '../../domain/cashier/mpesa-verification.entity';
@@ -61,8 +62,7 @@ export class PeriodManagementResolver {
     private readonly periodLockService: PeriodLockService,
     private readonly reconciliationValidatorService: ReconciliationValidatorService,
     private readonly chartOfAccountsService: ChartOfAccountsService,
-    private readonly financialService: FinancialService,
-    private readonly auditService: AuditService
+    private readonly financialService: FinancialService
   ) {}
 
   @Query()
@@ -121,6 +121,11 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(ManageReconciliationPermission.Permission)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.RECONCILIATION_CREATED,
+    entityType: 'Reconciliation',
+    extractEntityId: result => result?.id ?? null,
+  })
   async createReconciliation(
     @Ctx() ctx: RequestContext,
     @Args('input') input: any
@@ -142,6 +147,10 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(CreateInterAccountTransferPermission.Permission)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.EXPENSE_RECORDED,
+    extractEntityId: result => result?.sourceId ?? null,
+  })
   async recordExpense(
     @Ctx() ctx: RequestContext,
     @Args('input') input: { amount: number; sourceAccountCode: string; memo?: string }
@@ -156,6 +165,11 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(ManageReconciliationPermission.Permission)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.RECONCILIATION_VERIFIED,
+    entityType: 'Reconciliation',
+    extractEntityId: (_result, args) => args.reconciliationId ?? null,
+  })
   async verifyReconciliation(
     @Ctx() ctx: RequestContext,
     @Args('reconciliationId') reconciliationId: string
@@ -165,6 +179,10 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(CloseAccountingPeriodPermission.Permission)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.PERIOD_CLOSED,
+    extractEntityId: (_result, args) => args.periodEndDate ?? null,
+  })
   async closeAccountingPeriod(
     @Ctx() ctx: RequestContext,
     @Args('channelId') channelId: number,
@@ -175,6 +193,11 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(CloseAccountingPeriodPermission.Permission)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.PERIOD_OPENED,
+    entityType: 'AccountingPeriod',
+    extractEntityId: result => result?.id?.toString() ?? null,
+  })
   async openAccountingPeriod(
     @Ctx() ctx: RequestContext,
     @Args('channelId') channelId: number,
@@ -185,6 +208,11 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(ManageReconciliationPermission.Permission)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.INVENTORY_RECONCILIATION_CREATED,
+    entityType: 'Reconciliation',
+    extractEntityId: result => result?.id ?? null,
+  })
   async createInventoryReconciliation(
     @Ctx() ctx: RequestContext,
     @Args('input') input: any
@@ -194,6 +222,11 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(ManageReconciliationPermission.Permission)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.INTER_ACCOUNT_TRANSFER,
+    entityType: 'JournalEntry',
+    extractEntityId: result => result?.id ?? null,
+  })
   async createInterAccountTransfer(
     @Ctx() ctx: RequestContext,
     @Args('input') input: any
@@ -265,21 +298,6 @@ export class PeriodManagementResolver {
       lines,
     });
 
-    this.auditService
-      .log(ctx, 'inter_account_transfer.created', {
-        entityType: 'JournalEntry',
-        entityId: entry.id,
-        data: {
-          fromAccountCode: input.fromAccountCode,
-          toAccountCode: input.toAccountCode,
-          amount: input.amount,
-          feeAmount: input.feeAmount ?? undefined,
-          memo: input.memo ?? undefined,
-          transferId: sourceId,
-        },
-      })
-      .catch(() => {});
-
     return entry;
   }
 
@@ -325,6 +343,11 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(ManageReconciliationPermission.Permission)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.CASHIER_SESSION_OPENED,
+    entityType: 'CashierSession',
+    extractEntityId: result => result?.id ?? null,
+  })
   async openCashierSession(
     @Ctx() ctx: RequestContext,
     @Args('input') input: any
@@ -343,6 +366,10 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(ManageReconciliationPermission.Permission)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.CASHIER_SESSION_CLOSED,
+    extractEntityId: (_result, args) => args?.input?.sessionId ?? null,
+  })
   async closeCashierSession(@Ctx() ctx: RequestContext, @Args('input') input: any) {
     let sessionId = typeof input?.sessionId === 'string' ? input.sessionId.trim() : '';
     const channelId = typeof input?.channelId === 'number' ? input.channelId : undefined;
@@ -377,6 +404,11 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(ManageReconciliationPermission.Permission)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.CASHIER_SESSION_RECONCILIATION_CREATED,
+    entityType: 'Reconciliation',
+    extractEntityId: result => result?.id ?? null,
+  })
   async createCashierSessionReconciliation(
     @Ctx() ctx: RequestContext,
     @Args('sessionId') sessionId: string,
@@ -443,6 +475,36 @@ export class PeriodManagementResolver {
     @Args('channelId') channelId: number
   ): Promise<PaymentMethodReconciliationConfig[]> {
     return this.reconciliationValidatorService.getChannelReconciliationConfig(ctx, channelId);
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async shiftModalPrefillData(
+    @Ctx() ctx: RequestContext,
+    @Args('channelId') channelId: number
+  ): Promise<{
+    config: PaymentMethodReconciliationConfig[];
+    balances: Array<{ accountCode: string; accountName: string; balanceCents: string }>;
+  }> {
+    const config = await this.reconciliationValidatorService.getChannelReconciliationConfig(
+      ctx,
+      channelId
+    );
+    const cashierControlled = config.filter(c => c.isCashierControlled);
+    const accountCodes = [...new Set(cashierControlled.map(c => c.ledgerAccountCode))];
+    const today = new Date().toISOString().slice(0, 10);
+
+    const balances = await this.reconciliationService.getAccountBalancesForCodes(
+      ctx,
+      channelId,
+      accountCodes,
+      today
+    );
+
+    return {
+      config,
+      balances,
+    };
   }
 
   @Query()
@@ -540,6 +602,11 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(Permission.UpdateOrder) // Cashiers can record counts
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.CASH_COUNT_RECORDED,
+    entityType: 'CashDrawerCount',
+    extractEntityId: result => result?.count?.id ?? null,
+  })
   async recordCashCount(
     @Ctx() ctx: RequestContext,
     @Args('input') input: any
@@ -560,6 +627,11 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(Permission.UpdateOrder) // Cashiers can explain variance
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.VARIANCE_EXPLAINED,
+    entityType: 'CashDrawerCount',
+    extractEntityId: (_result, args) => args.countId ?? null,
+  })
   async explainVariance(
     @Ctx() ctx: RequestContext,
     @Args('countId') countId: string,
@@ -572,6 +644,11 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(ManageReconciliationPermission.Permission)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.CASH_COUNT_REVIEWED,
+    entityType: 'CashDrawerCount',
+    extractEntityId: (_result, args) => args.countId ?? null,
+  })
   async reviewCashCount(
     @Ctx() ctx: RequestContext,
     @Args('countId') countId: string,
@@ -584,6 +661,10 @@ export class PeriodManagementResolver {
 
   @Mutation()
   @Allow(Permission.UpdateOrder) // Cashiers can verify M-Pesa
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.MPESA_VERIFIED,
+    extractEntityId: (_result, args) => args?.input?.sessionId ?? null,
+  })
   async verifyMpesaTransactions(
     @Ctx() ctx: RequestContext,
     @Args('input') input: any

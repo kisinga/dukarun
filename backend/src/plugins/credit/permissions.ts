@@ -9,3 +9,8 @@ export const ManageCustomerCreditLimitPermission = new PermissionDefinition({
   name: 'ManageCustomerCreditLimit',
   description: 'Allows setting and adjusting customer credit limits.',
 });
+
+export const ReverseOrderPermission = new PermissionDefinition({
+  name: 'ReverseOrder',
+  description: 'Allows reversing an order (ledger reversal and mark order reversed).',
+});

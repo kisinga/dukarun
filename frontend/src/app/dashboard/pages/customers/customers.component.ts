@@ -16,8 +16,9 @@ import {
 } from '../../../core/services/stats/customer-stats.util';
 import { BulkPaymentModalComponent } from './components/bulk-payment-modal.component';
 import { CustomerAction, CustomerCardComponent } from './components/customer-card.component';
-import { CustomerSearchBarComponent } from './components/customer-search-bar.component';
 import type { CustomerStats } from '../../../core/services/stats/customer-stats.util';
+import { PageHeaderComponent } from '../../components/shared/page-header.component';
+import { ListSearchBarComponent } from '../../components/shared/list-search-bar.component';
 import { CustomerStatsComponent } from './components/customer-stats.component';
 import { CustomerTableRowComponent } from './components/customer-table-row.component';
 import { CustomerViewModalComponent } from './components/customer-view-modal.component';
@@ -42,7 +43,8 @@ import { PaginationComponent } from '../../components/shared/pagination.componen
     CommonModule,
     CustomerCardComponent,
     CustomerStatsComponent,
-    CustomerSearchBarComponent,
+    PageHeaderComponent,
+    ListSearchBarComponent,
     CustomerTableRowComponent,
     PaginationComponent,
     DeleteConfirmationModalComponent,

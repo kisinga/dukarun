@@ -35,49 +35,30 @@
 
 <div class="space-y-4 sm:space-y-5 lg:space-y-6 animate-stagger-children">
   <!-- Header -->
-  <app-page-header title="Products" subtitle="Manage your inventory">
-    <div actions class="flex items-center gap-1">
-      <button
-        class="btn btn-ghost btn-sm btn-square shrink-0 touch-manipulation"
-        (click)="refreshProducts()"
-        [class.loading]="isLoading()"
-        [disabled]="isLoading()"
-        title="Refresh"
+  <app-page-header
+    title="Products"
+    subtitle="Manage your inventory"
+    [isLoading]="isLoading()"
+    refreshTitle="Refresh products"
+    (refresh)="refreshProducts()"
+  >
+    <a
+      actions
+      routerLink="/dashboard/products/create"
+      class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
       >
-        @if (!isLoading()) {
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-        }
-      </button>
-      <a
-        routerLink="/dashboard/products/create"
-        class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-        </svg>
-        Add Product
-      </a>
-    </div>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+      </svg>
+      Add Product
+    </a>
   </app-page-header>
 
   <!-- Statistics Cards -->
@@ -88,177 +69,124 @@
   />
 
   <!-- Search & Filter Bar -->
-  <div class="card bg-base-100 shadow">
-    <div class="card-body p-4 gap-4">
-      <!-- Search Bar -->
-      <div class="w-full">
-        <app-product-search-bar
-          [searchQuery]="searchQuery()"
-          (searchQueryChange)="onSearchQueryChange($event)"
+  <app-list-search-bar
+    [searchQuery]="searchQuery()"
+    (searchQueryChange)="onSearchQueryChange($event)"
+    placeholder="Search by name or manufacturer..."
+  >
+    <!-- Active filter badges -->
+    @if (
+      searchQuery() ||
+      (selectedFacetValueIds()['manufacturer']?.length ?? 0) > 0 ||
+      (selectedFacetValueIds()['category']?.length ?? 0) > 0 ||
+      (selectedFacetValueIds()['tags']?.length ?? 0) > 0 ||
+      enabledFilter() !== 'all' ||
+      sortBy() ||
+      showLowStockOnly()
+    ) {
+      <div badges class="flex flex-wrap gap-1.5 items-center">
+        @for (code of facetCodes; track code) {
+          @if ((selectedFacetValueIds()[code]?.length ?? 0) > 0) {
+            <span class="badge badge-sm badge-outline gap-1.5">
+              {{ code | titlecase }}: {{ selectedFacetValueIds()[code]!.length }}
+              <button
+                class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
+                (click)="setFacetIds(code, [])"
+                type="button"
+              >
+                &times;
+              </button>
+            </span>
+          }
+        }
+        @if (enabledFilter() !== 'all') {
+          <span class="badge badge-sm badge-outline gap-1.5">
+            Status: {{ enabledFilter() | titlecase }}
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
+              (click)="setEnabledFilter('all')"
+              type="button"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (sortBy()) {
+          <span class="badge badge-sm badge-outline gap-1.5">
+            Sort: {{ sortBy() === 'name_asc' ? 'A-Z' : 'Z-A' }}
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
+              (click)="setSortBy(null)"
+              type="button"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (showLowStockOnly()) {
+          <span class="badge badge-sm badge-warning gap-1.5">
+            Low Stock
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
+              (click)="toggleLowStockFilter(false)"
+              type="button"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs ml-auto"
+          (click)="clearAllFilters(); toggleLowStockFilter(false)"
+        >
+          Clear all
+        </button>
+      </div>
+    }
+
+    <!-- Filters -->
+    <div filters class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+      @for (code of facetCodes; track code) {
+        <app-product-list-facet-selector
+          [facetCode]="code"
+          [selectedIds]="selectedFacetValueIds()[code] ?? []"
+          (selectedIdsChange)="setFacetIds(code, $event)"
         />
-      </div>
-
-      <!-- Filters Row -->
-      <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap">
-        <!-- Facet Filters -->
-        <div class="flex flex-wrap gap-2 flex-1">
-          @for (code of facetCodes; track code) {
-            <app-product-list-facet-selector
-              [facetCode]="code"
-              [selectedIds]="selectedFacetValueIds()[code] ?? []"
-              (selectedIdsChange)="setFacetIds(code, $event)"
-            />
-          }
-        </div>
-
-        <!-- Status & Sort Filters -->
-        <div class="flex gap-2 items-center flex-wrap">
-          <select
-            class="select select-bordered select-sm min-w-[120px]"
-            [value]="enabledFilter()"
-            (change)="setEnabledFilter($any($event.target).value)"
-          >
-            <option value="all">All status</option>
-            <option value="active">Active</option>
-            <option value="disabled">Disabled</option>
-          </select>
-
-          <select
-            class="select select-bordered select-sm min-w-[140px]"
-            [value]="sortBy() ?? ''"
-            (change)="setSortBy($any($event.target).value || null)"
-          >
-            <option value="">Sort by...</option>
-            <option value="name_asc">Name A–Z</option>
-            <option value="name_desc">Name Z–A</option>
-          </select>
-
-          <label
-            class="label cursor-pointer gap-2 px-3 py-2 rounded-lg border border-base-300 bg-base-100 hover:bg-base-200 transition-colors min-w-fit"
-            [class.border-warning]="showLowStockOnly()"
-            [class.bg-warning/10]="showLowStockOnly()"
-          >
-            <span class="label-text font-medium text-sm whitespace-nowrap">Low Stock</span>
-            <input
-              type="checkbox"
-              class="toggle toggle-warning toggle-sm"
-              [checked]="showLowStockOnly()"
-              (change)="toggleLowStockFilter($any($event.target).checked)"
-            />
-          </label>
-        </div>
-      </div>
-
-      <!-- Active Filters & Clear -->
-      @if (
-        searchQuery() ||
-        (selectedFacetValueIds()['manufacturer']?.length ?? 0) > 0 ||
-        (selectedFacetValueIds()['category']?.length ?? 0) > 0 ||
-        (selectedFacetValueIds()['tags']?.length ?? 0) > 0 ||
-        enabledFilter() !== 'all' ||
-        sortBy() ||
-        showLowStockOnly()
-      ) {
-        <div class="flex flex-wrap gap-2 items-center pt-2 border-t border-base-300">
-          <span class="text-xs font-medium text-base-content/60">Active filters:</span>
-
-          @if (searchQuery()) {
-            <span class="badge badge-sm badge-outline gap-1.5">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-3 w-3"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              "{{ searchQuery() }}"
-              <button
-                class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
-                (click)="onSearchQueryChange('')"
-                type="button"
-                aria-label="Clear search"
-              >
-                ×
-              </button>
-            </span>
-          }
-
-          @for (code of facetCodes; track code) {
-            @if ((selectedFacetValueIds()[code]?.length ?? 0) > 0) {
-              <span class="badge badge-sm badge-outline gap-1.5">
-                {{ code | titlecase }}: {{ selectedFacetValueIds()[code]!.length }}
-                <button
-                  class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
-                  (click)="setFacetIds(code, [])"
-                  type="button"
-                  [attr.aria-label]="'Clear ' + code"
-                >
-                  ×
-                </button>
-              </span>
-            }
-          }
-
-          @if (enabledFilter() !== 'all') {
-            <span class="badge badge-sm badge-outline gap-1.5">
-              Status: {{ enabledFilter() | titlecase }}
-              <button
-                class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
-                (click)="setEnabledFilter('all')"
-                type="button"
-                aria-label="Clear status"
-              >
-                ×
-              </button>
-            </span>
-          }
-
-          @if (sortBy()) {
-            <span class="badge badge-sm badge-outline gap-1.5">
-              Sort: {{ sortBy() === 'name_asc' ? 'A–Z' : 'Z–A' }}
-              <button
-                class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
-                (click)="setSortBy(null)"
-                type="button"
-                aria-label="Clear sort"
-              >
-                ×
-              </button>
-            </span>
-          }
-
-          @if (showLowStockOnly()) {
-            <span class="badge badge-sm badge-warning gap-1.5">
-              Low Stock Only
-              <button
-                class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
-                (click)="toggleLowStockFilter(false)"
-                type="button"
-                aria-label="Clear filter"
-              >
-                ×
-              </button>
-            </span>
-          }
-
-          <button
-            type="button"
-            class="btn btn-ghost btn-xs ml-auto"
-            (click)="clearAllFilters(); toggleLowStockFilter(false)"
-          >
-            Clear all filters
-          </button>
-        </div>
       }
+      <select
+        class="select select-bordered select-sm w-full"
+        [value]="enabledFilter()"
+        (change)="setEnabledFilter($any($event.target).value)"
+      >
+        <option value="all">All status</option>
+        <option value="active">Active</option>
+        <option value="disabled">Disabled</option>
+      </select>
+      <select
+        class="select select-bordered select-sm w-full"
+        [value]="sortBy() ?? ''"
+        (change)="setSortBy($any($event.target).value || null)"
+      >
+        <option value="">Sort by...</option>
+        <option value="name_asc">Name A-Z</option>
+        <option value="name_desc">Name Z-A</option>
+      </select>
+      <label
+        class="flex items-center justify-center gap-2 cursor-pointer rounded-lg border border-base-300 px-3 h-8 bg-base-100 hover:bg-base-200 transition-colors text-sm"
+        [class.border-warning]="showLowStockOnly()"
+        [class.bg-warning/10]="showLowStockOnly()"
+      >
+        <span class="whitespace-nowrap">Low Stock</span>
+        <input
+          type="checkbox"
+          class="checkbox checkbox-warning checkbox-xs"
+          [checked]="showLowStockOnly()"
+          (change)="toggleLowStockFilter($any($event.target).checked)"
+        />
+      </label>
     </div>
-  </div>
+  </app-list-search-bar>
 
   <!-- Error Alert -->
   @if (error()) {
@@ -368,27 +296,6 @@
 
   <!-- Products List -->
   @else {
-    <!-- List Controls -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1">
-      <div class="text-sm text-base-content/60">
-        Showing {{ (currentPage() - 1) * itemsPerPage() + 1 }} to {{ endItem() }} of
-        {{ totalItems() }} products
-      </div>
-
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-base-content/60">Per page:</span>
-        <select
-          class="select select-sm select-bordered"
-          [value]="itemsPerPage()"
-          (change)="changeItemsPerPage(+$any($event.target).value)"
-        >
-          @for (option of pageOptions; track option) {
-            <option [value]="option">{{ option }}</option>
-          }
-        </select>
-      </div>
-    </div>
-
     <!-- Mobile: Card View -->
     <div class="lg:hidden space-y-4">
       @for (product of displayedProducts(); track trackByProductId($index, product)) {
@@ -441,8 +348,11 @@
       [totalPages]="totalPages()"
       [totalItems]="totalItems()"
       [itemsPerPage]="itemsPerPage()"
-      [itemLabel]="'products'"
+      [pageOptions]="pageOptions"
+      [showItemsPerPage]="true"
+      itemLabel="products"
       (pageChange)="goToPage($event)"
+      (itemsPerPageChange)="changeItemsPerPage($event)"
     />
   }
 </div>

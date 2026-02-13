@@ -113,12 +113,6 @@ describe('Cashier-ledger flows', () => {
           .mockImplementation(() => Promise.resolve({ id: 'order-1', customFields: {} })),
         update: jest.fn().mockImplementation(() => Promise.resolve()),
       } as any;
-      const mockOrderService = {
-        findOne: jest.fn(),
-        addManualPaymentToOrder: jest
-          .fn()
-          .mockImplementation(() => Promise.resolve({ id: 'order-1' })),
-      } as any;
       const order = {
         id: 'order-1',
         code: 'ORD-001',
@@ -136,16 +130,20 @@ describe('Cashier-ledger flows', () => {
         metadata: { allocatedAmount: 5000 },
         createdAt: new Date(),
       };
-      mockOrderService.findOne
-        .mockResolvedValueOnce(order)
-        .mockResolvedValueOnce({ ...order, payments: [payment] });
+      const mockOrderService = {
+        findOne: () => Promise.resolve(order),
+      } as any;
+      const mockPaymentServiceFlowA = {
+        createPayment: () => Promise.resolve(payment),
+        settlePayment: () => Promise.resolve({ ...payment, state: 'Settled' }),
+      } as any;
       const paymentAllocationService = new PaymentAllocationService(
         {
           withTransaction: (c: any, fn: (t: any) => Promise<any>) => fn(c),
           getRepository: () => mockOrderRepo,
         } as any,
         mockOrderService,
-        { settlePayment: jest.fn().mockImplementation(() => Promise.resolve()) } as any,
+        mockPaymentServiceFlowA,
         mockPaymentFinancialService,
         {} as any,
         {
@@ -188,12 +186,6 @@ describe('Cashier-ledger flows', () => {
           .mockImplementation(() => Promise.resolve({ id: 'order-1', customFields: {} })),
         update: jest.fn().mockImplementation(() => Promise.resolve()),
       } as any;
-      const mockOrderServiceFlowB = {
-        findOne: jest.fn(),
-        addManualPaymentToOrder: jest
-          .fn()
-          .mockImplementation(() => Promise.resolve({ id: 'order-1' })),
-      } as any;
       const orderFlowB = {
         id: 'order-1',
         code: 'ORD-001',
@@ -211,13 +203,17 @@ describe('Cashier-ledger flows', () => {
         metadata: { allocatedAmount: 5000 },
         createdAt: new Date(),
       };
-      mockOrderServiceFlowB.findOne
-        .mockResolvedValueOnce(orderFlowB)
-        .mockResolvedValueOnce({ ...orderFlowB, payments: [paymentFlowB] });
+      const mockOrderServiceFlowB = {
+        findOne: () => Promise.resolve(orderFlowB),
+      } as any;
       const mockCashierSessionServiceFlowB = {
         requireOpenSession: jest
           .fn()
           .mockImplementation(() => Promise.resolve({ id: 'session-b', channelId: channel1Id })),
+      } as any;
+      const mockPaymentServiceFlowB = {
+        createPayment: () => Promise.resolve(paymentFlowB),
+        settlePayment: () => Promise.resolve({ ...paymentFlowB, state: 'Settled' }),
       } as any;
       const paymentAllocationServiceFlowB = new PaymentAllocationService(
         {
@@ -225,7 +221,7 @@ describe('Cashier-ledger flows', () => {
           getRepository: () => mockOrderRepo,
         } as any,
         mockOrderServiceFlowB,
-        { settlePayment: jest.fn().mockImplementation(() => Promise.resolve()) } as any,
+        mockPaymentServiceFlowB,
         mockFinancialService,
         {} as any,
         {
@@ -285,8 +281,7 @@ describe('Cashier-ledger flows', () => {
         mockPeriodLockService,
         {} as any,
         mockChartOfAccountsService,
-        mockFinancialService,
-        { log: jest.fn().mockReturnValue(Promise.resolve()) } as any
+        mockFinancialService
       );
 
       const result = await resolver.createInterAccountTransfer(ctx1, {
@@ -346,8 +341,7 @@ describe('Cashier-ledger flows', () => {
         mockPeriodLockService,
         {} as any,
         mockChartOfAccountsService,
-        mockFinancialServiceFlowD,
-        { log: jest.fn().mockReturnValue(Promise.resolve()) } as any
+        mockFinancialServiceFlowD
       );
 
       const input = {

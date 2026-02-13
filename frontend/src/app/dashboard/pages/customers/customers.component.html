@@ -24,58 +24,31 @@
 
 <div class="space-y-5 lg:space-y-6 animate-stagger-children">
   <!-- Header -->
-  <div class="flex items-start justify-between gap-4">
-    <div class="flex-1 min-w-0">
-      <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Customers</h1>
-      <p class="text-sm text-base-content/60 mt-1">Manage your customer database</p>
-    </div>
-
-    <div class="flex gap-2 shrink-0">
-      <button
-        (click)="refreshCustomers()"
-        class="btn btn-ghost btn-square btn-sm lg:btn-md"
-        [class.loading]="isLoading()"
-        title="Refresh customers"
+  <app-page-header
+    title="Customers"
+    subtitle="Manage your customer database"
+    [isLoading]="isLoading()"
+    refreshTitle="Refresh customers"
+    (refresh)="refreshCustomers()"
+  >
+    <button
+      actions
+      (click)="router.navigate(['/dashboard/customers/create'])"
+      class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
       >
-        @if (!isLoading()) {
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-        }
-      </button>
-      <button
-        class="btn btn-primary btn-sm lg:btn-md gap-2 hidden lg:flex"
-        (click)="router.navigate(['/dashboard/customers/create'])"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-          />
-        </svg>
-        Add Customer
-      </button>
-    </div>
-  </div>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+      </svg>
+      Add Customer
+    </button>
+  </app-page-header>
 
   <!-- Statistics Cards -->
   <app-customer-stats
@@ -90,18 +63,63 @@
   />
 
   <!-- Search Bar -->
-  <app-customer-search-bar
-    [searchQuery]="searchQuery()"
-    (searchChange)="searchQuery.set($event)"
-    [activeFilters]="{
-      verified: verifiedFilter(),
-      creditApproved: creditApprovedFilter(),
-      frozen: frozenFilter(),
-      recent: recentFilter(),
-    }"
-    [filterColors]="activeFilterColors()"
-    (clearFilter)="clearFilter($event.type)"
-  />
+  <app-list-search-bar
+    [(searchQuery)]="searchQuery"
+    placeholder="Search by name, email, or phone..."
+  >
+    @if (verifiedFilter() || creditApprovedFilter() || frozenFilter() || recentFilter()) {
+      <div badges class="flex flex-wrap gap-2">
+        @if (verifiedFilter()) {
+          <span class="badge badge-success gap-1.5">
+            Verified
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="clearFilter('verified')"
+              type="button"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (creditApprovedFilter()) {
+          <span class="badge badge-primary gap-1.5">
+            Credit Approved
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="clearFilter('creditApproved')"
+              type="button"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (frozenFilter()) {
+          <span class="badge badge-error gap-1.5">
+            Frozen
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="clearFilter('frozen')"
+              type="button"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (recentFilter()) {
+          <span class="badge badge-warning gap-1.5">
+            Recent
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="clearFilter('recent')"
+              type="button"
+            >
+              &times;
+            </button>
+          </span>
+        }
+      </div>
+    }
+  </app-list-search-bar>
 
   <!-- Error Alert -->
   @if (error()) {
@@ -200,27 +218,6 @@
 
   <!-- Customers List -->
   @else {
-    <!-- List Controls -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-1">
-      <div class="text-xs text-base-content/60">
-        Showing {{ (currentPage() - 1) * itemsPerPage() + 1 }} to {{ endItem() }} of
-        {{ filteredCustomers().length }} customers
-      </div>
-
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-base-content/60 hidden sm:inline">Per page:</span>
-        <select
-          class="select select-xs select-bordered"
-          [value]="itemsPerPage()"
-          (change)="changeItemsPerPage(+$any($event.target).value)"
-        >
-          @for (option of pageOptions; track option) {
-            <option [value]="option">{{ option }}</option>
-          }
-        </select>
-      </div>
-    </div>
-
     <!-- Mobile: Card View -->
     <div class="lg:hidden space-y-3">
       @for (customer of paginatedCustomers(); track trackByCustomerId($index, customer)) {

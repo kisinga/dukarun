@@ -2613,6 +2613,18 @@ export const GET_STOCK_ADJUSTMENTS = graphql(`
           previousStock
           newStock
           stockLocationId
+          variant {
+            id
+            name
+            sku
+            product {
+              name
+            }
+          }
+          stockLocation {
+            id
+            name
+          }
         }
         createdAt
         updatedAt
@@ -2747,6 +2759,26 @@ export const GET_CHANNEL_RECONCILIATION_CONFIG = graphql(`
       ledgerAccountCode
       isCashierControlled
       requiresReconciliation
+    }
+  }
+`);
+
+export const GET_SHIFT_MODAL_PREFILL_DATA = graphql(`
+  query GetShiftModalPrefillData($channelId: Int!) {
+    shiftModalPrefillData(channelId: $channelId) {
+      config {
+        paymentMethodId
+        paymentMethodCode
+        reconciliationType
+        ledgerAccountCode
+        isCashierControlled
+        requiresReconciliation
+      }
+      balances {
+        accountCode
+        accountName
+        balanceCents
+      }
     }
   }
 `);

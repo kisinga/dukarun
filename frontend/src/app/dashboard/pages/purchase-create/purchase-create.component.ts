@@ -4,6 +4,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -21,6 +22,8 @@ import { PurchaseService } from '../../../core/services/purchase.service';
 import { PurchaseDraft, PurchaseLineItem } from '../../../core/services/purchase.service.types';
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { SupplierService } from '../../../core/services/supplier.service';
+import { PageHeaderComponent } from '../../components/shared/page-header.component';
+import { CompanySearchSelectComponent } from '../shared/components/company-search-select.component';
 import { ProductSearchViewComponent } from '../shared/components/product-search-view.component';
 import { RejectionBannerComponent } from '../shared/components/rejection-banner.component';
 import { ApprovableFormBase } from '../shared/directives/approvable-form-base.directive';
@@ -32,6 +35,8 @@ import { PurchasePaymentSectionComponent } from './components/purchase-payment-s
   selector: 'app-purchase-create',
   imports: [
     CommonModule,
+    CompanySearchSelectComponent,
+    PageHeaderComponent,
     ProductSearchViewComponent,
     PurchaseItemEntryModalComponent,
     PurchaseLineItemsTableComponent,
@@ -39,179 +44,167 @@ import { PurchasePaymentSectionComponent } from './components/purchase-payment-s
     RejectionBannerComponent,
   ],
   template: `
-    <div class="min-h-screen bg-base-100">
-      <!-- Header -->
-      <div class="sticky top-0 z-10 bg-base-100 border-b border-base-200 px-4 py-3">
-        <div class="flex items-center justify-between">
-          <button (click)="goBack()" class="btn btn-ghost btn-sm btn-circle" aria-label="Go back">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 19l-7-7 7-7"
-              ></path>
-            </svg>
-          </button>
-          <h1 class="text-lg font-semibold">Record Purchase</h1>
-          <div class="w-10"></div>
+    <div class="space-y-4 sm:space-y-5 lg:space-y-6 animate-stagger-children pb-20 lg:pb-6">
+      <app-page-header
+        title="Record Purchase"
+        subtitle="Add supplier, items, and payment details"
+        [showRefresh]="false"
+      >
+        <button
+          actions
+          type="button"
+          (click)="goBack()"
+          class="btn btn-ghost btn-sm"
+          aria-label="Go back"
+        >
+          Cancel
+        </button>
+      </app-page-header>
+
+      <!-- Rejection banner (from rejected approval) -->
+      <app-rejection-banner [message]="rejectionMessage()" (dismiss)="dismissRejection()" />
+
+      <!-- Approval success banner -->
+      @if (approvalStatus() === 'approved') {
+        <div class="alert alert-success text-sm">
+          <span>Overdraft approved. You may proceed with the purchase.</span>
         </div>
-      </div>
+      }
 
-      <!-- Content -->
-      <div class="p-4 pb-28 space-y-4">
-        <!-- Rejection banner (from rejected approval) -->
-        <app-rejection-banner [message]="rejectionMessage()" (dismiss)="dismissRejection()" />
+      <!-- Error -->
+      @if (error()) {
+        <div class="alert alert-error text-sm">
+          <span>{{ error() }}</span>
+          <button (click)="clearError()" class="btn btn-ghost btn-xs">Dismiss</button>
+        </div>
+      }
 
-        <!-- Approval success banner -->
-        @if (approvalStatus() === 'approved') {
-          <div class="alert alert-success text-sm mb-4">
-            <span>Overdraft approved. You may proceed with the purchase.</span>
+      <!-- Overdraft confirmation -->
+      @if (showOverdraftConfirm()) {
+        <div class="alert alert-warning text-sm">
+          <div class="flex-1">
+            <p class="font-semibold">Insufficient account balance</p>
+            <p>Would you like to request overdraft approval to proceed?</p>
           </div>
-        }
-
-        <!-- Error -->
-        @if (error()) {
-          <div class="alert alert-error text-sm">
-            <span>{{ error() }}</span>
-            <button (click)="clearError()" class="btn btn-ghost btn-xs">Dismiss</button>
-          </div>
-        }
-
-        <!-- Overdraft confirmation -->
-        @if (showOverdraftConfirm()) {
-          <div class="alert alert-warning text-sm">
-            <div class="flex-1">
-              <p class="font-semibold">Insufficient account balance</p>
-              <p>Would you like to request overdraft approval to proceed?</p>
-            </div>
-            <div class="flex gap-2">
-              <button
-                class="btn btn-warning btn-sm"
-                (click)="requestOverdraftApproval()"
-                [disabled]="isRequestingApproval()"
-              >
-                @if (isRequestingApproval()) {
-                  <span class="loading loading-spinner loading-xs"></span>
-                }
-                Request Approval
-              </button>
-              <button class="btn btn-ghost btn-sm" (click)="cancelOverdraftRequest()">
-                Cancel
-              </button>
-            </div>
-          </div>
-        }
-
-        <!-- Approval requested success -->
-        @if (showApprovalRequestedMessage()) {
-          <div class="alert alert-info text-sm">
-            <span>Overdraft approval requested. You'll be notified when it's reviewed.</span>
-          </div>
-        }
-
-        <!-- Success -->
-        @if (showSuccessMessage()) {
-          <div class="alert alert-success text-sm">
-            <span>Purchase recorded successfully!</span>
-          </div>
-        }
-
-        @if (purchaseDraft(); as draft) {
-          <!-- Supplier + Date + Reference (inline) -->
-          <div class="space-y-2">
-            <select
-              class="select select-bordered select-sm w-full"
-              [value]="draft.supplierId || ''"
-              (change)="updateDraftField('supplierId', $any($event.target).value || null)"
+          <div class="flex gap-2">
+            <button
+              class="btn btn-warning btn-sm"
+              (click)="requestOverdraftApproval()"
+              [disabled]="isRequestingApproval()"
             >
-              <option value="">Select supplier...</option>
-              @for (supplier of suppliers(); track supplier.id) {
-                <option [value]="supplier.id">
-                  {{ supplier.firstName }} {{ supplier.lastName }}
-                  @if (supplier.emailAddress) {
-                    ({{ supplier.emailAddress }})
-                  }
-                </option>
+              @if (isRequestingApproval()) {
+                <span class="loading loading-spinner loading-xs"></span>
               }
-            </select>
-            <div class="grid grid-cols-2 gap-2">
-              <input
-                type="date"
-                class="input input-bordered input-sm"
-                [value]="formatDateForInput(draft.purchaseDate)"
-                (change)="
-                  updateDraftField('purchaseDate', parseDateInput($any($event.target).value))
-                "
-              />
-              <input
-                type="text"
-                class="input input-bordered input-sm"
-                placeholder="Invoice / reference"
-                [value]="draft.referenceNumber"
-                (input)="updateDraftField('referenceNumber', $any($event.target).value)"
-              />
-            </div>
+              Request Approval
+            </button>
+            <button class="btn btn-ghost btn-sm" (click)="cancelOverdraftRequest()">Cancel</button>
           </div>
+        </div>
+      }
 
-          <!-- Items -->
-          <div>
-            <div class="text-xs font-semibold uppercase tracking-wide text-base-content/50 mb-2">
-              Items
-              @if (draft.lines.length > 0) {
-                <span class="badge badge-xs badge-primary ml-1">{{ draft.lines.length }}</span>
-              }
-            </div>
-            <app-product-search-view
-              [searchResults]="productSearchResults()"
-              [isSearching]="isSearchingProducts()"
-              [placeholder]="'Search product by name or SKU...'"
-              [compact]="true"
-              [restrictVariantSelectionToInStock]="false"
-              (searchTermChange)="handleProductSearch($event)"
-              (productSelected)="onProductSelectedFromSearch($event)"
-              (variantSelected)="onVariantSelectedFromSearch($event)"
-            />
-            <div class="mt-2">
-              <app-purchase-line-items-table
-                [lineItems]="draft.lines"
-                (lineItemUpdate)="updateLineItem($event.index, $event.field, $event.value)"
-                (lineItemRemove)="removeLineItem($event)"
-              />
-            </div>
-          </div>
+      <!-- Approval requested success -->
+      @if (showApprovalRequestedMessage()) {
+        <div class="alert alert-info text-sm">
+          <span>Overdraft approval requested. You'll be notified when it's reviewed.</span>
+        </div>
+      }
 
-          <!-- Notes -->
-          <textarea
-            class="textarea textarea-bordered textarea-sm w-full"
-            rows="2"
-            placeholder="Notes (optional)"
-            [value]="draft.notes"
-            (input)="updateDraftField('notes', $any($event.target).value)"
-          ></textarea>
+      <!-- Success -->
+      @if (showSuccessMessage()) {
+        <div class="alert alert-success text-sm">
+          <span>Purchase recorded successfully!</span>
+        </div>
+      }
 
-          <!-- Payment -->
-          <div>
-            <div class="text-xs font-semibold uppercase tracking-wide text-base-content/50 mb-2">
-              Payment
-            </div>
-            <app-purchase-payment-section
-              [paymentStatus]="draft.paymentStatus"
-              [paymentAmount]="draft.paymentAmount"
-              [paymentAccountCode]="draft.paymentAccountCode"
-              [paymentReference]="draft.paymentReference"
-              [eligibleAccounts]="eligibleAccounts()"
-              [totalCost]="totalCost()"
-              (fieldChange)="onFieldChange($event)"
+      @if (purchaseDraft(); as draft) {
+        <!-- Supplier company (search + select) + Date + Reference -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="w-full sm:col-span-2 lg:col-span-1">
+            <app-company-search-select
+              [items]="filteredSuppliers()"
+              [selectedId]="draft.supplierId"
+              [searchTerm]="supplierSearchTerm()"
+              [placeholder]="'Search supplier company...'"
+              [isLoading]="false"
+              [getLabel]="getSupplierLabel"
+              [getSubtitle]="getSupplierSubtitle"
+              (searchTermChange)="onSupplierSearchTermChange($event)"
+              (select)="onSupplierSelect($event)"
+              (clear)="onSupplierClear()"
             />
           </div>
-        }
-      </div>
+          <input
+            type="date"
+            class="input input-bordered input-sm sm:input-md w-full"
+            [value]="formatDateForInput(draft.purchaseDate)"
+            (change)="updateDraftField('purchaseDate', parseDateInput($any($event.target).value))"
+          />
+          <input
+            type="text"
+            class="input input-bordered input-sm sm:input-md w-full"
+            placeholder="Invoice / reference"
+            [value]="draft.referenceNumber"
+            (input)="updateDraftField('referenceNumber', $any($event.target).value)"
+          />
+        </div>
 
-      <!-- Sticky Footer -->
+        <!-- Items -->
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-wide text-base-content/50 mb-2">
+            Items
+            @if (draft.lines.length > 0) {
+              <span class="badge badge-xs badge-primary ml-1">{{ draft.lines.length }}</span>
+            }
+          </div>
+          <app-product-search-view
+            [searchResults]="productSearchResults()"
+            [isSearching]="isSearchingProducts()"
+            [placeholder]="'Search product by name or SKU...'"
+            [compact]="true"
+            [restrictVariantSelectionToInStock]="false"
+            (searchTermChange)="handleProductSearch($event)"
+            (productSelected)="onProductSelectedFromSearch($event)"
+            (variantSelected)="onVariantSelectedFromSearch($event)"
+          />
+          <div class="mt-2">
+            <app-purchase-line-items-table
+              [lineItems]="draft.lines"
+              (lineItemUpdate)="updateLineItem($event.index, $event.field, $event.value)"
+              (lineItemRemove)="removeLineItem($event)"
+            />
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <textarea
+          class="textarea textarea-bordered textarea-sm sm:textarea-md w-full"
+          rows="2"
+          placeholder="Notes (optional)"
+          [value]="draft.notes"
+          (input)="updateDraftField('notes', $any($event.target).value)"
+        ></textarea>
+
+        <!-- Payment -->
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-wide text-base-content/50 mb-2">
+            Payment
+          </div>
+          <app-purchase-payment-section
+            [paymentStatus]="draft.paymentStatus"
+            [paymentAmount]="draft.paymentAmount"
+            [paymentAccountCode]="draft.paymentAccountCode"
+            [paymentReference]="draft.paymentReference"
+            [eligibleAccounts]="eligibleAccounts()"
+            [totalCost]="totalCost()"
+            (fieldChange)="onFieldChange($event)"
+          />
+        </div>
+      }
+
+      <!-- Fixed Footer (respects sidebar + bottom nav) -->
       @if (purchaseDraft(); as draft) {
         <div
-          class="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 px-4 py-3 z-10"
+          class="dashboard-fixed-bottom bg-base-100 border-t border-base-300 px-4 py-3 safe-area-inset-bottom"
         >
           <div class="flex items-center justify-between mb-2">
             <span class="text-sm text-base-content/70">
@@ -274,6 +267,19 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
   readonly showItemEntryModal = signal<boolean>(false);
   readonly itemEntryProduct = signal<ProductSearchResult | null>(null);
   readonly itemEntryVariant = signal<ProductVariant | null>(null);
+  // Supplier company search + select
+  readonly supplierSearchTerm = signal<string>('');
+  readonly filteredSuppliers = computed(() => {
+    const list = this.suppliers();
+    const term = this.supplierSearchTerm().trim().toLowerCase();
+    if (!term) return list;
+    return list.filter(
+      (s: any) =>
+        (s.firstName ?? '').toLowerCase().includes(term) ||
+        (s.lastName ?? '').toLowerCase().includes(term) ||
+        (s.emailAddress ?? '').toLowerCase().includes(term),
+    );
+  });
 
   // Overdraft approval UI state
   readonly showOverdraftConfirm = signal<boolean>(false);
@@ -350,6 +356,28 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
     this.itemEntryVariant.set(event.variant);
     this.showItemEntryModal.set(true);
     this.clearProductSearch();
+  }
+
+  getSupplierLabel = (s: {
+    firstName?: string;
+    lastName?: string;
+    emailAddress?: string;
+  }): string => [s.firstName, s.lastName].filter(Boolean).join(' ') || '';
+
+  getSupplierSubtitle = (s: { emailAddress?: string }): string => s.emailAddress ?? '';
+
+  onSupplierSearchTermChange(value: string): void {
+    this.supplierSearchTerm.set(value);
+    this.purchaseService.updateDraftField('supplierId', null);
+  }
+
+  onSupplierSelect(supplier: { id: string }): void {
+    this.purchaseService.updateDraftField('supplierId', supplier.id);
+  }
+
+  onSupplierClear(): void {
+    this.supplierSearchTerm.set('');
+    this.purchaseService.updateDraftField('supplierId', null);
   }
 
   onItemAddedFromModal(event: {
