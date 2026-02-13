@@ -2966,7 +2966,7 @@ export const GET_RECONCILIATIONS = graphql(`
 `);
 
 export const GET_RECONCILIATION_DETAILS = graphql(`
-  query GetReconciliationDetails($reconciliationId: ID!) {
+  query GetReconciliationDetails($reconciliationId: String!) {
     reconciliationDetails(reconciliationId: $reconciliationId) {
       accountId
       accountCode

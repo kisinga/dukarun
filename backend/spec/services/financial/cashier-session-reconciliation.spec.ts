@@ -40,6 +40,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
   let mockChannelRepo: any;
   let mockCountRepo: any;
   let mockChannelPaymentMethodService: any;
+  let mockAuditService: any;
 
   beforeEach(() => {
     mockSessionRepo = {
@@ -108,12 +109,17 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       getPaymentMethodDisplayName: jest.fn((pm: { code: string }) => pm.code),
     };
 
+    mockAuditService = {
+      log: jest.fn().mockImplementation(() => Promise.resolve()),
+    };
+
     service = new (OpenSessionService as any)(
       mockConnection,
       mockLedgerQueryService,
       mockReconciliationService,
       mockFinancialService,
-      mockChannelPaymentMethodService
+      mockChannelPaymentMethodService,
+      mockAuditService
     );
   });
 

@@ -23,6 +23,8 @@ import {
   toScopeRefId,
 } from './period-management.types';
 import { ChannelPaymentMethodService } from './channel-payment-method.service';
+import { AuditService } from '../../infrastructure/audit/audit.service';
+import { AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
 
 /**
  * Cashier Session Summary
@@ -120,7 +122,8 @@ export class OpenSessionService {
     private readonly ledgerQueryService: LedgerQueryService,
     private readonly reconciliationService: ReconciliationService,
     private readonly financialService: FinancialService,
-    private readonly channelPaymentMethodService: ChannelPaymentMethodService
+    private readonly channelPaymentMethodService: ChannelPaymentMethodService,
+    private readonly auditService: AuditService
   ) {}
 
   /**
@@ -190,6 +193,15 @@ export class OpenSessionService {
       },
       { snapshotDate: today }
     );
+
+    this.auditService
+      .log(ctx, AUDIT_EVENTS.CASHIER_SESSION_RECONCILIATION_CREATED, {
+        entityType: 'Reconciliation',
+        entityId: openingRecon.id,
+        data: { sessionId: savedSession.id, kind: 'opening' },
+        channelId: input.channelId,
+      })
+      .catch(() => {});
 
     for (const { accountCode, amountCents } of input.openingBalances) {
       if (amountCents !== 0) {
@@ -383,6 +395,15 @@ export class OpenSessionService {
         input.notes,
         declaredAmounts
       );
+
+      this.auditService
+        .log(txCtx, AUDIT_EVENTS.CASHIER_SESSION_RECONCILIATION_CREATED, {
+          entityType: 'Reconciliation',
+          entityId: closingRecon.id,
+          data: { sessionId, kind: 'closing' },
+          channelId,
+        })
+        .catch(() => {});
 
       // 4. Post per-account variance adjustments (mirrors opening pattern)
       for (const { accountCode, amountCents } of input.closingBalances) {
@@ -682,7 +703,16 @@ export class OpenSessionService {
   ): Promise<Array<{ accountCode: string; amountCents: string }>> {
     const requirements = await this.getChannelReconciliationRequirements(ctx, channelId);
     const codes = [...new Set(requirements.paymentMethods.map(pm => pm.ledgerAccountCode))];
-    if (codes.length === 0) return [];
+    if (codes.length === 0) {
+      // Fallback: use CASH_ON_HAND when no payment method config exists
+      const fallbackCode = ACCOUNT_CODES.CASH_ON_HAND;
+      const accountRepo = this.connection.getRepository(ctx, Account);
+      const exists = await accountRepo.findOne({ where: { channelId, code: fallbackCode } });
+      if (exists) {
+        return [{ accountCode: fallbackCode, amountCents: String(totalCents) }];
+      }
+      return [];
+    }
     return codes.map((code, i) => ({
       accountCode: code,
       amountCents: i === 0 ? String(totalCents) : '0',

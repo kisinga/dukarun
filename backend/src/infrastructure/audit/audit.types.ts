@@ -8,6 +8,8 @@ export interface AuditLogOptions {
   entityId?: string;
   data?: Record<string, any>;
   userId?: string; // Override if needed
+  /** When RequestContext has no channelId, callers (e.g. interceptor) can pass channelId from mutation args */
+  channelId?: number | string;
 }
 
 /**

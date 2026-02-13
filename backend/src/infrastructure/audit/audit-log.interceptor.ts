@@ -39,11 +39,17 @@ export class AuditLogInterceptor implements NestInterceptor {
         try {
           const entityId = metadata.extractEntityId?.(result, args) ?? null;
           const data = this.buildAuditData(metadata, args, result);
+          const channelIdFromArgs =
+            (args?.input as Record<string, unknown> | undefined)?.channelId ??
+            (args as Record<string, unknown>)?.channelId;
           await this.auditService
             .log(ctx, metadata.eventType, {
               entityType: metadata.entityType ?? undefined,
               entityId: entityId ?? undefined,
               data,
+              ...(channelIdFromArgs != null && channelIdFromArgs !== ''
+                ? { channelId: channelIdFromArgs as number | string }
+                : {}),
             })
             .catch(() => {}); // Non-blocking: don't fail the operation if audit fails
         } catch {

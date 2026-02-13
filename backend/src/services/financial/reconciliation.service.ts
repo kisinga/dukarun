@@ -4,13 +4,20 @@ import { In } from 'typeorm';
 import { ReconciliationAccount } from '../../domain/recon/reconciliation-account.entity';
 import { Reconciliation, ReconciliationScope } from '../../domain/recon/reconciliation.entity';
 import { Account } from '../../ledger/account.entity';
+import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import { AccountBalanceService } from './account-balance.service';
+import { ChannelPaymentMethodService } from './channel-payment-method.service';
 import { FinancialService } from './financial.service';
 import {
+  fromScopeRefId,
   ReconciliationStatus,
   ScopeReconciliationStatus,
   toScopeRefId,
 } from './period-management.types';
+import {
+  getAccountCodeFromPaymentMethod,
+  isCashierControlledPaymentMethod,
+} from './payment-method-mapping.config';
 
 /** Per-account declared amount by account code (API boundary). */
 export interface DeclaredAmountInput {
@@ -44,6 +51,7 @@ export class ReconciliationService {
   constructor(
     private readonly connection: TransactionalConnection,
     private readonly accountBalanceService: AccountBalanceService,
+    private readonly channelPaymentMethodService: ChannelPaymentMethodService,
     private readonly financialService: FinancialService
   ) {}
 
@@ -428,7 +436,8 @@ export class ReconciliationService {
       .createQueryBuilder('r')
       .where('r.channelId = :channelId', { channelId })
       .orderBy('r.rangeEnd', 'DESC')
-      .addOrderBy('r.rangeStart', 'DESC');
+      .addOrderBy('r.rangeStart', 'DESC')
+      .addOrderBy('r.id', 'DESC');
 
     if (options?.startDate) {
       qb.andWhere('r.rangeEnd >= :startDate', { startDate: options.startDate });
@@ -457,6 +466,85 @@ export class ReconciliationService {
   }
 
   /**
+   * Derive per-account details for a cash-session reconciliation when junction rows are empty.
+   * Uses channel payment method config to determine accounts; splits actualBalance to first account.
+   */
+  private async deriveCashSessionDetails(
+    ctx: RequestContext,
+    reconciliation: Reconciliation
+  ): Promise<
+    Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      declaredAmountCents: string | null;
+      expectedBalanceCents: string | null;
+      varianceCents: string | null;
+    }>
+  > {
+    const paymentMethods = await this.channelPaymentMethodService.getChannelPaymentMethods(
+      ctx,
+      reconciliation.channelId
+    );
+    const cashierControlled = paymentMethods.filter(
+      pm => pm.enabled && isCashierControlledPaymentMethod(pm)
+    );
+    let codes = [...new Set(cashierControlled.map(pm => getAccountCodeFromPaymentMethod(pm)))];
+    if (codes.length === 0) {
+      const accountRepo = this.connection.getRepository(ctx, Account);
+      const fallback = await accountRepo.findOne({
+        where: { channelId: reconciliation.channelId, code: ACCOUNT_CODES.CASH_ON_HAND },
+      });
+      if (!fallback) return [];
+      codes = [ACCOUNT_CODES.CASH_ON_HAND];
+    }
+
+    const accountRepo = this.connection.getRepository(ctx, Account);
+    const accounts = await accountRepo.find({
+      where: { channelId: reconciliation.channelId, code: In(codes) },
+    });
+    const actualTotal = BigInt(reconciliation.actualBalance ?? '0');
+    const result: Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      declaredAmountCents: string | null;
+      expectedBalanceCents: string | null;
+      varianceCents: string | null;
+    }> = [];
+
+    for (let i = 0; i < accounts.length; i++) {
+      const account = accounts[i];
+      const declaredStr = i === 0 ? actualTotal.toString() : '0';
+      let expectedStr: string | null = null;
+      let varianceStr: string | null = null;
+      try {
+        const balance = await this.accountBalanceService.getAccountBalance(
+          ctx,
+          account.code,
+          reconciliation.channelId,
+          reconciliation.rangeEnd
+        );
+        expectedStr = String(balance.balance);
+        const expected = BigInt(expectedStr);
+        const declared = BigInt(declaredStr);
+        varianceStr = (expected - declared).toString();
+      } catch {
+        // Account may be deleted or balance unavailable
+      }
+      result.push({
+        accountId: account.id,
+        accountCode: account.code,
+        accountName: account.name,
+        declaredAmountCents: declaredStr,
+        expectedBalanceCents: expectedStr,
+        varianceCents: varianceStr,
+      });
+    }
+    return result;
+  }
+
+  /**
    * Get per-account details for a reconciliation (accounts reconciled and variance per account).
    * Executed lazily when the user expands a row. Returns empty array if no reconciliation_account rows.
    */
@@ -479,91 +567,118 @@ export class ReconciliationService {
     const trimmedId = String(reconciliationId).trim();
     if (!trimmedId || trimmedId === '-1') return [];
 
-    const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
+    this.logger.log(`getReconciliationDetails requested reconciliationId=${trimmedId}`);
+
     let reconciliation: Reconciliation | null = null;
     try {
+      const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
       reconciliation = await reconciliationRepo.findOne({
         where: { id: trimmedId },
       });
-    } catch (e) {
-      this.logger.warn(`getReconciliationDetails invalid id: ${trimmedId}`, e);
-      return [];
-    }
-    if (!reconciliation) {
-      return [];
-    }
-
-    const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
-    let rows: Array<ReconciliationAccount & { account?: Account | null }>;
-    try {
-      rows = await junctionRepo.find({
-        where: { reconciliationId: trimmedId },
-        relations: ['account'],
-      });
-    } catch (e) {
-      this.logger.warn(`getReconciliationDetails junction find failed: ${trimmedId}`, e);
-      rows = [];
-    }
-    this.logger.log(
-      `getReconciliationDetails reconciliationId=${trimmedId} junctionRows=${rows.length}`
-    );
-
-    const result: Array<{
-      accountId: string;
-      accountCode: string;
-      accountName: string;
-      declaredAmountCents: string | null;
-      expectedBalanceCents: string | null;
-      varianceCents: string | null;
-    }> = [];
-
-    for (const row of rows) {
-      const account = row.account;
-      if (!account) continue;
-      const declaredStr = row.declaredAmountCents ?? null;
-      let expectedStr: string | null = null;
-      let varianceStr: string | null = null;
-      try {
-        const balance = await this.accountBalanceService.getAccountBalance(
-          ctx,
-          account.code,
-          reconciliation.channelId,
-          reconciliation.rangeEnd
-        );
-        expectedStr = String(balance.balance);
-        const expected = BigInt(expectedStr);
-        const declared = declaredStr !== null ? BigInt(declaredStr) : BigInt(0);
-        varianceStr = (expected - declared).toString();
-      } catch {
-        // Account may be deleted or balance unavailable
+      if (!reconciliation) {
+        this.logger.warn(`getReconciliationDetails reconciliation not found: ${trimmedId}`);
+        return [];
       }
-      result.push({
-        accountId: account.id,
-        accountCode: account.code,
-        accountName: account.name,
-        declaredAmountCents: declaredStr,
-        expectedBalanceCents: expectedStr,
-        varianceCents: varianceStr,
-      });
-    }
 
-    // Fallback: when no per-account junction rows (legacy, inventory, or empty manual),
-    // return a summary row so the user sees expected/actual/variance.
-    if (result.length === 0) {
-      const expected = reconciliation.expectedBalance ?? null;
-      const actual = reconciliation.actualBalance ?? null;
-      const variance = reconciliation.varianceAmount ?? null;
-      result.push({
-        accountId: trimmedId,
-        accountCode: '–',
-        accountName: 'Summary (no per-account breakdown)',
-        declaredAmountCents: actual,
-        expectedBalanceCents: expected,
-        varianceCents: variance,
-      });
-    }
+      const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
+      let rows: Array<ReconciliationAccount & { account?: Account | null }>;
+      try {
+        rows = await junctionRepo.find({
+          where: { reconciliationId: trimmedId },
+          relations: ['account'],
+        });
+      } catch (e) {
+        this.logger.warn(`getReconciliationDetails junction find failed: ${trimmedId}`, e);
+        rows = [];
+      }
+      this.logger.log(
+        `getReconciliationDetails reconciliationId=${trimmedId} junctionRows=${rows.length}`
+      );
 
-    return result;
+      const result: Array<{
+        accountId: string;
+        accountCode: string;
+        accountName: string;
+        declaredAmountCents: string | null;
+        expectedBalanceCents: string | null;
+        varianceCents: string | null;
+      }> = [];
+
+      for (const row of rows) {
+        const account = row.account;
+        if (!account) continue;
+        const declaredStr = row.declaredAmountCents ?? null;
+        let expectedStr: string | null = null;
+        let varianceStr: string | null = null;
+        try {
+          const balance = await this.accountBalanceService.getAccountBalance(
+            ctx,
+            account.code,
+            reconciliation.channelId,
+            reconciliation.rangeEnd
+          );
+          expectedStr = String(balance.balance);
+          const expected = BigInt(expectedStr);
+          const declared = declaredStr !== null ? BigInt(declaredStr) : BigInt(0);
+          varianceStr = (expected - declared).toString();
+        } catch {
+          // Account may be deleted or balance unavailable
+        }
+        result.push({
+          accountId: account.id,
+          accountCode: account.code,
+          accountName: account.name,
+          declaredAmountCents: declaredStr,
+          expectedBalanceCents: expectedStr,
+          varianceCents: varianceStr,
+        });
+      }
+
+      // When no junction rows: for cash-session scope, derive per-account details from channel config.
+      if (result.length === 0 && reconciliation.scope === 'cash-session') {
+        const derived = await this.deriveCashSessionDetails(ctx, reconciliation);
+        if (derived.length > 0) {
+          this.logger.log(
+            `getReconciliationDetails derived ${derived.length} rows from session config reconciliationId=${trimmedId}`
+          );
+          return derived;
+        }
+      }
+
+      // Fallback: when no per-account junction rows (legacy, inventory, or empty manual),
+      // return a summary row so the user sees expected/actual/variance.
+      if (result.length === 0) {
+        this.logger.log(`getReconciliationDetails fallback summary reconciliationId=${trimmedId}`);
+        const expected = reconciliation.expectedBalance ?? null;
+        const actual = reconciliation.actualBalance ?? null;
+        const variance = reconciliation.varianceAmount ?? null;
+        result.push({
+          accountId: trimmedId,
+          accountCode: '–',
+          accountName: 'Summary (no per-account breakdown)',
+          declaredAmountCents: actual,
+          expectedBalanceCents: expected,
+          varianceCents: variance,
+        });
+      }
+
+      return result;
+    } catch (e) {
+      this.logger.warn(`getReconciliationDetails error: ${trimmedId}`, e);
+      if (reconciliation) {
+        return [
+          {
+            accountId: trimmedId,
+            accountCode: '–',
+            accountName: 'Summary (no per-account breakdown)',
+            declaredAmountCents: reconciliation.actualBalance ?? null,
+            expectedBalanceCents: reconciliation.expectedBalance ?? null,
+            varianceCents: reconciliation.varianceAmount ?? null,
+          },
+        ];
+      }
+      return [];
+    }
   }
 
   /** Session id must be a UUID; reject placeholders like "-1" so invalid ids are never used. */
