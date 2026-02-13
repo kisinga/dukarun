@@ -15,3 +15,6 @@ build/
 .angular/
 .cursor/
 
+# Generated GraphQL outputs (codegen)
+frontend/src/app/core/graphql/generated/
+

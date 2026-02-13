@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import { CompanySearchSelectComponent } from '../../shared/components/company-search-select.component';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { validatePhoneNumber } from '../../../../core/utils/phone.utils';
 
@@ -19,89 +20,29 @@ export interface Customer {
  */
 @Component({
   selector: 'app-customer-selector',
-  imports: [CommonModule],
+  imports: [CommonModule, CompanySearchSelectComponent],
   template: `
     <div class="space-y-6">
       @if (!selectedCustomer() && !showForm()) {
-        <!-- Customer Search -->
+        <!-- Customer company search -->
         <div class="space-y-4 animate-in slide-in-from-top-2 duration-300">
           <div class="form-control">
             <label class="label">
-              <span class="label-text font-semibold">Search existing customer</span>
+              <span class="label-text font-semibold">Search existing customer company</span>
             </label>
-            <div class="relative">
-              <input
-                type="text"
-                class="input input-bordered w-full text-base"
-                placeholder="Search by name or phone..."
-                [value]="searchTerm()"
-                (input)="onSearchInput($any($event.target).value)"
-              />
-              @if (isSearching()) {
-                <span class="absolute right-3 top-1/2 -translate-y-1/2">
-                  <span class="loading loading-spinner loading-sm"></span>
-                </span>
-              }
-            </div>
+            <app-company-search-select
+              [items]="searchResults()"
+              [selectedId]="selectedCustomer()?.id ?? null"
+              [searchTerm]="searchTerm()"
+              [placeholder]="'Search customer company...'"
+              [isLoading]="isSearching()"
+              [getLabel]="getCustomerLabel"
+              [getSubtitle]="getCustomerSubtitle"
+              (searchTermChange)="onSearchInput($event)"
+              (select)="customerSelect.emit($event)"
+              (clear)="customerSelect.emit(null)"
+            />
           </div>
-
-          <!-- Search Results -->
-          @if (searchResults().length > 0) {
-            <div class="space-y-3 max-h-60 overflow-y-auto">
-              @for (customer of searchResults(); track customer.id; let i = $index) {
-                <button
-                  class="card bg-base-200 hover:bg-base-300 w-full p-4 text-left transition-all duration-200 hover:scale-105 active:scale-95 animate-in slide-in-from-left-2 duration-300"
-                  [style.animation-delay]="i * 50 + 'ms'"
-                  (click)="customerSelect.emit(customer)"
-                >
-                  <div class="flex items-center gap-4">
-                    <div class="avatar placeholder">
-                      <div class="bg-primary text-primary-content w-12 rounded-full">
-                        <span class="text-base font-bold">{{
-                          customer.name.charAt(0).toUpperCase()
-                        }}</span>
-                      </div>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <div class="font-semibold text-base truncate">{{ customer.name }}</div>
-                      <div class="text-sm text-base-content/60">{{ customer.phone }}</div>
-                      <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-base-content/70">
-                        <div class="badge badge-outline badge-success justify-start gap-1">
-                          <span>Available</span>
-                          <span class="font-semibold">{{
-                            currencyService.format(customer.availableCredit)
-                          }}</span>
-                        </div>
-                        <div
-                          class="badge badge-outline justify-start gap-1"
-                          [class.badge-error]="customer.outstandingAmount < 0"
-                        >
-                          <span>Owing</span>
-                          <span class="font-semibold">{{
-                            currencyService.format(customer.outstandingAmount)
-                          }}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5 text-base-content/40"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </div>
-                </button>
-              }
-            </div>
-          }
 
           <div class="divider">OR</div>
 
@@ -315,6 +256,9 @@ export class CustomerSelectorComponent {
   readonly newName = signal('');
   readonly newPhone = signal('');
   readonly newEmail = signal('');
+
+  getCustomerLabel = (c: Customer): string => c.name;
+  getCustomerSubtitle = (c: Customer): string => c.phone ?? '';
 
   readonly canCreate = () => {
     const name = this.newName().trim();

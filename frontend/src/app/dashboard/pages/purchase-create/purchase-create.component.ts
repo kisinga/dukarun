@@ -4,6 +4,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -22,6 +23,7 @@ import { PurchaseDraft, PurchaseLineItem } from '../../../core/services/purchase
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { SupplierService } from '../../../core/services/supplier.service';
 import { PageHeaderComponent } from '../../components/shared/page-header.component';
+import { CompanySearchSelectComponent } from '../shared/components/company-search-select.component';
 import { ProductSearchViewComponent } from '../shared/components/product-search-view.component';
 import { RejectionBannerComponent } from '../shared/components/rejection-banner.component';
 import { ApprovableFormBase } from '../shared/directives/approvable-form-base.directive';
@@ -33,6 +35,7 @@ import { PurchasePaymentSectionComponent } from './components/purchase-payment-s
   selector: 'app-purchase-create',
   imports: [
     CommonModule,
+    CompanySearchSelectComponent,
     PageHeaderComponent,
     ProductSearchViewComponent,
     PurchaseItemEntryModalComponent,
@@ -114,23 +117,22 @@ import { PurchasePaymentSectionComponent } from './components/purchase-payment-s
       }
 
       @if (purchaseDraft(); as draft) {
-        <!-- Supplier + Date + Reference -->
+        <!-- Supplier company (search + select) + Date + Reference -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <select
-            class="select select-bordered select-sm sm:select-md w-full sm:col-span-2 lg:col-span-1"
-            [value]="draft.supplierId || ''"
-            (change)="updateDraftField('supplierId', $any($event.target).value || null)"
-          >
-            <option value="">Select supplier...</option>
-            @for (supplier of suppliers(); track supplier.id) {
-              <option [value]="supplier.id">
-                {{ supplier.firstName }} {{ supplier.lastName }}
-                @if (supplier.emailAddress) {
-                  ({{ supplier.emailAddress }})
-                }
-              </option>
-            }
-          </select>
+          <div class="w-full sm:col-span-2 lg:col-span-1">
+            <app-company-search-select
+              [items]="filteredSuppliers()"
+              [selectedId]="draft.supplierId"
+              [searchTerm]="supplierSearchTerm()"
+              [placeholder]="'Search supplier company...'"
+              [isLoading]="false"
+              [getLabel]="getSupplierLabel"
+              [getSubtitle]="getSupplierSubtitle"
+              (searchTermChange)="onSupplierSearchTermChange($event)"
+              (select)="onSupplierSelect($event)"
+              (clear)="onSupplierClear()"
+            />
+          </div>
           <input
             type="date"
             class="input input-bordered input-sm sm:input-md w-full"
@@ -265,6 +267,19 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
   readonly showItemEntryModal = signal<boolean>(false);
   readonly itemEntryProduct = signal<ProductSearchResult | null>(null);
   readonly itemEntryVariant = signal<ProductVariant | null>(null);
+  // Supplier company search + select
+  readonly supplierSearchTerm = signal<string>('');
+  readonly filteredSuppliers = computed(() => {
+    const list = this.suppliers();
+    const term = this.supplierSearchTerm().trim().toLowerCase();
+    if (!term) return list;
+    return list.filter(
+      (s: any) =>
+        (s.firstName ?? '').toLowerCase().includes(term) ||
+        (s.lastName ?? '').toLowerCase().includes(term) ||
+        (s.emailAddress ?? '').toLowerCase().includes(term),
+    );
+  });
 
   // Overdraft approval UI state
   readonly showOverdraftConfirm = signal<boolean>(false);
@@ -341,6 +356,28 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
     this.itemEntryVariant.set(event.variant);
     this.showItemEntryModal.set(true);
     this.clearProductSearch();
+  }
+
+  getSupplierLabel = (s: {
+    firstName?: string;
+    lastName?: string;
+    emailAddress?: string;
+  }): string => [s.firstName, s.lastName].filter(Boolean).join(' ') || '';
+
+  getSupplierSubtitle = (s: { emailAddress?: string }): string => s.emailAddress ?? '';
+
+  onSupplierSearchTermChange(value: string): void {
+    this.supplierSearchTerm.set(value);
+    this.purchaseService.updateDraftField('supplierId', null);
+  }
+
+  onSupplierSelect(supplier: { id: string }): void {
+    this.purchaseService.updateDraftField('supplierId', supplier.id);
+  }
+
+  onSupplierClear(): void {
+    this.supplierSearchTerm.set('');
+    this.purchaseService.updateDraftField('supplierId', null);
   }
 
   onItemAddedFromModal(event: {
