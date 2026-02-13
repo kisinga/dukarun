@@ -94,7 +94,8 @@ describe('Cashier-ledger flows', () => {
         // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
         { createReconciliation: jest.fn().mockResolvedValue({ id: 'rec1' }) },
         mockOpenSessionFinancial,
-        mockChannelPaymentMethodService
+        mockChannelPaymentMethodService,
+        { log: jest.fn().mockImplementation(() => Promise.resolve()) }
       );
 
       const opened = await cashierSessionService.startSession(ctx1, {

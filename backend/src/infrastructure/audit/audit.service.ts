@@ -57,12 +57,12 @@ export class AuditService {
    */
   async log(ctx: RequestContext, eventType: string, options: AuditLogOptions = {}): Promise<void> {
     try {
-      // Get channelId from RequestContext (numeric ID)
-      const channelId = ctx.channelId || ctx.channel?.id;
+      // Get channelId: options (e.g. from mutation args) then RequestContext
+      const channelId = options.channelId ?? ctx.channelId ?? ctx.channel?.id;
 
       if (!channelId) {
-        this.logger.debug(
-          `Cannot log audit event ${eventType}: channelId not available in RequestContext`
+        this.logger.warn(
+          `Cannot log audit event ${eventType}: channelId not available in RequestContext or options`
         );
         return;
       }

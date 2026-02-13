@@ -21,6 +21,7 @@ describe('ReconciliationService', () => {
   let mockConnection: jest.Mocked<TransactionalConnection>;
   let mockReconciliationRepo: any;
   let mockAccountBalanceService: jest.Mocked<AccountBalanceService>;
+  let mockChannelPaymentMethodService: any;
   let mockFinancialService: any;
 
   beforeEach(() => {
@@ -49,9 +50,14 @@ describe('ReconciliationService', () => {
       postVarianceAdjustment: jest.fn().mockImplementation(() => Promise.resolve()),
     } as any;
 
+    mockChannelPaymentMethodService = {
+      getChannelPaymentMethods: jest.fn().mockImplementation(() => Promise.resolve([])),
+    };
+
     service = new ReconciliationService(
       mockConnection,
       mockAccountBalanceService,
+      mockChannelPaymentMethodService,
       mockFinancialService
     );
   });

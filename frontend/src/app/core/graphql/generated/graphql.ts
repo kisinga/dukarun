@@ -1503,8 +1503,6 @@ export type CreateReconciliationInput = {
   declaredAmounts: Array<DeclaredAmountInput>;
   expectedBalance?: InputMaybe<Scalars['String']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
-  rangeEnd: Scalars['DateTime']['input'];
-  rangeStart: Scalars['DateTime']['input'];
   scope: Scalars['String']['input'];
   scopeRefId: Scalars['String']['input'];
 };
@@ -7002,7 +7000,7 @@ export type QueryPurchasesArgs = {
 };
 
 export type QueryReconciliationDetailsArgs = {
-  reconciliationId: Scalars['ID']['input'];
+  reconciliationId: Scalars['String']['input'];
 };
 
 export type QueryReconciliationsArgs = {
@@ -12197,7 +12195,7 @@ export type GetReconciliationsQuery = {
 };
 
 export type GetReconciliationDetailsQueryVariables = Exact<{
-  reconciliationId: Scalars['ID']['input'];
+  reconciliationId: Scalars['String']['input'];
 }>;
 
 export type GetReconciliationDetailsQuery = {
@@ -22646,7 +22644,7 @@ export const GetReconciliationDetailsDocument = {
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'reconciliationId' } },
           type: {
             kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
           },
         },
       ],

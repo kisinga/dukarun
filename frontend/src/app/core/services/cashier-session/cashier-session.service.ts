@@ -399,18 +399,31 @@ export class CashierSessionService {
 
   /** Per-account details for a reconciliation (lazy-loaded when expanding a row). */
   getReconciliationDetails(reconciliationId: string) {
+    const id = reconciliationId != null ? String(reconciliationId).trim() : '';
+    if (!id || id === '-1') {
+      return of([]);
+    }
     const client = this.apolloService.getClient();
     return from(
       client.query<{
         reconciliationDetails: ReconciliationAccountDetail[];
       }>({
         query: GET_RECONCILIATION_DETAILS as any,
-        variables: { reconciliationId },
+        variables: { reconciliationId: id },
         fetchPolicy: 'network-only',
       }),
     ).pipe(
-      map((result) => result.data?.reconciliationDetails ?? []),
-      catchError(() => of([])),
+      map((result) => {
+        if (result.error) {
+          console.warn('[CashierSession] getReconciliationDetails error', result.error);
+          return [];
+        }
+        return result.data?.reconciliationDetails ?? [];
+      }),
+      catchError((err) => {
+        console.warn('[CashierSession] getReconciliationDetails failed', err);
+        return of([]);
+      }),
     );
   }
 

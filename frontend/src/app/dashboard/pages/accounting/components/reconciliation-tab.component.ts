@@ -143,7 +143,8 @@ export class ReconciliationTabComponent {
   }
 
   toggleExpand(r: Reconciliation): void {
-    if (!r?.id || r.id === '-1') return;
+    const id = r?.id;
+    if (id == null || id === '' || id === '-1') return;
     const current = this.expandedRowId();
     if (current === r.id) {
       this.expandedRowId.set(null);

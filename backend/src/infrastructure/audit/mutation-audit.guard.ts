@@ -38,11 +38,17 @@ export class MutationAuditGuard implements CanActivate {
 
     const mutationName = info.fieldName;
     const ctx = gqlContext.getContext().req as RequestContext;
+    const args = gqlContext.getArgs() as Record<string, unknown> | undefined;
+    const channelIdFromArgs =
+      (args?.input as Record<string, unknown> | undefined)?.channelId ?? args?.channelId;
 
     // Log generic mutation event (attempted)
     await this.auditService
       .log(ctx, `mutation.${mutationName}`, {
         data: { mutationName },
+        ...(channelIdFromArgs != null && channelIdFromArgs !== ''
+          ? { channelId: channelIdFromArgs as number | string }
+          : {}),
       })
       .catch(() => {});
 
