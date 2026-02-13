@@ -35,18 +35,20 @@ import { ProductLabelComponent } from './product-label.component';
   standalone: true,
   imports: [CommonModule, FormsModule, ProductLabelComponent],
   template: `
-    <div class="card bg-base-100 shadow-lg">
+    <div class="card bg-base-100 shadow-lg border border-base-200">
       <div
         class="card-body"
         [class.p-3]="!compact()"
         [class.md:p-4]="!compact()"
-        [class.p-2]="compact()"
+        [class.p-3]="compact()"
       >
-        <div class="flex items-center gap-2">
+        <div
+          class="rounded-xl border border-base-300 bg-base-200/50 px-3 py-2.5 flex items-center gap-2"
+        >
           <!-- Search Icon -->
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 text-base-content/70 shrink-0"
+            class="h-5 w-5 text-base-content/60 shrink-0"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -62,7 +64,7 @@ import { ProductLabelComponent } from './product-label.component';
           <!-- Search Input -->
           <input
             type="text"
-            class="input input-ghost flex-1 text-base p-0 focus:outline-none min-h-0 h-auto"
+            class="input input-ghost flex-1 text-base p-0 focus:outline-none min-h-0 h-auto bg-transparent"
             [placeholder]="placeholder()"
             title="Search by name or manufacturer"
             [(ngModel)]="searchTerm"

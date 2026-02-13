@@ -231,6 +231,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'stock-adjustments/create',
+        canActivate: [stockAdjustmentGuard],
+        loadComponent: () =>
+          import('./dashboard/pages/stock-adjustments/stock-adjustment-create/stock-adjustment-create.component').then(
+            (m) => m.StockAdjustmentCreateComponent,
+          ),
+      },
+      {
         path: 'settings',
         canActivate: [settingsGuard],
         loadComponent: () =>

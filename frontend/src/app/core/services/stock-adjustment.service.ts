@@ -1,4 +1,4 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { GetVariantStockLevelDocument } from '../graphql/generated/graphql';
 import { ApolloService } from './apollo.service';
 import { AuthService } from './auth.service';
@@ -6,6 +6,7 @@ import { StockAdjustmentDraftService } from './draft/stock-adjustment-draft.serv
 import { StockAdjustmentValidationService } from './stock-adjustment/stock-adjustment-validation.service';
 import { StockAdjustmentApiService } from './stock-adjustment/stock-adjustment-api.service';
 import { StockAdjustmentDraft, StockAdjustmentLineItem } from './stock-adjustment.service.types';
+import type { StockAdjustmentListOptions } from '../graphql/generated/graphql';
 
 /**
  * Stock Adjustment Service
@@ -35,6 +36,17 @@ export class StockAdjustmentService {
   readonly isLoading = this.draftService.isLoading;
   readonly error = this.draftService.error;
   readonly hasDraft = this.draftService.hasDraft;
+
+  // List view signals
+  private readonly adjustmentsSignal = signal<any[]>([]);
+  private readonly isLoadingListSignal = signal(false);
+  private readonly errorListSignal = signal<string | null>(null);
+  private readonly totalItemsSignal = signal(0);
+
+  readonly adjustments = this.adjustmentsSignal.asReadonly();
+  readonly isLoadingList = this.isLoadingListSignal.asReadonly();
+  readonly errorList = this.errorListSignal.asReadonly();
+  readonly totalItems = this.totalItemsSignal.asReadonly();
 
   // Permission check
   readonly hasPermission = computed(() => this.authService.hasManageStockAdjustmentsPermission());
@@ -151,6 +163,32 @@ export class StockAdjustmentService {
    */
   clearError(): void {
     this.draftService.clearError();
+  }
+
+  /**
+   * Fetch stock adjustments list
+   */
+  async fetchStockAdjustments(options?: StockAdjustmentListOptions): Promise<void> {
+    this.isLoadingListSignal.set(true);
+    this.errorListSignal.set(null);
+    try {
+      const { items, totalItems } = await this.apiService.getStockAdjustments(options);
+      this.adjustmentsSignal.set(items);
+      this.totalItemsSignal.set(totalItems);
+    } catch (error: any) {
+      this.errorListSignal.set(error?.message ?? 'Failed to fetch stock adjustments');
+      this.adjustmentsSignal.set([]);
+      this.totalItemsSignal.set(0);
+    } finally {
+      this.isLoadingListSignal.set(false);
+    }
+  }
+
+  /**
+   * Clear list error state
+   */
+  clearListError(): void {
+    this.errorListSignal.set(null);
   }
 
   /**

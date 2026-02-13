@@ -31,7 +31,7 @@ export const ADJUSTMENT_REASONS = [
         <!-- Reason -->
         <div class="form-control">
           <label class="label">
-            <span class="label-text font-semibold">📋 Reason *</span>
+            <span class="label-text font-semibold">Reason *</span>
           </label>
           <select
             class="select select-bordered w-full"
@@ -48,7 +48,7 @@ export const ADJUSTMENT_REASONS = [
         <!-- Notes -->
         <div class="form-control">
           <label class="label">
-            <span class="label-text font-semibold">📝 Notes</span>
+            <span class="label-text font-semibold">Notes</span>
           </label>
           <textarea
             class="textarea textarea-bordered w-full"

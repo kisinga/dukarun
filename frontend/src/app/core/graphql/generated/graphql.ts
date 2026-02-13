@@ -1384,6 +1384,8 @@ export type CreateOrderCustomFieldsInput = {
   auditCreatedAt?: InputMaybe<Scalars['DateTime']['input']>;
   createdByUserIdId?: InputMaybe<Scalars['ID']['input']>;
   lastModifiedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
+  reversedAt?: InputMaybe<Scalars['DateTime']['input']>;
+  reversedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type CreateOrderInput = {
@@ -3938,6 +3940,7 @@ export type Mutation = {
   requestLoginOTP: OtpResponse;
   requestRegistrationOTP: OtpResponse;
   requestUpdateOTP: OtpResponse;
+  reverseOrder: OrderReversalResult;
   reviewApprovalRequest: ApprovalRequest;
   reviewCashCount: CashDrawerCount;
   runPendingSearchIndexUpdates: Success;
@@ -4718,6 +4721,10 @@ export type MutationRequestUpdateOtpArgs = {
   identifier: Scalars['String']['input'];
 };
 
+export type MutationReverseOrderArgs = {
+  orderId: Scalars['ID']['input'];
+};
+
 export type MutationReviewApprovalRequestArgs = {
   input: ReviewApprovalRequestInput;
 };
@@ -5249,6 +5256,8 @@ export type OrderCustomFields = {
   auditCreatedAt?: Maybe<Scalars['DateTime']['output']>;
   createdByUserId?: Maybe<User>;
   lastModifiedByUserId?: Maybe<User>;
+  reversedAt?: Maybe<Scalars['DateTime']['output']>;
+  reversedByUserId?: Maybe<User>;
 };
 
 export type OrderFilterParameter = {
@@ -5263,6 +5272,7 @@ export type OrderFilterParameter = {
   customerLastName?: InputMaybe<StringOperators>;
   id?: InputMaybe<IdOperators>;
   orderPlacedAt?: InputMaybe<DateOperators>;
+  reversedAt?: InputMaybe<DateOperators>;
   shipping?: InputMaybe<NumberOperators>;
   shippingWithTax?: InputMaybe<NumberOperators>;
   state?: InputMaybe<StringOperators>;
@@ -5442,6 +5452,13 @@ export type OrderProcessState = {
   to: Array<Scalars['String']['output']>;
 };
 
+export type OrderReversalResult = {
+  __typename?: 'OrderReversalResult';
+  /** True if the order had settled payments before reversal (refund is not automatic). */
+  hadPayments: Scalars['Boolean']['output'];
+  order: Order;
+};
+
 export type OrderSortParameter = {
   aggregateOrderId?: InputMaybe<SortOrder>;
   auditCreatedAt?: InputMaybe<SortOrder>;
@@ -5452,6 +5469,8 @@ export type OrderSortParameter = {
   id?: InputMaybe<SortOrder>;
   lastModifiedByUserId?: InputMaybe<SortOrder>;
   orderPlacedAt?: InputMaybe<SortOrder>;
+  reversedAt?: InputMaybe<SortOrder>;
+  reversedByUserId?: InputMaybe<SortOrder>;
   shipping?: InputMaybe<SortOrder>;
   shippingWithTax?: InputMaybe<SortOrder>;
   state?: InputMaybe<SortOrder>;
@@ -5910,6 +5929,8 @@ export enum Permission {
   ReadTaxRate = 'ReadTaxRate',
   /** Grants permission to read Zone */
   ReadZone = 'ReadZone',
+  /** Allows reversing an order (ledger reversal and mark order reversed). */
+  ReverseOrder = 'ReverseOrder',
   /** SuperAdmin has unrestricted access to all operations */
   SuperAdmin = 'SuperAdmin',
   /** Grants permission to update Administrator */
@@ -8638,6 +8659,8 @@ export type UpdateOrderCustomFieldsInput = {
   auditCreatedAt?: InputMaybe<Scalars['DateTime']['input']>;
   createdByUserIdId?: InputMaybe<Scalars['ID']['input']>;
   lastModifiedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
+  reversedAt?: InputMaybe<Scalars['DateTime']['input']>;
+  reversedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type UpdateOrderInput = {
@@ -11755,6 +11778,14 @@ export type GetStockAdjustmentsQuery = {
         previousStock: number;
         newStock: number;
         stockLocationId: string;
+        variant?: {
+          __typename?: 'ProductVariant';
+          id: string;
+          name: string;
+          sku: string;
+          product: { __typename?: 'Product'; name: string };
+        } | null;
+        stockLocation?: { __typename?: 'StockLocation'; id: string; name: string } | null;
       }>;
     }>;
   };
@@ -21457,6 +21488,39 @@ export const GetStockAdjustmentsDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'previousStock' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'newStock' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'stockLocationId' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'variant' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'sku' } },
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: 'product' },
+                                    selectionSet: {
+                                      kind: 'SelectionSet',
+                                      selections: [
+                                        { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                                      ],
+                                    },
+                                  },
+                                ],
+                              },
+                            },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'stockLocation' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                                ],
+                              },
+                            },
                           ],
                         },
                       },

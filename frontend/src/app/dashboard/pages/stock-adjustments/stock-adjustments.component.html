@@ -1,131 +1,395 @@
-<div class="min-h-screen bg-base-100">
-  <!-- Sticky Header -->
-  <div class="sticky top-0 z-10 bg-base-100 border-b border-base-200 px-4 py-3">
-    <div class="flex items-center justify-between">
-      <button (click)="goBack()" class="btn btn-ghost btn-sm btn-circle" aria-label="Go back">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M15 19l-7-7 7-7"
-          ></path>
-        </svg>
-      </button>
-      <h1 class="text-lg font-semibold">Stock Adjustments</h1>
-      <div class="w-10"></div>
+<!-- FAB for Record Adjustment - Mobile Only -->
+<div class="fixed bottom-24 right-4 z-40 lg:hidden">
+  <a
+    routerLink="/dashboard/stock-adjustments/create"
+    class="btn btn-lg btn-circle btn-primary shadow-xl"
+    aria-label="Record stock adjustment"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      class="h-6 w-6"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+      />
+    </svg>
+  </a>
+</div>
+
+<div class="space-y-4 sm:space-y-5 lg:space-y-6 animate-stagger-children">
+  <app-page-header
+    title="Stock Adjustments"
+    subtitle="View and record inventory adjustments"
+    [isLoading]="isLoadingList()"
+    refreshTitle="Refresh adjustments"
+    (refresh)="refreshAdjustments()"
+  >
+    <a
+      actions
+      routerLink="/dashboard/stock-adjustments/create"
+      class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+      </svg>
+      Record adjustment
+    </a>
+  </app-page-header>
+
+  @if (showRecordedSuccess()) {
+    <div class="alert alert-success shadow-sm">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-5 w-5 shrink-0"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      <span class="flex-1">Stock adjustment recorded successfully.</span>
+      <button (click)="clearRecordedParam()" class="btn btn-sm btn-ghost">Dismiss</button>
     </div>
-  </div>
+  }
 
-  <!-- Content -->
-  <div class="p-4 space-y-4 animate-stagger-children">
-    <!-- Permission Check -->
-    @if (!hasPermission()) {
-      <div class="alert alert-error">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="stroke-current shrink-0 h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        <span
-          >You do not have permission to make stock adjustments. Please contact an
-          administrator.</span
-        >
+  <app-list-search-bar [(searchQuery)]="searchQuery" placeholder="Search by reason or notes...">
+    @if (reasonFilter()) {
+      <div badges class="flex flex-wrap gap-2">
+        <span class="badge badge-primary gap-1.5">
+          {{ getReasonLabel(reasonFilter()) }}
+          <button
+            class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+            (click)="clearReasonFilter()"
+            type="button"
+            aria-label="Clear reason filter"
+          >
+            &times;
+          </button>
+        </span>
       </div>
-    } @else {
-      <!-- Success Message -->
-      @if (showSuccessMessage()) {
-        <div class="alert alert-success">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="stroke-current shrink-0 h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <span>Stock adjustment recorded successfully!</span>
+    }
+    <div filters class="flex gap-2">
+      <select
+        class="select select-bordered select-sm sm:select-md flex-1 sm:flex-none sm:w-auto"
+        [value]="reasonFilter()"
+        (change)="onReasonFilterChange($any($event.target).value)"
+      >
+        <option value="">All reasons</option>
+        @for (r of reasonOptions; track r.value) {
+          <option [value]="r.value">{{ r.label }}</option>
+        }
+      </select>
+    </div>
+  </app-list-search-bar>
+
+  @if (errorList()) {
+    <div role="alert" class="alert alert-error">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-5 w-5 shrink-0"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      <span class="flex-1">{{ errorList() }}</span>
+      <button (click)="clearListError()" class="btn btn-sm">Dismiss</button>
+    </div>
+  }
+
+  @if (isLoadingList()) {
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <div class="flex flex-col items-center justify-center py-12">
+          <span class="loading loading-spinner loading-lg text-secondary"></span>
+          <p class="text-sm text-base-content/60 mt-4">Loading adjustments...</p>
         </div>
-      }
-
-      <!-- Error Message -->
-      @if (error(); as errorMsg) {
-        <div class="alert alert-error">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="stroke-current shrink-0 h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
+      </div>
+    </div>
+  } @else if (adjustments().length === 0 && !errorList()) {
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <div class="text-center py-12 lg:py-16 px-4">
+          <div
+            class="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <span>{{ errorMsg }}</span>
-          <button (click)="clearError()" class="btn btn-ghost btn-sm">×</button>
-        </div>
-      }
-
-      @if (adjustmentDraft(); as draft) {
-        <div class="space-y-4">
-          <!-- Adjustment Details Form -->
-          <app-stock-adjustment-form-fields
-            [draft]="draft"
-            (reasonChange)="handleReasonChange($event)"
-            (notesChange)="handleNotesChange($event)"
-          />
-
-          <!-- Add Item Form -->
-          <app-stock-adjustment-line-item-form
-            [stockLocations]="stockLocations()"
-            [productSearchTerm]="productSearchTerm()"
-            [productSearchResults]="productSearchResults()"
-            [lineItem]="newLineItem()"
-            (productSearch)="handleProductSearch($event)"
-            (productSelect)="handleProductSelect($event)"
-            (newStockChange)="handleNewStockChange($event)"
-            (addItem)="handleAddLineItem()"
-          />
-
-          <!-- Line Items Table -->
-          <app-stock-adjustment-line-items-table
-            [lineItems]="displayLineItems()"
-            [stockLocations]="stockLocations()"
-            (lineItemUpdate)="handleUpdateLineItem($event.index, $event.field, $event.value)"
-            (lineItemRemove)="handleRemoveLineItem($event)"
-          />
-
-          <!-- Submit Button -->
-          <div class="sticky bottom-0 bg-base-100 border-t border-base-200 pt-4 pb-4 -mx-4 px-4">
-            <button
-              class="btn btn-primary btn-block min-h-[3rem]"
-              [disabled]="!draft.reason || draft.lines.length === 0 || isLoading()"
-              (click)="handleSubmitAdjustment()"
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-8 w-8 lg:h-10 lg:w-10 text-base-content/30"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
             >
-              @if (isLoading()) {
-                <span class="loading loading-spinner loading-xs"></span>
-              }
-              💾 Record Adjustment
-            </button>
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold">No adjustments yet</h3>
+          <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
+            Record your first stock adjustment to correct inventory levels.
+          </p>
+          <a
+            routerLink="/dashboard/stock-adjustments/create"
+            class="btn btn-primary btn-sm mt-6 gap-2"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              />
+            </svg>
+            Record adjustment
+          </a>
+        </div>
+      </div>
+    </div>
+  } @else {
+    <!-- Expand / Collapse controls -->
+    <div class="flex justify-end gap-2">
+      <button class="btn btn-sm btn-ghost" (click)="expandAll()">Expand All</button>
+      <button class="btn btn-sm btn-ghost" (click)="collapseAll()">Collapse All</button>
+    </div>
+
+    <!-- Mobile: Cards with expansion -->
+    <div class="lg:hidden space-y-4">
+      @for (adj of paginatedAdjustments(); track trackByAdjustmentId($index, adj)) {
+        <div class="card bg-base-100 shadow border border-base-200">
+          <div class="card-body p-4">
+            <div class="flex justify-between items-start gap-2">
+              <button
+                type="button"
+                class="btn btn-ghost btn-xs shrink-0 p-1"
+                (click)="toggleExpanded(adj.id); $event.stopPropagation()"
+                [attr.aria-expanded]="isExpanded(adj.id)"
+                aria-label="Toggle line items"
+              >
+                @if (isExpanded(adj.id)) {
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M5 15l7-7 7 7"
+                    />
+                  </svg>
+                } @else {
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                }
+              </button>
+              <div class="flex-1 min-w-0">
+                <p class="font-semibold">{{ getReasonLabel(adj.reason) }}</p>
+                <p class="text-sm text-base-content/60">{{ formatDate(adj.createdAt) }}</p>
+              </div>
+              <span class="badge badge-ghost shrink-0">{{ adj.lines?.length ?? 0 }} line(s)</span>
+            </div>
+            @if (adj.notes) {
+              <p class="text-sm mt-2 text-base-content/70 line-clamp-2">{{ adj.notes }}</p>
+            }
+            @if (isExpanded(adj.id) && adj.lines?.length) {
+              <div class="mt-3 pt-3 border-t border-base-200">
+                <p class="text-xs font-semibold text-base-content/60 uppercase tracking-wide mb-2">
+                  Line items
+                </p>
+                <ul class="space-y-2">
+                  @for (line of adj.lines; track line.id) {
+                    <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+                      <span class="font-medium">{{ getLineVariantDisplay(line) }}</span>
+                      <span
+                        class="font-semibold tabular-nums"
+                        [class.text-success]="line.quantityChange > 0"
+                        [class.text-error]="line.quantityChange < 0"
+                        [class.text-base-content]="line.quantityChange === 0"
+                      >
+                        {{ formatDifference(line.quantityChange) }}
+                      </span>
+                      <span class="text-base-content/50 text-xs"
+                        >(prev {{ line.previousStock }} → {{ line.newStock }})</span
+                      >
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
           </div>
         </div>
       }
-    }
-  </div>
+    </div>
+
+    <!-- Desktop: Table with expansion -->
+    <div class="card bg-base-100 shadow hidden lg:block">
+      <div class="overflow-x-auto">
+        <table class="table table-zebra">
+          <thead>
+            <tr>
+              <th class="w-12"></th>
+              <th>Date</th>
+              <th>Reason</th>
+              <th>Lines</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (adj of paginatedAdjustments(); track trackByAdjustmentId($index, adj)) {
+              <tr>
+                <td>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    (click)="toggleExpanded(adj.id); $event.stopPropagation()"
+                    [attr.aria-expanded]="isExpanded(adj.id)"
+                    aria-label="Toggle line items"
+                  >
+                    @if (isExpanded(adj.id)) {
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M5 15l7-7 7 7"
+                        />
+                      </svg>
+                    } @else {
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    }
+                  </button>
+                </td>
+                <td>{{ formatDate(adj.createdAt) }}</td>
+                <td>{{ getReasonLabel(adj.reason) }}</td>
+                <td>{{ adj.lines?.length ?? 0 }}</td>
+                <td class="max-w-xs truncate">{{ adj.notes ?? '—' }}</td>
+              </tr>
+              @if (isExpanded(adj.id) && adj.lines?.length) {
+                <tr>
+                  <td colspan="5" class="bg-base-200 p-0">
+                    <div class="p-4">
+                      <h4 class="font-semibold mb-2 text-sm">Line items</h4>
+                      <div class="overflow-x-auto">
+                        <table class="table table-xs table-zebra">
+                          <thead>
+                            <tr>
+                              <th>Variant</th>
+                              <th class="text-right">Previous</th>
+                              <th class="text-right">New</th>
+                              <th class="text-right">Difference</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (line of adj.lines; track line.id) {
+                              <tr>
+                                <td>
+                                  <div class="font-medium">{{ getLineVariantDisplay(line) }}</div>
+                                </td>
+                                <td class="text-right text-tabular">{{ line.previousStock }}</td>
+                                <td class="text-right text-tabular">{{ line.newStock }}</td>
+                                <td class="text-right">
+                                  <span
+                                    class="font-semibold text-tabular"
+                                    [class.text-success]="line.quantityChange > 0"
+                                    [class.text-error]="line.quantityChange < 0"
+                                    [class.text-base-content]="line.quantityChange === 0"
+                                  >
+                                    {{ formatDifference(line.quantityChange) }}
+                                  </span>
+                                </td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <app-pagination
+      [currentPage]="currentPage()"
+      [totalPages]="totalPages()"
+      [totalItems]="totalItems()"
+      [itemsPerPage]="itemsPerPage()"
+      [pageOptions]="pageOptions"
+      [showItemsPerPage]="true"
+      itemLabel="adjustments"
+      (pageChange)="goToPage($event)"
+      (itemsPerPageChange)="changeItemsPerPage($event)"
+    />
+  }
 </div>

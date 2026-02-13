@@ -1,134 +1,87 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { ProductVariant } from '../../../../core/services/product/product-search.service';
-import { StockLocation } from '../../../../core/services/stock-location.service';
 
 /**
  * Stock Adjustment Line Item Form Component
  *
- * Handles adding new line items with product search, stock level display,
- * and new stock quantity input (not quantity change).
+ * Add-item form for an already-selected variant: one line showing current stock,
+ * new stock input, difference. Location is implicit from active company (global state).
+ * Product search is handled by the parent via ProductSearchViewComponent.
  */
 @Component({
   selector: 'app-stock-adjustment-line-item-form',
   imports: [CommonModule],
   template: `
     <div class="card bg-base-200 shadow">
-      <div class="card-body p-4 space-y-3">
-        <h3 class="font-semibold text-base">📦 Add Item</h3>
-
-        <!-- Product Search -->
-        <div class="form-control">
-          <input
-            type="text"
-            class="input input-bordered w-full"
-            placeholder="Search product by name or SKU..."
-            [value]="productSearchTerm()"
-            (input)="onProductSearch($any($event.target).value)"
-          />
-          @if (productSearchResults().length > 0) {
-            <div class="relative">
-              <div
-                class="absolute z-10 w-full mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
-              >
-                @for (variant of productSearchResults(); track variant.id) {
-                  <button
-                    type="button"
-                    class="w-full text-left px-4 py-3 hover:bg-base-200 border-b border-base-200 last:border-b-0"
-                    (click)="onProductSelect(variant)"
-                  >
-                    <div class="font-medium">
-                      {{ variant.productName || variant.name || variant.sku }}
-                    </div>
-                    @if (variant.name && variant.name !== variant.productName) {
-                      <div class="text-sm opacity-70">{{ variant.name }}</div>
-                    }
-                    <div class="text-xs opacity-60">SKU: {{ variant.sku }}</div>
-                  </button>
-                }
-              </div>
-            </div>
-          }
-        </div>
-
-        @if (lineItem().variantId) {
-          <div class="grid grid-cols-1 gap-3">
-            <!-- Current Stock Display -->
-            @if (currentStock() !== null) {
-              <div class="alert bg-base-100">
-                <div class="flex-1">
-                  <div class="text-sm font-semibold">Current Stock</div>
-                  <div class="text-2xl font-bold text-tabular">{{ currentStock() }}</div>
-                </div>
-              </div>
-            }
-
-            <!-- New Stock Quantity and Location -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div class="form-control">
-                <label class="label">
-                  <span class="label-text font-semibold">New Stock Quantity *</span>
-                </label>
-                <input
-                  type="number"
-                  class="input input-bordered w-full"
-                  placeholder="Enter counted quantity"
-                  step="0.01"
-                  min="0"
-                  [value]="lineItem().newStock ?? ''"
-                  (input)="onNewStockChange(parseFloat($any($event.target).value) || 0)"
-                />
-                @if (
-                  currentStock() !== null &&
-                  lineItem().newStock !== undefined &&
-                  lineItem().newStock !== null
-                ) {
-                  <div class="label">
-                    <span
-                      class="label-text-alt"
-                      [class.text-success]="difference() > 0"
-                      [class.text-error]="difference() < 0"
-                      [class.text-base-content]="difference() === 0"
-                    >
-                      Difference: {{ formatDifference(difference()) }}
-                    </span>
-                  </div>
-                }
-              </div>
-
-              @if (lineItem().stockLocationId) {
-                <div class="card bg-base-200">
-                  <div class="card-body p-3">
-                    <h3 class="font-bold text-sm">Location</h3>
-                    <p class="text-xs opacity-60">
-                      Stock will be adjusted at:
-                      <strong>{{ getLocationName(lineItem().stockLocationId!) }}</strong>
-                    </p>
-                  </div>
-                </div>
-              }
-            </div>
-
-            <!-- Add Button -->
-            <button
-              type="button"
-              class="btn btn-primary"
-              [disabled]="!canAddItem()"
-              (click)="onAddItem()"
-            >
-              ➕ Add Item
-            </button>
-          </div>
+      <div class="card-body p-4">
+        <h3 class="font-semibold text-base mb-2">Add Item</h3>
+        @if (lineItem().variant; as variant) {
+          <p class="text-sm text-base-content/70 mb-3">
+            {{ getVariantDisplayLabel(variant) }}
+          </p>
         }
+
+        <!-- One line: Current stock | New stock | Difference | Add -->
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="min-w-[6rem]">
+            <span class="label-text text-xs text-base-content/60 block mb-1">Current</span>
+            <span class="text-lg font-semibold text-tabular">{{ currentStock() ?? '–' }}</span>
+          </div>
+          <div class="flex-1 min-w-[8rem] max-w-[10rem]">
+            <label class="label py-0">
+              <span class="label-text text-xs font-semibold">New stock *</span>
+            </label>
+            <input
+              type="number"
+              class="input input-bordered w-full input-sm"
+              placeholder="Counted"
+              step="0.01"
+              min="0"
+              [value]="lineItem().newStock ?? ''"
+              (input)="onNewStockChange(parseFloat($any($event.target).value) || 0)"
+            />
+          </div>
+          <div class="min-w-[5rem]">
+            <span class="label-text text-xs text-base-content/60 block mb-1">Difference</span>
+            <span
+              class="text-lg font-semibold text-tabular"
+              [class.text-success]="difference() > 0"
+              [class.text-error]="difference() < 0"
+              [class.text-base-content]="difference() === 0"
+            >
+              {{ formatDifference(difference()) }}
+            </span>
+          </div>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm gap-1"
+            [disabled]="!canAddItem()"
+            (click)="onAddItem()"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              />
+            </svg>
+            Add
+          </button>
+        </div>
       </div>
     </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class StockAdjustmentLineItemFormComponent {
-  readonly stockLocations = input.required<StockLocation[]>();
-  readonly productSearchTerm = input<string>('');
-  readonly productSearchResults = input<ProductVariant[]>([]);
   readonly lineItem = input.required<{
     variantId?: string;
     variant?: ProductVariant;
@@ -137,37 +90,18 @@ export class StockAdjustmentLineItemFormComponent {
     currentStock?: number;
   }>();
 
-  readonly productSearch = output<string>();
-  readonly productSelect = output<ProductVariant>();
   readonly newStockChange = output<number>();
   readonly addItem = output<void>();
 
-  // Current stock level for selected variant/location
-  readonly currentStock = computed(() => {
-    const item = this.lineItem();
-    return item.currentStock ?? null;
-  });
+  readonly currentStock = computed(() => this.lineItem().currentStock ?? null);
 
-  // Computed difference
   readonly difference = computed(() => {
     const item = this.lineItem();
     const current = item.currentStock ?? null;
     const newStock = item.newStock;
-
-    if (current === null || newStock === undefined || newStock === null) {
-      return 0;
-    }
-
+    if (current === null || newStock === undefined || newStock === null) return 0;
     return newStock - current;
   });
-
-  onProductSearch(term: string): void {
-    this.productSearch.emit(term);
-  }
-
-  onProductSelect(variant: ProductVariant): void {
-    this.productSelect.emit(variant);
-  }
 
   onNewStockChange(value: number): void {
     this.newStockChange.emit(value);
@@ -181,7 +115,6 @@ export class StockAdjustmentLineItemFormComponent {
     const item = this.lineItem();
     return !!(
       item.variantId &&
-      item.stockLocationId &&
       item.newStock !== undefined &&
       item.newStock !== null &&
       item.newStock >= 0
@@ -189,21 +122,24 @@ export class StockAdjustmentLineItemFormComponent {
   }
 
   formatDifference(diff: number): string {
-    if (diff > 0) {
-      return `+${diff}`;
-    } else if (diff < 0) {
-      return String(diff);
-    } else {
-      return '0';
-    }
+    if (diff > 0) return `+${diff}`;
+    if (diff < 0) return String(diff);
+    return '0';
+  }
+
+  /** Product name · Variant name (SKU) */
+  getVariantDisplayLabel(variant: ProductVariant): string {
+    const productName = variant.productName?.trim();
+    const variantName = variant.name?.trim();
+    const sku = variant.sku?.trim();
+    const parts: string[] = [];
+    if (productName) parts.push(productName);
+    if (variantName && variantName !== productName) parts.push(variantName);
+    const main = parts.length ? parts.join(' · ') : variantName || sku || '—';
+    return sku ? `${main} (${sku})` : main;
   }
 
   parseFloat(value: string | number): number {
     return parseFloat(String(value)) || 0;
-  }
-
-  getLocationName(locationId: string): string {
-    const location = this.stockLocations().find((loc) => loc.id === locationId);
-    return location?.name || 'Unknown location';
   }
 }

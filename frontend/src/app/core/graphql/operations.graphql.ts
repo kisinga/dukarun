@@ -2613,6 +2613,18 @@ export const GET_STOCK_ADJUSTMENTS = graphql(`
           previousStock
           newStock
           stockLocationId
+          variant {
+            id
+            name
+            sku
+            product {
+              name
+            }
+          }
+          stockLocation {
+            id
+            name
+          }
         }
         createdAt
         updatedAt

@@ -154,6 +154,21 @@ app-dashboard-layout .safe-area-inset-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
+// Fixed bottom bar (e.g. primary CTA) that respects layout: above mobile bottom nav, right of sidebar on desktop
+.dashboard-main .dashboard-fixed-bottom {
+  position: fixed;
+  bottom: 3.5rem; // above mobile bottom nav (h-14)
+  left: 0;
+  right: 0;
+  z-index: 40;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+
+  @media (min-width: 1024px) {
+    bottom: 0;
+    left: 16rem; // sidebar w-64
+  }
+}
+
 app-dashboard-layout .border-l-3 {
   border-left-width: 3px;
 }

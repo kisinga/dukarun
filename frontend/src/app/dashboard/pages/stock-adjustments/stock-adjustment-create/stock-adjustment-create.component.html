@@ -1,0 +1,105 @@
+<div class="space-y-4 sm:space-y-5 lg:space-y-6 animate-stagger-children">
+  <app-page-header
+    title="Record stock adjustment"
+    subtitle="Correct inventory levels with a reason and line items"
+    [showRefresh]="false"
+  >
+    <button actions type="button" (click)="cancel()" class="btn btn-ghost btn-sm">Cancel</button>
+  </app-page-header>
+
+  @if (error()) {
+    <div role="alert" class="alert alert-error">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-5 w-5 shrink-0"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      <span class="flex-1">{{ error() }}</span>
+      <button (click)="clearError()" class="btn btn-sm">Dismiss</button>
+    </div>
+  }
+
+  @if (adjustmentDraft(); as draft) {
+    <div class="space-y-4">
+      <app-stock-adjustment-form-fields
+        [draft]="draft"
+        (reasonChange)="handleReasonChange($event)"
+        (notesChange)="handleNotesChange($event)"
+      />
+
+      <div class="mb-4">
+        <app-product-search-view
+          [searchResults]="productSearchResults()"
+          [isSearching]="isSearchingProducts()"
+          placeholder="Search product by name or SKU..."
+          [compact]="true"
+          [restrictVariantSelectionToInStock]="false"
+          (searchTermChange)="handleProductSearch($event)"
+          (productSelected)="onProductSelectedFromSearch($event)"
+          (variantSelected)="onVariantSelectedFromSearch($event)"
+        />
+      </div>
+
+      <app-stock-adjustment-line-items-table
+        [lineItems]="displayLineItems()"
+        (lineItemUpdate)="handleUpdateLineItem($event.index, $event.field, $event.value)"
+        (lineItemRemove)="handleRemoveLineItem($event)"
+      />
+
+      <div class="flex gap-2 pt-4">
+        <button
+          type="button"
+          class="btn btn-primary flex-1 sm:flex-none"
+          [disabled]="!draft.reason || draft.lines.length === 0 || isLoading()"
+          (click)="handleSubmitAdjustment()"
+        >
+          @if (isLoading()) {
+            <span class="loading loading-spinner loading-sm"></span>
+          } @else {
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+              />
+            </svg>
+            Record adjustment
+          }
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Add item modal: enter new stock and submit -->
+  <dialog #addItemModal class="modal" (close)="closeAddItemModal()">
+    <div class="modal-box">
+      <h3 class="font-semibold text-lg mb-4">Add item to adjustment</h3>
+      @if (newLineItem().variantId) {
+        <app-stock-adjustment-line-item-form
+          [lineItem]="newLineItem()"
+          (newStockChange)="handleNewStockChange($event)"
+          (addItem)="handleAddLineItem()"
+        />
+      }
+    </div>
+    <form method="dialog" class="modal-backdrop">
+      <button type="button" (click)="closeAddItemModal()">Close</button>
+    </form>
+  </dialog>
+</div>
