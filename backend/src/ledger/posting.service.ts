@@ -9,6 +9,8 @@ export interface PostingPayload {
   channelId: number;
   entryDate: string; // YYYY-MM-DD
   memo?: string;
+  /** Optional UUID of the journal entry this entry reverses (e.g. for OrderReversal). */
+  reversalOf?: string | null;
   // amounts in smallest currency unit (e.g., cents)
   lines: Array<{
     accountCode: string;
@@ -99,6 +101,7 @@ export class PostingService {
         memo: payload.memo,
         sourceType,
         sourceId,
+        reversalOf: payload.reversalOf ?? null,
       });
       await journalEntryRepo.save(entry);
 

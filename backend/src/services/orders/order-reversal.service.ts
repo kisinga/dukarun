@@ -1,0 +1,85 @@
+import { Injectable, Logger } from '@nestjs/common';
+import {
+  ID,
+  Order,
+  OrderService,
+  RequestContext,
+  TransactionalConnection,
+  UserInputError,
+} from '@vendure/core';
+import { LedgerPostingService } from '../financial/ledger-posting.service';
+
+export interface OrderReversalResult {
+  order: Order;
+  /** True if the order had settled payments (partially or fully paid) before reversal. Refund is not automatic. */
+  hadPayments: boolean;
+}
+
+/**
+ * Order Reversal Service
+ *
+ * Posts a single ledger entry dated at the reversal date that reverses the order's net effect
+ * (CreditSale + PaymentAllocation for credit orders, or Payment entries for cash orders),
+ * and marks the order as reversed via custom fields.
+ * Inventory/quantity restoration is left to Vendure.
+ */
+@Injectable()
+export class OrderReversalService {
+  private readonly logger = new Logger(OrderReversalService.name);
+
+  constructor(
+    private readonly orderService: OrderService,
+    private readonly ledgerPostingService: LedgerPostingService,
+    private readonly connection: TransactionalConnection
+  ) {}
+
+  /**
+   * Reverse an order: post OrderReversal ledger entry and set order customFields (reversedAt, reversedByUserId).
+   * Idempotent: if reversal entry already exists, returns current order and hadPayments from order state.
+   */
+  async reverseOrder(ctx: RequestContext, orderId: ID): Promise<OrderReversalResult> {
+    const order = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
+    if (!order) {
+      throw new UserInputError(`Order ${orderId} not found`);
+    }
+
+    const customFields = (order.customFields as Record<string, unknown>) || {};
+    if (customFields.reversedAt) {
+      throw new UserInputError(`Order ${order.code} is already reversed.`);
+    }
+
+    const settledPayments = (order.payments || [])
+      .filter(p => p.state === 'Settled')
+      .reduce((sum, p) => sum + p.amount, 0);
+    const hadPayments = settledPayments > 0;
+
+    const reversalDate = new Date().toISOString().slice(0, 10);
+    await this.ledgerPostingService.postOrderReversal(ctx, order.id.toString(), {
+      orderId: order.id.toString(),
+      orderCode: order.code,
+      customerId: order.customer?.id?.toString(),
+      reversalDate,
+    });
+
+    const orderRepo = this.connection.getRepository(ctx, Order);
+    const now = new Date();
+    await orderRepo.update(
+      { id: orderId },
+      {
+        customFields: {
+          ...customFields,
+          reversedAt: now,
+          reversedByUserId: ctx.activeUserId ?? undefined,
+        } as Record<string, unknown>,
+      }
+    );
+
+    this.logger.log(`Reversed order ${order.code} (reversal entry posted, order marked reversed).`);
+
+    const updatedOrder = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
+    return {
+      order: updatedOrder ?? order,
+      hadPayments,
+    };
+  }
+}

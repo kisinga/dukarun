@@ -29,6 +29,7 @@ import { CustomerPlugin } from './plugins/customers/customer.plugin';
 import {
   ApproveCustomerCreditPermission,
   ManageCustomerCreditLimitPermission,
+  ReverseOrderPermission,
 } from './plugins/credit/permissions';
 import { FractionalQuantityPlugin } from './plugins/inventory/fractional-quantity.plugin';
 import { LedgerPlugin } from './plugins/ledger/ledger.plugin';
@@ -127,6 +128,7 @@ export const config: VendureConfig = {
       OverridePricePermission,
       ApproveCustomerCreditPermission,
       ManageCustomerCreditLimitPermission,
+      ReverseOrderPermission,
       ManageStockAdjustmentsPermission,
     ],
     // OTP token auth strategy will be registered by PhoneAuthPlugin before bootstrap
@@ -941,6 +943,33 @@ export const config: VendureConfig = {
           {
             languageCode: LanguageCode.en,
             value: 'Timestamp when audit tracking was enabled for this order',
+          },
+        ],
+        public: false,
+        nullable: true,
+      },
+      {
+        name: 'reversedAt',
+        type: 'datetime',
+        label: [{ languageCode: LanguageCode.en, value: 'Reversed At' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'When this order was reversed (ledger reversal); null if not reversed',
+          },
+        ],
+        public: false,
+        nullable: true,
+      },
+      {
+        name: 'reversedByUserId',
+        type: 'relation',
+        entity: User,
+        label: [{ languageCode: LanguageCode.en, value: 'Reversed By User' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'User who performed the order reversal',
           },
         ],
         public: false,

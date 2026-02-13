@@ -21,6 +21,7 @@ import { OverridePricePermission } from '../../../plugins/pricing/price-override
 import {
   ApproveCustomerCreditPermission,
   ManageCustomerCreditLimitPermission,
+  ReverseOrderPermission,
 } from '../../../plugins/credit/permissions';
 import { ManageStockAdjustmentsPermission } from '../../../plugins/stock/permissions';
 import {
@@ -96,6 +97,7 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
       CloseAccountingPeriodPermission.Permission as Permission,
       CreateInterAccountTransferPermission.Permission as Permission,
       ManageSupplierCreditPurchasesPermission.Permission as Permission,
+      ReverseOrderPermission.Permission as Permission,
     ],
   },
   cashier: {
@@ -234,6 +236,7 @@ export class RoleProvisionerService {
     CloseAccountingPeriodPermission.Permission as Permission,
     CreateInterAccountTransferPermission.Permission as Permission,
     ManageSupplierCreditPurchasesPermission.Permission as Permission,
+    ReverseOrderPermission.Permission as Permission,
   ];
 
   constructor(
