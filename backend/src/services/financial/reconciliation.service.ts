@@ -12,19 +12,21 @@ import {
   toScopeRefId,
 } from './period-management.types';
 
+/** Per-account declared amount by account code (API boundary). */
+export interface DeclaredAmountInput {
+  accountCode: string;
+  amountCents: string;
+}
+
 export interface CreateReconciliationInput {
   channelId: number;
   scope: ReconciliationScope;
   scopeRefId: string;
-  rangeStart: string;
-  rangeEnd: string;
   expectedBalance?: string; // in smallest currency unit
   actualBalance: string; // in smallest currency unit
   notes?: string;
-  /** Account IDs (UUID) this reconciliation covers; rows inserted into reconciliation_account */
-  accountIds?: string[];
-  /** Per-account declared amounts (accountId -> declaredAmountCents string) for opening/closing */
-  accountDeclaredAmounts?: Record<string, string>;
+  /** Declared amounts by account code; resolved server-side to IDs with channel ownership validation */
+  declaredAmounts: DeclaredAmountInput[];
 }
 
 /**
@@ -46,17 +48,53 @@ export class ReconciliationService {
   ) {}
 
   /**
+   * Resolve declaredAmounts (by account code) to accountIds and accountDeclaredAmounts (by ID).
+   * Validates channel ownership: all codes must exist for the given channelId.
+   */
+  private async resolveDeclaredAmounts(
+    ctx: RequestContext,
+    channelId: number,
+    declaredAmounts: Array<{ accountCode: string; amountCents: string }>
+  ): Promise<{ accountIds: string[]; accountDeclaredAmounts: Record<string, string> }> {
+    if (declaredAmounts.length === 0) {
+      return { accountIds: [], accountDeclaredAmounts: {} };
+    }
+    const codes = [...new Set(declaredAmounts.map(d => d.accountCode))];
+    const accountRepo = this.connection.getRepository(ctx, Account);
+    const accounts = await accountRepo.find({
+      where: { channelId, code: In(codes) },
+      select: ['id', 'code'],
+    });
+    const byCode = new Map(accounts.map(a => [a.code, a.id]));
+    const missing = codes.filter(c => !byCode.has(c));
+    if (missing.length > 0) {
+      throw new Error(`Accounts not found for channel ${channelId}: ${missing.join(', ')}`);
+    }
+    const accountIds: string[] = [];
+    const accountDeclaredAmounts: Record<string, string> = {};
+    for (const d of declaredAmounts) {
+      const id = byCode.get(d.accountCode)!;
+      accountDeclaredAmounts[id] = d.amountCents;
+      if (!accountIds.includes(id)) accountIds.push(id);
+    }
+    return { accountIds, accountDeclaredAmounts };
+  }
+
+  /**
    * Create reconciliation record.
-   * For scope=manual: forces range to today, runs in one transaction, and posts variance to the ledger per account.
+   * Reconciliation is a snapshot in time; the service derives the snapshot date internally.
+   * For scope=manual: snapshot = today. For scope=cash-session: pass snapshotDate in options.
    */
   async createReconciliation(
     ctx: RequestContext,
-    input: CreateReconciliationInput
+    input: CreateReconciliationInput,
+    options?: { snapshotDate?: string }
   ): Promise<Reconciliation> {
     if (input.scope === 'manual') {
       return this.createManualReconciliationWithPosting(ctx, input);
     }
-    return this.createReconciliationRecordOnly(ctx, input);
+    const snapshotDate = options?.snapshotDate ?? new Date().toISOString().slice(0, 10);
+    return this.createReconciliationRecordOnly(ctx, input, snapshotDate);
   }
 
   /**
@@ -68,19 +106,25 @@ export class ReconciliationService {
   ): Promise<Reconciliation> {
     const today = new Date().toISOString().slice(0, 10);
     return this.connection.withTransaction(ctx, async txCtx => {
-      const accountRepo = this.connection.getRepository(txCtx, Account);
-      const declared = input.accountDeclaredAmounts ?? {};
-      const accountIds = input.accountIds ?? [];
+      const { accountIds, accountDeclaredAmounts } = await this.resolveDeclaredAmounts(
+        txCtx,
+        input.channelId,
+        input.declaredAmounts
+      );
+      const declared = accountDeclaredAmounts;
 
       if (accountIds.length === 0) {
-        return this.createReconciliationRecordOnly(txCtx, {
-          ...input,
-          rangeStart: today,
-          rangeEnd: today,
-          actualBalance: '0',
-        });
+        return this.createReconciliationRecordOnly(
+          txCtx,
+          {
+            ...input,
+            actualBalance: '0',
+          },
+          today
+        );
       }
 
+      const accountRepo = this.connection.getRepository(txCtx, Account);
       const accounts = await accountRepo.find({
         where: { id: In(accountIds) },
         select: ['id', 'code'],
@@ -130,7 +174,7 @@ export class ReconciliationService {
         scopeRefId: input.scopeRefId,
         rangeStart: today,
         rangeEnd: today,
-        status: 'draft',
+        status: 'verified',
         expectedBalance: String(expectedSum),
         actualBalance: String(actualSum),
         varianceAmount,
@@ -171,22 +215,27 @@ export class ReconciliationService {
    */
   private async createReconciliationRecordOnly(
     ctx: RequestContext,
-    input: CreateReconciliationInput
+    input: CreateReconciliationInput,
+    snapshotDate: string
   ): Promise<Reconciliation> {
-    this.logger.log(`createReconciliation input.accountIds=${JSON.stringify(input?.accountIds)}`);
+    const { accountIds, accountDeclaredAmounts } = await this.resolveDeclaredAmounts(
+      ctx,
+      input.channelId,
+      input.declaredAmounts
+    );
+
     const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
     const expectedBalance = input.expectedBalance ? BigInt(input.expectedBalance) : BigInt(0);
     const actualBalance = BigInt(input.actualBalance);
     const varianceAmount = (expectedBalance - actualBalance).toString();
     const createdBy = ctx.activeUserId ? parseInt(ctx.activeUserId.toString(), 10) : 0;
-
     const reconciliation = reconciliationRepo.create({
       channelId: input.channelId,
       scope: input.scope,
       scopeRefId: input.scopeRefId,
-      rangeStart: input.rangeStart,
-      rangeEnd: input.rangeEnd,
-      status: 'draft',
+      rangeStart: snapshotDate,
+      rangeEnd: snapshotDate,
+      status: 'verified',
       expectedBalance: input.expectedBalance || null,
       actualBalance: input.actualBalance,
       varianceAmount,
@@ -195,10 +244,10 @@ export class ReconciliationService {
     });
     const saved = await reconciliationRepo.save(reconciliation);
 
-    if (input.accountIds?.length) {
+    if (accountIds.length > 0) {
       const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
-      const declared = input.accountDeclaredAmounts ?? {};
-      const rows = input.accountIds.map(accountId =>
+      const declared = accountDeclaredAmounts;
+      const rows = accountIds.map(accountId =>
         junctionRepo.create({
           reconciliationId: saved.id,
           accountId,
@@ -424,21 +473,39 @@ export class ReconciliationService {
       varianceCents: string | null;
     }>
   > {
+    if (!reconciliationId || reconciliationId === '-1') {
+      return [];
+    }
+    const trimmedId = String(reconciliationId).trim();
+    if (!trimmedId || trimmedId === '-1') return [];
+
     const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
-    const reconciliation = await reconciliationRepo.findOne({
-      where: { id: reconciliationId },
-    });
+    let reconciliation: Reconciliation | null = null;
+    try {
+      reconciliation = await reconciliationRepo.findOne({
+        where: { id: trimmedId },
+      });
+    } catch (e) {
+      this.logger.warn(`getReconciliationDetails invalid id: ${trimmedId}`, e);
+      return [];
+    }
     if (!reconciliation) {
       return [];
     }
 
     const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
-    const rows = await junctionRepo.find({
-      where: { reconciliationId },
-      relations: ['account'],
-    });
+    let rows: Array<ReconciliationAccount & { account?: Account | null }>;
+    try {
+      rows = await junctionRepo.find({
+        where: { reconciliationId: trimmedId },
+        relations: ['account'],
+      });
+    } catch (e) {
+      this.logger.warn(`getReconciliationDetails junction find failed: ${trimmedId}`, e);
+      rows = [];
+    }
     this.logger.log(
-      `getReconciliationDetails reconciliationId=${reconciliationId} junctionRows=${rows.length}`
+      `getReconciliationDetails reconciliationId=${trimmedId} junctionRows=${rows.length}`
     );
 
     const result: Array<{
@@ -477,6 +544,22 @@ export class ReconciliationService {
         declaredAmountCents: declaredStr,
         expectedBalanceCents: expectedStr,
         varianceCents: varianceStr,
+      });
+    }
+
+    // Fallback: when no per-account junction rows (legacy, inventory, or empty manual),
+    // return a summary row so the user sees expected/actual/variance.
+    if (result.length === 0) {
+      const expected = reconciliation.expectedBalance ?? null;
+      const actual = reconciliation.actualBalance ?? null;
+      const variance = reconciliation.varianceAmount ?? null;
+      result.push({
+        accountId: trimmedId,
+        accountCode: '–',
+        accountName: 'Summary (no per-account breakdown)',
+        declaredAmountCents: actual,
+        expectedBalanceCents: expected,
+        varianceCents: variance,
       });
     }
 

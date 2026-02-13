@@ -167,34 +167,29 @@ export class OpenSessionService {
     }
 
     const today = savedSession.openedAt.toISOString().slice(0, 10);
-    const byCode = await this.getAccountIdsByCode(ctx, input.channelId, [...requiredCodes]);
-    const accountDeclaredAmounts: Record<string, string> = {};
-    let totalDeclared = 0;
-    for (const { accountCode, amountCents } of input.openingBalances) {
-      const accountId = byCode[accountCode];
-      if (accountId) {
-        accountDeclaredAmounts[accountId] = String(amountCents);
-        totalDeclared += amountCents;
-      }
-    }
-    const accountIds = Object.keys(accountDeclaredAmounts);
+    const declaredAmounts = input.openingBalances.map(b => ({
+      accountCode: b.accountCode,
+      amountCents: String(b.amountCents),
+    }));
+    const totalDeclared = input.openingBalances.reduce((s, b) => s + b.amountCents, 0);
 
-    const openingRecon = await this.reconciliationService.createReconciliation(ctx, {
-      channelId: input.channelId,
-      scope: 'cash-session',
-      scopeRefId: toScopeRefId({
+    const openingRecon = await this.reconciliationService.createReconciliation(
+      ctx,
+      {
+        channelId: input.channelId,
         scope: 'cash-session',
-        sessionId: savedSession.id,
-        kind: 'opening',
-      }),
-      rangeStart: today,
-      rangeEnd: today,
-      expectedBalance: '0',
-      actualBalance: String(totalDeclared),
-      notes: `Opening reconciliation for session ${savedSession.id}`,
-      accountIds,
-      accountDeclaredAmounts,
-    });
+        scopeRefId: toScopeRefId({
+          scope: 'cash-session',
+          sessionId: savedSession.id,
+          kind: 'opening',
+        }),
+        expectedBalance: '0',
+        actualBalance: String(totalDeclared),
+        notes: `Opening reconciliation for session ${savedSession.id}`,
+        declaredAmounts,
+      },
+      { snapshotDate: today }
+    );
 
     for (const { accountCode, amountCents } of input.openingBalances) {
       if (amountCents !== 0) {
@@ -378,18 +373,15 @@ export class OpenSessionService {
       await txSessionRepo.save(sessionInTx);
 
       // 3. Build per-account declared amounts and create closing reconciliation
-      const codes = input.closingBalances.map(b => b.accountCode);
-      const byCode = await this.getAccountIdsByCode(txCtx, channelId, codes);
-      const accountDeclaredAmounts: Record<string, string> = {};
-      for (const { accountCode, amountCents } of input.closingBalances) {
-        const accountId = byCode[accountCode];
-        if (accountId) accountDeclaredAmounts[accountId] = String(amountCents);
-      }
+      const declaredAmounts = input.closingBalances.map(b => ({
+        accountCode: b.accountCode,
+        amountCents: String(b.amountCents),
+      }));
       const closingRecon = await this.createSessionReconciliation(
         txCtx,
         sessionId,
         input.notes,
-        accountDeclaredAmounts
+        declaredAmounts
       );
 
       // 4. Post per-account variance adjustments (mirrors opening pattern)
@@ -618,13 +610,13 @@ export class OpenSessionService {
 
   /**
    * Create reconciliation record for a closed session.
-   * When closingDeclaredAmounts is provided (from closeSession), stores per-account declared amounts; otherwise uses session total only.
+   * When declaredAmounts is provided (from closeSession), uses per-account amounts; otherwise builds synthetic from session total.
    */
   async createSessionReconciliation(
     ctx: RequestContext,
     sessionId: string,
     notes?: string,
-    closingDeclaredAmounts?: Record<string, string>
+    declaredAmounts?: Array<{ accountCode: string; amountCents: string }>
   ): Promise<Reconciliation> {
     const summary = await this.getSessionSummary(ctx, sessionId);
 
@@ -636,8 +628,7 @@ export class OpenSessionService {
 
     const channelId = await this.getSessionChannelId(ctx, sessionId);
     const scopeRefId = toScopeRefId({ scope: 'cash-session', sessionId, kind: 'closing' });
-    const rangeStart = summary.openedAt.toISOString().slice(0, 10);
-    const rangeEnd = (summary.closedAt || new Date()).toISOString().slice(0, 10);
+    const snapshotDate = (summary.closedAt || new Date()).toISOString().slice(0, 10);
 
     const reconRepo = this.connection.getRepository(ctx, Reconciliation);
     const existingClosing = await reconRepo.findOne({
@@ -645,8 +636,8 @@ export class OpenSessionService {
         channelId,
         scope: 'cash-session',
         scopeRefId,
-        rangeStart,
-        rangeEnd,
+        rangeStart: snapshotDate,
+        rangeEnd: snapshotDate,
       },
     });
     if (existingClosing) {
@@ -654,29 +645,48 @@ export class OpenSessionService {
     }
 
     const expectedBalance = summary.openingFloat + summary.ledgerTotals.cashTotal;
-    const accountIds = await this.getCashierControlledAccountIds(ctx, channelId);
+    const total = summary.closingDeclared;
+
+    const effectiveDeclaredAmounts: Array<{ accountCode: string; amountCents: string }> =
+      declaredAmounts && declaredAmounts.length > 0
+        ? declaredAmounts
+        : await this.buildSyntheticDeclaredAmounts(ctx, channelId, Number(total));
 
     const actualBalance =
-      closingDeclaredAmounts && Object.keys(closingDeclaredAmounts).length > 0
-        ? Object.values(closingDeclaredAmounts)
-            .reduce((s, v) => s + BigInt(v), BigInt(0))
+      effectiveDeclaredAmounts.length > 0
+        ? effectiveDeclaredAmounts
+            .reduce((s, d) => s + BigInt(d.amountCents || '0'), BigInt(0))
             .toString()
-        : summary.closingDeclared.toString();
+        : total.toString();
 
     const input: CreateReconciliationInput = {
       channelId,
       scope: 'cash-session',
       scopeRefId,
-      rangeStart,
-      rangeEnd,
       expectedBalance: expectedBalance.toString(),
       actualBalance,
       notes: notes || `Cashier session reconciliation for session ${sessionId}`,
-      accountIds: accountIds.length > 0 ? accountIds : undefined,
-      accountDeclaredAmounts: closingDeclaredAmounts,
+      declaredAmounts: effectiveDeclaredAmounts,
     };
 
-    return this.reconciliationService.createReconciliation(ctx, input);
+    return this.reconciliationService.createReconciliation(ctx, input, {
+      snapshotDate,
+    });
+  }
+
+  /** Build synthetic declaredAmounts for standalone createCashierSessionReconciliation (first account gets total, rest 0). */
+  private async buildSyntheticDeclaredAmounts(
+    ctx: RequestContext,
+    channelId: number,
+    totalCents: number
+  ): Promise<Array<{ accountCode: string; amountCents: string }>> {
+    const requirements = await this.getChannelReconciliationRequirements(ctx, channelId);
+    const codes = [...new Set(requirements.paymentMethods.map(pm => pm.ledgerAccountCode))];
+    if (codes.length === 0) return [];
+    return codes.map((code, i) => ({
+      accountCode: code,
+      amountCents: i === 0 ? String(totalCents) : '0',
+    }));
   }
 
   /**

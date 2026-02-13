@@ -48,11 +48,6 @@ export type AccountBreakdown = {
   value: Scalars['Float']['output'];
 };
 
-export type AccountDeclaredAmountInput = {
-  accountId: Scalars['ID']['input'];
-  amountCents: Scalars['String']['input'];
-};
-
 export type AccountingPeriod = {
   __typename?: 'AccountingPeriod';
   channelId: Scalars['Int']['output'];
@@ -1503,10 +1498,9 @@ export type CreateProvinceInput = {
 };
 
 export type CreateReconciliationInput = {
-  accountDeclaredAmounts?: InputMaybe<Array<AccountDeclaredAmountInput>>;
-  accountIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   actualBalance: Scalars['String']['input'];
   channelId: Scalars['Int']['input'];
+  declaredAmounts: Array<DeclaredAmountInput>;
   expectedBalance?: InputMaybe<Scalars['String']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
   rangeEnd: Scalars['DateTime']['input'];
@@ -2243,6 +2237,11 @@ export type DateTimeStructFieldConfig = StructField & {
   step?: Maybe<Scalars['Int']['output']>;
   type: Scalars['String']['output'];
   ui?: Maybe<Scalars['JSON']['output']>;
+};
+
+export type DeclaredAmountInput = {
+  accountCode: Scalars['String']['input'];
+  amountCents: Scalars['String']['input'];
 };
 
 export type DeleteAssetInput = {

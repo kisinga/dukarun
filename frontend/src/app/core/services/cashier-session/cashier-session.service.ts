@@ -67,8 +67,8 @@ export interface ReconciliationListOptions {
   skip?: number;
 }
 
-export interface AccountDeclaredAmountInput {
-  accountId: string;
+export interface DeclaredAmountInput {
+  accountCode: string;
   amountCents: string;
 }
 
@@ -76,13 +76,10 @@ export interface CreateReconciliationInput {
   channelId: number;
   scope: string;
   scopeRefId: string;
-  rangeStart: string;
-  rangeEnd: string;
   expectedBalance?: string;
   actualBalance: string;
   notes?: string;
-  accountIds?: string[];
-  accountDeclaredAmounts?: AccountDeclaredAmountInput[];
+  declaredAmounts: DeclaredAmountInput[];
 }
 
 export interface CashierSessionLedgerTotals {

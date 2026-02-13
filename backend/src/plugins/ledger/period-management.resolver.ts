@@ -130,19 +130,7 @@ export class PeriodManagementResolver {
     @Ctx() ctx: RequestContext,
     @Args('input') input: any
   ): Promise<Reconciliation> {
-    const accountDeclaredAmounts: Record<string, string> | undefined =
-      Array.isArray(input.accountDeclaredAmounts) && input.accountDeclaredAmounts.length > 0
-        ? Object.fromEntries(
-            input.accountDeclaredAmounts.map((a: { accountId: string; amountCents: string }) => [
-              a.accountId,
-              a.amountCents,
-            ])
-          )
-        : undefined;
-    return this.reconciliationService.createReconciliation(ctx, {
-      ...input,
-      accountDeclaredAmounts: accountDeclaredAmounts ?? input.accountDeclaredAmounts,
-    });
+    return this.reconciliationService.createReconciliation(ctx, input);
   }
 
   @Mutation()

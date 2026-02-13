@@ -155,7 +155,7 @@ export class InventoryReconciliationService {
       scopeRefId,
       rangeStart: input.periodEndDate, // For inventory, range is typically a single date
       rangeEnd: input.periodEndDate,
-      status: 'draft',
+      status: 'verified',
       expectedBalance: inventoryValuation.totalValue,
       actualBalance: input.actualBalance,
       varianceAmount,
