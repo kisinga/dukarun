@@ -377,8 +377,9 @@ import {
                     <span class="text-sm font-medium">Quantity</span>
                     <div class="flex items-center gap-2">
                       <button
+                        type="button"
                         class="btn btn-sm btn-circle btn-ghost"
-                        (click)="quantityInput.stepDown()"
+                        (click)="decrementQuantity()"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -392,15 +393,16 @@ import {
                         </svg>
                       </button>
                       <input
-                        #quantityInput
                         type="number"
-                        value="1"
+                        [value]="quantity()"
                         min="1"
                         class="input input-sm input-bordered text-center text-tabular w-16"
+                        (input)="onQuantityInput($event)"
                       />
                       <button
+                        type="button"
                         class="btn btn-sm btn-circle btn-ghost"
-                        (click)="quantityInput.stepUp()"
+                        (click)="incrementQuantity()"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -419,8 +421,9 @@ import {
 
                 <!-- Add to Cart Button -->
                 <button
+                  type="button"
                   class="btn btn-primary btn-block min-h-[3rem] hover:scale-105 active:scale-95 transition-transform"
-                  (click)="handleSingleVariantAdd(quantityInput.value)"
+                  (click)="handleSingleVariantAdd()"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -532,6 +535,9 @@ export class ProductConfirmModalComponent {
   /** Bumped after each price change so template re-reads from service */
   private readonly priceVersion = signal(0);
 
+  /** Quantity for single-variant add (bound to input, reset when product changes) */
+  readonly quantity = signal(1);
+
   /** Variant id when price is in direct-edit mode; null otherwise */
   readonly editingPriceVariantId = signal<string | null>(null);
   /** Current input value while editing price (numeric string, currency units) */
@@ -542,6 +548,7 @@ export class ProductConfirmModalComponent {
       const prod = this.product();
       if (prod) {
         prod.variants.forEach((v) => this.priceModificationService.clearStacks(v.id));
+        this.quantity.set(1);
       }
       this.priceVersion.update((v) => v + 1);
     });
@@ -629,6 +636,20 @@ export class ProductConfirmModalComponent {
     this.editingPriceVariantId.set(null);
   }
 
+  incrementQuantity(): void {
+    this.quantity.update((q) => Math.max(1, q + 1));
+  }
+
+  decrementQuantity(): void {
+    this.quantity.update((q) => Math.max(1, q - 1));
+  }
+
+  onQuantityInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    const parsed = parseInt(value, 10);
+    this.quantity.set(Number.isNaN(parsed) || parsed < 1 ? 1 : parsed);
+  }
+
   handleVariantClick(variant: ProductVariant): void {
     const basePrice = Math.round(variant.priceWithTax);
     const currentPrice = this.priceModificationService.getCurrentPrice(
@@ -648,9 +669,10 @@ export class ProductConfirmModalComponent {
     this.variantSelected.emit({ variant, quantity: 1, priceOverride, facetValues });
   }
 
-  handleSingleVariantAdd(quantityValue: string): void {
+  handleSingleVariantAdd(): void {
     const variant = this.product()?.variants[0];
     if (!variant) return;
+    const qty = this.quantity();
     const basePrice = Math.round(variant.priceWithTax);
     const currentPrice = this.priceModificationService.getCurrentPrice(
       variant.id,
@@ -666,6 +688,6 @@ export class ProductConfirmModalComponent {
       facetCode: fv.facetCode,
       facet: fv.facetCode ? { code: fv.facetCode } : undefined,
     }));
-    this.variantSelected.emit({ variant, quantity: +quantityValue, priceOverride, facetValues });
+    this.variantSelected.emit({ variant, quantity: qty, priceOverride, facetValues });
   }
 }
