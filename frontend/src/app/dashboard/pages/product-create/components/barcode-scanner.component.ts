@@ -61,7 +61,13 @@ import { TracingService } from '../../../../core/services/tracing.service';
         }
         @if (lastScannedCode()) {
           <div class="alert alert-success alert-sm py-2">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
             </svg>
             <span class="text-xs">{{ lastScannedCode() }}</span>
@@ -90,11 +96,11 @@ import { TracingService } from '../../../../core/services/tracing.service';
               </div>
               <div class="badge badge-sm badge-ghost absolute bottom-3 left-1/2 -translate-x-1/2">
                 Align barcode within frame
-                </div>
               </div>
-              <button type="button" (click)="stopScanning()" class="btn btn-error btn-block mt-2">
-                Stop Scanner
-              </button>
+            </div>
+            <button type="button" (click)="stopScanning()" class="btn btn-error btn-block mt-2">
+              Stop Scanner
+            </button>
           }
 
           @if (error()) {
@@ -105,7 +111,13 @@ import { TracingService } from '../../../../core/services/tracing.service';
 
           @if (lastScannedCode()) {
             <div class="alert alert-success mt-2">
-              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <svg
+                class="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
               </svg>
               <span>Scanned: {{ lastScannedCode() }}</span>
@@ -202,19 +214,8 @@ import { TracingService } from '../../../../core/services/tracing.service';
       left: 8px;
       right: 8px;
       height: 2px;
+      top: 10%;
       background: linear-gradient(90deg, transparent, oklch(var(--p)), transparent);
-      animation: scan 2s ease-in-out infinite;
-    }
-
-    @keyframes scan {
-      0%, 100% {
-        top: 10%;
-        opacity: 0.5;
-      }
-      50% {
-        top: 85%;
-        opacity: 1;
-      }
     }
   `,
 })

@@ -212,31 +212,6 @@
 }
 
 // ============================================
-// ANIMATIONS - Fast, subtle
-// ============================================
-
-@media (prefers-reduced-motion: no-preference) {
-  .home-hero-intro {
-    animation: hero-fade 0.4s ease-out both;
-  }
-
-  .home-hero-intro-delay {
-    animation: hero-fade 0.5s ease-out 0.1s both;
-  }
-}
-
-@keyframes hero-fade {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-// ============================================
 // CAROUSEL - Touch-optimized
 // ============================================
 
@@ -320,13 +295,5 @@
   .hover\:-translate-y-1:hover,
   .hover\:-translate-y-0\.5:hover {
     transform: none;
-  }
-}
-
-// Reduce motion
-@media (prefers-reduced-motion: reduce) {
-  .home-hero-intro,
-  .home-hero-intro-delay {
-    animation: none;
   }
 }

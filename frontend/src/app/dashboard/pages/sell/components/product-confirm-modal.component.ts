@@ -29,7 +29,7 @@ import {
   imports: [CommonModule, ProductLabelComponent],
   template: `
     @if (isOpen() && product()) {
-      <div class="modal modal-open modal-bottom sm:modal-middle animate-in">
+      <div class="modal modal-open modal-bottom sm:modal-middle">
         <div class="modal-box max-w-xl p-0">
           <!-- Header -->
           <div class="bg-success/10 p-3 border-b border-base-300">
@@ -489,21 +489,6 @@ import {
     }
   `,
   styles: `
-    .animate-in {
-      animation: slideUp 0.3s ease-out;
-    }
-
-    @keyframes slideUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
     @media (max-width: 639px) {
       .modal-bottom .modal-box {
         width: 100%;

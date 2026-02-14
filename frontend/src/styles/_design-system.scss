@@ -462,19 +462,6 @@ $container-2xl: 1536px; // Full width limit
   width: $space-2;
   height: $space-2;
   border-radius: $radius-full;
-  &.pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
 }
 
 .text-secondary {
@@ -495,47 +482,4 @@ $container-2xl: 1536px; // Full width limit
   letter-spacing: $tracking-wide;
   text-transform: uppercase;
   border-radius: $radius-full;
-}
-
-.fade-in {
-  animation: fadeIn $transition-slow $ease-in-out;
-}
-
-.slide-up {
-  animation: slideUp $transition-slow $ease-in-out;
-}
-
-.scale-in {
-  animation: scaleIn $transition-base $ease-spring;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
 }

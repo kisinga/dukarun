@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   OnInit,
+  ViewEncapsulation,
   computed,
   effect,
   inject,
@@ -49,6 +50,8 @@ import type { NavItem, NavSection } from './nav.types';
     UserAvatarButtonComponent,
   ],
   templateUrl: './dashboard-layout.component.html',
+  styleUrl: './dashboard-layout.component.scss',
+  encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DashboardLayoutComponent implements OnInit {

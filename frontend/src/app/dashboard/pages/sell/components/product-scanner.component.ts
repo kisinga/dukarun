@@ -117,34 +117,6 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
       border: 3px solid oklch(var(--p));
       border-radius: 1rem;
       box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.5);
-      animation: scan-pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes scan-pulse {
-      0%,
-      100% {
-        opacity: 1;
-        border-color: oklch(var(--p));
-      }
-      50% {
-        opacity: 0.7;
-        border-color: oklch(var(--s));
-      }
-    }
-
-    .animate-in {
-      animation: slideIn 0.3s ease-in-out;
-    }
-
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(-20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

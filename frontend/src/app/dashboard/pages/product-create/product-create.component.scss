@@ -27,25 +27,6 @@
   }
 }
 
-@keyframes product-create-expandIn {
-  from {
-    opacity: 0;
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    margin-top: 0;
-  }
-  to {
-    opacity: 1;
-    max-height: 100px;
-  }
-}
-
-.animate-in {
-  animation: product-create-expandIn 0.2s ds.$ease-in-out forwards;
-  overflow: hidden;
-}
-
 .fixed.bottom-0 {
   padding-bottom: env(safe-area-inset-bottom);
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.1);
@@ -53,17 +34,6 @@
 
 .btn.btn-primary:not(:disabled) {
   box-shadow: 0 0 0 2px oklch(var(--p) / 0.3);
-  animation: product-create-subtleGlow 2s ease-in-out infinite;
-}
-
-@keyframes product-create-subtleGlow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 2px oklch(var(--p) / 0.3);
-  }
-  50% {
-    box-shadow: 0 0 0 3px oklch(var(--p) / 0.5);
-  }
 }
 
 .tooltip::before {

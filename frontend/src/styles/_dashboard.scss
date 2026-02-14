@@ -68,31 +68,6 @@ app-dashboard-layout .navbar {
   background-color: var(--color-base-100, #fafafa);
 }
 
-app-dashboard-layout .nav-link-ripple {
-  position: relative;
-  overflow: hidden;
-
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: radial-gradient(circle at center, oklch(var(--bc) / 0.12) 0%, transparent 65%);
-    opacity: 0;
-    transform: scale(0.8);
-    transition:
-      transform 0.35s ease-out,
-      opacity 0.2s ease-out;
-    pointer-events: none;
-  }
-
-  &:active::after {
-    opacity: 1;
-    transform: scale(1.8);
-    transition-duration: 0.08s;
-  }
-}
-
 app-dashboard-layout aside nav a {
   -webkit-tap-highlight-color: transparent;
 
@@ -117,36 +92,6 @@ app-dashboard-layout nav[role='navigation'] a {
 
   &:active {
     opacity: 0.7;
-  }
-}
-
-app-dashboard-layout .dropdown-content {
-  animation: dashboard-dropdown-show 0.15s ease-out;
-}
-
-@keyframes dashboard-dropdown-show {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-app-dashboard-layout .drawer-side aside {
-  animation: dashboard-sidebar-slide 0.2s ease-out;
-}
-
-@keyframes dashboard-sidebar-slide {
-  from {
-    opacity: 0.5;
-    transform: translateX(-12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -187,17 +132,6 @@ app-dashboard-layout .drawer-side aside {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  app-dashboard-layout .dropdown-content,
-  app-dashboard-layout .drawer-side aside {
-    animation: none;
-  }
-
-  app-dashboard-layout .nav-link-ripple::after {
-    display: none;
-  }
-}
-
 // -----------------------------------------------------------------------------
 // PAGE CONTENT — .dashboard-main (wraps router-outlet content)
 // -----------------------------------------------------------------------------
@@ -222,114 +156,9 @@ app-dashboard-layout .drawer-side aside {
   overflow: hidden;
 }
 
-.dashboard-main * {
-  transition-timing-function: ds.$ease-in-out;
-}
-
-.dashboard-main .card {
-  transition:
-    transform ds.$transition-base,
-    box-shadow ds.$transition-base,
-    border-color ds.$transition-base;
-
-  &:active {
-    transform: scale(0.98);
-  }
-}
-
-.dashboard-main .stats {
-  transition:
-    transform ds.$transition-base,
-    box-shadow ds.$transition-base;
-
-  &:hover {
-    transform: translateY(-2px);
-  }
-}
-
-.dashboard-main .btn {
-  transition: all ds.$transition-fast;
-
-  &:active:not(:disabled) {
-    transform: scale(0.96);
-  }
-}
-
-@keyframes dashboard-badge-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-.dashboard-main .badge-success .bg-success-content {
-  animation: dashboard-badge-pulse 2s ds.$ease-in-out infinite;
-}
-
-.dashboard-main .loading-spinner {
-  animation: dashboard-spin 1s linear infinite;
-}
-
-@keyframes dashboard-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.dashboard-main .input:focus-within {
-  transition: all ds.$transition-base ds.$ease-in-out;
-  transform: translateY(-1px);
-}
-
-.dashboard-main .dropdown-content {
-  animation: dashboard-dropdown-slide ds.$transition-base ds.$ease-in-out;
-}
-
-@keyframes dashboard-dropdown-slide {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.dashboard-main .alert {
-  animation: dashboard-alert-slide-in ds.$transition-slow ds.$ease-in-out;
-}
-
-@keyframes dashboard-alert-slide-in {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes dashboard-shimmer {
-  0% {
-    background-position: -1000px 0;
-  }
-  100% {
-    background-position: 1000px 0;
-  }
-}
-
 .dashboard-main .skeleton {
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 1000px 100%;
-  animation: dashboard-shimmer 2s infinite;
 }
 
 @media (max-width: 640px) {
