@@ -22,7 +22,7 @@
   </button>
 </div>
 
-<div class="space-y-5 lg:space-y-6 animate-stagger-children">
+<div class="space-y-5 lg:space-y-6 anim-stagger">
   <!-- Header -->
   <app-page-header
     title="Purchases"
@@ -239,7 +239,7 @@
               <th class="text-right">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="anim-stagger-rows">
             @for (purchase of paginatedPurchases(); track trackByPurchaseId($index, purchase)) {
               <tr
                 app-purchase-table-row

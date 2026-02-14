@@ -11,7 +11,7 @@ type PaymentMethodCode = string;
   standalone: true,
   imports: [CommonModule, CustomerSelectorComponent, CheckoutSummaryComponent],
   template: `
-    <div class="space-y-3 animate-in slide-in-from-bottom-2 duration-300">
+    <div class="space-y-3 anim-stagger">
       <!-- Step 1: Order Summary (Read-Only) -->
       @if (!selectedPaymentMethod()) {
         <app-checkout-summary
@@ -22,7 +22,7 @@ type PaymentMethodCode = string;
       }
 
       <!-- Step 2: Payment Method Selection -->
-      <div class="space-y-3 animate-in slide-in-from-bottom-2 duration-300 delay-100">
+      <div class="space-y-3">
         <!-- Credit Button (Large, Isolated, Above Grid) -->
         <button
           class="btn btn-warning btn-lg w-full flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-transform min-h-[52px]"
@@ -47,7 +47,7 @@ type PaymentMethodCode = string;
 
         <!-- Cash Payment Methods Grid -->
         @if (paymentMethodsError()) {
-          <div class="alert alert-error animate-in slide-in-from-top-2 duration-300">
+          <div class="alert alert-error anim-fade-in-down">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-4 w-4 flex-shrink-0"
@@ -68,9 +68,7 @@ type PaymentMethodCode = string;
             </div>
           </div>
         } @else {
-          <div
-            class="grid grid-cols-2 gap-2 sm:gap-3 animate-in slide-in-from-bottom-2 duration-300 delay-200"
-          >
+          <div class="grid grid-cols-2 gap-2 sm:gap-3 anim-stagger">
             @for (method of paymentMethods(); track method.id; let i = $index) {
               <button
                 class="card hover:bg-base-200 border-2 transition-all duration-300 p-3 sm:p-4 hover:scale-105 active:scale-95 min-h-[44px] touch-manipulation"
@@ -81,7 +79,6 @@ type PaymentMethodCode = string;
                 [class.ring-success]="selectedPaymentMethod() === method.code"
                 [class.ring-opacity-50]="selectedPaymentMethod() === method.code"
                 (click)="paymentMethodSelect.emit(method.code)"
-                [style.animation-delay]="i * 50 + 'ms'"
               >
                 <div class="flex flex-col items-center gap-2">
                   <div
@@ -125,7 +122,7 @@ type PaymentMethodCode = string;
 
           <!-- Confirmation after cash method selection -->
           @if (selectedPaymentMethod()) {
-            <div class="space-y-3 animate-in slide-in-from-bottom-2 duration-300 delay-300">
+            <div class="space-y-3 anim-fade-in-up">
               <!-- Optional Customer Selection (Collapsible/Minimal) -->
               @if (!selectedCustomerForCash()) {
                 <details class="collapse collapse-arrow bg-base-200 rounded-lg">

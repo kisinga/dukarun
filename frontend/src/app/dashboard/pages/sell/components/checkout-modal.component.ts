@@ -38,7 +38,7 @@ type PaymentMethodCode = string;
   ],
   template: `
     @if (isOpen()) {
-      <div class="modal modal-open modal-bottom sm:modal-middle animate-in fade-in duration-300">
+      <div class="modal modal-open modal-bottom sm:modal-middle modal-backdrop-anim">
         <!-- Success Animation (Full-Screen Overlay) -->
         <app-checkout-success
           [show]="showSuccessAnimation()"
@@ -48,7 +48,7 @@ type PaymentMethodCode = string;
 
         @if (!showSuccessAnimation()) {
           <div
-            class="modal-box max-w-2xl p-0 max-h-[90vh] sm:max-h-[95vh] flex flex-col animate-in slide-in-from-bottom-4 duration-300 relative"
+            class="modal-box max-w-2xl p-0 max-h-[90vh] sm:max-h-[95vh] flex flex-col modal-box-anim relative"
           >
             <!-- Modal Header -->
             <div
@@ -101,10 +101,7 @@ type PaymentMethodCode = string;
             <div class="flex-1 overflow-y-auto p-3 sm:p-4 relative">
               <!-- Error Alert -->
               @if (error()) {
-                <div
-                  role="alert"
-                  class="alert alert-error mb-3 animate-in slide-in-from-top-2 duration-300"
-                >
+                <div role="alert" class="alert alert-error mb-3 anim-fade-in-down">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     class="h-4 w-4 flex-shrink-0"

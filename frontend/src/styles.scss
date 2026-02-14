@@ -6,7 +6,7 @@
 // Import Design System — single source of truth (tokens, mixins, pattern classes)
 @use 'styles/design-system' as ds;
 
-// Animation utilities (animate-stagger-children, animate-fade-in, etc.)
+// Animation utilities (anim-stagger, anim-fade-in, modal-*-anim, collapsible, etc.)
 @use 'styles/animations';
 
 // Dashboard layout + page styles (scoped under app-dashboard-layout and .dashboard-main)
@@ -291,13 +291,17 @@ textarea:focus-visible {
 }
 
 // Reduced motion
+// Reduced motion: animations still run to their end state (so fill-mode works)
+// but complete near-instantly. This is better than `animation: none` which would
+// leave elements stuck at opacity:0 if fill-mode is "both" or "backwards".
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
 }

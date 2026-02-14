@@ -22,7 +22,7 @@
   </button>
 </div>
 
-<div class="space-y-5 lg:space-y-6 animate-stagger-children">
+<div class="space-y-5 lg:space-y-6 anim-stagger">
   <!-- Header -->
   <app-page-header
     title="Customers"
@@ -239,7 +239,7 @@
               <th class="text-right">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="anim-stagger-rows">
             @for (customer of paginatedCustomers(); track trackByCustomerId($index, customer)) {
               <tr
                 app-customer-table-row

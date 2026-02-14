@@ -7,7 +7,7 @@ import { CheckoutSummaryComponent } from './checkout-summary.component';
   standalone: true,
   imports: [CommonModule, CheckoutSummaryComponent],
   template: `
-    <div class="space-y-4 animate-in slide-in-from-left-2 duration-300">
+    <div class="space-y-4 anim-stagger">
       <div class="text-center">
         <div class="inline-flex items-center justify-center w-8 h-8 bg-info/10 rounded-full mb-3">
           <svg
@@ -36,7 +36,7 @@ import { CheckoutSummaryComponent } from './checkout-summary.component';
       />
 
       <button
-        class="btn btn-info btn-md sm:btn-lg w-full hover:scale-105 active:scale-95 transition-transform animate-in slide-in-from-bottom-2 duration-300 delay-200 min-h-[44px]"
+        class="btn btn-info btn-md sm:btn-lg w-full hover:scale-105 active:scale-95 transition-transform min-h-[44px]"
         (click)="complete.emit()"
         [disabled]="isProcessing()"
       >

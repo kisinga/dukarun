@@ -25,7 +25,7 @@
   </div>
 }
 
-<div class="space-y-4 sm:space-y-5 lg:space-y-6 animate-stagger-children">
+<div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
   <!-- Header -->
   <app-page-header title="Expenses" subtitle="Track operating costs">
     <div actions class="flex items-center gap-1">
@@ -209,7 +209,7 @@
                 <th class="text-right">Amount</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody class="anim-stagger-rows">
               @for (entry of entries(); track entry.id) {
                 <tr>
                   <td>{{ formatDate(entry.entryDate) }}</td>

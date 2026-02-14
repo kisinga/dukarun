@@ -1,4 +1,4 @@
-<div class="space-y-3 sm:space-y-4 animate-stagger-children">
+<div class="space-y-3 sm:space-y-4 anim-stagger">
   <!-- Header — greeting + shift toolbar -->
   <div class="overview-header rounded-lg border border-base-300 bg-base-100 overflow-hidden">
     <div class="p-3 sm:p-4">
@@ -145,61 +145,63 @@
     }
   </div>
 
-  <!-- Expanded Breakdown -->
-  @if (expandedCategory(); as expanded) {
-    @for (category of categories(); track category.type) {
-      @if (category.type === expanded && category.accounts.length > 0) {
-        <div class="rounded-lg overflow-hidden border border-base-300 bg-base-100">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-base-300">
-            <span class="text-sm font-bold text-base-content/70">
-              {{ category.name }} breakdown
-            </span>
-            <button
-              class="btn btn-ghost btn-xs btn-square touch-manipulation"
-              (click)="toggleCategory(category.type)"
-            >
-              <svg
-                class="h-3.5 w-3.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
+  <!-- Expanded Breakdown (collapsible per category) -->
+  @for (category of categories(); track category.type) {
+    @if (category.accounts.length > 0) {
+      <div class="collapsible" [class.open]="expandedCategory() === category.type">
+        <div>
+          <div class="rounded-lg overflow-hidden border border-base-300 bg-base-100">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-base-300">
+              <span class="text-sm font-bold text-base-content/70">
+                {{ category.name }} breakdown
+              </span>
+              <button
+                class="btn btn-ghost btn-xs btn-square touch-manipulation"
+                (click)="toggleCategory(category.type)"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+                <svg
+                  class="h-3.5 w-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
-          <div class="divide-y divide-base-300/50">
-            @for (account of category.accounts; track account.label) {
-              <div class="flex items-center justify-between px-4 py-3">
-                <div class="flex items-center gap-2.5">
+            <div class="divide-y divide-base-300/50">
+              @for (account of category.accounts; track account.label) {
+                <div class="flex items-center justify-between px-4 py-3">
+                  <div class="flex items-center gap-2.5">
+                    <span
+                      class="w-7 h-7 rounded-lg text-[10px] font-bold flex items-center justify-center shrink-0"
+                      [class.bg-success/10]="category.type === 'sales'"
+                      [class.text-success]="category.type === 'sales'"
+                      [class.bg-info/10]="category.type === 'purchases'"
+                      [class.text-info]="category.type === 'purchases'"
+                      [class.bg-error/10]="category.type === 'expenses'"
+                      [class.text-error]="category.type === 'expenses'"
+                    >
+                      {{ account.label[0] }}
+                    </span>
+                    <span class="text-sm text-base-content/70">{{ account.label }}</span>
+                  </div>
                   <span
-                    class="w-7 h-7 rounded-lg text-[10px] font-bold flex items-center justify-center shrink-0"
-                    [class.bg-success/10]="category.type === 'sales'"
+                    class="font-bold text-sm tabular-nums"
                     [class.text-success]="category.type === 'sales'"
-                    [class.bg-info/10]="category.type === 'purchases'"
                     [class.text-info]="category.type === 'purchases'"
-                    [class.bg-error/10]="category.type === 'expenses'"
                     [class.text-error]="category.type === 'expenses'"
                   >
-                    {{ account.label[0] }}
+                    {{ account.value }}
                   </span>
-                  <span class="text-sm text-base-content/70">{{ account.label }}</span>
                 </div>
-                <span
-                  class="font-bold text-sm tabular-nums"
-                  [class.text-success]="category.type === 'sales'"
-                  [class.text-info]="category.type === 'purchases'"
-                  [class.text-error]="category.type === 'expenses'"
-                >
-                  {{ account.value }}
-                </span>
-              </div>
-            }
+              }
+            </div>
           </div>
         </div>
-      }
+      </div>
     }
   }
 
@@ -263,46 +265,50 @@
         </div>
       </button>
 
-      @if (showRecentActivity()) {
-        <div class="border-t border-base-300">
-          @for (activity of recentActivity().slice(0, 8); track activity.id; let isLast = $last) {
-            <div
-              class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-base-200/30"
-              [class.border-b]="!isLast"
-              [class.border-base-300/50]="!isLast"
-            >
-              <div class="flex items-center gap-2.5 flex-1 min-w-0">
-                <span
-                  class="w-7 h-7 rounded-lg text-[10px] font-bold flex items-center justify-center shrink-0"
-                  [class.bg-success/10]="activity.type === 'Sale'"
-                  [class.text-success]="activity.type === 'Sale'"
-                  [class.bg-info/10]="activity.type === 'Purchase'"
-                  [class.text-info]="activity.type === 'Purchase'"
-                  [class.bg-error/10]="activity.type === 'Expense'"
-                  [class.text-error]="activity.type === 'Expense'"
-                >
-                  {{ activity.type[0] }}
-                </span>
-
-                <div class="min-w-0 flex-1">
-                  <span class="text-xs sm:text-sm font-medium truncate block text-base-content/80">
-                    {{ activity.description }}
-                  </span>
-                  <span class="text-[10px] text-base-content/40">{{ activity.time }}</span>
-                </div>
-              </div>
-
-              <span
-                class="font-bold tabular-nums text-xs sm:text-sm shrink-0 ml-3"
-                [class.text-success]="activity.amount.startsWith('+')"
-                [class.text-error]="activity.amount.startsWith('-')"
+      <div class="collapsible" [class.open]="showRecentActivity()">
+        <div>
+          <div class="border-t border-base-300">
+            @for (activity of recentActivity().slice(0, 8); track activity.id; let isLast = $last) {
+              <div
+                class="flex items-center justify-between px-4 py-3 transition-colors hover:bg-base-200/30"
+                [class.border-b]="!isLast"
+                [class.border-base-300/50]="!isLast"
               >
-                {{ activity.amount }}
-              </span>
-            </div>
-          }
+                <div class="flex items-center gap-2.5 flex-1 min-w-0">
+                  <span
+                    class="w-7 h-7 rounded-lg text-[10px] font-bold flex items-center justify-center shrink-0"
+                    [class.bg-success/10]="activity.type === 'Sale'"
+                    [class.text-success]="activity.type === 'Sale'"
+                    [class.bg-info/10]="activity.type === 'Purchase'"
+                    [class.text-info]="activity.type === 'Purchase'"
+                    [class.bg-error/10]="activity.type === 'Expense'"
+                    [class.text-error]="activity.type === 'Expense'"
+                  >
+                    {{ activity.type[0] }}
+                  </span>
+
+                  <div class="min-w-0 flex-1">
+                    <span
+                      class="text-xs sm:text-sm font-medium truncate block text-base-content/80"
+                    >
+                      {{ activity.description }}
+                    </span>
+                    <span class="text-[10px] text-base-content/40">{{ activity.time }}</span>
+                  </div>
+                </div>
+
+                <span
+                  class="font-bold tabular-nums text-xs sm:text-sm shrink-0 ml-3"
+                  [class.text-success]="activity.amount.startsWith('+')"
+                  [class.text-error]="activity.amount.startsWith('-')"
+                >
+                  {{ activity.amount }}
+                </span>
+              </div>
+            }
+          </div>
         </div>
-      }
+      </div>
     </div>
   }
 </div>

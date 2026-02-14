@@ -29,8 +29,8 @@ import {
   imports: [CommonModule, ProductLabelComponent],
   template: `
     @if (isOpen() && product()) {
-      <div class="modal modal-open modal-bottom sm:modal-middle">
-        <div class="modal-box max-w-xl p-0">
+      <div class="modal modal-open modal-bottom sm:modal-middle modal-backdrop-anim">
+        <div class="modal-box max-w-xl p-0 modal-box-anim">
           <!-- Header -->
           <div class="bg-success/10 p-3 border-b border-base-300">
             <div class="flex items-center justify-between">

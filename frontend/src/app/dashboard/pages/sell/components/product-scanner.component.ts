@@ -42,7 +42,7 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
   imports: [CommonModule],
   template: `
     @if (isScanning()) {
-      <div class="card bg-base-100 shadow-xl border-2 border-primary animate-in">
+      <div class="card bg-base-100 shadow-xl border-2 border-primary anim-fade-in">
         <div class="card-body p-3">
           <!-- Scanner Header -->
           <div class="flex items-center justify-between mb-2">
@@ -81,7 +81,7 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
 
           <!-- Barcode Not Found Feedback -->
           @if (barcodeNotFoundMessage()) {
-            <div class="alert alert-warning mt-2 animate-in">
+            <div class="alert alert-warning mt-2 anim-fade-in-down">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-5 w-5"

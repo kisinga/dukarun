@@ -9,7 +9,7 @@ import { CheckoutSummaryComponent } from './checkout-summary.component';
   standalone: true,
   imports: [CommonModule, CustomerSelectorComponent, CheckoutSummaryComponent],
   template: `
-    <div class="space-y-4 animate-in slide-in-from-left-2 duration-300">
+    <div class="space-y-4 anim-stagger">
       <div class="text-center">
         <div
           class="inline-flex items-center justify-center w-8 h-8 bg-warning/10 rounded-full mb-3"
@@ -32,7 +32,7 @@ import { CheckoutSummaryComponent } from './checkout-summary.component';
         <h4 class="font-bold text-lg sm:text-xl mb-1">Credit Sale</h4>
       </div>
 
-      <div class="animate-in slide-in-from-top-2 duration-300 delay-100">
+      <div>
         <app-customer-selector
           [selectedCustomer]="selectedCustomer()"
           [searchResults]="customerSearchResults()"
@@ -46,7 +46,7 @@ import { CheckoutSummaryComponent } from './checkout-summary.component';
 
       <!-- Complete Credit Sale -->
       @if (selectedCustomer()) {
-        <div class="space-y-4 animate-in slide-in-from-bottom-2 duration-300 delay-200">
+        <div class="space-y-4 anim-fade-in-up">
           <div class="grid grid-cols-3 gap-2">
             <div class="bg-base-200 rounded-xl p-3 text-center">
               <div class="text-xs text-base-content/60 uppercase tracking-wide">Limit</div>
