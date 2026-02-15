@@ -1,15 +1,14 @@
 /**
  * Artifact Management
  *
- * Handles downloading training images, saving model artifacts,
- * and cleanup of temporary files.
+ * Handles downloading training images and cleanup of temporary files.
+ * Model artifacts from Teachable Machine are normalized in export-normalizer.ts.
  */
-import * as tf from '@tensorflow/tfjs-node';
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
-import { DatasetItem, ProductManifestEntry, ModelMetadata, ArtifactFileNames } from './types';
-import { IMAGE_SIZE, logger } from './constants';
+import { DatasetItem, ProductManifestEntry } from './types';
+import { logger } from './constants';
 
 // =============================================================================
 // Dataset Download
@@ -140,114 +139,6 @@ function getFileExtension(url: string, filename: string): string {
 
   // Default to .jpg
   return '.jpg';
-}
-
-// =============================================================================
-// Model Artifact Saving
-// =============================================================================
-
-/**
- * Save trained model and metadata to disk.
- *
- * Creates three files:
- * - model.json: Model architecture and weight manifest
- * - weights.bin: Model weights (binary)
- * - metadata.json: Training metadata (labels, stats, etc.)
- *
- * @param model - Trained TensorFlow.js model
- * @param channelId - Channel ID for naming
- * @param artifactsDir - Directory to save artifacts
- * @param labels - Array of product IDs (class labels)
- * @param productCount - Number of products trained on
- * @param imageCount - Total number of training images
- * @returns File names of saved artifacts
- */
-export async function saveModelArtifacts(
-  model: tf.LayersModel,
-  channelId: string,
-  artifactsDir: string,
-  labels: string[],
-  productCount: number,
-  imageCount: number
-): Promise<{ fileNames: ArtifactFileNames }> {
-  logger.info(`Saving model artifacts to ${artifactsDir}...`);
-
-  if (!fs.existsSync(artifactsDir)) {
-    fs.mkdirSync(artifactsDir, { recursive: true });
-  }
-
-  // Save model to file system
-  const modelPath = `file://${artifactsDir}`;
-  await model.save(modelPath);
-
-  // The model.save creates model.json and group1-shardXofY.bin files
-  // Rename the weights file to weights.bin for consistency
-  const modelJsonPath = path.join(artifactsDir, 'model.json');
-  const weightsPath = path.join(artifactsDir, 'weights.bin');
-
-  // Find and rename the weights file(s)
-  const files = fs.readdirSync(artifactsDir);
-  const weightFiles = files.filter(f => f.endsWith('.bin') && f !== 'weights.bin');
-
-  if (weightFiles.length === 1) {
-    // Single weights file - rename it
-    fs.renameSync(path.join(artifactsDir, weightFiles[0]), weightsPath);
-
-    // Update model.json to reference the renamed weights file
-    const modelJson = JSON.parse(fs.readFileSync(modelJsonPath, 'utf8'));
-    if (modelJson.weightsManifest && modelJson.weightsManifest[0]) {
-      modelJson.weightsManifest[0].paths = ['weights.bin'];
-    }
-    fs.writeFileSync(modelJsonPath, JSON.stringify(modelJson));
-  } else if (weightFiles.length > 1) {
-    // Multiple weight shards - combine them
-    const weightBuffers: Buffer[] = [];
-    for (const wf of weightFiles.sort()) {
-      weightBuffers.push(fs.readFileSync(path.join(artifactsDir, wf)));
-      fs.unlinkSync(path.join(artifactsDir, wf)); // Remove original
-    }
-    fs.writeFileSync(weightsPath, Buffer.concat(weightBuffers));
-
-    // Update model.json
-    const modelJson = JSON.parse(fs.readFileSync(modelJsonPath, 'utf8'));
-    if (modelJson.weightsManifest && modelJson.weightsManifest[0]) {
-      modelJson.weightsManifest[0].paths = ['weights.bin'];
-    }
-    fs.writeFileSync(modelJsonPath, JSON.stringify(modelJson));
-  }
-
-  // Create metadata file
-  const trainingId = `${channelId}-${Date.now()}`;
-  const metadata: ModelMetadata = {
-    modelName: `product-classifier-${channelId}`,
-    trainingId,
-    labels,
-    imageSize: IMAGE_SIZE,
-    trainedAt: new Date().toISOString(),
-    productCount,
-    imageCount,
-    files: {
-      modelJson: 'model.json',
-      weights: 'weights.bin',
-      metadata: 'metadata.json',
-    },
-  };
-
-  const metadataPath = path.join(artifactsDir, 'metadata.json');
-  fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
-
-  logger.info('Model artifacts saved:');
-  logger.info(`  model.json: ${fs.statSync(modelJsonPath).size} bytes`);
-  logger.info(`  weights.bin: ${fs.statSync(weightsPath).size} bytes`);
-  logger.info(`  metadata.json: ${fs.statSync(metadataPath).size} bytes`);
-
-  return {
-    fileNames: {
-      modelJson: 'model.json',
-      weights: 'weights.bin',
-      metadata: 'metadata.json',
-    },
-  };
 }
 
 // =============================================================================

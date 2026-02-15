@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import winston from 'winston';
-import { startTraining } from './trainer';
+import { startTraining } from './pipeline';
 import { env } from './config/environment.config';
 
 // Setup logging
