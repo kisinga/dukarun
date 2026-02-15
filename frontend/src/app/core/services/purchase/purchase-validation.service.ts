@@ -18,8 +18,9 @@ export interface ValidationResult {
 export class PurchaseValidationService {
   /**
    * Validate purchase draft
+   * @param saveAsDraft When true, skips payment validation (for PO/draft)
    */
-  validateDraft(draft: PurchaseDraft | null): ValidationResult {
+  validateDraft(draft: PurchaseDraft | null, saveAsDraft?: boolean): ValidationResult {
     if (!draft) {
       return {
         isValid: false,
@@ -72,8 +73,8 @@ export class PurchaseValidationService {
       }
     }
 
-    // Validate payment fields
-    if (draft.paymentStatus === 'partial') {
+    // Validate payment fields (skip for draft PO)
+    if (!saveAsDraft && draft.paymentStatus === 'partial') {
       if (draft.paymentAmount == null || draft.paymentAmount <= 0) {
         return {
           isValid: false,

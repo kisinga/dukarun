@@ -138,6 +138,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'orders/edit/:id',
+        loadComponent: () =>
+          import('./dashboard/pages/orders/order-edit/order-edit.component').then(
+            (m) => m.OrderEditComponent,
+          ),
+      },
+      {
         path: 'payments',
         loadComponent: () =>
           import('./dashboard/pages/payments/payments.component').then((m) => m.PaymentsComponent),
@@ -183,6 +190,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./dashboard/pages/purchase-create/purchase-create.component').then(
             (m) => m.PurchaseCreateComponent,
+          ),
+      },
+      {
+        path: 'purchases/edit/:id',
+        loadComponent: () =>
+          import('./dashboard/pages/purchase-edit/purchase-edit.component').then(
+            (m) => m.PurchaseEditComponent,
           ),
       },
       {

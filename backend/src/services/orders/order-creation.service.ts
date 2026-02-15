@@ -34,6 +34,7 @@ export interface CreateOrderInput {
   metadata?: Record<string, any>;
   isCreditSale?: boolean;
   isCashierFlow?: boolean;
+  saveAsProforma?: boolean;
 }
 
 /**
@@ -81,9 +82,9 @@ export class OrderCreationService {
           this.validateInput(input);
           this.tracingService?.addEvent(span!, 'order.validation.complete');
 
-          // 2. Validate credit approval (basic check)
+          // 2. Validate credit approval (basic check) - skip for proforma (no payment = no credit exposure)
           const customerId = await this.ensureCustomer(transactionCtx, input.customerId);
-          if (input.isCreditSale) {
+          if (input.isCreditSale && !input.saveAsProforma) {
             await this.creditValidator.validateCreditApproval(
               transactionCtx,
               customerId,
@@ -110,6 +111,15 @@ export class OrderCreationService {
 
           // 7. Refresh order to recalculate totals after custom pricing and addresses
           let order = await this.orderStateService.refreshOrder(transactionCtx, draftOrder.id);
+
+          // Proforma: stop here - order stays in Draft. Log audit and return.
+          if (input.saveAsProforma) {
+            await this.updateTrackingFields(transactionCtx, draftOrder.id);
+            await this.logAuditEvents(transactionCtx, order, input, customerId, true);
+            this.logger.log(`Proforma order created: ${order.code}`);
+            this.tracingService?.endSpan(span!, true);
+            return order;
+          }
 
           // 8. Transition to ArrangingPayment (triggers tax recalculation)
           order = await this.orderStateService.transitionToState(
@@ -195,11 +205,11 @@ export class OrderCreationService {
       throw new UserInputError('Order must have at least one item.');
     }
 
-    if (!input.paymentMethodCode) {
+    if (!input.saveAsProforma && !input.paymentMethodCode) {
       throw new UserInputError('Payment method code is required.');
     }
 
-    if (input.isCreditSale && !input.customerId) {
+    if (input.isCreditSale && !input.saveAsProforma && !input.customerId) {
       throw new UserInputError('Customer ID is required for credit sales.');
     }
   }
@@ -349,7 +359,8 @@ export class OrderCreationService {
     ctx: RequestContext,
     order: Order,
     input: CreateOrderInput,
-    customerId: string
+    customerId: string,
+    isProforma?: boolean
   ): Promise<void> {
     if (!this.auditService) {
       return;
@@ -362,6 +373,7 @@ export class OrderCreationService {
         orderCode: order.code,
         total: order.total,
         isCreditSale: input.isCreditSale || false,
+        isProforma: isProforma || false,
         customerId,
       },
     });

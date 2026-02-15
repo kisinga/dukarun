@@ -53,12 +53,36 @@ export class StockManagementService {
   /**
    * Record a purchase and update stock levels
    * All operations are wrapped in a transaction for atomicity
+   * When saveAsDraft is true, creates draft purchase only (no ledger, no stock, no payment)
    */
   async recordPurchase(ctx: RequestContext, input: RecordPurchaseInput): Promise<StockPurchase> {
     return this.connection.withTransaction(ctx, async transactionCtx => {
       try {
         // 1. Validate input
         this.validationService.validatePurchaseInput(input);
+
+        // 1a. Draft flow: create draft purchase only, skip ledger/stock/payment
+        if (input.saveAsDraft === true) {
+          const purchase = await this.purchaseService.createDraftPurchaseRecord(
+            transactionCtx,
+            input
+          );
+          if (this.auditService) {
+            await this.auditService.log(transactionCtx, 'purchase.draft.created', {
+              entityType: 'Purchase',
+              entityId: purchase.id,
+              data: {
+                purchaseId: purchase.id,
+                supplierId: purchase.supplierId,
+                referenceNumber: purchase.referenceNumber,
+                totalCost: purchase.totalCost,
+                lineCount: purchase.lines?.length || 0,
+              },
+            });
+          }
+          this.logger.log(`Draft purchase created: ${purchase.id}`);
+          return purchase;
+        }
 
         // 1b. All purchases route through AP (Accounts Payable) for proper double-entry accounting.
         // The purchase creates a liability (AP), and the inline payment clears it.
@@ -255,6 +279,62 @@ export class StockManagementService {
         );
         throw error;
       }
+    });
+  }
+
+  /**
+   * Confirm a draft purchase: post to ledger and update stock levels
+   */
+  async confirmPurchase(ctx: RequestContext, purchaseId: string): Promise<StockPurchase> {
+    return this.connection.withTransaction(ctx, async transactionCtx => {
+      const purchase = await this.purchaseService.confirmPurchase(transactionCtx, purchaseId);
+
+      // Reload with lines for stock movement
+      const purchaseWithLines = await this.connection
+        .getRepository(transactionCtx, StockPurchase)
+        .findOne({
+          where: { id: purchaseId },
+          relations: ['lines'],
+        });
+
+      if (!purchaseWithLines || !purchaseWithLines.lines?.length) {
+        throw new UserInputError(`Purchase ${purchaseId} has no lines`);
+      }
+
+      const stockMovements = [];
+      for (const line of purchaseWithLines.lines) {
+        const movement = await this.stockMovementService.adjustStockLevel(
+          transactionCtx,
+          line.variantId,
+          line.stockLocationId,
+          line.quantity,
+          `Purchase ${purchaseId} (confirmed)`
+        );
+        stockMovements.push(movement);
+      }
+
+      if (this.auditService) {
+        await this.auditService.log(transactionCtx, 'purchase.confirmed', {
+          entityType: 'Purchase',
+          entityId: purchaseId,
+          data: {
+            purchaseId,
+            supplierId: purchase.supplierId,
+            referenceNumber: purchase.referenceNumber,
+            totalCost: purchase.totalCost,
+            lineCount: purchaseWithLines.lines.length,
+            stockMovements: stockMovements.map(m => ({
+              variantId: m.variantId,
+              locationId: m.locationId,
+              previousStock: m.previousStock,
+              newStock: m.newStock,
+            })),
+          },
+        });
+      }
+
+      this.logger.log(`Purchase confirmed: ${purchaseId}`);
+      return purchase;
     });
   }
 

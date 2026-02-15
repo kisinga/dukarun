@@ -212,16 +212,28 @@ import { PurchasePaymentSectionComponent } from './components/purchase-payment-s
             </span>
             <span class="text-lg font-bold">{{ formatCurrency(totalCost()) }}</span>
           </div>
-          <button
-            class="btn btn-primary w-full"
-            [disabled]="!canSubmit(draft)"
-            (click)="handleSubmitPurchase()"
-          >
-            @if (isLoading()) {
-              <span class="loading loading-spinner loading-xs"></span>
-            }
-            Record Purchase
-          </button>
+          <div class="flex gap-2">
+            <button
+              class="btn btn-ghost flex-1 border-2 border-dashed border-base-300"
+              [disabled]="!canSubmit(draft)"
+              (click)="handleSaveAsPO()"
+            >
+              @if (isLoading()) {
+                <span class="loading loading-spinner loading-xs"></span>
+              }
+              Save as PO
+            </button>
+            <button
+              class="btn btn-primary flex-1"
+              [disabled]="!canSubmit(draft)"
+              (click)="handleSubmitPurchase()"
+            >
+              @if (isLoading()) {
+                <span class="loading loading-spinner loading-xs"></span>
+              }
+              Record Purchase
+            </button>
+          </div>
         </div>
       }
 
@@ -427,6 +439,19 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
 
   canSubmit(draft: PurchaseDraft): boolean {
     return !!(draft.supplierId && draft.lines.length > 0 && !this.isLoading());
+  }
+
+  async handleSaveAsPO(): Promise<void> {
+    try {
+      await this.purchaseService.submitPurchase(true);
+      this.showSuccessMessage.set(true);
+      setTimeout(() => {
+        this.showSuccessMessage.set(false);
+        this.router.navigate(['/dashboard/purchases']);
+      }, 2000);
+    } catch (error: any) {
+      console.error('Save as PO failed:', error);
+    }
   }
 
   async handleSubmitPurchase(): Promise<void> {

@@ -71,14 +71,63 @@ export interface OrderData {
 }
 
 /**
+ * Document type for print - drives header and payment/fulfillment visibility.
+ */
+export type DocumentType = 'receipt' | 'invoice' | 'proforma' | 'purchase-order';
+
+/**
  * Contextual metadata for print rendering that isn't part of the order itself.
  * Keeps the OrderData interface aligned with the GraphQL schema.
  */
 export interface PrintMeta {
-  /** Display-friendly payment method name (e.g. "M-Pesa") instead of handler code */
+  /** Document type - drives header and payment section visibility */
+  documentType?: DocumentType;
+  /** Display-friendly payment method name (e.g. "M-Pesa") - never use raw code */
   paymentMethodName?: string;
   /** First name of the staff member who served the customer */
   servedBy?: string;
+}
+
+/**
+ * Print context - single entry point for all print calls (orders and purchases).
+ */
+export interface PrintContext {
+  documentType: DocumentType;
+  order?: OrderData;
+  purchase?: PurchaseData;
+  meta?: PrintMeta;
+}
+
+/**
+ * Purchase data for A4 purchase order / purchase invoice printing.
+ */
+export interface PurchaseData {
+  id: string;
+  supplierId: string;
+  purchaseDate: string;
+  referenceNumber?: string | null;
+  totalCost: number;
+  paymentStatus: string;
+  notes?: string | null;
+  status: string;
+  supplier?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    emailAddress?: string;
+  } | null;
+  lines: Array<{
+    id: string;
+    variantId: string;
+    quantity: number;
+    unitCost: number;
+    totalCost: number;
+    variant?: {
+      id: string;
+      name: string;
+      product?: { id: string; name: string };
+    };
+  }>;
 }
 
 /**
@@ -188,7 +237,9 @@ export class Receipt52mmTemplate extends PrintTemplate {
       ? this.formatDate(order.orderPlacedAt)
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
-    const paymentMethod = printMeta?.paymentMethodName || order.payments?.[0]?.method || 'N/A';
+    const docType = printMeta?.documentType ?? 'receipt';
+    const showPayment = docType !== 'proforma';
+    const paymentMethod = showPayment ? (printMeta?.paymentMethodName ?? 'N/A') : '';
     const name = companyName?.trim() || 'Your Company';
 
     let html = `
@@ -237,10 +288,16 @@ export class Receipt52mmTemplate extends PrintTemplate {
                         <span><strong>${this.formatCurrency(total, order.currencyCode)}</strong></span>
                     </div>
                 </div>
+                ${
+                  showPayment
+                    ? `
                 <div class="payment-section">
                     <p><strong>Payment:</strong> ${paymentMethod}</p>
                     ${printMeta?.servedBy ? `<p><strong>Served by:</strong> ${printMeta.servedBy}</p>` : ''}
                 </div>
+                `
+                    : ''
+                }
                 <div class="receipt-footer">
                     <p>Thank you for your business!</p>
                 </div>
@@ -361,7 +418,9 @@ export class Receipt80mmTemplate extends PrintTemplate {
       ? this.formatDate(order.orderPlacedAt)
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
-    const paymentMethod = printMeta?.paymentMethodName || order.payments?.[0]?.method || 'N/A';
+    const docType = printMeta?.documentType ?? 'receipt';
+    const showPayment = docType !== 'proforma';
+    const paymentMethod = showPayment ? (printMeta?.paymentMethodName ?? 'N/A') : '';
     const name = companyName?.trim() || 'Your Company';
 
     let html = `
@@ -410,10 +469,16 @@ export class Receipt80mmTemplate extends PrintTemplate {
                         <span><strong>${this.formatCurrency(total, order.currencyCode)}</strong></span>
                     </div>
                 </div>
+                ${
+                  showPayment
+                    ? `
                 <div class="payment-section">
                     <p><strong>Payment:</strong> ${paymentMethod}</p>
                     ${printMeta?.servedBy ? `<p><strong>Served by:</strong> ${printMeta.servedBy}</p>` : ''}
                 </div>
+                `
+                    : ''
+                }
                 <div class="receipt-footer">
                     <p>Thank you for your business!</p>
                 </div>
@@ -533,8 +598,13 @@ export class A4Template extends PrintTemplate {
       ? this.formatDate(order.orderPlacedAt)
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
-    const paymentMethod = printMeta?.paymentMethodName || order.payments?.[0]?.method || 'N/A';
-    const hasFulfillment = order.fulfillments && order.fulfillments.length > 0;
+    const docType = printMeta?.documentType ?? 'invoice';
+    const header =
+      docType === 'proforma' ? 'PROFORMA INVOICE' : docType === 'invoice' ? 'INVOICE' : 'INVOICE';
+    const showPayment = docType !== 'proforma' && (order.payments?.length ?? 0) > 0;
+    const paymentMethod = printMeta?.paymentMethodName ?? 'N/A';
+    const hasFulfillment =
+      docType !== 'proforma' && order.fulfillments && order.fulfillments.length > 0;
     const hasShipping = order.shippingAddress && !isWalkIn;
     const name = companyName?.trim() || 'Your Company';
 
@@ -547,7 +617,7 @@ export class A4Template extends PrintTemplate {
                         <p class="company-address">Your Company Address</p>
                     </div>
                     <div class="invoice-meta">
-                        <h2>INVOICE</h2>
+                        <h2>${header}</h2>
                         <p><strong>Order #:</strong> ${order.code}</p>
                         <p><strong>Date:</strong> ${date}</p>
                         <p><strong>Status:</strong> ${this.getStatusLabel(order.state)}</p>
@@ -629,12 +699,18 @@ export class A4Template extends PrintTemplate {
                             </div>
                         </div>
                     </div>
+                    ${
+                      showPayment
+                        ? `
                     <div class="payment-section">
                         <h3>Payment Information</h3>
                         <p><strong>Method:</strong> ${paymentMethod}</p>
                         <p><strong>Status:</strong> ${this.getPaymentStatus(order.payments?.[0]?.state || '')}</p>
                         ${printMeta?.servedBy ? `<p><strong>Served by:</strong> ${printMeta.servedBy}</p>` : ''}
                     </div>
+                    `
+                        : ''
+                    }
                     ${
                       hasFulfillment
                         ? `
@@ -779,5 +855,191 @@ export class A4Template extends PrintTemplate {
       Declined: 'Declined',
     };
     return statusMap[state] || state;
+  }
+}
+
+/**
+ * A4 Purchase Order Template
+ * Full-size professional PO format for draft/confirmed purchases
+ */
+export class A4PurchaseTemplate {
+  name = 'A4 Purchase Order';
+  width = '210mm';
+
+  render(
+    purchase: PurchaseData,
+    companyLogo?: string | null,
+    companyName?: string | null,
+    printMeta?: PrintMeta,
+  ): string {
+    const docType = printMeta?.documentType ?? 'purchase-order';
+    const header = 'PURCHASE ORDER';
+    const showPayment =
+      docType === 'purchase-order' &&
+      purchase.status === 'confirmed' &&
+      purchase.paymentStatus !== 'pending';
+    const supplierName = purchase.supplier
+      ? `${purchase.supplier.firstName ?? ''} ${purchase.supplier.lastName ?? ''}`.trim() ||
+        purchase.supplier.emailAddress ||
+        'Unknown Supplier'
+      : 'Unknown Supplier';
+    const date = this.formatDate(purchase.purchaseDate);
+    const total = Number(purchase.totalCost);
+    const name = companyName?.trim() || 'Your Company';
+    const paymentMethod = printMeta?.paymentMethodName ?? 'N/A';
+
+    let html = `
+            <div class="print-template a4-invoice a4-purchase">
+                <div class="invoice-header">
+                    <div class="company-info">
+                        ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
+                        <h1 class="company-name">${name}</h1>
+                        <p class="company-address">Your Company Address</p>
+                    </div>
+                    <div class="invoice-meta">
+                        <h2>${header}</h2>
+                        <p><strong>Reference:</strong> ${purchase.referenceNumber ?? purchase.id}</p>
+                        <p><strong>Date:</strong> ${date}</p>
+                        <p><strong>Status:</strong> ${purchase.status === 'draft' ? 'Draft' : purchase.paymentStatus}</p>
+                    </div>
+                </div>
+                <div class="invoice-body">
+                    <div class="customer-section">
+                        <h3>Supplier:</h3>
+                        <p><strong>${supplierName}</strong></p>
+                        ${purchase.supplier?.emailAddress ? `<p>${purchase.supplier.emailAddress}</p>` : ''}
+                    </div>
+                    <div class="items-section">
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="text-right">Quantity</th>
+                                    <th class="text-right">Unit Cost</th>
+                                    <th class="text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+        `;
+
+    purchase.lines.forEach((line) => {
+      const itemName =
+        line.variant?.name ?? line.variant?.product?.name ?? `Variant ${line.variantId}`;
+      const quantity = line.quantity;
+      const unitCost = Number(line.unitCost);
+      const lineTotal = Number(line.totalCost);
+      html += `
+                                <tr>
+                                    <td>${itemName}</td>
+                                    <td class="text-right">${quantity}</td>
+                                    <td class="text-right">${this.formatCurrency(unitCost, 'KES')}</td>
+                                    <td class="text-right">${this.formatCurrency(lineTotal, 'KES')}</td>
+                                </tr>
+            `;
+    });
+
+    html += `
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="totals-section">
+                        <div class="totals-table">
+                            <div class="total-row total-row-final">
+                                <span><strong>Total:</strong></span>
+                                <span><strong>${this.formatCurrency(total, 'KES')}</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                    ${
+                      showPayment
+                        ? `
+                    <div class="payment-section">
+                        <h3>Payment Information</h3>
+                        <p><strong>Method:</strong> ${paymentMethod}</p>
+                        <p><strong>Status:</strong> ${purchase.paymentStatus}</p>
+                    </div>
+                    `
+                        : ''
+                    }
+                    ${
+                      purchase.notes
+                        ? `
+                    <div class="notes-section" style="margin-top: 20px;">
+                        <h3>Notes</h3>
+                        <p>${purchase.notes}</p>
+                    </div>
+                    `
+                        : ''
+                    }
+                </div>
+                <div class="invoice-footer">
+                    <p>Thank you for your business!</p>
+                </div>
+            </div>
+        `;
+
+    return html;
+  }
+
+  private formatCurrency(amount: number, currencyCode: string = 'KES'): string {
+    return new Intl.NumberFormat('en-KE', {
+      style: 'currency',
+      currency: currencyCode,
+      minimumFractionDigits: 2,
+    }).format(amount / 100);
+  }
+
+  private formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-KE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  getStyles(): string {
+    return `
+            @page { size: 210mm 297mm; margin: 0; }
+            @media print {
+                .print-template.a4-purchase,
+                .print-template.a4-invoice {
+                    width: 210mm;
+                    max-width: 210mm;
+                    margin: 0 auto;
+                    padding: 20mm;
+                    font-size: 12px;
+                    line-height: 1.6;
+                }
+                .a4-purchase .invoice-header,
+                .a4-invoice .invoice-header {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: 30px;
+                    padding-bottom: 20px;
+                    border-bottom: 2px solid #000;
+                }
+                .a4-purchase .items-table,
+                .a4-invoice .items-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 20px 0;
+                }
+                .a4-purchase .items-table th,
+                .a4-purchase .items-table td,
+                .a4-invoice .items-table th,
+                .a4-invoice .items-table td {
+                    padding: 8px;
+                    text-align: left;
+                    border-bottom: 1px solid #ddd;
+                }
+                .a4-purchase .text-right,
+                .a4-invoice .text-right {
+                    text-align: right;
+                }
+            }
+        `;
   }
 }

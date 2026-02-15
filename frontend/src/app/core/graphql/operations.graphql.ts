@@ -973,6 +973,54 @@ export const ADD_ITEM_TO_DRAFT_ORDER = graphql(`
   }
 `);
 
+export const REMOVE_DRAFT_ORDER_LINE = graphql(`
+  mutation RemoveDraftOrderLine($orderId: ID!, $orderLineId: ID!) {
+    removeDraftOrderLine(orderId: $orderId, orderLineId: $orderLineId) {
+      ... on Order {
+        id
+        code
+        state
+        total
+        totalWithTax
+        lines {
+          id
+          quantity
+          linePrice
+          linePriceWithTax
+          productVariant {
+            id
+            name
+          }
+        }
+      }
+    }
+  }
+`);
+
+export const ADJUST_DRAFT_ORDER_LINE = graphql(`
+  mutation AdjustDraftOrderLine($orderId: ID!, $input: AdjustDraftOrderLineInput!) {
+    adjustDraftOrderLine(orderId: $orderId, input: $input) {
+      ... on Order {
+        id
+        code
+        state
+        total
+        totalWithTax
+        lines {
+          id
+          quantity
+          linePrice
+          linePriceWithTax
+          productVariant {
+            id
+            name
+          }
+        }
+      }
+    }
+  }
+`);
+
 export const ADD_MANUAL_PAYMENT_TO_ORDER = graphql(`
   mutation AddManualPaymentToOrder($input: ManualPaymentInput!) {
     addManualPaymentToOrder(input: $input) {
@@ -2576,6 +2624,7 @@ export const GET_PURCHASES = graphql(`
       items {
         id
         supplierId
+        status
         supplier {
           id
           firstName
@@ -2612,6 +2661,90 @@ export const GET_PURCHASES = graphql(`
         updatedAt
       }
       totalItems
+    }
+  }
+`);
+
+export const GET_PURCHASE = graphql(`
+  query GetPurchase($id: ID!) {
+    purchase(id: $id) {
+      id
+      supplierId
+      status
+      supplier {
+        id
+        firstName
+        lastName
+        emailAddress
+      }
+      purchaseDate
+      referenceNumber
+      totalCost
+      paymentStatus
+      isCreditPurchase
+      notes
+      lines {
+        id
+        variantId
+        variant {
+          id
+          name
+          product {
+            id
+            name
+          }
+        }
+        quantity
+        unitCost
+        totalCost
+        stockLocationId
+        stockLocation {
+          id
+          name
+        }
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`);
+
+export const CONFIRM_PURCHASE = graphql(`
+  mutation ConfirmPurchase($id: ID!) {
+    confirmPurchase(id: $id) {
+      id
+      supplierId
+      status
+      referenceNumber
+      totalCost
+      paymentStatus
+      lines {
+        id
+        variantId
+        quantity
+        unitCost
+        totalCost
+      }
+    }
+  }
+`);
+
+export const UPDATE_DRAFT_PURCHASE = graphql(`
+  mutation UpdateDraftPurchase($id: ID!, $input: UpdateDraftPurchaseInput!) {
+    updateDraftPurchase(id: $id, input: $input) {
+      id
+      supplierId
+      status
+      referenceNumber
+      totalCost
+      notes
+      lines {
+        id
+        variantId
+        quantity
+        unitCost
+        totalCost
+      }
     }
   }
 `);

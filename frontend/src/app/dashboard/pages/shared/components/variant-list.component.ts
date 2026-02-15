@@ -42,7 +42,7 @@ export interface VariantListItem {
                 <tr
                   class="border-base-300/50 transition-colors"
                   [class.cursor-pointer]="!disabled"
-                  [class.hover:bg-base-300]="!disabled"
+                  [class.hover:bg-base-200/80]="!disabled"
                   [class.cursor-not-allowed]="disabled"
                   [class.opacity-60]="disabled"
                   (click)="!disabled && onSelect(v)"

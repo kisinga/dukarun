@@ -84,11 +84,12 @@ const COMBINED_SCHEMA = gql`
 
   input CreateOrderInput {
     cartItems: [CartItemInput!]!
-    paymentMethodCode: String!
+    paymentMethodCode: String
     customerId: ID
     metadata: JSON
     isCreditSale: Boolean
     isCashierFlow: Boolean
+    saveAsProforma: Boolean
   }
 
   """

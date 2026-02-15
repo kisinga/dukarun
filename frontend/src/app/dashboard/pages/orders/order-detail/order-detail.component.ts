@@ -13,11 +13,13 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { OrderService } from '../../../../core/services/order.service';
 import { OrdersService } from '../../../../core/services/orders.service';
 import { CustomerPaymentService } from '../../../../core/services/customer/customer-payment.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
+import { PaymentMethodService } from '../../../../core/services/payment-method.service';
 import { OrderDetailHeaderComponent } from './components/order-detail-header.component';
 import { OrderCustomerInfoComponent } from './components/order-customer-info.component';
 import { OrderAddressComponent } from './components/order-address.component';
@@ -44,6 +46,7 @@ import { PrintControlsComponent } from '../../../../core/components/print-contro
   selector: 'app-order-detail',
   imports: [
     CommonModule,
+    RouterModule,
     OrderDetailHeaderComponent,
     OrderCustomerInfoComponent,
     OrderAddressComponent,
@@ -59,9 +62,11 @@ import { PrintControlsComponent } from '../../../../core/components/print-contro
 })
 export class OrderDetailComponent implements OnInit, AfterViewInit {
   private readonly ordersService = inject(OrdersService);
+  private readonly orderService = inject(OrderService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly paymentService = inject(CustomerPaymentService);
+  private readonly paymentMethodService = inject(PaymentMethodService);
   readonly currencyService = inject(CurrencyService);
 
   // Inputs for composable usage
@@ -83,12 +88,11 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
   );
   private readonly modalElement = viewChild<ElementRef<HTMLDialogElement>>('modalDialog');
 
-  // Computed values for child components
-  readonly canPrint = computed(() => {
-    const order = this.order();
-    if (!order) return false;
-    return order.state !== 'Draft';
-  });
+  // Draft order (proforma) - can print as proforma and complete to sale
+  readonly isDraftOrder = computed(() => this.order()?.state === 'Draft');
+
+  // Computed values for child components - allow print for all (Draft = proforma, others = receipt/invoice)
+  readonly canPrint = computed(() => !!this.order());
 
   readonly subtotal = computed(() => {
     const order = this.order();
@@ -214,6 +218,7 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
         this.ordersService.fetchOrderById(routeOrderId);
       }
     }
+    this.loadPaymentMethodsForDraft();
   }
 
   goBack(): void {
@@ -255,6 +260,43 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
   readonly isProcessingPayment = signal(false);
   readonly paymentError = signal<string | null>(null);
   readonly paymentSuccess = signal<string | null>(null);
+
+  // Draft → Sale: payment methods and completion
+  readonly paymentMethods = signal<{ id: string; code: string; name: string }[]>([]);
+  readonly selectedCompletePaymentCode = signal<string | null>(null);
+  readonly isCompletingDraft = signal(false);
+  readonly completeDraftError = signal<string | null>(null);
+
+  private async loadPaymentMethodsForDraft(): Promise<void> {
+    try {
+      const methods = await this.paymentMethodService.getPaymentMethods();
+      this.paymentMethods.set(
+        methods.filter((m) => m.enabled).map((m) => ({ id: m.id, code: m.code, name: m.name })),
+      );
+    } catch {
+      this.paymentMethods.set([]);
+    }
+  }
+
+  async handleCompleteDraftToSale(): Promise<void> {
+    const order = this.order();
+    const code = this.selectedCompletePaymentCode();
+    if (!order || !code) return;
+
+    this.isCompletingDraft.set(true);
+    this.completeDraftError.set(null);
+
+    try {
+      await this.orderService.completeDraftToSale(order.id, code);
+      this.paymentSuccess.set('Order completed. Payment recorded.');
+      await this.ordersService.fetchOrderById(order.id);
+      setTimeout(() => this.paymentSuccess.set(null), 3000);
+    } catch (error: any) {
+      this.completeDraftError.set(error?.message || 'Failed to complete order');
+    } finally {
+      this.isCompletingDraft.set(false);
+    }
+  }
 
   async handlePayOrder(): Promise<void> {
     const order = this.order();

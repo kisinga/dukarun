@@ -9,7 +9,12 @@ import {
 } from './purchase.service.types';
 import { PartialPaymentService } from './payments/partial-payment.service';
 import { ApolloService } from './apollo.service';
-import { GetPurchasesDocument } from '../graphql/generated/graphql';
+import {
+  GetPurchasesDocument,
+  GetPurchaseDocument,
+  ConfirmPurchaseDocument,
+  UpdateDraftPurchaseDocument,
+} from '../graphql/generated/graphql';
 
 /**
  * Purchase Service
@@ -127,12 +132,13 @@ export class PurchaseService {
 
   /**
    * Submit purchase to backend
+   * @param saveAsDraft When true, creates draft PO only (no ledger, no stock, no payment)
    */
-  async submitPurchase(): Promise<any> {
+  async submitPurchase(saveAsDraft?: boolean): Promise<any> {
     const draft = this.purchaseDraft();
 
-    // Validate draft
-    const validation = this.validationService.validateDraft(draft);
+    // Validate draft (relaxed for PO: payment not required)
+    const validation = this.validationService.validateDraft(draft, saveAsDraft);
     if (!validation.isValid) {
       const error = validation.error || 'Invalid purchase draft';
       this.draftService.setError(error);
@@ -143,7 +149,9 @@ export class PurchaseService {
     this.draftService.clearError();
 
     try {
-      const result = await this.apiService.recordPurchase(draft!);
+      const result = await this.apiService.recordPurchase(draft!, {
+        saveAsDraft: saveAsDraft ?? false,
+      });
 
       // Clear draft on success
       this.draftService.clear();
@@ -206,5 +214,71 @@ export class PurchaseService {
    */
   clearListError(): void {
     this.errorListSignal.set(null);
+  }
+
+  /**
+   * Fetch a single purchase by ID (e.g. for detail view or draft edit)
+   */
+  async fetchPurchaseById(id: string): Promise<any | null> {
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.query({
+        query: GetPurchaseDocument,
+        variables: { id },
+        fetchPolicy: 'network-only',
+      });
+      return result.data?.purchase ?? null;
+    } catch (error: any) {
+      console.error('❌ Failed to fetch purchase:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Confirm a draft purchase (run ledger/stock, set status to confirmed)
+   */
+  async confirmPurchase(id: string): Promise<any> {
+    const client = this.apolloService.getClient();
+    const result = await client.mutate({
+      mutation: ConfirmPurchaseDocument,
+      variables: { id },
+    });
+    if (result.error) {
+      throw new Error(result.error.message || 'Failed to confirm purchase');
+    }
+    const purchase = result.data?.confirmPurchase;
+    if (!purchase) {
+      throw new Error('No purchase returned from confirmPurchase');
+    }
+    return purchase;
+  }
+
+  /**
+   * Update a draft purchase (supplier, date, reference, notes, optionally lines)
+   */
+  async updateDraftPurchase(
+    id: string,
+    input: {
+      supplierId?: string;
+      purchaseDate?: string;
+      referenceNumber?: string;
+      notes?: string;
+      lines?: Array<{
+        variantId: string;
+        quantity: number;
+        unitCost: number;
+        stockLocationId: string;
+      }>;
+    },
+  ): Promise<any> {
+    const client = this.apolloService.getClient();
+    const result = await client.mutate({
+      mutation: UpdateDraftPurchaseDocument,
+      variables: { id, input },
+    });
+    if (result.error) {
+      throw new Error(result.error.message || 'Failed to update draft purchase');
+    }
+    return result.data?.updateDraftPurchase ?? null;
   }
 }

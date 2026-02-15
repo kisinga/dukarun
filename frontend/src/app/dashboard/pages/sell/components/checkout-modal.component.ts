@@ -160,6 +160,7 @@ type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
                   [customerSearchResultsForCash]="customerSearchResultsForCash()"
                   [isSearchingCustomersForCash]="isSearchingCustomersForCash()"
                   (selectCredit)="selectCredit.emit()"
+                  (saveAsProforma)="saveAsProforma.emit()"
                   (paymentMethodSelect)="onPaymentMethodSelect($event)"
                   (customerSearchForCash)="customerSearchForCash.emit($event)"
                   (customerSelectForCash)="customerSelectForCash.emit($event)"
@@ -221,6 +222,7 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
 
   // Payment selection outputs
   readonly selectCredit = output<void>();
+  readonly saveAsProforma = output<void>();
   readonly selectCash = output<void>();
   readonly selectCashier = output<void>();
 

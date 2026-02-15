@@ -1,13 +1,15 @@
 import { Injectable, inject } from '@angular/core';
-import { Order } from '../graphql/generated/graphql';
+import { CreateOrderInput as GqlCreateOrderInput, Order } from '../graphql/generated/graphql';
 import {
   ADD_FULFILLMENT_TO_ORDER,
   ADD_ITEM_TO_DRAFT_ORDER,
+  ADJUST_DRAFT_ORDER_LINE,
   ADD_MANUAL_PAYMENT_TO_ORDER,
   CREATE_DRAFT_ORDER,
   CREATE_ORDER,
   GET_ORDER_DETAILS,
   GET_PAYMENT_METHODS,
+  REMOVE_DRAFT_ORDER_LINE,
   SET_ORDER_LINE_CUSTOM_PRICE,
   TRANSITION_ORDER_TO_STATE,
 } from '../graphql/operations.graphql';
@@ -21,12 +23,12 @@ export interface CreateOrderInput {
     customLinePrice?: number; // Line price in cents
     priceOverrideReason?: string; // Reason code
   }>;
-  paymentMethodCode: string;
+  paymentMethodCode?: string; // Optional when saveAsProforma
   customerId?: string;
   metadata?: Record<string, any>;
-  // New fields:
   isCashierFlow?: boolean; // True = stay in ArrangingPayment
   isCreditSale?: boolean; // True = authorize but don't settle payment
+  saveAsProforma?: boolean; // True = create draft order (proforma invoice)
 }
 
 export interface OrderData {
@@ -90,23 +92,26 @@ export class OrderService {
       }
 
       // Call backend order creation mutation
+      // Note: saveAsProforma is from credit plugin; generated types may not include it
+      const createInput: Record<string, unknown> = {
+        cartItems: input.cartItems.map((item) => ({
+          variantId: String(item.variantId),
+          quantity: item.quantity,
+          customLinePrice: item.customLinePrice,
+          priceOverrideReason: item.priceOverrideReason,
+        })),
+        paymentMethodCode: input.saveAsProforma ? '' : (input.paymentMethodCode ?? ''),
+        customerId: input.customerId,
+        metadata: input.metadata,
+        isCreditSale: input.isCreditSale,
+        isCashierFlow: input.isCashierFlow,
+      };
+      if (input.saveAsProforma) {
+        createInput.saveAsProforma = true;
+      }
       const result = await client.mutate({
         mutation: CREATE_ORDER,
-        variables: {
-          input: {
-            cartItems: input.cartItems.map((item) => ({
-              variantId: String(item.variantId),
-              quantity: item.quantity,
-              customLinePrice: item.customLinePrice,
-              priceOverrideReason: item.priceOverrideReason,
-            })),
-            paymentMethodCode: input.paymentMethodCode,
-            customerId: input.customerId,
-            metadata: input.metadata,
-            isCreditSale: input.isCreditSale,
-            isCashierFlow: input.isCashierFlow,
-          },
-        },
+        variables: { input: createInput as GqlCreateOrderInput },
       });
 
       // Check for GraphQL errors
@@ -130,6 +135,23 @@ export class OrderService {
       console.error('❌ Order creation failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Complete a draft order (proforma) to a sale: transition to ArrangingPayment and add payment.
+   *
+   * @param orderId Draft order ID
+   * @param paymentMethodCode Payment method code (e.g. 'mpesa', 'cash-payment')
+   * @param metadata Optional payment metadata
+   * @returns Order after payment
+   */
+  async completeDraftToSale(
+    orderId: string,
+    paymentMethodCode: string,
+    metadata?: Record<string, any>,
+  ): Promise<Order> {
+    await this.transitionOrderState(orderId, 'ArrangingPayment');
+    return this.completeOrderPayment(orderId, paymentMethodCode, metadata);
   }
 
   /**
@@ -376,5 +398,78 @@ export class OrderService {
       console.error('❌ Setting custom line price failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Remove a line from a draft order
+   */
+  async removeDraftOrderLine(orderId: string, orderLineId: string): Promise<Order> {
+    const client = this.apolloService.getClient();
+    const result = await client.mutate({
+      mutation: REMOVE_DRAFT_ORDER_LINE as any,
+      variables: { orderId, orderLineId },
+    });
+    if (result.error) throw new Error(result.error.message);
+    const order = (result.data as any)?.removeDraftOrderLine;
+    if (
+      !order ||
+      order.__typename === 'OrderModificationError' ||
+      order.__typename === 'OrderInterceptorError'
+    ) {
+      throw new Error((order as any)?.message ?? 'Failed to remove line');
+    }
+    return order as Order;
+  }
+
+  /**
+   * Adjust quantity of a draft order line
+   */
+  async adjustDraftOrderLine(
+    orderId: string,
+    orderLineId: string,
+    quantity: number,
+  ): Promise<Order> {
+    const client = this.apolloService.getClient();
+    const result = await client.mutate({
+      mutation: ADJUST_DRAFT_ORDER_LINE as any,
+      variables: { orderId, input: { orderLineId, quantity } },
+    });
+    if (result.error) throw new Error(result.error.message);
+    const order = (result.data as any)?.adjustDraftOrderLine;
+    if (
+      !order ||
+      order.__typename === 'OrderModificationError' ||
+      order.__typename === 'OrderInterceptorError'
+    ) {
+      throw new Error((order as any)?.message ?? 'Failed to adjust line');
+    }
+    return order as Order;
+  }
+
+  /**
+   * Add an item to a draft order
+   */
+  async addItemToDraftOrder(
+    orderId: string,
+    input: { productVariantId: string; quantity: number; customLinePrice?: number },
+  ): Promise<Order> {
+    const client = this.apolloService.getClient();
+    const result = await client.mutate({
+      mutation: ADD_ITEM_TO_DRAFT_ORDER as any,
+      variables: {
+        orderId,
+        input: {
+          productVariantId: input.productVariantId,
+          quantity: input.quantity,
+          ...(input.customLinePrice != null && { customLinePrice: input.customLinePrice }),
+        },
+      },
+    });
+    if (result.error) throw new Error(result.error.message);
+    const data = (result.data as any)?.addItemToDraftOrder;
+    if (!data || data.__typename !== 'Order') {
+      throw new Error('Failed to add item to draft order');
+    }
+    return data as Order;
   }
 }
