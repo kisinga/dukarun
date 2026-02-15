@@ -478,6 +478,50 @@ export class SellComponent implements OnInit, OnDestroy {
     this.resetCheckoutState();
   }
 
+  async handleSaveAsProforma(): Promise<void> {
+    this.isProcessingCheckout.set(true);
+    this.checkoutError.set(null);
+
+    try {
+      const order = await this.orderService.createOrder({
+        cartItems: this.cartItems().map((item) => ({
+          variantId: item.variant.id,
+          quantity: item.quantity,
+          customLinePrice: item.customLinePrice,
+          priceOverrideReason: item.priceOverrideReason,
+        })),
+        saveAsProforma: true,
+        metadata: { isProforma: true },
+      });
+
+      this.showNotification(`Proforma created - Order ${order.code}`, 'success');
+
+      // Print proforma on A4 if printer enabled
+      if (this.enablePrinter()) {
+        try {
+          const fullOrder = await this.ordersService.fetchOrderById(order.id);
+          if (fullOrder) {
+            await this.printService.printOrder(fullOrder, 'a4', {
+              documentType: 'proforma',
+              servedBy: this.authService.user()?.firstName ?? undefined,
+            });
+          }
+        } catch (printError) {
+          console.warn('Proforma print failed:', printError);
+        }
+      }
+
+      this.cartService.clearCart();
+      this.cartItems.set([]);
+      this.showCheckoutModal.set(false);
+    } catch (error) {
+      console.error('Proforma creation failed:', error);
+      this.checkoutError.set(error instanceof Error ? error.message : 'Failed to create proforma.');
+    } finally {
+      this.isProcessingCheckout.set(false);
+    }
+  }
+
   handleCheckoutModalClose(): void {
     this.showCheckoutModal.set(false);
     this.checkoutType.set(null);
