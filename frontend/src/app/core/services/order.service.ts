@@ -107,7 +107,7 @@ export class OrderService {
         isCashierFlow: input.isCashierFlow,
       };
       if (input.saveAsProforma) {
-        createInput.saveAsProforma = true;
+        createInput['saveAsProforma'] = true;
       }
       const result = await client.mutate({
         mutation: CREATE_ORDER,
