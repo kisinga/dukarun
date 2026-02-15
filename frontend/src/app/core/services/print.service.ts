@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { CompanyService } from './company.service';
 import {
   PrintTemplate,
+  PrintMeta,
   OrderData,
   Receipt52mmTemplate,
   Receipt80mmTemplate,
@@ -57,8 +58,13 @@ export class PrintService {
    * Platform-agnostic: uses hidden iframe instead of opening new tab
    * @param order - Order data to print
    * @param templateId - Template ID to use (default: 'receipt-52mm')
+   * @param printMeta - Optional contextual metadata (payment method name, served by, etc.)
    */
-  async printOrder(order: OrderData, templateId: string = 'receipt-52mm'): Promise<void> {
+  async printOrder(
+    order: OrderData,
+    templateId: string = 'receipt-52mm',
+    printMeta?: PrintMeta,
+  ): Promise<void> {
     const template = this.getTemplate(templateId);
     if (!template) {
       console.error(`Template ${templateId} not found`);
@@ -70,7 +76,7 @@ export class PrintService {
     const companyName = this.companyService.activeCompany()?.code ?? 'Your Company';
 
     // Render the order
-    const html = template.render(order, companyLogo, companyName);
+    const html = template.render(order, companyLogo, companyName, printMeta);
     const styles = template.getStyles();
 
     // Create or reuse hidden iframe for printing

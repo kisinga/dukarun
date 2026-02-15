@@ -23,19 +23,6 @@ import { CurrencyService } from '../../../../../core/services/currency.service';
         -webkit-font-smoothing: antialiased;
       }
 
-      .success-bg-pulse {
-        opacity: 0;
-      }
-
-      .success-checkmark-path {
-        stroke-dasharray: 24;
-        stroke-dashoffset: 0;
-      }
-
-      .success-glow-pulse {
-        transform: scale(1.2);
-      }
-
       .success-amount-value {
         text-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
       }
@@ -50,14 +37,12 @@ import { CurrencyService } from '../../../../../core/services/currency.service';
         <div class="absolute inset-0 bg-success/5 success-bg-pulse"></div>
 
         <div
-          class="flex flex-col items-center gap-6 sm:gap-8 md:gap-10 relative z-10 success-content max-w-full px-4"
+          class="flex flex-col items-center gap-6 sm:gap-8 md:gap-10 relative z-10 max-w-full px-4"
         >
           <!-- Success Checkmark with Enhanced Animation -->
-          <div class="relative success-checkmark-container">
+          <div class="relative">
             <!-- Pulsing Glow Circle -->
-            <div
-              class="absolute inset-0 bg-success/30 rounded-full blur-xl success-glow-pulse"
-            ></div>
+            <div class="absolute inset-0 bg-success/30 rounded-full blur-xl opacity-50"></div>
 
             <!-- Main Circle with Bounce -->
             <div
@@ -77,12 +62,7 @@ import { CurrencyService } from '../../../../../core/services/currency.service';
                 stroke="currentColor"
                 stroke-width="2.5"
               >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M5 13l4 4L19 7"
-                  class="success-checkmark-path"
-                />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
 
@@ -90,11 +70,10 @@ import { CurrencyService } from '../../../../../core/services/currency.service';
             <div class="absolute inset-0 pointer-events-none overflow-visible">
               @for (i of getParticleArray(); track i) {
                 <div
-                  class="absolute w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4 bg-success rounded-full particle"
+                  class="absolute w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4 bg-success rounded-full"
                   [style.left.%]="50"
                   [style.top.%]="50"
                   [style.animation-delay.ms]="350 + i * 25"
-                  [style.animation-duration.ms]="650 + i * 40"
                   [class]="'particle-' + (i % 8)"
                 ></div>
               }
@@ -104,7 +83,7 @@ import { CurrencyService } from '../../../../../core/services/currency.service';
           <!-- Success Message with Fade In -->
           <div class="text-center space-y-2 sm:space-y-3 md:space-y-4 success-message">
             <h2
-              class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-base-content success-title leading-tight"
+              class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-base-content leading-tight"
             >
               Order Confirmed!
             </h2>
@@ -143,12 +122,13 @@ export class CheckoutSuccessComponent implements OnDestroy {
 
   readonly animatedAmount = signal<number>(0);
   readonly particleCount = 25;
-  private amountAnimationInterval: ReturnType<typeof setInterval> | null = null;
+  private amountAnimationFrame: number | null = null;
 
   constructor() {
     effect(() => {
       if (this.show() && this.amount()) {
         this.animatedAmount.set(0);
+        // Delay counter start to sync with success-amount entrance animation
         setTimeout(() => this.animateAmount(this.amount()!), 850);
       } else if (!this.show()) {
         this.resetState();
@@ -161,9 +141,9 @@ export class CheckoutSuccessComponent implements OnDestroy {
   }
 
   private resetState(): void {
-    if (this.amountAnimationInterval) {
-      clearInterval(this.amountAnimationInterval);
-      this.amountAnimationInterval = null;
+    if (this.amountAnimationFrame) {
+      cancelAnimationFrame(this.amountAnimationFrame);
+      this.amountAnimationFrame = null;
     }
     this.animatedAmount.set(0);
   }
@@ -172,29 +152,37 @@ export class CheckoutSuccessComponent implements OnDestroy {
     return Array.from({ length: this.particleCount }, (_, i) => i + 1);
   }
 
+  /**
+   * Animate the amount counter using requestAnimationFrame with an easeOutQuad
+   * curve — fast ramp then smooth deceleration. Feels satisfying on the sell
+   * completion screen.
+   */
   private animateAmount(targetAmount: number): void {
-    if (this.amountAnimationInterval) {
-      clearInterval(this.amountAnimationInterval);
+    if (this.amountAnimationFrame) {
+      cancelAnimationFrame(this.amountAnimationFrame);
     }
 
-    const duration = 600;
-    const steps = 25;
-    const stepDuration = duration / steps;
-    const stepAmount = targetAmount / steps;
-    let currentStep = 0;
+    const duration = 700; // ms
+    const startTime = performance.now();
 
-    this.amountAnimationInterval = setInterval(() => {
-      currentStep++;
-      const currentAmount = Math.min(stepAmount * currentStep, targetAmount);
-      this.animatedAmount.set(Math.round(currentAmount * 100) / 100);
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
 
-      if (currentStep >= steps) {
-        if (this.amountAnimationInterval) {
-          clearInterval(this.amountAnimationInterval);
-          this.amountAnimationInterval = null;
-        }
+      // easeOutQuad: fast start, smooth deceleration
+      const eased = 1 - (1 - progress) * (1 - progress);
+
+      const current = targetAmount * eased;
+      this.animatedAmount.set(Math.round(current * 100) / 100);
+
+      if (progress < 1) {
+        this.amountAnimationFrame = requestAnimationFrame(tick);
+      } else {
         this.animatedAmount.set(targetAmount);
+        this.amountAnimationFrame = null;
       }
-    }, stepDuration);
+    };
+
+    this.amountAnimationFrame = requestAnimationFrame(tick);
   }
 }

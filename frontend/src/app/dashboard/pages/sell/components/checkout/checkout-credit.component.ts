@@ -120,7 +120,7 @@ import { CheckoutSummaryComponent } from './checkout-summary.component';
 
           <div class="flex flex-col sm:flex-row gap-3">
             <button
-              class="btn btn-warning btn-md sm:btn-lg flex-1 hover:scale-105 active:scale-95 transition-transform min-h-[44px]"
+              class="btn btn-warning btn-md sm:btn-lg flex-1 interactive-press min-h-[44px]"
               (click)="complete.emit()"
               [disabled]="isProcessing() || !canCompleteCredit()"
             >
@@ -147,7 +147,7 @@ import { CheckoutSummaryComponent } from './checkout-summary.component';
 
             @if (enablePrinter()) {
               <button
-                class="btn btn-outline btn-warning btn-md sm:btn-lg flex-1 hover:scale-105 active:scale-95 transition-transform min-h-[44px]"
+                class="btn btn-outline btn-warning btn-md sm:btn-lg flex-1 interactive-press min-h-[44px]"
                 (click)="completeAndPrint.emit()"
                 [disabled]="isProcessing() || !canCompleteCredit()"
               >

@@ -1,11 +1,11 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
-import { RequestContext } from '@vendure/core';
 import { AuditService } from './audit.service';
 import { AUDIT_LOG_METADATA, AuditLogMetadata } from './audit-log.decorator';
+import { getVendureRequestContext } from './get-request-context';
 
 /**
  * Interceptor that automatically logs audit events for mutations decorated with @AuditLog.
@@ -13,6 +13,8 @@ import { AUDIT_LOG_METADATA, AuditLogMetadata } from './audit-log.decorator';
  */
 @Injectable()
 export class AuditLogInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(AuditLogInterceptor.name);
+
   constructor(
     private readonly auditService: AuditService,
     private readonly reflector: Reflector
@@ -30,8 +32,17 @@ export class AuditLogInterceptor implements NestInterceptor {
       return next.handle();
     }
 
+    // Extract the actual Vendure RequestContext from the Express request.
+    // gqlContext.getContext().req is the Express Request, NOT the RequestContext.
+    const ctx = getVendureRequestContext(context);
+    if (!ctx) {
+      this.logger.warn(
+        `Cannot audit ${metadata.eventType}: RequestContext not found on request object`
+      );
+      return next.handle();
+    }
+
     const gqlContext = GqlExecutionContext.create(context);
-    const ctx = gqlContext.getContext().req as RequestContext;
     const args = gqlContext.getArgs();
 
     return next.handle().pipe(

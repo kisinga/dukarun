@@ -9,19 +9,15 @@ import {
   signal,
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { GET_PRODUCTS } from '../../../core/graphql/operations.graphql';
-import { ApolloService } from '../../../core/services/apollo.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
 import { CashierSessionService } from '../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../core/services/company.service';
-import { CurrencyService } from '../../../core/services/currency.service';
 import { CustomerService } from '../../../core/services/customer.service';
 import { OrderService } from '../../../core/services/order.service';
 import { OrdersService } from '../../../core/services/orders.service';
 import { PrintPreferencesService } from '../../../core/services/print-preferences.service';
 import { PrintService } from '../../../core/services/print.service';
-import { ProductCacheService } from '../../../core/services/product/product-cache.service';
 import {
   ProductSearchResult,
   ProductSearchService,
@@ -29,18 +25,16 @@ import {
 } from '../../../core/services/product/product-search.service';
 import { SalesSyncGuardService } from '../../../core/services/sales-sync-guard.service';
 import { StockLocationService } from '../../../core/services/stock-location.service';
-import { ProductLabelComponent } from '../shared/components/product-label.component';
-import { VariantListComponent } from '../shared/components/variant-list.component';
 import { CartComponent, CartItem } from './components/cart.component';
 import { CheckoutFabComponent } from './components/checkout-fab.component';
 import { CheckoutModalComponent } from './components/checkout-modal.component';
+import { SelectedPaymentMethod } from './components/checkout/checkout-cash.component';
 import { Customer } from './components/customer-selector.component';
 import { ProductConfirmModalComponent } from './components/product-confirm-modal.component';
 import { ProductSearchViewComponent } from '../shared/components/product-search-view.component';
 import { ProductScannerComponent } from './components/product-scanner.component';
 
 type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
-type PaymentMethodCode = string;
 
 /**
  * Main POS sell page - orchestrates child components
@@ -56,7 +50,7 @@ type PaymentMethodCode = string;
  * - Search: searchResults, isSearching
  * - Scanner: isScannerActive, canStartScanner
  * - Detection: detectedProduct, showConfirmModal
- * - Cart: cartItems, cartTotal, showCartModal, cartItemAdded
+ * - Cart: cartItems, cartTotal, showCheckoutModal, cartItemAdded
  * - Checkout: checkoutType, isProcessingCheckout, selectedCustomer
  */
 @Component({
@@ -64,8 +58,6 @@ type PaymentMethodCode = string;
   imports: [
     CommonModule,
     RouterModule,
-    ProductLabelComponent,
-    VariantListComponent,
     ProductScannerComponent,
     ProductSearchViewComponent,
     ProductConfirmModalComponent,
@@ -79,7 +71,6 @@ type PaymentMethodCode = string;
 })
 export class SellComponent implements OnInit, OnDestroy {
   private readonly productSearchService = inject(ProductSearchService);
-  private readonly productCacheService = inject(ProductCacheService);
   private readonly companyService = inject(CompanyService);
   private readonly stockLocationService = inject(StockLocationService);
   private readonly orderService = inject(OrderService);
@@ -88,8 +79,6 @@ export class SellComponent implements OnInit, OnDestroy {
   private readonly cartService = inject(CartService);
   private readonly customerService = inject(CustomerService);
   protected readonly cashierSessionService = inject(CashierSessionService);
-  private readonly apolloService = inject(ApolloService);
-  private readonly currencyService = inject(CurrencyService);
   private readonly printService = inject(PrintService);
   private readonly printPreferences = inject(PrintPreferencesService);
   private readonly salesSyncGuard = inject(SalesSyncGuardService);
@@ -111,6 +100,13 @@ export class SellComponent implements OnInit, OnDestroy {
   // View computed
   readonly isManualSearchActive = computed(() => this.searchTerm().length > 0);
   readonly shouldShowCamera = computed(() => !this.isManualSearchActive());
+  /** Main search view shows results only when user has typed (avoids duplicating Quick Select list). */
+  readonly searchResultsForMainView = computed(() =>
+    this.isManualSearchActive() ? this.searchResults() : [],
+  );
+  /** Quick Select has its own list so search does not clear it. */
+  readonly quickSelectResults = signal<ProductSearchResult[]>([]);
+  readonly searchResultsForQuickSelect = computed(() => this.quickSelectResults());
 
   // Scanner component reference (to call methods)
   scannerComponent?: ProductScannerComponent;
@@ -157,11 +153,10 @@ export class SellComponent implements OnInit, OnDestroy {
   readonly isSearchingCustomersForCash = signal<boolean>(false);
 
   // Payment method state (for cash sales)
-  readonly selectedPaymentMethod = signal<PaymentMethodCode | null>(null);
+  readonly selectedPaymentMethod = signal<SelectedPaymentMethod | null>(null);
 
-  // Product list state (for quick selection)
-  readonly recentProducts = signal<ProductSearchResult[]>([]);
-  readonly isLoadingProducts = signal<boolean>(false);
+  // Quick Select: independent list, loaded via ProductSearchService.getRecentProducts
+  readonly isLoadingQuickSelect = signal<boolean>(false);
   readonly isMobile = signal<boolean>(false);
   /** Checkbox-driven collapse: open on desktop by default, closed on mobile; user can toggle. */
   readonly quickSelectOpen = signal<boolean>(false);
@@ -183,8 +178,10 @@ export class SellComponent implements OnInit, OnDestroy {
       }
     }
 
-    await this.loadRecentProducts();
     this.quickSelectOpen.set(!this.isMobile());
+    if (this.quickSelectOpen()) {
+      await this.loadQuickSelectProducts();
+    }
   }
 
   ngOnDestroy(): void {
@@ -199,66 +196,22 @@ export class SellComponent implements OnInit, OnDestroy {
 
   onQuickSelectToggle(checked: boolean): void {
     this.quickSelectOpen.set(checked);
+    if (checked) {
+      this.loadQuickSelectProducts();
+    }
   }
 
-  // Load recent products for quick selection (uses shared product cache when ready)
-  async loadRecentProducts(): Promise<void> {
-    if (this.productCacheService.isCacheReady()) {
-      this.recentProducts.set(this.productCacheService.getRecentProducts(10));
-      return;
-    }
-
-    this.isLoadingProducts.set(true);
+  /** Load recent products into Quick Select list (independent of search). */
+  async loadQuickSelectProducts(): Promise<void> {
+    this.isLoadingQuickSelect.set(true);
     try {
-      const client = this.apolloService.getClient();
-      const result = await client.query<{
-        products: { items: any[] };
-      }>({
-        query: GET_PRODUCTS,
-        variables: {
-          options: { take: 10, skip: 0 },
-        },
-        fetchPolicy: 'cache-first' as import('@apollo/client/core').FetchPolicy,
-      });
-
-      const products = (result.data?.products?.items || []).map((product: any) => ({
-        id: product.id,
-        name: product.name,
-        featuredAsset: product.featuredAsset
-          ? { preview: product.featuredAsset.preview }
-          : undefined,
-        facetValues: (product.facetValues || []).map((fv: any) => ({
-          name: fv.name,
-          facetCode: fv.facet?.code,
-          facet: fv.facet ? { code: fv.facet.code } : undefined,
-        })),
-        variants: product.variants.map((v: any) => ({
-          id: v.id,
-          name: v.name,
-          sku: v.sku,
-          priceWithTax: v.priceWithTax?.value || v.priceWithTax || 0,
-          stockLevel: v.stockOnHand > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
-          productId: product.id,
-          productName: product.name,
-          trackInventory: v.trackInventory,
-          customFields: v.customFields
-            ? {
-                wholesalePrice: v.customFields.wholesalePrice,
-                allowFractionalQuantity: v.customFields.allowFractionalQuantity,
-              }
-            : undefined,
-          featuredAsset: product.featuredAsset
-            ? { preview: product.featuredAsset.preview }
-            : undefined,
-        })),
-      }));
-
-      this.recentProducts.set(products);
+      const results = await this.productSearchService.getRecentProducts(10);
+      this.quickSelectResults.set(results);
     } catch (error) {
-      console.error('Failed to load recent products:', error);
-      this.recentProducts.set([]);
+      console.error('Failed to load quick select products:', error);
+      this.quickSelectResults.set([]);
     } finally {
-      this.isLoadingProducts.set(false);
+      this.isLoadingQuickSelect.set(false);
     }
   }
 
@@ -298,21 +251,18 @@ export class SellComponent implements OnInit, OnDestroy {
     }
   }
 
+  /** Single path for product selection: search and Quick Select both use this. */
   handleProductSelected(product: ProductSearchResult): void {
-    this.detectedProduct.set(product);
-    this.showConfirmModal.set(true);
-    this.handleClearSearch(); // Return to camera view
-  }
-
-  handleQuickAddProduct(product: ProductSearchResult): void {
     if (!product.variants || product.variants.length === 0) {
       this.showNotification('Product has no variants', 'error');
       return;
     }
-
-    // Single variant: direct add to cart
     if (product.variants.length === 1) {
       const variant = product.variants[0];
+      if (!this.canAddVariantToCart(variant, 1)) {
+        this.showNotification('Cannot add: out of stock', 'error');
+        return;
+      }
       const facetValues = product.facetValues?.map((fv) => ({
         name: fv.name,
         facetCode: fv.facetCode,
@@ -321,8 +271,11 @@ export class SellComponent implements OnInit, OnDestroy {
       this.addToCart(variant, 1, { facetValues });
       this.showNotification(`${product.name} added to cart`, 'success');
     } else {
-      // Multiple variants: show modal for selection
-      this.handleProductSelected(product);
+      this.detectedProduct.set(product);
+      this.showConfirmModal.set(true);
+    }
+    if (this.isManualSearchActive()) {
+      this.handleClearSearch();
     }
   }
 
@@ -330,6 +283,10 @@ export class SellComponent implements OnInit, OnDestroy {
     product: ProductSearchResult;
     variant: ProductVariant;
   }): void {
+    if (!this.canAddVariantToCart(event.variant, 1)) {
+      this.showNotification('Cannot add: out of stock', 'error');
+      return;
+    }
     const facetValues = event.product.facetValues?.map((fv) => ({
       name: fv.name,
       facetCode: fv.facetCode,
@@ -337,10 +294,6 @@ export class SellComponent implements OnInit, OnDestroy {
     }));
     this.addToCart(event.variant, 1, { facetValues });
     this.showNotification(`${event.product.name} added to cart`, 'success');
-  }
-
-  formatPrice(priceInCents: number): string {
-    return this.currencyService.format(priceInCents, true);
   }
 
   // Scanner Handlers
@@ -359,15 +312,8 @@ export class SellComponent implements OnInit, OnDestroy {
 
   handleProductDetected(product: ProductSearchResult): void {
     try {
-      console.log('[SellComponent] handleProductDetected called with product:', product.name);
       this.detectedProduct.set(product);
       this.showConfirmModal.set(true);
-      console.log(
-        '[SellComponent] Modal state set - showConfirmModal:',
-        this.showConfirmModal(),
-        'detectedProduct:',
-        this.detectedProduct(),
-      );
     } catch (error) {
       console.error('[SellComponent] Error in handleProductDetected:', error);
       // Show error notification
@@ -379,17 +325,26 @@ export class SellComponent implements OnInit, OnDestroy {
   handleVariantSelected(data: {
     variant: ProductVariant;
     quantity: number;
-    priceOverride?: { variantId: string; customLinePrice?: number; reason?: string };
     facetValues?: { name: string; facetCode?: string; facet?: { code: string } }[];
   }): void {
+    if (!this.canAddVariantToCart(data.variant, data.quantity)) {
+      this.showNotification('Cannot add: out of stock', 'error');
+      return;
+    }
     this.addToCart(data.variant, data.quantity, {
-      priceOverride: data.priceOverride,
       facetValues: data.facetValues,
     });
   }
 
+  /** True if variant can be added (no inventory tracking, or has enough stock). */
+  private canAddVariantToCart(variant: ProductVariant, quantity: number): boolean {
+    if (variant.trackInventory === false) return true;
+    if (variant.stockLevel === 'OUT_OF_STOCK') return false;
+    const onHand = variant.stockOnHand ?? 0;
+    return onHand >= quantity;
+  }
+
   handleConfirmModalClose(): void {
-    console.log('[SellComponent] Modal closed, resetting state');
     this.showConfirmModal.set(false);
     this.detectedProduct.set(null);
     // Scanner should be ready to start again - the scanner component will handle restart
@@ -620,7 +575,7 @@ export class SellComponent implements OnInit, OnDestroy {
   }
 
   // Payment Method Handler (Cash Sales)
-  handlePaymentMethodSelect(method: PaymentMethodCode): void {
+  handlePaymentMethodSelect(method: SelectedPaymentMethod): void {
     this.selectedPaymentMethod.set(method);
   }
 
@@ -852,6 +807,10 @@ export class SellComponent implements OnInit, OnDestroy {
             await this.printService.printOrder(
               fullOrder,
               this.printPreferences.getDefaultTemplateId(),
+              {
+                paymentMethodName: 'Credit',
+                servedBy: this.authService.user()?.firstName ?? undefined,
+              },
             );
           } else {
             this.showNotification('Order created but printing failed', 'warning');
@@ -914,10 +873,10 @@ export class SellComponent implements OnInit, OnDestroy {
           customLinePrice: item.customLinePrice,
           priceOverrideReason: item.priceOverrideReason,
         })),
-        paymentMethodCode: this.selectedPaymentMethod()!,
+        paymentMethodCode: this.selectedPaymentMethod()!.code,
         customerId: selectedCustomer?.id, // Include customer ID if selected
         metadata: {
-          paymentMethod: this.selectedPaymentMethod(),
+          paymentMethod: this.selectedPaymentMethod()?.code,
           ...(selectedCustomer && {
             customerId: selectedCustomer.id,
             customerName: selectedCustomer.name,
@@ -929,8 +888,7 @@ export class SellComponent implements OnInit, OnDestroy {
       this.salesSyncGuard.recordSale();
 
       // Trigger success animation
-      // We don't have easy access to payment method name here, so just use the code
-      const methodName = this.selectedPaymentMethod() || 'Cash';
+      const methodName = this.selectedPaymentMethod()?.name || 'Cash';
       this.successTrigger.set({ amount: this.cartTotal(), method: methodName });
 
       // Show success animation first, then close modal after delay
@@ -946,6 +904,10 @@ export class SellComponent implements OnInit, OnDestroy {
             await this.printService.printOrder(
               fullOrder,
               this.printPreferences.getDefaultTemplateId(),
+              {
+                paymentMethodName: this.selectedPaymentMethod()?.name,
+                servedBy: this.authService.user()?.firstName ?? undefined,
+              },
             );
           } else {
             this.showNotification('Order created but printing failed', 'warning');

@@ -338,15 +338,27 @@
                 (toggleExpand)="toggleExpand(product.id)"
                 (action)="onProductAction($event)"
               ></tr>
-              @if (isExpanded(product.id)) {
-                <tr class="bg-base-200/40 border-t border-base-300">
-                  <td colspan="7" class="p-0 align-top">
-                    <div class="border-l-2 border-base-300 pl-4 py-2 ml-4 my-1 rounded-r">
-                      <app-variant-list [variants]="product.variants ?? []" [showStock]="true" />
+              <!-- Expansion panel — daisyUI collapse, toggled by row click -->
+              <tr>
+                <td colspan="7" class="!p-0 !bg-transparent">
+                  <div
+                    class="collapse"
+                    [class.collapse-open]="isExpanded(product.id)"
+                    [class.collapse-close]="!isExpanded(product.id)"
+                  >
+                    <div class="collapse-title hidden"></div>
+                    <div class="collapse-content !p-0">
+                      @if ((product.variants ?? []).length > 0) {
+                        <app-variant-list
+                          [variants]="variantListItems(product)"
+                          [display]="'table'"
+                          [wrapperClass]="'ml-[6.5rem] mr-4'"
+                        />
+                      }
                     </div>
-                  </td>
-                </tr>
-              }
+                  </div>
+                </td>
+              </tr>
             }
           </tbody>
         </table>

@@ -71,6 +71,17 @@ export interface OrderData {
 }
 
 /**
+ * Contextual metadata for print rendering that isn't part of the order itself.
+ * Keeps the OrderData interface aligned with the GraphQL schema.
+ */
+export interface PrintMeta {
+  /** Display-friendly payment method name (e.g. "M-Pesa") instead of handler code */
+  paymentMethodName?: string;
+  /** First name of the staff member who served the customer */
+  servedBy?: string;
+}
+
+/**
  * Abstract base class for print templates
  */
 export abstract class PrintTemplate {
@@ -82,11 +93,13 @@ export abstract class PrintTemplate {
    * @param order - Order data
    * @param companyLogo - Optional logo URL
    * @param companyName - Company/channel display name (defaults to 'Your Company')
+   * @param printMeta - Optional contextual metadata (payment method name, served by, etc.)
    */
   abstract render(
     order: OrderData,
     companyLogo?: string | null,
     companyName?: string | null,
+    printMeta?: PrintMeta,
   ): string;
 
   /**
@@ -163,14 +176,19 @@ export class Receipt52mmTemplate extends PrintTemplate {
   name = '52mm Receipt';
   width = '52mm';
 
-  render(order: OrderData, companyLogo?: string | null, companyName?: string | null): string {
+  render(
+    order: OrderData,
+    companyLogo?: string | null,
+    companyName?: string | null,
+    printMeta?: PrintMeta,
+  ): string {
     const customerName = this.getCustomerName(order);
     const isWalkIn = this.isWalkInCustomer(order);
     const date = order.orderPlacedAt
       ? this.formatDate(order.orderPlacedAt)
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
-    const paymentMethod = order.payments?.[0]?.method || 'N/A';
+    const paymentMethod = printMeta?.paymentMethodName || order.payments?.[0]?.method || 'N/A';
     const name = companyName?.trim() || 'Your Company';
 
     let html = `
@@ -221,6 +239,7 @@ export class Receipt52mmTemplate extends PrintTemplate {
                 </div>
                 <div class="payment-section">
                     <p><strong>Payment:</strong> ${paymentMethod}</p>
+                    ${printMeta?.servedBy ? `<p><strong>Served by:</strong> ${printMeta.servedBy}</p>` : ''}
                 </div>
                 <div class="receipt-footer">
                     <p>Thank you for your business!</p>
@@ -330,14 +349,19 @@ export class Receipt80mmTemplate extends PrintTemplate {
   name = '80mm Receipt';
   width = '80mm';
 
-  render(order: OrderData, companyLogo?: string | null, companyName?: string | null): string {
+  render(
+    order: OrderData,
+    companyLogo?: string | null,
+    companyName?: string | null,
+    printMeta?: PrintMeta,
+  ): string {
     const customerName = this.getCustomerName(order);
     const isWalkIn = this.isWalkInCustomer(order);
     const date = order.orderPlacedAt
       ? this.formatDate(order.orderPlacedAt)
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
-    const paymentMethod = order.payments?.[0]?.method || 'N/A';
+    const paymentMethod = printMeta?.paymentMethodName || order.payments?.[0]?.method || 'N/A';
     const name = companyName?.trim() || 'Your Company';
 
     let html = `
@@ -388,6 +412,7 @@ export class Receipt80mmTemplate extends PrintTemplate {
                 </div>
                 <div class="payment-section">
                     <p><strong>Payment:</strong> ${paymentMethod}</p>
+                    ${printMeta?.servedBy ? `<p><strong>Served by:</strong> ${printMeta.servedBy}</p>` : ''}
                 </div>
                 <div class="receipt-footer">
                     <p>Thank you for your business!</p>
@@ -496,14 +521,19 @@ export class A4Template extends PrintTemplate {
   name = 'A4 Invoice';
   width = '210mm';
 
-  render(order: OrderData, companyLogo?: string | null, companyName?: string | null): string {
+  render(
+    order: OrderData,
+    companyLogo?: string | null,
+    companyName?: string | null,
+    printMeta?: PrintMeta,
+  ): string {
     const customerName = this.getCustomerName(order);
     const isWalkIn = this.isWalkInCustomer(order);
     const date = order.orderPlacedAt
       ? this.formatDate(order.orderPlacedAt)
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
-    const paymentMethod = order.payments?.[0]?.method || 'N/A';
+    const paymentMethod = printMeta?.paymentMethodName || order.payments?.[0]?.method || 'N/A';
     const hasFulfillment = order.fulfillments && order.fulfillments.length > 0;
     const hasShipping = order.shippingAddress && !isWalkIn;
     const name = companyName?.trim() || 'Your Company';
@@ -603,6 +633,7 @@ export class A4Template extends PrintTemplate {
                         <h3>Payment Information</h3>
                         <p><strong>Method:</strong> ${paymentMethod}</p>
                         <p><strong>Status:</strong> ${this.getPaymentStatus(order.payments?.[0]?.state || '')}</p>
+                        ${printMeta?.servedBy ? `<p><strong>Served by:</strong> ${printMeta.servedBy}</p>` : ''}
                     </div>
                     ${
                       hasFulfillment

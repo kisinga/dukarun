@@ -18,6 +18,7 @@ import {
 import { FacetService } from '../../../core/services/product/facet.service';
 import { FACET_CODES, type FacetCode } from '../../../core/services/product/facet.types';
 import { ProductService } from '../../../core/services/product.service';
+import { CurrencyService } from '../../../core/services/currency.service';
 import { calculateProductStats } from '../../../core/services/stats/product-stats.util';
 import {
   DeleteConfirmationData,
@@ -28,9 +29,12 @@ import { ProductAction, ProductCardComponent } from './components/product-card.c
 import { ProductListFacetSelectorComponent } from './components/product-list-facet-selector.component';
 import { ProductStats, ProductStatsComponent } from './components/product-stats.component';
 import { ProductTableRowComponent } from './components/product-table-row.component';
-import { VariantListComponent } from '../shared/components/variant-list.component';
 import { PageHeaderComponent } from '../../components/shared/page-header.component';
 import { ListSearchBarComponent } from '../../components/shared/list-search-bar.component';
+import {
+  VariantListComponent,
+  type VariantListItem,
+} from '../shared/components/variant-list.component';
 
 /**
  * Products list page - refactored with composable components
@@ -51,10 +55,10 @@ import { ListSearchBarComponent } from '../../components/shared/list-search-bar.
     ProductStatsComponent,
     ProductTableRowComponent,
     ListSearchBarComponent,
-    VariantListComponent,
     PaginationComponent,
     DeleteConfirmationModalComponent,
     PageHeaderComponent,
+    VariantListComponent,
   ],
   templateUrl: './products.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -65,6 +69,7 @@ export class ProductsComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  readonly currencyService = inject(CurrencyService);
 
   readonly canEditProduct = this.authService.hasUpdateProductPermission;
 
@@ -175,6 +180,25 @@ export class ProductsComponent implements OnInit {
     });
   }
 
+  /** Map product variants to VariantListItem for shared variant-list panel. */
+  variantListItems(product: {
+    variants?: Array<{
+      name: string;
+      sku: string;
+      priceWithTax: number;
+      stockOnHand?: number;
+      trackInventory?: boolean;
+    }>;
+  }): VariantListItem[] {
+    return (product.variants ?? []).map((v) => ({
+      name: v.name,
+      sku: v.sku,
+      priceWithTax: v.priceWithTax,
+      stockOnHand: v.stockOnHand,
+      trackInventory: v.trackInventory,
+    }));
+  }
+
   ngOnInit(): void {
     this.route.queryParams.subscribe((params) => {
       const lowStockParam = params['lowStock'] === 'true';
@@ -232,8 +256,7 @@ export class ProductsComponent implements OnInit {
 
     switch (action) {
       case 'view':
-        // Navigate to product detail view (to be implemented)
-        console.log('View product:', productId);
+        this.router.navigate(['/dashboard/products', productId]);
         break;
 
       case 'edit':

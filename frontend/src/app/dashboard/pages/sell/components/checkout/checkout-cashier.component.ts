@@ -36,7 +36,7 @@ import { CheckoutSummaryComponent } from './checkout-summary.component';
       />
 
       <button
-        class="btn btn-info btn-md sm:btn-lg w-full hover:scale-105 active:scale-95 transition-transform min-h-[44px]"
+        class="btn btn-info btn-md sm:btn-lg w-full interactive-press min-h-[44px]"
         (click)="complete.emit()"
         [disabled]="isProcessing()"
       >

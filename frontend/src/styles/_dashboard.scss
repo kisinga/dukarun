@@ -89,10 +89,12 @@ app-dashboard-layout aside nav a {
 
 app-dashboard-layout nav[role='navigation'] a {
   -webkit-tap-highlight-color: transparent;
+}
 
-  &:active {
-    opacity: 0.7;
-  }
+// .nav-link-ripple — used on sidebar links + mobile bottom nav.
+// Includes the ripple mixin from the design system for radial ink-wash on tap.
+.nav-link-ripple {
+  @include ds.ripple;
 }
 
 app-dashboard-layout .safe-area-inset-bottom {
@@ -206,4 +208,16 @@ app-dashboard-layout .drawer-side aside {
 
 .dashboard-main .rotate-180 {
   transform: rotate(180deg);
+}
+
+// -----------------------------------------------------------------------------
+// GLOBAL INTERACTION HOOKS — table rows & clickable list items
+// -----------------------------------------------------------------------------
+// Any <tr> inside a dashboard table that has the daisyUI `hover` class or
+// `cursor-pointer` gets subtle tap/click feedback. Rows without those classes
+// are unaffected. This does NOT block click propagation — purely visual.
+
+.dashboard-main table tbody tr.hover,
+.dashboard-main table tbody tr.cursor-pointer {
+  @include ds.row-highlight;
 }

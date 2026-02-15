@@ -48,7 +48,7 @@ export interface Customer {
 
           <!-- Create New Customer Button -->
           <button
-            class="btn btn-outline btn-primary w-full hover:scale-105 active:scale-95 transition-transform"
+            class="btn btn-outline btn-primary w-full interactive-press"
             (click)="showForm.set(true)"
           >
             <svg
@@ -132,14 +132,14 @@ export interface Customer {
 
           <div class="flex gap-3">
             <button
-              class="btn btn-ghost flex-1 hover:scale-105 active:scale-95 transition-transform"
+              class="btn btn-ghost flex-1 interactive-press"
               (click)="cancelForm()"
               [disabled]="isCreating()"
             >
               Cancel
             </button>
             <button
-              class="btn btn-primary flex-1 hover:scale-105 active:scale-95 transition-transform"
+              class="btn btn-primary flex-1 interactive-press"
               (click)="createCustomer()"
               [disabled]="isCreating() || !canCreate()"
             >

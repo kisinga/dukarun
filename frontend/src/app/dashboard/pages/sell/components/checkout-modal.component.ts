@@ -16,13 +16,12 @@ import {
   PaymentMethodService,
 } from '../../../../core/services/payment-method.service';
 import { Customer } from './customer-selector.component';
-import { CheckoutCashComponent } from './checkout/checkout-cash.component';
+import { CheckoutCashComponent, SelectedPaymentMethod } from './checkout/checkout-cash.component';
 import { CheckoutCashierComponent } from './checkout/checkout-cashier.component';
 import { CheckoutCreditComponent } from './checkout/checkout-credit.component';
 import { CheckoutSuccessComponent } from './checkout/checkout-success.component';
 
 type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
-type PaymentMethodCode = string;
 
 /**
  * Unified checkout modal handling all payment flows
@@ -200,7 +199,7 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
   readonly isSearchingCustomers = input<boolean>(false);
 
   // Cash sale inputs
-  readonly selectedPaymentMethod = input<PaymentMethodCode | null>(null);
+  readonly selectedPaymentMethod = input<SelectedPaymentMethod | null>(null);
   readonly selectedCustomerForCash = input<Customer | null>(null);
   readonly customerSearchResultsForCash = input<Customer[]>([]);
   readonly isSearchingCustomersForCash = input<boolean>(false);
@@ -217,7 +216,7 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
   readonly customerSelectForCash = output<Customer | null>();
   readonly customerCreate = output<{ name: string; phone: string; email?: string }>();
   readonly customerCreateForCash = output<{ name: string; phone: string; email?: string }>();
-  readonly paymentMethodSelect = output<PaymentMethodCode>();
+  readonly paymentMethodSelect = output<SelectedPaymentMethod>();
   readonly closeModal = output<void>();
 
   // Payment selection outputs
@@ -283,15 +282,11 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
   }
 
   getSelectedPaymentMethodName(): string {
-    const selectedCode = this.selectedPaymentMethod();
-    if (!selectedCode) return '';
-
-    const method = this.paymentMethods().find((m) => m.code === selectedCode);
-    return method?.name || selectedCode;
+    return this.selectedPaymentMethod()?.name ?? '';
   }
 
-  onPaymentMethodSelect(code: string): void {
-    this.paymentMethodSelect.emit(code as PaymentMethodCode);
+  onPaymentMethodSelect(method: SelectedPaymentMethod): void {
+    this.paymentMethodSelect.emit(method);
   }
 
   onCompleteCash(): void {

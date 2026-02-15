@@ -92,6 +92,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'products/:id',
+        loadComponent: () =>
+          import('./dashboard/pages/products/product-detail/product-detail.component').then(
+            (m) => m.ProductDetailComponent,
+          ),
+      },
+      {
         path: 'customers',
         loadComponent: () =>
           import('./dashboard/pages/customers/customers.component').then(

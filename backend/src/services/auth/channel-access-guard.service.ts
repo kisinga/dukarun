@@ -1,9 +1,10 @@
 import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
-import { Channel, ChannelService, RequestContext, TransactionalConnection } from '@vendure/core';
+import { ChannelService, RequestContext, TransactionalConnection } from '@vendure/core';
 import { findChannelById } from '../../utils/channel-access.util';
 import { ChannelStatus, getChannelStatus } from '../../domain/channel-custom-fields';
 import { AccessLevel } from './phone-auth.service';
+import { getVendureRequestContext } from '../../infrastructure/audit/get-request-context';
 
 /**
  * Channel Access Guard Service
@@ -28,7 +29,14 @@ export class ChannelAccessGuardService implements CanActivate {
     // Get GraphQL context
     const gqlContext = GqlExecutionContext.create(context);
     const info = gqlContext.getInfo();
-    const ctx = gqlContext.getContext().req as RequestContext;
+
+    // Extract the actual Vendure RequestContext from the Express request.
+    // gqlContext.getContext().req is the Express Request, NOT the RequestContext.
+    const ctx = getVendureRequestContext(context);
+    if (!ctx) {
+      // No RequestContext found - allow (might be system operation or early in pipeline)
+      return true;
+    }
 
     // Get channel ID from context
     const channelId = ctx.channelId;

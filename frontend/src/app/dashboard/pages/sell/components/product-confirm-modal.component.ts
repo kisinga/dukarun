@@ -1,11 +1,9 @@
 import { CommonModule } from '@angular/common';
 import {
-  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   effect,
   inject,
-  Injector,
   input,
   output,
   signal,
@@ -16,13 +14,12 @@ import {
   ProductVariant,
 } from '../../../../core/services/product/product-search.service';
 import { ProductLabelComponent } from '../../shared/components/product-label.component';
-import {
-  PriceModificationService,
-  PriceOverrideData,
-} from '../services/price-modification.service';
 
 /**
- * Modal for confirming product and selecting variant/quantity
+ * Modal for confirming a scanned/selected product and choosing variant/quantity.
+ *
+ * Price editing is NOT supported here — prices are read-only.
+ * Price adjustments happen exclusively in the cart (via up/down buttons on each line item).
  */
 @Component({
   selector: 'app-product-confirm-modal',
@@ -80,20 +77,18 @@ import {
               </div>
             </div>
 
-            <!-- Variant Selection -->
+            <!-- Variant Selection (multiple variants) -->
             @if (product()!.variants.length > 1) {
               <div class="space-y-1">
                 <p class="text-xs font-medium text-base-content/70 px-1 mb-1">Select variant:</p>
                 @for (variant of product()!.variants; track variant.id) {
                   <button
-                    class="w-full flex items-center justify-between gap-2 p-3 rounded-lg transition-all border-2"
+                    class="w-full flex items-center justify-between gap-2 p-3 rounded-lg transition-all border-2 interactive-ripple"
                     [class.bg-base-200]="variant.stockLevel === 'IN_STOCK'"
                     [class.bg-error/10]="variant.stockLevel === 'OUT_OF_STOCK'"
                     [class.border-transparent]="variant.stockLevel === 'IN_STOCK'"
                     [class.border-error/30]="variant.stockLevel === 'OUT_OF_STOCK'"
-                    [class.hover:bg-base-300]="variant.stockLevel === 'IN_STOCK'"
-                    [class.hover:border-primary]="variant.stockLevel === 'IN_STOCK'"
-                    [class.active:scale-[0.98]]="variant.stockLevel === 'IN_STOCK'"
+                    [class.interactive-press]="variant.stockLevel === 'IN_STOCK'"
                     [class.cursor-pointer]="variant.stockLevel === 'IN_STOCK'"
                     [class.cursor-not-allowed]="variant.stockLevel === 'OUT_OF_STOCK'"
                     [class.opacity-60]="variant.stockLevel === 'OUT_OF_STOCK'"
@@ -108,85 +103,9 @@ import {
                       }
                     </div>
                     <div class="text-right flex items-center gap-2">
-                      @if (canOverridePrices() && variant.stockLevel === 'IN_STOCK') {
-                        <!-- Price Controls -->
-                        <div class="flex items-center gap-1" (click)="$event.stopPropagation()">
-                          @if (editingPriceVariantId() !== variant.id) {
-                            <button
-                              class="btn btn-square btn-xs btn-ghost"
-                              (click)="decreaseVariantPrice(variant)"
-                              aria-label="Decrease price by 3%"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                class="h-3.5 w-3.5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M19 9l-7 7-7-7"
-                                />
-                              </svg>
-                            </button>
-                            <button
-                              type="button"
-                              class="text-base font-bold text-tabular min-w-[4rem] text-center cursor-pointer hover:underline"
-                              (click)="enterPriceEdit(variant)"
-                              aria-label="Edit price"
-                            >
-                              {{ getVariantPrice(variant) }}
-                            </button>
-                            <button
-                              class="btn btn-square btn-xs btn-ghost"
-                              (click)="increaseVariantPrice(variant)"
-                              aria-label="Increase price by 3%"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                class="h-3.5 w-3.5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M5 15l7-7 7 7"
-                                />
-                              </svg>
-                            </button>
-                          } @else {
-                            <input
-                              type="text"
-                              inputmode="decimal"
-                              class="input input-xs input-bordered text-base font-bold text-tabular min-w-[4rem] text-center price-edit-input"
-                              [value]="priceEditInputValue()"
-                              (input)="priceEditInputValue.set($any($event.target).value)"
-                              (blur)="commitPriceEdit(variant)"
-                              (keydown.enter)="commitPriceEdit(variant)"
-                              (keydown.escape)="cancelPriceEdit()"
-                              aria-label="Price"
-                            />
-                            <button
-                              type="button"
-                              class="btn btn-ghost btn-xs"
-                              (click)="resetPriceEdit(variant)"
-                              aria-label="Reset price to default"
-                            >
-                              Reset
-                            </button>
-                          }
-                        </div>
-                      } @else {
-                        <div class="text-base font-bold text-tabular">
-                          {{ currencyService.format(variant.priceWithTax) }}
-                        </div>
-                      }
+                      <div class="text-base font-bold text-tabular">
+                        {{ currencyService.format(variant.priceWithTax) }}
+                      </div>
                       <div
                         class="badge badge-sm"
                         [class.badge-success]="variant.stockLevel === 'IN_STOCK'"
@@ -248,85 +167,9 @@ import {
                     }
                   </div>
                   <div class="text-right flex items-center gap-2">
-                    @if (canOverridePrices() && product()!.variants[0].stockLevel === 'IN_STOCK') {
-                      <!-- Price Controls -->
-                      <div class="flex items-center gap-1">
-                        @if (editingPriceVariantId() !== product()!.variants[0].id) {
-                          <button
-                            class="btn btn-square btn-xs btn-ghost"
-                            (click)="decreaseSingleVariantPrice()"
-                            aria-label="Decrease price by 3%"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              class="h-3.5 w-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M19 9l-7 7-7-7"
-                              />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            class="text-xl font-bold text-primary text-tabular min-w-[5rem] text-center cursor-pointer hover:underline"
-                            (click)="enterPriceEdit(product()!.variants[0])"
-                            aria-label="Edit price"
-                          >
-                            {{ getSingleVariantPrice() }}
-                          </button>
-                          <button
-                            class="btn btn-square btn-xs btn-ghost"
-                            (click)="increaseSingleVariantPrice()"
-                            aria-label="Increase price by 3%"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              class="h-3.5 w-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M5 15l7-7 7 7"
-                              />
-                            </svg>
-                          </button>
-                        } @else {
-                          <input
-                            type="text"
-                            inputmode="decimal"
-                            class="input input-xs input-bordered text-xl font-bold text-primary text-tabular min-w-[5rem] text-center price-edit-input"
-                            [value]="priceEditInputValue()"
-                            (input)="priceEditInputValue.set($any($event.target).value)"
-                            (blur)="commitPriceEdit(product()!.variants[0])"
-                            (keydown.enter)="commitPriceEdit(product()!.variants[0])"
-                            (keydown.escape)="cancelPriceEdit()"
-                            aria-label="Price"
-                          />
-                          <button
-                            type="button"
-                            class="btn btn-ghost btn-xs"
-                            (click)="resetPriceEdit(product()!.variants[0])"
-                            aria-label="Reset price to default"
-                          >
-                            Reset
-                          </button>
-                        }
-                      </div>
-                    } @else {
-                      <div class="text-xl font-bold text-primary text-tabular">
-                        {{ currencyService.format(product()!.variants[0].priceWithTax) }}
-                      </div>
-                    }
+                    <div class="text-xl font-bold text-primary text-tabular">
+                      {{ currencyService.format(product()!.variants[0].priceWithTax) }}
+                    </div>
                     <div
                       class="badge badge-sm"
                       [class.badge-success]="product()!.variants[0].stockLevel === 'IN_STOCK'"
@@ -422,7 +265,7 @@ import {
                 <!-- Add to Cart Button -->
                 <button
                   type="button"
-                  class="btn btn-primary btn-block min-h-[3rem] hover:scale-105 active:scale-95 transition-transform"
+                  class="btn btn-primary btn-block min-h-[3rem] interactive-press"
                   (click)="handleSingleVariantAdd()"
                 >
                   <svg
@@ -501,124 +344,27 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProductConfirmModalComponent {
-  private readonly injector = inject(Injector);
   readonly currencyService = inject(CurrencyService);
-  readonly priceModificationService = inject(PriceModificationService);
 
   readonly isOpen = input.required<boolean>();
   readonly product = input.required<ProductSearchResult | null>();
-  readonly canOverridePrices = input<boolean>(false);
 
   readonly variantSelected = output<{
     variant: ProductVariant;
     quantity: number;
-    priceOverride?: PriceOverrideData;
     facetValues?: { name: string; facetCode?: string; facet?: { code: string } }[];
   }>();
   readonly closeModal = output<void>();
 
-  /** Bumped after each price change so template re-reads from service */
-  private readonly priceVersion = signal(0);
-
-  /** Quantity for single-variant add (bound to input, reset when product changes) */
+  /** Quantity for single-variant add (reset when product changes) */
   readonly quantity = signal(1);
-
-  /** Variant id when price is in direct-edit mode; null otherwise */
-  readonly editingPriceVariantId = signal<string | null>(null);
-  /** Current input value while editing price (numeric string, currency units) */
-  readonly priceEditInputValue = signal('');
 
   constructor() {
     effect(() => {
-      const prod = this.product();
-      if (prod) {
-        prod.variants.forEach((v) => this.priceModificationService.clearStacks(v.id));
-        this.quantity.set(1);
-      }
-      this.priceVersion.update((v) => v + 1);
+      // Reset quantity when product changes
+      this.product();
+      this.quantity.set(1);
     });
-  }
-
-  getVariantPrice(variant: ProductVariant): string {
-    this.priceVersion();
-    const base = Math.round(variant.priceWithTax);
-    const current = this.priceModificationService.getCurrentPrice(variant.id, 'unit', base);
-    return this.currencyService.format(current, false);
-  }
-
-  getSingleVariantPrice(): string {
-    const variant = this.product()?.variants[0];
-    if (!variant) return '';
-    return this.getVariantPrice(variant);
-  }
-
-  increaseVariantPrice(variant: ProductVariant): void {
-    const base = Math.round(variant.priceWithTax);
-    const currentPrice = this.priceModificationService.getCurrentPrice(variant.id, 'unit', base);
-    const result = this.priceModificationService.increasePrice(variant.id, currentPrice, 'unit');
-    if (!result) return;
-    this.priceVersion.update((v) => v + 1);
-  }
-
-  decreaseVariantPrice(variant: ProductVariant): void {
-    const base = Math.round(variant.priceWithTax);
-    const currentPrice = this.priceModificationService.getCurrentPrice(variant.id, 'unit', base);
-    const wholesalePrice = variant.customFields?.wholesalePrice ?? 0;
-    const result = this.priceModificationService.decreasePrice(
-      variant.id,
-      currentPrice,
-      1,
-      wholesalePrice,
-      'unit',
-    );
-    if (!result) return;
-    this.priceVersion.update((v) => v + 1);
-  }
-
-  increaseSingleVariantPrice(): void {
-    const variant = this.product()?.variants[0];
-    if (variant) {
-      this.increaseVariantPrice(variant);
-    }
-  }
-
-  decreaseSingleVariantPrice(): void {
-    const variant = this.product()?.variants[0];
-    if (variant) {
-      this.decreaseVariantPrice(variant);
-    }
-  }
-
-  enterPriceEdit(variant: ProductVariant): void {
-    this.editingPriceVariantId.set(variant.id);
-    this.priceEditInputValue.set(this.getVariantPrice(variant));
-    afterNextRender(() => document.querySelector<HTMLInputElement>('.price-edit-input')?.focus(), {
-      injector: this.injector,
-    });
-  }
-
-  commitPriceEdit(variant: ProductVariant): void {
-    const raw = this.priceEditInputValue().trim();
-    const units = parseFloat(raw);
-    if (Number.isNaN(units) || units < 0) {
-      this.editingPriceVariantId.set(null);
-      return;
-    }
-    const base = Math.round(variant.priceWithTax);
-    const parsedCents = Math.round(units * 100);
-    this.priceModificationService.setCustomPrice(variant.id, 'unit', base, parsedCents);
-    this.editingPriceVariantId.set(null);
-    this.priceVersion.update((v) => v + 1);
-  }
-
-  resetPriceEdit(variant: ProductVariant): void {
-    this.priceModificationService.clearStacks(variant.id);
-    this.editingPriceVariantId.set(null);
-    this.priceVersion.update((v) => v + 1);
-  }
-
-  cancelPriceEdit(): void {
-    this.editingPriceVariantId.set(null);
   }
 
   incrementQuantity(): void {
@@ -636,43 +382,22 @@ export class ProductConfirmModalComponent {
   }
 
   handleVariantClick(variant: ProductVariant): void {
-    const basePrice = Math.round(variant.priceWithTax);
-    const currentPrice = this.priceModificationService.getCurrentPrice(
-      variant.id,
-      'unit',
-      basePrice,
-    );
-    const priceOverride: PriceOverrideData | undefined =
-      currentPrice !== basePrice
-        ? { variantId: variant.id, customLinePrice: currentPrice, reason: 'Price adjusted' }
-        : undefined;
     const facetValues = this.product()?.facetValues?.map((fv) => ({
       name: fv.name,
       facetCode: fv.facetCode,
       facet: fv.facetCode ? { code: fv.facetCode } : undefined,
     }));
-    this.variantSelected.emit({ variant, quantity: 1, priceOverride, facetValues });
+    this.variantSelected.emit({ variant, quantity: 1, facetValues });
   }
 
   handleSingleVariantAdd(): void {
     const variant = this.product()?.variants[0];
     if (!variant) return;
-    const qty = this.quantity();
-    const basePrice = Math.round(variant.priceWithTax);
-    const currentPrice = this.priceModificationService.getCurrentPrice(
-      variant.id,
-      'unit',
-      basePrice,
-    );
-    const priceOverride: PriceOverrideData | undefined =
-      currentPrice !== basePrice
-        ? { variantId: variant.id, customLinePrice: currentPrice, reason: 'Price adjusted' }
-        : undefined;
     const facetValues = this.product()?.facetValues?.map((fv) => ({
       name: fv.name,
       facetCode: fv.facetCode,
       facet: fv.facetCode ? { code: fv.facetCode } : undefined,
     }));
-    this.variantSelected.emit({ variant, quantity: qty, priceOverride, facetValues });
+    this.variantSelected.emit({ variant, quantity: this.quantity(), facetValues });
   }
 }
