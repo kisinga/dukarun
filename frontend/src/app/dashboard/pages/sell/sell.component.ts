@@ -808,6 +808,8 @@ export class SellComponent implements OnInit, OnDestroy {
               fullOrder,
               this.printPreferences.getDefaultTemplateId(),
               {
+                documentType:
+                  this.printPreferences.getDefaultTemplateId() === 'a4' ? 'invoice' : 'receipt',
                 paymentMethodName: 'Credit',
                 servedBy: this.authService.user()?.firstName ?? undefined,
               },
@@ -905,6 +907,8 @@ export class SellComponent implements OnInit, OnDestroy {
               fullOrder,
               this.printPreferences.getDefaultTemplateId(),
               {
+                documentType:
+                  this.printPreferences.getDefaultTemplateId() === 'a4' ? 'invoice' : 'receipt',
                 paymentMethodName: this.selectedPaymentMethod()?.name,
                 servedBy: this.authService.user()?.firstName ?? undefined,
               },

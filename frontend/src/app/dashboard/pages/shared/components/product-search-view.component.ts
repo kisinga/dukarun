@@ -41,18 +41,168 @@ import { VariantListComponent } from './variant-list.component';
   standalone: true,
   imports: [CommonModule, FormsModule, ProductLabelComponent, VariantListComponent],
   template: `
-    <div class="card bg-base-100 shadow-lg border border-base-200">
-      <div
-        class="card-body"
-        [class.p-3]="!compact()"
-        [class.md:p-4]="!compact()"
-        [class.p-3]="compact()"
-      >
-        @if (!resultsOnly()) {
+    @if (resultsOnly()) {
+      <!-- List only: no card (parent e.g. Quick Select is the card) -->
+      @if (searchResults().length > 0) {
+        <div
+          class="divide-y divide-base-300 overflow-y-auto"
+          [class.max-h-[40vh]]="compact()"
+          [class.max-h-[50vh]]="!compact()"
+        >
+          @for (product of searchResults(); track product.id) {
+            @let expanded = product.variants.length > 1 && isExpanded(product.id);
+            <div class="bg-base-100">
+              <div class="flex items-center py-1.5 pl-2 pr-2 gap-0 min-h-0">
+                <button
+                  type="button"
+                  class="w-12 shrink-0 flex items-center justify-center gap-0.5 text-base-content/50 hover:text-base-content transition-colors py-1"
+                  [class.cursor-pointer]="product.variants.length > 1"
+                  [class.cursor-default]="product.variants.length <= 1"
+                  [attr.aria-label]="
+                    product.variants.length > 1
+                      ? isExpanded(product.id)
+                        ? 'Collapse variants'
+                        : 'Expand variants'
+                      : 'Single variant'
+                  "
+                  (click)="onExpandClick($event, product)"
+                >
+                  @if (product.variants.length > 1) {
+                    @if (isExpanded(product.id)) {
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    } @else {
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    }
+                    <span class="badge badge-xs badge-ghost text-base-content/60">{{
+                      product.variants.length
+                    }}</span>
+                  } @else {
+                    <span
+                      class="w-3 h-0.5 rounded bg-base-content/30 block shrink-0"
+                      aria-hidden="true"
+                    ></span>
+                  }
+                </button>
+                <button
+                  class="flex-1 flex items-center gap-2 min-w-0 py-1 pl-2 pr-1 bg-base-100 hover:bg-base-200 transition-colors text-left"
+                  (click)="productSelected.emit(product)"
+                >
+                  @if (product.featuredAsset) {
+                    <img
+                      [src]="product.featuredAsset.preview"
+                      [alt]="product.name"
+                      class="w-8 h-8 rounded object-cover shrink-0"
+                    />
+                  } @else {
+                    <div
+                      class="w-8 h-8 rounded bg-base-300 flex items-center justify-center shrink-0"
+                    >
+                      @if (isService(product)) {
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="h-4 w-4 text-accent"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                          />
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                        </svg>
+                      } @else {
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="h-4 w-4 text-primary"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                          />
+                        </svg>
+                      }
+                    </div>
+                  }
+                  <div class="flex-1 min-w-0">
+                    <app-product-label
+                      [productName]="product.name"
+                      [facetValues]="product.facetValues ?? []"
+                    />
+                  </div>
+                  <div class="w-14 shrink-0 text-right">
+                    <div class="text-[10px] uppercase tracking-wider text-base-content/70">
+                      Stock
+                    </div>
+                    <div class="text-xs font-mono tabular-nums text-base-content">
+                      {{ product.variants.length === 1 ? getSingleVariantStock(product) : '—' }}
+                    </div>
+                  </div>
+                  <div class="w-16 shrink-0 text-right">
+                    <div class="text-[10px] uppercase tracking-wider text-base-content/70">
+                      Price
+                    </div>
+                    <div class="text-xs font-mono tabular-nums text-base-content">
+                      {{
+                        product.variants.length === 1
+                          ? currencyService.format(product.variants[0].priceWithTax, false)
+                          : '—'
+                      }}
+                    </div>
+                  </div>
+                </button>
+              </div>
+              @if (expanded) {
+                <div class="bg-base-200 pl-2 pr-2 pb-1.5 pt-0.5">
+                  <app-variant-list
+                    [variants]="getVariantListItems(product)"
+                    [display]="'table'"
+                    [selectable]="true"
+                    (variantSelected)="onVariantItemSelected($event, product)"
+                  />
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    } @else {
+      <!-- Search mode: one card with search input + list -->
+      <div class="card bg-base-100 shadow-md border border-base-300">
+        <div class="card-body p-3 md:p-4">
           <div
-            class="rounded-xl border border-base-300 bg-base-200/50 px-3 py-2.5 flex items-center gap-2"
+            class="rounded-lg border border-base-300 bg-base-200 px-3 py-2.5 flex items-center gap-2"
           >
-            <!-- Search Icon -->
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-5 w-5 text-base-content/60 shrink-0"
@@ -67,8 +217,6 @@ import { VariantListComponent } from './variant-list.component';
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
               />
             </svg>
-
-            <!-- Search Input -->
             <input
               type="text"
               class="input input-ghost flex-1 text-base p-0 focus:outline-none min-h-0 h-auto bg-transparent"
@@ -77,8 +225,6 @@ import { VariantListComponent } from './variant-list.component';
               [(ngModel)]="searchTerm"
               (ngModelChange)="searchTermChange.emit($event)"
             />
-
-            <!-- Camera Toggle Button (when searching or on mobile) -->
             @if (shouldShowCameraButton()) {
               <button
                 class="btn btn-circle btn-sm btn-primary"
@@ -103,179 +249,166 @@ import { VariantListComponent } from './variant-list.component';
               </button>
             }
           </div>
-        }
-
-        <!-- Search Results -->
-        @if (searchResults().length > 0) {
-          <div
-            class="mt-3 space-y-3 overflow-y-auto"
-            [class.max-h-[60vh]]="!compact()"
-            [class.max-h-[40vh]]="compact()"
-          >
-            @for (product of searchResults(); track product.id) {
-              <div class="border border-base-300 rounded-lg overflow-hidden bg-base-100">
-                <div class="flex items-stretch min-h-11">
-                  <!-- Expansion icon (left, for all products) -->
-                  <button
-                    type="button"
-                    class="w-10 min-h-[2.75rem] shrink-0 flex items-center justify-center text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors border-r border-base-300"
-                    [class.cursor-pointer]="product.variants.length > 1"
-                    [class.cursor-default]="product.variants.length <= 1"
-                    [attr.aria-label]="
-                      product.variants.length > 1
-                        ? isExpanded(product.id)
-                          ? 'Collapse variants'
-                          : 'Expand variants'
-                        : 'Single variant'
-                    "
-                    (click)="onExpandClick($event, product)"
-                  >
-                    @if (product.variants.length > 1) {
-                      @if (isExpanded(product.id)) {
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-5 w-5 shrink-0"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          stroke-width="2"
-                        >
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                      } @else {
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-5 w-5 shrink-0"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          stroke-width="2"
-                        >
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                      }
-                    } @else {
-                      <span
-                        class="w-4 h-0.5 rounded bg-base-content/30 block shrink-0"
-                        aria-hidden="true"
-                      ></span>
-                    }
-                  </button>
-                  <!-- Product row (image, info, add) -->
-                  <button
-                    class="flex-1 flex items-center gap-3 p-3 min-h-11 bg-base-200 hover:bg-base-300 transition-colors text-left"
-                    (click)="productSelected.emit(product)"
-                  >
-                    <!-- Product Image -->
-                    @if (product.featuredAsset) {
-                      <img
-                        [src]="product.featuredAsset.preview"
-                        [alt]="product.name"
-                        class="w-10 h-10 rounded object-cover shrink-0"
-                      />
-                    } @else {
-                      <div
-                        class="w-10 h-10 rounded bg-base-300 flex items-center justify-center shrink-0"
-                      >
-                        @if (isService(product)) {
+          @if (searchResults().length > 0) {
+            <div
+              class="mt-2 divide-y divide-base-300 overflow-y-auto -mx-1 px-1"
+              [class.max-h-[55vh]]="!compact()"
+              [class.max-h-[35vh]]="compact()"
+            >
+              @for (product of searchResults(); track product.id) {
+                @let expanded = product.variants.length > 1 && isExpanded(product.id);
+                <div class="bg-base-100">
+                  <div class="flex items-center py-1.5 pl-2 pr-2 gap-0 min-h-0">
+                    <button
+                      type="button"
+                      class="w-12 shrink-0 flex items-center justify-center gap-0.5 text-base-content/50 hover:text-base-content transition-colors py-1"
+                      [class.cursor-pointer]="product.variants.length > 1"
+                      [class.cursor-default]="product.variants.length <= 1"
+                      [attr.aria-label]="
+                        product.variants.length > 1
+                          ? isExpanded(product.id)
+                            ? 'Collapse variants'
+                            : 'Expand variants'
+                          : 'Single variant'
+                      "
+                      (click)="onExpandClick($event, product)"
+                    >
+                      @if (product.variants.length > 1) {
+                        @if (isExpanded(product.id)) {
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            class="h-5 w-5 text-accent"
+                            class="h-4 w-4 shrink-0"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
+                            stroke-width="2"
                           >
                             <path
                               stroke-linecap="round"
                               stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                            />
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                              d="M19 9l-7 7-7-7"
                             />
                           </svg>
                         } @else {
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            class="h-5 w-5 text-primary"
+                            class="h-4 w-4 shrink-0"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
+                            stroke-width="2"
                           >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                            />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                           </svg>
                         }
+                        <span class="badge badge-xs badge-ghost text-base-content/60">{{
+                          product.variants.length
+                        }}</span>
+                      } @else {
+                        <span
+                          class="w-3 h-0.5 rounded bg-base-content/30 block shrink-0"
+                          aria-hidden="true"
+                        ></span>
+                      }
+                    </button>
+                    <button
+                      class="flex-1 flex items-center gap-2 min-w-0 py-1 pl-2 pr-1 bg-base-100 hover:bg-base-200 transition-colors text-left"
+                      (click)="productSelected.emit(product)"
+                    >
+                      @if (product.featuredAsset) {
+                        <img
+                          [src]="product.featuredAsset.preview"
+                          [alt]="product.name"
+                          class="w-8 h-8 rounded object-cover shrink-0"
+                        />
+                      } @else {
+                        <div
+                          class="w-8 h-8 rounded bg-base-300 flex items-center justify-center shrink-0"
+                        >
+                          @if (isService(product)) {
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              class="h-4 w-4 text-accent"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                              />
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                            </svg>
+                          } @else {
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              class="h-4 w-4 text-primary"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                              />
+                            </svg>
+                          }
+                        </div>
+                      }
+                      <div class="flex-1 min-w-0">
+                        <app-product-label
+                          [productName]="product.name"
+                          [facetValues]="product.facetValues ?? []"
+                        />
                       </div>
-                    }
-
-                    <!-- Product Info -->
-                    <div class="flex-1 min-w-0">
-                      <app-product-label
-                        [productName]="product.name"
-                        [facetValues]="product.facetValues ?? []"
-                      />
-                      <div class="text-xs text-base-content/70">
-                        {{ product.variants.length }} variant{{
-                          product.variants.length > 1 ? 's' : ''
-                        }}
-                      </div>
-                    </div>
-
-                    <!-- Stock (single-variant only) -->
-                    @if (product.variants.length === 1) {
-                      <div class="text-right shrink-0">
-                        <div class="text-[10px] uppercase tracking-wider text-base-content/50">
+                      <div class="w-14 shrink-0 text-right">
+                        <div class="text-[10px] uppercase tracking-wider text-base-content/70">
                           Stock
                         </div>
-                        <div class="text-sm font-mono tabular-nums">
-                          {{ getSingleVariantStock(product) }}
+                        <div class="text-xs font-mono tabular-nums text-base-content">
+                          {{ product.variants.length === 1 ? getSingleVariantStock(product) : '—' }}
                         </div>
                       </div>
-                    }
-
-                    <!-- Add Icon -->
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5 text-primary shrink-0"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                  </button>
-                </div>
-                <!-- Variant list (when expanded) — same panel as products page -->
-                @if (product.variants.length > 1 && isExpanded(product.id)) {
-                  <div class="border-t border-base-300 bg-base-200/60 pr-2 pb-1.5 pt-0">
-                    <app-variant-list
-                      [variants]="getVariantListItems(product)"
-                      [display]="'table'"
-                      [selectable]="true"
-                      (variantSelected)="onVariantItemSelected($event, product)"
-                    />
+                      <div class="w-16 shrink-0 text-right">
+                        <div class="text-[10px] uppercase tracking-wider text-base-content/70">
+                          Price
+                        </div>
+                        <div class="text-xs font-mono tabular-nums text-base-content">
+                          {{
+                            product.variants.length === 1
+                              ? currencyService.format(product.variants[0].priceWithTax, false)
+                              : '—'
+                          }}
+                        </div>
+                      </div>
+                    </button>
                   </div>
-                }
-              </div>
-            }
-          </div>
-        }
+                  @if (expanded) {
+                    <div class="bg-base-200 pl-2 pr-2 pb-1.5 pt-0.5">
+                      <app-variant-list
+                        [variants]="getVariantListItems(product)"
+                        [display]="'table'"
+                        [selectable]="true"
+                        (variantSelected)="onVariantItemSelected($event, product)"
+                      />
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
       </div>
-    </div>
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

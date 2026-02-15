@@ -53,11 +53,11 @@
     />
   }
 
-  <!-- Quick Select: reuses search results list and handlers (same as search above) -->
+  <!-- Quick Select: one card, list inside (no nested cards) -->
   @if (shouldShowCamera() || !isMobile()) {
     <div class="mt-4 md:mt-6">
       <div
-        class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-lg shadow-lg min-h-11"
+        class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-lg shadow-md min-h-11 overflow-hidden"
       >
         <input
           type="checkbox"
@@ -68,14 +68,14 @@
         />
         <label
           for="sell-quick-select-toggle"
-          class="collapse-title font-semibold text-base md:text-lg tracking-tight min-h-11 flex items-center justify-between gap-2 py-3 cursor-pointer"
+          class="collapse-title bg-base-200 font-semibold text-base md:text-lg tracking-tight min-h-11 flex items-center justify-between gap-2 py-3 pl-4 pr-10 cursor-pointer border-b border-base-300"
         >
           <span>Quick Select</span>
           <span class="badge badge-sm badge-primary badge-outline shrink-0">{{
             searchResultsForQuickSelect().length
           }}</span>
         </label>
-        <div class="collapse-content">
+        <div class="collapse-content bg-base-100 px-2 pb-2 pt-0">
           @if (isLoadingQuickSelect()) {
             <div class="flex items-center justify-center py-4">
               <span class="loading loading-spinner loading-md"></span>
