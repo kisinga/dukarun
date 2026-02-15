@@ -8,6 +8,7 @@ export interface PurchaseListOptions {
   take?: number;
   filter?: {
     supplierId?: ID;
+    status?: string;
     startDate?: Date;
     endDate?: Date;
   };
@@ -49,6 +50,10 @@ export class StockQueryService {
       qb.andWhere(`${alias}.supplierId = :supplierId`, {
         supplierId: parseInt(String(filter.supplierId), 10),
       });
+    }
+
+    if (filter?.status) {
+      qb.andWhere(`${alias}.status = :status`, { status: filter.status });
     }
 
     if (filter?.startDate) {
@@ -107,6 +112,19 @@ export class StockQueryService {
     const items = await itemsQb.getMany();
 
     return { items, totalItems };
+  }
+
+  /**
+   * Get a single purchase by ID
+   */
+  async getPurchaseById(ctx: RequestContext, id: string): Promise<StockPurchase | null> {
+    const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
+    const channelId = ctx.channelId as number;
+
+    return purchaseRepo.findOne({
+      where: { id, channelId },
+      relations: ['lines', 'lines.variant', 'lines.stockLocation', 'supplier'],
+    });
   }
 
   /**

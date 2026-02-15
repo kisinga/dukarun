@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
-import { RequestContext } from '@vendure/core';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
+import { getVendureRequestContext } from '../../infrastructure/audit/get-request-context';
 
 /**
  * Guard to enforce read-only mode for expired subscriptions
@@ -19,7 +19,14 @@ export class SubscriptionGuard implements CanActivate {
     // Get GraphQL context
     const gqlContext = GqlExecutionContext.create(context);
     const info = gqlContext.getInfo();
-    const ctx = gqlContext.getContext().req as RequestContext;
+
+    // Extract the actual Vendure RequestContext from the Express request.
+    // gqlContext.getContext().req is the Express Request, NOT the RequestContext.
+    const ctx = getVendureRequestContext(context);
+    if (!ctx) {
+      // No RequestContext found - allow (might be system operation or early in pipeline)
+      return true;
+    }
 
     // Skip if not a mutation
     if (info.operation.operation !== 'mutation') {

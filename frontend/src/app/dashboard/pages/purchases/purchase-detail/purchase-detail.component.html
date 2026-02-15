@@ -175,6 +175,38 @@
         </div>
       </div>
     </div>
+
+    <!-- Draft purchase: Confirm, Print, Edit -->
+    @if (isDraftPurchase()) {
+      <div class="mt-6 pt-4 border-t border-base-300/50 space-y-3">
+        <h3 class="font-semibold text-base">Draft purchase order</h3>
+        @if (confirmError()) {
+          <div class="alert alert-error text-sm">
+            <span>{{ confirmError() }}</span>
+            <button class="btn btn-ghost btn-xs" (click)="confirmError.set(null)">✕</button>
+          </div>
+        }
+        <div class="flex flex-wrap gap-2">
+          <button
+            class="btn btn-primary btn-sm"
+            [disabled]="isConfirming()"
+            (click)="handleConfirmPurchase()"
+          >
+            @if (isConfirming()) {
+              <span class="loading loading-spinner loading-xs"></span>
+            }
+            Confirm purchase
+          </button>
+          <button class="btn btn-outline btn-sm" (click)="handlePrintPurchase()">Print PO</button>
+          <a
+            [routerLink]="['/dashboard/purchases/edit', purchase()!.id]"
+            class="btn btn-ghost btn-sm border border-base-300"
+          >
+            Edit draft
+          </a>
+        </div>
+      </div>
+    }
   </div>
 </ng-template>
 

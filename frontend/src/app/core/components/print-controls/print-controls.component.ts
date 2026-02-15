@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { PrintService } from '../../services/print.service';
 import { PrintPreferencesService } from '../../services/print-preferences.service';
-import type { OrderData } from '../../services/print-templates';
+import { PaymentMethodService } from '../../services/payment-method.service';
+import type { OrderData, PrintMeta, DocumentType } from '../../services/print-templates';
 
 @Component({
   selector: 'app-print-controls',
@@ -51,6 +52,7 @@ export class PrintControlsComponent {
 
   private readonly printService = inject(PrintService);
   private readonly printPreferences = inject(PrintPreferencesService);
+  private readonly paymentMethodService = inject(PaymentMethodService);
 
   readonly templates = this.printService.getAvailableTemplates();
 
@@ -69,7 +71,33 @@ export class PrintControlsComponent {
     const order = this.order();
     if (!order) return;
 
-    await this.printService.printOrder(order, this.selectedTemplateId());
+    const docType = this.resolveDocumentType(order);
+    const paymentMethodName = await this.resolvePaymentMethodName(order);
+    const printMeta: PrintMeta = {
+      documentType: docType,
+      paymentMethodName: paymentMethodName ?? undefined,
+    };
+
+    await this.printService.printOrder(order, this.selectedTemplateId(), printMeta);
     this.printed.emit();
+  }
+
+  private resolveDocumentType(order: OrderData): DocumentType {
+    if (order.state === 'Draft') return 'proforma';
+    const templateId = this.selectedTemplateId();
+    if (templateId === 'a4') return 'invoice';
+    return 'receipt';
+  }
+
+  private async resolvePaymentMethodName(order: OrderData): Promise<string | null> {
+    const code = order.payments?.[0]?.method;
+    if (!code) return null;
+    try {
+      const methods = await this.paymentMethodService.getPaymentMethods();
+      const found = methods.find((m) => m.code === code);
+      return found?.name ?? null;
+    } catch {
+      return null;
+    }
   }
 }

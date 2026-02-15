@@ -1,24 +1,23 @@
 // ============================================
-// ANIMATIONS — Single source of truth
-// All animation utilities respect prefers-reduced-motion
+// ANIMATIONS — Composable CSS animation system
+// Token-driven: uses _design-system durations & easings
 // ============================================
+//
+// Accessibility: animations are always defined so they work regardless of OS
+// reduced-motion settings. The global reduced-motion rule in styles.scss
+// shortens durations to near-zero, so reduced-motion users see instant state
+// changes rather than no change at all.
+//
+// IMPORTANT: The animation shorthand requires separate duration + easing values.
+// Use $duration-* (not $transition-*) because $transition-* bundles duration+easing
+// and would produce invalid double-easing in the animation shorthand.
 
+@use 'sass:list';
 @use 'design-system' as ds;
 
 // -----------------------------------------------------------------------------
 // KEYFRAMES
 // -----------------------------------------------------------------------------
-
-@keyframes anim-fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 @keyframes anim-fade-in {
   from {
@@ -29,10 +28,21 @@
   }
 }
 
-@keyframes anim-slide-up {
+@keyframes anim-fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes anim-fade-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
   }
   to {
     opacity: 1;
@@ -43,7 +53,7 @@
 @keyframes anim-scale-in {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.96);
   }
   to {
     opacity: 1;
@@ -51,31 +61,357 @@
   }
 }
 
+@keyframes anim-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes anim-slide-out-right {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes anim-pulse-once {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes anim-shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
 // -----------------------------------------------------------------------------
-// ANIMATION UTILITY CLASSES
-// Only apply when user has NOT requested reduced motion
+// UTILITY CLASSES — entrance, feedback, stagger, delay
 // -----------------------------------------------------------------------------
 
-@media (prefers-reduced-motion: no-preference) {
-  .animate-stagger-children > * {
-    animation: anim-fade-in-up ds.$transition-slow ds.$ease-in-out backwards;
+// --- Entrance animations ---
 
-    @for $i from 1 through 10 {
-      &:nth-child(#{$i}) {
-        animation-delay: #{$i * 0.05}s;
-      }
+.anim-fade-in {
+  animation: anim-fade-in ds.$duration-base ds.$ease-in-out both;
+}
+
+.anim-fade-in-up {
+  animation: anim-fade-in-up ds.$duration-slow ds.$ease-in-out both;
+}
+
+.anim-fade-in-down {
+  animation: anim-fade-in-down ds.$duration-slow ds.$ease-in-out both;
+}
+
+.anim-scale-in {
+  animation: anim-scale-in ds.$duration-base ds.$ease-spring both;
+}
+
+.anim-slide-in-right {
+  animation: anim-slide-in-right ds.$duration-slow ds.$ease-in-out both;
+}
+
+.anim-slide-out-right {
+  animation: anim-slide-out-right ds.$duration-slow ds.$ease-in-out both;
+}
+
+// --- Feedback ---
+
+.anim-pulse-once {
+  animation: anim-pulse-once ds.$duration-slow ds.$ease-spring;
+}
+
+// --- Stagger children ---
+// Parent gets .anim-stagger; each direct child fades in with incremental delay
+
+.anim-stagger > * {
+  animation: anim-fade-in-up ds.$duration-slow ds.$ease-in-out backwards;
+
+  @for $i from 1 through 15 {
+    &:nth-child(#{$i}) {
+      animation-delay: #{$i * 0.04}s;
     }
   }
+}
 
-  .animate-fade-in {
-    animation: anim-fade-in ds.$transition-slow ds.$ease-in-out;
+// --- Table row stagger ---
+// <tbody class="anim-stagger-rows"> — opacity-only fade for <tr> elements.
+// Transform is unreliable on display:table-row, so we animate only opacity.
+
+.anim-stagger-rows > tr {
+  animation: anim-fade-in ds.$duration-slow ds.$ease-in-out backwards;
+
+  @for $i from 1 through 20 {
+    &:nth-child(#{$i}) {
+      animation-delay: #{$i * 0.03}s;
+    }
+  }
+}
+
+// --- Delay helpers (compose with entrance classes) ---
+
+.anim-delay-1 {
+  animation-delay: 100ms;
+}
+.anim-delay-2 {
+  animation-delay: 200ms;
+}
+.anim-delay-3 {
+  animation-delay: 300ms;
+}
+.anim-delay-4 {
+  animation-delay: 400ms;
+}
+
+// --- Modal pattern ---
+
+.modal-backdrop-anim {
+  animation: anim-fade-in ds.$duration-base ds.$ease-in-out both;
+}
+
+.modal-box-anim {
+  animation: anim-scale-in ds.$duration-base ds.$ease-spring both;
+}
+
+// --- Skeleton shimmer ---
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, transparent 0%, oklch(0.9 0 0 / 0.4) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: anim-shimmer 1.5s infinite;
+}
+
+// =============================================================================
+// CHECKOUT SUCCESS — orchestrated celebration sequence
+// =============================================================================
+//
+// Used by CheckoutSuccessComponent. Each keyframe is a stage in the animation:
+// 1. Background pulse fades in
+// 2. Circle bursts in with bounce
+// 3. Checkmark draws then bounces
+// 4. Glow rotates and pulses
+// 5. Particles fly outward
+// 6. Amount counter fades up (JS-driven count, CSS-driven entrance)
+
+@keyframes success-bg-pulse {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes success-circle-burst {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes success-checkmark-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes success-checkmark-bounce {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.2);
+  }
+  60% {
+    transform: scale(0.95);
+  }
+}
+
+@keyframes success-glow-rotate {
+  from {
+    transform: rotate(0deg) scale(1.2);
+    opacity: 0.5;
+  }
+  to {
+    transform: rotate(360deg) scale(1.2);
+    opacity: 0.3;
+  }
+}
+
+@keyframes success-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes success-amount-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// Particle burst — 8 directional variants (hardcoded cardinal + diagonal vectors)
+// 0=right, 1=down-right, 2=down, 3=down-left, 4=left, 5=up-left, 6=up, 7=up-right
+$particle-dirs:
+  (120px, 0px), (85px, 85px), (0px, 120px), (-85px, 85px), (-120px, 0px), (-85px, -85px),
+  (0px, -120px), (85px, -85px);
+
+@for $i from 0 through 7 {
+  $pair: list.nth($particle-dirs, $i + 1);
+  $x: list.nth($pair, 1);
+  $y: list.nth($pair, 2);
+
+  @keyframes success-particle-#{$i} {
+    0% {
+      transform: translate(0, 0) scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: translate($x, $y) scale(0);
+      opacity: 0;
+    }
+  }
+}
+
+// Utility classes for the success overlay
+.success-bg-pulse {
+  animation: success-bg-pulse ds.$duration-slow ds.$ease-in-out both;
+}
+
+.success-circle-burst {
+  animation: success-circle-burst 500ms ds.$ease-spring both;
+  animation-delay: 150ms;
+}
+
+.success-checkmark-draw {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: success-checkmark-draw 400ms ds.$ease-in-out both;
+  animation-delay: 400ms;
+}
+
+.success-checkmark-bounce {
+  animation: success-checkmark-bounce 400ms ds.$ease-spring both;
+  animation-delay: 750ms;
+}
+
+.success-rotate-glow {
+  animation: success-glow-rotate 3s linear infinite;
+  animation-delay: 300ms;
+}
+
+.success-message {
+  animation: success-message-in ds.$duration-slow ds.$ease-in-out both;
+  animation-delay: 600ms;
+}
+
+.success-amount {
+  animation: success-amount-in ds.$duration-slow ds.$ease-spring both;
+  animation-delay: 800ms;
+}
+
+@for $i from 0 through 7 {
+  .particle-#{$i} {
+    animation: success-particle-#{$i} 650ms ds.$ease-in-out both;
+  }
+}
+
+// =============================================================================
+// INTERACTION FEEDBACK — Composable CSS-only patterns for tap/click/hover
+// =============================================================================
+//
+// Three composable layers, each opt-in via a class:
+//   .interactive-ripple  — radial ink-wash on :active (links, nav items)
+//   .interactive-press   — subtle scale-down on :active (cards, buttons)
+//   .interactive-row     — background flash on :active (table rows, list items)
+//
+// Rules:
+//   • Pure CSS — no JS, no extra DOM, no event listeners.
+//   • Uses ::after for ripple so it never blocks pointer-events on children.
+//   • Reduced-motion users get instant state changes (handled by global rule
+//     in styles.scss).
+//   • Mobile-friendly: relies on :active which fires on touch.
+//
+
+// --- Ripple (radial ink-wash) ---
+// Use on: nav links, sidebar items, bottom bar items, icon buttons.
+// Mixin defined in _design-system.scss; class exposed here for templates.
+
+.interactive-ripple {
+  @include ds.ripple;
+}
+
+// --- Press (scale feedback) ---
+// Use on: stat cards, action buttons, any tappable container.
+// Composable: add alongside other classes. Does not affect layout.
+
+.interactive-press {
+  @include ds.press;
+}
+
+// --- Row highlight (background flash) ---
+// Use on: table rows, list items with click handlers.
+// Does NOT prevent click propagation — purely visual via :active.
+
+.interactive-row {
+  @include ds.row-highlight;
+}
+
+// -----------------------------------------------------------------------------
+// COLLAPSIBLE — CSS grid trick for smooth height transitions
+// -----------------------------------------------------------------------------
+
+.collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows ds.$transition-slow;
+
+  > * {
+    overflow: hidden;
   }
 
-  .animate-slide-up {
-    animation: anim-slide-up ds.$transition-slow ds.$ease-in-out;
-  }
-
-  .animate-scale-in {
-    animation: anim-scale-in ds.$transition-base ds.$ease-spring;
+  &.open {
+    grid-template-rows: 1fr;
   }
 }

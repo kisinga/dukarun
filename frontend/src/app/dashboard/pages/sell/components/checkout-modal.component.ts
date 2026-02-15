@@ -16,13 +16,12 @@ import {
   PaymentMethodService,
 } from '../../../../core/services/payment-method.service';
 import { Customer } from './customer-selector.component';
-import { CheckoutCashComponent } from './checkout/checkout-cash.component';
+import { CheckoutCashComponent, SelectedPaymentMethod } from './checkout/checkout-cash.component';
 import { CheckoutCashierComponent } from './checkout/checkout-cashier.component';
 import { CheckoutCreditComponent } from './checkout/checkout-credit.component';
 import { CheckoutSuccessComponent } from './checkout/checkout-success.component';
 
 type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
-type PaymentMethodCode = string;
 
 /**
  * Unified checkout modal handling all payment flows
@@ -38,7 +37,7 @@ type PaymentMethodCode = string;
   ],
   template: `
     @if (isOpen()) {
-      <div class="modal modal-open modal-bottom sm:modal-middle animate-in fade-in duration-300">
+      <div class="modal modal-open modal-bottom sm:modal-middle modal-backdrop-anim">
         <!-- Success Animation (Full-Screen Overlay) -->
         <app-checkout-success
           [show]="showSuccessAnimation()"
@@ -48,7 +47,7 @@ type PaymentMethodCode = string;
 
         @if (!showSuccessAnimation()) {
           <div
-            class="modal-box max-w-2xl p-0 max-h-[90vh] sm:max-h-[95vh] flex flex-col animate-in slide-in-from-bottom-4 duration-300 relative"
+            class="modal-box max-w-2xl p-0 max-h-[90vh] sm:max-h-[95vh] flex flex-col modal-box-anim relative"
           >
             <!-- Modal Header -->
             <div
@@ -101,10 +100,7 @@ type PaymentMethodCode = string;
             <div class="flex-1 overflow-y-auto p-3 sm:p-4 relative">
               <!-- Error Alert -->
               @if (error()) {
-                <div
-                  role="alert"
-                  class="alert alert-error mb-3 animate-in slide-in-from-top-2 duration-300"
-                >
+                <div role="alert" class="alert alert-error mb-3 anim-fade-in-down">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     class="h-4 w-4 flex-shrink-0"
@@ -164,6 +160,7 @@ type PaymentMethodCode = string;
                   [customerSearchResultsForCash]="customerSearchResultsForCash()"
                   [isSearchingCustomersForCash]="isSearchingCustomersForCash()"
                   (selectCredit)="selectCredit.emit()"
+                  (saveAsProforma)="saveAsProforma.emit()"
                   (paymentMethodSelect)="onPaymentMethodSelect($event)"
                   (customerSearchForCash)="customerSearchForCash.emit($event)"
                   (customerSelectForCash)="customerSelectForCash.emit($event)"
@@ -203,7 +200,7 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
   readonly isSearchingCustomers = input<boolean>(false);
 
   // Cash sale inputs
-  readonly selectedPaymentMethod = input<PaymentMethodCode | null>(null);
+  readonly selectedPaymentMethod = input<SelectedPaymentMethod | null>(null);
   readonly selectedCustomerForCash = input<Customer | null>(null);
   readonly customerSearchResultsForCash = input<Customer[]>([]);
   readonly isSearchingCustomersForCash = input<boolean>(false);
@@ -220,11 +217,12 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
   readonly customerSelectForCash = output<Customer | null>();
   readonly customerCreate = output<{ name: string; phone: string; email?: string }>();
   readonly customerCreateForCash = output<{ name: string; phone: string; email?: string }>();
-  readonly paymentMethodSelect = output<PaymentMethodCode>();
+  readonly paymentMethodSelect = output<SelectedPaymentMethod>();
   readonly closeModal = output<void>();
 
   // Payment selection outputs
   readonly selectCredit = output<void>();
+  readonly saveAsProforma = output<void>();
   readonly selectCash = output<void>();
   readonly selectCashier = output<void>();
 
@@ -286,15 +284,11 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
   }
 
   getSelectedPaymentMethodName(): string {
-    const selectedCode = this.selectedPaymentMethod();
-    if (!selectedCode) return '';
-
-    const method = this.paymentMethods().find((m) => m.code === selectedCode);
-    return method?.name || selectedCode;
+    return this.selectedPaymentMethod()?.name ?? '';
   }
 
-  onPaymentMethodSelect(code: string): void {
-    this.paymentMethodSelect.emit(code as PaymentMethodCode);
+  onPaymentMethodSelect(method: SelectedPaymentMethod): void {
+    this.paymentMethodSelect.emit(method);
   }
 
   onCompleteCash(): void {

@@ -22,7 +22,7 @@
   </a>
 </div>
 
-<div class="space-y-4 sm:space-y-5 lg:space-y-6 animate-stagger-children">
+<div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
   <app-page-header
     title="Stock Adjustments"
     subtitle="View and record inventory adjustments"
@@ -283,7 +283,7 @@
               <th>Notes</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="anim-stagger-rows">
             @for (adj of paginatedAdjustments(); track trackByAdjustmentId($index, adj)) {
               <tr>
                 <td>

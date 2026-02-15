@@ -4,14 +4,17 @@ import { PaymentMethod } from '../../../../../core/services/payment-method.servi
 import { Customer, CustomerSelectorComponent } from '../customer-selector.component';
 import { CheckoutSummaryComponent } from './checkout-summary.component';
 
-type PaymentMethodCode = string;
+export interface SelectedPaymentMethod {
+  code: string;
+  name: string;
+}
 
 @Component({
   selector: 'app-checkout-cash',
   standalone: true,
   imports: [CommonModule, CustomerSelectorComponent, CheckoutSummaryComponent],
   template: `
-    <div class="space-y-3 animate-in slide-in-from-bottom-2 duration-300">
+    <div class="space-y-3 anim-stagger">
       <!-- Step 1: Order Summary (Read-Only) -->
       @if (!selectedPaymentMethod()) {
         <app-checkout-summary
@@ -22,10 +25,32 @@ type PaymentMethodCode = string;
       }
 
       <!-- Step 2: Payment Method Selection -->
-      <div class="space-y-3 animate-in slide-in-from-bottom-2 duration-300 delay-100">
+      <div class="space-y-3">
+        <!-- Save as Proforma Button -->
+        <button
+          class="btn btn-ghost btn-lg w-full flex items-center justify-center gap-3 interactive-press min-h-[52px] border-2 border-dashed border-base-300"
+          (click)="saveAsProforma.emit()"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+          <span class="font-bold text-base sm:text-lg">Save as Proforma</span>
+        </button>
+
         <!-- Credit Button (Large, Isolated, Above Grid) -->
         <button
-          class="btn btn-warning btn-lg w-full flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-transform min-h-[52px]"
+          class="btn btn-warning btn-lg w-full flex items-center justify-center gap-3 interactive-press min-h-[52px]"
           (click)="selectCredit.emit()"
         >
           <svg
@@ -47,7 +72,7 @@ type PaymentMethodCode = string;
 
         <!-- Cash Payment Methods Grid -->
         @if (paymentMethodsError()) {
-          <div class="alert alert-error animate-in slide-in-from-top-2 duration-300">
+          <div class="alert alert-error anim-fade-in-down">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-4 w-4 flex-shrink-0"
@@ -68,27 +93,24 @@ type PaymentMethodCode = string;
             </div>
           </div>
         } @else {
-          <div
-            class="grid grid-cols-2 gap-2 sm:gap-3 animate-in slide-in-from-bottom-2 duration-300 delay-200"
-          >
+          <div class="grid grid-cols-2 gap-2 sm:gap-3 anim-stagger">
             @for (method of paymentMethods(); track method.id; let i = $index) {
               <button
-                class="card hover:bg-base-200 border-2 transition-all duration-300 p-3 sm:p-4 hover:scale-105 active:scale-95 min-h-[44px] touch-manipulation"
-                [class.border-success]="selectedPaymentMethod() === method.code"
-                [class.bg-success/10]="selectedPaymentMethod() === method.code"
-                [class.border-base-300]="selectedPaymentMethod() !== method.code"
-                [class.ring-2]="selectedPaymentMethod() === method.code"
-                [class.ring-success]="selectedPaymentMethod() === method.code"
-                [class.ring-opacity-50]="selectedPaymentMethod() === method.code"
-                (click)="paymentMethodSelect.emit(method.code)"
-                [style.animation-delay]="i * 50 + 'ms'"
+                class="card border-2 transition-all duration-300 p-3 sm:p-4 interactive-ripple interactive-press min-h-[44px] touch-manipulation"
+                [class.border-success]="selectedPaymentMethod()?.code === method.code"
+                [class.bg-success/10]="selectedPaymentMethod()?.code === method.code"
+                [class.border-base-300]="selectedPaymentMethod()?.code !== method.code"
+                [class.ring-2]="selectedPaymentMethod()?.code === method.code"
+                [class.ring-success]="selectedPaymentMethod()?.code === method.code"
+                [class.ring-opacity-50]="selectedPaymentMethod()?.code === method.code"
+                (click)="paymentMethodSelect.emit({ code: method.code, name: method.name })"
               >
                 <div class="flex flex-col items-center gap-2">
                   <div
                     class="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300"
-                    [class.bg-success/20]="selectedPaymentMethod() === method.code"
-                    [class.bg-base-200]="selectedPaymentMethod() !== method.code"
-                    [class.scale-110]="selectedPaymentMethod() === method.code"
+                    [class.bg-success/20]="selectedPaymentMethod()?.code === method.code"
+                    [class.bg-base-200]="selectedPaymentMethod()?.code !== method.code"
+                    [class.scale-110]="selectedPaymentMethod()?.code === method.code"
                   >
                     @if (method.customFields?.imageAsset?.preview) {
                       <img
@@ -100,8 +122,8 @@ type PaymentMethodCode = string;
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         class="h-5 w-5 transition-colors duration-300"
-                        [class.text-success]="selectedPaymentMethod() === method.code"
-                        [class.text-base-content/60]="selectedPaymentMethod() !== method.code"
+                        [class.text-success]="selectedPaymentMethod()?.code === method.code"
+                        [class.text-base-content/60]="selectedPaymentMethod()?.code !== method.code"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -125,7 +147,7 @@ type PaymentMethodCode = string;
 
           <!-- Confirmation after cash method selection -->
           @if (selectedPaymentMethod()) {
-            <div class="space-y-3 animate-in slide-in-from-bottom-2 duration-300 delay-300">
+            <div class="space-y-3 anim-fade-in-up">
               <!-- Optional Customer Selection (Collapsible/Minimal) -->
               @if (!selectedCustomerForCash()) {
                 <details class="collapse collapse-arrow bg-base-200 rounded-lg">
@@ -197,7 +219,7 @@ type PaymentMethodCode = string;
 
               <div class="flex flex-col sm:flex-row gap-3">
                 <button
-                  class="btn btn-success btn-md sm:btn-lg flex-1 hover:scale-105 active:scale-95 transition-transform min-h-[44px]"
+                  class="btn btn-success btn-md sm:btn-lg flex-1 interactive-press min-h-[44px]"
                   (click)="complete.emit()"
                   [disabled]="isProcessing()"
                 >
@@ -224,7 +246,7 @@ type PaymentMethodCode = string;
 
                 @if (enablePrinter()) {
                   <button
-                    class="btn btn-outline btn-success btn-md sm:btn-lg flex-1 hover:scale-105 active:scale-95 transition-transform min-h-[44px]"
+                    class="btn btn-outline btn-success btn-md sm:btn-lg flex-1 interactive-press min-h-[44px]"
                     (click)="completeAndPrint.emit()"
                     [disabled]="isProcessing()"
                   >
@@ -264,7 +286,7 @@ export class CheckoutCashComponent {
   readonly isProcessing = input<boolean>(false);
   readonly paymentMethods = input<PaymentMethod[]>([]);
   readonly paymentMethodsError = input<string | null>(null);
-  readonly selectedPaymentMethod = input<PaymentMethodCode | null>(null);
+  readonly selectedPaymentMethod = input<SelectedPaymentMethod | null>(null);
   readonly selectedCustomerForCash = input<Customer | null>(null);
   readonly customerSearchResultsForCash = input<Customer[]>([]);
   readonly isSearchingCustomersForCash = input<boolean>(false);
@@ -272,7 +294,8 @@ export class CheckoutCashComponent {
   readonly enablePrinter = input<boolean>(true);
 
   readonly selectCredit = output<void>();
-  readonly paymentMethodSelect = output<PaymentMethodCode>();
+  readonly saveAsProforma = output<void>();
+  readonly paymentMethodSelect = output<SelectedPaymentMethod>();
   readonly customerSearchForCash = output<string>();
   readonly customerSelectForCash = output<Customer | null>();
   readonly customerCreateForCash = output<{ name: string; phone: string; email?: string }>();
@@ -280,10 +303,6 @@ export class CheckoutCashComponent {
   readonly completeAndPrint = output<void>();
 
   getSelectedPaymentMethodName(): string {
-    const selectedCode = this.selectedPaymentMethod();
-    if (!selectedCode) return '';
-
-    const method = this.paymentMethods().find((m) => m.code === selectedCode);
-    return method?.name || selectedCode;
+    return this.selectedPaymentMethod()?.name ?? '';
   }
 }

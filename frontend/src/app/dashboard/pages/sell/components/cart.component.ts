@@ -82,7 +82,7 @@ export interface CartItem {
       <!-- Cart Items -->
       @if (items().length > 0) {
         <div
-          class="space-y-3"
+          class="rounded-lg border border-base-300 bg-base-100 shadow-sm divide-y divide-base-300"
           [class.max-h-[60vh]]="displayMode() === 'modal'"
           [class.overflow-y-auto]="displayMode() === 'modal'"
         >

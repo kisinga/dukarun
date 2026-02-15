@@ -4,6 +4,7 @@ import { ManageStockAdjustmentsPermission } from './permissions';
 import { ManageSupplierCreditPurchasesPermission } from '../credit/supplier-credit.permissions';
 import { StockManagementService } from '../../services/stock/stock-management.service';
 import { StockQueryService } from '../../services/stock/stock-query.service';
+import { PurchaseService } from '../../services/stock/purchase.service';
 import { StockPurchase } from '../../services/stock/entities/purchase.entity';
 import { InventoryStockAdjustment } from '../../services/stock/entities/stock-adjustment.entity';
 
@@ -25,6 +26,20 @@ interface RecordPurchaseInput {
     debitAccountCode?: string;
     reference?: string;
   };
+  saveAsDraft?: boolean;
+}
+
+interface UpdateDraftPurchaseInput {
+  supplierId?: string;
+  purchaseDate?: Date;
+  referenceNumber?: string | null;
+  notes?: string | null;
+  lines?: Array<{
+    variantId: string;
+    quantity: number;
+    unitCost: number;
+    stockLocationId: string;
+  }>;
 }
 
 interface RecordStockAdjustmentInput {
@@ -41,7 +56,8 @@ interface RecordStockAdjustmentInput {
 export class StockResolver {
   constructor(
     private readonly stockManagementService: StockManagementService,
-    private readonly stockQueryService: StockQueryService
+    private readonly stockQueryService: StockQueryService,
+    private readonly purchaseService: PurchaseService
   ) {}
 
   @Query()
@@ -51,6 +67,15 @@ export class StockResolver {
     @Args('options') options?: any
   ): Promise<{ items: StockPurchase[]; totalItems: number }> {
     return this.stockQueryService.getPurchases(ctx, options);
+  }
+
+  @Query()
+  @Allow(Permission.ReadProduct)
+  async purchase(
+    @Ctx() ctx: RequestContext,
+    @Args('id') id: string
+  ): Promise<StockPurchase | null> {
+    return this.stockQueryService.getPurchaseById(ctx, id);
   }
 
   @Query()
@@ -74,6 +99,25 @@ export class StockResolver {
       // The permission system will verify the user has ManageSupplierCreditPurchasesPermission
     }
     return this.stockManagementService.recordPurchase(ctx, input);
+  }
+
+  @Mutation()
+  @Allow(Permission.UpdateProduct, ManageSupplierCreditPurchasesPermission.Permission)
+  async confirmPurchase(
+    @Ctx() ctx: RequestContext,
+    @Args('id') id: string
+  ): Promise<StockPurchase> {
+    return this.stockManagementService.confirmPurchase(ctx, id);
+  }
+
+  @Mutation()
+  @Allow(Permission.UpdateProduct, ManageSupplierCreditPurchasesPermission.Permission)
+  async updateDraftPurchase(
+    @Ctx() ctx: RequestContext,
+    @Args('id') id: string,
+    @Args('input') input: UpdateDraftPurchaseInput
+  ): Promise<StockPurchase> {
+    return this.purchaseService.updateDraftPurchase(ctx, id, input);
   }
 
   @Mutation()

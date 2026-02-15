@@ -63,7 +63,7 @@
 
         <!-- Stage 1: Item type, product basics & how it's sold -->
         @if (currentStage() === 1) {
-          <div class="space-y-3 lg:space-y-4">
+          <div class="space-y-3 lg:space-y-4 anim-fade-in-up">
             <!-- Item type (product vs service) -->
             <app-item-type-selector
               [itemType]="itemType()"
@@ -190,7 +190,7 @@
 
         <!-- Stage 2: Variants / SKUs, pricing & stock -->
         @if (currentStage() === 2) {
-          <div class="space-y-3 lg:space-y-4">
+          <div class="space-y-3 lg:space-y-4 anim-fade-in-up">
             @if (itemType() === 'product') {
               <!-- Variant dimensions for products -->
               <app-variant-dimension-editor

@@ -11,6 +11,7 @@ export const STOCK_ADMIN_SCHEMA = gql`
     paymentStatus: String!
     notes: String
     isCreditPurchase: Boolean!
+    status: String!
     lines: [StockPurchaseLine!]!
     createdAt: DateTime!
     updatedAt: DateTime!
@@ -77,6 +78,15 @@ export const STOCK_ADMIN_SCHEMA = gql`
     isCreditPurchase: Boolean
     payment: InlinePaymentInput
     approvalId: ID
+    saveAsDraft: Boolean
+  }
+
+  input UpdateDraftPurchaseInput {
+    supplierId: ID
+    purchaseDate: DateTime
+    referenceNumber: String
+    notes: String
+    lines: [PurchaseLineInput!]
   }
 
   input PurchaseLineInput {
@@ -107,6 +117,7 @@ export const STOCK_ADMIN_SCHEMA = gql`
 
   input PurchaseFilterInput {
     supplierId: ID
+    status: String
     startDate: DateTime
     endDate: DateTime
   }
@@ -135,11 +146,14 @@ export const STOCK_ADMIN_SCHEMA = gql`
 
   extend type Query {
     purchases(options: PurchaseListOptions): StockPurchaseList!
+    purchase(id: ID!): StockPurchase
     stockAdjustments(options: StockAdjustmentListOptions): InventoryStockAdjustmentList!
   }
 
   extend type Mutation {
     recordPurchase(input: RecordPurchaseInput!): StockPurchase!
+    confirmPurchase(id: ID!): StockPurchase!
+    updateDraftPurchase(id: ID!, input: UpdateDraftPurchaseInput!): StockPurchase!
     recordStockAdjustment(input: RecordStockAdjustmentInput!): InventoryStockAdjustment!
   }
 `;

@@ -22,7 +22,7 @@
   </button>
 </div>
 
-<div class="space-y-5 lg:space-y-6 animate-stagger-children">
+<div class="space-y-5 lg:space-y-6 anim-stagger">
   <!-- Header -->
   <app-page-header
     title="Purchases"
@@ -31,23 +31,44 @@
     refreshTitle="Refresh purchases"
     (refresh)="refreshPurchases()"
   >
-    <button
-      actions
-      (click)="router.navigate(['/dashboard/purchases/create'])"
-      class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-4 w-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        stroke-width="2"
+    <div actions class="flex gap-2">
+      <button
+        (click)="router.navigate(['/dashboard/purchases/create'])"
+        class="btn btn-ghost btn-sm gap-1.5 hidden lg:flex touch-manipulation border-2 border-dashed border-base-300"
       >
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-      </svg>
-      Create Purchase
-    </button>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
+        Create PO
+      </button>
+      <button
+        (click)="router.navigate(['/dashboard/purchases/create'])"
+        class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        Create Purchase
+      </button>
+    </div>
   </app-page-header>
 
   <!-- Pending Draft Banner -->
@@ -239,7 +260,7 @@
               <th class="text-right">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="anim-stagger-rows">
             @for (purchase of paginatedPurchases(); track trackByPurchaseId($index, purchase)) {
               <tr
                 app-purchase-table-row

@@ -37,6 +37,9 @@ export class StockPurchase {
   @Column({ type: 'boolean', default: false })
   isCreditPurchase: boolean;
 
+  @Column({ type: 'varchar', default: 'confirmed' })
+  status: 'draft' | 'confirmed';
+
   @OneToMany(() => StockPurchaseLine, line => line.purchase, { cascade: true })
   lines: StockPurchaseLine[];
 

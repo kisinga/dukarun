@@ -13,10 +13,12 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { PurchaseService } from '../../../../core/services/purchase.service';
+import { PrintService } from '../../../../core/services/print.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
+import type { PurchaseData } from '../../../../core/services/print-templates';
 import { PurchaseDetailHeaderComponent } from './components/purchase-detail-header.component';
 import { PurchaseSupplierInfoComponent } from './components/purchase-supplier-info.component';
 import { PurchaseItemsTableComponent } from './components/purchase-items-table.component';
@@ -39,6 +41,7 @@ import { PurchasePaymentInfoComponent } from './components/purchase-payment-info
   selector: 'app-purchase-detail',
   imports: [
     CommonModule,
+    RouterModule,
     PurchaseDetailHeaderComponent,
     PurchaseSupplierInfoComponent,
     PurchaseItemsTableComponent,
@@ -51,6 +54,7 @@ import { PurchasePaymentInfoComponent } from './components/purchase-payment-info
 })
 export class PurchaseDetailComponent implements OnInit, AfterViewInit {
   private readonly purchaseService = inject(PurchaseService);
+  private readonly printService = inject(PrintService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   readonly currencyService = inject(CurrencyService);
@@ -123,6 +127,11 @@ export class PurchaseDetailComponent implements OnInit, AfterViewInit {
     return purchase?.isCreditPurchase || false;
   });
 
+  readonly isDraftPurchase = computed(() => {
+    const p = this.purchase();
+    return p && (p.status === 'draft' || (p as any).status === 'Draft');
+  });
+
   constructor() {
     // Watch for purchaseId input changes (modal mode)
     effect(() => {
@@ -191,16 +200,16 @@ export class PurchaseDetailComponent implements OnInit, AfterViewInit {
     this.error.set(null);
 
     try {
-      // Try to find purchase in the list first
       const purchases = this.purchaseService.purchases();
       const foundPurchase = purchases.find((p) => p.id === id);
-
       if (foundPurchase) {
         this.purchase.set(foundPurchase);
       } else {
-        // If not in list, fetch it
-        // For now, we'll use the list data. If needed, we can add a fetchPurchaseById method
-        this.error.set('Purchase not found. Please refresh the purchases list.');
+        const fetched = await this.purchaseService.fetchPurchaseById(id);
+        this.purchase.set(fetched ?? null);
+        if (!fetched) {
+          this.error.set('Purchase not found.');
+        }
       }
     } catch (error: any) {
       console.error('❌ Failed to fetch purchase:', error);
@@ -209,6 +218,53 @@ export class PurchaseDetailComponent implements OnInit, AfterViewInit {
     } finally {
       this.isLoading.set(false);
     }
+  }
+
+  readonly isConfirming = signal(false);
+  readonly confirmError = signal<string | null>(null);
+
+  async handleConfirmPurchase(): Promise<void> {
+    const p = this.purchase();
+    if (!p?.id) return;
+
+    this.isConfirming.set(true);
+    this.confirmError.set(null);
+    try {
+      await this.purchaseService.confirmPurchase(p.id);
+      await this.fetchPurchase(p.id);
+    } catch (error: any) {
+      this.confirmError.set(error?.message || 'Failed to confirm purchase');
+    } finally {
+      this.isConfirming.set(false);
+    }
+  }
+
+  async handlePrintPurchase(): Promise<void> {
+    const p = this.purchase();
+    if (!p) return;
+
+    const purchaseData: PurchaseData = {
+      id: p.id,
+      supplierId: p.supplierId,
+      purchaseDate: p.purchaseDate,
+      referenceNumber: p.referenceNumber,
+      totalCost: p.totalCost,
+      paymentStatus: p.paymentStatus ?? 'pending',
+      notes: p.notes,
+      status: p.status ?? 'draft',
+      supplier: p.supplier,
+      lines: (p.lines || []).map((line: any) => ({
+        id: line.id,
+        variantId: line.variantId,
+        quantity: line.quantity,
+        unitCost: line.unitCost,
+        totalCost: line.totalCost,
+        variant: line.variant,
+      })),
+    };
+    await this.printService.printPurchase(purchaseData, {
+      documentType: 'purchase-order',
+    });
   }
 
   close(): void {

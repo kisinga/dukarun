@@ -92,6 +92,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'products/:id',
+        loadComponent: () =>
+          import('./dashboard/pages/products/product-detail/product-detail.component').then(
+            (m) => m.ProductDetailComponent,
+          ),
+      },
+      {
         path: 'customers',
         loadComponent: () =>
           import('./dashboard/pages/customers/customers.component').then(
@@ -128,6 +135,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./dashboard/pages/orders/order-detail/order-detail.component').then(
             (m) => m.OrderDetailComponent,
+          ),
+      },
+      {
+        path: 'orders/edit/:id',
+        loadComponent: () =>
+          import('./dashboard/pages/orders/order-edit/order-edit.component').then(
+            (m) => m.OrderEditComponent,
           ),
       },
       {
@@ -176,6 +190,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./dashboard/pages/purchase-create/purchase-create.component').then(
             (m) => m.PurchaseCreateComponent,
+          ),
+      },
+      {
+        path: 'purchases/edit/:id',
+        loadComponent: () =>
+          import('./dashboard/pages/purchase-edit/purchase-edit.component').then(
+            (m) => m.PurchaseEditComponent,
           ),
       },
       {

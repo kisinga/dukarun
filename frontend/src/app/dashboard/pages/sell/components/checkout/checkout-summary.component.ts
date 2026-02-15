@@ -7,10 +7,7 @@ import { CurrencyService } from '../../../../../core/services/currency.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div
-      class="bg-base-200 rounded-xl p-4 sm:p-6 animate-in slide-in-from-bottom-2 duration-300"
-      [class.delay-100]="delay()"
-    >
+    <div class="bg-base-200 rounded-xl p-4 sm:p-6 anim-fade-in-up">
       <div class="flex justify-between items-center mb-2">
         <span class="text-xs sm:text-sm text-base-content/60">Items</span>
         <span class="font-semibold text-base sm:text-lg">{{ itemCount() }}</span>

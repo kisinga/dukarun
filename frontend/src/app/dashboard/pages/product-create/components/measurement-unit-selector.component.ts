@@ -14,7 +14,7 @@ import { ChangeDetectionStrategy, Component, input, output, signal } from '@angu
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (visible()) {
-      <div class="space-y-2 animate-in">
+      <div class="space-y-2 anim-fade-in-up">
         <h3 class="text-sm font-medium text-base-content/70">Measurement unit</h3>
 
         <!-- Quick unit buttons -->

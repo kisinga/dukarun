@@ -18,6 +18,9 @@ export * from './notification-item.component';
 export * from './notification-list.component';
 export * from './notification-dropdown.component';
 
+// Layout Components
+export * from './entity-detail-layout.component';
+
 // Shared UI Components
 export * from './delete-confirmation-modal.component';
 export * from './pagination.component';

@@ -16,7 +16,7 @@ export type SizeTemplate = 'clothing' | 'packs' | 'custom' | null;
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (visible()) {
-      <div class="space-y-2 animate-in">
+      <div class="space-y-2 anim-fade-in-up">
         <h3 class="text-sm font-medium text-base-content/70">Size options</h3>
         <div class="flex flex-wrap gap-2">
           <button
@@ -89,4 +89,3 @@ export class SizeTemplateSelectorComponent {
     return this.templates[template];
   }
 }
-

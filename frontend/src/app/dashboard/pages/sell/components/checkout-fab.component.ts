@@ -10,8 +10,9 @@ import { CurrencyService } from '../../../../core/services/currency.service';
   imports: [CommonModule],
   template: `
     <button
-      class="fixed bottom-20 right-4 btn btn-primary btn-lg shadow-xl z-40 flex items-center gap-3 rounded-full px-5 sm:bottom-24 sm:right-6"
+      class="fixed bottom-20 right-4 btn btn-primary btn-lg shadow-xl z-40 flex items-center gap-3 rounded-full px-5 sm:bottom-24 sm:right-6 anim-scale-in"
       [class.btn-disabled]="disabled() || total() === 0"
+      [class.anim-pulse-once]="cartJustUpdated()"
       (click)="checkout.emit()"
       aria-label="Proceed to checkout"
     >
@@ -39,6 +40,7 @@ export class CheckoutFabComponent {
   // Inputs
   readonly total = input.required<number>(); // in cents
   readonly disabled = input<boolean>(false);
+  readonly cartJustUpdated = input<boolean>(false);
 
   // Outputs
   readonly checkout = output<void>();

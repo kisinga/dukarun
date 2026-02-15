@@ -26,7 +26,7 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
   imports: [CommonModule, ProductLabelComponent],
   template: `
     @if (isOpen() && product()) {
-      <div class="modal modal-open modal-bottom sm:modal-middle animate-in">
+      <div class="modal modal-open modal-bottom sm:modal-middle">
         <div class="modal-box max-w-xl p-0 max-h-[90vh] flex flex-col">
           <!-- Header -->
           <div class="bg-primary/10 p-3 border-b border-base-300 flex-shrink-0">
@@ -281,21 +281,6 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
     }
   `,
   styles: `
-    .animate-in {
-      animation: slideUp 0.3s ease-out;
-    }
-
-    @keyframes slideUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
     @media (max-width: 639px) {
       .modal-bottom .modal-box {
         width: 100%;

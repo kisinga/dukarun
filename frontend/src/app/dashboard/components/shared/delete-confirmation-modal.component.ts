@@ -28,8 +28,8 @@ export interface DeleteConfirmationData {
   selector: 'app-delete-confirmation-modal',
   imports: [CommonModule],
   template: `
-    <dialog #modal class="modal">
-      <div class="modal-box">
+    <dialog #modal class="modal modal-backdrop-anim">
+      <div class="modal-box modal-box-anim">
         <!-- Icon -->
         <div class="flex justify-center mb-4">
           <div class="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center">
@@ -78,8 +78,8 @@ export interface DeleteConfirmationData {
             </svg>
             <div class="text-sm">
               <p class="font-semibold mb-1">
-                This {{ entityType() }} has {{ relatedCount() }}
-                {{ relatedLabel() }}{{ relatedCount() === 1 ? '' : 's' }}
+                This {{ entityType() }} has {{ relatedCount() }} {{ relatedLabel()
+                }}{{ relatedCount() === 1 ? '' : 's' }}
                 that will also be deleted.
               </p>
               @if (hasWarningDetails()) {
@@ -182,4 +182,3 @@ export class DeleteConfirmationModalComponent {
     modal?.close();
   }
 }
-

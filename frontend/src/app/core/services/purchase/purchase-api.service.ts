@@ -17,8 +17,10 @@ export class PurchaseApiService {
 
   /**
    * Record purchase via GraphQL mutation
+   * @param draft Purchase draft data
+   * @param options.saveAsDraft When true, creates draft PO only (no ledger, no stock)
    */
-  async recordPurchase(draft: PurchaseDraft): Promise<any> {
+  async recordPurchase(draft: PurchaseDraft, options?: { saveAsDraft?: boolean }): Promise<any> {
     const client = this.apolloService.getClient();
 
     // Convert unitCost to cents for backend
@@ -31,7 +33,7 @@ export class PurchaseApiService {
       supplierId: draft.supplierId!,
       purchaseDate: draft.purchaseDate.toISOString(),
       referenceNumber: draft.referenceNumber || null,
-      paymentStatus: draft.paymentStatus,
+      paymentStatus: options?.saveAsDraft ? 'pending' : draft.paymentStatus,
       notes: draft.notes || null,
       lines: draft.lines.map((line) => ({
         variantId: line.variantId,
@@ -41,13 +43,18 @@ export class PurchaseApiService {
       })),
     };
 
+    // Include saveAsDraft when creating PO (draft purchase)
+    if (options?.saveAsDraft) {
+      input.saveAsDraft = true;
+    }
+
     // Include approval ID if present (for overdraft-approved purchases)
     if (draft.approvalId) {
       input.approvalId = draft.approvalId;
     }
 
-    // Include inline payment for paid/partial purchases
-    if (draft.paymentStatus !== 'pending') {
+    // Include inline payment for paid/partial purchases (skip for draft PO)
+    if (!options?.saveAsDraft && draft.paymentStatus !== 'pending') {
       input.payment = {
         amount:
           draft.paymentAmount != null ? Math.round(draft.paymentAmount * 100) : totalCostCents,

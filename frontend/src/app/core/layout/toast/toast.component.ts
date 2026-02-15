@@ -7,7 +7,7 @@ import { ToastService } from '../../services/toast.service';
   template: `
     <div class="toast toast-top toast-end z-50">
       @for (toast of toasts(); track toast.id) {
-        <div class="alert" [class]="getAlertClass(toast.type)">
+        <div class="alert anim-slide-in-right" [class]="getAlertClass(toast.type)">
           <div class="flex items-start gap-3">
             <div class="flex-shrink-0">
               <span class="text-lg">{{ getIcon(toast.type) }}</span>

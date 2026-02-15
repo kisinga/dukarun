@@ -1,4 +1,4 @@
-<div class="space-y-4 sm:space-y-5 lg:space-y-6 animate-stagger-children">
+<div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
   <!-- Header -->
   <div class="flex items-start justify-between gap-3 sm:gap-4">
     <div class="flex-1 min-w-0">
@@ -172,7 +172,7 @@
               <th class="text-right">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="anim-stagger-rows">
             @for (payment of paginatedPayments(); track trackByPaymentId($index, payment)) {
               <tr app-payment-table-row [payment]="payment" (action)="onPaymentAction($event)"></tr>
             }

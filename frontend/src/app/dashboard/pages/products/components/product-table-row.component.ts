@@ -12,7 +12,8 @@ import { ProductAction, ProductCardData } from './product-card.component';
   selector: '[app-product-table-row]',
   imports: [CommonModule, ProductLabelComponent],
   host: {
-    class: 'hover',
+    class: 'hover cursor-pointer',
+    '(click)': 'onExpandClick()',
   },
   templateUrl: './product-table-row.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

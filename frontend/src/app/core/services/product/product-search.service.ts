@@ -217,6 +217,35 @@ export class ProductSearchService {
   }
 
   /**
+   * Get recent/first N products (same shape as search results).
+   * Used by Quick Select so product selection uses one consistent path.
+   * Cache-first when available; otherwise fetches from network.
+   */
+  async getRecentProducts(limit: number): Promise<ProductSearchResult[]> {
+    if (this.cacheService.isCacheReady()) {
+      return this.cacheService.getRecentProducts(limit);
+    }
+    try {
+      const fetchPolicy = 'cache-first' as FetchPolicy;
+      const client = this.apolloService.getClient();
+      const result = await client.query<{
+        products: { items: any[] };
+      }>({
+        query: GET_PRODUCTS,
+        variables: {
+          options: { take: limit, skip: 0 },
+        },
+        fetchPolicy,
+      });
+      const items = result.data?.products?.items ?? [];
+      return items.map((p: any) => this.mapper.toProductSearchResult(p));
+    } catch (error) {
+      console.error('Failed to load recent products:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get variant by ID
    * Searches through cached products first, then falls back to network
    * @param variantId - Variant ID to lookup

@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
-import { GqlExecutionContext } from '@nestjs/graphql';
 import { RequestContext, TransactionalConnection, Administrator } from '@vendure/core';
 import { env } from '../../infrastructure/config/environment.config';
+import { getVendureRequestContext } from '../../infrastructure/audit/get-request-context';
 
 /**
  * Service Token Authentication Guard
@@ -21,9 +21,8 @@ export class MlServiceAuthGuard implements CanActivate {
   constructor(private connection: TransactionalConnection) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const gqlContext = GqlExecutionContext.create(context);
-    // In Vendure, gqlContext.getContext().req IS the RequestContext
-    const requestContext = gqlContext.getContext().req as RequestContext;
+    // Extract the actual Vendure RequestContext from the Express request.
+    const requestContext = getVendureRequestContext(context);
 
     if (!requestContext) {
       this.logger.warn('No RequestContext found in GraphQL context');
@@ -31,14 +30,14 @@ export class MlServiceAuthGuard implements CanActivate {
     }
 
     // Access the underlying HTTP request from RequestContext
-    const httpReq = (requestContext as any).req;
+    const httpReq = requestContext.req;
     if (!httpReq) {
       this.logger.debug('No HTTP request found on RequestContext');
       return true; // Let other guards handle
     }
 
     // Extract Authorization header from HTTP request
-    const authHeader = httpReq.headers?.authorization || httpReq.headers?.Authorization;
+    const authHeader = httpReq.headers?.authorization || (httpReq.headers as any)?.Authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       // No auth header - let other guards handle it (normal user auth)
       return true;

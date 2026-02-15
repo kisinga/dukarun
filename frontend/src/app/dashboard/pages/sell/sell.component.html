@@ -1,8 +1,8 @@
 <!-- Toast Notification -->
 @if (notificationMessage()) {
-  <div class="toast toast-top toast-center z-50 animate-in">
+  <div class="toast toast-top toast-center z-50">
     <div
-      class="alert shadow-lg"
+      class="alert shadow-lg anim-fade-in-down"
       [class.alert-success]="notificationType() === 'success'"
       [class.alert-warning]="notificationType() === 'warning'"
       [class.alert-error]="notificationType() === 'error'"
@@ -28,12 +28,13 @@
 }
 
 <!-- Main Content -->
-<div class="container-app py-4 md:py-6 space-y-4 md:space-y-6 pb-20 md:pb-6">
-  <!-- Search View -->
+<div class="container-app py-4 md:py-6 space-y-4 md:space-y-6 pb-20 md:pb-6 anim-stagger">
+  <!-- Search View (independent state; results only when user has typed; variants expanded by default) -->
   <app-product-search-view
-    [searchResults]="searchResults()"
+    [searchResults]="searchResultsForMainView()"
     [isSearching]="isSearching()"
     [showCameraButton]="isManualSearchActive()"
+    [variantsExpandedByDefault]="true"
     (searchTermChange)="handleSearchTermChange($event)"
     (productSelected)="handleProductSelected($event)"
     (variantSelected)="handleVariantSelectedFromSearch($event)"
@@ -52,135 +53,51 @@
     />
   }
 
-  <!-- Recent Products List (always visible on desktop, conditional on mobile) -->
+  <!-- Quick Select: one card, list inside (no nested cards) -->
   @if (shouldShowCamera() || !isMobile()) {
     <div class="mt-4 md:mt-6">
-      @if (isLoadingProducts()) {
-        <div class="card bg-base-100 shadow-lg">
-          <div class="card-body p-3 md:p-4">
+      <div
+        class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-lg shadow-md min-h-11 overflow-hidden"
+      >
+        <input
+          type="checkbox"
+          id="sell-quick-select-toggle"
+          [checked]="quickSelectOpen()"
+          (change)="onQuickSelectToggle($any($event.target).checked)"
+          aria-label="Toggle Quick Select"
+        />
+        <label
+          for="sell-quick-select-toggle"
+          class="collapse-title bg-base-200 font-semibold text-base md:text-lg tracking-tight min-h-11 flex items-center justify-between gap-2 py-3 pl-4 pr-10 cursor-pointer border-b border-base-300"
+        >
+          <span>Quick Select</span>
+          <span class="badge badge-sm badge-primary badge-outline shrink-0">{{
+            searchResultsForQuickSelect().length
+          }}</span>
+        </label>
+        <div class="collapse-content bg-base-100 px-2 pb-2 pt-0">
+          @if (isLoadingQuickSelect()) {
             <div class="flex items-center justify-center py-4">
               <span class="loading loading-spinner loading-md"></span>
               <span class="ml-2 text-sm text-base-content/70">Loading products...</span>
             </div>
-          </div>
+          } @else {
+            <app-product-search-view
+              [resultsOnly]="true"
+              [searchResults]="searchResultsForQuickSelect()"
+              [compact]="true"
+              [variantsExpandedByDefault]="false"
+              (productSelected)="handleProductSelected($event)"
+              (variantSelected)="handleVariantSelectedFromSearch($event)"
+            />
+          }
         </div>
-      } @else if (recentProducts().length > 0) {
-        <div
-          class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-lg shadow-lg min-h-11"
-        >
-          <input
-            type="checkbox"
-            id="sell-quick-select-toggle"
-            [checked]="quickSelectOpen()"
-            (change)="onQuickSelectToggle($any($event.target).checked)"
-            aria-label="Toggle Quick Select"
-          />
-          <label
-            for="sell-quick-select-toggle"
-            class="collapse-title font-semibold text-base md:text-lg tracking-tight min-h-11 flex items-center justify-between gap-2 py-3 cursor-pointer"
-          >
-            <span>Quick Select</span>
-            <span class="badge badge-sm badge-primary badge-outline shrink-0">{{
-              recentProducts().length
-            }}</span>
-          </label>
-          <div class="collapse-content">
-            <div class="space-y-3 max-h-[23vh] overflow-y-auto pb-1">
-              @for (product of recentProducts(); track product.id) {
-                <div class="border border-base-300 rounded-lg overflow-hidden bg-base-100">
-                  <button
-                    class="w-full flex items-center gap-3 p-3 bg-base-200 active:bg-base-300 hover:bg-base-300 transition-colors min-h-11 touch-manipulation"
-                    (click)="handleQuickAddProduct(product)"
-                  >
-                    <!-- Product Image -->
-                    @if (product.featuredAsset) {
-                      <img
-                        [src]="product.featuredAsset.preview"
-                        [alt]="product.name"
-                        class="w-10 h-10 rounded object-cover flex-shrink-0"
-                      />
-                    } @else {
-                      <div
-                        class="w-10 h-10 rounded bg-base-300 flex items-center justify-center flex-shrink-0"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-5 w-5 text-primary"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                          />
-                        </svg>
-                      </div>
-                    }
-
-                    <!-- Product Info -->
-                    <div class="flex-1 text-left min-w-0">
-                      <app-product-label
-                        [productName]="product.name"
-                        [facetValues]="product.facetValues ?? []"
-                      />
-                      @if (product.variants.length > 1) {
-                        <div class="text-xs text-base-content/70">
-                          {{ product.variants.length }} variants
-                        </div>
-                      }
-                    </div>
-
-                    <!-- Price (for single variant) or Add Icon -->
-                    @if (product.variants.length === 1) {
-                      <div class="text-sm font-semibold text-primary flex-shrink-0">
-                        {{ formatPrice(product.variants[0].priceWithTax) }}
-                      </div>
-                    }
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5 text-primary flex-shrink-0"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                  </button>
-                  @if (product.variants.length > 1) {
-                    <details
-                      class="collapse collapse-arrow border-t border-base-300 bg-base-200/60"
-                      [class.collapse-open]="product.variants.length <= 3"
-                      [attr.open]="product.variants.length <= 3"
-                    >
-                      <summary
-                        class="collapse-title min-h-0 py-1 pl-6 pr-2 text-xs text-base-content/70 cursor-pointer"
-                      >
-                        <span class="sr-only">Toggle variants</span>
-                      </summary>
-                      <div class="collapse-content pl-6 pr-2 pb-1.5 pt-0">
-                        <app-variant-list [variants]="product.variants" />
-                      </div>
-                    </details>
-                  }
-                </div>
-              }
-            </div>
-          </div>
-        </div>
-      }
+      </div>
     </div>
   }
 
   <!-- Empty State (only when searching but no results) -->
-  @if (isManualSearchActive() && searchResults().length === 0 && !isSearching()) {
+  @if (isManualSearchActive() && searchResultsForMainView().length === 0 && !isSearching()) {
     <div class="text-center py-12">
       <div class="text-5xl mb-2">🔍</div>
       <p class="font-semibold">No products found</p>
@@ -205,6 +122,7 @@
   <app-checkout-fab
     [total]="cartTotal()"
     [disabled]="!cashierSessionService.hasActiveSession()"
+    [cartJustUpdated]="cartItemAdded()"
     (checkout)="handleProceedToCheckout()"
   />
 }
@@ -238,15 +156,14 @@
 <app-product-confirm-modal
   [isOpen]="showConfirmModal()"
   [product]="detectedProduct()"
-  [canOverridePrices]="canOverridePrices()"
   (variantSelected)="handleVariantSelected($event)"
   (closeModal)="handleConfirmModalClose()"
 />
 
 <!-- Clear Cart Confirmation Modal -->
 @if (showClearCartConfirm()) {
-  <div class="modal modal-open modal-bottom sm:modal-middle animate-in fade-in duration-300">
-    <div class="modal-box animate-in slide-in-from-bottom-4 duration-300">
+  <div class="modal modal-open modal-bottom sm:modal-middle modal-backdrop-anim">
+    <div class="modal-box modal-box-anim">
       <h3 class="font-bold text-lg text-error mb-4">Clear Cart</h3>
       <p class="py-4 text-base-content/80">
         Are you sure you want to clear all items from your cart? This action cannot be undone.
@@ -290,6 +207,7 @@
   (customerCreateForCash)="handleCustomerCreateForCash($event)"
   (paymentMethodSelect)="handlePaymentMethodSelect($event)"
   (selectCredit)="handleCheckoutCredit()"
+  (saveAsProforma)="handleSaveAsProforma()"
   (selectCash)="handleCheckoutCash()"
   (selectCashier)="handleCheckoutCashier()"
   (closeModal)="handleCheckoutModalClose()"

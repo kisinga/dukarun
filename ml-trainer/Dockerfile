@@ -1,34 +1,26 @@
-FROM node:20-bullseye-slim
+# Node 20 + Chromium for Puppeteer (Teachable Machine automation)
+FROM node:20-bullseye
 
-# Install system dependencies required for @tensorflow/tfjs-node
-# python3, make, g++ are needed for native compilation if prebuilds fail
-# libc6-dev, libssl-dev etc. are good to have for native addons
+# Install Chromium and dependencies for headless browser
 RUN apt-get update && apt-get install -y \
-    python3 \
-    make \
-    g++ \
-    build-essential \
-    libc6-dev \
+    chromium \
+    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
+
+# Puppeteer will use this Chromium in Docker
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1
 
 WORKDIR /app
 
-# Copy package files first to leverage cache
 COPY package.json package-lock.json ./
 
-# Install dependencies
-# We use npm ci for reliable builds
-# If tfjs-node prebuilds fail, it will fall back to build-from-source (slow but reliable)
 RUN npm ci
 
-# Copy source code
 COPY . .
 
-# Build TypeScript
 RUN npm run build
 
-# Expose port (ML_PORT default is 3005)
 EXPOSE 3005
 
-# Start command
 CMD ["npm", "start"]

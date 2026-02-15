@@ -1,4 +1,4 @@
-<div class="space-y-4 sm:space-y-5 lg:space-y-6 animate-stagger-children">
+<div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
   <!-- Header -->
   <app-page-header
     title="Sales"
@@ -150,7 +150,7 @@
               <th class="text-right">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="anim-stagger-rows">
             @for (order of paginatedOrders(); track trackByOrderId($index, order)) {
               <tr app-order-table-row [order]="order" (action)="onOrderAction($event)"></tr>
             }

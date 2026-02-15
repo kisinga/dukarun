@@ -127,6 +127,11 @@ $transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 $transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
 $transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 
+// Duration-only tokens (for animation shorthand where easing is specified separately)
+$duration-fast: 150ms;
+$duration-base: 200ms;
+$duration-slow: 300ms;
+
 $ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 $ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
@@ -233,6 +238,72 @@ $container-2xl: 1536px; // Full width limit
 }
 
 // ============================================
+// INTERACTION MIXINS
+// ============================================
+// Composable tactile feedback for interactive elements.
+// Use these in any component or global stylesheet.
+// All honor reduced-motion via the global rule in styles.scss.
+
+/// Radial ink-wash on :active via ::after pseudo-element.
+/// Does not block pointer-events. Requires no extra DOM.
+/// The fade-out is intentionally slow ($duration-slow) so the flash is
+/// perceptible even when :active is very brief (mobile tap).
+@mixin ripple {
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 50%, oklch(var(--bc) / 0.15) 0%, transparent 70%);
+    opacity: 0;
+    // Slow fade-out keeps the wash visible after a quick tap
+    transition: opacity $duration-slow $ease-in-out;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  &:active::after {
+    opacity: 1;
+    // Instant flash on press
+    transition-duration: 0ms;
+  }
+
+  @media (hover: hover) {
+    &:hover::after {
+      opacity: 0.6;
+    }
+  }
+}
+
+/// Subtle scale-down on :active for tappable containers.
+@mixin press {
+  transition: transform $duration-fast $ease-in-out;
+
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+/// Background tint on :active for rows/list items.
+@mixin row-highlight {
+  transition: background-color $duration-fast $ease-in-out;
+  -webkit-tap-highlight-color: transparent;
+
+  &:active {
+    background-color: oklch(var(--bc) / 0.06);
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      background-color: oklch(var(--bc) / 0.03);
+    }
+  }
+}
+
+// ============================================
 // PATTERN CLASSES (use in templates; all use tokens/mixins above)
 // ============================================
 
@@ -246,14 +317,12 @@ $container-2xl: 1536px; // Full width limit
 
 .stat-card {
   @include card;
+  @include press;
   padding: $space-3;
   cursor: pointer;
   transition: all $transition-base;
   @include tablet {
     padding: $space-4;
-  }
-  &:active {
-    transform: scale(0.97);
   }
   @include touch-device {
     @include touch-target;
@@ -305,16 +374,13 @@ $container-2xl: 1536px; // Full width limit
   overflow: hidden;
   .collapse-header {
     @include touch-target;
+    @include ripple;
     & {
       padding: $space-3 $space-4;
       display: flex;
       align-items: center;
       gap: $space-3;
       cursor: pointer;
-      transition: background-color $transition-fast;
-    }
-    &:hover {
-      background-color: oklch(var(--b2) / 0.5);
     }
     @include tablet {
       padding: $space-4;
@@ -332,6 +398,7 @@ $container-2xl: 1536px; // Full width limit
 
 .action-button {
   @include touch-target;
+  @include press;
   & {
     font-weight: $font-semibold;
     font-size: $text-base;
@@ -341,9 +408,6 @@ $container-2xl: 1536px; // Full width limit
   @include tablet {
     font-size: $text-lg;
   }
-  &:active {
-    transform: scale(0.95);
-  }
   &:focus-visible {
     @include focus-ring;
   }
@@ -351,18 +415,12 @@ $container-2xl: 1536px; // Full width limit
 
 .list-item {
   @include touch-target;
+  @include row-highlight;
   & {
     padding: $space-3 $space-4;
     display: flex;
     align-items: center;
     gap: $space-3;
-    transition: background-color $transition-fast;
-  }
-  &:hover {
-    background-color: oklch(var(--b2));
-  }
-  &:active {
-    background-color: oklch(var(--b3));
   }
   @include tablet {
     padding: $space-4;
@@ -462,19 +520,6 @@ $container-2xl: 1536px; // Full width limit
   width: $space-2;
   height: $space-2;
   border-radius: $radius-full;
-  &.pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
 }
 
 .text-secondary {
@@ -495,47 +540,4 @@ $container-2xl: 1536px; // Full width limit
   letter-spacing: $tracking-wide;
   text-transform: uppercase;
   border-radius: $radius-full;
-}
-
-.fade-in {
-  animation: fadeIn $transition-slow $ease-in-out;
-}
-
-.slide-up {
-  animation: slideUp $transition-slow $ease-in-out;
-}
-
-.scale-in {
-  animation: scaleIn $transition-base $ease-spring;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
 }

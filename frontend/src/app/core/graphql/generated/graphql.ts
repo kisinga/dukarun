@@ -1390,7 +1390,8 @@ export type CreateOrderInput = {
   isCashierFlow?: InputMaybe<Scalars['Boolean']['input']>;
   isCreditSale?: InputMaybe<Scalars['Boolean']['input']>;
   metadata?: InputMaybe<Scalars['JSON']['input']>;
-  paymentMethodCode: Scalars['String']['input'];
+  paymentMethodCode?: InputMaybe<Scalars['String']['input']>;
+  saveAsProforma?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export type CreatePaymentMethodCustomFieldsInput = {
@@ -3705,6 +3706,7 @@ export type Mutation = {
   closeCashierSession: CashierSessionSummary;
   /** Complete training and upload model files (multipart) */
   completeTraining: Scalars['Boolean']['output'];
+  confirmPurchase: StockPurchase;
   /** Create a new Administrator */
   createAdministrator: Administrator;
   createApprovalRequest: ApprovalRequest;
@@ -4004,6 +4006,7 @@ export type Mutation = {
   /** Update an existing CustomerGroup */
   updateCustomerGroup: CustomerGroup;
   updateCustomerNote: HistoryEntry;
+  updateDraftPurchase: StockPurchase;
   /** Update an existing Facet */
   updateFacet: Facet;
   /** Update a single FacetValue */
@@ -4202,6 +4205,10 @@ export type MutationCompleteTrainingArgs = {
   metadata: Scalars['Upload']['input'];
   modelJson: Scalars['Upload']['input'];
   weightsFile: Scalars['Upload']['input'];
+};
+
+export type MutationConfirmPurchaseArgs = {
+  id: Scalars['ID']['input'];
 };
 
 export type MutationCreateAdministratorArgs = {
@@ -4897,6 +4904,11 @@ export type MutationUpdateCustomerGroupArgs = {
 
 export type MutationUpdateCustomerNoteArgs = {
   input: UpdateCustomerNoteInput;
+};
+
+export type MutationUpdateDraftPurchaseArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateDraftPurchaseInput;
 };
 
 export type MutationUpdateFacetArgs = {
@@ -6495,6 +6507,7 @@ export type ProvinceTranslationInput = {
 export type PurchaseFilterInput = {
   endDate?: InputMaybe<Scalars['DateTime']['input']>;
   startDate?: InputMaybe<Scalars['DateTime']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
   supplierId?: InputMaybe<Scalars['ID']['input']>;
 };
 
@@ -6642,6 +6655,7 @@ export type Query = {
   promotions: PromotionList;
   province?: Maybe<Province>;
   provinces: ProvinceList;
+  purchase?: Maybe<StockPurchase>;
   purchases: StockPurchaseList;
   reconciliationDetails: Array<ReconciliationAccountDetail>;
   reconciliations: ReconciliationList;
@@ -6995,6 +7009,10 @@ export type QueryProvincesArgs = {
   options?: InputMaybe<ProvinceListOptions>;
 };
 
+export type QueryPurchaseArgs = {
+  id: Scalars['ID']['input'];
+};
+
 export type QueryPurchasesArgs = {
   options?: InputMaybe<PurchaseListOptions>;
 };
@@ -7209,6 +7227,7 @@ export type RecordPurchaseInput = {
   paymentStatus: Scalars['String']['input'];
   purchaseDate: Scalars['DateTime']['input'];
   referenceNumber?: InputMaybe<Scalars['String']['input']>;
+  saveAsDraft?: InputMaybe<Scalars['Boolean']['input']>;
   supplierId: Scalars['ID']['input'];
 };
 
@@ -7988,6 +8007,7 @@ export type StockPurchase = {
   paymentStatus: Scalars['String']['output'];
   purchaseDate: Scalars['DateTime']['output'];
   referenceNumber?: Maybe<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
   supplier?: Maybe<Customer>;
   supplierId: Scalars['ID']['output'];
   totalCost: Scalars['Int']['output'];
@@ -8620,6 +8640,14 @@ export type UpdateCustomerNoteInput = {
 };
 
 export type UpdateCustomerResult = Customer | EmailAddressConflictError;
+
+export type UpdateDraftPurchaseInput = {
+  lines?: InputMaybe<Array<PurchaseLineInput>>;
+  notes?: InputMaybe<Scalars['String']['input']>;
+  purchaseDate?: InputMaybe<Scalars['DateTime']['input']>;
+  referenceNumber?: InputMaybe<Scalars['String']['input']>;
+  supplierId?: InputMaybe<Scalars['ID']['input']>;
+};
 
 export type UpdateFacetInput = {
   code?: InputMaybe<Scalars['String']['input']>;
@@ -9982,6 +10010,65 @@ export type AddItemToDraftOrderMutation = {
         id: string;
         code: string;
         state: string;
+        lines: Array<{
+          __typename?: 'OrderLine';
+          id: string;
+          quantity: number;
+          linePrice: number;
+          linePriceWithTax: number;
+          productVariant: { __typename?: 'ProductVariant'; id: string; name: string };
+        }>;
+      }
+    | { __typename?: 'OrderInterceptorError' }
+    | { __typename?: 'OrderLimitError' }
+    | { __typename?: 'OrderModificationError' };
+};
+
+export type RemoveDraftOrderLineMutationVariables = Exact<{
+  orderId: Scalars['ID']['input'];
+  orderLineId: Scalars['ID']['input'];
+}>;
+
+export type RemoveDraftOrderLineMutation = {
+  __typename?: 'Mutation';
+  removeDraftOrderLine:
+    | {
+        __typename?: 'Order';
+        id: string;
+        code: string;
+        state: string;
+        total: number;
+        totalWithTax: number;
+        lines: Array<{
+          __typename?: 'OrderLine';
+          id: string;
+          quantity: number;
+          linePrice: number;
+          linePriceWithTax: number;
+          productVariant: { __typename?: 'ProductVariant'; id: string; name: string };
+        }>;
+      }
+    | { __typename?: 'OrderInterceptorError' }
+    | { __typename?: 'OrderModificationError' };
+};
+
+export type AdjustDraftOrderLineMutationVariables = Exact<{
+  orderId: Scalars['ID']['input'];
+  input: AdjustDraftOrderLineInput;
+}>;
+
+export type AdjustDraftOrderLineMutation = {
+  __typename?: 'Mutation';
+  adjustDraftOrderLine:
+    | { __typename?: 'InsufficientStockError' }
+    | { __typename?: 'NegativeQuantityError' }
+    | {
+        __typename?: 'Order';
+        id: string;
+        code: string;
+        state: string;
+        total: number;
+        totalWithTax: number;
         lines: Array<{
           __typename?: 'OrderLine';
           id: string;
@@ -11739,6 +11826,7 @@ export type GetPurchasesQuery = {
       __typename?: 'StockPurchase';
       id: string;
       supplierId: string;
+      status: string;
       purchaseDate: any;
       referenceNumber?: string | null;
       totalCost: number;
@@ -11770,6 +11858,102 @@ export type GetPurchasesQuery = {
         } | null;
         stockLocation?: { __typename?: 'StockLocation'; id: string; name: string } | null;
       }>;
+    }>;
+  };
+};
+
+export type GetPurchaseQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+export type GetPurchaseQuery = {
+  __typename?: 'Query';
+  purchase?: {
+    __typename?: 'StockPurchase';
+    id: string;
+    supplierId: string;
+    status: string;
+    purchaseDate: any;
+    referenceNumber?: string | null;
+    totalCost: number;
+    paymentStatus: string;
+    isCreditPurchase: boolean;
+    notes?: string | null;
+    createdAt: any;
+    updatedAt: any;
+    supplier?: {
+      __typename?: 'Customer';
+      id: string;
+      firstName: string;
+      lastName: string;
+      emailAddress: string;
+    } | null;
+    lines: Array<{
+      __typename?: 'StockPurchaseLine';
+      id: string;
+      variantId: string;
+      quantity: number;
+      unitCost: number;
+      totalCost: number;
+      stockLocationId: string;
+      variant?: {
+        __typename?: 'ProductVariant';
+        id: string;
+        name: string;
+        product: { __typename?: 'Product'; id: string; name: string };
+      } | null;
+      stockLocation?: { __typename?: 'StockLocation'; id: string; name: string } | null;
+    }>;
+  } | null;
+};
+
+export type ConfirmPurchaseMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+export type ConfirmPurchaseMutation = {
+  __typename?: 'Mutation';
+  confirmPurchase: {
+    __typename?: 'StockPurchase';
+    id: string;
+    supplierId: string;
+    status: string;
+    referenceNumber?: string | null;
+    totalCost: number;
+    paymentStatus: string;
+    lines: Array<{
+      __typename?: 'StockPurchaseLine';
+      id: string;
+      variantId: string;
+      quantity: number;
+      unitCost: number;
+      totalCost: number;
+    }>;
+  };
+};
+
+export type UpdateDraftPurchaseMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+  input: UpdateDraftPurchaseInput;
+}>;
+
+export type UpdateDraftPurchaseMutation = {
+  __typename?: 'Mutation';
+  updateDraftPurchase: {
+    __typename?: 'StockPurchase';
+    id: string;
+    supplierId: string;
+    status: string;
+    referenceNumber?: string | null;
+    totalCost: number;
+    notes?: string | null;
+    lines: Array<{
+      __typename?: 'StockPurchaseLine';
+      id: string;
+      variantId: string;
+      quantity: number;
+      unitCost: number;
+      totalCost: number;
     }>;
   };
 };
@@ -16425,6 +16609,190 @@ export const AddItemToDraftOrderDocument = {
     },
   ],
 } as unknown as DocumentNode<AddItemToDraftOrderMutation, AddItemToDraftOrderMutationVariables>;
+export const RemoveDraftOrderLineDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'RemoveDraftOrderLine' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'orderId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'orderLineId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'removeDraftOrderLine' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'orderId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'orderId' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'orderLineId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'orderLineId' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'InlineFragment',
+                  typeCondition: { kind: 'NamedType', name: { kind: 'Name', value: 'Order' } },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'state' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'total' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalWithTax' } },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'lines' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'quantity' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'linePrice' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'linePriceWithTax' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'productVariant' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<RemoveDraftOrderLineMutation, RemoveDraftOrderLineMutationVariables>;
+export const AdjustDraftOrderLineDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'AdjustDraftOrderLine' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'orderId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'AdjustDraftOrderLineInput' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'adjustDraftOrderLine' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'orderId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'orderId' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'InlineFragment',
+                  typeCondition: { kind: 'NamedType', name: { kind: 'Name', value: 'Order' } },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'state' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'total' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalWithTax' } },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'lines' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'quantity' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'linePrice' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'linePriceWithTax' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'productVariant' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<AdjustDraftOrderLineMutation, AdjustDraftOrderLineMutationVariables>;
 export const AddManualPaymentToOrderDocument = {
   kind: 'Document',
   definitions: [
@@ -21471,6 +21839,7 @@ export const GetPurchasesDocument = {
                     selections: [
                       { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'supplierId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'status' } },
                       {
                         kind: 'Field',
                         name: { kind: 'Name', value: 'supplier' },
@@ -21552,6 +21921,254 @@ export const GetPurchasesDocument = {
     },
   ],
 } as unknown as DocumentNode<GetPurchasesQuery, GetPurchasesQueryVariables>;
+export const GetPurchaseDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetPurchase' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'purchase' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'id' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'supplier' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
+                    ],
+                  },
+                },
+                { kind: 'Field', name: { kind: 'Name', value: 'purchaseDate' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'referenceNumber' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'totalCost' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'paymentStatus' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'isCreditPurchase' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'lines' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'variantId' } },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'variant' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'product' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                      { kind: 'Field', name: { kind: 'Name', value: 'quantity' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'unitCost' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalCost' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'stockLocationId' } },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'stockLocation' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+                { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetPurchaseQuery, GetPurchaseQueryVariables>;
+export const ConfirmPurchaseDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'ConfirmPurchase' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'confirmPurchase' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'id' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'referenceNumber' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'totalCost' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'paymentStatus' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'lines' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'variantId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'quantity' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'unitCost' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalCost' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<ConfirmPurchaseMutation, ConfirmPurchaseMutationVariables>;
+export const UpdateDraftPurchaseDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateDraftPurchase' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'UpdateDraftPurchaseInput' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateDraftPurchase' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'id' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierId' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'referenceNumber' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'totalCost' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'lines' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'variantId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'quantity' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'unitCost' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalCost' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UpdateDraftPurchaseMutation, UpdateDraftPurchaseMutationVariables>;
 export const RecordStockAdjustmentDocument = {
   kind: 'Document',
   definitions: [

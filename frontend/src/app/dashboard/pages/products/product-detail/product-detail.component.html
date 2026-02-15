@@ -1,0 +1,229 @@
+<app-entity-detail-layout
+  [title]="title()"
+  [subtitle]="subtitle()"
+  [isLoading]="isLoading()"
+  [error]="error()"
+  (back)="goBack()"
+>
+  <!-- Header actions -->
+  <div header-actions class="flex gap-1.5">
+    <button
+      class="btn btn-primary btn-sm gap-1.5"
+      (click)="onPurchase()"
+      title="Purchase from Supplier"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+        />
+      </svg>
+      <span class="hidden sm:inline">Purchase</span>
+    </button>
+    @if (canEdit()) {
+      <button class="btn btn-ghost btn-sm gap-1.5" (click)="onEdit()" title="Edit Product">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+          />
+        </svg>
+        <span class="hidden sm:inline">Edit</span>
+      </button>
+    }
+  </div>
+
+  <!-- Product detail body -->
+  @if (product(); as p) {
+    <div class="space-y-4 md:space-y-6">
+      <!-- Product overview card -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body p-4 md:p-6">
+          <div class="flex flex-col sm:flex-row gap-4 sm:gap-6">
+            <!-- Product image -->
+            <div class="avatar shrink-0 self-start">
+              <div
+                class="w-24 h-24 sm:w-32 sm:h-32 rounded-xl ring-2 ring-base-300 ring-offset-2 bg-base-200 flex items-center justify-center"
+              >
+                @if (getThumbnail()) {
+                  <img
+                    [src]="getThumbnail()!"
+                    [alt]="p.name"
+                    class="object-cover w-full h-full rounded-xl"
+                  />
+                } @else {
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-12 w-12 text-primary"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
+                  </svg>
+                }
+              </div>
+            </div>
+
+            <!-- Product info -->
+            <div class="flex-1 min-w-0 space-y-3">
+              <!-- Name + facet pills -->
+              <div>
+                <app-product-label
+                  [productName]="p.name"
+                  [facetValues]="facetValues()"
+                  class="text-lg"
+                />
+                @if (p.description) {
+                  <p class="text-sm text-base-content/60 leading-relaxed mt-1.5 line-clamp-3">
+                    {{ p.description }}
+                  </p>
+                }
+              </div>
+
+              <!-- Stat row -->
+              <div class="flex flex-wrap gap-2">
+                @if (p.enabled) {
+                  <app-status-badge type="success" label="Active" [showIcon]="true" />
+                } @else {
+                  <app-status-badge type="neutral" label="Disabled" />
+                }
+                <span class="badge badge-outline badge-sm gap-1">
+                  {{ variants().length }} variant{{ variants().length !== 1 ? 's' : '' }}
+                </span>
+                <span class="badge badge-outline badge-sm gap-1 font-mono">
+                  {{ priceRange() }}
+                </span>
+                @if (barcode()) {
+                  <span class="badge badge-ghost badge-sm gap-1 font-mono">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-3 w-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
+                      />
+                    </svg>
+                    {{ barcode() }}
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Variants table -->
+      @if (variants().length > 0) {
+        <div class="card bg-base-100 shadow">
+          <div class="card-body p-0">
+            <h3
+              class="font-semibold text-sm px-4 pt-4 md:px-6 md:pt-5 text-base-content/70 uppercase tracking-wider"
+            >
+              Variants
+            </h3>
+            <div class="overflow-x-auto">
+              <table class="table table-sm w-full">
+                <thead>
+                  <tr class="text-xs text-base-content/50 uppercase tracking-wider">
+                    <th class="font-medium">Name</th>
+                    <th class="font-medium">SKU</th>
+                    <th class="font-medium text-right">Price</th>
+                    @if (!isService()) {
+                      <th class="font-medium text-right">Wholesale</th>
+                    }
+                    <th class="font-medium text-right w-20">Stock</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (v of variants(); track v.id) {
+                    <tr>
+                      <td class="font-medium">{{ v.name }}</td>
+                      <td class="text-base-content/50 font-mono text-xs">{{ v.sku }}</td>
+                      <td class="text-right font-mono tabular-nums">
+                        {{ currencyService.format(v.priceWithTax, false) }}
+                      </td>
+                      @if (!isService()) {
+                        <td class="text-right font-mono tabular-nums text-base-content/50">
+                          @if (v.customFields?.wholesalePrice) {
+                            {{ currencyService.format(v.customFields.wholesalePrice, false) }}
+                          } @else {
+                            <span class="text-base-content/30">—</span>
+                          }
+                        </td>
+                      }
+                      <td class="text-right">
+                        <span
+                          class="badge badge-xs"
+                          [class.badge-info]="v.trackInventory === false"
+                          [class.badge-success]="v.trackInventory !== false && v.stockOnHand > 20"
+                          [class.badge-warning]="
+                            v.trackInventory !== false && v.stockOnHand > 0 && v.stockOnHand <= 20
+                          "
+                          [class.badge-error]="v.trackInventory !== false && v.stockOnHand === 0"
+                        >
+                          {{ v.trackInventory === false ? '∞' : v.stockOnHand }}
+                        </span>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Assets gallery (if multiple images) -->
+      @if (product()?.assets?.length > 1) {
+        <div class="card bg-base-100 shadow">
+          <div class="card-body p-4 md:p-6">
+            <h3 class="font-semibold text-sm text-base-content/70 uppercase tracking-wider mb-3">
+              Images
+            </h3>
+            <div class="flex flex-wrap gap-3">
+              @for (asset of product().assets; track asset.id) {
+                <div class="avatar">
+                  <div class="w-20 h-20 rounded-lg ring-1 ring-base-300 bg-base-200">
+                    <img
+                      [src]="asset.preview"
+                      [alt]="asset.name"
+                      class="object-cover w-full h-full rounded-lg"
+                    />
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</app-entity-detail-layout>

@@ -2,10 +2,13 @@ import { Injectable, inject } from '@angular/core';
 import { CompanyService } from './company.service';
 import {
   PrintTemplate,
+  PrintMeta,
   OrderData,
+  PurchaseData,
   Receipt52mmTemplate,
   Receipt80mmTemplate,
   A4Template,
+  A4PurchaseTemplate,
 } from './print-templates';
 
 /**
@@ -26,6 +29,8 @@ export class PrintService {
     ['receipt-80mm', new Receipt80mmTemplate()],
     ['a4', new A4Template()],
   ]);
+
+  private readonly a4PurchaseTemplate = new A4PurchaseTemplate();
 
   /**
    * Get all available templates
@@ -57,8 +62,13 @@ export class PrintService {
    * Platform-agnostic: uses hidden iframe instead of opening new tab
    * @param order - Order data to print
    * @param templateId - Template ID to use (default: 'receipt-52mm')
+   * @param printMeta - Optional contextual metadata (payment method name, served by, etc.)
    */
-  async printOrder(order: OrderData, templateId: string = 'receipt-52mm'): Promise<void> {
+  async printOrder(
+    order: OrderData,
+    templateId: string = 'receipt-52mm',
+    printMeta?: PrintMeta,
+  ): Promise<void> {
     const template = this.getTemplate(templateId);
     if (!template) {
       console.error(`Template ${templateId} not found`);
@@ -70,7 +80,7 @@ export class PrintService {
     const companyName = this.companyService.activeCompany()?.code ?? 'Your Company';
 
     // Render the order
-    const html = template.render(order, companyLogo, companyName);
+    const html = template.render(order, companyLogo, companyName, printMeta);
     const styles = template.getStyles();
 
     // Create or reuse hidden iframe for printing
@@ -155,6 +165,98 @@ export class PrintService {
       iframeDoc.close();
 
       // Wait for content to load, then print
+      const printWindow = printFrame.contentWindow;
+      if (!printWindow) {
+        reject(new Error('Failed to access iframe window'));
+        return;
+      }
+
+      printWindow.onload = () => setTimeout(doPrint, 250);
+      setTimeout(() => {
+        if (!printed && printWindow.document.readyState === 'complete') {
+          doPrint();
+        }
+      }, 500);
+    });
+  }
+
+  /**
+   * Print a purchase order using A4 template
+   * A4-only as per design for purchase orders
+   */
+  async printPurchase(purchase: PurchaseData, printMeta?: PrintMeta): Promise<void> {
+    const companyLogo = this.companyService.companyLogoAsset()?.preview || null;
+    const companyName = this.companyService.activeCompany()?.code ?? 'Your Company';
+
+    const html = this.a4PurchaseTemplate.render(purchase, companyLogo, companyName, {
+      ...printMeta,
+      documentType: 'purchase-order',
+    });
+    const styles = this.a4PurchaseTemplate.getStyles();
+
+    let printFrame = document.getElementById('print-frame') as HTMLIFrameElement;
+    if (!printFrame) {
+      printFrame = document.createElement('iframe');
+      printFrame.id = 'print-frame';
+      printFrame.style.position = 'absolute';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = 'none';
+      printFrame.style.left = '-9999px';
+      document.body.appendChild(printFrame);
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      let printed = false;
+      const doPrint = () => {
+        if (printed) return;
+        printed = true;
+        try {
+          const win = printFrame.contentWindow;
+          if (win) {
+            win.focus();
+            win.print();
+          }
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      const iframeDoc = printFrame.contentDocument || printFrame.contentWindow?.document;
+      if (!iframeDoc) {
+        reject(new Error('Failed to access iframe document'));
+        return;
+      }
+
+      const ref = purchase.referenceNumber ?? purchase.id;
+      iframeDoc.open();
+      iframeDoc.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Purchase Order ${ref}</title>
+                    <meta charset="utf-8">
+                    <style>
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        body { font-family: Arial, sans-serif; }
+                        ${styles}
+                        @media print {
+                            body { margin: 0; padding: 0; }
+                            .no-print { display: none !important; }
+                        }
+                        @media screen {
+                            .print-template { margin: 20px auto; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${html}
+                </body>
+                </html>
+            `);
+      iframeDoc.close();
+
       const printWindow = printFrame.contentWindow;
       if (!printWindow) {
         reject(new Error('Failed to access iframe window'));

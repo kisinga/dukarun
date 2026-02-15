@@ -24,7 +24,7 @@
   </button>
 </div>
 
-<div class="space-y-4 sm:space-y-5 lg:space-y-6 animate-stagger-children">
+<div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
   <app-page-header title="Inter-account transfers" subtitle="Move funds between accounts">
     <div actions class="flex items-center gap-1">
       <button
@@ -160,7 +160,7 @@
                 <th class="text-right">Amount</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody class="anim-stagger-rows">
               @for (entry of entries(); track entry.id) {
                 <tr
                   role="button"

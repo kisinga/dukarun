@@ -25,7 +25,7 @@ export interface Customer {
     <div class="space-y-6">
       @if (!selectedCustomer() && !showForm()) {
         <!-- Customer company search -->
-        <div class="space-y-4 animate-in slide-in-from-top-2 duration-300">
+        <div class="space-y-4 anim-stagger">
           <div class="form-control">
             <label class="label">
               <span class="label-text font-semibold">Search existing customer company</span>
@@ -48,7 +48,7 @@ export interface Customer {
 
           <!-- Create New Customer Button -->
           <button
-            class="btn btn-outline btn-primary w-full hover:scale-105 active:scale-95 transition-transform animate-in slide-in-from-bottom-2 duration-300 delay-200"
+            class="btn btn-outline btn-primary w-full interactive-press"
             (click)="showForm.set(true)"
           >
             <svg
@@ -72,8 +72,8 @@ export interface Customer {
 
       <!-- New Customer Form -->
       @if (showForm()) {
-        <div class="space-y-6 animate-in slide-in-from-top-2 duration-300">
-          <div class="alert alert-info animate-in slide-in-from-top-2 duration-300 delay-100">
+        <div class="space-y-6 anim-stagger">
+          <div class="alert alert-info">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-5 w-5 flex-shrink-0"
@@ -91,7 +91,7 @@ export interface Customer {
             <span class="text-sm">Only basic details required for quick customer creation</span>
           </div>
 
-          <div class="form-control animate-in slide-in-from-left-2 duration-300 delay-200">
+          <div class="form-control">
             <label class="label">
               <span class="label-text font-semibold">Name *</span>
             </label>
@@ -104,7 +104,7 @@ export interface Customer {
             />
           </div>
 
-          <div class="form-control animate-in slide-in-from-left-2 duration-300 delay-300">
+          <div class="form-control">
             <label class="label">
               <span class="label-text font-semibold">Phone Number *</span>
             </label>
@@ -117,7 +117,7 @@ export interface Customer {
             />
           </div>
 
-          <div class="form-control animate-in slide-in-from-left-2 duration-300 delay-400">
+          <div class="form-control">
             <label class="label">
               <span class="label-text font-semibold">Email (optional)</span>
             </label>
@@ -130,16 +130,16 @@ export interface Customer {
             />
           </div>
 
-          <div class="flex gap-3 animate-in slide-in-from-bottom-2 duration-300 delay-500">
+          <div class="flex gap-3">
             <button
-              class="btn btn-ghost flex-1 hover:scale-105 active:scale-95 transition-transform"
+              class="btn btn-ghost flex-1 interactive-press"
               (click)="cancelForm()"
               [disabled]="isCreating()"
             >
               Cancel
             </button>
             <button
-              class="btn btn-primary flex-1 hover:scale-105 active:scale-95 transition-transform"
+              class="btn btn-primary flex-1 interactive-press"
               (click)="createCustomer()"
               [disabled]="isCreating() || !canCreate()"
             >
@@ -154,9 +154,7 @@ export interface Customer {
 
       <!-- Selected Customer Display -->
       @if (selectedCustomer()) {
-        <div
-          class="card bg-success/10 border-2 border-success animate-in slide-in-from-bottom-2 duration-300"
-        >
+        <div class="card bg-success/10 border-2 border-success anim-fade-in-up">
           <div class="card-body p-6">
             <div class="flex items-center gap-4">
               <div class="avatar placeholder">
