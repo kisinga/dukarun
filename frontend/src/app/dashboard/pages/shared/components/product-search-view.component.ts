@@ -24,14 +24,13 @@ import { VariantListComponent } from './variant-list.component';
  * Shared product search UI: card with search input, optional camera/action button,
  * and a list of product results (image, label, variant count, expandable variants).
  * Used on sell and purchase pages for consistent UX.
- * Search matches when all words appear in product name or manufacturer.
  *
- * Variant selection guard (contract):
- * - `restrictVariantSelectionToInStock`: when true (default), out-of-stock variants are
- *   disabled (preventive toggle); when false, all variants are selectable (e.g. purchase/restock).
- *   The "Out of stock" indicator is always shown for OOS variants for information; only the
- *   ability to select them is controlled by this input. Set to false on purchase page so
- *   OOS items can be selected.
+ * Search does not filter by availability; the search service returns all matching products.
+ * Callers decide how to handle out-of-stock items via `restrictVariantSelectionToInStock`:
+ *
+ * - When true (default, e.g. sell page): single-variant OOS rows are not selectable (disabled
+ *   styling, no click), and OOS variant rows in the expandable list are disabled. Stock shown in red for OOS.
+ * - When false (e.g. purchases page): all products and variants are selectable; OOS is informational only.
  *
  * Results-only mode (resultsOnly = true): hides the search input and shows only the
  * product list. Used by sell page Quick Select to reuse the same list UI and handlers.
@@ -102,8 +101,13 @@ import { VariantListComponent } from './variant-list.component';
                   }
                 </button>
                 <button
-                  class="flex-1 flex items-center gap-2 min-w-0 py-1 pl-2 pr-1 bg-base-100 hover:bg-base-200 transition-colors text-left"
-                  (click)="productSelected.emit(product)"
+                  type="button"
+                  class="flex-1 flex items-center gap-2 min-w-0 py-1 pl-2 pr-1 bg-base-100 transition-colors text-left"
+                  [class.hover:bg-base-200]="isProductRowSelectable(product)"
+                  [class.cursor-pointer]="isProductRowSelectable(product)"
+                  [class.cursor-not-allowed]="!isProductRowSelectable(product)"
+                  [class.opacity-60]="!isProductRowSelectable(product)"
+                  (click)="onProductRowClick(product)"
                 >
                   @if (product.featuredAsset) {
                     <img
@@ -164,7 +168,11 @@ import { VariantListComponent } from './variant-list.component';
                     <div class="text-[10px] uppercase tracking-wider text-base-content/70">
                       Stock
                     </div>
-                    <div class="text-xs font-mono tabular-nums text-base-content">
+                    <div
+                      class="text-xs font-mono tabular-nums"
+                      [class.text-error]="isSingleVariantOutOfStock(product)"
+                      [class.text-base-content]="!isSingleVariantOutOfStock(product)"
+                    >
                       {{ product.variants.length === 1 ? getSingleVariantStock(product) : '—' }}
                     </div>
                   </div>
@@ -312,8 +320,13 @@ import { VariantListComponent } from './variant-list.component';
                       }
                     </button>
                     <button
-                      class="flex-1 flex items-center gap-2 min-w-0 py-1 pl-2 pr-1 bg-base-100 hover:bg-base-200 transition-colors text-left"
-                      (click)="productSelected.emit(product)"
+                      type="button"
+                      class="flex-1 flex items-center gap-2 min-w-0 py-1 pl-2 pr-1 bg-base-100 transition-colors text-left"
+                      [class.hover:bg-base-200]="isProductRowSelectable(product)"
+                      [class.cursor-pointer]="isProductRowSelectable(product)"
+                      [class.cursor-not-allowed]="!isProductRowSelectable(product)"
+                      [class.opacity-60]="!isProductRowSelectable(product)"
+                      (click)="onProductRowClick(product)"
                     >
                       @if (product.featuredAsset) {
                         <img
@@ -374,7 +387,11 @@ import { VariantListComponent } from './variant-list.component';
                         <div class="text-[10px] uppercase tracking-wider text-base-content/70">
                           Stock
                         </div>
-                        <div class="text-xs font-mono tabular-nums text-base-content">
+                        <div
+                          class="text-xs font-mono tabular-nums"
+                          [class.text-error]="isSingleVariantOutOfStock(product)"
+                          [class.text-base-content]="!isSingleVariantOutOfStock(product)"
+                        >
                           {{ product.variants.length === 1 ? getSingleVariantStock(product) : '—' }}
                         </div>
                       </div>
@@ -486,6 +503,28 @@ export class ProductSearchViewComponent implements OnDestroy {
     return String(v.stockOnHand ?? 0);
   }
 
+  /** True when single-variant product is OOS and tracked (for styling stock in red). */
+  isSingleVariantOutOfStock(product: ProductSearchResult): boolean {
+    const v = product.variants?.[0];
+    return !!(
+      v &&
+      product.variants!.length === 1 &&
+      v.trackInventory !== false &&
+      v.stockLevel === 'OUT_OF_STOCK'
+    );
+  }
+
+  /**
+   * When restrictVariantSelectionToInStock is true: single-variant OOS (tracked) rows are not selectable.
+   * Multi-variant products remain selectable (user picks variant; OOS variants are disabled in the list).
+   */
+  isProductRowSelectable(product: ProductSearchResult): boolean {
+    if (!this.restrictVariantSelectionToInStock()) return true;
+    if (product.variants?.length !== 1) return true;
+    const v = product.variants[0]!;
+    return v.trackInventory === false || v.stockLevel !== 'OUT_OF_STOCK';
+  }
+
   isExpanded(productId: string): boolean {
     return this.expandedProductIds().has(productId);
   }
@@ -513,6 +552,12 @@ export class ProductSearchViewComponent implements OnDestroy {
       trackInventory: v.trackInventory,
       isDisabled: this.restrictVariantSelectionToInStock() && v.stockLevel === 'OUT_OF_STOCK',
     }));
+  }
+
+  onProductRowClick(product: ProductSearchResult): void {
+    if (this.isProductRowSelectable(product)) {
+      this.productSelected.emit(product);
+    }
   }
 
   onVariantItemSelected(item: VariantListItem, product: ProductSearchResult): void {

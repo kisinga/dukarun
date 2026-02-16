@@ -70,6 +70,10 @@ export class ProductSearchService {
   /**
    * Search products by name, manufacturer, SKU, or barcode (cache-first for offline support).
    * Matches when all words appear in product name or manufacturer.
+   *
+   * Does not filter by item availability. All matching products are returned regardless of
+   * stock; callers (e.g. sell page, purchases page) decide how to handle out-of-stock items.
+   *
    * @param queryOptions - Optional fetch policy; default cache-first; use network-only after mutations if needed
    */
   async searchProducts(

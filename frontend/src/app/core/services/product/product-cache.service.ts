@@ -2,7 +2,6 @@ import { Injectable, inject, signal } from '@angular/core';
 import { CACHE_CONFIGS, CacheService } from '../cache.service';
 import { PREFETCH_PRODUCTS } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
-import { parseSearchWords } from './product-search-term.util';
 import { ProductMapperService } from './product-mapper.service';
 import { SalesSyncGuardService } from '../sales-sync-guard.service';
 import { ProductSearchResult, ProductVariant } from './product-search.service';
@@ -25,8 +24,16 @@ export interface CacheStatus {
 }
 
 /**
- * Offline-first product cache service
- * Pre-fetches all products for a channel and maintains local cache
+ * Offline-first product cache service.
+ * Pre-fetches all products for a channel and maintains an in-memory + persisted cache.
+ *
+ * When the cache is updated:
+ * - On dashboard init: prefetchChannelProducts(channelId) runs (stale-while-revalidate if
+ *   persisted cache exists).
+ * - On logout / app clear: clearCache() runs (e.g. from AppInitService.clearCache).
+ *
+ * The cache is not invalidated after product create/update/delete. It can become stale until
+ * the user re-initializes (e.g. re-open dashboard, refresh) or cache is cleared.
  */
 @Injectable({
   providedIn: 'root',
@@ -55,6 +62,7 @@ export class ProductCacheService {
   /**
    * Pre-fetch all products for the channel on boot.
    * Uses persisted cache when valid (stale-while-revalidate), then updates from network.
+   * Does not filter by availability; all products are cached. Callers decide OOS handling.
    */
   async prefetchChannelProducts(channelId: string): Promise<boolean> {
     this.statusSignal.update((s) => ({ ...s, isLoading: true, error: null }));
@@ -160,14 +168,19 @@ export class ProductCacheService {
   }
 
   /**
-   * Search products by name and manufacturer from cache (offline-capable).
-   * Matches when all words appear somewhere in product name or manufacturer.
+   * Search products from cache (offline-capable).
+   * Matches when the search phrase appears in product name, manufacturer, or any variant SKU
+   * (phrase/substring match, case-insensitive). Aligned with products list and network search
+   * for those fields. Cache does not store description/slug; matches on those only happen when
+   * the network path is used (cache returned no results).
+   * Does not filter by availability; callers decide how to handle out-of-stock items.
    */
   searchProducts(searchTerm: string): ProductSearchResult[] {
-    const words = parseSearchWords(searchTerm);
-    if (words.length === 0 || (words.length === 1 && words[0]!.length < 2)) {
+    const term = searchTerm.trim();
+    if (term.length < 2) {
       return [];
     }
+    const termLower = term.toLowerCase();
 
     const results: ProductSearchResult[] = [];
     for (const product of this.productsById.values()) {
@@ -176,20 +189,23 @@ export class ProductCacheService {
           ?.filter((fv) => fv.facetCode === 'manufacturer')
           .map((fv) => fv.name)
           .join(' ') ?? '';
-      const searchable = `${product.name} ${manufacturerNames}`.toLowerCase();
-      if (words.every((w) => searchable.includes(w))) {
+      const variantSkus = (product.variants ?? [])
+        .map((v) => v.sku)
+        .filter(Boolean)
+        .join(' ');
+      const searchable = `${product.name} ${manufacturerNames} ${variantSkus}`.toLowerCase();
+      if (searchable.includes(termLower)) {
         results.push(product);
       }
     }
 
-    const firstWord = words[0] ?? '';
     return results.slice(0, 10).sort((a, b) => {
       const aName = a.name.toLowerCase();
       const bName = b.name.toLowerCase();
-      const aExact = aName.startsWith(firstWord);
-      const bExact = bName.startsWith(firstWord);
-      if (aExact && !bExact) return -1;
-      if (!aExact && bExact) return 1;
+      const aStarts = aName.startsWith(termLower);
+      const bStarts = bName.startsWith(termLower);
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
       return a.name.localeCompare(b.name);
     });
   }
@@ -204,6 +220,7 @@ export class ProductCacheService {
   /**
    * Get first N products from cache (e.g. for "recent" or quick-select).
    * Shared across Sell and other components to avoid duplicate GET_PRODUCTS.
+   * Does not filter by availability.
    */
   getRecentProducts(limit: number): ProductSearchResult[] {
     return Array.from(this.productsById.values()).slice(0, limit);
