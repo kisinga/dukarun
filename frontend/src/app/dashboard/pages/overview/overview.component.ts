@@ -114,10 +114,6 @@ export class OverviewComponent implements OnInit, OnDestroy {
         const companyId = this.companyService.activeCompanyId();
         if (companyId) {
           this.dashboardService.fetchDashboardData();
-          const channelId = parseInt(companyId, 10);
-          if (!isNaN(channelId)) {
-            this.cashierSessionService.getCurrentSession(channelId).subscribe();
-          }
         }
       },
       { allowSignalWrites: true },
@@ -125,13 +121,6 @@ export class OverviewComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    const companyId = this.companyService.activeCompanyId();
-    if (companyId) {
-      const channelId = parseInt(companyId, 10);
-      if (!isNaN(channelId)) {
-        this.cashierSessionService.getCurrentSession(channelId).subscribe();
-      }
-    }
     this.dashboardService.fetchDashboardData();
     this.initDesktopDefaults();
   }

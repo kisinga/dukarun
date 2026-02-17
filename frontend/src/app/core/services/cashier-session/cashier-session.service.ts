@@ -1,7 +1,8 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { Injectable, inject, signal, computed, effect } from '@angular/core';
 import moment from 'moment';
 import { gql } from '@apollo/client/core';
 import { ApolloService } from '../apollo.service';
+import { CompanyService } from '../company.service';
 import { map, catchError, of, from, tap } from 'rxjs';
 import {
   GET_ACCOUNT_BALANCES_AS_OF,
@@ -155,6 +156,7 @@ export interface CashierSessionListOptions {
 })
 export class CashierSessionService {
   private readonly apolloService = inject(ApolloService);
+  private readonly companyService = inject(CompanyService);
 
   readonly currentSession = signal<CashierSession | null>(null);
   readonly sessions = signal<CashierSession[]>([]);
@@ -210,6 +212,23 @@ export class CashierSessionService {
 
   /** Computed: has variance (non-zero) */
   readonly hasVariance = computed(() => Math.abs(this.varianceAmount()) > 0);
+
+  constructor() {
+    // Load current cashier session (open/close status) whenever the active channel changes,
+    // so the status is available globally and not tied to navigating to the dashboard.
+    effect(() => {
+      const id = this.companyService.activeCompanyId();
+      if (id === null) {
+        this.currentSession.set(null);
+        this.lastClosedAt.set(null);
+        return;
+      }
+      const channelId = parseInt(id, 10);
+      if (Number.isNaN(channelId)) return;
+      const sub = this.getCurrentSession(channelId).subscribe();
+      return () => sub.unsubscribe();
+    });
+  }
 
   /** Session id must be a valid UUID; never store placeholder/invalid ids (e.g. -1). */
   private static isValidSessionId(id: unknown): boolean {
