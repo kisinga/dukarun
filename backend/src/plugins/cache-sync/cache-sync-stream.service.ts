@@ -16,9 +16,19 @@ interface CustomerEventLike {
 }
 
 /**
+ * ProductVariantEvent entity shape (variant has productId for parent product).
+ */
+interface ProductVariantEventLike {
+  type: 'created' | 'updated' | 'deleted';
+  entity: { id: string; productId?: string };
+  ctx: RequestContext;
+}
+
+/**
  * Multicasts entity change events to SSE clients. Subscribes to EventBus
- * (ProductEvent, CustomerEvent, PaymentMethodChangedEvent) and pushes
+ * (ProductEvent, ProductVariantEvent, CustomerEvent, PaymentMethodChangedEvent) and pushes
  * CacheSyncMessage to a single Subject and to the recent buffer for catch-up on reconnect.
+ * ProductVariantEvent (e.g. variant price update) is emitted as product so frontend invalidates the product.
  */
 @Injectable()
 export class CacheSyncStreamService implements OnModuleInit {
@@ -45,6 +55,29 @@ export class CacheSyncStreamService implements OnModuleInit {
       this.message$.next(msg);
       this.recentBuffer.push(msg).catch(() => {});
     });
+
+    try {
+      const { ProductVariantEvent } = require('@vendure/core');
+      this.eventBus.ofType(ProductVariantEvent).subscribe((event: unknown) => {
+        const e = event as ProductVariantEventLike;
+        const channelId = e.ctx?.channelId?.toString();
+        if (!channelId) return;
+        const action = this.toAction(e.type);
+        if (!action) return;
+        const productId = e.entity?.productId?.toString();
+        if (!productId) return;
+        this.logger.log(
+          `CacheSync: event received entityType=product (from variant) action=${action} channelId=${channelId} productId=${productId}`
+        );
+        const msg: CacheSyncMessage = { entityType: 'product', action, channelId, id: productId };
+        this.message$.next(msg);
+        this.recentBuffer.push(msg).catch(() => {});
+      });
+    } catch {
+      this.logger.warn(
+        'ProductVariantEvent not available; variant (e.g. price) cache sync disabled'
+      );
+    }
 
     this.eventBus
       .ofType(PaymentMethodChangedEvent)
