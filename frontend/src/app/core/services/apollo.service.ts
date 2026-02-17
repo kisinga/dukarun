@@ -8,11 +8,9 @@ import { environment } from '../../../environments/environment';
 import { APOLLO_TEST_CLIENT } from './apollo-test-client.token';
 
 /**
- * Service for managing Apollo GraphQL client
- * Handles authentication tokens, headers, and request configuration
- *
- * Channel token: CompanyService calls setChannelToken() whenever the active company changes.
- * The token is held in memory (not localStorage) and read by the authLink on every request.
+ * Apollo client: auth is cookie-only (credentials: 'include'); no Authorization header.
+ * Single auth path for GraphQL and SSE (EventSource cannot send headers). Channel token
+ * is still sent via vendure-token header when available.
  */
 @Injectable({
   providedIn: 'root',
@@ -20,7 +18,6 @@ import { APOLLO_TEST_CLIENT } from './apollo-test-client.token';
 export class ApolloService {
   private readonly router = inject(Router);
 
-  private readonly AUTH_TOKEN_KEY = 'auth_token';
   private readonly LANGUAGE_CODE_KEY = 'language_code';
 
   private apolloClient: ApolloClient;
@@ -60,27 +57,6 @@ export class ApolloService {
    */
   getClient(): ApolloClient {
     return this.apolloClient;
-  }
-
-  /**
-   * Store authentication token
-   */
-  setAuthToken(token: string): void {
-    localStorage.setItem(this.AUTH_TOKEN_KEY, token);
-  }
-
-  /**
-   * Get stored authentication token
-   */
-  getAuthToken(): string | null {
-    return localStorage.getItem(this.AUTH_TOKEN_KEY);
-  }
-
-  /**
-   * Remove authentication token
-   */
-  clearAuthToken(): void {
-    localStorage.removeItem(this.AUTH_TOKEN_KEY);
   }
 
   /**
@@ -125,41 +101,16 @@ export class ApolloService {
     });
 
     /**
-     * Middleware to attach auth token and headers to requests
-     *
-     * Channel Token Behavior:
-     * - By default, channel token is included in all requests (if available)
-     * - To skip channel token for specific operations, pass context option:
-     *
-     *   Example:
-     *   ```
-     *   client.query({
-     *     query: MY_QUERY,
-     *     context: { skipChannelToken: true }
-     *   })
-     *   ```
-     *
-     * This is useful for auth operations where channel context isn't established yet
+     * Context link: channel token + tracing. Auth is cookie-only (credentials: 'include' on HttpLink).
+     * Skip channel token via context: { skipChannelToken: true } (e.g. login).
      */
-    const authLink = new SetContextLink(async (prevContext, operation) => {
-      const authToken = this.getAuthToken();
+    const authLink = new SetContextLink(async (prevContext) => {
       const channelToken = this.getChannelToken();
       const headers: Record<string, string> = { ...prevContext['headers'] };
-
-      if (authToken) {
-        headers['authorization'] = `Bearer ${authToken}`;
-      }
-
-      // Only send channel token if:
-      // 1. Channel token exists
-      // 2. Operation context doesn't explicitly skip it
       if (channelToken && !prevContext['skipChannelToken']) {
         headers['vendure-token'] = channelToken;
       }
-
-      // Propagate trace context to backend for distributed tracing
       propagation.inject(otelContext.active(), headers);
-
       return { headers };
     });
 
@@ -237,9 +188,6 @@ export class ApolloService {
    * Clears local state and redirects to login
    */
   private handleSessionExpired(): void {
-    // Clear auth token
-    this.clearAuthToken();
-
     // Notify AuthService to clean up its state (including company/channel state)
     if (this.sessionExpiredCallback) {
       this.sessionExpiredCallback();

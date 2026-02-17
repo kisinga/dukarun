@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "test": "jest --passWithNoTests"
+    "test": "jest"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
@@ -22,9 +22,11 @@
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
     "@types/node": "^25.0.6",
     "jest": "^30.2.0",
     "nodemon": "^3.1.11",
+    "ts-jest": "^29.4.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
   }

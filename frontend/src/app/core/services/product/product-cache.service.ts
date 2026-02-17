@@ -1,10 +1,16 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { CACHE_CONFIGS, CacheService } from '../cache.service';
+import { AppCacheService } from '../cache/app-cache.service';
+import { CacheSyncService } from '../cache/cache-sync.service';
+import type { CacheSyncEntityHandler } from '../cache/cache-sync-handler.interface';
 import { PREFETCH_PRODUCTS } from '../../graphql/operations.graphql';
+import { GET_PRODUCT } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { ProductMapperService } from './product-mapper.service';
 import { SalesSyncGuardService } from '../sales-sync-guard.service';
 import { ProductSearchResult, ProductVariant } from './product-search.service';
+
+const PRODUCTS_CACHE_KEY = 'products_list';
+const PRODUCTS_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
 /** Persisted shape for product list cache */
 interface ProductCachePayload {
@@ -38,11 +44,18 @@ export interface CacheStatus {
 @Injectable({
   providedIn: 'root',
 })
-export class ProductCacheService {
+export class ProductCacheService implements CacheSyncEntityHandler {
+  readonly entityType = 'product' as const;
+
   private readonly apolloService = inject(ApolloService);
-  private readonly cacheService = inject(CacheService);
+  private readonly appCache = inject(AppCacheService);
   private readonly salesSyncGuard = inject(SalesSyncGuardService);
   private readonly mapper = inject(ProductMapperService);
+  private readonly cacheSyncService = inject(CacheSyncService);
+
+  constructor() {
+    this.cacheSyncService.registerHandler(this);
+  }
 
   // Signals for cache status
   private readonly statusSignal = signal<CacheStatus>({
@@ -67,13 +80,17 @@ export class ProductCacheService {
   async prefetchChannelProducts(channelId: string): Promise<boolean> {
     this.statusSignal.update((s) => ({ ...s, isLoading: true, error: null }));
 
-    // Try hydrate from localStorage first (resilient to poor connection / instant boot)
-    const stored = this.cacheService.get<ProductCachePayload>(
-      CACHE_CONFIGS.PRODUCTS,
-      'list',
-      channelId,
-    );
-    if (stored?.products?.length) {
+    const scope = `channel:${channelId}` as const;
+    const stored = await this.appCache.getKV<ProductCachePayload>(scope, PRODUCTS_CACHE_KEY);
+
+    // Use cache if valid and not expired (24h TTL)
+    const now = Date.now();
+    const valid =
+      stored?.products?.length &&
+      stored.lastSync != null &&
+      now - stored.lastSync < PRODUCTS_TTL_MS;
+
+    if (valid && stored) {
       this.hydrateFromPayload(stored);
       console.log(`📦 Hydrated ${stored.products.length} products from cache`);
       this.statusSignal.update((s) => ({
@@ -84,14 +101,10 @@ export class ProductCacheService {
         lastSync: stored.lastSync ? new Date(stored.lastSync) : null,
         error: null,
       }));
-      // Revalidate in background (stale-while-revalidate)
-      this.prefetchFromNetwork(channelId).catch(() => {
-        // Keep existing cache on failure
-      });
+      this.prefetchFromNetwork(channelId).catch(() => {});
       return true;
     }
 
-    // No valid cache: fetch from network
     return this.prefetchFromNetwork(channelId);
   }
 
@@ -130,13 +143,11 @@ export class ProductCacheService {
 
       this.hydrateFromPayload({ products, lastSync: Date.now() });
 
-      // Persist for next boot and poor-connection resilience
-      this.cacheService.set(
-        CACHE_CONFIGS.PRODUCTS,
-        'list',
-        { products, lastSync: Date.now() },
-        channelId,
-      );
+      const scope = `channel:${channelId}` as const;
+      await this.appCache.setKV(scope, PRODUCTS_CACHE_KEY, {
+        products,
+        lastSync: Date.now(),
+      });
 
       console.log(`✅ Cached ${products.length} products locally`);
       this.statusSignal.update((s) => ({
@@ -243,15 +254,86 @@ export class ProductCacheService {
     return null;
   }
 
+  /** CacheSyncEntityHandler: fetch one product and update cache. */
+  async hydrateOne(channelId: string, productId: string): Promise<void> {
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.query<{ product: unknown }>({
+        query: GET_PRODUCT,
+        variables: { id: productId },
+        fetchPolicy: 'network-only',
+      });
+      const raw = result.data?.product;
+      if (!raw) return;
+      const product = this.mapper.toProductSearchResult(raw);
+      this.productsById.set(product.id, product);
+      const normalizedName = product.name.toLowerCase();
+      const existing = this.productsByName.get(normalizedName) ?? [];
+      const without = existing.filter((p) => p.id !== product.id);
+      this.productsByName.set(normalizedName, [...without, product]);
+      this.statusSignal.update((s) => ({
+        ...s,
+        productCount: this.productsById.size,
+      }));
+      const scope = `channel:${channelId}` as const;
+      const stored = await this.appCache.getKV<ProductCachePayload>(scope, PRODUCTS_CACHE_KEY);
+      if (stored?.products) {
+        const rest = stored.products.filter((p) => p.id !== product.id);
+        const products = [...rest, product];
+        await this.appCache.setKV(scope, PRODUCTS_CACHE_KEY, {
+          products,
+          lastSync: Date.now(),
+        });
+      }
+    } catch (err) {
+      console.warn('[ProductCache] hydrateOne failed', { channelId, productId }, err);
+    }
+  }
+
+  /** CacheSyncEntityHandler: remove one product from cache. */
+  invalidateOne(channelId: string, productId: string): void {
+    const product = this.productsById.get(productId);
+    if (!product) return;
+    this.productsById.delete(productId);
+    const normalizedName = product.name.toLowerCase();
+    const list = this.productsByName.get(normalizedName);
+    if (list) {
+      const next = list.filter((p) => p.id !== productId);
+      if (next.length) this.productsByName.set(normalizedName, next);
+      else this.productsByName.delete(normalizedName);
+    }
+    this.statusSignal.update((s) => ({
+      ...s,
+      productCount: this.productsById.size,
+    }));
+    const scope = `channel:${channelId}` as const;
+    void this.appCache.getKV<ProductCachePayload>(scope, PRODUCTS_CACHE_KEY).then((stored) => {
+      if (stored?.products) {
+        const products = stored.products.filter((p) => p.id !== productId);
+        return this.appCache.setKV(scope, PRODUCTS_CACHE_KEY, {
+          products,
+          lastSync: stored.lastSync ?? Date.now(),
+        });
+      }
+      return undefined;
+    });
+  }
+
+  has(channelId: string, id: string): boolean {
+    return this.productsById.has(id);
+  }
+
   /**
    * Clear cache (memory and persisted for current channel).
    * Caller should pass channelId when known so persisted cache is cleared.
    */
   clearCache(channelId?: string): void {
+    console.log('[ProductCache] clearCache', { channelId });
     this.productsById.clear();
     this.productsByName.clear();
     if (channelId) {
-      this.cacheService.remove(CACHE_CONFIGS.PRODUCTS, 'list', channelId);
+      const scope = `channel:${channelId}` as const;
+      this.appCache.removeKV(scope, PRODUCTS_CACHE_KEY);
     }
     this.statusSignal.set({
       isInitialized: false,

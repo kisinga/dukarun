@@ -34,6 +34,7 @@ import {
 import { FractionalQuantityPlugin } from './plugins/inventory/fractional-quantity.plugin';
 import { LedgerPlugin } from './plugins/ledger/ledger.plugin';
 import { MlModelPlugin } from './plugins/ml/ml-model.plugin';
+import { CacheSyncPlugin } from './plugins/cache-sync/cache-sync.plugin';
 import { NotificationPlugin } from './plugins/notifications/notification.plugin';
 import { OverridePricePermission } from './plugins/pricing/price-override.permission';
 import { PriceOverridePlugin } from './plugins/pricing/price-override.plugin';
@@ -112,7 +113,9 @@ export const config: VendureConfig = {
     uploadMaxFileSize: 52428800, // 50MB for large model files
   },
   authOptions: {
-    tokenMethod: ['bearer', 'cookie'],
+    // Cookie-first: app uses cookie only (EventSource/SSE cannot send headers). Bearer kept for scripts (e.g. deploy-ml-model.js).
+    // Vendure applies cookie-session to admin/shop only when cookieOptions.name is an object, so req.session is set and AuthGuard sees the token.
+    tokenMethod: ['cookie', 'bearer'],
     superadminCredentials: {
       identifier: env.superadmin.username,
       password: env.superadmin.password,
@@ -121,8 +124,9 @@ export const config: VendureConfig = {
       secret: env.app.cookieSecret,
       httpOnly: true,
       sameSite: 'lax',
-      secure: COOKIE_SECURE,
+      secure: COOKIE_SECURE, // false for localhost (http); true for production https
       maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year in milliseconds
+      name: { shop: 'session', admin: 'session' }, // Required so Vendure mounts cookie-session middleware and populates req.session
     },
     customPermissions: [
       OverridePricePermission,
@@ -134,6 +138,10 @@ export const config: VendureConfig = {
     // OTP token auth strategy will be registered by PhoneAuthPlugin before bootstrap
     // It must be first in the array to be found by getAuthenticationStrategy (which uses find())
   },
+  // --- Auth transport (tokenMethod) pros/cons ---
+  // Cookie-only: Single path for browser (GraphQL + SSE). No header/cookie sync. EventSource works. Scripts/CLI cannot use admin-api without a cookie jar.
+  // Bearer-only: Scripts/CLI/mobile easy. SSE cannot send headers, so cache-sync would need a separate workaround.
+  // Cookie + bearer (current): App uses cookie; scripts (e.g. deploy-ml-model.js) keep using Bearer. Cookie-first order so browser requests use session cookie when present.
   dbConnectionOptions: {
     type: 'postgres',
     synchronize: false, // Never use in production
@@ -1478,6 +1486,7 @@ export const config: VendureConfig = {
     ChannelSettingsPlugin,
     FractionalQuantityPlugin,
     NotificationPlugin,
+    CacheSyncPlugin,
     ApprovalPlugin,
     AuditCorePlugin, // AuditService only (no GraphQL). Required by LedgerPlugin and AuditPlugin.
     LedgerPlugin, // Load before CreditPlugin - provides PostingService

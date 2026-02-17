@@ -5,6 +5,7 @@ import {
   SubscribeToPushDocument,
   UnsubscribeToPushDocument,
 } from '../../graphql/generated/graphql';
+import { AppCacheService } from '../cache/app-cache.service';
 import { ApolloService } from '../apollo.service';
 import { AuthService } from '../auth.service';
 import { NotificationLoaderService } from './notification-loader.service';
@@ -42,7 +43,9 @@ export class NotificationPushService {
   readonly isPushEnabled = this.isPushEnabledSignal.asReadonly();
   readonly permission = this.permissionSignal.asReadonly();
 
-  private readonly HAS_PROMPTED_KEY = 'notification_permission_prompted';
+  private static readonly CACHE_KEY_PROMPTED = 'notification_permission_prompted';
+
+  private readonly appCache = inject(AppCacheService);
 
   constructor() {
     // Initialize push service when authenticated
@@ -176,11 +179,11 @@ export class NotificationPushService {
    * Prompt for notification permission if not already prompted
    */
   async promptPermissionIfNeeded(): Promise<void> {
-    if (this.hasPrompted()) {
+    if (await this.hasPrompted()) {
       return;
     }
 
-    this.setPrompted();
+    await this.setPrompted();
 
     if (Notification.permission === 'default') {
       await this.requestPushPermission();
@@ -468,17 +471,21 @@ export class NotificationPushService {
   }
 
   /**
-   * Check if permission was already prompted
+   * Check if permission was already prompted (stored in app cache, cleared on logout)
    */
-  private hasPrompted(): boolean {
-    return localStorage.getItem(this.HAS_PROMPTED_KEY) === 'true';
+  private async hasPrompted(): Promise<boolean> {
+    const value = await this.appCache.getKV<boolean>(
+      'global',
+      NotificationPushService.CACHE_KEY_PROMPTED,
+    );
+    return value === true;
   }
 
   /**
    * Mark permission as prompted
    */
-  private setPrompted(): void {
-    localStorage.setItem(this.HAS_PROMPTED_KEY, 'true');
+  private async setPrompted(): Promise<void> {
+    await this.appCache.setKV('global', NotificationPushService.CACHE_KEY_PROMPTED, true);
   }
 
   /**

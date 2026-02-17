@@ -98,7 +98,16 @@ export class MlModelService {
       const result = await this.loaderService.loadModel(channelId);
 
       if (!result) {
-        throw new Error('Failed to load model');
+        this.errorSignal.set({
+          type: ModelErrorType.NOT_FOUND,
+          message:
+            'ML model not configured for this channel. Set up model asset IDs in channel settings to use product recognition.',
+          technicalDetails: `No model sources for channel ${channelId}`,
+        });
+        this.model = null;
+        this.metadata = null;
+        this.isInitializedSignal.set(false);
+        return false;
       }
 
       this.model = result.model;

@@ -57,7 +57,7 @@ import type { NavItem, NavSection } from './nav.types';
 export class DashboardLayoutComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly companyService = inject(CompanyService);
-  private readonly appInitService = inject(AppInitService);
+  protected readonly appInitService = inject(AppInitService);
   private readonly notificationService = inject(NotificationService);
   private readonly notificationStateService = inject(NotificationStateService);
   private readonly subscriptionService = inject(SubscriptionService);
@@ -187,6 +187,14 @@ export class DashboardLayoutComponent implements OnInit {
 
   // Shift status
   protected readonly shiftOpen = this.cashierSessionService.hasActiveSession;
+  /** Ticks every 60s so shift duration in the badge updates. */
+  protected readonly shiftDurationTick = signal(0);
+  /** "at 09:30" (same day) or "on 15 Feb 2025 09:30" (other day). Badge already shows open/closed. */
+  protected readonly shiftDurationText = computed(() => {
+    this.shiftDurationTick();
+    const since = this.cashierSessionService.shiftStatusSince();
+    return since?.at ? this.cashierSessionService.formatShiftTimeAt(since.at) : null;
+  });
 
   protected readonly userAvatar = computed(() => {
     const user = this.user();
@@ -230,6 +238,10 @@ export class DashboardLayoutComponent implements OnInit {
       if (mode === 'open') this.openOpenDayModal();
       else this.openCloseDayModal();
     });
+
+    // Update shift duration in badge every 60s
+    const intervalId = setInterval(() => this.shiftDurationTick.update((n) => n + 1), 60_000);
+    this.destroyRef.onDestroy(() => clearInterval(intervalId));
   }
 
   ngOnInit(): void {
@@ -464,6 +476,19 @@ export class DashboardLayoutComponent implements OnInit {
   setDayModalBalance(accountCode: string, value: string | number): void {
     const str = value != null && value !== '' ? String(value) : '';
     this.dayModalBalances.update((prev) => ({ ...prev, [accountCode]: str }));
+  }
+
+  /** Display name for an account in the shift modal: prefer ledger account name from balances, else payment method. */
+  getAccountDisplayName(acc: PaymentMethodReconciliationConfig): string {
+    const code = acc.ledgerAccountCode;
+    if (this.dayModalMode() === 'open') {
+      const p = this.dayModalPreviousClosing().find((b) => b.accountCode === code);
+      if (p?.accountName) return p.accountName;
+    } else {
+      const e = this.dayModalExpectedClosing().find((b) => b.accountCode === code);
+      if (e?.accountName) return e.accountName;
+    }
+    return acc.paymentMethodName || acc.paymentMethodCode;
   }
 
   /** Check if the opening modal has any variance from previous closing. */

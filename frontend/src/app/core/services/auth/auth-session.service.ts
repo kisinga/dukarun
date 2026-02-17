@@ -75,7 +75,7 @@ export class AuthSessionService {
 
         // CRITICAL: Restore session BEFORE fetching channels
         // This prevents fetchUserChannels from resetting to first company
-        this.companyService.initializeFromStorage();
+        await this.companyService.initializeFromCache();
 
         // Fetch user channels asynchronously (non-blocking) to restore channel state
         // This ensures channels are available even on hard refresh, but doesn't block initialization
@@ -105,7 +105,6 @@ export class AuthSessionService {
   clearSession(): void {
     this.userSignal.set(null);
     this.companyService.clearActiveCompany();
-    this.apolloService.clearAuthToken();
     this.apolloService.clearCache();
   }
 

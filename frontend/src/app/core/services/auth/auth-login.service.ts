@@ -8,7 +8,7 @@ import type {
 import { formatPhoneNumber } from '../../utils/phone.utils';
 import { ApolloService } from '../apollo.service';
 import { AppInitService } from '../app-init.service';
-import { CacheService } from '../cache.service';
+import { AppCacheService } from '../cache/app-cache.service';
 import { CompanyService } from '../company.service';
 import { AuthOtpService } from './auth-otp.service';
 import { AuthSessionService } from './auth-session.service';
@@ -27,7 +27,7 @@ export class AuthLoginService {
   private readonly otpService = inject(AuthOtpService);
   private readonly sessionService = inject(AuthSessionService);
   private readonly companyService = inject(CompanyService);
-  private readonly cacheService = inject(CacheService);
+  private readonly appCache = inject(AppCacheService);
   private readonly appInitService = inject(AppInitService);
 
   /**
@@ -39,8 +39,8 @@ export class AuthLoginService {
       // Clear Apollo cache (GraphQL query results)
       await this.apolloService.clearCache();
 
-      // Clear all CacheService caches (localStorage, sessionStorage, memory)
-      this.cacheService.clearAll();
+      // Clear single app cache (channel DB + global/session KV)
+      await this.appCache.clearAll();
 
       // Clear company session data
       this.companyService.clearActiveCompany();

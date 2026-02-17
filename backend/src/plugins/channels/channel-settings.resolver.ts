@@ -1,8 +1,9 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
+import { Allow, Ctx, EventBus, Permission, RequestContext } from '@vendure/core';
 import { gql } from 'graphql-tag';
 
+import { PaymentMethodChangedEvent } from '../../infrastructure/events/cache-invalidation.events';
 import { ChannelSettingsService } from '../../services/channels/channel-settings.service';
 import {
   ChannelAdminService,
@@ -69,10 +70,13 @@ export const channelSettingsSchema = gql`
 
 @Resolver()
 export class ChannelSettingsResolver {
+  private readonly logger = new Logger(ChannelSettingsResolver.name);
+
   constructor(
     private readonly channelSettingsService: ChannelSettingsService,
     private readonly channelAdminService: ChannelAdminService,
-    private readonly channelPaymentService: ChannelPaymentService
+    private readonly channelPaymentService: ChannelPaymentService,
+    private readonly eventBus: EventBus
   ) {}
 
   @Query()
@@ -181,12 +185,26 @@ export class ChannelSettingsResolver {
   @Mutation()
   @Allow(Permission.CreatePaymentMethod)
   async createChannelPaymentMethod(@Ctx() ctx: RequestContext, @Args('input') input: any) {
-    return this.channelPaymentService.createChannelPaymentMethod(ctx, input);
+    const result = await this.channelPaymentService.createChannelPaymentMethod(ctx, input);
+    if (result?.id != null) {
+      this.eventBus.publish(new PaymentMethodChangedEvent(ctx, 'created', String(result.id)));
+      this.logger.log(
+        `CacheSync: published PaymentMethodChangedEvent action=created paymentMethodId=${result.id} channelId=${ctx.channelId ?? 'n/a'}`
+      );
+    }
+    return result;
   }
 
   @Mutation()
   @Allow(Permission.UpdatePaymentMethod)
   async updateChannelPaymentMethod(@Ctx() ctx: RequestContext, @Args('input') input: any) {
-    return this.channelPaymentService.updateChannelPaymentMethod(ctx, input);
+    const result = await this.channelPaymentService.updateChannelPaymentMethod(ctx, input);
+    if (result?.id != null) {
+      this.eventBus.publish(new PaymentMethodChangedEvent(ctx, 'updated', String(result.id)));
+      this.logger.log(
+        `CacheSync: published PaymentMethodChangedEvent action=updated paymentMethodId=${result.id} channelId=${ctx.channelId ?? 'n/a'}`
+      );
+    }
+    return result;
   }
 }

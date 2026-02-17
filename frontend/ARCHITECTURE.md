@@ -561,7 +561,6 @@ Dashboard is **channel-specific** by default. Users with multi-company access ca
 - `getDefaultLocation()` - Returns channel's default stock location
 - Removed: `activeLocationId` signal (no longer needed)
 - Removed: `selectLocation()` method (no multi-location support yet)
-- Removed: localStorage persistence for location
 
 **DashboardService:**
 
@@ -573,7 +572,7 @@ Dashboard is **channel-specific** by default. Users with multi-company access ca
 **Application Boot:**
 
 ```
-1. Login → Company restored from localStorage
+1. Login → Company restored from cache
 2. StockLocationService.fetchLocations()
 3. Default location identified (first location or from channel.customFields.defaultStockLocationId)
 4. Dashboard fetches channel-scoped data
