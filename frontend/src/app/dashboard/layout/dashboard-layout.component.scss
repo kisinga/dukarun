@@ -3,6 +3,21 @@
   display: block;
 }
 
+// Indeterminate progress bar for cache loading overlay
+.cache-loading-bar {
+  width: 33%;
+  animation: cache-loading-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes cache-loading-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
 // Duka Door logo: show light or dark by theme — prominent in sidebar
 .duka-door-logo {
   position: relative;

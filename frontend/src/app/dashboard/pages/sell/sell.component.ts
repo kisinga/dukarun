@@ -5,6 +5,7 @@ import {
   OnDestroy,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -24,6 +25,7 @@ import {
   ProductVariant,
 } from '../../../core/services/product/product-search.service';
 import { SalesSyncGuardService } from '../../../core/services/sales-sync-guard.service';
+import { ShiftModalTriggerService } from '../../../core/services/cashier-session/shift-modal-trigger.service';
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { CartComponent, CartItem } from './components/cart.component';
 import { CheckoutFabComponent } from './components/checkout-fab.component';
@@ -76,9 +78,10 @@ export class SellComponent implements OnInit, OnDestroy {
   private readonly orderService = inject(OrderService);
   private readonly ordersService = inject(OrdersService);
   private readonly authService = inject(AuthService);
-  private readonly cartService = inject(CartService);
+  protected readonly cartService = inject(CartService);
   private readonly customerService = inject(CustomerService);
   protected readonly cashierSessionService = inject(CashierSessionService);
+  protected readonly shiftModalTrigger = inject(ShiftModalTriggerService);
   private readonly printService = inject(PrintService);
   private readonly printPreferences = inject(PrintPreferencesService);
   private readonly salesSyncGuard = inject(SalesSyncGuardService);
@@ -123,8 +126,17 @@ export class SellComponent implements OnInit, OnDestroy {
   readonly showClearCartConfirm = signal<boolean>(false);
   readonly cartItemAdded = signal<boolean>(false); // Visual feedback flag
 
-  // Cart state
+  // Cart state (synced from CartService when cache load completes and on mutations)
   readonly cartItems = signal<CartItem[]>([]);
+
+  constructor() {
+    effect(() => {
+      if (!this.cartService.isLoadingFromCache()) {
+        this.cartItems.set(this.cartService.cartItems());
+      }
+    });
+  }
+
   readonly cartSubtotal = computed(() =>
     this.cartItems().reduce((sum, item) => sum + item.subtotal, 0),
   );
@@ -162,13 +174,22 @@ export class SellComponent implements OnInit, OnDestroy {
   readonly quickSelectOpen = signal<boolean>(false);
   private resizeListener?: () => void;
 
+  /** Ticks every 60s so closed time in banner updates. */
+  private readonly closedDurationTick = signal(0);
+  /** When no session: "at 17:45" or "on 14 Feb 2025 17:45". Banner already says closed. */
+  protected readonly closedDurationText = computed(() => {
+    this.closedDurationTick();
+    if (this.cashierSessionService.hasActiveSession()) return null;
+    const at = this.cashierSessionService.lastClosedAt();
+    return at ? this.cashierSessionService.formatShiftTimeAt(at) : null;
+  });
+
   async ngOnInit(): Promise<void> {
     this.checkMobile();
     this.resizeListener = () => this.checkMobile();
     window.addEventListener('resize', this.resizeListener);
 
     this.cartService.loadCartFromCache();
-    this.cartItems.set(this.cartService.cartItems());
 
     const companyId = this.companyService.activeCompanyId();
     if (companyId) {
@@ -182,9 +203,17 @@ export class SellComponent implements OnInit, OnDestroy {
     if (this.quickSelectOpen()) {
       await this.loadQuickSelectProducts();
     }
+
+    this.closedDurationIntervalId = setInterval(
+      () => this.closedDurationTick.update((n) => n + 1),
+      60_000,
+    );
   }
 
+  private closedDurationIntervalId?: ReturnType<typeof setInterval>;
+
   ngOnDestroy(): void {
+    if (this.closedDurationIntervalId) clearInterval(this.closedDurationIntervalId);
     if (this.resizeListener) {
       window.removeEventListener('resize', this.resizeListener);
     }
@@ -848,16 +877,12 @@ export class SellComponent implements OnInit, OnDestroy {
           // Fetch full order data for printing
           const fullOrder = await this.ordersService.fetchOrderById(order.id);
           if (fullOrder) {
-            await this.printService.printOrder(
-              fullOrder,
-              this.printPreferences.getDefaultTemplateId(),
-              {
-                documentType:
-                  this.printPreferences.getDefaultTemplateId() === 'a4' ? 'invoice' : 'receipt',
-                paymentMethodName: 'Credit',
-                servedBy: this.authService.user()?.firstName ?? undefined,
-              },
-            );
+            const templateId = await this.printPreferences.getDefaultTemplateId();
+            await this.printService.printOrder(fullOrder, templateId, {
+              documentType: templateId === 'a4' ? 'invoice' : 'receipt',
+              paymentMethodName: 'Credit',
+              servedBy: this.authService.user()?.firstName ?? undefined,
+            });
           } else {
             this.showNotification('Order created but printing failed', 'warning');
           }
@@ -947,16 +972,12 @@ export class SellComponent implements OnInit, OnDestroy {
           // Fetch full order data for printing
           const fullOrder = await this.ordersService.fetchOrderById(order.id);
           if (fullOrder) {
-            await this.printService.printOrder(
-              fullOrder,
-              this.printPreferences.getDefaultTemplateId(),
-              {
-                documentType:
-                  this.printPreferences.getDefaultTemplateId() === 'a4' ? 'invoice' : 'receipt',
-                paymentMethodName: this.selectedPaymentMethod()?.name,
-                servedBy: this.authService.user()?.firstName ?? undefined,
-              },
-            );
+            const templateId = await this.printPreferences.getDefaultTemplateId();
+            await this.printService.printOrder(fullOrder, templateId, {
+              documentType: templateId === 'a4' ? 'invoice' : 'receipt',
+              paymentMethodName: this.selectedPaymentMethod()?.name,
+              servedBy: this.authService.user()?.firstName ?? undefined,
+            });
           } else {
             this.showNotification('Order created but printing failed', 'warning');
           }

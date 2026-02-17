@@ -12,19 +12,34 @@
   </div>
 }
 
-<!-- Session required banner -->
+<!-- Session required banner — click opens open-shift modal directly -->
 @if (!cashierSessionService.hasActiveSession()) {
-  <div class="alert alert-warning mx-4 md:mx-6 mt-3 md:mt-4 p-3 sm:p-4">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+  <button
+    type="button"
+    (click)="shiftModalTrigger.openOpenModal()"
+    class="alert alert-warning mx-4 md:mx-6 mt-3 md:mt-4 p-3 sm:p-4 w-[calc(100%-2rem)] md:w-[calc(100%-3rem)] text-left cursor-pointer hover:brightness-95 transition-all border-0 gap-3"
+    aria-label="Open shift to sell — opens shift modal"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      class="h-5 w-5 shrink-0"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+    >
       <path
         fill-rule="evenodd"
         d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
         clip-rule="evenodd"
       />
     </svg>
-    <span>Open a session to sell. Go to the Dashboard and click "Open shift" first.</span>
-    <a routerLink="/dashboard" class="btn btn-sm btn-ghost">Open shift</a>
-  </div>
+    <span class="flex-1">
+      Open a session to sell. Click here to open shift.
+      @if (closedDurationText(); as duration) {
+        <span class="block text-xs opacity-90 mt-0.5 tabular-nums">{{ duration }}</span>
+      }
+    </span>
+    <span class="btn btn-sm btn-ghost shrink-0">Open shift</span>
+  </button>
 }
 
 <!-- Main Content -->
@@ -106,15 +121,24 @@
   }
 
   <!-- Inline Cart (Always Visible) -->
-  <app-cart
-    [items]="cartItems()"
-    [canOverridePrices]="canOverridePrices()"
-    [displayMode]="'inline'"
-    (quantityChange)="handleCartQuantityChange($event)"
-    (priceChange)="handlePriceOverrideChange($event)"
-    (removeItem)="handleCartItemRemove($event)"
-    (clearCart)="handleClearCart()"
-  />
+  @if (cartService.isLoadingFromCache()) {
+    <div
+      class="flex items-center justify-center py-6 border border-base-300 rounded-lg bg-base-100"
+    >
+      <span class="loading loading-spinner loading-md"></span>
+      <span class="ml-2 text-sm text-base-content/70">Loading cart...</span>
+    </div>
+  } @else {
+    <app-cart
+      [items]="cartItems()"
+      [canOverridePrices]="canOverridePrices()"
+      [displayMode]="'inline'"
+      (quantityChange)="handleCartQuantityChange($event)"
+      (priceChange)="handlePriceOverrideChange($event)"
+      (removeItem)="handleCartItemRemove($event)"
+      (clearCart)="handleClearCart()"
+    />
+  }
 </div>
 
 <!-- Checkout FAB -->

@@ -1,13 +1,17 @@
 import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import { ApolloService } from './apollo.service';
+import { CacheSyncService } from './cache/cache-sync.service';
 import { CompanyService } from './company.service';
+import { CustomerSearchService } from './customer/customer-search.service';
 import { loadMlModelService } from './ml-model.loader';
 import type { MlModelService } from './ml-model/ml-model.service';
 import { ModelErrorType } from './ml-model/model-error.util';
 import { NotificationService } from './notification.service';
+import { PaymentMethodService } from './payment-method.service';
 import { ProductCacheService } from './product/product-cache.service';
 import { SalesSyncGuardService } from './sales-sync-guard.service';
 import { StockLocationService } from './stock-location.service';
+import { SupplierSearchService } from './supplier/supplier-search.service';
 
 /**
  * Initialization status for dashboard boot
@@ -32,10 +36,15 @@ export class AppInitService {
   private readonly apolloService = inject(ApolloService);
   private readonly companyService = inject(CompanyService);
   private readonly productCacheService = inject(ProductCacheService);
+  private readonly paymentMethodService = inject(PaymentMethodService);
+  private readonly customerSearchService = inject(CustomerSearchService);
+  private readonly supplierSearchService = inject(SupplierSearchService);
   private readonly salesSyncGuard = inject(SalesSyncGuardService);
   private readonly stockLocationService = inject(StockLocationService);
   private readonly notificationService = inject(NotificationService);
   private readonly injector = inject(Injector);
+  /** Injected so CacheSyncService is created and starts SSE when user has a channel */
+  private readonly cacheSyncService = inject(CacheSyncService);
   private mlModelService: MlModelService | null = null;
 
   private readonly initStatusSignal = signal<InitStatus>({
@@ -78,14 +87,17 @@ export class AppInitService {
     this.initStatusSignal.update((s) => ({ ...s, channelId, error: null }));
 
     try {
-      // Run prefetch operations in parallel
-      const [productsSuccess, modelSuccess, locationsSuccess, notificationsSuccess] =
-        await Promise.allSettled([
-          this.prefetchProducts(channelId),
-          this.prefetchModel(channelId),
-          this.prefetchStockLocations(),
-          this.prefetchNotifications(),
-        ]);
+      // Run prefetch operations in parallel (payment methods, customers, suppliers populate cache for sell/checkout)
+      const settled = await Promise.allSettled([
+        this.prefetchProducts(channelId),
+        this.prefetchModel(channelId),
+        this.prefetchStockLocations(),
+        this.prefetchNotifications(),
+        this.prefetchPaymentMethods(),
+        this.prefetchCustomers(),
+        this.prefetchSuppliers(),
+      ]);
+      const [productsSuccess, modelSuccess, locationsSuccess, notificationsSuccess] = settled;
 
       // Update status based on results
       this.initStatusSignal.update((s) => ({
@@ -192,6 +204,45 @@ export class AppInitService {
       return true;
     } catch (error: any) {
       console.error('Failed to prefetch notifications:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Pre-fetch payment methods for checkout/sell (populates AppCacheService)
+   */
+  private async prefetchPaymentMethods(): Promise<boolean> {
+    try {
+      await this.paymentMethodService.getPaymentMethods();
+      return true;
+    } catch (error: any) {
+      console.warn('Failed to prefetch payment methods:', error?.message ?? error);
+      return false;
+    }
+  }
+
+  /**
+   * Pre-fetch customers for sell/customer list (populates AppCacheService)
+   */
+  private async prefetchCustomers(): Promise<boolean> {
+    try {
+      await this.customerSearchService.fetchCustomers();
+      return true;
+    } catch (error: any) {
+      console.warn('Failed to prefetch customers:', error?.message ?? error);
+      return false;
+    }
+  }
+
+  /**
+   * Pre-fetch suppliers for purchase flows (populates AppCacheService)
+   */
+  private async prefetchSuppliers(): Promise<boolean> {
+    try {
+      await this.supplierSearchService.fetchSuppliers();
+      return true;
+    } catch (error: any) {
+      console.warn('Failed to prefetch suppliers:', error?.message ?? error);
       return false;
     }
   }

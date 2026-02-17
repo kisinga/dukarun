@@ -22,7 +22,11 @@ export interface ModelError {
 export function parseError(error: any): ModelError {
   const message = error.message || 'Unknown error';
 
-  if (message.includes('not found') || message.includes('404')) {
+  if (
+    message.includes('not found') ||
+    message.includes('404') ||
+    message.includes('not configured')
+  ) {
     return {
       type: ModelErrorType.NOT_FOUND,
       message: 'ML model files not found. Please train a model for your store first.',

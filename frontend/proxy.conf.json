@@ -5,7 +5,8 @@
     "target": "http://localhost:3000",
     "secure": false,
     "changeOrigin": true,
-    "logLevel": "debug"
+    "logLevel": "debug",
+    "withCredentials": true
   },
   "/shop-api": {
     "target": "http://localhost:3000",
@@ -20,6 +21,12 @@
     "logLevel": "debug"
   },
   "/test-notifications": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/cache-sync": {
     "target": "http://localhost:3000",
     "secure": false,
     "changeOrigin": true,

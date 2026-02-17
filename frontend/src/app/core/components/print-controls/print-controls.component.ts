@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  input,
+  OnInit,
+  output,
+  signal,
+} from '@angular/core';
 import { PrintService } from '../../services/print.service';
 import { PrintPreferencesService } from '../../services/print-preferences.service';
 import { PaymentMethodService } from '../../services/payment-method.service';
@@ -43,7 +51,7 @@ import type { OrderData, PrintMeta, DocumentType } from '../../services/print-te
     </div>
   `,
 })
-export class PrintControlsComponent {
+export class PrintControlsComponent implements OnInit {
   readonly order = input.required<OrderData | null>();
   readonly disabled = input<boolean>(false);
   readonly printed = output<void>();
@@ -56,15 +64,17 @@ export class PrintControlsComponent {
 
   readonly templates = this.printService.getAvailableTemplates();
 
-  constructor() {
-    this.selectedTemplateId.set(this.printPreferences.getDefaultTemplateId());
+  ngOnInit(): void {
+    void this.printPreferences.getDefaultTemplateId().then((id) => {
+      this.selectedTemplateId.set(id);
+    });
   }
 
   onTemplateChange(event: Event): void {
     const select = event.target as HTMLSelectElement;
     const id = select.value;
     this.selectedTemplateId.set(id);
-    this.printPreferences.setDefaultTemplateId(id);
+    void this.printPreferences.setDefaultTemplateId(id);
   }
 
   async onPrint(): Promise<void> {

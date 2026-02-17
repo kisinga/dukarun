@@ -34,9 +34,7 @@ export class ModelLoaderService {
     const sources = await this.sourceResolver.getModelSources(channelId);
 
     if (!sources) {
-      throw new Error(
-        'ML model not configured for this channel. Please set up the model asset IDs in channel settings.',
-      );
+      return null;
     }
 
     // Include credentials to send session cookies for authenticated asset access

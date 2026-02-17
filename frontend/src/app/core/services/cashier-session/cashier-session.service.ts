@@ -1,4 +1,5 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
+import moment from 'moment';
 import { gql } from '@apollo/client/core';
 import { ApolloService } from '../apollo.service';
 import { map, catchError, of, from, tap } from 'rxjs';
@@ -162,8 +163,44 @@ export class CashierSessionService {
   readonly isLoading = signal(false);
   readonly error = signal<string | null>(null);
 
+  /**
+   * When the shift was last closed (ISO date string). Set when closeSession succeeds, cleared when openSession succeeds.
+   * Used to show "closed for Xh" in the UI. Not persisted across refresh.
+   */
+  readonly lastClosedAt = signal<string | null>(null);
+
   /** Computed: is there an active session? */
   readonly hasActiveSession = computed(() => this.currentSession() !== null);
+
+  /**
+   * Reference date for "time open" or "time closed": openedAt when open, lastClosedAt when closed.
+   * Used with current time to render duration in the shift badge.
+   */
+  readonly shiftStatusSince = computed(() => {
+    const session = this.currentSession();
+    if (session?.openedAt) return { at: session.openedAt, isOpen: true };
+    const closed = this.lastClosedAt();
+    if (closed) return { at: closed, isOpen: false };
+    return null;
+  });
+
+  /**
+   * Format a shift open/close time for display. Same day: "at HH:mm"; other day: "on D MMM YYYY HH:mm".
+   * Used by dashboard badge and sell banner so label (Open/Closed) is only shown once in the UI.
+   */
+  formatShiftTimeAt(isoDate: string): string | null {
+    const m = moment(isoDate);
+    if (!m.isValid()) return null;
+    if (m.isSame(moment(), 'day')) return `at ${m.format('HH:mm')}`;
+    return `on ${m.format('D MMM YYYY HH:mm')}`;
+  }
+
+  /** How long the shift has been open (openedAt → now), e.g. "2 hours" / "a day". */
+  formatShiftDuration(openedAt: string): string | null {
+    const m = moment(openedAt);
+    if (!m.isValid()) return null;
+    return m.fromNow(true);
+  }
 
   /** Computed: variance amount parsed as number (in cents) */
   readonly varianceAmount = computed(() => {
@@ -205,12 +242,43 @@ export class CashierSessionService {
         this.isLoading.set(false);
         return session;
       }),
+      tap((session) => {
+        if (!session) this.loadLastClosedAt(channelId).subscribe();
+      }),
       catchError((err) => {
         this.error.set(err.message || 'Failed to get current session');
         this.isLoading.set(false);
         this.currentSession.set(null);
         return of(null);
       }),
+    );
+  }
+
+  /**
+   * Load the closedAt of the most recent closed session into lastClosedAt so the UI can show "closed for X".
+   * Called when getCurrentSession returns null (e.g. on load or after refresh).
+   */
+  loadLastClosedAt(channelId: number) {
+    const client = this.apolloService.getClient();
+    return from(
+      client.query<{ cashierSessions: { items: CashierSession[] } }>({
+        query: GET_CASHIER_SESSIONS as any,
+        variables: { channelId, options: { status: 'closed', take: 1 } },
+        fetchPolicy: 'network-only',
+      }),
+    ).pipe(
+      map((result) => {
+        const items = result.data?.cashierSessions?.items ?? [];
+        const last = items[0];
+        if (last?.closedAt)
+          this.lastClosedAt.set(
+            typeof last.closedAt === 'string'
+              ? last.closedAt
+              : (last.closedAt as Date).toISOString(),
+          );
+        return last?.closedAt ?? null;
+      }),
+      catchError(() => of(null)),
     );
   }
 
@@ -339,6 +407,7 @@ export class CashierSessionService {
         const raw = result.data?.openCashierSession ?? null;
         const session = raw && CashierSessionService.isValidSessionId(raw.id) ? raw : null;
         this.currentSession.set(session);
+        if (session) this.lastClosedAt.set(null);
         this.isLoading.set(false);
         return session;
       }),
@@ -493,6 +562,8 @@ export class CashierSessionService {
         if (summary) {
           this.sessionSummary.set(summary);
           this.currentSession.set(null); // Session is now closed
+          const closedAt = (summary as { closedAt?: string | null }).closedAt;
+          if (closedAt) this.lastClosedAt.set(closedAt);
         }
         this.isLoading.set(false);
         return summary;
@@ -620,6 +691,7 @@ export class CashierSessionService {
     this.sessions.set([]);
     this.totalSessions.set(0);
     this.sessionSummary.set(null);
+    this.lastClosedAt.set(null);
     this.isLoading.set(false);
     this.error.set(null);
   }

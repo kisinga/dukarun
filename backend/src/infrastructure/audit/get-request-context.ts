@@ -1,20 +1,41 @@
 import { ExecutionContext, Logger } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
+import { Request } from 'express';
 import { RequestContext } from '@vendure/core';
 
 /**
  * The key under which Vendure stores the RequestContext on the Express request.
  * This mirrors the internal constant from @vendure/core/dist/common/constants.
  * See: node_modules/@vendure/core/dist/common/constants.js
+ * Exported so other code (e.g. REST guards) can attach/read context for REST routes.
  */
-const REQUEST_CONTEXT_KEY = 'vendureRequestContext';
+export const REQUEST_CONTEXT_KEY = 'vendureRequestContext';
 const REQUEST_CONTEXT_MAP_KEY = 'vendureRequestContextMap';
 
 const logger = new Logger('getVendureRequestContext');
 
-interface RequestContextStore {
+export interface RequestContextStore {
   default: RequestContext;
   withTransactionManager?: RequestContext;
+}
+
+/**
+ * Single place that writes RequestContext onto the Express request.
+ * Readers use getVendureRequestContext (GraphQL) or getRequestContextFromReq (HTTP).
+ */
+export function attachRequestContext(req: Request, ctx: RequestContext): void {
+  (req as unknown as Record<string, RequestContextStore>)[REQUEST_CONTEXT_KEY] = {
+    default: ctx,
+  };
+}
+
+/**
+ * Reads RequestContext from an Express request (HTTP/REST).
+ * Returns null if not set.
+ */
+export function getRequestContextFromReq(req: Request): RequestContext | null {
+  const store = (req as unknown as Record<string, RequestContextStore>)[REQUEST_CONTEXT_KEY];
+  return store?.default ?? null;
 }
 
 /**

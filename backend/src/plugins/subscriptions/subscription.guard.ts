@@ -16,20 +16,27 @@ export class SubscriptionGuard implements CanActivate {
   constructor(private subscriptionService: SubscriptionService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Get GraphQL context
+    // Only run for GraphQL; HTTP routes (e.g. cache-sync SSE) have no operation.
+    // ContextType in NestJS may not include 'graphql' in its union; runtime can still be 'graphql'.
+    if ((context.getType() as string) !== 'graphql') {
+      return true;
+    }
+
     const gqlContext = GqlExecutionContext.create(context);
     const info = gqlContext.getInfo();
+    const operation = info?.operation;
+    if (!operation) {
+      return true;
+    }
 
     // Extract the actual Vendure RequestContext from the Express request.
-    // gqlContext.getContext().req is the Express Request, NOT the RequestContext.
     const ctx = getVendureRequestContext(context);
     if (!ctx) {
-      // No RequestContext found - allow (might be system operation or early in pipeline)
       return true;
     }
 
     // Skip if not a mutation
-    if (info.operation.operation !== 'mutation') {
+    if (operation.operation !== 'mutation') {
       return true; // Allow all queries
     }
 

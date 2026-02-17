@@ -1,5 +1,5 @@
 import { computed, inject, signal, Signal, WritableSignal } from '@angular/core';
-import { CACHE_CONFIGS, CacheService } from '../cache.service';
+import { AppCacheService } from '../cache/app-cache.service';
 import { CompanyService } from '../company.service';
 
 /**
@@ -13,48 +13,48 @@ import { CompanyService } from '../company.service';
  * Follows LOB principle: single source of truth with local caching
  */
 export abstract class DraftBaseService<T> {
-  protected readonly cacheService = inject(CacheService);
+  protected readonly appCache = inject(AppCacheService);
   protected readonly companyService = inject(CompanyService);
 
   // State signals
   protected readonly draftSignal: WritableSignal<T | null>;
   protected readonly isLoadingSignal: WritableSignal<boolean>;
+  protected readonly isLoadingFromCacheSignal: WritableSignal<boolean>;
   protected readonly errorSignal: WritableSignal<string | null>;
 
   // Public readonly signals
   readonly draft: Signal<T | null>;
   readonly isLoading: Signal<boolean>;
+  /** True from when loadFromCache runs until the cache read completes. Use to show loading until draft is hydrated. */
+  readonly isLoadingFromCache: Signal<boolean>;
   readonly error: Signal<string | null>;
 
   // Computed signals
   readonly hasDraft: Signal<boolean>;
 
-  constructor(
-    protected readonly cacheKey: string,
-    protected readonly cacheConfig = CACHE_CONFIGS.CART,
-  ) {
-    // Initialize signals
+  constructor(protected readonly cacheKey: string) {
     this.draftSignal = signal<T | null>(null);
     this.isLoadingSignal = signal<boolean>(false);
+    this.isLoadingFromCacheSignal = signal<boolean>(false);
     this.errorSignal = signal<string | null>(null);
 
-    // Expose as readonly
     this.draft = this.draftSignal.asReadonly();
     this.isLoading = this.isLoadingSignal.asReadonly();
+    this.isLoadingFromCache = this.isLoadingFromCacheSignal.asReadonly();
     this.error = this.errorSignal.asReadonly();
-
-    // Computed
     this.hasDraft = computed(() => this.draftSignal() !== null);
   }
 
   /**
-   * Initialize draft (load from cache or create new)
+   * Initialize draft: load from cache, then create a new draft only if none was loaded.
+   * Call when entering a screen that needs the draft. isLoadingFromCache is true until cache read completes.
    */
   initialize(): void {
-    this.loadFromCache();
-    if (!this.draftSignal()) {
-      this.createNewDraft();
-    }
+    this.loadFromCache(() => {
+      if (!this.draftSignal()) {
+        this.createNewDraft();
+      }
+    });
   }
 
   /**
@@ -70,21 +70,25 @@ export abstract class DraftBaseService<T> {
   }
 
   /**
-   * Load draft from cache
+   * Load draft from cache (async). Optionally run onDone when the read completes (e.g. to create new draft if empty).
    */
-  protected loadFromCache(): void {
+  protected loadFromCache(onDone?: () => void): void {
     const channelId = this.companyService.activeCompanyId();
     if (!channelId) {
+      onDone?.();
       return;
     }
 
-    const cached = this.cacheService.get<T>(this.cacheConfig, this.cacheKey, channelId);
-
-    if (cached) {
-      // Allow subclass to transform cached data (e.g., Date parsing)
-      const transformed = this.transformCachedData(cached);
-      this.draftSignal.set(transformed);
-    }
+    this.isLoadingFromCacheSignal.set(true);
+    const scope = `channel:${channelId}` as const;
+    this.appCache.getKV<T>(scope, this.cacheKey).then((cached) => {
+      if (cached != null) {
+        const transformed = this.transformCachedData(cached);
+        this.draftSignal.set(transformed);
+      }
+      this.isLoadingFromCacheSignal.set(false);
+      onDone?.();
+    });
   }
 
   /**
@@ -100,13 +104,12 @@ export abstract class DraftBaseService<T> {
    */
   protected persist(): void {
     const channelId = this.companyService.activeCompanyId();
-    if (!channelId) {
-      return;
-    }
+    if (!channelId) return;
 
     const draft = this.draftSignal();
     if (draft) {
-      this.cacheService.set(this.cacheConfig, this.cacheKey, draft, channelId);
+      const scope = `channel:${channelId}` as const;
+      this.appCache.setKV(scope, this.cacheKey, draft);
     }
   }
 
@@ -123,11 +126,10 @@ export abstract class DraftBaseService<T> {
    */
   protected clearCache(): void {
     const channelId = this.companyService.activeCompanyId();
-    if (!channelId) {
-      return;
-    }
+    if (!channelId) return;
 
-    this.cacheService.remove(this.cacheConfig, this.cacheKey, channelId);
+    const scope = `channel:${channelId}` as const;
+    this.appCache.removeKV(scope, this.cacheKey);
   }
 
   /**

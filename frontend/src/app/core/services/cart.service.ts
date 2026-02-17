@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { ApolloService } from './apollo.service';
 import { AuthService } from './auth.service';
-import { CACHE_CONFIGS, CacheService } from './cache.service';
+import { AppCacheService } from './cache/app-cache.service';
 import { CompanyService } from './company.service';
 import { ProductVariant } from './product/product-search.service';
 
@@ -58,16 +58,20 @@ export interface CartSummary {
 export class CartService {
   private readonly authService = inject(AuthService);
   private readonly apolloService = inject(ApolloService);
-  private readonly cacheService = inject(CacheService);
+  private readonly appCache = inject(AppCacheService);
   private readonly companyService = inject(CompanyService);
 
   // Cart state signals
   private readonly cartItemsSignal = signal<CartItem[]>([]);
   private readonly isLoadingSignal = signal<boolean>(false);
+  /** True while persisted cart is being loaded from cache. Set false when load completes (or no channel). */
+  private readonly isLoadingFromCacheSignal = signal<boolean>(false);
 
   // Public computed signals
   readonly cartItems = this.cartItemsSignal.asReadonly();
   readonly isLoading = this.isLoadingSignal.asReadonly();
+  /** True from when loadCartFromCache() is called until the cache read finishes. Use to show loading UI until cart is hydrated. */
+  readonly isLoadingFromCache = this.isLoadingFromCacheSignal.asReadonly();
   readonly totalItems = computed(() =>
     this.cartItemsSignal().reduce((sum, item) => sum + item.quantity, 0),
   );
@@ -157,7 +161,8 @@ export class CartService {
   }
 
   /**
-   * Load cart from cache
+   * Load cart from cache (async). Call this when entering a screen that needs the cart (e.g. sell page).
+   * isLoadingFromCache is true from this call until the cache read completes — use it to show loading state.
    */
   loadCartFromCache(): void {
     const channelId = this.companyService.activeCompanyId();
@@ -166,11 +171,15 @@ export class CartService {
       return;
     }
 
-    const cachedCart = this.cacheService.get<CartItem[]>(CACHE_CONFIGS.CART, 'items', channelId);
-    if (cachedCart) {
-      this.cartItemsSignal.set(cachedCart);
-      console.log(`📦 Loaded cart from cache: ${cachedCart.length} items`);
-    }
+    this.isLoadingFromCacheSignal.set(true);
+    const scope = `channel:${channelId}` as const;
+    this.appCache.getKV<CartItem[]>(scope, 'items').then((cachedCart) => {
+      if (cachedCart?.length !== undefined) {
+        this.cartItemsSignal.set(cachedCart);
+        console.log(`📦 Loaded cart from cache: ${cachedCart.length} items`);
+      }
+      this.isLoadingFromCacheSignal.set(false);
+    });
   }
 
   /**
@@ -178,13 +187,10 @@ export class CartService {
    */
   private persistCart(): void {
     const channelId = this.companyService.activeCompanyId();
-    if (!channelId) {
-      console.log('No active channel, skipping cart persist');
-      return;
-    }
+    if (!channelId) return;
 
-    const cartItems = this.cartItemsSignal();
-    this.cacheService.set(CACHE_CONFIGS.CART, 'items', cartItems, channelId);
+    const scope = `channel:${channelId}` as const;
+    this.appCache.setKV(scope, 'items', this.cartItemsSignal());
   }
 
   /**
