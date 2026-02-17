@@ -708,8 +708,8 @@ export const SEARCH_BY_BARCODE = graphql(`
 `);
 
 export const PREFETCH_PRODUCTS = graphql(`
-  query PrefetchProducts($take: Int!) {
-    products(options: { take: $take, skip: 0 }) {
+  query PrefetchProducts($take: Int!, $skip: Int) {
+    products(options: { take: $take, skip: $skip }) {
       totalItems
       items {
         id

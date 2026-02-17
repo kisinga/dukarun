@@ -12,6 +12,9 @@ import { ProductSearchResult, ProductVariant } from './product-search.service';
 const PRODUCTS_CACHE_KEY = 'products_list';
 const PRODUCTS_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
+/** Max products to cache locally (perf limit; untested). Cache as many as possible up to this cap. */
+const MAX_PRODUCTS_CACHE = 2000;
+
 /** Persisted shape for product list cache */
 interface ProductCachePayload {
   products: ProductSearchResult[];
@@ -125,21 +128,39 @@ export class ProductCacheService implements CacheSyncEntityHandler {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<{
-        products: { totalItems: number; items: any[] };
-      }>({
-        query: PREFETCH_PRODUCTS,
-        variables: { take: 100 },
-        fetchPolicy: 'network-only',
-      });
+      const allItems: any[] = [];
+      let totalItems = 0;
+      let skip = 0;
 
-      if (!result.data?.products?.items) {
-        throw new Error('No products returned from server');
+      // Fetch up to MAX_PRODUCTS_CACHE; paginate if the first response doesn't include all
+      while (true) {
+        const take = Math.min(MAX_PRODUCTS_CACHE - allItems.length, 2000);
+        if (take <= 0) break;
+
+        const result = await client.query<{
+          products: { totalItems: number; items: any[] };
+        }>({
+          query: PREFETCH_PRODUCTS,
+          variables: { take, skip: skip ?? 0 },
+          fetchPolicy: 'network-only',
+        });
+
+        const data = result.data?.products;
+        if (!data?.items) {
+          throw new Error('No products returned from server');
+        }
+
+        totalItems = data.totalItems;
+        allItems.push(...data.items);
+        skip += data.items.length;
+
+        const toFetch = Math.min(MAX_PRODUCTS_CACHE, totalItems);
+        if (allItems.length >= toFetch || data.items.length === 0) {
+          break;
+        }
       }
 
-      const products = result.data.products.items.map((p: any) =>
-        this.mapper.toProductSearchResult(p),
-      );
+      const products = allItems.map((p: any) => this.mapper.toProductSearchResult(p));
 
       this.hydrateFromPayload({ products, lastSync: Date.now() });
 
