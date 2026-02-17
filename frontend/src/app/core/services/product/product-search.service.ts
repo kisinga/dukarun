@@ -132,7 +132,7 @@ export class ProductSearchService {
       }>({
         query: GET_PRODUCTS,
         variables: {
-          options: { filter: { _or: searchOr }, take: 5 },
+          options: { filter: { _or: searchOr }, take: 20 },
         },
         fetchPolicy,
       });

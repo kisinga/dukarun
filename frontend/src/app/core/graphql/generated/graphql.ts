@@ -9744,6 +9744,7 @@ export type SearchByBarcodeQuery = {
 
 export type PrefetchProductsQueryVariables = Exact<{
   take: Scalars['Int']['input'];
+  skip?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 export type PrefetchProductsQuery = {
@@ -15577,6 +15578,11 @@ export const PrefetchProductsDocument = {
             type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
           },
         },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'skip' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
+        },
       ],
       selectionSet: {
         kind: 'SelectionSet',
@@ -15599,7 +15605,7 @@ export const PrefetchProductsDocument = {
                     {
                       kind: 'ObjectField',
                       name: { kind: 'Name', value: 'skip' },
-                      value: { kind: 'IntValue', value: '0' },
+                      value: { kind: 'Variable', name: { kind: 'Name', value: 'skip' } },
                     },
                   ],
                 },
