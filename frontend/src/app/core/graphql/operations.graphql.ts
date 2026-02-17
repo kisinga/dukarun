@@ -714,6 +714,7 @@ export const PREFETCH_PRODUCTS = graphql(`
       items {
         id
         name
+        enabled
         featuredAsset {
           preview
         }

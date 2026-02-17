@@ -9756,6 +9756,7 @@ export type PrefetchProductsQuery = {
       __typename?: 'Product';
       id: string;
       name: string;
+      enabled: boolean;
       featuredAsset?: { __typename?: 'Asset'; preview: string } | null;
       facetValues: Array<{
         __typename?: 'FacetValue';
@@ -15623,6 +15624,7 @@ export const PrefetchProductsDocument = {
                     selections: [
                       { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'enabled' } },
                       {
                         kind: 'Field',
                         name: { kind: 'Name', value: 'featuredAsset' },

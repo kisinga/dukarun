@@ -7,6 +7,7 @@ import { GET_PRODUCT } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { ProductMapperService } from './product-mapper.service';
 import { SalesSyncGuardService } from '../sales-sync-guard.service';
+import type { ProductListOptions } from '../../graphql/generated/graphql';
 import { ProductSearchResult, ProductVariant } from './product-search.service';
 
 const PRODUCTS_CACHE_KEY = 'products_list';
@@ -14,6 +15,9 @@ const PRODUCTS_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
 /** Max products to cache locally (perf limit; untested). Cache as many as possible up to this cap. */
 const MAX_PRODUCTS_CACHE = 2000;
+
+/** Vendure rejects list queries with take > 1000. Cap each request so prefetch paginates instead of failing. */
+const VENDURE_MAX_TAKE = 1000;
 
 /** Persisted shape for product list cache */
 interface ProductCachePayload {
@@ -134,7 +138,7 @@ export class ProductCacheService implements CacheSyncEntityHandler {
 
       // Fetch up to MAX_PRODUCTS_CACHE; paginate if the first response doesn't include all
       while (true) {
-        const take = Math.min(MAX_PRODUCTS_CACHE - allItems.length, 2000);
+        const take = Math.min(MAX_PRODUCTS_CACHE - allItems.length, VENDURE_MAX_TAKE);
         if (take <= 0) break;
 
         const result = await client.query<{
@@ -200,37 +204,47 @@ export class ProductCacheService implements CacheSyncEntityHandler {
   }
 
   /**
+   * Build searchable string for a product (name + manufacturer + SKUs). Normalized for matching.
+   */
+  private getSearchableString(product: ProductSearchResult): string {
+    const manufacturerNames =
+      product.facetValues
+        ?.filter((fv) => fv.facetCode === 'manufacturer')
+        .map((fv) => fv.name)
+        .join(' ') ?? '';
+    const variantSkus = (product.variants ?? [])
+      .map((v) => v.sku)
+      .filter(Boolean)
+      .join(' ');
+    return `${product.name} ${manufacturerNames} ${variantSkus}`
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
    * Search products from cache (offline-capable).
-   * Matches when the search phrase appears in product name, manufacturer, or any variant SKU
-   * (phrase/substring match, case-insensitive). Aligned with products list and network search
-   * for those fields. Cache does not store description/slug; matches on those only happen when
-   * the network path is used (cache returned no results).
+   * Word-based match: every word in the search term must appear in product name, manufacturer, or any variant SKU
+   * (case-insensitive, normalized spaces). Returns all matches so multiple products with the same name all appear.
    * Does not filter by availability; callers decide how to handle out-of-stock items.
    */
   searchProducts(searchTerm: string): ProductSearchResult[] {
-    const term = searchTerm.trim();
+    const term = searchTerm.replace(/\s+/g, ' ').trim();
     if (term.length < 2) {
       return [];
     }
-    const termLower = term.toLowerCase();
+    const words = term.toLowerCase().split(/\s+/).filter(Boolean);
 
     const results: ProductSearchResult[] = [];
     for (const product of this.productsById.values()) {
-      const manufacturerNames =
-        product.facetValues
-          ?.filter((fv) => fv.facetCode === 'manufacturer')
-          .map((fv) => fv.name)
-          .join(' ') ?? '';
-      const variantSkus = (product.variants ?? [])
-        .map((v) => v.sku)
-        .filter(Boolean)
-        .join(' ');
-      const searchable = `${product.name} ${manufacturerNames} ${variantSkus}`.toLowerCase();
-      if (searchable.includes(termLower)) {
+      const searchable = this.getSearchableString(product);
+      const allWordsMatch = words.every((word) => searchable.includes(word));
+      if (allWordsMatch) {
         results.push(product);
       }
     }
 
+    const termLower = term.toLowerCase();
     return results.slice(0, 10).sort((a, b) => {
       const aName = a.name.toLowerCase();
       const bName = b.name.toLowerCase();
@@ -247,6 +261,77 @@ export class ProductCacheService implements CacheSyncEntityHandler {
    */
   isCacheReady(): boolean {
     return this.statusSignal().isInitialized;
+  }
+
+  /**
+   * List products from cache with filter, sort, and pagination (same semantics as server).
+   * Used by the products page so search/filter does not hit the network when cache is ready.
+   */
+  listProducts(options?: ProductListOptions): { items: ProductSearchResult[]; totalItems: number } {
+    let list = Array.from(this.productsById.values());
+
+    const filter = options?.filter;
+    if (filter) {
+      list = list.filter((product) => this.productMatchesFilter(product, filter));
+    }
+
+    const totalItems = list.length;
+
+    const sort = options?.sort;
+    if (sort?.name) {
+      list = [...list].sort((a, b) => {
+        const cmp = a.name.localeCompare(b.name);
+        return sort.name === 'DESC' ? -cmp : cmp;
+      });
+    }
+
+    const skip = options?.skip ?? 0;
+    const take = options?.take ?? 50;
+    const items = list.slice(skip, skip + take);
+
+    return { items, totalItems };
+  }
+
+  /**
+   * Interpret ProductFilterParameter and return whether the product matches (cache has name, enabled, facetValues, sku via variants).
+   */
+  private productMatchesFilter(product: ProductSearchResult, filter: any): boolean {
+    if (!filter || typeof filter !== 'object') return true;
+
+    if (filter._and && Array.isArray(filter._and)) {
+      return filter._and.every((f: any) => this.productMatchesFilter(product, f));
+    }
+    if (filter._or && Array.isArray(filter._or)) {
+      return filter._or.some((f: any) => this.productMatchesFilter(product, f));
+    }
+
+    if (filter.name?.contains != null) {
+      const searchable = this.getSearchableString(product);
+      const term = String(filter.name.contains).toLowerCase().replace(/\s+/g, ' ');
+      const words = term.split(/\s+/).filter(Boolean);
+      return words.every((w: string) => searchable.includes(w));
+    }
+    if (filter.description?.contains != null || filter.slug?.contains != null) {
+      return false;
+    }
+    if (filter.sku?.contains != null) {
+      const skus = (product.variants ?? [])
+        .map((v) => v.sku ?? '')
+        .join(' ')
+        .toLowerCase();
+      const term = String(filter.sku.contains).toLowerCase();
+      return skus.includes(term);
+    }
+    if (filter.facetValueId?.in != null) {
+      const ids = new Set((filter.facetValueId.in as string[]) ?? []);
+      const productFacetIds = (product.facetValues ?? []).map((fv) => fv.id);
+      return productFacetIds.some((id) => ids.has(id));
+    }
+    if (filter.enabled?.eq !== undefined) {
+      return product.enabled === filter.enabled.eq;
+    }
+
+    return true;
   }
 
   /**

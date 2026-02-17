@@ -64,13 +64,6 @@ export class ExpensesComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadExpenses();
-    const companyId = this.companyService.activeCompanyId();
-    if (companyId) {
-      const channelId = parseInt(companyId, 10);
-      if (!isNaN(channelId)) {
-        this.cashierSessionService.getCurrentSession(channelId).subscribe();
-      }
-    }
   }
 
   loadExpenses(): void {

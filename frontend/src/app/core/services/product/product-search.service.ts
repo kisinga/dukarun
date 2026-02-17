@@ -35,8 +35,9 @@ export interface ProductVariant {
   };
 }
 
-/** Facet value for display (manufacturer/category pills) */
+/** Facet value for display (manufacturer/category pills) and filter by id */
 export interface ProductFacetValue {
+  id: string;
   name: string;
   facetCode: string;
 }
@@ -47,6 +48,7 @@ export interface ProductFacetValue {
 export interface ProductSearchResult {
   id: string;
   name: string;
+  enabled?: boolean;
   variants: ProductVariant[];
   featuredAsset?: {
     preview: string;

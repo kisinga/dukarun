@@ -102,14 +102,12 @@ export class ShiftsComponent implements OnInit {
     const channelId = this.channelId();
     if (!channelId) return;
 
-    this.cashierSessionService.getCurrentSession(channelId).subscribe({
-      next: (session) => {
-        const sid = session?.id != null ? String(session.id) : '';
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sid);
-        if (isUuid) this.loadCurrentSessionOpeningDetails(sid);
-        else this.currentSessionOpeningDetails.set(null);
-      },
-    });
+    // Open/close status is loaded globally by CashierSessionService when channel is set
+    const session = this.cashierSessionService.currentSession();
+    const sid = session?.id != null ? String(session.id) : '';
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sid);
+    if (isUuid) this.loadCurrentSessionOpeningDetails(sid);
+    else this.currentSessionOpeningDetails.set(null);
     this.loadSessions(channelId);
   }
 

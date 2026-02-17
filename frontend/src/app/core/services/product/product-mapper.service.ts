@@ -15,12 +15,14 @@ export class ProductMapperService {
     const facetValues = (graphqlProduct.facetValues || [])
       .filter((fv: any) => fv?.facet?.code === 'manufacturer' || fv?.facet?.code === 'category')
       .map((fv: any) => ({
+        id: fv.id ?? '',
         name: fv.name,
         facetCode: fv.facet?.code ?? '',
       }));
     return {
       id: graphqlProduct.id,
       name: graphqlProduct.name,
+      enabled: graphqlProduct.enabled,
       featuredAsset: extractAssetPreview(graphqlProduct.featuredAsset),
       variants: (graphqlProduct.variants || []).map((v: any) =>
         this.toProductVariant(v, graphqlProduct),
