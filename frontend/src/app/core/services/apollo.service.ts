@@ -18,7 +18,6 @@ import { APOLLO_TEST_CLIENT } from './apollo-test-client.token';
 export class ApolloService {
   private readonly router = inject(Router);
 
-  private readonly AUTH_TOKEN_KEY = 'auth_token';
   private readonly LANGUAGE_CODE_KEY = 'language_code';
 
   private apolloClient: ApolloClient;
@@ -189,9 +188,6 @@ export class ApolloService {
    * Clears local state and redirects to login
    */
   private handleSessionExpired(): void {
-    // Clear auth token
-    this.clearAuthToken();
-
     // Notify AuthService to clean up its state (including company/channel state)
     if (this.sessionExpiredCallback) {
       this.sessionExpiredCallback();

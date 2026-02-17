@@ -105,7 +105,6 @@ export class AuthSessionService {
   clearSession(): void {
     this.userSignal.set(null);
     this.companyService.clearActiveCompany();
-    this.apolloService.clearAuthToken();
     this.apolloService.clearCache();
   }
 
