@@ -60,139 +60,9 @@
     </div>
   }
 
-  <!-- ===== PERFORMANCE KPIs (MV-backed, always visible) ===== -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-    <!-- Revenue 7D -->
-    <div class="kpi-card kpi-card--revenue rounded-xl p-3 sm:p-4">
-      <div class="flex items-center justify-between mb-2">
-        <span class="kpi-label">Revenue (7D)</span>
-        <span class="kpi-icon kpi-icon--revenue">
-          <svg
-            class="h-3.5 w-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </span>
-      </div>
-      @if (analyticsLoading()) {
-        <div class="skeleton h-7 w-24 rounded"></div>
-      } @else {
-        <p class="text-xl sm:text-2xl font-bold tabular-nums text-primary leading-none">
-          {{ revenue7dFormatted() }}
-        </p>
-      }
-      @if (salesSparklineData().length > 1) {
-        <div class="mt-2">
-          <app-sparkline
-            [data]="salesSparklineData()"
-            [width]="120"
-            [height]="24"
-            color="oklch(var(--p))"
-          />
-        </div>
-      }
-    </div>
-
-    <!-- Total Orders 7D -->
-    <div class="kpi-card kpi-card--orders rounded-xl p-3 sm:p-4">
-      <div class="flex items-center justify-between mb-2">
-        <span class="kpi-label">Orders (7D)</span>
-        <span class="kpi-icon kpi-icon--orders">
-          <svg
-            class="h-3.5 w-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-        </span>
-      </div>
-      @if (analyticsLoading()) {
-        <div class="skeleton h-7 w-16 rounded"></div>
-      } @else {
-        <p class="text-xl sm:text-2xl font-bold tabular-nums text-secondary leading-none">
-          {{ orders7d() }}
-        </p>
-        @if (orders7d() > 0) {
-          <p class="text-[10px] text-base-content/50 mt-1.5 tabular-nums">
-            ~{{ avgDailyOrders() }}/day · Avg {{ avgOrderValueFormatted() }}
-          </p>
-        }
-      }
-    </div>
-
-    <!-- Avg Profit Margin -->
-    <div class="kpi-card kpi-card--margin rounded-xl p-3 sm:p-4">
-      <div class="flex items-center justify-between mb-2">
-        <span class="kpi-label">Profit Margin</span>
-        <span class="kpi-icon kpi-icon--margin">
-          <svg
-            class="h-3.5 w-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-            />
-          </svg>
-        </span>
-      </div>
-      @if (analyticsLoading()) {
-        <div class="skeleton h-7 w-16 rounded"></div>
-      } @else {
-        <p class="text-xl sm:text-2xl font-bold tabular-nums text-success leading-none">
-          <app-animated-counter [target]="avgMarginTarget()" [formatFn]="formatPercent" />
-        </p>
-      }
-    </div>
-
-    <!-- Products -->
-    <div class="kpi-card kpi-card--products rounded-xl p-3 sm:p-4">
-      <div class="flex items-center justify-between mb-2">
-        <span class="kpi-label">Products</span>
-        <span class="kpi-icon kpi-icon--products">
-          <svg
-            class="h-3.5 w-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-            />
-          </svg>
-        </span>
-      </div>
-      <p class="text-xl sm:text-2xl font-bold tabular-nums text-accent leading-none">
-        {{ productCount() }}
-      </p>
-    </div>
-  </div>
-
-  <!-- ===== FINANCIAL OVERVIEW (Ledger, period-driven) ===== -->
+  <!-- ===== FINANCIAL OVERVIEW (at top, period-driven: tabs drive revenue + margin + categories) ===== -->
   <div class="rounded-xl border border-base-300 bg-base-100 overflow-hidden">
-    <!-- Section header with integrated period tabs -->
+    <!-- Period tabs: drive all numbers below -->
     <div
       class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-3 border-b border-base-300/60"
     >
@@ -211,7 +81,29 @@
       </div>
     </div>
 
-    <!-- Financial cards — responsive grid with visual dividers -->
+    <!-- Period-driven summary: Revenue + Profit margin (same period as tabs) -->
+    <div class="grid grid-cols-2 gap-3 px-4 py-3 border-b border-base-300/40">
+      <div class="kpi-card kpi-card--revenue rounded-lg p-3">
+        <span class="kpi-label">Revenue</span>
+        <p class="text-xl font-bold tabular-nums text-primary leading-tight mt-1">
+          {{ periodRevenueFormatted() }}
+        </p>
+      </div>
+      <div class="kpi-card kpi-card--margin rounded-lg p-3">
+        <span class="kpi-label">Profit margin (7D)</span>
+        @if (analyticsLoading()) {
+          <div class="skeleton h-7 w-14 rounded mt-1"></div>
+        } @else if (profitMarginPercent() !== null) {
+          <p class="text-xl font-bold tabular-nums text-success leading-tight mt-1">
+            {{ profitMarginPercent() }}%
+          </p>
+        } @else {
+          <p class="text-xl font-bold tabular-nums text-base-content/50 leading-tight mt-1">—</p>
+        }
+      </div>
+    </div>
+
+    <!-- Category cards — Sales, Purchases, Expenses for selected period -->
     <div
       class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-base-300/40"
     >
@@ -413,88 +305,4 @@
       </div>
     </div>
   }
-
-  <!-- Business Insights (analytics — collapsed by default) -->
-  <div class="rounded-lg border border-base-300 overflow-hidden bg-base-100">
-    <button
-      class="w-full flex items-center justify-between px-4 py-3 hover:bg-base-200/50 transition-colors touch-manipulation"
-      (click)="toggleInsights()"
-    >
-      <span class="font-bold text-sm text-base-content/70">Business Insights</span>
-      <div class="flex items-center gap-2">
-        @if (analyticsLoading()) {
-          <span class="loading loading-spinner loading-xs text-primary"></span>
-        }
-        <svg
-          class="h-4 w-4 text-base-content/30 transition-transform duration-200"
-          [class.rotate-180]="insightsOpen()"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </div>
-    </button>
-
-    <div class="collapsible" [class.open]="insightsOpen()">
-      <div class="border-t border-base-300">
-        @if (analyticsLoading()) {
-          <div class="flex items-center justify-center py-8">
-            <span class="loading loading-spinner loading-sm text-primary"></span>
-          </div>
-        } @else if (analyticsStats()) {
-          <div
-            class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-base-300/50"
-          >
-            <!-- Sales Trend Sparkline -->
-            <div class="px-4 py-3">
-              <p
-                class="text-[11px] font-semibold uppercase tracking-wide text-base-content/50 mb-2"
-              >
-                7-Day Sales Trend
-              </p>
-              @if (salesSparklineData().length > 1) {
-                <app-sparkline
-                  [data]="salesSparklineData()"
-                  [width]="160"
-                  [height]="40"
-                  color="oklch(var(--su))"
-                />
-              } @else {
-                <p class="text-xs text-base-content/40">Not enough data</p>
-              }
-            </div>
-
-            <!-- Avg Profit Margin -->
-            <div class="px-4 py-3">
-              <p
-                class="text-[11px] font-semibold uppercase tracking-wide text-base-content/50 mb-1"
-              >
-                Avg Profit Margin
-              </p>
-              <p class="text-2xl font-bold text-success tabular-nums">
-                <app-animated-counter [target]="avgMarginTarget()" [formatFn]="formatPercent" />
-              </p>
-            </div>
-
-            <!-- Total Revenue -->
-            <div class="px-4 py-3">
-              <p
-                class="text-[11px] font-semibold uppercase tracking-wide text-base-content/50 mb-1"
-              >
-                Revenue (7D)
-              </p>
-              <p class="text-2xl font-bold text-primary tabular-nums">
-                <app-animated-counter [target]="totalRevenueTarget()" [formatFn]="formatRevenue" />
-              </p>
-            </div>
-          </div>
-        } @else {
-          <p class="text-xs text-base-content/40 text-center py-6">No analytics data available</p>
-        }
-      </div>
-    </div>
-  </div>
 </div>

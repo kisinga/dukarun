@@ -14,8 +14,6 @@ import { CompanyService } from '../../../core/services/company.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { DashboardService, PeriodStats } from '../../../core/services/dashboard.service';
 import { AnalyticsService } from '../../../core/services/analytics.service';
-import { SparklineComponent } from '../../components/shared/charts/sparkline.component';
-import { AnimatedCounterComponent } from '../../components/shared/charts/animated-counter.component';
 import { OrderTableRowComponent } from '../orders/components/order-table-row.component';
 import { OrderCardComponent } from '../orders/components/order-card.component';
 
@@ -41,13 +39,7 @@ interface CategoryData {
 
 @Component({
   selector: 'app-overview',
-  imports: [
-    RouterModule,
-    SparklineComponent,
-    AnimatedCounterComponent,
-    OrderTableRowComponent,
-    OrderCardComponent,
-  ],
+  imports: [RouterModule, OrderTableRowComponent, OrderCardComponent],
   templateUrl: './overview.component.html',
   styleUrl: './overview.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -95,41 +87,25 @@ export class OverviewComponent implements OnInit {
     return this.dashboardService.stats()?.variantCount || 0;
   });
 
-  /** MV-backed 7D KPIs */
-  protected readonly orders7d = computed(() => this.analyticsStats()?.totalOrders ?? 0);
-  protected readonly revenue7dFormatted = computed(() =>
-    this.currencyService.format(this.analyticsStats()?.totalRevenue ?? 0),
-  );
-  protected readonly avgOrderValueFormatted = computed(() => {
-    const stats = this.analyticsStats();
-    if (!stats || stats.totalOrders === 0) return this.currencyService.format(0);
-    return this.currencyService.format(Math.round(stats.totalRevenue / stats.totalOrders));
+  /** Period-driven: revenue (sales) for selected period */
+  protected readonly periodRevenueFormatted = computed(() => {
+    const categories = this.categories();
+    const sales = categories.find((c) => c.type === 'sales');
+    if (!sales) return this.currencyService.format(0);
+    const stat = sales.stats.find((s) => s.period === this.selectedPeriod());
+    return stat?.amount ?? this.currencyService.format(0);
   });
-  protected readonly avgDailyOrders = computed(() => {
-    const stats = this.analyticsStats();
-    if (!stats) return 0;
-    const days = stats.salesTrend?.length || 1;
-    return Math.round(stats.totalOrders / days);
+
+  /** Profit margin from analytics MV (order-line margin: revenue - wholesale cost). Not period-driven; 7D. */
+  private readonly analyticsService = inject(AnalyticsService);
+  protected readonly analyticsStats = this.analyticsService.stats;
+  protected readonly analyticsLoading = this.analyticsService.isLoading;
+  protected readonly profitMarginPercent = computed(() => {
+    const margin = this.analyticsStats()?.averageProfitMargin;
+    return margin != null ? Math.round(margin * 10) / 10 : null;
   });
 
   protected readonly sessionOpen = this.cashierSessionService.hasActiveSession;
-
-  // Business Insights (analytics — lazy)
-  private readonly analyticsService = inject(AnalyticsService);
-  protected readonly insightsOpen = signal(false);
-  private insightsFetched = false;
-  protected readonly analyticsStats = this.analyticsService.stats;
-  protected readonly analyticsLoading = this.analyticsService.isLoading;
-
-  protected readonly salesSparklineData = computed(() =>
-    (this.analyticsStats()?.salesTrend ?? []).map((p) => p.value),
-  );
-  protected readonly avgMarginTarget = computed(() =>
-    Math.round(this.analyticsStats()?.averageProfitMargin ?? 0),
-  );
-  protected readonly totalRevenueTarget = computed(() =>
-    Math.round((this.analyticsStats()?.totalRevenue ?? 0) / 100),
-  );
 
   constructor() {
     effect(
@@ -218,15 +194,6 @@ export class OverviewComponent implements OnInit {
     });
   }
 
-  toggleInsights(): void {
-    const opening = !this.insightsOpen();
-    this.insightsOpen.set(opening);
-    if (opening && !this.insightsFetched) {
-      this.insightsFetched = true;
-      this.analyticsService.fetch('7d');
-    }
-  }
-
   async refresh(): Promise<void> {
     await this.dashboardService.refresh();
     const companyId = this.companyService.activeCompanyId();
@@ -254,7 +221,4 @@ export class OverviewComponent implements OnInit {
     };
     return now.toLocaleDateString('en-US', options);
   }
-
-  readonly formatPercent = (v: number): string => `${v.toFixed(1)}%`;
-  readonly formatRevenue = (v: number): string => this.currencyService.format(v * 100);
 }
