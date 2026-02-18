@@ -1,0 +1,41 @@
+<h1>Channels</h1>
+@if (loading()) {
+  <p>Loading…</p>
+}
+@if (error()) {
+  <p class="error">{{ error() }}</p>
+}
+@if (channels().length) {
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Status</th>
+          <th>Trial ends</th>
+          <th>Subscription</th>
+          <th>Max admins</th>
+          <th>Cashier</th>
+          <th>Printer</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (ch of channels(); track ch.id) {
+          <tr>
+            <td>{{ ch.code }}</td>
+            <td><span class="badge" [class]="'badge-' + ch.customFields.status.toLowerCase()">{{ ch.customFields.status }}</span></td>
+            <td>{{ formatDate(ch.customFields.trialEndsAt) }}</td>
+            <td>{{ ch.customFields.subscriptionStatus }}</td>
+            <td>{{ ch.customFields.maxAdminCount }}</td>
+            <td>{{ ch.customFields.cashierFlowEnabled ? 'Yes' : 'No' }}</td>
+            <td>{{ ch.customFields.enablePrinter ? 'Yes' : 'No' }}</td>
+            <td><a [routerLink]="['/channels', ch.id]">View</a></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+} @else if (!loading()) {
+  <p>No channels.</p>
+}

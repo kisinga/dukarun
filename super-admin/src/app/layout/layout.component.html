@@ -1,0 +1,16 @@
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">Super Admin</div>
+    <nav>
+      <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+      <a routerLink="/channels" routerLinkActive="active">Channels</a>
+      <a routerLink="/subscription-tiers" routerLinkActive="active">Subscription Tiers</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button type="button" (click)="auth.logout()">Logout</button>
+    </div>
+  </aside>
+  <main class="main">
+    <router-outlet />
+  </main>
+</div>

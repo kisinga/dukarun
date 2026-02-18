@@ -1,0 +1,64 @@
+<a routerLink="/channels" class="back">← Channels</a>
+@if (loading()) {
+  <p>Loading…</p>
+}
+@if (error()) {
+  <p class="error">{{ error() }}</p>
+}
+@if (channel(); as ch) {
+  <h1>Channel: {{ ch.code }}</h1>
+  <div class="grid">
+    <section class="card">
+      <h2>Info</h2>
+      <p><strong>Status</strong> {{ ch.customFields.status }}</p>
+      <p><strong>Trial ends</strong> {{ formatDate(ch.customFields.trialEndsAt) }}</p>
+      <p><strong>Subscription</strong> {{ ch.customFields.subscriptionStatus }}</p>
+      <p><strong>SMS</strong> N/A</p>
+    </section>
+    <section class="card">
+      <h2>Update status</h2>
+      <select [ngModel]="newStatus()" (ngModelChange)="newStatus.set($event)">
+        @for (opt of statusOptions; track opt) {
+          <option [value]="opt">{{ opt }}</option>
+        }
+      </select>
+      <button type="button" (click)="updateStatus()" [disabled]="saving()">Save</button>
+    </section>
+    <section class="card">
+      <h2>Extend trial</h2>
+      <input type="date" [ngModel]="newTrialEndsAt()" (ngModelChange)="newTrialEndsAt.set($event)" />
+      <button type="button" (click)="extendTrial()" [disabled]="saving()">Save</button>
+    </section>
+  </div>
+  @if (analytics(); as a) {
+    <section class="card">
+      <h2>Analytics (30d)</h2>
+      <p>Revenue: {{ revenue(a) }}</p>
+      <p>Orders: {{ orders(a) }}</p>
+      <p>Avg margin: {{ margin(a) }}%</p>
+    </section>
+  }
+  <section class="card">
+    <h2>Audit log</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Event</th>
+            <th>Entity</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (log of auditLogs(); track log.id) {
+            <tr>
+              <td>{{ formatDate(log.timestamp) }}</td>
+              <td>{{ log.eventType }}</td>
+              <td>{{ log.entityType }} {{ log.entityId ?? '' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+}

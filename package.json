@@ -5,7 +5,8 @@
   "workspaces": [
     "backend",
     "frontend",
-    "ml-trainer"
+    "ml-trainer",
+    "super-admin"
   ],
   "engines": {
     "node": ">=20"
@@ -14,10 +15,11 @@
     "setup": "ts-node scripts/setup.ts",
     "predev": "npm run setup -- --quick --fix",
     "dev": "npm run services:up && npm run dev:all",
-    "dev:all": "concurrently -k -n BE,FE,ML -c blue,green,red npm:dev:backend npm:dev:frontend npm:dev:ml",
+    "dev:all": "concurrently -k -n BE,FE,ML,SA -c blue,green,red,magenta npm:dev:backend npm:dev:frontend npm:dev:ml npm:dev:super-admin",
     "dev:backend": "npm run dev -w @dukarun/backend",
     "dev:frontend": "npm start -w @dukarun/frontend",
     "dev:ml": "npm run dev -w @dukarun/ml-trainer",
+    "dev:super-admin": "npm start -w super-admin",
     "codegen": "npm run codegen -w @dukarun/frontend",
     "codegen:watch": "npm run codegen:watch -w @dukarun/frontend",
     "services:up": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml up -d",

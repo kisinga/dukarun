@@ -1,0 +1,17 @@
+h1 { margin: 0 0 1rem; font-size: 1.5rem; }
+.error { color: #b91c1c; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.stat-card {
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  .stat-label { display: block; font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem; }
+  .stat-value { font-size: 1.5rem; font-weight: 700; }
+}
+.link { color: #2563eb; text-decoration: none; &:hover { text-decoration: underline; } }

@@ -1,0 +1,53 @@
+<h1>Subscription Tiers</h1>
+@if (error()) {
+  <p class="error">{{ error() }}</p>
+}
+<div class="card form-card">
+  <h2>Add tier</h2>
+  <form (ngSubmit)="create()">
+    <div class="form-row">
+      <input [(ngModel)]="formModel.code" name="code" placeholder="Code" required />
+      <input [(ngModel)]="formModel.name" name="name" placeholder="Name" required />
+    </div>
+    <div class="form-row">
+      <input [(ngModel)]="formModel.description" name="description" placeholder="Description" />
+    </div>
+    <div class="form-row">
+      <input type="number" [(ngModel)]="formModel.priceMonthly" name="priceMonthly" placeholder="Price monthly (cents)" />
+      <input type="number" [(ngModel)]="formModel.priceYearly" name="priceYearly" placeholder="Price yearly (cents)" />
+    </div>
+    <button type="submit" [disabled]="saving()">Create</button>
+  </form>
+</div>
+@if (loading()) {
+  <p>Loading…</p>
+} @else {
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Price (mo/yr)</th>
+          <th>Active</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (t of tiers(); track t.id) {
+          <tr [class.inactive]="!t.isActive">
+            <td>{{ t.code }}</td>
+            <td>{{ t.name }}</td>
+            <td>{{ t.priceMonthly }} / {{ t.priceYearly }}</td>
+            <td>{{ t.isActive ? 'Yes' : 'No' }}</td>
+            <td>
+              @if (t.isActive) {
+                <button type="button" class="btn-sm" (click)="deactivate(t.id)" [disabled]="saving()">Deactivate</button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
