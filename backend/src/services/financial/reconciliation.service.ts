@@ -684,12 +684,14 @@ export class ReconciliationService {
   /**
    * Get per-account reconciliation details for a cashier session.
    * @param kind - 'opening' = reconciliation at session open (first by snapshotAt ASC); 'closing' = at close (first by snapshotAt DESC). Default 'closing'.
+   * @param channelId - Optional. When provided, filters by channel so the reconciliation belongs to the requested channel.
    * Returns [] if no matching reconciliation exists or if sessionId is not a valid UUID.
    */
   async getSessionReconciliationDetails(
     ctx: RequestContext,
     sessionId: string,
-    kind: 'opening' | 'closing' = 'closing'
+    kind: 'opening' | 'closing' = 'closing',
+    channelId?: number
   ): Promise<
     Array<{
       accountId: string;
@@ -711,12 +713,14 @@ export class ReconciliationService {
 
     // Primary: kind-specific scopeRefId (new format: sessionId:opening or sessionId:closing)
     const kindRef = toScopeRefId({ scope: 'cash-session', sessionId: trimmed, kind });
-    let list = await reconciliationRepo
+    let qb = reconciliationRepo
       .createQueryBuilder('r')
       .where('r.scope = :scope', { scope: 'cash-session' })
-      .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: kindRef })
-      .take(1)
-      .getMany();
+      .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: kindRef });
+    if (channelId != null && !Number.isNaN(channelId)) {
+      qb = qb.andWhere('r.channelId = :channelId', { channelId });
+    }
+    let list = await qb.take(1).getMany();
 
     // Fallback: legacy bare sessionId (for records created before kind suffix was added)
     if (list.length === 0) {
@@ -725,6 +729,9 @@ export class ReconciliationService {
         .createQueryBuilder('r')
         .where('r.scope = :scope', { scope: 'cash-session' })
         .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: legacyRef });
+      if (channelId != null && !Number.isNaN(channelId)) {
+        legacyQb.andWhere('r.channelId = :channelId', { channelId });
+      }
       if (kind === 'opening') {
         legacyQb.orderBy('r.snapshotAt', 'ASC');
       } else {
@@ -733,9 +740,44 @@ export class ReconciliationService {
       list = await legacyQb.take(1).getMany();
     }
 
+    // If channelId was provided and we still have nothing, try without channel filter so we can
+    // return data when reconciliation exists but was stored with a different channelId (data fix can follow).
+    if (list.length === 0 && channelId != null && !Number.isNaN(channelId)) {
+      const unscopeQb = reconciliationRepo
+        .createQueryBuilder('r')
+        .where('r.scope = :scope', { scope: 'cash-session' })
+        .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: kindRef });
+      if (kind === 'opening') {
+        unscopeQb.orderBy('r.snapshotAt', 'ASC');
+      } else {
+        unscopeQb.orderBy('r.snapshotAt', 'DESC');
+      }
+      let unscopeList = await unscopeQb.take(2).getMany();
+      if (unscopeList.length === 0) {
+        const legacyRef = toScopeRefId({ scope: 'cash-session', sessionId: trimmed });
+        const legacyUnscopeQb = reconciliationRepo
+          .createQueryBuilder('r')
+          .where('r.scope = :scope', { scope: 'cash-session' })
+          .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: legacyRef });
+        if (kind === 'opening') {
+          legacyUnscopeQb.orderBy('r.snapshotAt', 'ASC');
+        } else {
+          legacyUnscopeQb.orderBy('r.snapshotAt', 'DESC');
+        }
+        unscopeList = await legacyUnscopeQb.take(2).getMany();
+      }
+      if (unscopeList.length === 1) {
+        this.logger.warn(
+          `getSessionReconciliationDetails sessionId=${sessionId} kind=${kind} channelId=${channelId}: ` +
+            `no row with channelId=${channelId}, found one with channelId=${unscopeList[0].channelId} (using it)`
+        );
+        list = unscopeList;
+      }
+    }
+
     const reconciliation = list[0];
     this.logger.log(
-      `getSessionReconciliationDetails sessionId=${sessionId} kind=${kind} found=${!!reconciliation} reconciliationId=${reconciliation?.id ?? 'n/a'}`
+      `getSessionReconciliationDetails sessionId=${sessionId} kind=${kind} channelId=${channelId ?? 'none'} kindRef=${kindRef} found=${!!reconciliation} reconciliationId=${reconciliation?.id ?? 'n/a'}`
     );
     if (!reconciliation) return [];
     return this.getReconciliationDetails(ctx, reconciliation.id);

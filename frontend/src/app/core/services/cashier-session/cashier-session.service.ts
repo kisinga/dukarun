@@ -22,8 +22,8 @@ import {
 } from '../../graphql/operations.graphql';
 
 const GET_SESSION_RECONCILIATION_DETAILS = gql`
-  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String) {
-    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind) {
+  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String, $channelId: Int) {
+    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind, channelId: $channelId) {
       accountId
       accountCode
       accountName
@@ -518,18 +518,30 @@ export class CashierSessionService {
    * Per-account reconciliation details for a session.
    * @param sessionId - Session ID (must be a valid UUID; invalid/placeholder ids are not sent to the API).
    * @param kind - 'opening' for variances at open (e.g. current shift), 'closing' for variances at close (default)
+   * @param channelId - Optional. When provided, backend filters by channel for correct reconciliation lookup.
    */
-  getSessionReconciliationDetails(sessionId: string, kind: 'opening' | 'closing' = 'closing') {
+  getSessionReconciliationDetails(
+    sessionId: string,
+    kind: 'opening' | 'closing' = 'closing',
+    channelId?: number,
+  ) {
     if (!CashierSessionService.isValidSessionId(sessionId)) {
       return of([]);
     }
     const client = this.apolloService.getClient();
+    const variables: { sessionId: string; kind: string; channelId?: number } = {
+      sessionId,
+      kind: kind === 'opening' ? 'opening' : 'closing',
+    };
+    if (channelId != null && !Number.isNaN(channelId)) {
+      variables.channelId = channelId;
+    }
     return from(
       client.query<{
         sessionReconciliationDetails: ReconciliationAccountDetail[];
       }>({
         query: GET_SESSION_RECONCILIATION_DETAILS,
-        variables: { sessionId, kind: kind === 'opening' ? 'opening' : 'closing' },
+        variables,
         fetchPolicy: 'network-only',
       }),
     ).pipe(

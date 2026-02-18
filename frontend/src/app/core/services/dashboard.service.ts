@@ -12,6 +12,21 @@ import { CompanyService } from './company.service';
 import { CurrencyService } from './currency.service';
 import { OrderMapperService } from './order-mapper.service';
 
+/** COGS-derived period totals (cents; from mv_daily_sales_summary + order stats) */
+export interface SalesSummaryPeriod {
+  revenue: number;
+  cogs: number;
+  margin: number;
+  orderCount: number;
+}
+
+/** COGS-derived sales summary for dashboard (today / week / month) */
+export interface SalesSummary {
+  today: SalesSummaryPeriod;
+  week: SalesSummaryPeriod;
+  month: SalesSummaryPeriod;
+}
+
 /**
  * Dashboard statistics aggregated from Vendure data
  */
@@ -19,6 +34,8 @@ export interface DashboardStats {
   sales: PeriodStats;
   purchases: PeriodStats;
   expenses: PeriodStats;
+  /** COGS-derived revenue, cogs, margin, orderCount per period (when available) */
+  salesSummary: SalesSummary | null;
   productCount: number;
   variantCount: number;
   activeUsers: number;
@@ -72,7 +89,7 @@ export interface RecentActivity {
  *
  * Single Responsibility: State management and orchestration only
  */
-/** Raw dashboard stats response from ledger (sales, purchases, expenses in one call) */
+/** Raw dashboard stats response from ledger + COGS sales summary */
 interface DashboardStatsResponse {
   sales?: {
     today: number;
@@ -92,6 +109,7 @@ interface DashboardStatsResponse {
     month: number;
     accounts: Array<{ label: string; value: number; icon: string }>;
   };
+  salesSummary?: SalesSummary | null;
 }
 
 @Injectable({
@@ -173,6 +191,7 @@ export class DashboardService {
           { label: 'Salaries', value: 0, icon: '👥' },
           { label: 'Other', value: 0, icon: '📋' },
         ]),
+        salesSummary: ledgerStats?.salesSummary ?? null,
         productCount: products.productCount,
         variantCount: products.variantCount,
         activeUsers: 0, // Replaced by MV-based strip on overview
@@ -205,7 +224,7 @@ export class DashboardService {
     const client = this.apolloService.getClient();
     try {
       const result = await client.query<{ dashboardStats: DashboardStatsResponse }>({
-        query: GET_DASHBOARD_STATS,
+        query: GET_DASHBOARD_STATS as import('graphql').DocumentNode,
         fetchPolicy: 'network-only',
       });
       return result.data?.dashboardStats ?? null;

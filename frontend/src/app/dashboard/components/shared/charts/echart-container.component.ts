@@ -18,7 +18,7 @@ import {
   template: `
     <div class="relative" [style.height]="height()">
       <div #chartEl class="w-full h-full"></div>
-      @if (loading) {
+      @if (loading()) {
         <div class="absolute inset-0 flex items-center justify-center bg-base-100/60">
           <span class="loading loading-spinner loading-sm text-primary"></span>
         </div>
@@ -35,7 +35,7 @@ export class EchartContainerComponent implements OnInit {
   private chart: any;
   private readonly chartReady = signal(false);
   private observer?: ResizeObserver;
-  protected loading = true;
+  protected readonly loading = signal(true);
 
   private readonly destroyRef = inject(DestroyRef);
 
@@ -70,7 +70,7 @@ export class EchartContainerComponent implements OnInit {
 
     this.chart = init(el, null, { renderer: 'canvas' });
     this.chart.setOption(this.option());
-    this.loading = false;
+    this.loading.set(false);
     this.chartReady.set(true);
 
     this.observer = new ResizeObserver(() => this.chart?.resize());

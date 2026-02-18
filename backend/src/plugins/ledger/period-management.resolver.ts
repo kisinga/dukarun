@@ -541,13 +541,24 @@ export class PeriodManagementResolver {
   async sessionReconciliationDetails(
     @Ctx() ctx: RequestContext,
     @Args('sessionId') sessionId: string,
-    @Args('kind', { nullable: true }) kind?: string
+    @Args('kind', { nullable: true }) kind?: string,
+    @Args('channelId', { nullable: true }) channelId?: number
   ) {
-    PeriodManagementResolver.logger.log(
-      `sessionReconciliationDetails called sessionId=${sessionId} kind=${kind}`
-    );
+    const trimmed = typeof sessionId === 'string' ? sessionId.trim() : '';
+    if (!trimmed || trimmed === '-1') {
+      return [];
+    }
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(trimmed)) {
+      return [];
+    }
     const reconKind = kind === 'opening' ? 'opening' : 'closing';
-    return this.reconciliationService.getSessionReconciliationDetails(ctx, sessionId, reconKind);
+    return this.reconciliationService.getSessionReconciliationDetails(
+      ctx,
+      trimmed,
+      reconKind,
+      channelId
+    );
   }
 
   @Query()

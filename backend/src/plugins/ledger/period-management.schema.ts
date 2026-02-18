@@ -311,7 +311,11 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     shiftModalPrefillData(channelId: Int!): ShiftModalPrefillData!
     reconciliations(channelId: Int!, options: ReconciliationListOptions): ReconciliationList!
     reconciliationDetails(reconciliationId: String!): [ReconciliationAccountDetail!]!
-    sessionReconciliationDetails(sessionId: ID!, kind: String): [ReconciliationAccountDetail!]!
+    sessionReconciliationDetails(
+      sessionId: ID!
+      kind: String
+      channelId: Int
+    ): [ReconciliationAccountDetail!]!
     accountBalancesAsOf(channelId: Int!, asOfDate: String!): [AccountBalanceAsOfItem!]!
     lastClosedSessionClosingBalances(channelId: Int!): [LastClosingBalance!]!
     expectedSessionClosingBalances(sessionId: ID!): [ExpectedClosingBalance!]!

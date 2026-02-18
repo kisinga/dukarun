@@ -28,6 +28,20 @@ export interface AnalyticsQueryParams {
   limit?: number;
 }
 
+/** COGS-derived period totals for dashboard (cents; orderCount from mv_daily_order_stats) */
+export interface DashboardSalesSummaryPeriod {
+  revenue: number;
+  cogs: number;
+  margin: number;
+  orderCount: number;
+}
+
+export interface DashboardSalesSummary {
+  today: DashboardSalesSummaryPeriod;
+  week: DashboardSalesSummaryPeriod;
+  month: DashboardSalesSummaryPeriod;
+}
+
 @Injectable()
 export class AnalyticsQueryService {
   private readonly logger = new Logger(AnalyticsQueryService.name);
@@ -243,8 +257,76 @@ export class AnalyticsQueryService {
     return Number(rows[0]?.orders ?? 0);
   }
 
+  /**
+   * COGS-derived sales summary for dashboard (today / week / month).
+   * Revenue, cogs, margin from mv_daily_sales_summary; order_count from mv_daily_order_stats.
+   * All monetary values in cents.
+   */
+  async getDashboardSalesSummary(
+    channelId: number,
+    startOfToday: string,
+    startOfWeek: string,
+    startOfMonth: string,
+    endDateStr: string
+  ): Promise<DashboardSalesSummary> {
+    const [summaryRows, orderRows] = await Promise.all([
+      this.dataSource.query(
+        `SELECT
+          COALESCE(SUM(CASE WHEN sale_date >= $2 AND sale_date <= $5 THEN total_revenue ELSE 0 END), 0)::bigint AS revenue_today,
+          COALESCE(SUM(CASE WHEN sale_date >= $2 AND sale_date <= $5 THEN total_cogs ELSE 0 END), 0)::bigint AS cogs_today,
+          COALESCE(SUM(CASE WHEN sale_date >= $2 AND sale_date <= $5 THEN total_margin ELSE 0 END), 0)::bigint AS margin_today,
+          COALESCE(SUM(CASE WHEN sale_date >= $3 AND sale_date <= $5 THEN total_revenue ELSE 0 END), 0)::bigint AS revenue_week,
+          COALESCE(SUM(CASE WHEN sale_date >= $3 AND sale_date <= $5 THEN total_cogs ELSE 0 END), 0)::bigint AS cogs_week,
+          COALESCE(SUM(CASE WHEN sale_date >= $3 AND sale_date <= $5 THEN total_margin ELSE 0 END), 0)::bigint AS margin_week,
+          COALESCE(SUM(CASE WHEN sale_date >= $4 AND sale_date <= $5 THEN total_revenue ELSE 0 END), 0)::bigint AS revenue_month,
+          COALESCE(SUM(CASE WHEN sale_date >= $4 AND sale_date <= $5 THEN total_cogs ELSE 0 END), 0)::bigint AS cogs_month,
+          COALESCE(SUM(CASE WHEN sale_date >= $4 AND sale_date <= $5 THEN total_margin ELSE 0 END), 0)::bigint AS margin_month
+        FROM mv_daily_sales_summary
+        WHERE channel_id = $1 AND sale_date BETWEEN $4 AND $5`,
+        [channelId, startOfToday, startOfWeek, startOfMonth, endDateStr]
+      ),
+      this.dataSource.query(
+        `SELECT
+          COALESCE(SUM(CASE WHEN order_date >= $2 AND order_date <= $5 THEN order_count ELSE 0 END), 0)::int AS orders_today,
+          COALESCE(SUM(CASE WHEN order_date >= $3 AND order_date <= $5 THEN order_count ELSE 0 END), 0)::int AS orders_week,
+          COALESCE(SUM(CASE WHEN order_date >= $4 AND order_date <= $5 THEN order_count ELSE 0 END), 0)::int AS orders_month
+        FROM mv_daily_order_stats
+        WHERE channel_id = $1 AND order_date BETWEEN $4 AND $5`,
+        [channelId, startOfToday, startOfWeek, startOfMonth, endDateStr]
+      ),
+    ]);
+
+    const s = summaryRows[0] ?? {};
+    const o = orderRows[0] ?? {};
+    return {
+      today: {
+        revenue: Number(s.revenue_today ?? 0),
+        cogs: Number(s.cogs_today ?? 0),
+        margin: Number(s.margin_today ?? 0),
+        orderCount: Number(o.orders_today ?? 0),
+      },
+      week: {
+        revenue: Number(s.revenue_week ?? 0),
+        cogs: Number(s.cogs_week ?? 0),
+        margin: Number(s.margin_week ?? 0),
+        orderCount: Number(o.orders_week ?? 0),
+      },
+      month: {
+        revenue: Number(s.revenue_month ?? 0),
+        cogs: Number(s.cogs_month ?? 0),
+        margin: Number(s.margin_month ?? 0),
+        orderCount: Number(o.orders_month ?? 0),
+      },
+    };
+  }
+
   async refreshAll(): Promise<void> {
-    const views = ['mv_daily_product_sales', 'mv_daily_order_stats', 'mv_daily_customer_stats'];
+    const views = [
+      'mv_daily_product_sales',
+      'mv_daily_order_stats',
+      'mv_daily_customer_stats',
+      'mv_daily_sales_summary', // after mv_daily_product_sales (depends on it)
+    ];
     for (const view of views) {
       try {
         await this.dataSource.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${view}`);

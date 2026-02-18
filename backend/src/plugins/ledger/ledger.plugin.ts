@@ -25,6 +25,7 @@ import { PurchasePostingStrategy } from '../../services/financial/strategies/pur
 import { SalePostingStrategy } from '../../services/financial/strategies/sale-posting.strategy';
 import { InventoryReconciliationService } from '../../services/financial/inventory-reconciliation.service';
 import { LedgerQueryService } from '../../services/financial/ledger-query.service';
+import { AnalyticsQueryService } from '../../services/analytics/analytics-query.service';
 import { PeriodEndClosingService } from '../../services/financial/period-end-closing.service';
 import { PeriodLockService } from '../../services/financial/period-lock.service';
 import { ReconciliationValidatorService } from '../../services/financial/reconciliation-validator.service';
@@ -91,6 +92,7 @@ const COMBINED_SCHEMA = gql`
     ReconciliationResolver,
     PeriodManagementResolver,
     LedgerQueryService,
+    AnalyticsQueryService,
     AccountBalanceService,
     PeriodLockService,
     ReconciliationService,

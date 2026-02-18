@@ -853,6 +853,26 @@ export const GET_DASHBOARD_STATS = graphql(`
           icon
         }
       }
+      salesSummary {
+        today {
+          revenue
+          cogs
+          margin
+          orderCount
+        }
+        week {
+          revenue
+          cogs
+          margin
+          orderCount
+        }
+        month {
+          revenue
+          cogs
+          margin
+          orderCount
+        }
+      }
     }
   }
 `);

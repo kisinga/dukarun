@@ -81,8 +81,8 @@
       </div>
     </div>
 
-    <!-- Period-driven summary: Revenue + Profit margin (same period as tabs) -->
-    <div class="grid grid-cols-2 gap-3 px-4 py-3 border-b border-base-300/40">
+    <!-- Period-driven summary: Revenue, Gross profit, Orders, Profit margin (COGS-based when available) -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 px-4 py-3 border-b border-base-300/40">
       <div class="kpi-card kpi-card--revenue rounded-lg p-3">
         <span class="kpi-label">Revenue</span>
         <p class="text-xl font-bold tabular-nums text-primary leading-tight mt-1">
@@ -90,7 +90,22 @@
         </p>
       </div>
       <div class="kpi-card kpi-card--margin rounded-lg p-3">
-        <span class="kpi-label">Profit margin (7D)</span>
+        <span class="kpi-label">Gross profit</span>
+        <p class="text-xl font-bold tabular-nums text-success leading-tight mt-1">
+          {{ periodGrossProfitFormatted() }}
+        </p>
+        <span class="text-[10px] text-base-content/40 mt-0.5 block">based on COGS</span>
+      </div>
+      <div class="kpi-card rounded-lg p-3">
+        <span class="kpi-label">Orders</span>
+        @if (periodOrderCount() !== null) {
+          <p class="text-xl font-bold tabular-nums leading-tight mt-1">{{ periodOrderCount() }}</p>
+        } @else {
+          <p class="text-xl font-bold tabular-nums text-base-content/50 leading-tight mt-1">—</p>
+        }
+      </div>
+      <div class="kpi-card kpi-card--margin rounded-lg p-3">
+        <span class="kpi-label">Profit margin ({{ getActivePeriodLabel() }})</span>
         @if (analyticsLoading()) {
           <div class="skeleton h-7 w-14 rounded mt-1"></div>
         } @else if (profitMarginPercent() !== null) {
@@ -206,6 +221,30 @@
         </div>
       }
     }
+
+    <!-- Sales (revenue) chart — same period as tabs above, visually linked -->
+    <div class="border-t border-base-300/60 px-4 py-3 bg-base-200/20">
+      <div class="flex flex-wrap items-center gap-2 mb-2">
+        <h3 class="text-sm font-bold text-base-content/70">Sales (revenue)</h3>
+        <span
+          class="badge badge-sm badge-ghost text-base-content/60"
+          aria-label="Chart follows period"
+        >
+          {{ getActivePeriodLabel() }}
+        </span>
+      </div>
+      <div class="min-h-[200px]">
+        @if (salesChartHasData()) {
+          <app-echart-container [option]="salesChartOption()" height="220px" />
+        } @else if (analyticsLoading()) {
+          <div class="skeleton h-[220px] w-full rounded-lg"></div>
+        } @else {
+          <p class="text-sm text-base-content/50 py-8 text-center">
+            No sales data for {{ getActivePeriodLabel() }}.
+          </p>
+        }
+      </div>
+    </div>
   </div>
 
   <!-- ===== PRODUCT & INVENTORY (stats only, minimal) ===== -->
