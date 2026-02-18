@@ -40,15 +40,15 @@ WORKDIR /usr/src/app
 
 ENV NODE_ENV=production
 
+# Copy node_modules from builder (already has all deps that built successfully)
+# Re-running npm ci in prod was missing packages; copying guarantees consistency
 COPY --from=builder /app/package.json /app/package-lock.json ./
-
-# Workspace manifests required so npm ci installs backend runtime deps
 COPY --from=builder /app/backend/package.json backend/
 COPY --from=builder /app/frontend/package.json frontend/
 COPY --from=builder /app/ml-trainer/package.json ml-trainer/
+COPY --from=builder /app/node_modules ./node_modules
 
-RUN npm ci --quiet --no-audit --no-fund --omit=dev && \
-    npm cache clean --force
+RUN npm prune --omit=dev
 
 COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/static ./static
