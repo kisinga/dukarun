@@ -557,13 +557,9 @@ export class ReconciliationService {
       varianceCents: string | null;
     }>
   > {
-    if (!reconciliationId || reconciliationId === '-1') {
-      return [];
-    }
+    if (!reconciliationId || reconciliationId === '-1') return [];
     const trimmedId = String(reconciliationId).trim();
     if (!trimmedId || trimmedId === '-1') return [];
-
-    this.logger.log(`getReconciliationDetails requested reconciliationId=${trimmedId}`);
 
     let reconciliation: Reconciliation | null = null;
     try {
@@ -571,10 +567,7 @@ export class ReconciliationService {
       reconciliation = await reconciliationRepo.findOne({
         where: { id: trimmedId },
       });
-      if (!reconciliation) {
-        this.logger.warn(`getReconciliationDetails reconciliation not found: ${trimmedId}`);
-        return [];
-      }
+      if (!reconciliation) return [];
 
       const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
       let rows: Array<ReconciliationAccount & { account?: Account | null }>;
@@ -583,13 +576,9 @@ export class ReconciliationService {
           where: { reconciliationId: trimmedId },
           relations: ['account'],
         });
-      } catch (e) {
-        this.logger.warn(`getReconciliationDetails junction find failed: ${trimmedId}`, e);
+      } catch {
         rows = [];
       }
-      this.logger.log(
-        `getReconciliationDetails reconciliationId=${trimmedId} junctionRows=${rows.length}`
-      );
 
       const result: Array<{
         accountId: string;
@@ -633,18 +622,12 @@ export class ReconciliationService {
       // When no junction rows: for cash-session scope, derive per-account details from channel config.
       if (result.length === 0 && reconciliation.scope === 'cash-session') {
         const derived = await this.deriveCashSessionDetails(ctx, reconciliation);
-        if (derived.length > 0) {
-          this.logger.log(
-            `getReconciliationDetails derived ${derived.length} rows from session config reconciliationId=${trimmedId}`
-          );
-          return derived;
-        }
+        if (derived.length > 0) return derived;
       }
 
       // Fallback: when no per-account junction rows (legacy, inventory, or empty manual),
       // return a summary row so the user sees expected/actual/variance.
       if (result.length === 0) {
-        this.logger.log(`getReconciliationDetails fallback summary reconciliationId=${trimmedId}`);
         const expected = reconciliation.expectedBalance ?? null;
         const actual = reconciliation.actualBalance ?? null;
         const variance = reconciliation.varianceAmount ?? null;
@@ -660,7 +643,6 @@ export class ReconciliationService {
 
       return result;
     } catch (e) {
-      this.logger.warn(`getReconciliationDetails error: ${trimmedId}`, e);
       if (reconciliation) {
         return [
           {
@@ -704,9 +686,6 @@ export class ReconciliationService {
   > {
     const trimmed = typeof sessionId === 'string' ? sessionId.trim() : '';
     if (!trimmed || trimmed === '-1' || !ReconciliationService.UUID_REGEX.test(trimmed)) {
-      this.logger.warn(
-        `getSessionReconciliationDetails: invalid sessionId (rejected), kind=${kind}`
-      );
       return [];
     }
     const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
@@ -767,18 +746,11 @@ export class ReconciliationService {
         unscopeList = await legacyUnscopeQb.take(2).getMany();
       }
       if (unscopeList.length === 1) {
-        this.logger.warn(
-          `getSessionReconciliationDetails sessionId=${sessionId} kind=${kind} channelId=${channelId}: ` +
-            `no row with channelId=${channelId}, found one with channelId=${unscopeList[0].channelId} (using it)`
-        );
         list = unscopeList;
       }
     }
 
     const reconciliation = list[0];
-    this.logger.log(
-      `getSessionReconciliationDetails sessionId=${sessionId} kind=${kind} channelId=${channelId ?? 'none'} kindRef=${kindRef} found=${!!reconciliation} reconciliationId=${reconciliation?.id ?? 'n/a'}`
-    );
     if (!reconciliation) return [];
     return this.getReconciliationDetails(ctx, reconciliation.id);
   }

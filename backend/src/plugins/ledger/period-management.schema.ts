@@ -1,5 +1,7 @@
 import { gql } from 'graphql-tag';
 
+/** Session and other UUID-bearing ids use String! not ID! so Vendure's integer ID strategy does not decode them to -1. See docs/GRAPHQL_IDS_AND_UUIDS.md */
+
 export const PERIOD_MANAGEMENT_SCHEMA = gql`
   type AccountingPeriod {
     id: ID!
@@ -49,7 +51,7 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
   }
 
   type CashierSessionSummary {
-    sessionId: ID!
+    sessionId: String!
     cashierUserId: Int!
     openedAt: DateTime!
     closedAt: DateTime
@@ -66,7 +68,7 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
   }
 
   type ClosedSessionMissingReconciliation {
-    sessionId: ID!
+    sessionId: String!
     closedAt: DateTime!
   }
 
@@ -81,7 +83,7 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
   }
 
   input CloseCashierSessionInput {
-    sessionId: ID!
+    sessionId: String!
     channelId: Int
     closingBalances: [AccountAmountInput!]!
     notes: String
@@ -99,7 +101,7 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
   type CashDrawerCount {
     id: ID!
     channelId: Int!
-    sessionId: ID!
+    sessionId: String!
     countType: String!
     takenAt: DateTime!
     declaredCash: String!
@@ -122,7 +124,7 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
   type MpesaVerification {
     id: ID!
     channelId: Int!
-    sessionId: ID!
+    sessionId: String!
     verifiedAt: DateTime!
     transactionCount: Int!
     allConfirmed: Boolean!
@@ -132,13 +134,13 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
   }
 
   input RecordCashCountInput {
-    sessionId: ID!
+    sessionId: String!
     declaredCash: String!
     countType: String!
   }
 
   input VerifyMpesaInput {
-    sessionId: ID!
+    sessionId: String!
     allConfirmed: Boolean!
     flaggedTransactionIds: [String!]
     notes: String
@@ -283,7 +285,7 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     fromAccountCode: String!
     toAccountCode: String!
     amount: String! # in smallest currency unit (principal)
-    entryDate: DateTime!
+    entryDate: String! # date-only YYYY-MM-DD (or ISO datetime; normalized to date)
     memo: String
     feeAmount: String # optional, in smallest currency unit (tagged expense)
     expenseTag: String # optional, e.g. "transaction_fee"; used in meta when feeAmount present
@@ -299,26 +301,26 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
       stockLocationId: Int
     ): InventoryValuation!
     currentCashierSession(channelId: Int!): CashierSession
-    cashierSession(sessionId: ID!): CashierSessionSummary
+    cashierSession(sessionId: String!): CashierSessionSummary
     cashierSessions(channelId: Int!, options: CashierSessionListOptions): CashierSessionList!
     # Cash Control Queries
-    sessionCashCounts(sessionId: ID!): [CashDrawerCount!]!
+    sessionCashCounts(sessionId: String!): [CashDrawerCount!]!
     pendingVarianceReviews(channelId: Int!): [CashDrawerCount!]!
-    sessionMpesaVerifications(sessionId: ID!): [MpesaVerification!]!
+    sessionMpesaVerifications(sessionId: String!): [MpesaVerification!]!
     # Reconciliation Config Queries (driven by PaymentMethod custom fields)
-    sessionReconciliationRequirements(sessionId: ID!): SessionReconciliationRequirements!
+    sessionReconciliationRequirements(sessionId: String!): SessionReconciliationRequirements!
     channelReconciliationConfig(channelId: Int!): [PaymentMethodReconciliationConfig!]!
     shiftModalPrefillData(channelId: Int!): ShiftModalPrefillData!
     reconciliations(channelId: Int!, options: ReconciliationListOptions): ReconciliationList!
     reconciliationDetails(reconciliationId: String!): [ReconciliationAccountDetail!]!
     sessionReconciliationDetails(
-      sessionId: ID!
+      sessionId: String!
       kind: String
       channelId: Int
     ): [ReconciliationAccountDetail!]!
     accountBalancesAsOf(channelId: Int!, asOfDate: String!): [AccountBalanceAsOfItem!]!
     lastClosedSessionClosingBalances(channelId: Int!): [LastClosingBalance!]!
-    expectedSessionClosingBalances(sessionId: ID!): [ExpectedClosingBalance!]!
+    expectedSessionClosingBalances(sessionId: String!): [ExpectedClosingBalance!]!
     closedSessionsMissingReconciliation(
       channelId: Int!
       startDate: DateTime
@@ -345,18 +347,18 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
   extend type Mutation {
     recordExpense(input: RecordExpenseInput!): RecordExpenseResult!
     createReconciliation(input: CreateReconciliationInput!): Reconciliation!
-    verifyReconciliation(reconciliationId: ID!): Reconciliation!
+    verifyReconciliation(reconciliationId: String!): Reconciliation!
     closeAccountingPeriod(channelId: Int!, periodEndDate: DateTime!): PeriodEndCloseResult!
     openAccountingPeriod(channelId: Int!, periodStartDate: DateTime!): AccountingPeriod!
     createInventoryReconciliation(input: CreateInventoryReconciliationInput!): Reconciliation!
     createInterAccountTransfer(input: InterAccountTransferInput!): JournalEntry!
     openCashierSession(input: OpenCashierSessionInput!): CashierSession!
     closeCashierSession(input: CloseCashierSessionInput!): CashierSessionSummary!
-    createCashierSessionReconciliation(sessionId: ID!, notes: String): Reconciliation!
+    createCashierSessionReconciliation(sessionId: String!, notes: String): Reconciliation!
     # Cash Control Mutations
     recordCashCount(input: RecordCashCountInput!): CashCountResult!
-    explainVariance(countId: ID!, reason: String!): CashDrawerCount!
-    reviewCashCount(countId: ID!, notes: String): CashDrawerCount!
+    explainVariance(countId: String!, reason: String!): CashDrawerCount!
+    reviewCashCount(countId: String!, notes: String): CashDrawerCount!
     verifyMpesaTransactions(input: VerifyMpesaInput!): MpesaVerification!
   }
 `;

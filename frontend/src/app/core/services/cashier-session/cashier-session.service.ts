@@ -1,6 +1,5 @@
 import { Injectable, inject, signal, computed, effect } from '@angular/core';
 import moment from 'moment';
-import { gql } from '@apollo/client/core';
 import { ApolloService } from '../apollo.service';
 import { CompanyService } from '../company.service';
 import { map, catchError, of, from, tap } from 'rxjs';
@@ -13,6 +12,7 @@ import {
   GET_SHIFT_MODAL_PREFILL_DATA,
   GET_RECONCILIATIONS,
   GET_RECONCILIATION_DETAILS,
+  GET_SESSION_RECONCILIATION_DETAILS,
   GET_LAST_CLOSED_SESSION_CLOSING_BALANCES,
   GET_EXPECTED_SESSION_CLOSING_BALANCES,
   OPEN_CASHIER_SESSION,
@@ -20,19 +20,6 @@ import {
   CREATE_CASHIER_SESSION_RECONCILIATION,
   CREATE_RECONCILIATION,
 } from '../../graphql/operations.graphql';
-
-const GET_SESSION_RECONCILIATION_DETAILS = gql`
-  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String, $channelId: Int) {
-    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind, channelId: $channelId) {
-      accountId
-      accountCode
-      accountName
-      declaredAmountCents
-      expectedBalanceCents
-      varianceCents
-    }
-  }
-`;
 
 export interface CashierSession {
   id: string;

@@ -3001,7 +3001,7 @@ export const GET_CURRENT_CASHIER_SESSION = graphql(`
 `);
 
 export const GET_CASHIER_SESSION = graphql(`
-  query GetCashierSession($sessionId: ID!) {
+  query GetCashierSession($sessionId: String!) {
     cashierSession(sessionId: $sessionId) {
       sessionId
       cashierUserId
@@ -3070,7 +3070,7 @@ export const CLOSE_CASHIER_SESSION = graphql(`
 `);
 
 export const CREATE_CASHIER_SESSION_RECONCILIATION = graphql(`
-  mutation CreateCashierSessionReconciliation($sessionId: ID!, $notes: String) {
+  mutation CreateCashierSessionReconciliation($sessionId: String!, $notes: String) {
     createCashierSessionReconciliation(sessionId: $sessionId, notes: $notes) {
       id
       channelId
@@ -3140,8 +3140,8 @@ export const GET_RECONCILIATION_DETAILS = graphql(`
 `);
 
 export const GET_SESSION_RECONCILIATION_DETAILS = graphql(`
-  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String) {
-    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind) {
+  query GetSessionReconciliationDetails($sessionId: String!, $kind: String, $channelId: Int) {
+    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind, channelId: $channelId) {
       accountId
       accountCode
       accountName
@@ -3174,7 +3174,7 @@ export const GET_LAST_CLOSED_SESSION_CLOSING_BALANCES = graphql(`
 `);
 
 export const GET_EXPECTED_SESSION_CLOSING_BALANCES = graphql(`
-  query GetExpectedSessionClosingBalances($sessionId: ID!) {
+  query GetExpectedSessionClosingBalances($sessionId: String!) {
     expectedSessionClosingBalances(sessionId: $sessionId) {
       accountCode
       accountName
@@ -3188,7 +3188,7 @@ export const GET_EXPECTED_SESSION_CLOSING_BALANCES = graphql(`
 // ============================================================================
 
 export const GET_SESSION_CASH_COUNTS = graphql(`
-  query GetSessionCashCounts($sessionId: ID!) {
+  query GetSessionCashCounts($sessionId: String!) {
     sessionCashCounts(sessionId: $sessionId) {
       id
       channelId
@@ -3227,7 +3227,7 @@ export const GET_PENDING_VARIANCE_REVIEWS = graphql(`
 `);
 
 export const GET_SESSION_MPESA_VERIFICATIONS = graphql(`
-  query GetSessionMpesaVerifications($sessionId: ID!) {
+  query GetSessionMpesaVerifications($sessionId: String!) {
     sessionMpesaVerifications(sessionId: $sessionId) {
       id
       channelId
@@ -3261,7 +3261,7 @@ export const RECORD_CASH_COUNT = graphql(`
 `);
 
 export const EXPLAIN_VARIANCE = graphql(`
-  mutation ExplainVariance($countId: ID!, $reason: String!) {
+  mutation ExplainVariance($countId: String!, $reason: String!) {
     explainVariance(countId: $countId, reason: $reason) {
       id
       varianceReason
@@ -3270,7 +3270,7 @@ export const EXPLAIN_VARIANCE = graphql(`
 `);
 
 export const REVIEW_CASH_COUNT = graphql(`
-  mutation ReviewCashCount($countId: ID!, $notes: String) {
+  mutation ReviewCashCount($countId: String!, $notes: String) {
     reviewCashCount(countId: $countId, notes: $notes) {
       id
       declaredCash

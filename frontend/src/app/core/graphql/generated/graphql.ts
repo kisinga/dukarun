@@ -576,7 +576,7 @@ export type CashDrawerCount = {
   reviewNotes?: Maybe<Scalars['String']['output']>;
   reviewedAt?: Maybe<Scalars['DateTime']['output']>;
   reviewedByUserId?: Maybe<Scalars['Int']['output']>;
-  sessionId: Scalars['ID']['output'];
+  sessionId: Scalars['String']['output'];
   takenAt: Scalars['DateTime']['output'];
   variance?: Maybe<Scalars['String']['output']>;
   varianceReason?: Maybe<Scalars['String']['output']>;
@@ -622,7 +622,7 @@ export type CashierSessionSummary = {
   ledgerTotals: CashierSessionLedgerTotals;
   openedAt: Scalars['DateTime']['output'];
   openingFloat: Scalars['String']['output'];
-  sessionId: Scalars['ID']['output'];
+  sessionId: Scalars['String']['output'];
   status: Scalars['String']['output'];
   variance: Scalars['String']['output'];
 };
@@ -894,13 +894,13 @@ export type CloseCashierSessionInput = {
   channelId?: InputMaybe<Scalars['Int']['input']>;
   closingBalances: Array<AccountAmountInput>;
   notes?: InputMaybe<Scalars['String']['input']>;
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 };
 
 export type ClosedSessionMissingReconciliation = {
   __typename?: 'ClosedSessionMissingReconciliation';
   closedAt: Scalars['DateTime']['output'];
-  sessionId: Scalars['ID']['output'];
+  sessionId: Scalars['String']['output'];
 };
 
 export type Collection = Node & {
@@ -2198,6 +2198,7 @@ export type DashboardStats = {
   expenses: PeriodStats;
   purchases: PeriodStats;
   sales: PeriodStats;
+  salesSummary?: Maybe<SalesSummary>;
 };
 
 /** Operators for filtering on a list of Date fields */
@@ -2880,7 +2881,7 @@ export type IntStructFieldConfig = StructField & {
 export type InterAccountTransferInput = {
   amount: Scalars['String']['input'];
   channelId: Scalars['Int']['input'];
-  entryDate: Scalars['DateTime']['input'];
+  entryDate: Scalars['String']['input'];
   expenseTag?: InputMaybe<Scalars['String']['input']>;
   feeAmount?: InputMaybe<Scalars['String']['input']>;
   fromAccountCode: Scalars['String']['input'];
@@ -3650,7 +3651,7 @@ export type MpesaVerification = {
   flaggedTransactionIds?: Maybe<Array<Scalars['String']['output']>>;
   id: Scalars['ID']['output'];
   notes?: Maybe<Scalars['String']['output']>;
-  sessionId: Scalars['ID']['output'];
+  sessionId: Scalars['String']['output'];
   transactionCount: Scalars['Int']['output'];
   verifiedAt: Scalars['DateTime']['output'];
   verifiedByUserId: Scalars['Int']['output'];
@@ -4247,7 +4248,7 @@ export type MutationCreateAssetsArgs = {
 
 export type MutationCreateCashierSessionReconciliationArgs = {
   notes?: InputMaybe<Scalars['String']['input']>;
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 };
 
 export type MutationCreateChannelArgs = {
@@ -4575,7 +4576,7 @@ export type MutationDuplicateEntityArgs = {
 };
 
 export type MutationExplainVarianceArgs = {
-  countId: Scalars['ID']['input'];
+  countId: Scalars['String']['input'];
   reason: Scalars['String']['input'];
 };
 
@@ -4756,7 +4757,7 @@ export type MutationReviewApprovalRequestArgs = {
 };
 
 export type MutationReviewCashCountArgs = {
-  countId: Scalars['ID']['input'];
+  countId: Scalars['String']['input'];
   notes?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -5065,7 +5066,7 @@ export type MutationVerifyMpesaTransactionsArgs = {
 };
 
 export type MutationVerifyReconciliationArgs = {
-  reconciliationId: Scalars['ID']['input'];
+  reconciliationId: Scalars['String']['input'];
 };
 
 export type MutationVerifyRegistrationOtpArgs = {
@@ -5192,6 +5193,16 @@ export type OtpResponse = {
   message: Scalars['String']['output'];
   sessionId?: Maybe<Scalars['String']['output']>;
   success: Scalars['Boolean']['output'];
+};
+
+/** Open batch summary for choosing which batch to sell from (e.g. expiry / traceability). */
+export type OpenBatchForVariant = {
+  __typename?: 'OpenBatchForVariant';
+  batchNumber?: Maybe<Scalars['String']['output']>;
+  expiryDate?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['ID']['output'];
+  quantity: Scalars['Float']['output'];
+  unitCost: Scalars['Int']['output'];
 };
 
 export type OpenCashierSessionInput = {
@@ -5563,7 +5574,7 @@ export type PaySingleOrderInput = {
 export type PaySinglePurchaseInput = {
   debitAccountCode?: InputMaybe<Scalars['String']['input']>;
   paymentAmount?: InputMaybe<Scalars['Float']['input']>;
-  purchaseId: Scalars['ID']['input'];
+  purchaseId: Scalars['String']['input'];
 };
 
 export type Payment = Node & {
@@ -6548,6 +6559,8 @@ export type PurchaseFilterInput = {
 };
 
 export type PurchaseLineInput = {
+  batchNumber?: InputMaybe<Scalars['String']['input']>;
+  expiryDate?: InputMaybe<Scalars['DateTime']['input']>;
   quantity: Scalars['Float']['input'];
   stockLocationId: Scalars['ID']['input'];
   unitCost: Scalars['Int']['input'];
@@ -6663,6 +6676,8 @@ export type Query = {
   mlTrainingInfo: MlTrainingInfo;
   /** Get photo manifest for training (JSON with URLs) */
   mlTrainingManifest: MlTrainingManifest;
+  /** Open batches for a variant (and optional location) for batch selection when recording a sale. */
+  openBatchesForVariant: Array<OpenBatchForVariant>;
   order?: Maybe<Order>;
   orders: OrderList;
   paymentMethod?: Maybe<PaymentMethod>;
@@ -6768,7 +6783,7 @@ export type QueryAuditLogsArgs = {
 };
 
 export type QueryCashierSessionArgs = {
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 };
 
 export type QueryCashierSessionsArgs = {
@@ -6873,7 +6888,7 @@ export type QueryEligibleShippingMethodsForDraftOrderArgs = {
 };
 
 export type QueryExpectedSessionClosingBalancesArgs = {
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 };
 
 export type QueryFacetArgs = {
@@ -6968,6 +6983,11 @@ export type QueryMlTrainingInfoArgs = {
 
 export type QueryMlTrainingManifestArgs = {
   channelId: Scalars['ID']['input'];
+};
+
+export type QueryOpenBatchesForVariantArgs = {
+  productVariantId: Scalars['ID']['input'];
+  stockLocationId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 export type QueryOrderArgs = {
@@ -7089,20 +7109,21 @@ export type QuerySellersArgs = {
 };
 
 export type QuerySessionCashCountsArgs = {
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 };
 
 export type QuerySessionMpesaVerificationsArgs = {
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 };
 
 export type QuerySessionReconciliationDetailsArgs = {
+  channelId?: InputMaybe<Scalars['Int']['input']>;
   kind?: InputMaybe<Scalars['String']['input']>;
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 };
 
 export type QuerySessionReconciliationRequirementsArgs = {
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 };
 
 export type QueryShiftModalPrefillDataArgs = {
@@ -7197,10 +7218,10 @@ export type Reconciliation = {
   expectedBalance?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   notes?: Maybe<Scalars['String']['output']>;
-  snapshotAt: Scalars['DateTime']['output'];
   reviewedBy?: Maybe<Scalars['Int']['output']>;
   scope: Scalars['String']['output'];
   scopeRefId: Scalars['String']['output'];
+  snapshotAt: Scalars['DateTime']['output'];
   status: Scalars['String']['output'];
   varianceAmount: Scalars['String']['output'];
 };
@@ -7245,7 +7266,7 @@ export type ReconciliationSummary = {
 export type RecordCashCountInput = {
   countType: Scalars['String']['input'];
   declaredCash: Scalars['String']['input'];
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 };
 
 export type RecordExpenseInput = {
@@ -7567,6 +7588,23 @@ export type Sale = Node &
     type: StockMovementType;
     updatedAt: Scalars['DateTime']['output'];
   };
+
+/** COGS-derived sales summary for dashboard (today / week / month). */
+export type SalesSummary = {
+  __typename?: 'SalesSummary';
+  month: SalesSummaryPeriod;
+  today: SalesSummaryPeriod;
+  week: SalesSummaryPeriod;
+};
+
+/** COGS-derived sales totals for a single period (cents; orderCount from order stats). */
+export type SalesSummaryPeriod = {
+  __typename?: 'SalesSummaryPeriod';
+  cogs: Scalars['Float']['output'];
+  margin: Scalars['Float']['output'];
+  orderCount: Scalars['Int']['output'];
+  revenue: Scalars['Float']['output'];
+};
 
 export type ScheduledTask = {
   __typename?: 'ScheduledTask';
@@ -8986,7 +9024,7 @@ export type VerifyMpesaInput = {
   allConfirmed: Scalars['Boolean']['input'];
   flaggedTransactionIds?: InputMaybe<Array<Scalars['String']['input']>>;
   notes?: InputMaybe<Scalars['String']['input']>;
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 };
 
 export type Zone = Node & {
@@ -9948,6 +9986,30 @@ export type GetDashboardStatsQuery = {
         icon: string;
       }>;
     };
+    salesSummary?: {
+      __typename?: 'SalesSummary';
+      today: {
+        __typename?: 'SalesSummaryPeriod';
+        revenue: number;
+        cogs: number;
+        margin: number;
+        orderCount: number;
+      };
+      week: {
+        __typename?: 'SalesSummaryPeriod';
+        revenue: number;
+        cogs: number;
+        margin: number;
+        orderCount: number;
+      };
+      month: {
+        __typename?: 'SalesSummaryPeriod';
+        revenue: number;
+        cogs: number;
+        margin: number;
+        orderCount: number;
+      };
+    } | null;
   };
 };
 
@@ -12279,7 +12341,7 @@ export type GetCurrentCashierSessionQuery = {
 };
 
 export type GetCashierSessionQueryVariables = Exact<{
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 }>;
 
 export type GetCashierSessionQuery = {
@@ -12368,7 +12430,7 @@ export type CloseCashierSessionMutation = {
 };
 
 export type CreateCashierSessionReconciliationMutationVariables = Exact<{
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
   notes?: InputMaybe<Scalars['String']['input']>;
 }>;
 
@@ -12457,8 +12519,9 @@ export type GetReconciliationDetailsQuery = {
 };
 
 export type GetSessionReconciliationDetailsQueryVariables = Exact<{
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
   kind?: InputMaybe<Scalars['String']['input']>;
+  channelId?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 export type GetSessionReconciliationDetailsQuery = {
@@ -12505,7 +12568,7 @@ export type GetLastClosedSessionClosingBalancesQuery = {
 };
 
 export type GetExpectedSessionClosingBalancesQueryVariables = Exact<{
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 }>;
 
 export type GetExpectedSessionClosingBalancesQuery = {
@@ -12519,7 +12582,7 @@ export type GetExpectedSessionClosingBalancesQuery = {
 };
 
 export type GetSessionCashCountsQueryVariables = Exact<{
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 }>;
 
 export type GetSessionCashCountsQuery = {
@@ -12566,7 +12629,7 @@ export type GetPendingVarianceReviewsQuery = {
 };
 
 export type GetSessionMpesaVerificationsQueryVariables = Exact<{
-  sessionId: Scalars['ID']['input'];
+  sessionId: Scalars['String']['input'];
 }>;
 
 export type GetSessionMpesaVerificationsQuery = {
@@ -12609,7 +12672,7 @@ export type RecordCashCountMutation = {
 };
 
 export type ExplainVarianceMutationVariables = Exact<{
-  countId: Scalars['ID']['input'];
+  countId: Scalars['String']['input'];
   reason: Scalars['String']['input'];
 }>;
 
@@ -12619,7 +12682,7 @@ export type ExplainVarianceMutation = {
 };
 
 export type ReviewCashCountMutationVariables = Exact<{
-  countId: Scalars['ID']['input'];
+  countId: Scalars['String']['input'];
   notes?: InputMaybe<Scalars['String']['input']>;
 }>;
 
@@ -16333,6 +16396,54 @@ export const GetDashboardStatsDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'label' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'value' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'icon' } },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'salesSummary' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'today' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'revenue' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'cogs' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'margin' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'orderCount' } },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'week' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'revenue' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'cogs' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'margin' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'orderCount' } },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'month' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'revenue' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'cogs' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'margin' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'orderCount' } },
                           ],
                         },
                       },
@@ -22982,7 +23093,7 @@ export const GetCashierSessionDocument = {
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'sessionId' } },
           type: {
             kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
           },
         },
       ],
@@ -23218,7 +23329,7 @@ export const CreateCashierSessionReconciliationDocument = {
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'sessionId' } },
           type: {
             kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
           },
         },
         {
@@ -23454,13 +23565,18 @@ export const GetSessionReconciliationDetailsDocument = {
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'sessionId' } },
           type: {
             kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
           },
         },
         {
           kind: 'VariableDefinition',
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'kind' } },
           type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
         },
       ],
       selectionSet: {
@@ -23479,6 +23595,11 @@ export const GetSessionReconciliationDetailsDocument = {
                 kind: 'Argument',
                 name: { kind: 'Name', value: 'kind' },
                 value: { kind: 'Variable', name: { kind: 'Name', value: 'kind' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'channelId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
               },
             ],
             selectionSet: {
@@ -23619,7 +23740,7 @@ export const GetExpectedSessionClosingBalancesDocument = {
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'sessionId' } },
           type: {
             kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
           },
         },
       ],
@@ -23666,7 +23787,7 @@ export const GetSessionCashCountsDocument = {
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'sessionId' } },
           type: {
             kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
           },
         },
       ],
@@ -23776,7 +23897,7 @@ export const GetSessionMpesaVerificationsDocument = {
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'sessionId' } },
           type: {
             kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
           },
         },
       ],
@@ -23888,7 +24009,7 @@ export const ExplainVarianceDocument = {
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'countId' } },
           type: {
             kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
           },
         },
         {
@@ -23944,7 +24065,7 @@ export const ReviewCashCountDocument = {
           variable: { kind: 'Variable', name: { kind: 'Name', value: 'countId' } },
           type: {
             kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
           },
         },
         {
