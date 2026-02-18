@@ -878,10 +878,13 @@ export const GET_RECENT_ORDERS = graphql(`
         totalWithTax
         state
         createdAt
+        orderPlacedAt
         currencyCode
         customer {
+          id
           firstName
           lastName
+          emailAddress
         }
         lines {
           id
@@ -895,6 +898,13 @@ export const GET_RECENT_ORDERS = graphql(`
               name
             }
           }
+        }
+        payments {
+          id
+          state
+          amount
+          method
+          createdAt
         }
       }
     }
@@ -3361,5 +3371,76 @@ export const REVIEW_APPROVAL_REQUEST = graphql(`
       message
       reviewedAt
     }
+  }
+`);
+
+// ============================================================================
+// ANALYTICS
+// ============================================================================
+
+export const GET_ANALYTICS_STATS = graphql(`
+  query GetAnalyticsStats($timeRange: AnalyticsTimeRange!, $limit: Int) {
+    analyticsStats(timeRange: $timeRange, limit: $limit) {
+      topSelling {
+        productVariantId
+        productId
+        productName
+        variantName
+        totalQuantity
+        totalRevenue
+        totalMargin
+        marginPercent
+        quantityChangePercent
+      }
+      highestRevenue {
+        productVariantId
+        productId
+        productName
+        variantName
+        totalQuantity
+        totalRevenue
+        totalMargin
+        marginPercent
+      }
+      highestMargin {
+        productVariantId
+        productId
+        productName
+        variantName
+        totalQuantity
+        totalRevenue
+        totalMargin
+        marginPercent
+      }
+      trending {
+        productVariantId
+        productId
+        productName
+        variantName
+        totalQuantity
+        quantityChangePercent
+      }
+      salesTrend {
+        date
+        value
+      }
+      orderVolumeTrend {
+        date
+        value
+      }
+      customerGrowthTrend {
+        date
+        value
+      }
+      averageProfitMargin
+      totalRevenue
+      totalOrders
+    }
+  }
+`);
+
+export const REFRESH_ANALYTICS = graphql(`
+  mutation RefreshAnalytics {
+    refreshAnalytics
   }
 `);

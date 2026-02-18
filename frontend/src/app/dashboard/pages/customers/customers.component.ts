@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CustomerService } from '../../../core/services/customer.service';
+import { AnalyticsService } from '../../../core/services/analytics.service';
 import {
   calculateCustomerStats,
   isCustomerCreditFrozen,
@@ -27,6 +28,11 @@ import {
   DeleteConfirmationModalComponent,
 } from '../../components/shared/delete-confirmation-modal.component';
 import { PaginationComponent } from '../../components/shared/pagination.component';
+import {
+  PeriodSelectorComponent,
+  type AnalyticsPeriod,
+} from '../../components/shared/charts/period-selector.component';
+import { EchartContainerComponent } from '../../components/shared/charts/echart-container.component';
 
 /**
  * Customers list page - similar to products page
@@ -50,14 +56,35 @@ import { PaginationComponent } from '../../components/shared/pagination.componen
     DeleteConfirmationModalComponent,
     BulkPaymentModalComponent,
     CustomerViewModalComponent,
+    PeriodSelectorComponent,
+    EchartContainerComponent,
   ],
   templateUrl: './customers.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CustomersComponent implements OnInit {
   private readonly customerService = inject(CustomerService);
+  private readonly analyticsService = inject(AnalyticsService);
   readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
+  // Customer growth trend (lazy, MV-backed)
+  readonly trendOpen = signal(false);
+  readonly trendPeriod = signal<AnalyticsPeriod>('30d');
+  readonly analyticsStats = this.analyticsService.stats;
+  readonly analyticsLoading = this.analyticsService.isLoading;
+  private trendFetched = false;
+  readonly customerGrowthChartOption = computed(() => {
+    const trend = this.analyticsStats()?.customerGrowthTrend ?? [];
+    const dates = trend.map((p) => p.date);
+    const values = trend.map((p) => p.value);
+    return {
+      xAxis: { type: 'category' as const, data: dates },
+      yAxis: { type: 'value' as const },
+      series: [{ type: 'line' as const, data: values, smooth: true }],
+      grid: { left: '3%', right: '4%', bottom: '3%', top: '4%', containLabel: true },
+    };
+  });
 
   // View references
   readonly deleteModal = viewChild<DeleteConfirmationModalComponent>('deleteModal');
@@ -472,6 +499,20 @@ export class CustomersComponent implements OnInit {
     if (type === 'frozen') return 'Frozen';
     if (type === 'recent') return 'Recent';
     return '';
+  }
+
+  toggleCustomerGrowthTrend(): void {
+    const opening = !this.trendOpen();
+    this.trendOpen.set(opening);
+    if (opening && !this.trendFetched) {
+      this.trendFetched = true;
+      void this.analyticsService.fetch(this.trendPeriod());
+    }
+  }
+
+  onTrendPeriodChange(period: AnalyticsPeriod): void {
+    this.trendPeriod.set(period);
+    void this.analyticsService.fetch(period);
   }
 
   /**

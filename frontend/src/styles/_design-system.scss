@@ -541,3 +541,52 @@ $container-2xl: 1536px; // Full width limit
   text-transform: uppercase;
   border-radius: $radius-full;
 }
+
+// ============================================
+// TABLE — ROW-CLICK PATTERN
+// ============================================
+// RULE: All tables MUST define a primary action on row click.
+// Rows navigate to a detail view; explicit "View" buttons are forbidden.
+// Contextual actions (Pay, Print, Delete) remain as icon buttons
+// in the last column and MUST call $event.stopPropagation().
+//
+// Desktop: `<tr>` host gets cursor-pointer + row-highlight.
+// Mobile:  Card variant navigates on tap; contextual actions
+//          in a footer strip.
+
+.table-clickable {
+  tbody tr {
+    cursor: pointer;
+    @include row-highlight;
+  }
+}
+
+// ============================================
+// KPI CARD PATTERN
+// ============================================
+// Tinted card with a semantic top-accent bar (::before).
+// Use for always-visible performance metrics at the top of a page.
+// Structure: icon + label header, then large bold number, optional
+// sparkline or sub-stat.
+
+@mixin kpi-card($color-var) {
+  @include card;
+  position: relative;
+  overflow: hidden;
+  padding: $space-3;
+  background: oklch(var(#{$color-var}) / 0.04);
+
+  @include tablet {
+    padding: $space-4;
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: oklch(var(#{$color-var}));
+  }
+}

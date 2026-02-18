@@ -1,9 +1,6 @@
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import {
   ChangeDetectionStrategy,
   Component,
-  OnDestroy,
   OnInit,
   computed,
   effect,
@@ -16,6 +13,11 @@ import { ShiftModalTriggerService } from '../../../core/services/cashier-session
 import { CompanyService } from '../../../core/services/company.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { DashboardService, PeriodStats } from '../../../core/services/dashboard.service';
+import { AnalyticsService } from '../../../core/services/analytics.service';
+import { SparklineComponent } from '../../components/shared/charts/sparkline.component';
+import { AnimatedCounterComponent } from '../../components/shared/charts/animated-counter.component';
+import { OrderTableRowComponent } from '../orders/components/order-table-row.component';
+import { OrderCardComponent } from '../orders/components/order-card.component';
 
 type Period = 'today' | 'week' | 'month';
 
@@ -37,22 +39,20 @@ interface CategoryData {
   accounts: AccountDetail[];
 }
 
-interface RecentActivity {
-  id: string;
-  type: string;
-  description: string;
-  amount: string;
-  time: string;
-}
-
 @Component({
   selector: 'app-overview',
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [
+    RouterModule,
+    SparklineComponent,
+    AnimatedCounterComponent,
+    OrderTableRowComponent,
+    OrderCardComponent,
+  ],
   templateUrl: './overview.component.html',
   styleUrl: './overview.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class OverviewComponent implements OnInit, OnDestroy {
+export class OverviewComponent implements OnInit {
   private readonly dashboardService = inject(DashboardService);
   private readonly companyService = inject(CompanyService);
   private readonly currencyService = inject(CurrencyService);
@@ -62,9 +62,6 @@ export class OverviewComponent implements OnInit, OnDestroy {
 
   protected readonly selectedPeriod = signal<Period>('today');
   protected readonly expandedCategory = signal<string | null>(null);
-  protected readonly showRecentActivity = signal(false);
-
-  private resizeListener?: () => void;
 
   protected readonly isLoading = this.dashboardService.isLoading;
   protected readonly error = this.dashboardService.error;
@@ -89,24 +86,47 @@ export class OverviewComponent implements OnInit, OnDestroy {
     ];
   });
 
-  protected readonly recentActivity = computed(() => {
-    return this.dashboardService.recentActivity() || [];
-  });
+  protected readonly recentOrders = this.dashboardService.recentOrders;
 
   protected readonly productCount = computed(() => {
     return this.dashboardService.stats()?.productCount || 0;
   });
-
-  protected readonly activeUsers = computed(() => {
-    return this.dashboardService.stats()?.activeUsers || 0;
+  protected readonly variantCount = computed(() => {
+    return this.dashboardService.stats()?.variantCount || 0;
   });
 
-  protected readonly averageSale = computed(() => {
-    const avg = this.dashboardService.stats()?.averageSale || 0;
-    return this.formatCurrency(avg);
+  /** MV-backed 7D KPIs */
+  protected readonly orders7d = computed(() => this.analyticsStats()?.totalOrders ?? 0);
+  protected readonly revenue7dFormatted = computed(() =>
+    this.currencyService.format(this.analyticsStats()?.totalRevenue ?? 0),
+  );
+  protected readonly avgOrderValueFormatted = computed(() => {
+    const stats = this.analyticsStats();
+    if (!stats || stats.totalOrders === 0) return this.currencyService.format(0);
+    return this.currencyService.format(Math.round(stats.totalRevenue / stats.totalOrders));
+  });
+  protected readonly avgDailyOrders = computed(() => {
+    const stats = this.analyticsStats();
+    if (!stats) return 0;
+    const days = stats.salesTrend?.length || 1;
+    return Math.round(stats.totalOrders / days);
   });
 
   protected readonly sessionOpen = this.cashierSessionService.hasActiveSession;
+
+  // Business Insights (analytics — lazy)
+  private readonly analyticsService = inject(AnalyticsService);
+  protected readonly insightsOpen = signal(false);
+  private insightsFetched = false;
+  protected readonly analyticsStats = this.analyticsService.stats;
+  protected readonly analyticsLoading = this.analyticsService.isLoading;
+
+  protected readonly salesSparklineData = computed(() =>
+    (this.analyticsStats()?.salesTrend ?? []).map((p) => p.value),
+  );
+  protected readonly avgMarginTarget = computed(() =>
+    Math.round(this.analyticsStats()?.averageProfitMargin ?? 0),
+  );
 
   constructor() {
     effect(
@@ -114,6 +134,7 @@ export class OverviewComponent implements OnInit, OnDestroy {
         const companyId = this.companyService.activeCompanyId();
         if (companyId) {
           this.dashboardService.fetchDashboardData();
+          void this.analyticsService.fetch('7d');
         }
       },
       { allowSignalWrites: true },
@@ -121,28 +142,7 @@ export class OverviewComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.dashboardService.fetchDashboardData();
-    this.initDesktopDefaults();
-  }
-
-  private initDesktopDefaults(): void {
-    const isDesktop = window.innerWidth >= 1024;
-    if (isDesktop) {
-      this.showRecentActivity.set(true);
-    }
-
-    this.resizeListener = () => {
-      if (window.innerWidth >= 1024 && !this.showRecentActivity()) {
-        this.showRecentActivity.set(true);
-      }
-    };
-    window.addEventListener('resize', this.resizeListener);
-  }
-
-  ngOnDestroy(): void {
-    if (this.resizeListener) {
-      window.removeEventListener('resize', this.resizeListener);
-    }
+    // Data fetching handled by constructor effect
   }
 
   private createCategoryData(
@@ -197,6 +197,10 @@ export class OverviewComponent implements OnInit, OnDestroy {
     this.selectedPeriod.set(period);
   }
 
+  getActivePeriodLabel(): string {
+    return this.periods.find((p) => p.key === this.selectedPeriod())?.label ?? '';
+  }
+
   toggleCategory(categoryType: string): void {
     if (this.expandedCategory() === categoryType) {
       this.expandedCategory.set(null);
@@ -205,14 +209,19 @@ export class OverviewComponent implements OnInit, OnDestroy {
     }
   }
 
-  toggleRecentActivity(): void {
-    this.showRecentActivity.update((v) => !v);
-  }
-
   navigateToInventory(): void {
     this.router.navigate(['/dashboard/products'], {
       queryParams: { lowStock: 'true' },
     });
+  }
+
+  toggleInsights(): void {
+    const opening = !this.insightsOpen();
+    this.insightsOpen.set(opening);
+    if (opening && !this.insightsFetched) {
+      this.insightsFetched = true;
+      this.analyticsService.fetch('7d');
+    }
   }
 
   async refresh(): Promise<void> {
@@ -242,4 +251,6 @@ export class OverviewComponent implements OnInit, OnDestroy {
     };
     return now.toLocaleDateString('en-US', options);
   }
+
+  readonly formatPercent = (v: number): string => `${v.toFixed(1)}%`;
 }

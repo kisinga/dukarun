@@ -1,6 +1,5 @@
-import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { OrderStateBadgeComponent } from './order-state-badge.component';
 
@@ -38,13 +37,14 @@ export interface OrderTableRowData {
 
 export type OrderAction = 'view' | 'print' | 'pay';
 
-/**
- * Order Table Row Component for desktop view
- */
 @Component({
   selector: 'tr[app-order-table-row]',
-  imports: [CommonModule, RouterLink, OrderStateBadgeComponent],
+  imports: [OrderStateBadgeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'cursor-pointer transition-colors',
+    '(click)': 'navigateToOrder()',
+  },
   template: `
     <td>
       <div class="font-medium">{{ order().code }}</div>
@@ -65,30 +65,33 @@ export type OrderAction = 'view' | 'print' | 'pay';
       <app-order-state-badge [state]="order().state" />
     </td>
     <td class="text-right">
-      <div class="flex justify-end gap-2">
-        <button
-          class="btn btn-sm btn-ghost"
-          (click)="onAction('view')"
-          [routerLink]="['/dashboard/orders', order().id]"
-        >
-          View
-        </button>
+      <div class="flex justify-end gap-1">
         @if (canPay()) {
           <button
-            class="btn btn-sm btn-success"
-            (click)="onAction('pay'); $event.preventDefault(); $event.stopPropagation()"
+            class="btn btn-xs btn-success"
+            (click)="onAction('pay'); $event.stopPropagation()"
           >
             Pay
           </button>
         }
         @if (canPrint()) {
           <button
-            class="btn btn-sm btn-primary"
-            (click)="onAction('print')"
-            [routerLink]="['/dashboard/orders', order().id]"
-            [queryParams]="{ print: true }"
+            class="btn btn-xs btn-ghost"
+            (click)="onAction('print'); $event.stopPropagation()"
           >
-            Print
+            <svg
+              class="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+              />
+            </svg>
           </button>
         }
       </div>
@@ -97,6 +100,7 @@ export type OrderAction = 'view' | 'print' | 'pay';
 })
 export class OrderTableRowComponent {
   private readonly currencyService = inject(CurrencyService);
+  private readonly router = inject(Router);
   readonly order = input.required<OrderTableRowData>();
   readonly action = output<{ action: OrderAction; orderId: string }>();
 
@@ -126,28 +130,26 @@ export class OrderTableRowComponent {
   }
 
   canPrint(): boolean {
-    const state = this.order().state;
-    return state !== 'Draft';
+    return this.order().state !== 'Draft';
   }
 
   readonly canPay = computed(() => {
     const order = this.order();
-    // Only show pay button for unpaid credit orders
     if (order.state !== 'ArrangingPayment') return false;
-    if (!order.customer) return false; // Credit orders have customers
+    if (!order.customer) return false;
 
-    // Check if order has outstanding balance
     const payments = order.payments || [];
     const settledPayments = payments
       .filter((p: any) => p.state === 'Settled')
       .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
     const orderTotal = order.totalWithTax || order.total || 0;
-    const outstandingAmount = orderTotal - settledPayments;
-
-    // Only show if there's outstanding balance
-    return outstandingAmount > 0;
+    return orderTotal - settledPayments > 0;
   });
+
+  navigateToOrder(): void {
+    this.router.navigate(['/dashboard/orders', this.order().id]);
+  }
 
   onAction(actionType: OrderAction): void {
     this.action.emit({ action: actionType, orderId: this.order().id });

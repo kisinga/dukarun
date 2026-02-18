@@ -1,0 +1,69 @@
+# Dukarun Dashboard — Design Language Rules
+
+These rules define the interaction and layout patterns for the dashboard UI.
+Follow them when creating or modifying any dashboard component.
+
+## Tables & Lists
+
+### Row-click is the primary action
+Every table and list MUST define a primary action triggered by clicking/tapping the row.
+- **Desktop tables**: The `<tr>` host element navigates on click (`cursor-pointer`, `hover:bg-base-200/30`).
+- **Mobile cards**: The card surface navigates on tap.
+- **No "View" buttons**: An explicit "View" button is redundant and forbidden.
+- **Contextual actions only**: Secondary actions (Pay, Print, Delete) appear as small icon buttons in the last column. They MUST call `$event.stopPropagation()` to prevent the row-click from firing.
+
+### Reuse existing table components
+When displaying orders/sales in any context (overview, reports), reuse `OrderTableRowComponent` (desktop) and `OrderCardComponent` (mobile) rather than building bespoke lists.
+
+## KPI Cards
+
+### Structure
+KPI cards sit at the top of pages to show always-visible performance metrics.
+```
+┌──────────────────────────┐
+│ [icon]  LABEL            │  ← kpi-label: 11px, uppercase, tracking-wide
+│                          │
+│ 1,234                    │  ← text-xl/2xl, font-bold, tabular-nums, semantic color
+│ ┄┄┄┄ sparkline ┄┄┄┄     │  ← optional micro-chart
+└──────────────────────────┘
+```
+
+### Semantic tinting
+Each KPI card uses a subtle tinted background + a 2px top accent bar matching its semantic color:
+- Revenue → `--p` (primary)
+- Orders → `--s` (secondary)
+- Margin → `--su` (success)
+- Products → `--a` (accent)
+
+Use the `kpi-card($color-var)` mixin from `_design-system.scss`.
+
+## Financial Overview Section
+
+### Period selector is visually coupled
+The Today / This week / This month tabs MUST be inside the Financial Overview card header — never floating separately above it. This makes the toggle's scope obvious.
+
+### Category cards show the active period label
+Each finance card (Sales, Purchases, Expenses) displays the active period name (e.g. "Today") in its header so users know which timeframe the big number represents.
+
+## No Redundant Information
+
+Never show the same data point in two places on a page. If a metric appears in a KPI card at the top (e.g. product count), do not repeat it inside a sidebar alert or section below. Choose the most prominent, contextually appropriate location and consolidate there.
+
+## Low Stock Alert
+
+The low stock alert is a single prominent card in the sidebar with:
+- Warning icon in a tinted badge
+- Large bold count
+- Descriptive subtitle
+- Navigates to inventory on click
+
+## Collapsible Sections
+
+Use the CSS `.collapsible` + `.open` pattern (max-height transition) for progressive disclosure. Avoid `<details>` for sections that need animated open/close.
+
+## Responsive Strategy
+
+- **Mobile-first**: Default styles target phones.
+- **Desktop tables at `sm:` (640px)**: Tables hidden below `sm:`, cards shown instead.
+- **Two-column layout at `lg:` (1024px)**: Financial overview + sidebar.
+- **KPI grid**: 2 columns on mobile, 4 columns at `lg:`.

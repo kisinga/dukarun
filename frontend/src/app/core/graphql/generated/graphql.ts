@@ -228,6 +228,27 @@ export type AlreadyRefundedError = ErrorResult & {
   refundId: Scalars['ID']['output'];
 };
 
+export type AnalyticsStats = {
+  __typename?: 'AnalyticsStats';
+  averageProfitMargin: Scalars['Float']['output'];
+  customerGrowthTrend: Array<TimeSeriesPoint>;
+  highestMargin: Array<ProductPerformance>;
+  highestRevenue: Array<ProductPerformance>;
+  orderVolumeTrend: Array<TimeSeriesPoint>;
+  salesTrend: Array<TimeSeriesPoint>;
+  topSelling: Array<ProductPerformance>;
+  totalOrders: Scalars['Int']['output'];
+  totalRevenue: Scalars['Float']['output'];
+  trending: Array<ProductPerformance>;
+};
+
+export type AnalyticsTimeRange = {
+  endDate: Scalars['String']['input'];
+  previousEndDate?: InputMaybe<Scalars['String']['input']>;
+  previousStartDate?: InputMaybe<Scalars['String']['input']>;
+  startDate: Scalars['String']['input'];
+};
+
 export type ApplyCouponCodeResult =
   | CouponCodeExpiredError
   | CouponCodeInvalidError
@@ -3900,6 +3921,7 @@ export type Mutation = {
   recordExpense: RecordExpenseResult;
   recordPurchase: StockPurchase;
   recordStockAdjustment: InventoryStockAdjustment;
+  refreshAnalytics: Scalars['Boolean']['output'];
   refundOrder: RefundOrderResult;
   reindex: Job;
   /** Removes Collections from the specified Channel */
@@ -6192,6 +6214,20 @@ export type ProductOptionTranslationInput = {
   name?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type ProductPerformance = {
+  __typename?: 'ProductPerformance';
+  marginPercent?: Maybe<Scalars['Float']['output']>;
+  productId: Scalars['ID']['output'];
+  productName: Scalars['String']['output'];
+  productVariantId: Scalars['ID']['output'];
+  quantityChangePercent?: Maybe<Scalars['Float']['output']>;
+  totalCost?: Maybe<Scalars['Float']['output']>;
+  totalMargin?: Maybe<Scalars['Float']['output']>;
+  totalQuantity: Scalars['Int']['output'];
+  totalRevenue: Scalars['Float']['output'];
+  variantName?: Maybe<Scalars['String']['output']>;
+};
+
 export type ProductSortParameter = {
   barcode?: InputMaybe<SortOrder>;
   createdAt?: InputMaybe<SortOrder>;
@@ -6550,6 +6586,7 @@ export type Query = {
   administrator?: Maybe<Administrator>;
   administratorByUserId?: Maybe<Administrator>;
   administrators: AdministratorList;
+  analyticsStats: AnalyticsStats;
   /** Get a single Asset by id */
   asset?: Maybe<Asset>;
   /** Get a list of Assets */
@@ -6711,6 +6748,11 @@ export type QueryAdministratorByUserIdArgs = {
 
 export type QueryAdministratorsArgs = {
   options?: InputMaybe<AdministratorListOptions>;
+};
+
+export type QueryAnalyticsStatsArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  timeRange: AnalyticsTimeRange;
 };
 
 export type QueryAssetArgs = {
@@ -8416,6 +8458,12 @@ export type TextStructFieldConfig = StructField & {
   ui?: Maybe<Scalars['JSON']['output']>;
 };
 
+export type TimeSeriesPoint = {
+  __typename?: 'TimeSeriesPoint';
+  date: Scalars['String']['output'];
+  value: Scalars['Float']['output'];
+};
+
 export type TransitionFulfillmentToStateResult = Fulfillment | FulfillmentStateTransitionError;
 
 export type TransitionOrderToStateResult = Order | OrderStateTransitionError;
@@ -9926,8 +9974,15 @@ export type GetRecentOrdersQuery = {
       totalWithTax: number;
       state: string;
       createdAt: any;
+      orderPlacedAt?: any | null;
       currencyCode: CurrencyCode;
-      customer?: { __typename?: 'Customer'; firstName: string; lastName: string } | null;
+      customer?: {
+        __typename?: 'Customer';
+        id: string;
+        firstName: string;
+        lastName: string;
+        emailAddress: string;
+      } | null;
       lines: Array<{
         __typename?: 'OrderLine';
         id: string;
@@ -9940,6 +9995,14 @@ export type GetRecentOrdersQuery = {
           product: { __typename?: 'Product'; id: string; name: string };
         };
       }>;
+      payments?: Array<{
+        __typename?: 'Payment';
+        id: string;
+        state: string;
+        amount: number;
+        method: string;
+        createdAt: any;
+      }> | null;
     }>;
   };
 };
@@ -12707,6 +12770,71 @@ export type ReviewApprovalRequestMutation = {
     reviewedAt?: any | null;
   };
 };
+
+export type GetAnalyticsStatsQueryVariables = Exact<{
+  timeRange: AnalyticsTimeRange;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetAnalyticsStatsQuery = {
+  __typename?: 'Query';
+  analyticsStats: {
+    __typename?: 'AnalyticsStats';
+    averageProfitMargin: number;
+    totalRevenue: number;
+    totalOrders: number;
+    topSelling: Array<{
+      __typename?: 'ProductPerformance';
+      productVariantId: string;
+      productId: string;
+      productName: string;
+      variantName?: string | null;
+      totalQuantity: number;
+      totalRevenue: number;
+      totalMargin?: number | null;
+      marginPercent?: number | null;
+      quantityChangePercent?: number | null;
+    }>;
+    highestRevenue: Array<{
+      __typename?: 'ProductPerformance';
+      productVariantId: string;
+      productId: string;
+      productName: string;
+      variantName?: string | null;
+      totalQuantity: number;
+      totalRevenue: number;
+      totalMargin?: number | null;
+      marginPercent?: number | null;
+    }>;
+    highestMargin: Array<{
+      __typename?: 'ProductPerformance';
+      productVariantId: string;
+      productId: string;
+      productName: string;
+      variantName?: string | null;
+      totalQuantity: number;
+      totalRevenue: number;
+      totalMargin?: number | null;
+      marginPercent?: number | null;
+    }>;
+    trending: Array<{
+      __typename?: 'ProductPerformance';
+      productVariantId: string;
+      productId: string;
+      productName: string;
+      variantName?: string | null;
+      totalQuantity: number;
+      quantityChangePercent?: number | null;
+    }>;
+    salesTrend: Array<{ __typename?: 'TimeSeriesPoint'; date: string; value: number }>;
+    orderVolumeTrend: Array<{ __typename?: 'TimeSeriesPoint'; date: string; value: number }>;
+    customerGrowthTrend: Array<{ __typename?: 'TimeSeriesPoint'; date: string; value: number }>;
+  };
+};
+
+export type RefreshAnalyticsMutationVariables = Exact<{ [key: string]: never }>;
+
+export type RefreshAnalyticsMutation = { __typename?: 'Mutation'; refreshAnalytics: boolean };
 
 export type UpdateProductBasicMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -16344,6 +16472,7 @@ export const GetRecentOrdersDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'totalWithTax' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'state' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'orderPlacedAt' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currencyCode' } },
                       {
                         kind: 'Field',
@@ -16351,8 +16480,10 @@ export const GetRecentOrdersDocument = {
                         selectionSet: {
                           kind: 'SelectionSet',
                           selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
                           ],
                         },
                       },
@@ -16387,6 +16518,20 @@ export const GetRecentOrdersDocument = {
                                 ],
                               },
                             },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'payments' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'state' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'amount' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'method' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
                           ],
                         },
                       },
@@ -24176,6 +24321,174 @@ export const ReviewApprovalRequestDocument = {
     },
   ],
 } as unknown as DocumentNode<ReviewApprovalRequestMutation, ReviewApprovalRequestMutationVariables>;
+export const GetAnalyticsStatsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetAnalyticsStats' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'timeRange' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'AnalyticsTimeRange' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'limit' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'analyticsStats' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'timeRange' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'timeRange' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'limit' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'limit' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'topSelling' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'productVariantId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'productId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'productName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'variantName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalQuantity' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalRevenue' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalMargin' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'marginPercent' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'quantityChangePercent' } },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'highestRevenue' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'productVariantId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'productId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'productName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'variantName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalQuantity' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalRevenue' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalMargin' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'marginPercent' } },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'highestMargin' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'productVariantId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'productId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'productName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'variantName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalQuantity' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalRevenue' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalMargin' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'marginPercent' } },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'trending' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'productVariantId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'productId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'productName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'variantName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalQuantity' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'quantityChangePercent' } },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'salesTrend' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'date' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'value' } },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'orderVolumeTrend' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'date' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'value' } },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'customerGrowthTrend' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'date' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'value' } },
+                    ],
+                  },
+                },
+                { kind: 'Field', name: { kind: 'Name', value: 'averageProfitMargin' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'totalRevenue' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'totalOrders' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetAnalyticsStatsQuery, GetAnalyticsStatsQueryVariables>;
+export const RefreshAnalyticsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'RefreshAnalytics' },
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [{ kind: 'Field', name: { kind: 'Name', value: 'refreshAnalytics' } }],
+      },
+    },
+  ],
+} as unknown as DocumentNode<RefreshAnalyticsMutation, RefreshAnalyticsMutationVariables>;
 export const UpdateProductBasicDocument = {
   kind: 'Document',
   definitions: [

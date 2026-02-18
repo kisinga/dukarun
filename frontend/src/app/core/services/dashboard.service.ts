@@ -5,11 +5,11 @@ import {
   GET_PRODUCTS,
   GET_RECENT_ORDERS,
 } from '../graphql/operations.graphql';
+import type { CacheSyncEntityHandler } from './cache/cache-sync-handler.interface';
+import { CacheSyncService } from './cache/cache-sync.service';
 import { ApolloService } from './apollo.service';
 import { CompanyService } from './company.service';
 import { CurrencyService } from './currency.service';
-import { PurchaseMetricsService } from './dashboard/purchase-metrics.service';
-import { SalesMetricsService } from './dashboard/sales-metrics.service';
 import { OrderMapperService } from './order-mapper.service';
 
 /**
@@ -20,6 +20,7 @@ export interface DashboardStats {
   purchases: PeriodStats;
   expenses: PeriodStats;
   productCount: number;
+  variantCount: number;
   activeUsers: number;
   averageSale: number;
   profitMargin: number;
@@ -65,13 +66,34 @@ export interface RecentActivity {
  * - Automatically scoped to active company via CompanyService
  *
  * COMPOSITION:
- * - SalesMetricsService: Sales data and payment clustering
- * - PurchaseMetricsService: Purchase data aggregation
+ * - Single GET_DASHBOARD_STATS for sales, purchases, expenses (ledger)
  * - Product stats: Fetched directly (simple query)
  * - Recent activity: Transformed from orders
  *
  * Single Responsibility: State management and orchestration only
  */
+/** Raw dashboard stats response from ledger (sales, purchases, expenses in one call) */
+interface DashboardStatsResponse {
+  sales?: {
+    today: number;
+    week: number;
+    month: number;
+    accounts: Array<{ label: string; value: number; icon: string }>;
+  };
+  purchases?: {
+    today: number;
+    week: number;
+    month: number;
+    accounts: Array<{ label: string; value: number; icon: string }>;
+  };
+  expenses?: {
+    today: number;
+    week: number;
+    month: number;
+    accounts: Array<{ label: string; value: number; icon: string }>;
+  };
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -80,12 +102,25 @@ export class DashboardService {
   private readonly companyService = inject(CompanyService);
   private readonly currencyService = inject(CurrencyService);
   private readonly orderMapper = inject(OrderMapperService);
-  private readonly salesMetricsService = inject(SalesMetricsService);
-  private readonly purchaseMetricsService = inject(PurchaseMetricsService);
+  private readonly cacheSyncService = inject(CacheSyncService);
+
+  private readonly orderSyncHandler: CacheSyncEntityHandler = {
+    entityType: 'order',
+    invalidateOne: (channelId: string) => {
+      if (this.companyService.activeCompanyId() === channelId) {
+        void this.refetchRecentOrdersOnly();
+      }
+    },
+  };
+
+  constructor() {
+    this.cacheSyncService.registerHandler(this.orderSyncHandler);
+  }
 
   // State signals
   private readonly statsSignal = signal<DashboardStats | null>(null);
   private readonly recentActivitySignal = signal<RecentActivity[]>([]);
+  private readonly recentOrdersSignal = signal<any[]>([]);
   private readonly lowStockCountSignal = signal<number>(0);
   private readonly isLoadingSignal = signal(false);
   private readonly errorSignal = signal<string | null>(null);
@@ -93,6 +128,7 @@ export class DashboardService {
   // Public readonly signals
   readonly stats = this.statsSignal.asReadonly();
   readonly recentActivity = this.recentActivitySignal.asReadonly();
+  readonly recentOrders = this.recentOrdersSignal.asReadonly();
   readonly lowStockCount = this.lowStockCountSignal.asReadonly();
   readonly isLoading = this.isLoadingSignal.asReadonly();
   readonly error = this.errorSignal.asReadonly();
@@ -102,12 +138,12 @@ export class DashboardService {
 
   /**
    * Fetch all dashboard data
-   * This is the main entry point - call this when dashboard loads or refreshes
+   * This is the main entry point - call this when dashboard loads or refreshes.
+   * Uses a single GET_DASHBOARD_STATS call for sales, purchases, and expenses (ledger).
    *
    * Data is automatically scoped to active channel (no location parameter needed)
    */
   async fetchDashboardData(): Promise<void> {
-    // Don't fetch if no company is active
     if (!this.companyService.activeCompanyId()) {
       console.warn('No active company - skipping dashboard data fetch');
       return;
@@ -117,29 +153,35 @@ export class DashboardService {
     this.errorSignal.set(null);
 
     try {
-      // Fetch data in parallel for performance
-      const [salesMetrics, products, recentOrders, purchaseMetrics, lowStockCount, expenseMetrics] =
-        await Promise.all([
-          this.salesMetricsService.fetchSalesMetrics(),
-          this.fetchProductStats(),
-          this.fetchRecentOrders(),
-          this.purchaseMetricsService.fetchPurchaseMetrics(),
-          this.fetchLowStockCount(),
-          this.fetchExpenseMetrics(),
-        ]);
+      const [ledgerStats, products, recentOrders, lowStockCount] = await Promise.all([
+        this.fetchDashboardStats(),
+        this.fetchProductStats(),
+        this.fetchRecentOrders(),
+        this.fetchLowStockCount(),
+      ]);
 
-      // Aggregate into dashboard stats
       const stats: DashboardStats = {
-        sales: salesMetrics.periodStats,
-        purchases: purchaseMetrics,
-        expenses: expenseMetrics,
+        sales: this.mapToPeriodStats(ledgerStats?.sales, [
+          { label: 'Cash Sales', value: 0, icon: '💵' },
+          { label: 'Credit', value: 0, icon: '🏦' },
+        ]),
+        purchases: this.mapToPeriodStats(ledgerStats?.purchases, [
+          { label: 'Inventory', value: 0, icon: '📦' },
+        ]),
+        expenses: this.mapToPeriodStats(ledgerStats?.expenses, [
+          { label: 'Rent', value: 0, icon: '🏠' },
+          { label: 'Salaries', value: 0, icon: '👥' },
+          { label: 'Other', value: 0, icon: '📋' },
+        ]),
         productCount: products.productCount,
-        activeUsers: 1, // Placeholder - would need custom tracking
-        averageSale: salesMetrics.averageOrderValue,
-        profitMargin: 0, // Placeholder - needs cost data
+        variantCount: products.variantCount,
+        activeUsers: 0, // Replaced by MV-based strip on overview
+        averageSale: 0,
+        profitMargin: 0,
       };
 
       this.statsSignal.set(stats);
+      this.recentOrdersSignal.set(recentOrders);
       this.recentActivitySignal.set(
         this.orderMapper.toRecentActivities(
           recentOrders,
@@ -154,6 +196,40 @@ export class DashboardService {
     } finally {
       this.isLoadingSignal.set(false);
     }
+  }
+
+  /**
+   * Single ledger request: sales, purchases, expenses in one call.
+   */
+  private async fetchDashboardStats(): Promise<DashboardStatsResponse | null> {
+    const client = this.apolloService.getClient();
+    try {
+      const result = await client.query<{ dashboardStats: DashboardStatsResponse }>({
+        query: GET_DASHBOARD_STATS,
+        fetchPolicy: 'network-only',
+      });
+      return result.data?.dashboardStats ?? null;
+    } catch (error) {
+      console.error('Failed to fetch dashboard stats from ledger:', error);
+      return null;
+    }
+  }
+
+  private mapToPeriodStats(
+    raw: DashboardStatsResponse['sales'],
+    defaultAccounts: AccountBreakdown[],
+  ): PeriodStats {
+    if (!raw) {
+      return { today: 0, week: 0, month: 0, accounts: defaultAccounts };
+    }
+    return {
+      today: raw.today,
+      week: raw.week,
+      month: raw.month,
+      accounts: raw.accounts?.length
+        ? raw.accounts.map((acc) => ({ label: acc.label, value: acc.value, icon: acc.icon }))
+        : defaultAccounts,
+    };
   }
 
   /**
@@ -179,6 +255,27 @@ export class DashboardService {
     } catch (error) {
       console.error('Failed to fetch product stats:', error);
       return { productCount: 0, variantCount: 0 };
+    }
+  }
+
+  /**
+   * Refetch only recent orders and activity (called when SSE order event arrives).
+   * Updates recentOrders and recentActivity signals without touching other dashboard data.
+   */
+  async refetchRecentOrdersOnly(): Promise<void> {
+    if (!this.companyService.activeCompanyId()) return;
+    try {
+      const recentOrders = await this.fetchRecentOrders();
+      this.recentOrdersSignal.set(recentOrders);
+      this.recentActivitySignal.set(
+        this.orderMapper.toRecentActivities(
+          recentOrders,
+          (c) => this.currencyService.format(c),
+          (d) => this.getTimeDifference(d),
+        ),
+      );
+    } catch (error) {
+      console.error('Failed to refetch recent orders:', error);
     }
   }
 
@@ -275,71 +372,6 @@ export class DashboardService {
   }
 
   /**
-   * Fetch expense metrics from ledger
-   */
-  private async fetchExpenseMetrics(): Promise<PeriodStats> {
-    const client = this.apolloService.getClient();
-
-    try {
-      // Fetch dashboard stats from ledger (all periods calculated server-side)
-      const result = await client.query<{
-        dashboardStats: {
-          expenses: {
-            today: number;
-            week: number;
-            month: number;
-            accounts: Array<{
-              label: string;
-              value: number;
-              icon: string;
-            }>;
-          };
-        };
-      }>({
-        query: GET_DASHBOARD_STATS,
-        fetchPolicy: 'network-only', // Always fetch fresh data from ledger
-      });
-
-      const expenses = result.data?.dashboardStats?.expenses;
-      if (!expenses) {
-        return {
-          today: 0,
-          week: 0,
-          month: 0,
-          accounts: [
-            { label: 'Rent', value: 0, icon: '🏠' },
-            { label: 'Salaries', value: 0, icon: '👥' },
-            { label: 'Other', value: 0, icon: '📋' },
-          ],
-        };
-      }
-
-      return {
-        today: expenses.today,
-        week: expenses.week,
-        month: expenses.month,
-        accounts: expenses.accounts.map((acc) => ({
-          label: acc.label,
-          value: acc.value,
-          icon: acc.icon,
-        })),
-      };
-    } catch (error) {
-      console.error('Failed to fetch expense metrics from ledger:', error);
-      return {
-        today: 0,
-        week: 0,
-        month: 0,
-        accounts: [
-          { label: 'Rent', value: 0, icon: '🏠' },
-          { label: 'Salaries', value: 0, icon: '👥' },
-          { label: 'Other', value: 0, icon: '📋' },
-        ],
-      };
-    }
-  }
-
-  /**
    * Format currency value (deprecated - use CurrencyService instead)
    * Kept for backward compatibility but uses CurrencyService internally
    */
@@ -381,6 +413,7 @@ export class DashboardService {
   clearData(): void {
     this.statsSignal.set(null);
     this.recentActivitySignal.set([]);
+    this.recentOrdersSignal.set([]);
     this.lowStockCountSignal.set(0);
     this.errorSignal.set(null);
   }
