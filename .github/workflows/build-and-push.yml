@@ -49,7 +49,8 @@ jobs:
       - name: Build and push backend
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
+          file: ./backend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -93,7 +94,8 @@ jobs:
       - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend
+          context: .
+          file: ./frontend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -136,7 +138,7 @@ jobs:
       - name: Build and push ml-trainer
         uses: docker/build-push-action@v5
         with:
-          context: ./ml-trainer
+          context: .
           file: ./ml-trainer/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}

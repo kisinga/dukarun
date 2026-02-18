@@ -11,6 +11,7 @@ Complete guide for local development and production deployment.
 - [Local Development](#local-development)
 - [Production Deployment](#production-deployment)
 - [Docker Containers](#docker-containers)
+- [Docker workspace builds](#docker-workspace-builds)
 - [Database Operations](#database-operations)
 - [Troubleshooting](#troubleshooting)
 
@@ -118,6 +119,10 @@ docker compose up -d
 ```
 
 **Note:** Both compose files are already configured to use `dukarun_services_network` as an external network. The network must be created manually before starting services.
+
+### Docker workspace builds
+
+Backend, frontend, and ml-trainer images are built **from the repository root** using the root `package-lock.json`. This keeps installs deterministic and avoids lockfile sync issues in CI. See **[DOCKER_WORKSPACE_BUILDS.md](./DOCKER_WORKSPACE_BUILDS.md)** for the pattern, why we use it, and what to do when changing dependencies.
 
 **For Coolify Deployments:** Follow the same network setup steps above. Create the network via SSH or Coolify terminal before deploying services. If using Coolify's "Connect to Predefined Network" feature, change the network name from `dukarun_services_network` to `coolify` in both compose files.
 

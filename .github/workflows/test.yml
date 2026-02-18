@@ -21,14 +21,13 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: 'backend/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Install and test backend
         run: |
-          cd backend
           npm ci
-          npm run build
-          npm run test:coverage
+          npm run build -w @dukarun/backend
+          npm run test:coverage -w @dukarun/backend
         timeout-minutes: 10
 
       - name: Upload backend coverage artifacts
@@ -59,7 +58,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Install Google Chrome
         run: |
@@ -67,21 +66,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y /tmp/google-chrome-stable_current_amd64.deb
 
-      - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm ci
+      - name: Install dependencies
+        run: npm ci
 
       - name: Production build (catches budget errors)
-        run: |
-          cd frontend
-          npm run build -- --configuration production
+        run: npm run build -w @dukarun/frontend -- --configuration production
 
       - name: Run frontend tests
         run: |
-          cd frontend
           export CHROME_BIN=/usr/bin/google-chrome-stable
-          npm run test:ci
+          npm run test:ci -w @dukarun/frontend
         timeout-minutes: 10
 
       - name: Upload frontend coverage artifacts
