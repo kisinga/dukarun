@@ -47,7 +47,7 @@ COPY --from=builder /app/backend/package.json backend/
 COPY --from=builder /app/frontend/package.json frontend/
 COPY --from=builder /app/ml-trainer/package.json ml-trainer/
 
-RUN npm ci --quiet --no-audit --no-fund --omit=dev --workspace=@dukarun/backend && \
+RUN npm ci --quiet --no-audit --no-fund --omit=dev && \
     npm cache clean --force
 
 COPY --from=builder /app/backend/dist ./dist
