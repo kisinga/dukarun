@@ -44,7 +44,7 @@ import { PurchasePaymentSectionComponent } from './components/purchase-payment-s
     RejectionBannerComponent,
   ],
   template: `
-    <div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger pb-20 lg:pb-6">
+    <div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger pb-32 lg:pb-28">
       <app-page-header
         title="Record Purchase"
         subtitle="Add supplier, items, and payment details"
