@@ -46,6 +46,9 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix={{branch}}-
 
+      - name: Set dockerignore for backend
+        run: cp dockerignore.backend .dockerignore
+
       - name: Build and push backend
         uses: docker/build-push-action@v5
         with:
@@ -91,6 +94,9 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix={{branch}}-
 
+      - name: Set dockerignore for frontend
+        run: cp dockerignore.frontend .dockerignore
+
       - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
@@ -134,6 +140,9 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix={{branch}}-
+
+      - name: Set dockerignore for ml-trainer
+        run: cp dockerignore.ml-trainer .dockerignore
 
       - name: Build and push ml-trainer
         uses: docker/build-push-action@v5

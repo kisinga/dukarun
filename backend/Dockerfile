@@ -18,9 +18,11 @@ COPY ml-trainer/package.json ml-trainer/
 
 ENV NODE_ENV=development
 
-RUN npm ci --quiet --no-audit --no-fund --include=dev
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --quiet --no-audit --no-fund --include=dev --workspace=@dukarun/backend
 
-COPY . .
+# Only backend source; frontend/ml-trainer excluded via dockerignore.backend
+COPY backend ./backend
 
 RUN npm run build -w @dukarun/backend
 

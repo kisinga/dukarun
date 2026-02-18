@@ -1,0 +1,30 @@
+# Base exclusions (from .dockerignore)
+node_modules/
+**/node_modules/
+.git/
+.github/
+dist/
+**/dist/
+.angular/
+**/.angular/
+**/*.spec.ts
+**/*.test.ts
+**/e2e/
+coverage/
+**/coverage/
+.env*
+.vscode/
+.idea/
+*.log
+.DS_Store
+Thumbs.db
+docs/
+*.md
+!README.md
+
+# ML trainer build: exclude other apps (keep workspace package.json for npm)
+backend/*
+!backend/package.json
+frontend/*
+!frontend/package.json
+super-admin/
