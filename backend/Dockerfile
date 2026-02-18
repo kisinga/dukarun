@@ -42,7 +42,12 @@ ENV NODE_ENV=production
 
 COPY --from=builder /app/package.json /app/package-lock.json ./
 
-RUN npm ci --quiet --no-audit --no-fund --omit=dev && \
+# Workspace manifests required so npm ci installs backend runtime deps
+COPY --from=builder /app/backend/package.json backend/
+COPY --from=builder /app/frontend/package.json frontend/
+COPY --from=builder /app/ml-trainer/package.json ml-trainer/
+
+RUN npm ci --quiet --no-audit --no-fund --omit=dev --workspace=@dukarun/backend && \
     npm cache clean --force
 
 COPY --from=builder /app/backend/dist ./dist
