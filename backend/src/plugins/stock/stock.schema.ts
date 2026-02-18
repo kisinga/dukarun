@@ -94,6 +94,8 @@ export const STOCK_ADMIN_SCHEMA = gql`
     quantity: Float!
     unitCost: Int!
     stockLocationId: ID!
+    batchNumber: String
+    expiryDate: DateTime
   }
 
   input RecordStockAdjustmentInput {

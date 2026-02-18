@@ -416,8 +416,7 @@ export class ReconciliationValidatorService {
       .where('reconciliation.channelId = :channelId', { channelId })
       .andWhere('reconciliation.scope = :scope', { scope: ref.scope })
       .andWhere('reconciliation.scopeRefId = :scopeRefId', { scopeRefId })
-      .andWhere('reconciliation.rangeStart <= :periodEndDate', { periodEndDate })
-      .andWhere('reconciliation.rangeEnd >= :periodEndDate', { periodEndDate })
+      .andWhere('reconciliation.snapshotAt = :periodEndDate', { periodEndDate })
       .getOne();
   }
 }

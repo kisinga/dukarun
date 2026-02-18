@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ID, RequestContext, UserInputError } from '@vendure/core';
 import {
   BatchAllocation,
@@ -22,7 +22,7 @@ import { InventoryStore } from '../interfaces/inventory-store.interface';
 export class FifoCostingStrategy implements CostingStrategy {
   private readonly logger = new Logger(FifoCostingStrategy.name);
 
-  constructor(private readonly inventoryStore: InventoryStore) {}
+  constructor(@Inject('InventoryStore') private readonly inventoryStore: InventoryStore) {}
 
   getName(): string {
     return 'FIFO';
@@ -36,13 +36,14 @@ export class FifoCostingStrategy implements CostingStrategy {
     ctx: RequestContext,
     request: CostAllocationRequest
   ): Promise<CostAllocationResult> {
-    // Get open batches ordered by creation date (oldest first)
+    // Get open batches ordered by creation date only (strict FIFO - oldest first)
     const batches = await this.inventoryStore.getOpenBatchesForConsumption(ctx, {
       channelId: request.channelId,
       stockLocationId: request.stockLocationId,
       productVariantId: request.productVariantId,
       maxQuantity: request.quantity,
       excludeExpired: false, // FIFO doesn't exclude expired, FEFO would
+      orderBy: 'createdAt',
     });
 
     if (batches.length === 0) {

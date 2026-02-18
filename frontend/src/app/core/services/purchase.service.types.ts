@@ -9,6 +9,10 @@ export interface PurchaseLineItem {
   quantity: number;
   unitCost: number; // In base currency units (e.g., 10.99)
   stockLocationId: string;
+  /** Optional supplier lot or batch number for traceability */
+  batchNumber?: string | null;
+  /** Optional expiry / use-by date (ISO date string or YYYY-MM-DD) */
+  expiryDate?: string | null;
 }
 
 /**

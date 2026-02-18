@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { Order, Payment, RequestContext } from '@vendure/core';
+import { Order, Payment, RequestContext, StockLocationService } from '@vendure/core';
 import { ACCOUNT_CODES } from '../../../ledger/account-codes.constants';
 import { BaseTransactionStrategy } from '../base-transaction-strategy';
 import { ChartOfAccountsService } from '../chart-of-accounts.service';
 import { LedgerPostingService } from '../ledger-posting.service';
 import { LedgerQueryService } from '../ledger-query.service';
+import { InventoryService, RecordSaleInput } from '../../inventory/inventory.service';
 import {
   PaymentPostingContext,
   SalePostingContext,
@@ -49,7 +50,9 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
   constructor(
     postingService: LedgerPostingService,
     queryService: LedgerQueryService,
-    private readonly chartOfAccountsService: ChartOfAccountsService
+    private readonly chartOfAccountsService: ChartOfAccountsService,
+    private readonly inventoryService: InventoryService,
+    private readonly stockLocationService: StockLocationService
   ) {
     super(postingService, queryService, 'SalePostingStrategy');
   }
@@ -116,6 +119,8 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
 
     this.logger.log(`Posted credit sale for order ${order.code} to ledger`);
 
+    await this.recordSaleCogsIfNeeded(data.ctx, order);
+
     return {
       success: true,
     };
@@ -163,9 +168,73 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
 
     this.logger.log(`Posted cash sale (payment ${payment.id}) for order ${order.code} to ledger`);
 
+    await this.recordSaleCogsIfNeeded(data.ctx, order);
+
     return {
       success: true,
     };
+  }
+
+  /**
+   * Record COGS for the order (FIFO allocation, ledger COGS post) once per order.
+   * Idempotent: skips if COGS already posted for this order.
+   */
+  private async recordSaleCogsIfNeeded(ctx: RequestContext, order: Order): Promise<void> {
+    try {
+      const channelId = ctx.channelId as number;
+      const orderId = order.id.toString();
+
+      const alreadyPosted = await this.queryService.hasInventorySaleCogsForOrder(
+        channelId,
+        orderId
+      );
+      if (alreadyPosted) {
+        return;
+      }
+
+      const locationResult = await this.stockLocationService.findAll(ctx, { take: 1 });
+      const location = locationResult.items?.[0];
+      if (!location) {
+        this.logger.warn(
+          `No stock location for channel ${channelId}; skipping COGS recording for order ${order.code}`
+        );
+        return;
+      }
+
+      const lines = (order.lines ?? [])
+        .filter(line => line.quantity > 0)
+        .map(line => ({
+          productVariantId: String(line.productVariantId ?? (line as any).productVariant?.id),
+          quantity: line.quantity,
+        }));
+
+      if (lines.length === 0) {
+        return;
+      }
+
+      const saleDate =
+        order.orderPlacedAt != null
+          ? new Date(order.orderPlacedAt).toISOString().slice(0, 10)
+          : undefined;
+
+      const input: RecordSaleInput = {
+        orderId,
+        orderCode: order.code,
+        channelId: ctx.channelId as any,
+        stockLocationId: location.id as any,
+        customerId: order.customer?.id?.toString() ?? '',
+        saleDate,
+        lines,
+      };
+
+      await this.inventoryService.recordSale(ctx, input);
+      this.logger.log(`Recorded COGS for order ${order.code}`);
+    } catch (err) {
+      this.logger.error(
+        `Failed to record COGS for order ${order.code}: ${err instanceof Error ? err.message : String(err)}`
+      );
+      throw err;
+    }
   }
 
   protected getAffectedAccountCodes(data: TransactionData): string[] {

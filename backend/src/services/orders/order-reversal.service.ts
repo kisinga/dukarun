@@ -8,6 +8,7 @@ import {
   UserInputError,
 } from '@vendure/core';
 import { LedgerPostingService } from '../financial/ledger-posting.service';
+import { InventoryService } from '../inventory/inventory.service';
 
 export interface OrderReversalResult {
   order: Order;
@@ -30,7 +31,8 @@ export class OrderReversalService {
   constructor(
     private readonly orderService: OrderService,
     private readonly ledgerPostingService: LedgerPostingService,
-    private readonly connection: TransactionalConnection
+    private readonly connection: TransactionalConnection,
+    private readonly inventoryService: InventoryService
   ) {}
 
   /**
@@ -60,6 +62,14 @@ export class OrderReversalService {
       customerId: order.customer?.id?.toString(),
       reversalDate,
     });
+
+    try {
+      await this.inventoryService.reverseSale(ctx, order.id.toString());
+    } catch (err) {
+      this.logger.warn(
+        `Inventory reverseSale failed for order ${order.code}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
 
     const orderRepo = this.connection.getRepository(ctx, Order);
     const now = new Date();

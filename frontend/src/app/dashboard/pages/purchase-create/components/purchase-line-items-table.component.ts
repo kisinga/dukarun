@@ -107,6 +107,33 @@ import { PurchaseLineItem } from '../../../../core/services/purchase.service.typ
               </div>
             </div>
 
+            <!-- Optional: Batch number & Expiry date -->
+            <div class="flex flex-wrap items-end gap-2 mt-2 pt-2 border-t border-base-300">
+              <div class="flex flex-col gap-0.5 min-w-0 flex-1 max-w-[140px]">
+                <label class="text-xs opacity-60">Batch / lot</label>
+                <input
+                  type="text"
+                  class="input input-bordered input-xs w-full"
+                  [value]="line.batchNumber ?? ''"
+                  placeholder="Optional"
+                  (change)="
+                    onLineItemUpdate($index, 'batchNumber', $any($event.target).value || null)
+                  "
+                />
+              </div>
+              <div class="flex flex-col gap-0.5 min-w-0 flex-1 max-w-[120px]">
+                <label class="text-xs opacity-60">Expiry date</label>
+                <input
+                  type="date"
+                  class="input input-bordered input-xs w-full"
+                  [value]="line.expiryDate ?? ''"
+                  (change)="
+                    onLineItemUpdate($index, 'expiryDate', $any($event.target).value || null)
+                  "
+                />
+              </div>
+            </div>
+
             <!-- Pricing comparison -->
             @if (line.variant && line.unitCost > 0) {
               <div class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-base-300">

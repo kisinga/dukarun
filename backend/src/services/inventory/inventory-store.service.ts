@@ -73,6 +73,7 @@ export class InventoryStoreService implements InventoryStore {
       expiryDate: input.expiryDate || null,
       sourceType: input.sourceType,
       sourceId: String(input.sourceId),
+      batchNumber: input.batchNumber ?? null,
       metadata: input.metadata || null,
     });
 
@@ -158,8 +159,12 @@ export class InventoryStoreService implements InventoryStore {
       });
     }
 
-    // Order by expiry date first (FEFO), then by creation date (FIFO)
-    query.orderBy('batch.expiryDate', 'ASC', 'NULLS FIRST').addOrderBy('batch.createdAt', 'ASC');
+    // Order: strict FIFO = createdAt only; otherwise FEFO = expiry then createdAt
+    if (filters.orderBy === 'createdAt') {
+      query.orderBy('batch.createdAt', 'ASC');
+    } else {
+      query.orderBy('batch.expiryDate', 'ASC', 'NULLS FIRST').addOrderBy('batch.createdAt', 'ASC');
+    }
 
     if (filters.maxQuantity !== undefined) {
       // Limit to batches that together have at least maxQuantity

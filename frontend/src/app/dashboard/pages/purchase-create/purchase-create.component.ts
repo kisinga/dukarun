@@ -396,6 +396,8 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
     variant: ProductVariant;
     quantity: number;
     unitCost: number;
+    batchNumber?: string | null;
+    expiryDate?: string | null;
   }): void {
     const defaultLocation = this.stockLocations()[0];
     if (!defaultLocation) return;
@@ -405,6 +407,8 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
       quantity: event.quantity,
       unitCost: event.unitCost,
       stockLocationId: defaultLocation.id,
+      batchNumber: event.batchNumber ?? undefined,
+      expiryDate: event.expiryDate ?? undefined,
     };
     this.purchaseService.addPurchaseItemLocal(lineItem);
     this.closeItemEntryModal();

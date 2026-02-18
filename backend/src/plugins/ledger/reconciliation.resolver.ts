@@ -13,18 +13,13 @@ function toDateTimeString(val: string | undefined | null): string {
 
 /**
  * Field resolver for Reconciliation.
- * Converts rangeStart/rangeEnd (stored as date-only YYYY-MM-DD) to full ISO datetime
- * so the GraphQL DateTime scalar can serialize them.
+ * Converts snapshotAt (stored as date-only YYYY-MM-DD) to full ISO datetime
+ * so the GraphQL DateTime scalar can serialize it.
  */
 @Resolver('Reconciliation')
 export class ReconciliationResolver {
   @ResolveField()
-  rangeStart(@Root() recon: Reconciliation): string {
-    return toDateTimeString(recon.rangeStart);
-  }
-
-  @ResolveField()
-  rangeEnd(@Root() recon: Reconciliation): string {
-    return toDateTimeString(recon.rangeEnd);
+  snapshotAt(@Root() recon: Reconciliation): string {
+    return toDateTimeString(recon.snapshotAt);
   }
 }

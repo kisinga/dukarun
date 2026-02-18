@@ -1,0 +1,173 @@
+@if (context().isLoading) {
+  <div class="flex justify-center py-8">
+    <span class="loading loading-spinner loading-lg"></span>
+  </div>
+} @else if (context().reconciliations.length === 0) {
+  <div class="text-center py-8 text-base-content/70">
+    <p>No reconciliations found</p>
+  </div>
+} @else {
+  <div class="overflow-x-auto mt-4 max-h-[70vh] overflow-y-auto">
+    <table class="table table-zebra">
+      <thead class="sticky top-0 z-10 bg-base-100">
+        <tr>
+          <th class="w-12" scope="col"></th>
+          <th>Snapshot date</th>
+          <th>Scope</th>
+          <th>Scope ref</th>
+          <th>Expected</th>
+          <th>Actual</th>
+          <th>Variance</th>
+          <th>Status</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of context().reconciliations; track r.id) {
+          <tr [class.bg-warning/10]="hasVariance(r)">
+            <td class="align-middle">
+              <button
+                type="button"
+                class="btn btn-sm btn-square btn-outline btn-neutral min-w-8"
+                (click)="toggleExpand(r)"
+                [attr.aria-expanded]="isExpanded(r)"
+                [attr.aria-label]="isExpanded(r) ? 'Collapse details' : 'Expand details'"
+                [title]="isExpanded(r) ? 'Collapse details' : 'Expand details'"
+              >
+                @if (isExpanded(r)) {
+                  <span aria-hidden="true">▼</span>
+                } @else {
+                  <span aria-hidden="true">▶</span>
+                }
+              </button>
+            </td>
+            <td class="whitespace-nowrap">
+              {{ context().formatDate(r.snapshotAt) }}
+            </td>
+            <td>
+              <span class="badge badge-outline">{{ r.scope }}</span>
+            </td>
+            <td class="font-mono text-sm">{{ r.scopeRefId }}</td>
+            <td>{{ context().formatCurrency(r.expectedBalance ?? '0') }}</td>
+            <td>{{ context().formatCurrency(r.actualBalance ?? '0') }}</td>
+            <td>
+              @if (hasVariance(r)) {
+                <span class="font-semibold text-warning">{{
+                  context().formatCurrency(r.varianceAmount)
+                }}</span>
+              } @else {
+                {{ context().formatCurrency(r.varianceAmount) }}
+              }
+            </td>
+            <td>
+              <span
+                class="badge"
+                [class.badge-success]="r.status === 'verified'"
+                [class.badge-warning]="r.status !== 'verified'"
+              >
+                {{ r.status }}
+              </span>
+            </td>
+            <td class="max-w-32 truncate" [title]="r.notes ?? ''">{{ r.notes ?? '–' }}</td>
+          </tr>
+          @if (isExpanded(r)) {
+            <tr class="bg-base-200/50">
+              <td colspan="9" class="p-0">
+                <div class="px-4 py-3 pl-12">
+                  @if (loadingDetailsId() === r.id) {
+                    <div class="flex items-center gap-2 text-base-content/70">
+                      <span class="loading loading-spinner loading-sm"></span>
+                      Loading accounts…
+                    </div>
+                  } @else {
+                    @let details = getDetails(r);
+                    @if (details.length === 0) {
+                      <p class="text-base-content/70 text-sm">
+                        No per-account data for this reconciliation.
+                      </p>
+                    } @else {
+                      <table class="table table-sm table-zebra">
+                        <thead>
+                          <tr>
+                            <th>Account</th>
+                            <th>Code</th>
+                            <th>Expected</th>
+                            <th>Declared</th>
+                            <th>Variance</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (d of details; track d.accountId) {
+                            <tr [class.bg-warning/10]="d.varianceCents && d.varianceCents !== '0'">
+                              <td>{{ d.accountName }}</td>
+                              <td class="font-mono text-sm">{{ d.accountCode }}</td>
+                              <td>
+                                {{
+                                  d.expectedBalanceCents != null
+                                    ? context().formatCurrency(d.expectedBalanceCents)
+                                    : '–'
+                                }}
+                              </td>
+                              <td>
+                                {{
+                                  d.declaredAmountCents != null
+                                    ? context().formatCurrency(d.declaredAmountCents)
+                                    : '–'
+                                }}
+                              </td>
+                              <td>
+                                @if (d.varianceCents && d.varianceCents !== '0') {
+                                  <span class="font-semibold text-warning">{{
+                                    context().formatCurrency(d.varianceCents)
+                                  }}</span>
+                                } @else {
+                                  {{
+                                    d.varianceCents != null
+                                      ? context().formatCurrency(d.varianceCents)
+                                      : '–'
+                                  }}
+                                }
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    }
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (totalPages() > 1) {
+    <div class="join flex justify-center mt-4">
+      <button
+        class="join-item btn btn-sm"
+        [disabled]="context().currentPage === 1"
+        (click)="onPageChange(context().currentPage - 1)"
+      >
+        «
+      </button>
+      @for (page of pageNumbers(); track page) {
+        <button
+          class="join-item btn btn-sm"
+          [class.btn-active]="context().currentPage === page"
+          (click)="onPageChange(page)"
+        >
+          {{ page }}
+        </button>
+      }
+      <button
+        class="join-item btn btn-sm"
+        [disabled]="context().currentPage === totalPages()"
+        (click)="onPageChange(context().currentPage + 1)"
+      >
+        »
+      </button>
+    </div>
+  }
+}

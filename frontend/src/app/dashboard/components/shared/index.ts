@@ -24,3 +24,4 @@ export * from './entity-detail-layout.component';
 // Shared UI Components
 export * from './delete-confirmation-modal.component';
 export * from './pagination.component';
+export * from './reconciliation-history/reconciliation-history.component';

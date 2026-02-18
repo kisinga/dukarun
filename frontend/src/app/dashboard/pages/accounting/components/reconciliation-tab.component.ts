@@ -9,16 +9,13 @@ import {
   output,
   signal,
 } from '@angular/core';
-import {
-  CashierSessionService,
-  type Reconciliation,
-  type ReconciliationAccountDetail,
-} from '../../../../core/services/cashier-session/cashier-session.service';
+import { CashierSessionService } from '../../../../core/services/cashier-session/cashier-session.service';
+import { ReconciliationHistoryComponent } from '../../../components/shared/reconciliation-history/reconciliation-history.component';
 import type { ReconciliationTabContext } from '../accounting-context';
 
 @Component({
   selector: 'app-reconciliation-tab',
-  imports: [CommonModule],
+  imports: [CommonModule, ReconciliationHistoryComponent],
   templateUrl: './reconciliation-tab.component.html',
   styleUrl: './reconciliation-tab.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -47,22 +44,18 @@ export class ReconciliationTabComponent {
   >([]);
   manualBalancesLoading = signal(false);
 
-  /** Expandable row: which reconciliation id is expanded (null = none). */
-  expandedRowId = signal<string | null>(null);
-  /** Cached per-account details by reconciliation id (lazy-loaded on expand). */
-  detailsCache = signal<Record<string, ReconciliationAccountDetail[]>>({});
-  /** Reconciliation id currently loading details (for spinner in expanded row). */
-  loadingDetailsId = signal<string | null>(null);
-
-  totalPages = computed(() => {
-    const total = this.context().totalItems;
-    const size = this.context().pageSize;
-    return Math.ceil(total / size) || 1;
-  });
-
-  pageNumbers = computed(() => {
-    const total = this.totalPages();
-    return Array.from({ length: total }, (_, i) => i + 1);
+  /** Context for the shared reconciliation history component. */
+  historyContext = computed(() => {
+    const ctx = this.context();
+    return {
+      reconciliations: ctx.reconciliations,
+      isLoading: ctx.isLoading,
+      totalItems: ctx.totalItems,
+      currentPage: ctx.currentPage,
+      pageSize: ctx.pageSize,
+      formatDate: ctx.formatDate,
+      formatCurrency: ctx.formatCurrency,
+    };
   });
 
   tableAccounts = computed(() => this.context().reconciliationTableAccounts);
@@ -129,44 +122,8 @@ export class ReconciliationTabComponent {
     return type ? type.charAt(0).toUpperCase() + type.slice(1).toLowerCase() : '';
   }
 
-  hasVariance(r: Reconciliation): boolean {
-    const v = parseInt(r.varianceAmount, 10);
-    return !Number.isNaN(v) && v !== 0;
-  }
-
   onPageChange(page: number) {
     this.pageChange.emit(page);
-  }
-
-  isExpanded(r: Reconciliation): boolean {
-    return this.expandedRowId() === r.id;
-  }
-
-  toggleExpand(r: Reconciliation): void {
-    const id = r?.id;
-    if (id == null || id === '' || id === '-1') return;
-    const current = this.expandedRowId();
-    if (current === r.id) {
-      this.expandedRowId.set(null);
-      return;
-    }
-    this.expandedRowId.set(r.id);
-    const cache = this.detailsCache();
-    if (cache[r.id] !== undefined) {
-      return;
-    }
-    this.loadingDetailsId.set(r.id);
-    this.cashierSessionService.getReconciliationDetails(r.id).subscribe({
-      next: (details) => {
-        this.detailsCache.update((c) => ({ ...c, [r.id]: details }));
-        this.loadingDetailsId.set(null);
-      },
-      error: () => this.loadingDetailsId.set(null),
-    });
-  }
-
-  getDetails(r: Reconciliation): ReconciliationAccountDetail[] {
-    return this.detailsCache()[r.id] ?? [];
   }
 
   /** Set declared amount in shillings (user-facing). */

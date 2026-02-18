@@ -180,8 +180,7 @@ export class ReconciliationService {
         channelId: input.channelId,
         scope: 'manual',
         scopeRefId: input.scopeRefId,
-        rangeStart: today,
-        rangeEnd: today,
+        snapshotAt: today,
         status: 'verified',
         expectedBalance: String(expectedSum),
         actualBalance: String(actualSum),
@@ -241,8 +240,7 @@ export class ReconciliationService {
       channelId: input.channelId,
       scope: input.scope,
       scopeRefId: input.scopeRefId,
-      rangeStart: snapshotDate,
-      rangeEnd: snapshotDate,
+      snapshotAt: snapshotDate,
       status: 'verified',
       expectedBalance: input.expectedBalance || null,
       actualBalance: input.actualBalance,
@@ -305,12 +303,11 @@ export class ReconciliationService {
   ): Promise<ReconciliationStatus> {
     const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
 
-    // Find all reconciliations that cover this period end date
+    // Find reconciliations whose snapshot is at this period end date
     const reconciliations = await reconciliationRepo
       .createQueryBuilder('reconciliation')
       .where('reconciliation.channelId = :channelId', { channelId })
-      .andWhere('reconciliation.rangeStart <= :periodEndDate', { periodEndDate })
-      .andWhere('reconciliation.rangeEnd >= :periodEndDate', { periodEndDate })
+      .andWhere('reconciliation.snapshotAt = :periodEndDate', { periodEndDate })
       .getMany();
 
     // Build scope status list
@@ -435,15 +432,14 @@ export class ReconciliationService {
       .getRepository(ctx, Reconciliation)
       .createQueryBuilder('r')
       .where('r.channelId = :channelId', { channelId })
-      .orderBy('r.rangeEnd', 'DESC')
-      .addOrderBy('r.rangeStart', 'DESC')
+      .orderBy('r.snapshotAt', 'DESC')
       .addOrderBy('r.id', 'DESC');
 
     if (options?.startDate) {
-      qb.andWhere('r.rangeEnd >= :startDate', { startDate: options.startDate });
+      qb.andWhere('r.snapshotAt >= :startDate', { startDate: options.startDate });
     }
     if (options?.endDate) {
-      qb.andWhere('r.rangeStart <= :endDate', { endDate: options.endDate });
+      qb.andWhere('r.snapshotAt <= :endDate', { endDate: options.endDate });
     }
     if (options?.scope) {
       qb.andWhere('r.scope = :scope', { scope: options.scope });
@@ -523,7 +519,7 @@ export class ReconciliationService {
           ctx,
           account.code,
           reconciliation.channelId,
-          reconciliation.rangeEnd
+          reconciliation.snapshotAt
         );
         expectedStr = String(balance.balance);
         const expected = BigInt(expectedStr);
@@ -615,7 +611,7 @@ export class ReconciliationService {
             ctx,
             account.code,
             reconciliation.channelId,
-            reconciliation.rangeEnd
+            reconciliation.snapshotAt
           );
           expectedStr = String(balance.balance);
           const expected = BigInt(expectedStr);
@@ -687,7 +683,7 @@ export class ReconciliationService {
 
   /**
    * Get per-account reconciliation details for a cashier session.
-   * @param kind - 'opening' = reconciliation at session open (first by rangeStart); 'closing' = at close (first by rangeEnd DESC). Default 'closing'.
+   * @param kind - 'opening' = reconciliation at session open (first by snapshotAt ASC); 'closing' = at close (first by snapshotAt DESC). Default 'closing'.
    * Returns [] if no matching reconciliation exists or if sessionId is not a valid UUID.
    */
   async getSessionReconciliationDetails(
@@ -730,9 +726,9 @@ export class ReconciliationService {
         .where('r.scope = :scope', { scope: 'cash-session' })
         .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: legacyRef });
       if (kind === 'opening') {
-        legacyQb.orderBy('r.rangeStart', 'ASC').addOrderBy('r.rangeEnd', 'ASC');
+        legacyQb.orderBy('r.snapshotAt', 'ASC');
       } else {
-        legacyQb.orderBy('r.rangeEnd', 'DESC').addOrderBy('r.rangeStart', 'DESC');
+        legacyQb.orderBy('r.snapshotAt', 'DESC');
       }
       list = await legacyQb.take(1).getMany();
     }

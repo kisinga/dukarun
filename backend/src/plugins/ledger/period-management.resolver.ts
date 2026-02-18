@@ -27,6 +27,7 @@ import {
 import { ReconciliationValidatorService } from '../../services/financial/reconciliation-validator.service';
 import { ReconciliationService } from '../../services/financial/reconciliation.service';
 import { FinancialService } from '../../services/financial/financial.service';
+import { InventoryService } from '../../services/inventory/inventory.service';
 import {
   CloseAccountingPeriodPermission,
   CreateInterAccountTransferPermission,
@@ -62,7 +63,8 @@ export class PeriodManagementResolver {
     private readonly periodLockService: PeriodLockService,
     private readonly reconciliationValidatorService: ReconciliationValidatorService,
     private readonly chartOfAccountsService: ChartOfAccountsService,
-    private readonly financialService: FinancialService
+    private readonly financialService: FinancialService,
+    private readonly inventoryService: InventoryService
   ) {}
 
   @Query()
@@ -582,6 +584,36 @@ export class PeriodManagementResolver {
       take,
       skip,
     });
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async openBatchesForVariant(
+    @Ctx() ctx: RequestContext,
+    @Args('productVariantId') productVariantId: string,
+    @Args('stockLocationId', { nullable: true }) stockLocationId?: string
+  ): Promise<
+    Array<{
+      id: string;
+      quantity: number;
+      unitCost: number;
+      expiryDate: Date | null;
+      batchNumber: string | null;
+    }>
+  > {
+    const channelId = ctx.channelId as number;
+    const batches = await this.inventoryService.getOpenBatches(ctx, {
+      channelId,
+      stockLocationId: stockLocationId ?? undefined,
+      productVariantId,
+    });
+    return batches.map(b => ({
+      id: String(b.id),
+      quantity: b.quantity,
+      unitCost: b.unitCost,
+      expiryDate: b.expiryDate,
+      batchNumber: b.batchNumber ?? null,
+    }));
   }
 
   // ============================================================================

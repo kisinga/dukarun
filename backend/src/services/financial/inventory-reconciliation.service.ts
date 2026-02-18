@@ -153,8 +153,7 @@ export class InventoryReconciliationService {
       channelId: input.channelId,
       scope: 'inventory',
       scopeRefId,
-      rangeStart: input.periodEndDate, // For inventory, range is typically a single date
-      rangeEnd: input.periodEndDate,
+      snapshotAt: input.periodEndDate,
       status: 'verified',
       expectedBalance: inventoryValuation.totalValue,
       actualBalance: input.actualBalance,

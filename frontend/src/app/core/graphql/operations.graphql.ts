@@ -3056,8 +3056,7 @@ export const CREATE_CASHIER_SESSION_RECONCILIATION = graphql(`
       channelId
       scope
       scopeRefId
-      rangeStart
-      rangeEnd
+      snapshotAt
       status
       expectedBalance
       actualBalance
@@ -3075,8 +3074,7 @@ export const CREATE_RECONCILIATION = graphql(`
       channelId
       scope
       scopeRefId
-      rangeStart
-      rangeEnd
+      snapshotAt
       status
       expectedBalance
       actualBalance
@@ -3095,8 +3093,7 @@ export const GET_RECONCILIATIONS = graphql(`
         channelId
         scope
         scopeRefId
-        rangeStart
-        rangeEnd
+        snapshotAt
         status
         expectedBalance
         actualBalance

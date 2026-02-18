@@ -181,13 +181,23 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     itemCount: Int!
   }
 
+  """
+  Open batch summary for choosing which batch to sell from (e.g. expiry / traceability).
+  """
+  type OpenBatchForVariant {
+    id: ID!
+    quantity: Float!
+    unitCost: Int!
+    expiryDate: DateTime
+    batchNumber: String
+  }
+
   type Reconciliation {
     id: ID!
     channelId: Int!
     scope: String!
     scopeRefId: String!
-    rangeStart: DateTime!
-    rangeEnd: DateTime!
+    snapshotAt: DateTime!
     status: String!
     expectedBalance: String
     actualBalance: String
@@ -312,6 +322,10 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
       take: Int
       skip: Int
     ): [ClosedSessionMissingReconciliation!]!
+    """
+    Open batches for a variant (and optional location) for batch selection when recording a sale.
+    """
+    openBatchesForVariant(productVariantId: ID!, stockLocationId: ID): [OpenBatchForVariant!]!
   }
 
   input RecordExpenseInput {

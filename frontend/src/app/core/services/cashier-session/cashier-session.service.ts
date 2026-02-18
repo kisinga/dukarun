@@ -107,8 +107,7 @@ export interface Reconciliation {
   channelId: number;
   scope: string;
   scopeRefId: string;
-  rangeStart: string;
-  rangeEnd: string;
+  snapshotAt: string;
   status: string;
   expectedBalance?: string | null;
   actualBalance?: string | null;

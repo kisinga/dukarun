@@ -7197,8 +7197,7 @@ export type Reconciliation = {
   expectedBalance?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   notes?: Maybe<Scalars['String']['output']>;
-  rangeEnd: Scalars['DateTime']['output'];
-  rangeStart: Scalars['DateTime']['output'];
+  snapshotAt: Scalars['DateTime']['output'];
   reviewedBy?: Maybe<Scalars['Int']['output']>;
   scope: Scalars['String']['output'];
   scopeRefId: Scalars['String']['output'];
@@ -12381,8 +12380,7 @@ export type CreateCashierSessionReconciliationMutation = {
     channelId: number;
     scope: string;
     scopeRefId: string;
-    rangeStart: any;
-    rangeEnd: any;
+    snapshotAt: any;
     status: string;
     expectedBalance?: string | null;
     actualBalance?: string | null;
@@ -12404,8 +12402,7 @@ export type CreateReconciliationMutation = {
     channelId: number;
     scope: string;
     scopeRefId: string;
-    rangeStart: any;
-    rangeEnd: any;
+    snapshotAt: any;
     status: string;
     expectedBalance?: string | null;
     actualBalance?: string | null;
@@ -12431,8 +12428,7 @@ export type GetReconciliationsQuery = {
       channelId: number;
       scope: string;
       scopeRefId: string;
-      rangeStart: any;
-      rangeEnd: any;
+      snapshotAt: any;
       status: string;
       expectedBalance?: string | null;
       actualBalance?: string | null;
@@ -23256,8 +23252,7 @@ export const CreateCashierSessionReconciliationDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'scope' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'scopeRefId' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'rangeStart' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'rangeEnd' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'snapshotAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'status' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'expectedBalance' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'actualBalance' } },
@@ -23312,8 +23307,7 @@ export const CreateReconciliationDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'scope' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'scopeRefId' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'rangeStart' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'rangeEnd' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'snapshotAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'status' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'expectedBalance' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'actualBalance' } },
@@ -23381,8 +23375,7 @@ export const GetReconciliationsDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'scope' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'scopeRefId' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'rangeStart' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'rangeEnd' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'snapshotAt' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'status' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'expectedBalance' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'actualBalance' } },

@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { RequestContext } from '@vendure/core';
 import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import { Account } from '../../ledger/account.entity';
+import { JournalEntry } from '../../ledger/journal-entry.entity';
 import { JournalLine } from '../../ledger/journal-line.entity';
 import { AccountBalanceService } from './account-balance.service';
 
@@ -585,6 +586,21 @@ export class LedgerQueryService {
       mpesaTotal: mpesaBalance.balance,
       totalCollected: cashBalance.balance + mpesaBalance.balance,
     };
+  }
+
+  /**
+   * Returns true if COGS has already been posted for this order (idempotency guard for recordSale).
+   */
+  async hasInventorySaleCogsForOrder(channelId: number, orderId: string): Promise<boolean> {
+    const entryRepo = this.dataSource.getRepository(JournalEntry);
+    const existing = await entryRepo.findOne({
+      where: {
+        channelId,
+        sourceType: 'InventorySaleCogs',
+        sourceId: orderId,
+      },
+    });
+    return existing != null;
   }
 
   /**

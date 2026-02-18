@@ -264,7 +264,7 @@ export class OpenSessionService {
           scope: 'cash-session',
           scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId }),
         },
-        order: { rangeStart: 'ASC' },
+        order: { snapshotAt: 'ASC' },
         take: 1,
       });
       openingRecon = legacyRecons[0] ?? null;
@@ -306,7 +306,7 @@ export class OpenSessionService {
           scope: 'cash-session',
           scopeRefId: toScopeRefId({ scope: 'cash-session', sessionId }),
         },
-        order: { rangeStart: 'ASC' },
+        order: { snapshotAt: 'ASC' },
         take: 1,
       });
       openingRecon = legacyRecons[0] ?? null;
@@ -610,13 +610,12 @@ export class OpenSessionService {
         kind: 'closing',
       });
       const legacyRef = toScopeRefId({ scope: 'cash-session', sessionId: session.id });
-      const rangeStart = session.openedAt.toISOString().slice(0, 10);
-      const rangeEnd = new Date(session.closedAt).toISOString().slice(0, 10);
+      const snapshotAt = new Date(session.closedAt).toISOString().slice(0, 10);
 
       const existing = await reconRepo.findOne({
         where: [
           { channelId, scope: 'cash-session', scopeRefId: kindRef },
-          { channelId, scope: 'cash-session', scopeRefId: legacyRef, rangeStart, rangeEnd },
+          { channelId, scope: 'cash-session', scopeRefId: legacyRef, snapshotAt },
         ],
       });
       if (!existing) {
@@ -657,8 +656,7 @@ export class OpenSessionService {
         channelId,
         scope: 'cash-session',
         scopeRefId,
-        rangeStart: snapshotDate,
-        rangeEnd: snapshotDate,
+        snapshotAt: snapshotDate,
       },
     });
     if (existingClosing) {

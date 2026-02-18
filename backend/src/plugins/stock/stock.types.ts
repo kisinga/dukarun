@@ -5,6 +5,10 @@ export interface PurchaseLineInput {
   quantity: number;
   unitCost: number; // In smallest currency unit (cents)
   stockLocationId: ID;
+  /** Optional supplier lot or batch number */
+  batchNumber?: string | null;
+  /** Optional expiry / use-by date for this line's batch */
+  expiryDate?: Date | null;
 }
 
 export interface RecordPurchaseInput {
