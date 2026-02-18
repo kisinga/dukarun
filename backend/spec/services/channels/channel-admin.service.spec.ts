@@ -201,6 +201,7 @@ describe('ChannelAdminService', () => {
       const adminQbChain = {
         innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([] as never),
       };
@@ -213,6 +214,9 @@ describe('ChannelAdminService', () => {
       } as never);
       mockConnection.getRepository.mockImplementation((_ctx: any, entity: any) => {
         if (entity === User) return userRepo;
+        return { findOne: jest.fn().mockResolvedValue(null as never), save: jest.fn() };
+      });
+      mockConnection.rawConnection.getRepository.mockImplementation((entity: any) => {
         if (entity === Administrator) return { createQueryBuilder: () => adminQbChain };
         return { findOne: jest.fn().mockResolvedValue(null as never), save: jest.fn() };
       });
@@ -226,6 +230,159 @@ describe('ChannelAdminService', () => {
         })
       ).rejects.toThrow(); // Fails later (e.g. role creation) but not "already belongs"
       expect(mockRoleTemplateService.getTemplateByCode).toHaveBeenCalled();
+    });
+  });
+
+  describe('getChannelAdminCount (limit check)', () => {
+    it('count query excludes soft-deleted users and administrators', async () => {
+      const ctx = { channelId: 2 } as unknown as RequestContext;
+      const userWithChannel3 = {
+        id: 100,
+        identifier: '0712345678',
+        verified: true,
+        roles: [{ id: 1, code: 'admin', channels: [{ id: 3 } as Channel] } as Role],
+      } as unknown as User;
+      const userRepo = {
+        findOne: jest.fn().mockResolvedValue(userWithChannel3 as never),
+        save: jest.fn().mockImplementation((u: unknown) => Promise.resolve(u)),
+      };
+      const andWhereCalls: string[] = [];
+      const adminQbChain: {
+        innerJoin: ReturnType<typeof jest.fn>;
+        where: ReturnType<typeof jest.fn>;
+        andWhere: ReturnType<typeof jest.fn>;
+        select: ReturnType<typeof jest.fn>;
+        getRawMany: ReturnType<typeof jest.fn>;
+      } = {
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockImplementation((clause: unknown) => {
+          andWhereCalls.push(clause as string);
+          return adminQbChain;
+        }),
+        select: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([{ admin_id: 1 }] as never),
+      };
+      mockChannelService.findOne.mockResolvedValue({
+        id: 2,
+        customFields: { maxAdminCount: 5 },
+      } as never);
+      mockRoleTemplateService.getTemplateByCode.mockResolvedValue({
+        id: 'tpl-1',
+        code: 'admin',
+        name: 'Admin',
+        permissions: ['ReadSettings', 'UpdateSettings'],
+      } as never);
+      mockRoleTemplateService.findRoleByChannelAndTemplateId.mockResolvedValue({
+        id: 10,
+        code: 'channel-2-tpl-1',
+        channels: [{ id: 2 }],
+      } as never);
+      const savedAdmin = {
+        id: '50',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        emailAddress: '0712345678',
+        user: { id: 100 },
+      } as unknown as Administrator;
+      mockConnection.getRepository.mockImplementation((_ctx: any, entity: any) => {
+        if (entity === User) return userRepo;
+        if (entity === Administrator)
+          return {
+            findOne: jest.fn().mockResolvedValueOnce(savedAdmin as never),
+            save: jest.fn().mockResolvedValue(savedAdmin as never),
+          };
+        return { findOne: jest.fn().mockResolvedValue(null as never), save: jest.fn() };
+      });
+      mockConnection.rawConnection.getRepository.mockImplementation((entity: any) => {
+        if (entity === Administrator) return { createQueryBuilder: () => adminQbChain };
+        return { findOne: jest.fn(), save: jest.fn() };
+      });
+
+      await service.inviteChannelAdministrator(ctx, {
+        phoneNumber: '+254712345678',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        roleTemplateCode: 'admin',
+      });
+
+      expect(andWhereCalls).toContain('user.deletedAt IS NULL');
+      expect(andWhereCalls).toContain('admin.deletedAt IS NULL');
+    });
+  });
+
+  describe('re-add after disable', () => {
+    it('re-invite by phone after disable succeeds and returns an Administrator', async () => {
+      const ctx = { channelId: 2 } as unknown as RequestContext;
+      const existingUser = {
+        id: 100,
+        identifier: '0712345678',
+        verified: true,
+        roles: [], // cleared by disable
+      } as unknown as User;
+      const userRepo = {
+        findOne: jest.fn().mockResolvedValue(existingUser as never),
+        save: jest.fn().mockImplementation((u: unknown) => Promise.resolve(u as User)),
+      };
+      const adminQbChain = {
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([{ admin_id: 1 }] as never),
+      };
+      const newAdmin = {
+        id: '99',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        emailAddress: '0712345678',
+        user: existingUser,
+      } as unknown as Administrator;
+      mockChannelService.findOne.mockResolvedValue({
+        id: 2,
+        customFields: { maxAdminCount: 5 },
+      } as never);
+      mockRoleTemplateService.getTemplateByCode.mockResolvedValue({
+        id: 'tpl-1',
+        code: 'admin',
+        name: 'Admin',
+        permissions: ['ReadSettings', 'UpdateSettings'],
+      } as never);
+      mockRoleTemplateService.findRoleByChannelAndTemplateId.mockResolvedValue({
+        id: 10,
+        code: 'channel-2-tpl-1',
+        channels: [{ id: 2 }],
+      } as never);
+      const adminFindOne = jest
+        .fn()
+        .mockResolvedValue(null as never) // no existing Administrator (was removed on disable)
+        .mockResolvedValueOnce(null as never);
+      const adminSave = jest.fn().mockResolvedValue(newAdmin as never);
+      mockConnection.getRepository.mockImplementation((_ctx: any, entity: any) => {
+        if (entity === User) return userRepo;
+        if (entity === Administrator) return { findOne: adminFindOne, save: adminSave };
+        return { findOne: jest.fn().mockResolvedValue(null as never), save: jest.fn() };
+      });
+      mockConnection.rawConnection.getRepository.mockImplementation((entity: any) => {
+        if (entity === Administrator) return { createQueryBuilder: () => adminQbChain };
+        return { findOne: jest.fn(), save: jest.fn() };
+      });
+
+      const result = await service.inviteChannelAdministrator(ctx, {
+        phoneNumber: '+254712345678',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        roleTemplateCode: 'admin',
+      });
+
+      expect(result).toBeDefined();
+      expect(result.id).toBe('99');
+      expect(result.firstName).toBe('Jane');
+      expect(result.lastName).toBe('Doe');
+      expect(adminSave).toHaveBeenCalled();
+      expect(mockEventBus.publish).toHaveBeenCalled();
+      const event = (mockEventBus.publish as jest.Mock).mock.calls[0][0] as { type: string };
+      expect(event.type).toBe('created');
     });
   });
 });
