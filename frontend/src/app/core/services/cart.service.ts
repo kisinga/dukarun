@@ -215,33 +215,48 @@ export class CartService {
 
   /**
    * Add item locally (for POS quick add)
-   * This is a local-only operation for the POS system
+   * This is a local-only operation for the POS system.
+   * Optional customLinePrice and priceOverrideReason persist custom pricing in the cart.
    */
   addItemLocal(
     variant: ProductVariant,
     quantity: number,
     facetValues?: CartItemFacetValue[],
+    customLinePrice?: number,
+    priceOverrideReason?: string,
   ): void {
     const items = this.cartItemsSignal();
     const existingIndex = items.findIndex((item) => item.variant.id === variant.id);
 
     const newItems =
       existingIndex >= 0
-        ? items.map((item, i) =>
-            i === existingIndex
-              ? {
-                  ...item,
-                  quantity: item.quantity + quantity,
-                  subtotal: (item.quantity + quantity) * variant.priceWithTax,
-                }
-              : item,
-          )
+        ? items.map((item, i) => {
+            if (i !== existingIndex) return item;
+            const newQuantity = item.quantity + quantity;
+            const effectiveCustomPrice =
+              customLinePrice != null ? customLinePrice : item.customLinePrice;
+            const effectiveReason =
+              priceOverrideReason !== undefined ? priceOverrideReason : item.priceOverrideReason;
+            const subtotal =
+              effectiveCustomPrice != null
+                ? effectiveCustomPrice
+                : newQuantity * variant.priceWithTax;
+            return {
+              ...item,
+              quantity: newQuantity,
+              customLinePrice: effectiveCustomPrice,
+              priceOverrideReason: effectiveReason,
+              subtotal,
+            };
+          })
         : [
             ...items,
             {
               variant,
               quantity,
-              subtotal: quantity * variant.priceWithTax,
+              subtotal: customLinePrice ?? quantity * variant.priceWithTax,
+              customLinePrice,
+              priceOverrideReason,
               facetValues: facetValues ?? [],
             },
           ];
@@ -251,7 +266,8 @@ export class CartService {
   }
 
   /**
-   * Update item quantity locally
+   * Update item quantity locally.
+   * Preserves customLinePrice when set; subtotal uses custom line total or default price.
    */
   updateItemQuantityLocal(variantId: string, quantity: number): void {
     const items = this.cartItemsSignal();
@@ -263,9 +279,41 @@ export class CartService {
     }
     const newItems = items.map((i) =>
       i.variant.id === variantId
-        ? { ...i, quantity, subtotal: quantity * i.variant.priceWithTax }
+        ? {
+            ...i,
+            quantity,
+            subtotal: i.customLinePrice ?? quantity * i.variant.priceWithTax,
+          }
         : i,
     );
+    this.cartItemsSignal.set(newItems);
+    this.persistCart();
+  }
+
+  /**
+   * Set or clear custom price for a line. Persists so component sync from service keeps override.
+   */
+  updateItemPriceLocal(
+    variantId: string,
+    customLinePrice?: number,
+    priceOverrideReason?: string,
+  ): void {
+    const items = this.cartItemsSignal();
+    const newItems = items.map((i) => {
+      if (i.variant.id !== variantId) return i;
+      const subtotal =
+        customLinePrice != null && customLinePrice > 0
+          ? customLinePrice
+          : i.quantity * i.variant.priceWithTax;
+      return {
+        ...i,
+        customLinePrice:
+          customLinePrice != null && customLinePrice > 0 ? customLinePrice : undefined,
+        priceOverrideReason:
+          customLinePrice != null && customLinePrice > 0 ? priceOverrideReason : undefined,
+        subtotal,
+      };
+    });
     this.cartItemsSignal.set(newItems);
     this.persistCart();
   }

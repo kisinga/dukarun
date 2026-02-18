@@ -392,23 +392,16 @@ export class SellComponent implements OnInit, OnDestroy {
       facetValues?: { name: string; facetCode?: string; facet?: { code: string } }[];
     },
   ): void {
-    // Use CartService for persistence
-    this.cartService.addItemLocal(variant, quantity, options?.facetValues);
-
-    // Update local state
-    const items = this.cartService.cartItems();
-    this.cartItems.set(items);
-
-    // Apply price override if provided
-    if (options?.priceOverride?.customLinePrice) {
-      const item = items.find((i) => i.variant.id === variant.id);
-      if (item) {
-        item.customLinePrice = options.priceOverride!.customLinePrice;
-        item.priceOverrideReason = options.priceOverride!.reason;
-        item.subtotal = options.priceOverride!.customLinePrice; // Already in cents
-        this.cartItems.set([...items]);
-      }
-    }
+    const customLinePrice = options?.priceOverride?.customLinePrice;
+    const priceOverrideReason = options?.priceOverride?.reason;
+    this.cartService.addItemLocal(
+      variant,
+      quantity,
+      options?.facetValues,
+      customLinePrice,
+      priceOverrideReason,
+    );
+    this.cartItems.set(this.cartService.cartItems());
 
     this.showConfirmModal.set(false);
     this.detectedProduct.set(null);
@@ -457,22 +450,8 @@ export class SellComponent implements OnInit, OnDestroy {
     customLinePrice?: number;
     reason?: string;
   }): void {
-    const items = this.cartItems();
-    const item = items.find((i) => i.variant.id === data.variantId);
-
-    if (item) {
-      if (data.customLinePrice && data.customLinePrice > 0) {
-        item.customLinePrice = data.customLinePrice;
-        item.priceOverrideReason = data.reason;
-        item.subtotal = data.customLinePrice; // Already in cents
-      } else {
-        item.customLinePrice = undefined;
-        item.priceOverrideReason = undefined;
-        item.subtotal = item.quantity * item.variant.priceWithTax; // Already in cents
-      }
-
-      this.cartItems.set([...items]);
-    }
+    this.cartService.updateItemPriceLocal(data.variantId, data.customLinePrice, data.reason);
+    this.cartItems.set(this.cartService.cartItems());
   }
 
   handleProceedToCheckout(): void {
