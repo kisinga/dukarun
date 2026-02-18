@@ -250,12 +250,14 @@ describe('Cashier-ledger flows', () => {
 
   describe('Flow C: Session then transfer – transfer succeeds when session open', () => {
     it('createInterAccountTransfer succeeds with valid from/to and amount', async () => {
-      const mockPeriodLockService = {
-        validatePeriodIsOpen: jest.fn().mockImplementation(() => Promise.resolve()),
-      } as any;
-      const mockChartOfAccountsService = {
-        validatePaymentSourceAccount: jest.fn().mockImplementation(() => Promise.resolve()),
-      } as any;
+      const mockPeriodEndClosingService = {} as any;
+      const mockReconciliationService = {} as any;
+      const mockInventoryReconciliationService = {} as any;
+      const mockCashierSessionServiceFlowC = {
+        requireOpenSession: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve({ id: 'session-c', channelId: channel1Id })),
+      };
       const mockPostingService = {
         post: jest.fn().mockImplementation(() =>
           Promise.resolve({
@@ -265,24 +267,54 @@ describe('Cashier-ledger flows', () => {
             sourceId: 'transfer-1',
           })
         ),
-      } as any;
-      const mockCashierSessionServiceFlowC = {
-        requireOpenSession: jest
-          .fn()
-          .mockImplementation(() => Promise.resolve({ id: 'session-c', channelId: channel1Id })),
-      } as any;
+      };
+      const mockLinesFlowC = [
+        {
+          id: 'l1',
+          account: { code: ACCOUNT_CODES.CASH_ON_HAND, name: 'Cash' },
+          debit: '0',
+          credit: '5000',
+          meta: null as Record<string, unknown> | null,
+        },
+        {
+          id: 'l2',
+          account: { code: ACCOUNT_CODES.BANK_MAIN, name: 'Bank' },
+          debit: '5000',
+          credit: '0',
+          meta: null as Record<string, unknown> | null,
+        },
+      ];
+      const mockConnection = {
+        getRepository: jest.fn().mockReturnValue({
+          createQueryBuilder: jest.fn().mockReturnValue({
+            innerJoinAndSelect: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            getMany: jest.fn().mockImplementation(() => Promise.resolve(mockLinesFlowC)),
+          }),
+        }),
+      };
+      const mockPeriodLockService = {
+        validatePeriodIsOpen: jest.fn().mockImplementation(() => Promise.resolve()),
+      };
+      const mockReconciliationValidatorService = {} as any;
+      const mockChartOfAccountsService = {
+        validatePaymentSourceAccount: jest.fn().mockImplementation(() => Promise.resolve()),
+      };
       const mockFinancialService = {} as any;
+      const mockInventoryService = {} as any;
+
       const resolver = new PeriodManagementResolver(
-        {} as any,
-        {} as any,
-        {} as any,
-        mockCashierSessionServiceFlowC,
-        mockPostingService,
-        {} as any,
-        mockPeriodLockService,
-        {} as any,
-        mockChartOfAccountsService,
-        mockFinancialService
+        mockPeriodEndClosingService,
+        mockReconciliationService,
+        mockInventoryReconciliationService,
+        mockCashierSessionServiceFlowC as any,
+        mockPostingService as any,
+        mockConnection as any,
+        mockPeriodLockService as any,
+        mockReconciliationValidatorService,
+        mockChartOfAccountsService as any,
+        mockFinancialService,
+        mockInventoryService
       );
 
       const result = await resolver.createInterAccountTransfer(ctx1, {
@@ -314,35 +346,67 @@ describe('Cashier-ledger flows', () => {
         sourceId: 'idem-1',
       };
       let postCallCount = 0;
+      const mockPeriodEndClosingService = {} as any;
+      const mockReconciliationService = {} as any;
+      const mockInventoryReconciliationService = {} as any;
+      const mockCashierSessionServiceFlowD = {
+        requireOpenSession: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve({ id: 'session-d', channelId: channel1Id })),
+      };
       const mockPostingService = {
         post: jest.fn().mockImplementation(() => {
           postCallCount++;
           return Promise.resolve(sameEntry);
         }),
-      } as any;
+      };
+      const mockLinesFlowD = [
+        {
+          id: 'l1',
+          account: { code: ACCOUNT_CODES.CASH_ON_HAND, name: 'Cash' },
+          debit: '0',
+          credit: '1000',
+          meta: null as Record<string, unknown> | null,
+        },
+        {
+          id: 'l2',
+          account: { code: ACCOUNT_CODES.BANK_MAIN, name: 'Bank' },
+          debit: '1000',
+          credit: '0',
+          meta: null as Record<string, unknown> | null,
+        },
+      ];
+      const mockConnectionFlowD = {
+        getRepository: jest.fn().mockReturnValue({
+          createQueryBuilder: jest.fn().mockReturnValue({
+            innerJoinAndSelect: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            getMany: jest.fn().mockImplementation(() => Promise.resolve(mockLinesFlowD)),
+          }),
+        }),
+      };
       const mockPeriodLockService = {
         validatePeriodIsOpen: jest.fn().mockImplementation(() => Promise.resolve()),
-      } as any;
+      };
+      const mockReconciliationValidatorService = {} as any;
       const mockChartOfAccountsService = {
         validatePaymentSourceAccount: jest.fn().mockImplementation(() => Promise.resolve()),
-      } as any;
-      const mockCashierSessionServiceFlowD = {
-        requireOpenSession: jest
-          .fn()
-          .mockImplementation(() => Promise.resolve({ id: 'session-d', channelId: channel1Id })),
-      } as any;
+      };
       const mockFinancialServiceFlowD = {} as any;
+      const mockInventoryService = {} as any;
+
       const resolver = new PeriodManagementResolver(
-        {} as any,
-        {} as any,
-        {} as any,
-        mockCashierSessionServiceFlowD,
-        mockPostingService,
-        {} as any,
-        mockPeriodLockService,
-        {} as any,
-        mockChartOfAccountsService,
-        mockFinancialServiceFlowD
+        mockPeriodEndClosingService,
+        mockReconciliationService,
+        mockInventoryReconciliationService,
+        mockCashierSessionServiceFlowD as any,
+        mockPostingService as any,
+        mockConnectionFlowD as any,
+        mockPeriodLockService as any,
+        mockReconciliationValidatorService,
+        mockChartOfAccountsService as any,
+        mockFinancialServiceFlowD,
+        mockInventoryService
       );
 
       const input = {
