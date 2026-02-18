@@ -16,6 +16,9 @@ import { ShiftModalTriggerService } from '../../../core/services/cashier-session
 import { CompanyService } from '../../../core/services/company.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { DashboardService, PeriodStats } from '../../../core/services/dashboard.service';
+import { AnalyticsService } from '../../../core/services/analytics.service';
+import { SparklineComponent } from '../../components/shared/charts/sparkline.component';
+import { AnimatedCounterComponent } from '../../components/shared/charts/animated-counter.component';
 
 type Period = 'today' | 'week' | 'month';
 
@@ -47,7 +50,7 @@ interface RecentActivity {
 
 @Component({
   selector: 'app-overview',
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, SparklineComponent, AnimatedCounterComponent],
   templateUrl: './overview.component.html',
   styleUrl: './overview.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -107,6 +110,23 @@ export class OverviewComponent implements OnInit, OnDestroy {
   });
 
   protected readonly sessionOpen = this.cashierSessionService.hasActiveSession;
+
+  // Business Insights (analytics — lazy)
+  private readonly analyticsService = inject(AnalyticsService);
+  protected readonly insightsOpen = signal(false);
+  private insightsFetched = false;
+  protected readonly analyticsStats = this.analyticsService.stats;
+  protected readonly analyticsLoading = this.analyticsService.isLoading;
+
+  protected readonly salesSparklineData = computed(() =>
+    (this.analyticsStats()?.salesTrend ?? []).map((p) => p.value),
+  );
+  protected readonly avgMarginTarget = computed(() =>
+    Math.round(this.analyticsStats()?.averageProfitMargin ?? 0),
+  );
+  protected readonly totalRevenueTarget = computed(() =>
+    Math.round((this.analyticsStats()?.totalRevenue ?? 0) / 100),
+  );
 
   constructor() {
     effect(
@@ -215,6 +235,15 @@ export class OverviewComponent implements OnInit, OnDestroy {
     });
   }
 
+  toggleInsights(): void {
+    const opening = !this.insightsOpen();
+    this.insightsOpen.set(opening);
+    if (opening && !this.insightsFetched) {
+      this.insightsFetched = true;
+      this.analyticsService.fetch('7d');
+    }
+  }
+
   async refresh(): Promise<void> {
     await this.dashboardService.refresh();
     const companyId = this.companyService.activeCompanyId();
@@ -242,4 +271,7 @@ export class OverviewComponent implements OnInit, OnDestroy {
     };
     return now.toLocaleDateString('en-US', options);
   }
+
+  readonly formatPercent = (v: number): string => `${v.toFixed(1)}%`;
+  readonly formatRevenue = (v: number): string => this.currencyService.format(v * 100);
 }
