@@ -28,6 +28,7 @@ describe('PeriodManagementResolver.createInterAccountTransfer', () => {
 
   const MOCK_SESSION = { id: 'session-123', channelId: 1, status: 'open' as const };
   let mockCashierSessionService: any;
+  let mockConnection: any;
 
   beforeEach(() => {
     mockPeriodLockService = {
@@ -46,11 +47,38 @@ describe('PeriodManagementResolver.createInterAccountTransfer', () => {
       sourceId: validInput.transferId,
       entryDate: validInput.entryDate,
       memo: validInput.memo,
+      status: 'posted',
+      postedAt: new Date(),
       lines: [],
     };
     mockPostingService = {
       post: jest.fn().mockImplementation(() => Promise.resolve(mockJournalEntry)),
     } as any;
+    const mockLinesWithAccount = [
+      {
+        id: 'l1',
+        account: { code: validInput.fromAccountCode, name: 'Cash on hand' },
+        debit: '0',
+        credit: '10000',
+        meta: {},
+      },
+      {
+        id: 'l2',
+        account: { code: validInput.toAccountCode, name: 'Bank main' },
+        debit: '10000',
+        credit: '0',
+        meta: {},
+      },
+    ];
+    mockConnection = {
+      getRepository: jest.fn().mockReturnValue({
+        createQueryBuilder: jest.fn().mockReturnValue({
+          innerJoinAndSelect: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          getMany: jest.fn().mockImplementation(() => Promise.resolve(mockLinesWithAccount)),
+        }),
+      }),
+    };
     const mockFinancialService = {} as any;
     resolver = new PeriodManagementResolver(
       {} as any,
@@ -58,11 +86,12 @@ describe('PeriodManagementResolver.createInterAccountTransfer', () => {
       {} as any,
       mockCashierSessionService,
       mockPostingService,
-      {} as any,
+      mockConnection,
       mockPeriodLockService,
       {} as any,
       mockChartOfAccountsService,
-      mockFinancialService
+      mockFinancialService,
+      {} as any
     );
   });
 

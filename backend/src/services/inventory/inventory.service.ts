@@ -4,19 +4,21 @@ import { LedgerPostingService } from '../financial/ledger-posting.service';
 import {
   BatchAllocation,
   CostAllocationRequest,
-  CostingStrategy,
+  CostAllocationResult,
 } from './interfaces/costing-strategy.interface';
-import { ExpiryPolicy } from './interfaces/expiry-policy.interface';
+import { FifoCostingStrategy } from './strategies/fifo-costing.strategy';
+import { DefaultExpiryPolicy } from './policies/default-expiry.policy';
 import {
   BatchFilters,
   CreateBatchInput,
   CreateMovementInput,
   InventoryBatch,
   InventoryMovement,
-  InventoryStore,
   MovementType,
   ValuationSnapshot,
 } from './interfaces/inventory-store.interface';
+import { SaleCogs } from './entities/sale-cogs.entity';
+import { InventoryStoreService } from './inventory-store.service';
 
 /**
  * Input for recording a purchase
@@ -33,6 +35,7 @@ export interface RecordPurchaseInput {
     quantity: number;
     unitCost: number; // in cents
     expiryDate?: Date | null;
+    batchNumber?: string | null;
   }>;
 }
 
@@ -54,9 +57,13 @@ export interface RecordSaleInput {
   channelId: ID;
   stockLocationId: ID;
   customerId: string;
+  /** Sale date (YYYY-MM-DD) for analytics; defaults to today */
+  saleDate?: string;
   lines: Array<{
     productVariantId: ID;
     quantity: number;
+    /** When set, sell from this batch only; otherwise use costing strategy. */
+    batchId?: ID;
   }>;
 }
 
@@ -117,6 +124,26 @@ export interface WriteOffResult {
 }
 
 /**
+ * Input for creating opening stock batches (synthetic batches with unitCost 0)
+ */
+export interface CreateOpeningStockBatchesInput {
+  channelId: ID;
+  stockLocationId: ID;
+  lines: Array<{
+    productVariantId: ID;
+    quantity: number;
+  }>;
+}
+
+/**
+ * Result of creating opening stock batches
+ */
+export interface OpeningStockBatchesResult {
+  batches: InventoryBatch[];
+  movements: InventoryMovement[];
+}
+
+/**
  * InventoryService
  *
  * High-level facade for inventory operations.
@@ -129,9 +156,9 @@ export class InventoryService {
 
   constructor(
     private readonly connection: TransactionalConnection,
-    private readonly inventoryStore: InventoryStore,
-    private readonly costingStrategy: CostingStrategy,
-    private readonly expiryPolicy: ExpiryPolicy,
+    private readonly inventoryStore: InventoryStoreService,
+    private readonly costingStrategy: FifoCostingStrategy,
+    private readonly expiryPolicy: DefaultExpiryPolicy,
     private readonly ledgerPostingService: LedgerPostingService
   ) {}
 
@@ -156,6 +183,7 @@ export class InventoryService {
             expiryDate: line.expiryDate || null,
             sourceType: 'Purchase',
             sourceId: input.purchaseId,
+            batchNumber: line.batchNumber ?? null,
             metadata: {
               purchaseReference: input.purchaseReference,
               supplierId: input.supplierId,
@@ -236,80 +264,119 @@ export class InventoryService {
       try {
         const allAllocations: BatchAllocation[] = [];
         const movements: InventoryMovement[] = [];
+        const lineCogsRows: Array<{ productVariantId: ID; quantity: number; cogsCents: number }> =
+          [];
 
         // Process each line
         for (const line of input.lines) {
-          // Verify stock level
-          const hasStock = await this.inventoryStore.verifyStockLevel(
-            transactionCtx,
-            line.productVariantId,
-            input.stockLocationId,
-            line.quantity
-          );
+          let allocationResult: CostAllocationResult;
 
-          if (!hasStock) {
-            throw new UserInputError(
-              `Insufficient stock for variant ${line.productVariantId}. Requested: ${line.quantity}`
-            );
-          }
-
-          // Allocate cost using costing strategy
-          const allocationRequest: CostAllocationRequest = {
-            channelId: input.channelId,
-            stockLocationId: input.stockLocationId,
-            productVariantId: line.productVariantId,
-            quantity: line.quantity,
-            sourceType: 'Order',
-            sourceId: input.orderId,
-            metadata: {
-              orderCode: input.orderCode,
-              customerId: input.customerId,
-            },
-          };
-
-          const allocationResult = await this.costingStrategy.allocateCost(
-            transactionCtx,
-            allocationRequest
-          );
-
-          // Validate expiry for each batch before consuming
-          for (const allocation of allocationResult.allocations) {
-            const batch = await this.inventoryStore.getOpenBatches(transactionCtx, {
+          if (line.batchId) {
+            // Single-batch path: sell from the specified batch only
+            const batches = await this.inventoryStore.getOpenBatches(transactionCtx, {
               channelId: input.channelId,
               stockLocationId: input.stockLocationId,
               productVariantId: line.productVariantId,
             });
+            const batch = batches.find(b => String(b.id) === String(line.batchId));
+            if (!batch) {
+              throw new UserInputError(
+                `Batch ${line.batchId} not found or not available for variant ${line.productVariantId}`
+              );
+            }
+            if (batch.quantity < line.quantity) {
+              throw new UserInputError(
+                `Insufficient quantity in batch ${line.batchId}. Available: ${batch.quantity}, requested: ${line.quantity}`
+              );
+            }
+            const expiryValidation = await this.expiryPolicy.validateBeforeConsume(
+              transactionCtx,
+              batch,
+              line.quantity,
+              MovementType.SALE
+            );
+            if (!expiryValidation.allowed) {
+              throw new UserInputError(
+                expiryValidation.error || 'Cannot consume batch due to expiry policy'
+              );
+            }
+            if (expiryValidation.warning) {
+              this.logger.warn(expiryValidation.warning);
+            }
+            const totalCost = batch.unitCost * line.quantity;
+            allocationResult = {
+              allocations: [
+                {
+                  batchId: batch.id,
+                  quantity: line.quantity,
+                  unitCost: batch.unitCost,
+                  totalCost,
+                },
+              ],
+              totalCost,
+              metadata: {},
+            };
+          } else {
+            // Strategy path: use costing strategy to allocate
+            const hasStock = await this.inventoryStore.verifyStockLevel(
+              transactionCtx,
+              line.productVariantId,
+              input.stockLocationId,
+              line.quantity
+            );
+            if (!hasStock) {
+              throw new UserInputError(
+                `Insufficient stock for variant ${line.productVariantId}. Requested: ${line.quantity}`
+              );
+            }
+            const allocationRequest: CostAllocationRequest = {
+              channelId: input.channelId,
+              stockLocationId: input.stockLocationId,
+              productVariantId: line.productVariantId,
+              quantity: line.quantity,
+              sourceType: 'Order',
+              sourceId: input.orderId,
+              metadata: {
+                orderCode: input.orderCode,
+                customerId: input.customerId,
+              },
+            };
+            allocationResult = await this.costingStrategy.allocateCost(
+              transactionCtx,
+              allocationRequest
+            );
+          }
 
-            const allocatedBatch = batch.find(b => b.id === allocation.batchId);
+          // Validate expiry and consume for each allocation (same path for both)
+          for (const allocation of allocationResult.allocations) {
+            const batches = await this.inventoryStore.getOpenBatches(transactionCtx, {
+              channelId: input.channelId,
+              stockLocationId: input.stockLocationId,
+              productVariantId: line.productVariantId,
+            });
+            const allocatedBatch = batches.find(b => b.id === allocation.batchId);
             if (!allocatedBatch) {
               throw new Error(`Batch ${allocation.batchId} not found`);
             }
-
             const expiryValidation = await this.expiryPolicy.validateBeforeConsume(
               transactionCtx,
               allocatedBatch,
               allocation.quantity,
               MovementType.SALE
             );
-
             if (!expiryValidation.allowed) {
               throw new UserInputError(
                 expiryValidation.error || 'Cannot consume batch due to expiry policy'
               );
             }
-
             if (expiryValidation.warning) {
               this.logger.warn(expiryValidation.warning);
             }
-
-            // Update batch quantity
             await this.inventoryStore.updateBatchQuantity(
               transactionCtx,
               allocation.batchId,
               -allocation.quantity
             );
-
-            // Create movement
             const movementInput: CreateMovementInput = {
               channelId: input.channelId,
               stockLocationId: input.stockLocationId,
@@ -324,7 +391,6 @@ export class InventoryService {
                 customerId: input.customerId,
               },
             };
-
             const movement = await this.inventoryStore.createMovement(
               transactionCtx,
               movementInput
@@ -333,6 +399,12 @@ export class InventoryService {
           }
 
           allAllocations.push(...allocationResult.allocations);
+          const lineCogs = allocationResult.allocations.reduce((sum, a) => sum + a.totalCost, 0);
+          lineCogsRows.push({
+            productVariantId: line.productVariantId,
+            quantity: line.quantity,
+            cogsCents: lineCogs,
+          });
         }
 
         // Calculate total COGS
@@ -352,6 +424,23 @@ export class InventoryService {
           totalCogs,
         });
 
+        // Persist sale_cogs for analytics (same transaction)
+        const saleDate = input.saleDate ?? new Date().toISOString().slice(0, 10);
+        const saleCogsRepo = this.connection.getRepository(transactionCtx, SaleCogs);
+        for (const row of lineCogsRows) {
+          const saleCogs = saleCogsRepo.create({
+            channelId: Number(input.channelId),
+            orderId: input.orderId,
+            orderLineId: null,
+            productVariantId: Number(row.productVariantId),
+            saleDate,
+            quantity: row.quantity,
+            cogsCents: row.cogsCents,
+            source: 'fifo',
+          });
+          await saleCogsRepo.save(saleCogs);
+        }
+
         this.logger.log(
           `Recorded sale ${input.orderId}: ${allAllocations.length} allocations, total COGS: ${totalCogs}`
         );
@@ -369,6 +458,154 @@ export class InventoryService {
         throw error;
       }
     });
+  }
+
+  /**
+   * Create opening stock batches for variants that have no batches at the given location.
+   * Idempotent: deterministic sourceId per (variant, location) so duplicate calls return existing batch.
+   * Used when a variant receives initial stock (product create or first stock set).
+   */
+  async createOpeningStockBatches(
+    ctx: RequestContext,
+    input: CreateOpeningStockBatchesInput
+  ): Promise<OpeningStockBatchesResult> {
+    return this.connection.withTransaction(ctx, async transactionCtx => {
+      const batches: InventoryBatch[] = [];
+      const movements: InventoryMovement[] = [];
+
+      for (const line of input.lines) {
+        if (line.quantity <= 0) continue;
+
+        const sourceId = `OpeningStock:${line.productVariantId}:${input.stockLocationId}`;
+        const batchInput: CreateBatchInput = {
+          channelId: input.channelId,
+          stockLocationId: input.stockLocationId,
+          productVariantId: line.productVariantId,
+          quantity: line.quantity,
+          unitCost: 0,
+          expiryDate: null,
+          sourceType: 'OpeningStock',
+          sourceId,
+        };
+
+        const batch = await this.inventoryStore.createBatch(transactionCtx, batchInput);
+        batches.push(batch);
+
+        const movementInput: CreateMovementInput = {
+          channelId: input.channelId,
+          stockLocationId: input.stockLocationId,
+          productVariantId: line.productVariantId,
+          movementType: MovementType.PURCHASE,
+          quantity: line.quantity,
+          batchId: batch.id,
+          sourceType: 'OpeningStock',
+          sourceId,
+          metadata: { openingStock: true },
+        };
+        const movement = await this.inventoryStore.createMovement(transactionCtx, movementInput);
+        movements.push(movement);
+      }
+
+      this.logger.log(
+        `Created ${batches.length} opening stock batch(es) at location ${input.stockLocationId}`
+      );
+      return { batches, movements };
+    });
+  }
+
+  /**
+   * Ensure a variant has an opening-stock batch at the given location when it has no batches.
+   * Call when stock is set (e.g. after adjustStockLevel) so FIFO/recordSale always has a batch to consume.
+   * No-op if the variant already has batches at this location.
+   */
+  async ensureOpeningStockBatchIfNeeded(
+    ctx: RequestContext,
+    productVariantId: ID,
+    stockLocationId: ID,
+    quantity: number
+  ): Promise<OpeningStockBatchesResult | null> {
+    if (quantity <= 0) return null;
+
+    const existing = await this.inventoryStore.getOpenBatches(ctx, {
+      channelId: ctx.channelId as number,
+      stockLocationId,
+      productVariantId,
+    });
+    if (existing.length > 0) return null;
+
+    return this.createOpeningStockBatches(ctx, {
+      channelId: ctx.channelId as ID,
+      stockLocationId,
+      lines: [{ productVariantId, quantity }],
+    });
+  }
+
+  /**
+   * Reverse a sale: restore batch quantities from SALE movements for this order,
+   * create reversal movements, and void sale_cogs rows so analytics exclude the order.
+   * Idempotent: if OrderReversal movements already exist for this order, no-op.
+   */
+  async reverseSale(ctx: RequestContext, orderId: string): Promise<void> {
+    await this.connection.withTransaction(ctx, async transactionCtx => {
+      const channelId = ctx.channelId as number;
+
+      const allReversals = await this.inventoryStore.getMovements(transactionCtx, {
+        channelId,
+        sourceType: 'OrderReversal',
+      });
+      const existingReversal = allReversals.filter(m =>
+        m.sourceId.startsWith(`${orderId}-reversal`)
+      );
+      if (existingReversal.length > 0) {
+        this.logger.log(
+          `Reversal already applied for order ${orderId}, skipping inventory reverseSale`
+        );
+        await this.voidSaleCogsForOrder(transactionCtx, orderId);
+        return;
+      }
+
+      const saleMovements = await this.inventoryStore.getMovements(transactionCtx, {
+        channelId,
+        sourceType: 'Order',
+        sourceId: orderId,
+      });
+
+      if (saleMovements.length === 0) {
+        await this.voidSaleCogsForOrder(transactionCtx, orderId);
+        return;
+      }
+
+      for (const mov of saleMovements) {
+        if (mov.movementType !== MovementType.SALE || mov.quantity >= 0) continue;
+        const batchId = mov.batchId ?? mov.batch?.id;
+        if (!batchId) continue;
+
+        const restoreQty = Math.abs(mov.quantity);
+        await this.inventoryStore.updateBatchQuantity(transactionCtx, batchId, restoreQty);
+
+        const reversalSourceId = `${orderId}-reversal-${batchId}`;
+        const movementInput: CreateMovementInput = {
+          channelId,
+          stockLocationId: mov.stockLocationId,
+          productVariantId: mov.productVariantId,
+          movementType: MovementType.PURCHASE,
+          quantity: restoreQty,
+          batchId,
+          sourceType: 'OrderReversal',
+          sourceId: reversalSourceId,
+          metadata: { reversedOrderId: orderId },
+        };
+        await this.inventoryStore.createMovement(transactionCtx, movementInput);
+      }
+
+      await this.voidSaleCogsForOrder(transactionCtx, orderId);
+      this.logger.log(`Reversed sale for order ${orderId}: restored batches, voided sale_cogs`);
+    });
+  }
+
+  private async voidSaleCogsForOrder(ctx: RequestContext, orderId: string): Promise<void> {
+    const repo = this.connection.getRepository(ctx, SaleCogs);
+    await repo.delete({ orderId });
   }
 
   /**

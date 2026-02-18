@@ -162,15 +162,11 @@ export class ChannelAdminService {
 
       await this.attachRoleToExistingUser(ctx, existingUser, role);
 
-      const administrator = await this.connection.getRepository(ctx, Administrator).findOne({
-        where: { user: { id: existingUser.id } },
-      });
-
-      if (!administrator) {
-        throw new BadRequestException(
-          `Administrator not found for user with phone number ${cleanInput.phoneNumber}`
-        );
-      }
+      const administrator = await this.findOrCreateAdministratorForUser(
+        ctx,
+        existingUser,
+        cleanInput
+      );
 
       await this.updateAdministratorEmailIfNeeded(ctx, administrator, cleanInput.emailAddress);
       await this.sendWelcomeSms(ctx, cleanInput.phoneNumber, channelId.toString(), true);
@@ -543,18 +539,23 @@ export class ChannelAdminService {
 
   /**
    * Count distinct administrators for the channel (one row per admin, not per role).
+   * Excludes soft-deleted users and administrators. Uses rawConnection so the count
+   * is not affected by request-context filtering.
    */
   private async getChannelAdminCount(
     ctx: RequestContext,
     channelId: string | number
   ): Promise<number> {
-    const result = await this.connection
-      .getRepository(ctx, Administrator)
+    const id = typeof channelId === 'string' ? parseInt(channelId, 10) : channelId;
+    const result = await this.connection.rawConnection
+      .getRepository(Administrator)
       .createQueryBuilder('admin')
       .innerJoin('admin.user', 'user')
       .innerJoin('user.roles', 'role')
       .innerJoin('role.channels', 'channel')
-      .where('channel.id = :channelId', { channelId })
+      .where('channel.id = :id', { id })
+      .andWhere('user.deletedAt IS NULL')
+      .andWhere('admin.deletedAt IS NULL')
       .select('DISTINCT admin.id')
       .getRawMany<{ admin_id: number }>();
     return result.length;
@@ -637,6 +638,36 @@ export class ChannelAdminService {
 
     administrator.emailAddress = newEmail.trim();
     await this.connection.getRepository(ctx, Administrator).save(administrator);
+  }
+
+  /**
+   * Find an existing Administrator for the user, or create one (e.g. when re-adding a user
+   * who was previously disabled and had their Administrator entity removed).
+   */
+  private async findOrCreateAdministratorForUser(
+    ctx: RequestContext,
+    existingUser: User,
+    cleanInput: { firstName: string; lastName: string; phoneNumber: string; emailAddress?: string }
+  ): Promise<Administrator> {
+    const existing = await this.connection.getRepository(ctx, Administrator).findOne({
+      where: { user: { id: existingUser.id } },
+    });
+    if (existing) {
+      return existing;
+    }
+    const emailToUse =
+      cleanInput.emailAddress && cleanInput.emailAddress.trim().length > 0
+        ? cleanInput.emailAddress.trim()
+        : cleanInput.phoneNumber;
+    const administrator = new Administrator({
+      emailAddress: emailToUse,
+      firstName: cleanInput.firstName,
+      lastName: cleanInput.lastName,
+      user: existingUser,
+    });
+    const savedAdmin = await this.connection.getRepository(ctx, Administrator).save(administrator);
+    await this.eventBus.publish(new AdministratorEvent(ctx, savedAdmin, 'created'));
+    return savedAdmin;
   }
 
   private async attachRoleToExistingUser(

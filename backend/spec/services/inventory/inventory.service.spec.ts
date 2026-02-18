@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { RequestContext, TransactionalConnection, UserInputError } from '@vendure/core';
 import { InventoryService } from '../../../src/services/inventory/inventory.service';
+import { InventoryStoreService } from '../../../src/services/inventory/inventory-store.service';
 import { InventoryStore } from '../../../src/services/inventory/interfaces/inventory-store.interface';
 import { CostingStrategy } from '../../../src/services/inventory/interfaces/costing-strategy.interface';
 import { ExpiryPolicy } from '../../../src/services/inventory/interfaces/expiry-policy.interface';
@@ -49,15 +50,20 @@ describe('InventoryService', () => {
       postInventoryWriteOff: jest.fn(),
     } as unknown as LedgerPostingService;
 
+    const mockRepo = {
+      create: jest.fn((dto: any) => dto),
+      save: jest.fn((entity: any) => Promise.resolve(entity)),
+    };
     const connection = {
       withTransaction: jest.fn((ctx: any, fn: any) => fn(ctx)),
+      getRepository: jest.fn(() => mockRepo),
     } as unknown as TransactionalConnection;
 
     const service = new InventoryService(
       connection,
-      inventoryStore,
-      costingStrategy,
-      expiryPolicy,
+      inventoryStore as unknown as InventoryStoreService,
+      costingStrategy as any,
+      expiryPolicy as any,
       ledgerPostingService
     );
 

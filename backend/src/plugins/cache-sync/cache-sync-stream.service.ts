@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { EventBus, ProductEvent, RequestContext } from '@vendure/core';
+import { EventBus, OrderEvent, ProductEvent, RequestContext } from '@vendure/core';
 import { Observable, Subject } from 'rxjs';
 import { PaymentMethodChangedEvent } from '../../infrastructure/events/cache-invalidation.events';
 import { CacheSyncRecentBufferService } from './cache-sync-recent-buffer.service';
@@ -120,6 +120,20 @@ export class CacheSyncStreamService implements OnModuleInit {
     } catch {
       this.logger.warn('CustomerEvent not available; customer cache sync disabled');
     }
+
+    this.eventBus.ofType(OrderEvent).subscribe((event: OrderEvent) => {
+      const channelId = event.ctx?.channelId?.toString();
+      if (!channelId) return;
+      const action = this.toAction(event.type);
+      if (!action) return;
+      const id = event.entity?.id?.toString();
+      this.logger.log(
+        `CacheSync: event received entityType=order action=${action} channelId=${channelId} id=${id ?? 'n/a'}`
+      );
+      const msg: CacheSyncMessage = { entityType: 'order', action, channelId, id };
+      this.message$.next(msg);
+      this.recentBuffer.push(msg).catch(() => {});
+    });
   }
 
   getMessageStream(): Observable<CacheSyncMessage> {

@@ -40,6 +40,12 @@ export class PurchaseApiService {
         quantity: line.quantity,
         unitCost: Math.round(line.unitCost * 100), // Convert to cents
         stockLocationId: line.stockLocationId,
+        batchNumber: line.batchNumber ?? null,
+        expiryDate: line.expiryDate
+          ? typeof line.expiryDate === 'string'
+            ? line.expiryDate
+            : new Date(line.expiryDate).toISOString()
+          : null,
       })),
     };
 

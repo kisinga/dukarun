@@ -1,5 +1,5 @@
 /** Entity types aligned with backend cache-sync.types.CacheSyncEntityType */
-export type CacheSyncEntityType = 'product' | 'payment_method' | 'customer' | 'supplier';
+export type CacheSyncEntityType = 'product' | 'payment_method' | 'customer' | 'supplier' | 'order';
 
 /**
  * Handler interface for entity caches. Register with CacheSyncService so the cache layer

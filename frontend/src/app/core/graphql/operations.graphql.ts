@@ -853,6 +853,26 @@ export const GET_DASHBOARD_STATS = graphql(`
           icon
         }
       }
+      salesSummary {
+        today {
+          revenue
+          cogs
+          margin
+          orderCount
+        }
+        week {
+          revenue
+          cogs
+          margin
+          orderCount
+        }
+        month {
+          revenue
+          cogs
+          margin
+          orderCount
+        }
+      }
     }
   }
 `);
@@ -878,10 +898,13 @@ export const GET_RECENT_ORDERS = graphql(`
         totalWithTax
         state
         createdAt
+        orderPlacedAt
         currencyCode
         customer {
+          id
           firstName
           lastName
+          emailAddress
         }
         lines {
           id
@@ -895,6 +918,13 @@ export const GET_RECENT_ORDERS = graphql(`
               name
             }
           }
+        }
+        payments {
+          id
+          state
+          amount
+          method
+          createdAt
         }
       }
     }
@@ -2971,7 +3001,7 @@ export const GET_CURRENT_CASHIER_SESSION = graphql(`
 `);
 
 export const GET_CASHIER_SESSION = graphql(`
-  query GetCashierSession($sessionId: ID!) {
+  query GetCashierSession($sessionId: String!) {
     cashierSession(sessionId: $sessionId) {
       sessionId
       cashierUserId
@@ -3040,14 +3070,13 @@ export const CLOSE_CASHIER_SESSION = graphql(`
 `);
 
 export const CREATE_CASHIER_SESSION_RECONCILIATION = graphql(`
-  mutation CreateCashierSessionReconciliation($sessionId: ID!, $notes: String) {
+  mutation CreateCashierSessionReconciliation($sessionId: String!, $notes: String) {
     createCashierSessionReconciliation(sessionId: $sessionId, notes: $notes) {
       id
       channelId
       scope
       scopeRefId
-      rangeStart
-      rangeEnd
+      snapshotAt
       status
       expectedBalance
       actualBalance
@@ -3065,8 +3094,7 @@ export const CREATE_RECONCILIATION = graphql(`
       channelId
       scope
       scopeRefId
-      rangeStart
-      rangeEnd
+      snapshotAt
       status
       expectedBalance
       actualBalance
@@ -3085,8 +3113,7 @@ export const GET_RECONCILIATIONS = graphql(`
         channelId
         scope
         scopeRefId
-        rangeStart
-        rangeEnd
+        snapshotAt
         status
         expectedBalance
         actualBalance
@@ -3113,8 +3140,8 @@ export const GET_RECONCILIATION_DETAILS = graphql(`
 `);
 
 export const GET_SESSION_RECONCILIATION_DETAILS = graphql(`
-  query GetSessionReconciliationDetails($sessionId: ID!, $kind: String) {
-    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind) {
+  query GetSessionReconciliationDetails($sessionId: String!, $kind: String, $channelId: Int) {
+    sessionReconciliationDetails(sessionId: $sessionId, kind: $kind, channelId: $channelId) {
       accountId
       accountCode
       accountName
@@ -3147,7 +3174,7 @@ export const GET_LAST_CLOSED_SESSION_CLOSING_BALANCES = graphql(`
 `);
 
 export const GET_EXPECTED_SESSION_CLOSING_BALANCES = graphql(`
-  query GetExpectedSessionClosingBalances($sessionId: ID!) {
+  query GetExpectedSessionClosingBalances($sessionId: String!) {
     expectedSessionClosingBalances(sessionId: $sessionId) {
       accountCode
       accountName
@@ -3161,7 +3188,7 @@ export const GET_EXPECTED_SESSION_CLOSING_BALANCES = graphql(`
 // ============================================================================
 
 export const GET_SESSION_CASH_COUNTS = graphql(`
-  query GetSessionCashCounts($sessionId: ID!) {
+  query GetSessionCashCounts($sessionId: String!) {
     sessionCashCounts(sessionId: $sessionId) {
       id
       channelId
@@ -3200,7 +3227,7 @@ export const GET_PENDING_VARIANCE_REVIEWS = graphql(`
 `);
 
 export const GET_SESSION_MPESA_VERIFICATIONS = graphql(`
-  query GetSessionMpesaVerifications($sessionId: ID!) {
+  query GetSessionMpesaVerifications($sessionId: String!) {
     sessionMpesaVerifications(sessionId: $sessionId) {
       id
       channelId
@@ -3234,7 +3261,7 @@ export const RECORD_CASH_COUNT = graphql(`
 `);
 
 export const EXPLAIN_VARIANCE = graphql(`
-  mutation ExplainVariance($countId: ID!, $reason: String!) {
+  mutation ExplainVariance($countId: String!, $reason: String!) {
     explainVariance(countId: $countId, reason: $reason) {
       id
       varianceReason
@@ -3243,7 +3270,7 @@ export const EXPLAIN_VARIANCE = graphql(`
 `);
 
 export const REVIEW_CASH_COUNT = graphql(`
-  mutation ReviewCashCount($countId: ID!, $notes: String) {
+  mutation ReviewCashCount($countId: String!, $notes: String) {
     reviewCashCount(countId: $countId, notes: $notes) {
       id
       declaredCash
@@ -3361,5 +3388,76 @@ export const REVIEW_APPROVAL_REQUEST = graphql(`
       message
       reviewedAt
     }
+  }
+`);
+
+// ============================================================================
+// ANALYTICS
+// ============================================================================
+
+export const GET_ANALYTICS_STATS = graphql(`
+  query GetAnalyticsStats($timeRange: AnalyticsTimeRange!, $limit: Int) {
+    analyticsStats(timeRange: $timeRange, limit: $limit) {
+      topSelling {
+        productVariantId
+        productId
+        productName
+        variantName
+        totalQuantity
+        totalRevenue
+        totalMargin
+        marginPercent
+        quantityChangePercent
+      }
+      highestRevenue {
+        productVariantId
+        productId
+        productName
+        variantName
+        totalQuantity
+        totalRevenue
+        totalMargin
+        marginPercent
+      }
+      highestMargin {
+        productVariantId
+        productId
+        productName
+        variantName
+        totalQuantity
+        totalRevenue
+        totalMargin
+        marginPercent
+      }
+      trending {
+        productVariantId
+        productId
+        productName
+        variantName
+        totalQuantity
+        quantityChangePercent
+      }
+      salesTrend {
+        date
+        value
+      }
+      orderVolumeTrend {
+        date
+        value
+      }
+      customerGrowthTrend {
+        date
+        value
+      }
+      averageProfitMargin
+      totalRevenue
+      totalOrders
+    }
+  }
+`);
+
+export const REFRESH_ANALYTICS = graphql(`
+  mutation RefreshAnalytics {
+    refreshAnalytics
   }
 `);

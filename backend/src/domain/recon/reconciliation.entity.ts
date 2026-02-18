@@ -4,7 +4,7 @@ export type ReconciliationScope = 'cash-session' | 'method' | 'bank' | 'inventor
 export type ReconciliationStatus = 'draft' | 'verified';
 
 @Entity('reconciliation')
-@Index(['channelId', 'rangeStart', 'rangeEnd'])
+@Index('IDX_reconciliation_channelId_snapshotAt', ['channelId', 'snapshotAt'])
 export class Reconciliation {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -19,11 +19,9 @@ export class Reconciliation {
   @Column({ type: 'varchar', length: 64 })
   scopeRefId!: string;
 
+  /** Snapshot date (YYYY-MM-DD). Reconciliation is a snapshot at this point in time. */
   @Column({ type: 'date' })
-  rangeStart!: string;
-
-  @Column({ type: 'date' })
-  rangeEnd!: string;
+  snapshotAt!: string;
 
   @Column({ type: 'varchar', length: 16, default: 'draft' })
   status!: ReconciliationStatus;

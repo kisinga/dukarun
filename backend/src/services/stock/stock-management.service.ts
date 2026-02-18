@@ -218,56 +218,51 @@ export class StockManagementService {
           );
         }
 
-        // 8. Shadow mode: Record purchase in InventoryService if enabled
-        if (this.inventoryService && this.inventoryConfig) {
+        // 8. Record purchase in InventoryService when available (creates batches for COGS/FIFO)
+        if (this.inventoryService) {
           try {
-            const isValuationEnabled = await this.inventoryConfig.isValuationEnabled(
-              transactionCtx,
-              ctx.channelId!
-            );
+            await this.inventoryService.recordPurchase(transactionCtx, {
+              purchaseId: purchase.id,
+              channelId: ctx.channelId!,
+              stockLocationId: input.lines[0]?.stockLocationId || 0,
+              supplierId: String(input.supplierId),
+              purchaseReference: purchase.referenceNumber || purchase.id,
+              isCreditPurchase: input.isCreditPurchase ?? false,
+              lines: input.lines.map(line => ({
+                productVariantId: line.variantId,
+                quantity: line.quantity,
+                unitCost: line.unitCost,
+                expiryDate:
+                  line.expiryDate == null
+                    ? null
+                    : line.expiryDate instanceof Date
+                      ? line.expiryDate
+                      : new Date(line.expiryDate as string),
+                batchNumber: line.batchNumber ?? null,
+              })),
+            });
+            this.logger.log(`Purchase ${purchase.id} recorded in InventoryService`);
 
-            if (isValuationEnabled) {
-              await this.inventoryService.recordPurchase(transactionCtx, {
-                purchaseId: purchase.id,
-                channelId: ctx.channelId!,
-                stockLocationId: input.lines[0]?.stockLocationId || 0,
-                supplierId: String(input.supplierId),
-                purchaseReference: purchase.referenceNumber || purchase.id,
-                isCreditPurchase: input.isCreditPurchase ?? false,
-                lines: input.lines.map(line => ({
-                  productVariantId: line.variantId,
-                  quantity: line.quantity,
-                  unitCost: line.unitCost,
-                  expiryDate: null, // TODO: Add expiry date to purchase input if needed
-                })),
-              });
-
-              this.logger.log(
-                `Shadow mode: Purchase ${purchase.id} also recorded in InventoryService`
-              );
-
-              // Run reconciliation if service is available
-              if (this.reconciliationService) {
-                try {
-                  const reconciliation =
-                    await this.reconciliationService.getInventoryValuationVsLedger(transactionCtx);
-                  if (!reconciliation.isBalanced) {
-                    this.logger.warn(
-                      `Inventory valuation mismatch detected: difference=${reconciliation.difference}`
-                    );
-                  }
-                } catch (reconError) {
+            if (this.reconciliationService) {
+              try {
+                const reconciliation =
+                  await this.reconciliationService.getInventoryValuationVsLedger(transactionCtx);
+                if (!reconciliation.isBalanced) {
                   this.logger.warn(
-                    `Reconciliation check failed: ${reconError instanceof Error ? reconError.message : String(reconError)}`
+                    `Inventory valuation mismatch detected: difference=${reconciliation.difference}`
                   );
                 }
+              } catch (reconError) {
+                this.logger.warn(
+                  `Reconciliation check failed: ${reconError instanceof Error ? reconError.message : String(reconError)}`
+                );
               }
             }
           } catch (inventoryError) {
-            // Don't fail the main operation if shadow mode fails
             this.logger.error(
-              `Shadow mode: Failed to record purchase in InventoryService: ${inventoryError instanceof Error ? inventoryError.message : String(inventoryError)}`
+              `Failed to record purchase in InventoryService: ${inventoryError instanceof Error ? inventoryError.message : String(inventoryError)}`
             );
+            throw inventoryError;
           }
         }
 

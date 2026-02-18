@@ -1,6 +1,7 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
 import { LedgerQueryService } from '../../services/financial/ledger-query.service';
+import { AnalyticsQueryService } from '../../services/analytics/analytics-query.service';
 
 interface PeriodStats {
   today: number;
@@ -13,15 +14,30 @@ interface PeriodStats {
   }>;
 }
 
+interface SalesSummaryPeriod {
+  revenue: number;
+  cogs: number;
+  margin: number;
+  orderCount: number;
+}
+
 interface DashboardStats {
   sales: PeriodStats;
   purchases: PeriodStats;
   expenses: PeriodStats;
+  salesSummary?: {
+    today: SalesSummaryPeriod;
+    week: SalesSummaryPeriod;
+    month: SalesSummaryPeriod;
+  } | null;
 }
 
 @Resolver()
 export class DashboardStatsResolver {
-  constructor(private readonly ledgerQueryService: LedgerQueryService) {}
+  constructor(
+    private readonly ledgerQueryService: LedgerQueryService,
+    private readonly analyticsQueryService: AnalyticsQueryService
+  ) {}
 
   @Query()
   @Allow(Permission.ReadOrder)
@@ -35,10 +51,21 @@ export class DashboardStatsResolver {
 
     // Calculate period boundaries
     const periods = this.ledgerQueryService.calculatePeriods(now);
-    const endDateStr = endDate ? endDate.toISOString().slice(0, 10) : undefined;
+    const endDateStr = endDate
+      ? endDate.toISOString().slice(0, 10)
+      : now.toISOString().slice(0, 10);
 
     // Batch fetch account metadata once for getSalesBreakdown optimization
     const accountIds = await this.ledgerQueryService.getAccountIdsForSalesBreakdown(channelId);
+
+    // COGS-derived sales summary (mv_daily_sales_summary + mv_daily_order_stats)
+    const salesSummaryPromise = this.analyticsQueryService.getDashboardSalesSummary(
+      channelId,
+      periods.startOfToday,
+      periods.startOfWeek,
+      periods.startOfMonth,
+      endDateStr
+    );
 
     // Fetch sales stats for all periods
     // Only fetch month breakdown for accounts (used in UI breakdown display)
@@ -61,11 +88,12 @@ export class DashboardStatsResolver {
       this.ledgerQueryService.getPurchaseTotal(channelId, periods.startOfMonth, endDateStr),
     ]);
 
-    // Fetch expense stats for all periods
-    const [expensesToday, expensesWeek, expensesMonth] = await Promise.all([
+    // Fetch expense stats and sales summary
+    const [expensesToday, expensesWeek, expensesMonth, salesSummary] = await Promise.all([
       this.ledgerQueryService.getExpenseTotal(channelId, periods.startOfToday, endDateStr),
       this.ledgerQueryService.getExpenseTotal(channelId, periods.startOfWeek, endDateStr),
       this.ledgerQueryService.getExpenseTotal(channelId, periods.startOfMonth, endDateStr),
+      salesSummaryPromise,
     ]);
 
     // All values in smallest currency unit (cents) - UI layer handles display conversion
@@ -127,6 +155,7 @@ export class DashboardStatsResolver {
       sales,
       purchases,
       expenses,
+      salesSummary: salesSummary ?? null,
     };
   }
 }

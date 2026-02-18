@@ -8,10 +8,10 @@
       type="button"
       class="btn btn-ghost btn-sm btn-square"
       (click)="load()"
-      [class.loading]="isLoading()"
+      [class.loading]="sessionsLoading()"
       title="Refresh"
     >
-      @if (!isLoading()) {
+      @if (!sessionsLoading()) {
         <svg
           xmlns="http://www.w3.org/2000/svg"
           class="h-4 w-4"
@@ -103,197 +103,204 @@
     </div>
   </div>
 
-  <!-- Recent sessions -->
+  <!-- Shift history -->
   <div class="card card-border">
     <div class="card-body">
-      <h3 class="card-title text-base">Recent sessions</h3>
-      @if (isLoading() && sessions().length === 0) {
+      <h3 class="card-title text-base">Shift history</h3>
+      <p class="text-base-content/70 text-sm">
+        Past and current cashier sessions. Expand a row to view opening and closing reconciliation
+        details.
+      </p>
+      @if (sessionsLoading()) {
         <div class="flex justify-center py-8">
           <span class="loading loading-spinner loading-lg"></span>
         </div>
       } @else if (sessions().length === 0) {
-        <p class="text-sm text-base-content/60 py-4">No sessions yet.</p>
+        <div class="text-center py-8 text-base-content/70">
+          <p>No shifts found</p>
+        </div>
       } @else {
-        <div class="flex flex-col gap-4">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="text-sm text-base-content/70">
-              Showing {{ rangeStart() }}–{{ rangeEnd() }} of {{ totalSessions() }}
-            </p>
-            <label class="flex items-center gap-2 text-sm">
-              <span class="text-base-content/70">Per page</span>
-              <select
-                class="select select-bordered select-sm w-20"
-                [value]="pageSize()"
-                (change)="onPageSizeChange(+$any($event.target).value)"
-              >
-                @for (opt of pageSizeOptions; track opt) {
-                  <option [value]="opt">{{ opt }}</option>
-                }
-              </select>
-            </label>
-          </div>
-          <div
-            class="overflow-x-auto rounded-lg border border-base-300 max-h-[60vh] overflow-y-auto"
-          >
-            <table class="table table-zebra table-sm">
-              <thead class="sticky top-0 z-10 bg-base-200">
+        <div class="overflow-x-auto mt-4 max-h-[70vh] overflow-y-auto">
+          <table class="table table-zebra">
+            <thead class="sticky top-0 z-10 bg-base-100">
+              <tr>
+                <th class="w-12" scope="col"></th>
+                <th>Opened at</th>
+                <th>Closed at</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (session of sessions(); track session.id) {
                 <tr>
-                  <th class="w-12" scope="col"></th>
-                  <th scope="col">Opened</th>
-                  <th scope="col">Closed</th>
-                  <th scope="col">Status</th>
-                </tr>
-              </thead>
-              <tbody class="anim-stagger-rows">
-                @for (s of sessions(); track s.id) {
-                  <tr>
-                    <td class="align-middle">
-                      @if (s.closedAt) {
-                        <button
-                          type="button"
-                          class="btn btn-sm btn-square btn-outline btn-neutral min-w-8"
-                          (click)="toggleExpand(s)"
-                          [attr.aria-expanded]="isExpanded(s)"
-                          aria-label="{{
-                            isExpanded(s)
-                              ? 'Collapse reconciliation details'
-                              : 'Expand reconciliation details'
-                          }}"
-                          [title]="
-                            isExpanded(s) ? 'Collapse details' : 'Expand reconciliation details'
-                          "
-                        >
-                          @if (isExpanded(s)) {
-                            <span aria-hidden="true">▼</span>
-                          } @else {
-                            <span aria-hidden="true">▶</span>
-                          }
-                        </button>
-                      } @else {
-                        <span class="text-base-content/40">—</span>
-                      }
-                    </td>
-                    <td class="whitespace-nowrap">{{ formatDateTime(s.openedAt) }}</td>
-                    <td class="whitespace-nowrap">
-                      {{ s.closedAt ? formatDateTime(s.closedAt) : '—' }}
-                    </td>
-                    <td>
-                      <span
-                        [class]="
-                          s.closedAt
-                            ? 'badge badge-ghost badge-sm'
-                            : 'badge badge-success badge-soft badge-sm'
-                        "
-                      >
-                        {{ sessionStatus(s) }}
-                      </span>
-                    </td>
-                  </tr>
-                  @if (isExpanded(s)) {
-                    <tr class="bg-base-200/50">
-                      <td colspan="4" class="p-0">
-                        <div class="px-4 py-3 pl-12">
-                          @if (loadingDetailsSessionId() === s.id) {
-                            <div class="flex items-center gap-2 text-base-content/70">
-                              <span class="loading loading-spinner loading-sm"></span>
-                              Loading reconciliation details…
-                            </div>
-                          } @else {
-                            @let details = getSessionDetails(s);
-                            @if (details.length === 0) {
-                              <p class="text-base-content/70 text-sm">
-                                No reconciliation data for this session.
-                              </p>
-                            } @else {
-                              <p class="text-sm font-medium text-base-content/80 mb-2">
-                                Accounts reconciled
-                              </p>
-                              <table class="table table-sm table-zebra">
-                                <thead>
-                                  <tr>
-                                    <th>Account</th>
-                                    <th>Code</th>
-                                    <th>Expected</th>
-                                    <th>Declared</th>
-                                    <th>Variance</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  @for (d of details; track d.accountId) {
-                                    <tr
-                                      [class.bg-warning/10]="
-                                        d.varianceCents && d.varianceCents !== '0'
-                                      "
-                                    >
-                                      <td>{{ d.accountName }}</td>
-                                      <td class="font-mono text-sm">{{ d.accountCode }}</td>
-                                      <td>{{ formatCents(d.expectedBalanceCents) }}</td>
-                                      <td>{{ formatCents(d.declaredAmountCents) }}</td>
-                                      <td>
-                                        @if (d.varianceCents && d.varianceCents !== '0') {
-                                          <span class="font-semibold text-warning">{{
-                                            formatCents(d.varianceCents)
-                                          }}</span>
-                                        } @else {
-                                          {{ formatCents(d.varianceCents) }}
-                                        }
-                                      </td>
-                                    </tr>
-                                  }
-                                </tbody>
-                              </table>
-                            }
-                          }
-                        </div>
-                      </td>
-                    </tr>
-                  }
-                }
-              </tbody>
-            </table>
-          </div>
-          @if (totalPages() > 1) {
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="text-sm text-base-content/70">
-                Page {{ sessionsPage() }} of {{ totalPages() }}
-              </p>
-              <div class="join">
-                <button
-                  type="button"
-                  class="join-item btn btn-sm"
-                  [disabled]="sessionsPage() === 1"
-                  (click)="onSessionsPageChange(sessionsPage() - 1)"
-                  aria-label="Previous page"
-                >
-                  «
-                </button>
-                @for (page of pageNumbers(); track $index) {
-                  @if (page === -1) {
-                    <span class="join-item btn btn-sm btn-disabled">…</span>
-                  } @else {
+                  <td class="align-middle">
                     <button
                       type="button"
-                      class="join-item btn btn-sm"
-                      [class.btn-active]="sessionsPage() === page"
-                      (click)="onSessionsPageChange(page)"
+                      class="btn btn-sm btn-square btn-outline btn-neutral min-w-8"
+                      (click)="toggleExpand(session)"
+                      [attr.aria-expanded]="isSessionExpanded(session)"
+                      [attr.aria-label]="
+                        isSessionExpanded(session) ? 'Collapse details' : 'Expand details'
+                      "
+                      [title]="isSessionExpanded(session) ? 'Collapse details' : 'Expand details'"
                     >
-                      {{ page }}
+                      @if (isSessionExpanded(session)) {
+                        <span aria-hidden="true">▼</span>
+                      } @else {
+                        <span aria-hidden="true">▶</span>
+                      }
                     </button>
-                  }
+                  </td>
+                  <td class="whitespace-nowrap">{{ formatDateTime(session.openedAt) }}</td>
+                  <td class="whitespace-nowrap">
+                    @if (session.closedAt) {
+                      {{ formatDateTime(session.closedAt) }}
+                    } @else {
+                      –
+                    }
+                  </td>
+                  <td>
+                    <span
+                      class="badge"
+                      [class.badge-success]="session.status === 'open'"
+                      [class.badge-ghost]="session.status === 'closed'"
+                    >
+                      {{ session.status }}
+                    </span>
+                  </td>
+                </tr>
+                @if (isSessionExpanded(session)) {
+                  <tr class="bg-base-200/50">
+                    <td colspan="4" class="p-0">
+                      <div class="px-4 py-3 pl-12">
+                        @if (loadingDetailsSessionId() === session.id) {
+                          <div class="flex items-center gap-2 text-base-content/70">
+                            <span class="loading loading-spinner loading-sm"></span>
+                            Loading reconciliation details…
+                          </div>
+                        } @else {
+                          @let details = getShiftDetails(session);
+                          @if (details) {
+                            @if (details.opening.length > 0 || details.closing.length > 0) {
+                              <div class="space-y-4">
+                                @if (details.opening.length > 0) {
+                                  <div>
+                                    <p class="text-sm font-medium text-base-content/80 mb-2">
+                                      Opening reconciliation
+                                    </p>
+                                    <div class="overflow-x-auto">
+                                      <table class="table table-sm table-zebra">
+                                        <thead>
+                                          <tr>
+                                            <th>Account</th>
+                                            <th>Code</th>
+                                            <th>Expected</th>
+                                            <th>Declared</th>
+                                            <th>Variance</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          @for (d of details.opening; track d.accountId) {
+                                            <tr
+                                              [class.bg-warning/10]="
+                                                d.varianceCents && d.varianceCents !== '0'
+                                              "
+                                            >
+                                              <td>{{ d.accountName }}</td>
+                                              <td class="font-mono text-sm">{{ d.accountCode }}</td>
+                                              <td>{{ formatCents(d.expectedBalanceCents) }}</td>
+                                              <td>{{ formatCents(d.declaredAmountCents) }}</td>
+                                              <td>{{ formatCents(d.varianceCents) }}</td>
+                                            </tr>
+                                          }
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                }
+                                @if (details.closing.length > 0) {
+                                  <div>
+                                    <p class="text-sm font-medium text-base-content/80 mb-2">
+                                      Closing reconciliation
+                                    </p>
+                                    <div class="overflow-x-auto">
+                                      <table class="table table-sm table-zebra">
+                                        <thead>
+                                          <tr>
+                                            <th>Account</th>
+                                            <th>Code</th>
+                                            <th>Expected</th>
+                                            <th>Declared</th>
+                                            <th>Variance</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          @for (d of details.closing; track d.accountId) {
+                                            <tr
+                                              [class.bg-warning/10]="
+                                                d.varianceCents && d.varianceCents !== '0'
+                                              "
+                                            >
+                                              <td>{{ d.accountName }}</td>
+                                              <td class="font-mono text-sm">{{ d.accountCode }}</td>
+                                              <td>{{ formatCents(d.expectedBalanceCents) }}</td>
+                                              <td>{{ formatCents(d.declaredAmountCents) }}</td>
+                                              <td>{{ formatCents(d.varianceCents) }}</td>
+                                            </tr>
+                                          }
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                }
+                              </div>
+                            } @else {
+                              <p class="text-base-content/70 text-sm">
+                                No reconciliation data for this shift.
+                              </p>
+                            }
+                          } @else {
+                            <p class="text-base-content/70 text-sm">
+                              No reconciliation data for this shift.
+                            </p>
+                          }
+                        }
+                      </div>
+                    </td>
+                  </tr>
                 }
-                <button
-                  type="button"
-                  class="join-item btn btn-sm"
-                  [disabled]="sessionsPage() === totalPages()"
-                  (click)="onSessionsPageChange(sessionsPage() + 1)"
-                  aria-label="Next page"
-                >
-                  »
-                </button>
-              </div>
-            </div>
-          }
+              }
+            </tbody>
+          </table>
         </div>
+
+        @if (sessionsTotalPages() > 1) {
+          <div class="join flex justify-center mt-4">
+            <button
+              class="join-item btn btn-sm"
+              [disabled]="sessionsPage() === 1"
+              (click)="onSessionsPageChange(sessionsPage() - 1)"
+            >
+              «
+            </button>
+            @for (page of sessionsPageNumbers(); track page) {
+              <button
+                class="join-item btn btn-sm"
+                [class.btn-active]="sessionsPage() === page"
+                (click)="onSessionsPageChange(page)"
+              >
+                {{ page }}
+              </button>
+            }
+            <button
+              class="join-item btn btn-sm"
+              [disabled]="sessionsPage() === sessionsTotalPages()"
+              (click)="onSessionsPageChange(sessionsPage() + 1)"
+            >
+              »
+            </button>
+          </div>
+        }
       }
     </div>
   </div>

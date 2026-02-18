@@ -1,5 +1,12 @@
 import { Channel, ProductVariant, StockLocation } from '@vendure/core';
-import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { InventoryBatch } from './inventory-batch.entity';
 
 /**
@@ -26,10 +33,15 @@ export enum MovementType {
  * - sourceType + sourceId provide idempotency
  */
 @Entity('inventory_movement')
-@Index(['channelId', 'stockLocationId', 'productVariantId', 'createdAt'])
-@Index(['channelId', 'sourceType', 'sourceId'], { unique: true })
-@Index(['batchId'])
-@Index(['movementType'])
+@Index('IDX_inventory_movement_channel_location_variant_created', [
+  'channelId',
+  'stockLocationId',
+  'productVariantId',
+  'createdAt',
+])
+@Index('UQ_inventory_movement_source', ['channelId', 'sourceType', 'sourceId'], { unique: true })
+@Index('IDX_inventory_movement_batch', ['batchId'])
+@Index('IDX_inventory_movement_type', ['movementType'])
 export class InventoryMovement {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -73,6 +85,6 @@ export class InventoryMovement {
   @Column({ type: 'jsonb', nullable: true })
   metadata!: Record<string, any> | null;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn()
   createdAt!: Date;
 }

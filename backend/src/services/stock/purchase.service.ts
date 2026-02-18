@@ -18,6 +18,10 @@ export interface PurchaseLineInput {
   quantity: number;
   unitCost: number; // In smallest currency unit (cents)
   stockLocationId: ID;
+  /** Optional supplier lot or batch number for traceability */
+  batchNumber?: string | null;
+  /** Optional expiry / use-by date for this line's batch (Date or ISO string from GraphQL) */
+  expiryDate?: Date | string | null;
 }
 
 export interface RecordPurchaseInput {

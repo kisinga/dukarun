@@ -116,6 +116,14 @@ export class ApolloService {
 
     // Global error handling for authentication errors
     const errorLink = onError((errorResponse) => {
+      const { operation, forward } = errorResponse;
+
+      // Do not treat the session-check query as global session expiry; its failure is
+      // handled in AuthSessionService.fetchActiveAdministrator() (user set to null, init completes).
+      if (operation?.operationName === 'GetActiveAdministrator') {
+        return forward(operation);
+      }
+
       // Access error properties with type assertion since TypeScript types may not expose them
       const graphQLErrors = (errorResponse as any).graphQLErrors;
       const networkError = (errorResponse as any).networkError;
@@ -162,6 +170,8 @@ export class ApolloService {
           return;
         }
       }
+
+      return;
     });
 
     return new ApolloClient({

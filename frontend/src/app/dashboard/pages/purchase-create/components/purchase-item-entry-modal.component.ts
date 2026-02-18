@@ -255,6 +255,37 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
                 </div>
               </div>
 
+              <!-- Optional: Batch number & Expiry date -->
+              <div
+                class="flex flex-wrap items-end gap-3 rounded-lg bg-base-100 p-3 border border-base-300"
+              >
+                <div class="flex flex-col gap-1 min-w-0 flex-1">
+                  <label class="text-xs font-medium text-base-content/70" for="batch-number">
+                    Batch / lot number
+                  </label>
+                  <input
+                    id="batch-number"
+                    type="text"
+                    [value]="batchNumber()"
+                    placeholder="Optional"
+                    class="input input-sm input-bordered w-full"
+                    (input)="batchNumber.set($any($event.target).value)"
+                  />
+                </div>
+                <div class="flex flex-col gap-1 min-w-0 flex-1">
+                  <label class="text-xs font-medium text-base-content/70" for="expiry-date">
+                    Expiry / use-by date
+                  </label>
+                  <input
+                    id="expiry-date"
+                    type="date"
+                    [value]="expiryDate()"
+                    class="input input-sm input-bordered w-full"
+                    (input)="expiryDate.set($any($event.target).value)"
+                  />
+                </div>
+              </div>
+
               <!-- Add Button -->
               <button
                 class="btn btn-primary btn-block min-h-[3rem] hover:scale-[1.02] active:scale-95 transition-transform"
@@ -301,12 +332,16 @@ export class PurchaseItemEntryModalComponent {
     variant: ProductVariant;
     quantity: number;
     unitCost: number;
+    batchNumber?: string | null;
+    expiryDate?: string | null;
   }>();
   readonly closeModal = output<void>();
 
   readonly selectedVariant = signal<ProductVariant | null>(null);
   readonly quantity = signal<number>(1);
   readonly unitCost = signal<number>(0);
+  readonly batchNumber = signal<string>('');
+  readonly expiryDate = signal<string>('');
   readonly lineTotal = computed(() => this.quantity() * this.unitCost());
 
   constructor() {
@@ -320,10 +355,14 @@ export class PurchaseItemEntryModalComponent {
           v.customFields?.wholesalePrice != null ? v.customFields.wholesalePrice / 100 : 0,
         );
         this.quantity.set(1);
+        this.batchNumber.set('');
+        this.expiryDate.set('');
       } else if (p) {
         this.selectedVariant.set(null);
         this.quantity.set(1);
         this.unitCost.set(0);
+        this.batchNumber.set('');
+        this.expiryDate.set('');
       }
     });
   }
@@ -334,6 +373,8 @@ export class PurchaseItemEntryModalComponent {
       variant.customFields?.wholesalePrice != null ? variant.customFields.wholesalePrice / 100 : 0,
     );
     this.quantity.set(1);
+    this.batchNumber.set('');
+    this.expiryDate.set('');
   }
 
   allowFractional(): boolean {
@@ -358,10 +399,14 @@ export class PurchaseItemEntryModalComponent {
   handleAdd(): void {
     const sv = this.selectedVariant();
     if (!sv) return;
+    const bn = this.batchNumber().trim() || null;
+    const ed = this.expiryDate().trim() || null;
     this.itemAdded.emit({
       variant: sv,
       quantity: this.quantity(),
       unitCost: this.unitCost(),
+      batchNumber: bn ?? undefined,
+      expiryDate: ed ?? undefined,
     });
   }
 

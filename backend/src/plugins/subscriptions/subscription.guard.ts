@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
+import { Permission } from '@vendure/common/lib/generated-types';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
 import { getVendureRequestContext } from '../../infrastructure/audit/get-request-context';
 
@@ -40,6 +41,11 @@ export class SubscriptionGuard implements CanActivate {
       return true; // Allow all queries
     }
 
+    // Superadmins are never subject to subscription restrictions
+    if (ctx.userHasPermissions([Permission.SuperAdmin])) {
+      return true;
+    }
+
     // Get channel ID from context
     const channelId = ctx.channelId;
     if (!channelId) {
@@ -50,9 +56,12 @@ export class SubscriptionGuard implements CanActivate {
     // Get mutation name
     const mutationName = info.fieldName;
 
-    // Allow subscription-related mutations even if expired
+    // Allow auth mutations (user has no session yet during login/logout)
+    // and subscription-related mutations even if expired.
     // Also allow ML service mutations (they use service token auth, not user sessions)
     const subscriptionMutations = [
+      'login', // Must always be allowed — no session exists yet at login time
+      'logout',
       'initiateSubscriptionPurchase',
       'verifySubscriptionPayment',
       'cancelSubscription',

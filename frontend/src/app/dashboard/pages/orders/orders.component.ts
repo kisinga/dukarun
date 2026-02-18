@@ -12,6 +12,7 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { OrdersService } from '../../../core/services/orders.service';
+import { AnalyticsService } from '../../../core/services/analytics.service';
 import { PaginationComponent } from '../../components/shared/pagination.component';
 import { OrderAction, OrderCardComponent } from './components/order-card.component';
 import { PayOrderModalComponent, PayOrderModalData } from './components/pay-order-modal.component';
@@ -19,6 +20,11 @@ import { OrderStats, OrderStatsComponent } from './components/order-stats.compon
 import { OrderTableRowComponent } from './components/order-table-row.component';
 import { PageHeaderComponent } from '../../components/shared/page-header.component';
 import { ListSearchBarComponent } from '../../components/shared/list-search-bar.component';
+import {
+  PeriodSelectorComponent,
+  type AnalyticsPeriod,
+} from '../../components/shared/charts/period-selector.component';
+import { EchartContainerComponent } from '../../components/shared/charts/echart-container.component';
 
 /**
  * Orders list page - refactored with composable components
@@ -40,12 +46,15 @@ import { ListSearchBarComponent } from '../../components/shared/list-search-bar.
     PayOrderModalComponent,
     PageHeaderComponent,
     ListSearchBarComponent,
+    PeriodSelectorComponent,
+    EchartContainerComponent,
   ],
   templateUrl: './orders.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class OrdersComponent implements OnInit {
   private readonly ordersService = inject(OrdersService);
+  private readonly analyticsService = inject(AnalyticsService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -70,6 +79,24 @@ export class OrdersComponent implements OnInit {
   readonly pageOptions = [10, 25, 50, 100];
   readonly selectedOrderForPayment = signal<PayOrderModalData | null>(null);
   private readonly payOrderModal = viewChild(PayOrderModalComponent);
+
+  // Order volume trend (lazy, MV-backed)
+  readonly trendOpen = signal(false);
+  readonly trendPeriod = signal<AnalyticsPeriod>('30d');
+  readonly analyticsStats = this.analyticsService.stats;
+  readonly analyticsLoading = this.analyticsService.isLoading;
+  private trendFetched = false;
+  readonly orderVolumeChartOption = computed(() => {
+    const trend = this.analyticsStats()?.orderVolumeTrend ?? [];
+    const dates = trend.map((p) => p.date);
+    const values = trend.map((p) => p.value);
+    return {
+      xAxis: { type: 'category' as const, data: dates },
+      yAxis: { type: 'value' as const },
+      series: [{ type: 'bar' as const, data: values }],
+      grid: { left: '3%', right: '4%', bottom: '3%', top: '4%', containLabel: true },
+    };
+  });
 
   // Computed: filtered orders
   readonly filteredOrders = computed(() => {
@@ -372,6 +399,20 @@ export class OrdersComponent implements OnInit {
     if (filter === 'ArrangingPayment') return 'Unpaid';
     if (filter === 'PaymentSettled') return 'Paid';
     return '';
+  }
+
+  toggleOrderVolumeTrend(): void {
+    const opening = !this.trendOpen();
+    this.trendOpen.set(opening);
+    if (opening && !this.trendFetched) {
+      this.trendFetched = true;
+      void this.analyticsService.fetch(this.trendPeriod());
+    }
+  }
+
+  onTrendPeriodChange(period: AnalyticsPeriod): void {
+    this.trendPeriod.set(period);
+    void this.analyticsService.fetch(period);
   }
 
   /**

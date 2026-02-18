@@ -77,8 +77,7 @@ describe('ReconciliationService', () => {
       const createdReconciliation: Reconciliation = {
         id: 'recon-1',
         ...input,
-        rangeStart: new Date().toISOString().slice(0, 10),
-        rangeEnd: new Date().toISOString().slice(0, 10),
+        snapshotAt: new Date().toISOString().slice(0, 10),
         status: 'verified',
         varianceAmount: '50', // 1000 - 950
         createdBy: 1,
@@ -109,8 +108,7 @@ describe('ReconciliationService', () => {
       const createdReconciliation: Reconciliation = {
         id: 'recon-1',
         ...input,
-        rangeStart: new Date().toISOString().slice(0, 10),
-        rangeEnd: new Date().toISOString().slice(0, 10),
+        snapshotAt: new Date().toISOString().slice(0, 10),
         status: 'verified',
         varianceAmount: '-50', // 1000 - 1050
         createdBy: 1,

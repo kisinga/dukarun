@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext, TransactionalConnection } from '@vendure/core';
 import { AuditLog as AuditLogDecorator } from '../../infrastructure/audit/audit-log.decorator';
@@ -10,6 +9,7 @@ import { AccountingPeriod } from '../../domain/period/accounting-period.entity';
 import { Reconciliation } from '../../domain/recon/reconciliation.entity';
 import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import { JournalEntry } from '../../ledger/journal-entry.entity';
+import { JournalLine } from '../../ledger/journal-line.entity';
 import { PostingService } from '../../ledger/posting.service';
 import {
   CashCountResult,
@@ -27,6 +27,7 @@ import {
 import { ReconciliationValidatorService } from '../../services/financial/reconciliation-validator.service';
 import { ReconciliationService } from '../../services/financial/reconciliation.service';
 import { FinancialService } from '../../services/financial/financial.service';
+import { InventoryService } from '../../services/inventory/inventory.service';
 import {
   CloseAccountingPeriodPermission,
   CreateInterAccountTransferPermission,
@@ -50,6 +51,26 @@ interface CashDrawerCountGraphQL {
   countedByUserId: number;
 }
 
+/** Result shape for createInterAccountTransfer (matches GraphQL JournalEntry with lines.accountCode/accountName resolved). */
+interface JournalEntryResult {
+  id: string;
+  channelId: number;
+  entryDate: string;
+  postedAt: Date;
+  sourceType: string;
+  sourceId: string;
+  status: string;
+  memo: string | null;
+  lines: Array<{
+    id: string;
+    accountCode: string;
+    accountName: string;
+    debit: number;
+    credit: number;
+    meta: Record<string, unknown> | null;
+  }>;
+}
+
 @Resolver()
 export class PeriodManagementResolver {
   constructor(
@@ -62,7 +83,8 @@ export class PeriodManagementResolver {
     private readonly periodLockService: PeriodLockService,
     private readonly reconciliationValidatorService: ReconciliationValidatorService,
     private readonly chartOfAccountsService: ChartOfAccountsService,
-    private readonly financialService: FinancialService
+    private readonly financialService: FinancialService,
+    private readonly inventoryService: InventoryService
   ) {}
 
   @Query()
@@ -218,13 +240,27 @@ export class PeriodManagementResolver {
   async createInterAccountTransfer(
     @Ctx() ctx: RequestContext,
     @Args('input') input: any
-  ): Promise<JournalEntry> {
+  ): Promise<JournalEntryResult> {
     if (!input.transferId || typeof input.transferId !== 'string' || !input.transferId.trim()) {
       throw new Error('transferId is required for idempotent inter-account transfer.');
     }
     const sourceId = input.transferId.trim();
 
-    await this.periodLockService.validatePeriodIsOpen(ctx, input.channelId, input.entryDate);
+    const entryDate =
+      typeof input.entryDate === 'string' && input.entryDate.trim()
+        ? (() => {
+            const d = new Date(input.entryDate.trim());
+            if (Number.isNaN(d.getTime())) {
+              throw new Error('entryDate must be a valid date (e.g. YYYY-MM-DD).');
+            }
+            return d.toISOString().slice(0, 10);
+          })()
+        : null;
+    if (!entryDate) {
+      throw new Error('entryDate is required.');
+    }
+
+    await this.periodLockService.validatePeriodIsOpen(ctx, input.channelId, entryDate);
 
     await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, input.fromAccountCode);
     await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, input.toAccountCode);
@@ -281,12 +317,37 @@ export class PeriodManagementResolver {
 
     const entry = await this.postingService.post(ctx, 'inter-account-transfer', sourceId, {
       channelId: input.channelId,
-      entryDate: input.entryDate,
+      entryDate,
       memo: input.memo || 'Inter-account transfer for reconciliation',
       lines,
     });
 
-    return entry;
+    // Load lines with account so we can return accountCode/accountName (GraphQL JournalLine type)
+    const lineRepo = this.connection.getRepository(ctx, JournalLine);
+    const linesWithAccount = await lineRepo
+      .createQueryBuilder('line')
+      .innerJoinAndSelect('line.account', 'account')
+      .where('line.entryId = :entryId', { entryId: entry.id })
+      .getMany();
+
+    return {
+      id: entry.id,
+      channelId: entry.channelId,
+      entryDate: entry.entryDate,
+      postedAt: entry.postedAt,
+      sourceType: entry.sourceType,
+      sourceId: entry.sourceId,
+      status: entry.status ?? 'posted',
+      memo: entry.memo ?? null,
+      lines: linesWithAccount.map(line => ({
+        id: line.id,
+        accountCode: line.account.code,
+        accountName: line.account.name,
+        debit: parseInt(line.debit, 10),
+        credit: parseInt(line.credit, 10),
+        meta: line.meta ?? null,
+      })),
+    };
   }
 
   // ============================================================================
@@ -532,20 +593,29 @@ export class PeriodManagementResolver {
     return this.reconciliationService.getAccountBalancesAsOf(ctx, channelId, asOfDate);
   }
 
-  private static readonly logger = new Logger('PeriodManagementResolver');
-
   @Query()
   @Allow(Permission.ReadOrder)
   async sessionReconciliationDetails(
     @Ctx() ctx: RequestContext,
     @Args('sessionId') sessionId: string,
-    @Args('kind', { nullable: true }) kind?: string
+    @Args('kind', { nullable: true }) kind?: string,
+    @Args('channelId', { nullable: true }) channelId?: number
   ) {
-    PeriodManagementResolver.logger.log(
-      `sessionReconciliationDetails called sessionId=${sessionId} kind=${kind}`
-    );
+    const trimmed = typeof sessionId === 'string' ? sessionId.trim() : '';
+    if (!trimmed || trimmed === '-1') {
+      return [];
+    }
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(trimmed)) {
+      return [];
+    }
     const reconKind = kind === 'opening' ? 'opening' : 'closing';
-    return this.reconciliationService.getSessionReconciliationDetails(ctx, sessionId, reconKind);
+    return this.reconciliationService.getSessionReconciliationDetails(
+      ctx,
+      trimmed,
+      reconKind,
+      channelId
+    );
   }
 
   @Query()
@@ -582,6 +652,36 @@ export class PeriodManagementResolver {
       take,
       skip,
     });
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async openBatchesForVariant(
+    @Ctx() ctx: RequestContext,
+    @Args('productVariantId') productVariantId: string,
+    @Args('stockLocationId', { nullable: true }) stockLocationId?: string
+  ): Promise<
+    Array<{
+      id: string;
+      quantity: number;
+      unitCost: number;
+      expiryDate: Date | null;
+      batchNumber: string | null;
+    }>
+  > {
+    const channelId = ctx.channelId as number;
+    const batches = await this.inventoryService.getOpenBatches(ctx, {
+      channelId,
+      stockLocationId: stockLocationId ?? undefined,
+      productVariantId,
+    });
+    return batches.map(b => ({
+      id: String(b.id),
+      quantity: b.quantity,
+      unitCost: b.unitCost,
+      expiryDate: b.expiryDate,
+      batchNumber: b.batchNumber ?? null,
+    }));
   }
 
   // ============================================================================

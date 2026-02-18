@@ -25,10 +25,19 @@ import { PurchasePostingStrategy } from '../../services/financial/strategies/pur
 import { SalePostingStrategy } from '../../services/financial/strategies/sale-posting.strategy';
 import { InventoryReconciliationService } from '../../services/financial/inventory-reconciliation.service';
 import { LedgerQueryService } from '../../services/financial/ledger-query.service';
+import { AnalyticsQueryService } from '../../services/analytics/analytics-query.service';
 import { PeriodEndClosingService } from '../../services/financial/period-end-closing.service';
 import { PeriodLockService } from '../../services/financial/period-lock.service';
 import { ReconciliationValidatorService } from '../../services/financial/reconciliation-validator.service';
 import { ReconciliationService } from '../../services/financial/reconciliation.service';
+import { InventoryBatch } from '../../services/inventory/entities/inventory-batch.entity';
+import { InventoryMovement } from '../../services/inventory/entities/inventory-movement.entity';
+import { SaleCogs } from '../../services/inventory/entities/sale-cogs.entity';
+import { InventoryService } from '../../services/inventory/inventory.service';
+import { InventoryStoreService } from '../../services/inventory/inventory-store.service';
+import { InventoryStore } from '../../services/inventory/interfaces/inventory-store.interface';
+import { DefaultExpiryPolicy } from '../../services/inventory/policies/default-expiry.policy';
+import { FifoCostingStrategy } from '../../services/inventory/strategies/fifo-costing.strategy';
 import { PurchasePayment } from '../../services/stock/entities/purchase-payment.entity';
 import { DashboardStatsResolver } from './dashboard-stats.resolver';
 import { DASHBOARD_STATS_SCHEMA } from './dashboard-stats.schema';
@@ -65,9 +74,17 @@ const COMBINED_SCHEMA = gql`
     PeriodLock,
     AccountingPeriod,
     PurchasePayment,
+    InventoryBatch,
+    InventoryMovement,
+    SaleCogs,
   ],
   providers: [
     PostingService,
+    InventoryStoreService,
+    { provide: 'InventoryStore', useClass: InventoryStoreService },
+    FifoCostingStrategy,
+    DefaultExpiryPolicy,
+    InventoryService,
     ChartOfAccountsService,
     ChannelPaymentMethodService,
     DashboardStatsResolver,
@@ -75,6 +92,7 @@ const COMBINED_SCHEMA = gql`
     ReconciliationResolver,
     PeriodManagementResolver,
     LedgerQueryService,
+    AnalyticsQueryService,
     AccountBalanceService,
     PeriodLockService,
     ReconciliationService,

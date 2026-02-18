@@ -180,8 +180,7 @@ export class ReconciliationService {
         channelId: input.channelId,
         scope: 'manual',
         scopeRefId: input.scopeRefId,
-        rangeStart: today,
-        rangeEnd: today,
+        snapshotAt: today,
         status: 'verified',
         expectedBalance: String(expectedSum),
         actualBalance: String(actualSum),
@@ -241,8 +240,7 @@ export class ReconciliationService {
       channelId: input.channelId,
       scope: input.scope,
       scopeRefId: input.scopeRefId,
-      rangeStart: snapshotDate,
-      rangeEnd: snapshotDate,
+      snapshotAt: snapshotDate,
       status: 'verified',
       expectedBalance: input.expectedBalance || null,
       actualBalance: input.actualBalance,
@@ -305,12 +303,11 @@ export class ReconciliationService {
   ): Promise<ReconciliationStatus> {
     const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
 
-    // Find all reconciliations that cover this period end date
+    // Find reconciliations whose snapshot is at this period end date
     const reconciliations = await reconciliationRepo
       .createQueryBuilder('reconciliation')
       .where('reconciliation.channelId = :channelId', { channelId })
-      .andWhere('reconciliation.rangeStart <= :periodEndDate', { periodEndDate })
-      .andWhere('reconciliation.rangeEnd >= :periodEndDate', { periodEndDate })
+      .andWhere('reconciliation.snapshotAt = :periodEndDate', { periodEndDate })
       .getMany();
 
     // Build scope status list
@@ -435,15 +432,14 @@ export class ReconciliationService {
       .getRepository(ctx, Reconciliation)
       .createQueryBuilder('r')
       .where('r.channelId = :channelId', { channelId })
-      .orderBy('r.rangeEnd', 'DESC')
-      .addOrderBy('r.rangeStart', 'DESC')
+      .orderBy('r.snapshotAt', 'DESC')
       .addOrderBy('r.id', 'DESC');
 
     if (options?.startDate) {
-      qb.andWhere('r.rangeEnd >= :startDate', { startDate: options.startDate });
+      qb.andWhere('r.snapshotAt >= :startDate', { startDate: options.startDate });
     }
     if (options?.endDate) {
-      qb.andWhere('r.rangeStart <= :endDate', { endDate: options.endDate });
+      qb.andWhere('r.snapshotAt <= :endDate', { endDate: options.endDate });
     }
     if (options?.scope) {
       qb.andWhere('r.scope = :scope', { scope: options.scope });
@@ -523,7 +519,7 @@ export class ReconciliationService {
           ctx,
           account.code,
           reconciliation.channelId,
-          reconciliation.rangeEnd
+          reconciliation.snapshotAt
         );
         expectedStr = String(balance.balance);
         const expected = BigInt(expectedStr);
@@ -561,13 +557,9 @@ export class ReconciliationService {
       varianceCents: string | null;
     }>
   > {
-    if (!reconciliationId || reconciliationId === '-1') {
-      return [];
-    }
+    if (!reconciliationId || reconciliationId === '-1') return [];
     const trimmedId = String(reconciliationId).trim();
     if (!trimmedId || trimmedId === '-1') return [];
-
-    this.logger.log(`getReconciliationDetails requested reconciliationId=${trimmedId}`);
 
     let reconciliation: Reconciliation | null = null;
     try {
@@ -575,10 +567,7 @@ export class ReconciliationService {
       reconciliation = await reconciliationRepo.findOne({
         where: { id: trimmedId },
       });
-      if (!reconciliation) {
-        this.logger.warn(`getReconciliationDetails reconciliation not found: ${trimmedId}`);
-        return [];
-      }
+      if (!reconciliation) return [];
 
       const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
       let rows: Array<ReconciliationAccount & { account?: Account | null }>;
@@ -587,13 +576,9 @@ export class ReconciliationService {
           where: { reconciliationId: trimmedId },
           relations: ['account'],
         });
-      } catch (e) {
-        this.logger.warn(`getReconciliationDetails junction find failed: ${trimmedId}`, e);
+      } catch {
         rows = [];
       }
-      this.logger.log(
-        `getReconciliationDetails reconciliationId=${trimmedId} junctionRows=${rows.length}`
-      );
 
       const result: Array<{
         accountId: string;
@@ -615,7 +600,7 @@ export class ReconciliationService {
             ctx,
             account.code,
             reconciliation.channelId,
-            reconciliation.rangeEnd
+            reconciliation.snapshotAt
           );
           expectedStr = String(balance.balance);
           const expected = BigInt(expectedStr);
@@ -637,18 +622,12 @@ export class ReconciliationService {
       // When no junction rows: for cash-session scope, derive per-account details from channel config.
       if (result.length === 0 && reconciliation.scope === 'cash-session') {
         const derived = await this.deriveCashSessionDetails(ctx, reconciliation);
-        if (derived.length > 0) {
-          this.logger.log(
-            `getReconciliationDetails derived ${derived.length} rows from session config reconciliationId=${trimmedId}`
-          );
-          return derived;
-        }
+        if (derived.length > 0) return derived;
       }
 
       // Fallback: when no per-account junction rows (legacy, inventory, or empty manual),
       // return a summary row so the user sees expected/actual/variance.
       if (result.length === 0) {
-        this.logger.log(`getReconciliationDetails fallback summary reconciliationId=${trimmedId}`);
         const expected = reconciliation.expectedBalance ?? null;
         const actual = reconciliation.actualBalance ?? null;
         const variance = reconciliation.varianceAmount ?? null;
@@ -664,7 +643,6 @@ export class ReconciliationService {
 
       return result;
     } catch (e) {
-      this.logger.warn(`getReconciliationDetails error: ${trimmedId}`, e);
       if (reconciliation) {
         return [
           {
@@ -687,13 +665,15 @@ export class ReconciliationService {
 
   /**
    * Get per-account reconciliation details for a cashier session.
-   * @param kind - 'opening' = reconciliation at session open (first by rangeStart); 'closing' = at close (first by rangeEnd DESC). Default 'closing'.
+   * @param kind - 'opening' = reconciliation at session open (first by snapshotAt ASC); 'closing' = at close (first by snapshotAt DESC). Default 'closing'.
+   * @param channelId - Optional. When provided, filters by channel so the reconciliation belongs to the requested channel.
    * Returns [] if no matching reconciliation exists or if sessionId is not a valid UUID.
    */
   async getSessionReconciliationDetails(
     ctx: RequestContext,
     sessionId: string,
-    kind: 'opening' | 'closing' = 'closing'
+    kind: 'opening' | 'closing' = 'closing',
+    channelId?: number
   ): Promise<
     Array<{
       accountId: string;
@@ -706,21 +686,20 @@ export class ReconciliationService {
   > {
     const trimmed = typeof sessionId === 'string' ? sessionId.trim() : '';
     if (!trimmed || trimmed === '-1' || !ReconciliationService.UUID_REGEX.test(trimmed)) {
-      this.logger.warn(
-        `getSessionReconciliationDetails: invalid sessionId (rejected), kind=${kind}`
-      );
       return [];
     }
     const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
 
     // Primary: kind-specific scopeRefId (new format: sessionId:opening or sessionId:closing)
     const kindRef = toScopeRefId({ scope: 'cash-session', sessionId: trimmed, kind });
-    let list = await reconciliationRepo
+    let qb = reconciliationRepo
       .createQueryBuilder('r')
       .where('r.scope = :scope', { scope: 'cash-session' })
-      .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: kindRef })
-      .take(1)
-      .getMany();
+      .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: kindRef });
+    if (channelId != null && !Number.isNaN(channelId)) {
+      qb = qb.andWhere('r.channelId = :channelId', { channelId });
+    }
+    let list = await qb.take(1).getMany();
 
     // Fallback: legacy bare sessionId (for records created before kind suffix was added)
     if (list.length === 0) {
@@ -729,18 +708,49 @@ export class ReconciliationService {
         .createQueryBuilder('r')
         .where('r.scope = :scope', { scope: 'cash-session' })
         .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: legacyRef });
+      if (channelId != null && !Number.isNaN(channelId)) {
+        legacyQb.andWhere('r.channelId = :channelId', { channelId });
+      }
       if (kind === 'opening') {
-        legacyQb.orderBy('r.rangeStart', 'ASC').addOrderBy('r.rangeEnd', 'ASC');
+        legacyQb.orderBy('r.snapshotAt', 'ASC');
       } else {
-        legacyQb.orderBy('r.rangeEnd', 'DESC').addOrderBy('r.rangeStart', 'DESC');
+        legacyQb.orderBy('r.snapshotAt', 'DESC');
       }
       list = await legacyQb.take(1).getMany();
     }
 
+    // If channelId was provided and we still have nothing, try without channel filter so we can
+    // return data when reconciliation exists but was stored with a different channelId (data fix can follow).
+    if (list.length === 0 && channelId != null && !Number.isNaN(channelId)) {
+      const unscopeQb = reconciliationRepo
+        .createQueryBuilder('r')
+        .where('r.scope = :scope', { scope: 'cash-session' })
+        .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: kindRef });
+      if (kind === 'opening') {
+        unscopeQb.orderBy('r.snapshotAt', 'ASC');
+      } else {
+        unscopeQb.orderBy('r.snapshotAt', 'DESC');
+      }
+      let unscopeList = await unscopeQb.take(2).getMany();
+      if (unscopeList.length === 0) {
+        const legacyRef = toScopeRefId({ scope: 'cash-session', sessionId: trimmed });
+        const legacyUnscopeQb = reconciliationRepo
+          .createQueryBuilder('r')
+          .where('r.scope = :scope', { scope: 'cash-session' })
+          .andWhere('r.scopeRefId = :scopeRefId', { scopeRefId: legacyRef });
+        if (kind === 'opening') {
+          legacyUnscopeQb.orderBy('r.snapshotAt', 'ASC');
+        } else {
+          legacyUnscopeQb.orderBy('r.snapshotAt', 'DESC');
+        }
+        unscopeList = await legacyUnscopeQb.take(2).getMany();
+      }
+      if (unscopeList.length === 1) {
+        list = unscopeList;
+      }
+    }
+
     const reconciliation = list[0];
-    this.logger.log(
-      `getSessionReconciliationDetails sessionId=${sessionId} kind=${kind} found=${!!reconciliation} reconciliationId=${reconciliation?.id ?? 'n/a'}`
-    );
     if (!reconciliation) return [];
     return this.getReconciliationDetails(ctx, reconciliation.id);
   }

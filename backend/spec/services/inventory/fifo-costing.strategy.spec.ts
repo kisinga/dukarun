@@ -44,6 +44,47 @@ describe('FifoCostingStrategy', () => {
   });
 
   describe('allocateCost', () => {
+    it('should request batches with orderBy createdAt for strict FIFO', async () => {
+      const { strategy, inventoryStore } = buildService();
+      const batches: InventoryBatch[] = [
+        {
+          id: 'batch-1',
+          channelId: 1,
+          stockLocationId: 2,
+          productVariantId: 3,
+          quantity: 100,
+          unitCost: 5000,
+          expiryDate: null,
+          sourceType: 'Purchase',
+          sourceId: 'purchase-1',
+          metadata: null,
+          createdAt: new Date('2024-01-01'),
+          updatedAt: new Date('2024-01-01'),
+        },
+      ];
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue(batches);
+
+      const request: CostAllocationRequest = {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 10,
+        sourceType: 'Order',
+        sourceId: 'order-123',
+      };
+
+      await strategy.allocateCost(ctx, request);
+
+      expect(inventoryStore.getOpenBatchesForConsumption).toHaveBeenCalledWith(ctx, {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        maxQuantity: 10,
+        excludeExpired: false,
+        orderBy: 'createdAt',
+      });
+    });
+
     it('should allocate from oldest batches first', async () => {
       const { strategy, inventoryStore } = buildService();
 

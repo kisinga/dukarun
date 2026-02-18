@@ -1,5 +1,14 @@
 import { Channel, ProductVariant, StockLocation } from '@vendure/core';
-import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Check,
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 /**
  * Inventory Batch Entity
@@ -13,9 +22,15 @@ import { Column, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeor
  * - sourceType + sourceId provide idempotency
  */
 @Entity('inventory_batch')
-@Index(['channelId', 'stockLocationId', 'productVariantId', 'createdAt'])
-@Index(['channelId', 'sourceType', 'sourceId'])
-@Index(['expiryDate'])
+@Check('CHK_inventory_batch_quantity_non_negative', '"quantity" >= 0')
+@Index('IDX_inventory_batch_channel_location_variant_created', [
+  'channelId',
+  'stockLocationId',
+  'productVariantId',
+  'createdAt',
+])
+@Index('IDX_inventory_batch_channel_source', ['channelId', 'sourceType', 'sourceId'])
+@Index('IDX_inventory_batch_expiry', ['expiryDate'])
 export class InventoryBatch {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -53,12 +68,16 @@ export class InventoryBatch {
   @Column({ type: 'varchar', length: 255 })
   sourceId!: string; // e.g., purchase ID, adjustment ID
 
+  /** Optional supplier lot or batch number for traceability */
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  batchNumber!: string | null;
+
   @Column({ type: 'jsonb', nullable: true })
   metadata!: Record<string, any> | null;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn()
   createdAt!: Date;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @UpdateDateColumn()
   updatedAt!: Date;
 }

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   ID,
   ProductVariant,
@@ -7,6 +7,7 @@ import {
   TransactionalConnection,
   UserInputError,
 } from '@vendure/core';
+import { InventoryService } from '../inventory/inventory.service';
 
 export interface StockMovementResult {
   variantId: ID;
@@ -26,7 +27,10 @@ export interface StockMovementResult {
 export class StockMovementService {
   private readonly logger = new Logger('StockMovementService');
 
-  constructor(private readonly connection: TransactionalConnection) {}
+  constructor(
+    private readonly connection: TransactionalConnection,
+    @Optional() private readonly inventoryService?: InventoryService
+  ) {}
 
   /**
    * Adjust stock level for a variant at a specific location
@@ -91,6 +95,21 @@ export class StockMovementService {
       `Stock adjusted: variant=${variantId}, location=${locationId}, ` +
         `change=${quantityChange}, previous=${previousStock}, new=${newStock}, reason=${reason}`
     );
+
+    if (newStock > 0 && this.inventoryService) {
+      try {
+        await this.inventoryService.ensureOpeningStockBatchIfNeeded(
+          ctx,
+          variantId,
+          locationId,
+          newStock
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Opening stock batch creation failed for variant ${variantId}: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
 
     return {
       variantId,

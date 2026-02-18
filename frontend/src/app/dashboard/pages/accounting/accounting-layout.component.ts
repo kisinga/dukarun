@@ -3,9 +3,9 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 const ACCOUNTING_TABS: { path: string; label: string }[] = [
-  { path: 'ledger', label: 'Ledger' },
   { path: 'expenses', label: 'Expenses' },
   { path: 'transfers', label: 'Inter-account transfers' },
+  { path: 'ledger', label: 'Ledger' },
 ];
 
 @Component({

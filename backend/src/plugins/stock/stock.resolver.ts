@@ -19,6 +19,8 @@ interface RecordPurchaseInput {
     quantity: number;
     unitCost: number;
     stockLocationId: string;
+    batchNumber?: string | null;
+    expiryDate?: Date | string | null;
   }>;
   isCreditPurchase?: boolean;
   payment?: {
@@ -39,6 +41,8 @@ interface UpdateDraftPurchaseInput {
     quantity: number;
     unitCost: number;
     stockLocationId: string;
+    batchNumber?: string | null;
+    expiryDate?: Date | string | null;
   }>;
 }
 

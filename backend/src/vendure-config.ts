@@ -34,6 +34,7 @@ import {
 import { FractionalQuantityPlugin } from './plugins/inventory/fractional-quantity.plugin';
 import { LedgerPlugin } from './plugins/ledger/ledger.plugin';
 import { MlModelPlugin } from './plugins/ml/ml-model.plugin';
+import { AnalyticsPlugin } from './plugins/analytics/analytics.plugin';
 import { CacheSyncPlugin } from './plugins/cache-sync/cache-sync.plugin';
 import { NotificationPlugin } from './plugins/notifications/notification.plugin';
 import { OverridePricePermission } from './plugins/pricing/price-override.permission';
@@ -1490,6 +1491,7 @@ export const config: VendureConfig = {
     ApprovalPlugin,
     AuditCorePlugin, // AuditService only (no GraphQL). Required by LedgerPlugin and AuditPlugin.
     LedgerPlugin, // Load before CreditPlugin - provides PostingService
+    AnalyticsPlugin, // Product-level analytics via materialized views
     StockPlugin, // Load before CreditPlugin so StockPurchase type is available
     CreditPlugin, // Depends on LedgerPlugin
     CustomerPlugin, // Customer duplicate prevention

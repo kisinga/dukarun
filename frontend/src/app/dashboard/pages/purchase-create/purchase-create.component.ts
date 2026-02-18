@@ -44,7 +44,7 @@ import { PurchasePaymentSectionComponent } from './components/purchase-payment-s
     RejectionBannerComponent,
   ],
   template: `
-    <div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger pb-20 lg:pb-6">
+    <div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger pb-32 lg:pb-28">
       <app-page-header
         title="Record Purchase"
         subtitle="Add supplier, items, and payment details"
@@ -396,6 +396,8 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
     variant: ProductVariant;
     quantity: number;
     unitCost: number;
+    batchNumber?: string | null;
+    expiryDate?: string | null;
   }): void {
     const defaultLocation = this.stockLocations()[0];
     if (!defaultLocation) return;
@@ -405,6 +407,8 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
       quantity: event.quantity,
       unitCost: event.unitCost,
       stockLocationId: defaultLocation.id,
+      batchNumber: event.batchNumber ?? undefined,
+      expiryDate: event.expiryDate ?? undefined,
     };
     this.purchaseService.addPurchaseItemLocal(lineItem);
     this.closeItemEntryModal();

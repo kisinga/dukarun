@@ -4,6 +4,7 @@ import {
   Component,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -14,6 +15,12 @@ import {
   type ReconciliationAccountDetail,
 } from '../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../core/services/company.service';
+
+/** Cached reconciliation details for a shift (opening and/or closing). */
+export interface ShiftReconciliationDetails {
+  opening: ReconciliationAccountDetail[];
+  closing: ReconciliationAccountDetail[];
+}
 
 @Component({
   selector: 'app-shifts',
@@ -28,25 +35,23 @@ export class ShiftsComponent implements OnInit {
   private readonly companyService = inject(CompanyService);
 
   readonly currentSession = this.cashierSessionService.currentSession;
-  readonly sessions = this.cashierSessionService.sessions;
-  readonly totalSessions = this.cashierSessionService.totalSessions;
-  readonly isLoading = this.cashierSessionService.isLoading;
   readonly error = this.cashierSessionService.error;
 
+  /** Shifts list (sessions). */
+  readonly sessions = signal<CashierSession[]>([]);
+  readonly sessionsTotal = signal(0);
+  readonly sessionsLoading = signal(false);
   readonly sessionsPage = signal(1);
-  readonly pageSize = signal(20);
-  readonly pageSizeOptions = [10, 20, 50, 100] as const;
-
-  /** Expand session row: which session id is expanded (null = none). */
-  readonly expandedSessionId = signal<string | null>(null);
-  /** Cached per-account details by session id (lazy-loaded on expand). */
-  readonly sessionDetailsCache = signal<Record<string, ReconciliationAccountDetail[]>>({});
-  /** Session id currently loading details. */
-  readonly loadingDetailsSessionId = signal<string | null>(null);
+  readonly sessionsPageSize = 25;
 
   /** Opening reconciliation details for the current (open) session – loaded when there is an active session. */
   readonly currentSessionOpeningDetails = signal<ReconciliationAccountDetail[] | null>(null);
   readonly loadingCurrentOpeningDetails = signal(false);
+
+  /** Expandable row: which session id is expanded (null = none). Per-shift reconciliation details cache. */
+  readonly expandedSessionId = signal<string | null>(null);
+  readonly shiftDetailsCache = signal<Record<string, ShiftReconciliationDetails>>({});
+  readonly loadingDetailsSessionId = signal<string | null>(null);
 
   readonly channelId = computed(() => {
     const id = this.companyService.activeCompanyId();
@@ -55,44 +60,26 @@ export class ShiftsComponent implements OnInit {
 
   readonly hasActiveSession = this.cashierSessionService.hasActiveSession;
 
-  readonly totalPages = computed(() => {
-    const total = this.totalSessions();
-    const size = this.pageSize();
-    return Math.max(1, Math.ceil(total / size));
-  });
+  private static readonly UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  /** Page numbers to show in pagination (max 7 slots; use -1 for ellipsis). */
-  readonly pageNumbers = computed(() => {
-    const current = this.sessionsPage();
-    const total = this.totalPages();
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-    const pages: number[] = [];
-    let start = Math.max(1, current - 3);
-    let end = Math.min(total, start + 6);
-    if (end - start < 6) start = Math.max(1, end - 6);
-    if (start > 1) pages.push(1);
-    if (start > 2) pages.push(-1);
-    for (let p = start; p <= end; p++) pages.push(p);
-    if (end < total - 1) pages.push(-1);
-    if (end < total) pages.push(total);
-    return pages;
-  });
-
-  /** "Showing 1–20 of 45" range (1-based). */
-  readonly rangeStart = computed(() => {
-    const page = this.sessionsPage();
-    const size = this.pageSize();
-    const total = this.totalSessions();
-    if (total === 0) return 0;
-    return (page - 1) * size + 1;
-  });
-
-  readonly rangeEnd = computed(() => {
-    const page = this.sessionsPage();
-    const size = this.pageSize();
-    const total = this.totalSessions();
-    return Math.min(page * size, total);
-  });
+  constructor() {
+    // Load opening details whenever currentSession becomes available (same pattern as reconciliation
+    // history: details load when the parent context is ready). Current session is set asynchronously
+    // by CashierSessionService when channel loads, so we must react to it here instead of only in load().
+    effect(() => {
+      const channelId = this.channelId();
+      const session = this.cashierSessionService.currentSession();
+      if (!channelId) return;
+      const sid = session?.id != null ? String(session.id).trim() : '';
+      const valid = sid !== '' && sid !== '-1' && ShiftsComponent.UUID_REGEX.test(sid);
+      if (valid) {
+        this.loadCurrentSessionOpeningDetails(sid);
+      } else {
+        this.currentSessionOpeningDetails.set(null);
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.load();
@@ -102,50 +89,140 @@ export class ShiftsComponent implements OnInit {
     const channelId = this.channelId();
     if (!channelId) return;
 
-    // Open/close status is loaded globally by CashierSessionService when channel is set
+    // Opening details are driven by effect(); here we only refresh if we already have a session.
     const session = this.cashierSessionService.currentSession();
-    const sid = session?.id != null ? String(session.id) : '';
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sid);
-    if (isUuid) this.loadCurrentSessionOpeningDetails(sid);
-    else this.currentSessionOpeningDetails.set(null);
-    this.loadSessions(channelId);
+    const sid = session?.id != null ? String(session.id).trim() : '';
+    const isValidSessionId = sid !== '' && sid !== '-1' && ShiftsComponent.UUID_REGEX.test(sid);
+    if (isValidSessionId) {
+      this.loadCurrentSessionOpeningDetails(sid);
+    } else {
+      this.currentSessionOpeningDetails.set(null);
+    }
+    this.loadSessions();
   }
 
   /** Load opening reconciliation details for the current session (variances at open). Shown at top when there is an open shift. */
   loadCurrentSessionOpeningDetails(sessionId: string): void {
+    if (!sessionId || sessionId === '-1' || !ShiftsComponent.UUID_REGEX.test(sessionId)) {
+      this.currentSessionOpeningDetails.set(null);
+      return;
+    }
     this.loadingCurrentOpeningDetails.set(true);
     this.currentSessionOpeningDetails.set(null);
-    this.cashierSessionService.getSessionReconciliationDetails(sessionId, 'opening').subscribe({
-      next: (details) => {
-        this.currentSessionOpeningDetails.set(details);
-        this.loadingCurrentOpeningDetails.set(false);
-      },
-      error: () => this.loadingCurrentOpeningDetails.set(false),
-    });
+    const channelId = this.channelId();
+    this.cashierSessionService
+      .getSessionReconciliationDetails(sessionId, 'opening', channelId || undefined)
+      .subscribe({
+        next: (details) => {
+          // Only apply if this is still the current session (avoid stale response overwriting).
+          const current = this.cashierSessionService.currentSession();
+          if (current && String(current.id).trim() === sessionId) {
+            this.currentSessionOpeningDetails.set(details);
+          }
+          this.loadingCurrentOpeningDetails.set(false);
+        },
+        error: () => this.loadingCurrentOpeningDetails.set(false),
+      });
   }
 
-  loadSessions(channelId: number): void {
+  loadSessions(): void {
+    const channelId = this.channelId();
+    if (!channelId) return;
+    this.sessionsLoading.set(true);
     const page = this.sessionsPage();
-    const size = this.pageSize();
-    this.cashierSessionService
-      .getSessions(channelId, {
-        take: size,
-        skip: (page - 1) * size,
-      })
-      .subscribe();
+    const take = this.sessionsPageSize;
+    const skip = (page - 1) * take;
+    this.cashierSessionService.getSessions(channelId, { take, skip }).subscribe({
+      next: (res) => {
+        this.sessions.set(res.items ?? []);
+        this.sessionsTotal.set(res.totalItems ?? 0);
+        this.sessionsLoading.set(false);
+      },
+      error: () => {
+        this.sessions.set([]);
+        this.sessionsTotal.set(0);
+        this.sessionsLoading.set(false);
+      },
+    });
   }
 
   onSessionsPageChange(page: number): void {
     this.sessionsPage.set(page);
-    const channelId = this.channelId();
-    if (channelId) this.loadSessions(channelId);
+    this.loadSessions();
   }
 
-  onPageSizeChange(newSize: number): void {
-    this.pageSize.set(newSize);
-    this.sessionsPage.set(1);
+  readonly sessionsTotalPages = computed(() => {
+    const total = this.sessionsTotal();
+    const size = this.sessionsPageSize;
+    return Math.ceil(total / size) || 1;
+  });
+
+  readonly sessionsPageNumbers = computed(() => {
+    const total = this.sessionsTotalPages();
+    return Array.from({ length: total }, (_, i) => i + 1);
+  });
+
+  isSessionExpanded(session: CashierSession): boolean {
+    return this.expandedSessionId() === session.id;
+  }
+
+  getShiftDetails(session: CashierSession): ShiftReconciliationDetails | undefined {
+    return this.shiftDetailsCache()[session.id];
+  }
+
+  toggleExpand(session: CashierSession): void {
+    const id = session?.id;
+    if (id == null || id === '' || id === '-1') return;
+    const current = this.expandedSessionId();
+    if (current === id) {
+      this.expandedSessionId.set(null);
+      return;
+    }
+    this.expandedSessionId.set(id);
+    const cache = this.shiftDetailsCache();
+    if (cache[id] !== undefined) {
+      return;
+    }
+    this.loadShiftDetails(id);
+  }
+
+  /** Load opening and closing reconciliation details for a shift (lazy on expand). */
+  loadShiftDetails(sessionId: string): void {
+    if (!sessionId || sessionId === '-1' || !ShiftsComponent.UUID_REGEX.test(sessionId)) {
+      return;
+    }
     const channelId = this.channelId();
-    if (channelId) this.loadSessions(channelId);
+    this.loadingDetailsSessionId.set(sessionId);
+    const done = (
+      opening: ReconciliationAccountDetail[],
+      closing: ReconciliationAccountDetail[],
+    ) => {
+      this.shiftDetailsCache.update((c) => ({
+        ...c,
+        [sessionId]: { opening, closing },
+      }));
+      this.loadingDetailsSessionId.set(null);
+    };
+    this.cashierSessionService
+      .getSessionReconciliationDetails(sessionId, 'opening', channelId || undefined)
+      .subscribe({
+        next: (opening) => {
+          this.cashierSessionService
+            .getSessionReconciliationDetails(sessionId, 'closing', channelId || undefined)
+            .subscribe({
+              next: (closing) => done(opening, closing),
+              error: () => done(opening, []),
+            });
+        },
+        error: () => {
+          this.cashierSessionService
+            .getSessionReconciliationDetails(sessionId, 'closing', channelId || undefined)
+            .subscribe({
+              next: (closing) => done([], closing),
+              error: () => done([], []),
+            });
+        },
+      });
   }
 
   formatDateTime(dateStr: string): string {
@@ -156,45 +233,6 @@ export class ShiftsComponent implements OnInit {
       hour: '2-digit',
       minute: '2-digit',
     });
-  }
-
-  sessionStatus(session: CashierSession): string {
-    return session.closedAt ? 'Closed' : 'Open';
-  }
-
-  isExpanded(session: CashierSession): boolean {
-    const sessionId = typeof session.id === 'string' ? session.id.trim() : String(session.id);
-    return this.expandedSessionId() === sessionId;
-  }
-
-  toggleExpand(session: CashierSession): void {
-    const sessionId = typeof session.id === 'string' ? session.id.trim() : String(session.id);
-    const current = this.expandedSessionId();
-    if (current === sessionId) {
-      this.expandedSessionId.set(null);
-      return;
-    }
-    this.expandedSessionId.set(sessionId);
-    const cache = this.sessionDetailsCache();
-    if (cache[sessionId] !== undefined) {
-      return;
-    }
-    if (!session.closedAt) {
-      return;
-    }
-    this.loadingDetailsSessionId.set(sessionId);
-    this.cashierSessionService.getSessionReconciliationDetails(sessionId, 'closing').subscribe({
-      next: (details) => {
-        this.sessionDetailsCache.update((c) => ({ ...c, [sessionId]: details }));
-        this.loadingDetailsSessionId.set(null);
-      },
-      error: () => this.loadingDetailsSessionId.set(null),
-    });
-  }
-
-  getSessionDetails(session: CashierSession): ReconciliationAccountDetail[] {
-    const sessionId = typeof session.id === 'string' ? session.id.trim() : String(session.id);
-    return this.sessionDetailsCache()[sessionId] ?? [];
   }
 
   /** Format amount in cents for display (e.g. "12345" → "123.45"). */

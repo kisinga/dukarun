@@ -37,7 +37,7 @@ export class PurchaseMetricsService {
           };
         };
       }>({
-        query: GET_DASHBOARD_STATS,
+        query: GET_DASHBOARD_STATS as import('graphql').DocumentNode,
         fetchPolicy: 'network-only', // Always fetch fresh data from ledger
       });
 
