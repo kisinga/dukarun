@@ -67,7 +67,43 @@ export const SUBSCRIPTION_SCHEMA = gql`
     checkSubscriptionStatus(channelId: ID): SubscriptionStatus!
   }
 
+  input CreateSubscriptionTierInput {
+    code: String!
+    name: String!
+    description: String
+    priceMonthly: Int!
+    priceYearly: Int!
+    features: JSON
+    isActive: Boolean
+  }
+
+  input UpdateSubscriptionTierInput {
+    id: ID!
+    code: String
+    name: String
+    description: String
+    priceMonthly: Int
+    priceYearly: Int
+    features: JSON
+    isActive: Boolean
+  }
+
   extend type Mutation {
+    """
+    Create subscription tier (SuperAdmin only)
+    """
+    createSubscriptionTier(input: CreateSubscriptionTierInput!): SubscriptionTier!
+
+    """
+    Update subscription tier (SuperAdmin only)
+    """
+    updateSubscriptionTier(input: UpdateSubscriptionTierInput!): SubscriptionTier!
+
+    """
+    Deactivate subscription tier (SuperAdmin only)
+    """
+    deactivateSubscriptionTier(id: ID!): Boolean!
+
     """
     Initiate subscription purchase
     """
@@ -134,6 +170,52 @@ export class SubscriptionResolver {
     }
 
     return this.subscriptionService.checkSubscriptionStatus(ctx, String(channelId));
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async createSubscriptionTier(
+    @Ctx() ctx: RequestContext,
+    @Args('input')
+    input: {
+      code: string;
+      name: string;
+      description?: string;
+      priceMonthly: number;
+      priceYearly: number;
+      features?: any;
+      isActive?: boolean;
+    }
+  ): Promise<SubscriptionTier> {
+    return this.subscriptionService.createSubscriptionTier(ctx, input);
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async updateSubscriptionTier(
+    @Ctx() ctx: RequestContext,
+    @Args('input')
+    input: {
+      id: string;
+      code?: string;
+      name?: string;
+      description?: string;
+      priceMonthly?: number;
+      priceYearly?: number;
+      features?: any;
+      isActive?: boolean;
+    }
+  ): Promise<SubscriptionTier> {
+    return this.subscriptionService.updateSubscriptionTier(ctx, input);
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async deactivateSubscriptionTier(
+    @Ctx() ctx: RequestContext,
+    @Args('id') id: string
+  ): Promise<boolean> {
+    return this.subscriptionService.deleteSubscriptionTier(ctx, id);
   }
 
   @Mutation()

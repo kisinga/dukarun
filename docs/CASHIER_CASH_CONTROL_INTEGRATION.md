@@ -18,10 +18,12 @@ This document explains the relationship between **Cash Control** and **Cashier F
 
 ### Cashier Flow
 
-**Cashier Flow** is an order approval workflow that:
+**Cashier Flow** is intended as an order approval workflow that:
 - Keeps orders in `ArrangingPayment` state until approved
 - Requires cashier approval before order completion
 - Tracks cashier session status (`cashierOpen`)
+
+**Current implementation note:** The channel setting `cashierFlowEnabled` exists and is used in the UI (e.g. sell/checkout). Backend logic does **not** currently gate order completion on cashier approval—orders are not held in a pending state until a cashier (or approver) explicitly approves. To implement the gate: add a state or flag (e.g. order custom field or a dedicated state) and block transition to PaymentSettled/Fulfilled when `cashierFlowEnabled` is true until an explicit "cashier approve" action (or an approval request of type e.g. `order_completion`) is performed. The same approval/event pattern used by ApprovalPlugin can be reused. See `docs/INTERNAL_APPROVAL_WORKFLOWS.md` for the approval pipeline.
 
 ## Current State
 

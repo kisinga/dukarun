@@ -1505,13 +1505,13 @@ export const config: VendureConfig = {
     AuditCorePlugin, // AuditService only (no GraphQL). Required by LedgerPlugin and AuditPlugin.
     LedgerPlugin, // Load before CreditPlugin - provides PostingService
     AnalyticsPlugin, // Product-level analytics via materialized views
-    SuperAdminPlugin, // Platform operator API (platformChannels, platformStats, etc.)
+    AuditPlugin, // Adds auditLogs query and AuditLog/AuditLogOptions types. Must be before SuperAdminPlugin.
+    SuperAdminPlugin, // Platform operator API (platformChannels, platformStats, auditLogsForChannel, etc.)
     StockPlugin, // Load before CreditPlugin so StockPurchase type is available
     CreditPlugin, // Depends on LedgerPlugin
     CustomerPlugin, // Customer duplicate prevention
     SubscriptionPlugin,
     ChannelEventsPlugin,
-    AuditPlugin, // Adds auditLogs query and event subscriber
     // PhoneAuthPlugin must be registered early so its strategy can be added to adminAuthenticationStrategy
     PhoneAuthPlugin,
     AssetServerPlugin.init({

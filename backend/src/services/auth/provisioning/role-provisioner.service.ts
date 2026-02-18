@@ -30,6 +30,7 @@ import {
   CreateInterAccountTransferPermission,
 } from '../../../plugins/ledger/permissions';
 import { ManageSupplierCreditPurchasesPermission } from '../../../plugins/credit/supplier-credit.permissions';
+import { ManageApprovalsPermission } from '../../../plugins/approval/approval.plugin';
 
 /**
  * Role Template Definitions
@@ -98,6 +99,7 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
       CreateInterAccountTransferPermission.Permission as Permission,
       ManageSupplierCreditPurchasesPermission.Permission as Permission,
       ReverseOrderPermission.Permission as Permission,
+      ManageApprovalsPermission.Permission as Permission,
     ],
   },
   cashier: {
@@ -113,6 +115,7 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
       Permission.ReadProduct,
       ApproveCustomerCreditPermission.Permission as Permission,
       ManageReconciliationPermission.Permission as Permission,
+      ManageApprovalsPermission.Permission as Permission,
     ],
   },
   accountant: {
@@ -237,6 +240,7 @@ export class RoleProvisionerService {
     CreateInterAccountTransferPermission.Permission as Permission,
     ManageSupplierCreditPurchasesPermission.Permission as Permission,
     ReverseOrderPermission.Permission as Permission,
+    ManageApprovalsPermission.Permission as Permission,
   ];
 
   constructor(

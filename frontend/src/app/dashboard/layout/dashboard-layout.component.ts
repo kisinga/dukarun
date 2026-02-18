@@ -35,6 +35,7 @@ import {
   UserAvatarButtonComponent,
 } from '../components/shared';
 import type { NavItem, NavSection } from './nav.types';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-dashboard-layout',
@@ -127,7 +128,12 @@ export class DashboardLayoutComponent implements OnInit {
             route: '/dashboard/accounting',
             visible: () => hasSettings,
           },
-          // { label: 'Approvals', icon: 'approvals', route: '/dashboard/approvals' },
+          {
+            label: 'Approvals',
+            icon: 'approvals',
+            route: '/dashboard/approvals',
+            visible: () => auth.hasManageApprovalsPermission(),
+          },
         ],
       },
       {
@@ -176,6 +182,8 @@ export class DashboardLayoutComponent implements OnInit {
 
   // Subscription status
   protected readonly isTrialActive = this.subscriptionService.isTrialActive;
+  protected readonly hasSuperAdminPermission = this.authService.hasSuperAdminPermission;
+  protected readonly vendureAdminUrl = (): string => environment.vendureAdminUrl ?? '/admin';
 
   /** Whether to show Settings link in footer (requires UpdateSettings permission). */
   protected hasSettingsForFooter(): boolean {

@@ -13,10 +13,12 @@ export interface ApprovalRequest {
   channelId: string;
   type: string;
   status: 'pending' | 'approved' | 'rejected';
+  dueAt: string | null;
   requestedById: string;
   reviewedById: string | null;
   reviewedAt: string | null;
   message: string | null;
+  rejectionReasonCode: string | null;
   metadata: Record<string, any>;
   entityType: string | null;
   entityId: string | null;
@@ -81,6 +83,7 @@ export class ApprovalService {
     metadata?: Record<string, any>;
     entityType?: string;
     entityId?: string;
+    dueAt?: string;
   }): Promise<ApprovalRequest> {
     const client = this.apolloService.getClient();
     const result = await client.mutate({
@@ -97,6 +100,7 @@ export class ApprovalService {
     id: string;
     action: 'approved' | 'rejected';
     message?: string;
+    rejectionReasonCode?: string;
   }): Promise<ApprovalRequest> {
     const client = this.apolloService.getClient();
     const result = await client.mutate({

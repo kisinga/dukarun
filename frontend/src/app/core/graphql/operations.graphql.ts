@@ -3310,10 +3310,12 @@ export const GET_APPROVAL_REQUESTS = graphql(`
         channelId
         type
         status
+        dueAt
         requestedById
         reviewedById
         reviewedAt
         message
+        rejectionReasonCode
         metadata
         entityType
         entityId
@@ -3332,10 +3334,12 @@ export const GET_APPROVAL_REQUEST = graphql(`
       channelId
       type
       status
+      dueAt
       requestedById
       reviewedById
       reviewedAt
       message
+      rejectionReasonCode
       metadata
       entityType
       entityId
@@ -3353,10 +3357,12 @@ export const GET_MY_APPROVAL_REQUESTS = graphql(`
         channelId
         type
         status
+        dueAt
         requestedById
         reviewedById
         reviewedAt
         message
+        rejectionReasonCode
         metadata
         entityType
         entityId

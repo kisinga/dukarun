@@ -29,6 +29,7 @@ import { CommunicationPlugin } from '../communication/communication.plugin';
     ChannelAdminService,
     ChannelPaymentService,
   ],
+  exports: [ChannelSettingsService, ChannelAdminService],
   adminApiExtensions: {
     resolvers: [ChannelSettingsResolver],
     schema: channelSettingsSchema,

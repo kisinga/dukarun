@@ -20,9 +20,40 @@ Frontend: ApprovalService → ApprovableFormBase → Component
 | `below_wholesale` | Selling below wholesale price | `orderId`, `variantId`, `price`, `wholesalePrice` |
 | `order_reversal` | Reversing a completed order | `orderId`, `reason`, `amount` |
 
+## Rejection reason codes
+
+When rejecting a request, reviewers can optionally set a structured reason (stored in `rejectionReasonCode`). Used for consistent feedback and reporting.
+
+| Code | Label |
+|------|--------|
+| `policy` | Policy |
+| `insufficient_info` | Insufficient information |
+| `other` | Other |
+
+New codes can be added by extending the entity/input and the frontend dropdown; keep labels in sync in the notification subscriber and Approvals page.
+
+## SLA and reminders
+
+Approval requests support an optional `dueAt` (date/time). A future scheduler or job can query `approval_request` where `status = 'pending'` and `dueAt < now()` (or `dueAt` within the next N hours) to send reminders or fire an `approval.due` event. No built-in reminder engine in core—schema and events anticipate it.
+
 ## Adding a New Approval Type
 
-### 1. Backend: Trigger the approval
+### 1. Backend: Register a handler (when approval has a side effect on approve)
+
+If "approve" should trigger a side effect (e.g. run order reversal), register a handler in your plugin's `onModuleInit`:
+
+```typescript
+// Inject ApprovalHandlerRegistry (from ApprovalPlugin) and your service
+this.approvalHandlerRegistry.register('your_type', {
+  onApproved: async (ctx, request) => {
+    // e.g. call yourService.doThing(ctx, request.entityId);
+  },
+});
+```
+
+Overdraft has no handler (the flow is validated at submit time when `approvalId` is present). Order reversal registers a handler that calls `OrderReversalService.reverseOrder`.
+
+### 2. Backend: Trigger the approval
 
 In your service, throw a `UserInputError` with a recognizable message when the condition is met. The frontend catches this and offers the user an approval request option.
 
@@ -41,7 +72,7 @@ if (input.approvalId && this.approvalService) {
 }
 ```
 
-### 2. Backend: Handle approval in notification subscriber
+### 3. Backend: Handle approval in notification subscriber
 
 In `notification.subscriber.ts`, add your type's route to `getApprovalSourceRoute()`:
 
@@ -55,7 +86,7 @@ private getApprovalSourceRoute(type: string): string {
 }
 ```
 
-### 3. Frontend: Catch the error and create request
+### 4. Frontend: Catch the error and create request
 
 ```typescript
 try {

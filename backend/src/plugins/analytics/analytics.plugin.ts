@@ -14,6 +14,7 @@ import { ANALYTICS_STATS_SCHEMA } from './analytics-stats.schema';
     AnalyticsRefreshScheduler,
     AnalyticsStatsResolver,
   ],
+  exports: [AnalyticsQueryService],
   adminApiExtensions: {
     schema: ANALYTICS_STATS_SCHEMA,
     resolvers: [AnalyticsStatsResolver],
