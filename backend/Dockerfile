@@ -40,25 +40,14 @@ WORKDIR /usr/src/app
 
 ENV NODE_ENV=production
 
-# Copy node_modules from builder (already has all deps that built successfully)
-# Re-running npm ci in prod was missing packages; copying guarantees consistency
-COPY --from=builder /app/package.json /app/package-lock.json ./
-COPY --from=builder /app/backend/package.json backend/
-COPY --from=builder /app/frontend/package.json frontend/
-COPY --from=builder /app/ml-trainer/package.json ml-trainer/
+# Preserve workspace layout so Node resolves backend/node_modules (p-limit, etc.)
 COPY --from=builder /app/node_modules ./node_modules
-
-RUN npm prune --omit=dev
-
-COPY --from=builder /app/backend/dist ./dist
+COPY --from=builder /app/backend ./backend
 COPY --from=builder /app/backend/static ./static
 RUN mkdir -p static/assets/cache static/uploads
 
 RUN echo "Verifying production files:" && \
-    ls -la dist/ && \
-    if [ ! -f "dist/src/index.js" ]; then echo "❌ dist/src/index.js not found in production stage!"; exit 1; fi && \
-    if [ ! -f "dist/src/index-worker.js" ]; then echo "❌ dist/src/index-worker.js not found in production stage!"; exit 1; fi && \
-    if [ ! -f "dist/src/entrypoint.js" ]; then echo "❌ dist/src/entrypoint.js not found in production stage!"; exit 1; fi && \
+    test -f backend/dist/src/index.js && test -f backend/dist/src/entrypoint.js && \
     echo "✅ Production stage verification successful"
 
 RUN addgroup -g 1001 -S vendure && \
@@ -72,4 +61,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 EXPOSE 3000
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/src/entrypoint.js"]
+CMD ["node", "backend/dist/src/entrypoint.js"]
