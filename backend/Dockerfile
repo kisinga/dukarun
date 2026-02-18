@@ -38,18 +38,17 @@ FROM node:22-alpine
 
 RUN apk add --no-cache wget dumb-init
 
-WORKDIR /usr/src/app
-
 ENV NODE_ENV=production
 
 # Preserve workspace layout so Node resolves backend/node_modules (p-limit, etc.)
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/backend ./backend
-COPY --from=builder /app/backend/static ./static
-RUN mkdir -p static/assets/cache static/uploads
+COPY --from=builder /app/node_modules /usr/src/app/node_modules
+COPY --from=builder /app/backend /usr/src/app/backend
+RUN mkdir -p /usr/src/app/backend/static/assets/cache /usr/src/app/backend/static/uploads
+
+WORKDIR /usr/src/app/backend
 
 RUN echo "Verifying production files:" && \
-    test -f backend/dist/src/index.js && test -f backend/dist/src/entrypoint.js && \
+    test -f dist/src/index.js && test -f dist/src/entrypoint.js && \
     echo "✅ Production stage verification successful"
 
 RUN addgroup -g 1001 -S vendure && \
@@ -63,4 +62,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 EXPOSE 3000
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "backend/dist/src/entrypoint.js"]
+CMD ["node", "dist/src/entrypoint.js"]
