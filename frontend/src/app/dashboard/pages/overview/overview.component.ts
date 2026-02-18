@@ -127,6 +127,9 @@ export class OverviewComponent implements OnInit {
   protected readonly avgMarginTarget = computed(() =>
     Math.round(this.analyticsStats()?.averageProfitMargin ?? 0),
   );
+  protected readonly totalRevenueTarget = computed(() =>
+    Math.round((this.analyticsStats()?.totalRevenue ?? 0) / 100),
+  );
 
   constructor() {
     effect(
@@ -253,4 +256,5 @@ export class OverviewComponent implements OnInit {
   }
 
   readonly formatPercent = (v: number): string => `${v.toFixed(1)}%`;
+  readonly formatRevenue = (v: number): string => this.currencyService.format(v * 100);
 }
