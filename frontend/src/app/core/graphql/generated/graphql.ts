@@ -259,11 +259,13 @@ export type ApprovalRequest = {
   __typename?: 'ApprovalRequest';
   channelId: Scalars['ID']['output'];
   createdAt: Scalars['DateTime']['output'];
+  dueAt?: Maybe<Scalars['DateTime']['output']>;
   entityId?: Maybe<Scalars['String']['output']>;
   entityType?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   message?: Maybe<Scalars['String']['output']>;
   metadata?: Maybe<Scalars['JSON']['output']>;
+  rejectionReasonCode?: Maybe<Scalars['String']['output']>;
   requestedById: Scalars['ID']['output'];
   reviewedAt?: Maybe<Scalars['DateTime']['output']>;
   reviewedById?: Maybe<Scalars['ID']['output']>;
@@ -701,6 +703,7 @@ export type ChannelCustomFields = {
   paystackSubscriptionCode?: Maybe<Scalars['String']['output']>;
   requireOpeningCount?: Maybe<Scalars['Boolean']['output']>;
   status?: Maybe<Scalars['String']['output']>;
+  stockValueCache?: Maybe<Scalars['String']['output']>;
   subscriptionExpiredReminderSentAt?: Maybe<Scalars['DateTime']['output']>;
   subscriptionExpiresAt?: Maybe<Scalars['DateTime']['output']>;
   subscriptionStartedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -777,6 +780,7 @@ export type ChannelFilterParameter = {
   pricesIncludeTax?: InputMaybe<BooleanOperators>;
   requireOpeningCount?: InputMaybe<BooleanOperators>;
   status?: InputMaybe<StringOperators>;
+  stockValueCache?: InputMaybe<StringOperators>;
   subscriptionExpiredReminderSentAt?: InputMaybe<DateOperators>;
   subscriptionExpiresAt?: InputMaybe<DateOperators>;
   subscriptionStartedAt?: InputMaybe<DateOperators>;
@@ -867,6 +871,7 @@ export type ChannelSortParameter = {
   paystackSubscriptionCode?: InputMaybe<SortOrder>;
   requireOpeningCount?: InputMaybe<SortOrder>;
   status?: InputMaybe<SortOrder>;
+  stockValueCache?: InputMaybe<SortOrder>;
   subscriptionExpiredReminderSentAt?: InputMaybe<SortOrder>;
   subscriptionExpiresAt?: InputMaybe<SortOrder>;
   subscriptionStartedAt?: InputMaybe<SortOrder>;
@@ -888,6 +893,14 @@ export type ChannelSubscription = {
   subscriptionStartedAt?: Maybe<Scalars['DateTime']['output']>;
   tier?: Maybe<SubscriptionTier>;
   trialEndsAt?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type ChannelsByStatus = {
+  __typename?: 'ChannelsByStatus';
+  APPROVED: Scalars['Int']['output'];
+  BANNED: Scalars['Int']['output'];
+  DISABLED: Scalars['Int']['output'];
+  UNAPPROVED: Scalars['Int']['output'];
 };
 
 export type CloseCashierSessionInput = {
@@ -1193,6 +1206,7 @@ export type CreateAdministratorInput = {
 };
 
 export type CreateApprovalRequestInput = {
+  dueAt?: InputMaybe<Scalars['DateTime']['input']>;
   entityId?: InputMaybe<Scalars['String']['input']>;
   entityType?: InputMaybe<Scalars['String']['input']>;
   metadata?: InputMaybe<Scalars['JSON']['input']>;
@@ -1265,6 +1279,7 @@ export type CreateChannelCustomFieldsInput = {
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
+  stockValueCache?: InputMaybe<Scalars['String']['input']>;
   subscriptionExpiredReminderSentAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionExpiresAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionStartedAt?: InputMaybe<Scalars['DateTime']['input']>;
@@ -1554,6 +1569,16 @@ export type CreateStockLocationInput = {
   customFields?: InputMaybe<Scalars['JSON']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
+};
+
+export type CreateSubscriptionTierInput = {
+  code: Scalars['String']['input'];
+  description?: InputMaybe<Scalars['String']['input']>;
+  features?: InputMaybe<Scalars['JSON']['input']>;
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  name: Scalars['String']['input'];
+  priceMonthly: Scalars['Int']['input'];
+  priceYearly: Scalars['Int']['input'];
 };
 
 export type CreateTagInput = {
@@ -3787,6 +3812,8 @@ export type Mutation = {
   /** Create a new ShippingMethod */
   createShippingMethod: ShippingMethod;
   createStockLocation: StockLocation;
+  /** Create subscription tier (SuperAdmin only) */
+  createSubscriptionTier: SubscriptionTier;
   /** Create a new Tag */
   createTag: Tag;
   /** Create a new TaxCategory */
@@ -3795,6 +3822,8 @@ export type Mutation = {
   createTaxRate: TaxRate;
   /** Create a new Zone */
   createZone: Zone;
+  /** Deactivate subscription tier (SuperAdmin only) */
+  deactivateSubscriptionTier: Scalars['Boolean']['output'];
   /** Delete an Administrator */
   deleteAdministrator: DeletionResponse;
   /** Delete multiple Administrators */
@@ -3888,6 +3917,7 @@ export type Mutation = {
    */
   duplicateEntity: DuplicateEntityResult;
   explainVariance: CashDrawerCount;
+  extendTrialPlatform: Channel;
   /** Manually trigger photo extraction */
   extractPhotosForTraining: Scalars['Boolean']['output'];
   flushBufferedJobs: Success;
@@ -4013,9 +4043,11 @@ export type Mutation = {
   /** Update an existing Channel */
   updateChannel: UpdateChannelResult;
   updateChannelAdmin: Administrator;
+  updateChannelFeatureFlagsPlatform: Channel;
   updateChannelLogo: ChannelSettings;
   updateChannelPaymentMethod: PaymentMethod;
   updateChannelStatus: Channel;
+  updateChannelStatusPlatform: Channel;
   /** Update an existing Collection */
   updateCollection: Collection;
   /** Update an existing Country */
@@ -4065,6 +4097,8 @@ export type Mutation = {
   /** Update an existing ShippingMethod */
   updateShippingMethod: ShippingMethod;
   updateStockLocation: StockLocation;
+  /** Update subscription tier (SuperAdmin only) */
+  updateSubscriptionTier: SubscriptionTier;
   updateSupplierCreditDuration: SupplierCreditSummary;
   updateSupplierCreditLimit: SupplierCreditSummary;
   /** Update an existing Tag */
@@ -4084,6 +4118,7 @@ export type Mutation = {
   verifyRegistrationOTP: RegistrationResult;
   /** Verify subscription payment */
   verifySubscriptionPayment: Scalars['Boolean']['output'];
+  voidOrder: OrderReversalResult;
 };
 
 export type MutationAddCustomersToGroupArgs = {
@@ -4362,6 +4397,10 @@ export type MutationCreateStockLocationArgs = {
   input: CreateStockLocationInput;
 };
 
+export type MutationCreateSubscriptionTierArgs = {
+  input: CreateSubscriptionTierInput;
+};
+
 export type MutationCreateTagArgs = {
   input: CreateTagInput;
 };
@@ -4376,6 +4415,10 @@ export type MutationCreateTaxRateArgs = {
 
 export type MutationCreateZoneArgs = {
   input: CreateZoneInput;
+};
+
+export type MutationDeactivateSubscriptionTierArgs = {
+  id: Scalars['ID']['input'];
 };
 
 export type MutationDeleteAdministratorArgs = {
@@ -4578,6 +4621,11 @@ export type MutationDuplicateEntityArgs = {
 export type MutationExplainVarianceArgs = {
   countId: Scalars['String']['input'];
   reason: Scalars['String']['input'];
+};
+
+export type MutationExtendTrialPlatformArgs = {
+  channelId: Scalars['ID']['input'];
+  trialEndsAt: Scalars['DateTime']['input'];
 };
 
 export type MutationExtractPhotosForTrainingArgs = {
@@ -4884,6 +4932,10 @@ export type MutationUpdateChannelAdminArgs = {
   permissions: Array<Scalars['String']['input']>;
 };
 
+export type MutationUpdateChannelFeatureFlagsPlatformArgs = {
+  input: UpdateChannelFeatureFlagsInput;
+};
+
 export type MutationUpdateChannelLogoArgs = {
   logoAssetId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -4893,6 +4945,11 @@ export type MutationUpdateChannelPaymentMethodArgs = {
 };
 
 export type MutationUpdateChannelStatusArgs = {
+  channelId: Scalars['ID']['input'];
+  status: Scalars['String']['input'];
+};
+
+export type MutationUpdateChannelStatusPlatformArgs = {
   channelId: Scalars['ID']['input'];
   status: Scalars['String']['input'];
 };
@@ -5019,6 +5076,10 @@ export type MutationUpdateStockLocationArgs = {
   input: UpdateStockLocationInput;
 };
 
+export type MutationUpdateSubscriptionTierArgs = {
+  input: UpdateSubscriptionTierInput;
+};
+
 export type MutationUpdateSupplierCreditDurationArgs = {
   input: UpdateSupplierCreditDurationInput;
 };
@@ -5078,6 +5139,10 @@ export type MutationVerifyRegistrationOtpArgs = {
 export type MutationVerifySubscriptionPaymentArgs = {
   channelId: Scalars['ID']['input'];
   reference: Scalars['String']['input'];
+};
+
+export type MutationVoidOrderArgs = {
+  orderId: Scalars['ID']['input'];
 };
 
 export type NativeAuthInput = {
@@ -6030,6 +6095,33 @@ export type PermissionDefinition = {
   name: Scalars['String']['output'];
 };
 
+export type PlatformChannel = {
+  __typename?: 'PlatformChannel';
+  code: Scalars['String']['output'];
+  customFields: PlatformChannelCustomFields;
+  id: Scalars['ID']['output'];
+  token: Scalars['String']['output'];
+};
+
+export type PlatformChannelCustomFields = {
+  __typename?: 'PlatformChannelCustomFields';
+  cashControlEnabled: Scalars['Boolean']['output'];
+  cashierFlowEnabled: Scalars['Boolean']['output'];
+  enablePrinter: Scalars['Boolean']['output'];
+  maxAdminCount: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  subscriptionStatus?: Maybe<Scalars['String']['output']>;
+  trialEndsAt?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type PlatformStats = {
+  __typename?: 'PlatformStats';
+  activeSubscriptionsCount: Scalars['Int']['output'];
+  channelsByStatus: ChannelsByStatus;
+  totalChannels: Scalars['Int']['output'];
+  trialExpiringSoonCount: Scalars['Int']['output'];
+};
+
 export type PreviewCollectionVariantsInput = {
   filters: Array<ConfigurableOperationInput>;
   inheritFilters: Scalars['Boolean']['input'];
@@ -6600,11 +6692,13 @@ export type Query = {
   administratorByUserId?: Maybe<Administrator>;
   administrators: AdministratorList;
   analyticsStats: AnalyticsStats;
+  analyticsStatsForChannel: AnalyticsStats;
   /** Get a single Asset by id */
   asset?: Maybe<Asset>;
   /** Get a list of Assets */
   assets: AssetList;
   auditLogs: Array<AuditLog>;
+  auditLogsForChannel: Array<AuditLog>;
   cashierSession?: Maybe<CashierSessionSummary>;
   cashierSessions: CashierSessionList;
   channel?: Maybe<Channel>;
@@ -6687,6 +6781,8 @@ export type Query = {
   pendingSearchIndexUpdates: Scalars['Int']['output'];
   pendingVarianceReviews: Array<CashDrawerCount>;
   periodReconciliationStatus: ReconciliationStatus;
+  platformChannels: Array<PlatformChannel>;
+  platformStats: PlatformStats;
   /** Used for real-time previews of the contents of a Collection */
   previewCollectionVariants: ProductVariantList;
   /** Get a Product either by id or slug. If neither id nor slug is specified, an error will result. */
@@ -6732,6 +6828,7 @@ export type Query = {
   stockAdjustments: InventoryStockAdjustmentList;
   stockLocation?: Maybe<StockLocation>;
   stockLocations: StockLocationList;
+  stockValueStats: StockValueStats;
   supplierCreditSummary: SupplierCreditSummary;
   tag: Tag;
   tags: TagList;
@@ -6770,6 +6867,12 @@ export type QueryAnalyticsStatsArgs = {
   timeRange: AnalyticsTimeRange;
 };
 
+export type QueryAnalyticsStatsForChannelArgs = {
+  channelId: Scalars['ID']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  timeRange: AnalyticsTimeRange;
+};
+
 export type QueryAssetArgs = {
   id: Scalars['ID']['input'];
 };
@@ -6779,6 +6882,11 @@ export type QueryAssetsArgs = {
 };
 
 export type QueryAuditLogsArgs = {
+  options?: InputMaybe<AuditLogOptions>;
+};
+
+export type QueryAuditLogsForChannelArgs = {
+  channelId: Scalars['ID']['input'];
   options?: InputMaybe<AuditLogOptions>;
 };
 
@@ -7154,6 +7262,11 @@ export type QueryStockLocationsArgs = {
   options?: InputMaybe<StockLocationListOptions>;
 };
 
+export type QueryStockValueStatsArgs = {
+  forceRefresh?: InputMaybe<Scalars['Boolean']['input']>;
+  stockLocationId?: InputMaybe<Scalars['ID']['input']>;
+};
+
 export type QuerySupplierCreditSummaryArgs = {
   supplierId: Scalars['ID']['input'];
 };
@@ -7271,6 +7384,7 @@ export type RecordCashCountInput = {
 
 export type RecordExpenseInput = {
   amount: Scalars['Int']['input'];
+  category?: InputMaybe<Scalars['String']['input']>;
   memo?: InputMaybe<Scalars['String']['input']>;
   sourceAccountCode: Scalars['String']['input'];
 };
@@ -7519,6 +7633,7 @@ export type ReviewApprovalRequestInput = {
   action: Scalars['String']['input'];
   id: Scalars['ID']['input'];
   message?: InputMaybe<Scalars['String']['input']>;
+  rejectionReasonCode?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Role = Node & {
@@ -8112,6 +8227,14 @@ export type StockPurchaseList = {
   totalItems: Scalars['Int']['output'];
 };
 
+/** Stock value at retail, wholesale, and cost (cents). Cached per channel; use forceRefresh to recompute. */
+export type StockValueStats = {
+  __typename?: 'StockValueStats';
+  cost: Scalars['Float']['output'];
+  retail: Scalars['Float']['output'];
+  wholesale: Scalars['Float']['output'];
+};
+
 export type StringCustomFieldConfig = CustomField & {
   __typename?: 'StringCustomFieldConfig';
   deprecated?: Maybe<Scalars['Boolean']['output']>;
@@ -8615,6 +8738,7 @@ export type UpdateChannelCustomFieldsInput = {
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
+  stockValueCache?: InputMaybe<Scalars['String']['input']>;
   subscriptionExpiredReminderSentAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionExpiresAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionStartedAt?: InputMaybe<Scalars['DateTime']['input']>;
@@ -8622,6 +8746,14 @@ export type UpdateChannelCustomFieldsInput = {
   subscriptionTierId?: InputMaybe<Scalars['ID']['input']>;
   trialEndsAt?: InputMaybe<Scalars['DateTime']['input']>;
   varianceNotificationThreshold?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type UpdateChannelFeatureFlagsInput = {
+  cashControlEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  channelId: Scalars['ID']['input'];
+  enablePrinter?: InputMaybe<Scalars['Boolean']['input']>;
+  maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateChannelInput = {
@@ -8948,6 +9080,17 @@ export type UpdateStockLocationInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
   name?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateSubscriptionTierInput = {
+  code?: InputMaybe<Scalars['String']['input']>;
+  description?: InputMaybe<Scalars['String']['input']>;
+  features?: InputMaybe<Scalars['JSON']['input']>;
+  id: Scalars['ID']['input'];
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  priceMonthly?: InputMaybe<Scalars['Int']['input']>;
+  priceYearly?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateSupplierCreditDurationInput = {
@@ -10013,6 +10156,21 @@ export type GetDashboardStatsQuery = {
   };
 };
 
+export type GetStockValueStatsQueryVariables = Exact<{
+  stockLocationId?: InputMaybe<Scalars['ID']['input']>;
+  forceRefresh?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
+
+export type GetStockValueStatsQuery = {
+  __typename?: 'Query';
+  stockValueStats: {
+    __typename?: 'StockValueStats';
+    retail: number;
+    wholesale: number;
+    cost: number;
+  };
+};
+
 export type GetProductStatsQueryVariables = Exact<{ [key: string]: never }>;
 
 export type GetProductStatsQuery = {
@@ -10369,6 +10527,19 @@ export type TransitionOrderToStateMutation = {
     | null;
 };
 
+export type VoidOrderMutationVariables = Exact<{
+  orderId: Scalars['ID']['input'];
+}>;
+
+export type VoidOrderMutation = {
+  __typename?: 'Mutation';
+  voidOrder: {
+    __typename?: 'OrderReversalResult';
+    hadPayments: boolean;
+    order: { __typename?: 'Order'; id: string; code: string; state: string };
+  };
+};
+
 export type AddFulfillmentToOrderMutationVariables = Exact<{
   input: FulfillOrderInput;
 }>;
@@ -10520,6 +10691,7 @@ export type GetOrdersQuery = {
         method: string;
         createdAt: any;
       }> | null;
+      customFields?: { __typename?: 'OrderCustomFields'; reversedAt?: any | null } | null;
     }>;
   };
 };
@@ -10658,6 +10830,7 @@ export type GetOrderFullQuery = {
       createdAt: any;
       metadata?: any | null;
     }> | null;
+    customFields?: { __typename?: 'OrderCustomFields'; reversedAt?: any | null } | null;
     fulfillments?: Array<{
       __typename?: 'Fulfillment';
       id: string;
@@ -12734,10 +12907,12 @@ export type GetApprovalRequestsQuery = {
       channelId: string;
       type: string;
       status: string;
+      dueAt?: any | null;
       requestedById: string;
       reviewedById?: string | null;
       reviewedAt?: any | null;
       message?: string | null;
+      rejectionReasonCode?: string | null;
       metadata?: any | null;
       entityType?: string | null;
       entityId?: string | null;
@@ -12759,10 +12934,12 @@ export type GetApprovalRequestQuery = {
     channelId: string;
     type: string;
     status: string;
+    dueAt?: any | null;
     requestedById: string;
     reviewedById?: string | null;
     reviewedAt?: any | null;
     message?: string | null;
+    rejectionReasonCode?: string | null;
     metadata?: any | null;
     entityType?: string | null;
     entityId?: string | null;
@@ -12786,10 +12963,12 @@ export type GetMyApprovalRequestsQuery = {
       channelId: string;
       type: string;
       status: string;
+      dueAt?: any | null;
       requestedById: string;
       reviewedById?: string | null;
       reviewedAt?: any | null;
       message?: string | null;
+      rejectionReasonCode?: string | null;
       metadata?: any | null;
       entityType?: string | null;
       entityId?: string | null;
@@ -16458,6 +16637,57 @@ export const GetDashboardStatsDocument = {
     },
   ],
 } as unknown as DocumentNode<GetDashboardStatsQuery, GetDashboardStatsQueryVariables>;
+export const GetStockValueStatsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetStockValueStats' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'stockLocationId' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'forceRefresh' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Boolean' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'stockValueStats' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'stockLocationId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'stockLocationId' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'forceRefresh' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'forceRefresh' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'retail' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'wholesale' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'cost' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetStockValueStatsQuery, GetStockValueStatsQueryVariables>;
 export const GetProductStatsDocument = {
   kind: 'Document',
   definitions: [
@@ -17605,6 +17835,60 @@ export const TransitionOrderToStateDocument = {
   TransitionOrderToStateMutation,
   TransitionOrderToStateMutationVariables
 >;
+export const VoidOrderDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'VoidOrder' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'orderId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'voidOrder' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'orderId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'orderId' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'order' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'state' } },
+                    ],
+                  },
+                },
+                { kind: 'Field', name: { kind: 'Name', value: 'hadPayments' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<VoidOrderMutation, VoidOrderMutationVariables>;
 export const AddFulfillmentToOrderDocument = {
   kind: 'Document',
   definitions: [
@@ -18017,6 +18301,16 @@ export const GetOrdersDocument = {
                           ],
                         },
                       },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'customFields' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'reversedAt' } },
+                          ],
+                        },
+                      },
                     ],
                   },
                 },
@@ -18313,6 +18607,14 @@ export const GetOrderFullDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'metadata' } },
                     ],
+                  },
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'customFields' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [{ kind: 'Field', name: { kind: 'Name', value: 'reversedAt' } }],
                   },
                 },
                 {
@@ -24202,10 +24504,12 @@ export const GetApprovalRequestsDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'type' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'dueAt' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'requestedById' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'reviewedById' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'reviewedAt' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'message' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'rejectionReasonCode' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'metadata' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'entityType' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'entityId' } },
@@ -24260,10 +24564,12 @@ export const GetApprovalRequestDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'type' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'dueAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'requestedById' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'reviewedById' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'reviewedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'message' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'rejectionReasonCode' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'metadata' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'entityType' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'entityId' } },
@@ -24317,10 +24623,12 @@ export const GetMyApprovalRequestsDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'type' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'dueAt' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'requestedById' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'reviewedById' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'reviewedAt' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'message' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'rejectionReasonCode' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'metadata' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'entityType' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'entityId' } },

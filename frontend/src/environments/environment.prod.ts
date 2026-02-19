@@ -7,6 +7,7 @@ declare global {
       serviceName?: string;
       serviceVersion?: string;
       vapidPublicKey?: string;
+      vendureAdminUrl?: string;
     };
   }
 }
@@ -26,6 +27,7 @@ import { BRAND_CONFIG } from '../app/core/constants/brand.constants';
 export const environment = {
   production: true,
   apiUrl: '/admin-api', // Will use same origin in production
+  vendureAdminUrl: runtimeConfig.vendureAdminUrl ?? '/admin', // Backend Admin UI (same origin or override)
   // SigNoz Observability Configuration - injected at runtime via window.__APP_CONFIG__
   enableTracing: runtimeConfig.enableTracing ?? true,
   signozEndpoint: runtimeConfig.signozEndpoint ?? '/signoz/v1/traces',

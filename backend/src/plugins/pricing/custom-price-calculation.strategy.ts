@@ -30,8 +30,9 @@ export class CustomPriceCalculationStrategy implements OrderItemPriceCalculation
         );
       }
 
+      // Vendure expects price in smallest currency unit (cents). customLinePrice is line total in cents.
       return {
-        price: customLinePrice / 100 / quantity,
+        price: customLinePrice / quantity,
         priceIncludesTax: true,
       };
     }

@@ -8,6 +8,7 @@ import { MpesaVerification } from '../../domain/cashier/mpesa-verification.entit
 import { AccountingPeriod } from '../../domain/period/accounting-period.entity';
 import { Reconciliation } from '../../domain/recon/reconciliation.entity';
 import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
+import { EXPENSE_CATEGORY_CODES } from '../../ledger/expense-categories.constants';
 import { JournalEntry } from '../../ledger/journal-entry.entity';
 import { JournalLine } from '../../ledger/journal-line.entity';
 import { PostingService } from '../../ledger/posting.service';
@@ -163,13 +164,20 @@ export class PeriodManagementResolver {
   })
   async recordExpense(
     @Ctx() ctx: RequestContext,
-    @Args('input') input: { amount: number; sourceAccountCode: string; memo?: string }
+    @Args('input')
+    input: { amount: number; sourceAccountCode: string; memo?: string; category?: string }
   ): Promise<{ sourceId: string }> {
+    const category =
+      input.category && typeof input.category === 'string' ? input.category.trim() : undefined;
+    if (category !== undefined && category !== '' && !EXPENSE_CATEGORY_CODES.has(category)) {
+      throw new Error(`Invalid expense category: ${category}`);
+    }
     return this.financialService.recordExpense(
       ctx,
       input.amount,
       input.sourceAccountCode,
-      input.memo?.trim() || undefined
+      input.memo?.trim() || undefined,
+      category || undefined
     );
   }
 
@@ -463,7 +471,11 @@ export class PeriodManagementResolver {
     @Args('sessionId') sessionId: string,
     @Args('notes', { nullable: true }) notes?: string
   ): Promise<Reconciliation> {
-    return this.cashierSessionService.createSessionReconciliation(ctx, sessionId, notes);
+    return this.cashierSessionService.createSessionReconciliationWithVariancePosting(
+      ctx,
+      sessionId,
+      notes
+    );
   }
 
   // ============================================================================

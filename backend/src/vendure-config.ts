@@ -35,6 +35,7 @@ import { FractionalQuantityPlugin } from './plugins/inventory/fractional-quantit
 import { LedgerPlugin } from './plugins/ledger/ledger.plugin';
 import { MlModelPlugin } from './plugins/ml/ml-model.plugin';
 import { AnalyticsPlugin } from './plugins/analytics/analytics.plugin';
+import { SuperAdminPlugin } from './plugins/super-admin/super-admin.plugin';
 import { CacheSyncPlugin } from './plugins/cache-sync/cache-sync.plugin';
 import { NotificationPlugin } from './plugins/notifications/notification.plugin';
 import { OverridePricePermission } from './plugins/pricing/price-override.permission';
@@ -65,9 +66,21 @@ export const config: VendureConfig = {
     channelTokenKey: 'vendure-token',
     trustProxy: IS_PRODUCTION ? 1 : false,
     cors: {
-      origin: IS_PRODUCTION
-        ? env.app.frontendUrl?.split(',') || true
-        : ['http://localhost:4200', 'http://127.0.0.1:4200'],
+      origin: (() => {
+        if (IS_PRODUCTION) {
+          const origins = env.app.frontendUrl?.split(',').filter(Boolean) || [];
+          if (env.app.superAdminUrl) origins.push(env.app.superAdminUrl);
+          return origins.length ? origins : true;
+        }
+        const devOrigins = [
+          'http://localhost:4200',
+          'http://127.0.0.1:4200',
+          'http://localhost:4201',
+          'http://127.0.0.1:4201',
+        ];
+        if (env.app.superAdminUrl) devOrigins.push(env.app.superAdminUrl);
+        return devOrigins;
+      })(),
       credentials: true,
     },
     // Debug modes enabled only in development
@@ -355,6 +368,19 @@ export const config: VendureConfig = {
         public: true,
         nullable: false,
         ui: { tab: 'Settings' },
+      },
+      {
+        name: 'stockValueCache',
+        type: 'text',
+        label: [{ languageCode: LanguageCode.en, value: 'Stock Value Cache' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'Cached stock value stats (retail, wholesale, cost) as JSON; internal use only',
+          },
+        ],
+        public: false,
+        nullable: true,
       },
       {
         name: 'status',
@@ -1492,12 +1518,13 @@ export const config: VendureConfig = {
     AuditCorePlugin, // AuditService only (no GraphQL). Required by LedgerPlugin and AuditPlugin.
     LedgerPlugin, // Load before CreditPlugin - provides PostingService
     AnalyticsPlugin, // Product-level analytics via materialized views
+    AuditPlugin, // Adds auditLogs query and AuditLog/AuditLogOptions types. Must be before SuperAdminPlugin.
+    SuperAdminPlugin, // Platform operator API (platformChannels, platformStats, auditLogsForChannel, etc.)
     StockPlugin, // Load before CreditPlugin so StockPurchase type is available
     CreditPlugin, // Depends on LedgerPlugin
     CustomerPlugin, // Customer duplicate prevention
     SubscriptionPlugin,
     ChannelEventsPlugin,
-    AuditPlugin, // Adds auditLogs query and event subscriber
     // PhoneAuthPlugin must be registered early so its strategy can be added to adminAuthenticationStrategy
     PhoneAuthPlugin,
     AssetServerPlugin.init({

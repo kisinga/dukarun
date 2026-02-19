@@ -1,0 +1,32 @@
+<h1>Dashboard</h1>
+@if (loading()) {
+  <p>Loading…</p>
+}
+@if (error()) {
+  <p class="error">{{ error() }}</p>
+}
+@if (stats(); as s) {
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span class="stat-label">Total Channels</span>
+      <span class="stat-value">{{ s.totalChannels }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Approved</span>
+      <span class="stat-value">{{ s.channelsByStatus.APPROVED }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Unapproved</span>
+      <span class="stat-value">{{ s.channelsByStatus.UNAPPROVED }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Trial expiring soon (7d)</span>
+      <span class="stat-value">{{ s.trialExpiringSoonCount }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Active subscriptions</span>
+      <span class="stat-value">{{ s.activeSubscriptionsCount }}</span>
+    </div>
+  </div>
+  <p><a routerLink="/channels" class="link">View all channels →</a></p>
+}

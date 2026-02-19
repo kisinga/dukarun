@@ -147,6 +147,18 @@ The frontend uses a **channel-first** model (see `frontend/ARCHITECTURE.md`). At
 
 ---
 
+## Stock value at hand
+
+On the **dashboard Overview**, the **Product & Inventory** card shows a **Stock value (at hand)** row with three numbers:
+
+- **Retail** – Total value of current stock if sold at selling prices.
+- **Wholesale** – Total value at wholesale prices (variant custom field).
+- **Cost** – Total value at cost (from inventory batches; COGS basis).
+
+Values are cached per channel and refresh when stock or prices change; a refresh button forces an immediate recompute. Implementation and API details are in **[STOCK_VALUE_STATS.md](../STOCK_VALUE_STATS.md)** (source of truth for this feature).
+
+---
+
 ## Stock and Adjustments (Current & Future)
 
 ### 1. Current Stock Behaviour

@@ -206,6 +206,32 @@
                   <span class="text-sm font-semibold">Upgrade</span>
                 </a>
               }
+              @if (hasSuperAdminPermission()) {
+                <a
+                  [href]="vendureAdminUrl()"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-base-200/80 transition-colors cursor-pointer"
+                >
+                  <div class="w-7 h-7 rounded-lg bg-base-200 flex items-center justify-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-3.5 w-3.5 text-base-content/60"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                      />
+                    </svg>
+                  </div>
+                  <span class="text-sm">Vendure Admin</span>
+                </a>
+              }
             </div>
 
             <!-- Logout -->

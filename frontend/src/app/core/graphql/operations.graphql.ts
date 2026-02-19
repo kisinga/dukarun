@@ -877,6 +877,16 @@ export const GET_DASHBOARD_STATS = graphql(`
   }
 `);
 
+export const GET_STOCK_VALUE_STATS = graphql(`
+  query GetStockValueStats($stockLocationId: ID, $forceRefresh: Boolean) {
+    stockValueStats(stockLocationId: $stockLocationId, forceRefresh: $forceRefresh) {
+      retail
+      wholesale
+      cost
+    }
+  }
+`);
+
 export const GET_PRODUCT_STATS = graphql(`
   query GetProductStats {
     products(options: { take: 1 }) {
@@ -1193,6 +1203,19 @@ export const TRANSITION_ORDER_TO_STATE = graphql(`
   }
 `);
 
+export const VOID_ORDER = graphql(`
+  mutation VoidOrder($orderId: ID!) {
+    voidOrder(orderId: $orderId) {
+      order {
+        id
+        code
+        state
+      }
+      hadPayments
+    }
+  }
+`);
+
 export const ADD_FULFILLMENT_TO_ORDER = graphql(`
   mutation AddFulfillmentToOrder($input: FulfillOrderInput!) {
     addFulfillmentToOrder(input: $input) {
@@ -1383,6 +1406,9 @@ export const GET_ORDERS = graphql(`
           method
           createdAt
         }
+        customFields {
+          reversedAt
+        }
       }
       totalItems
     }
@@ -1502,6 +1528,9 @@ export const GET_ORDER_FULL = graphql(`
         method
         createdAt
         metadata
+      }
+      customFields {
+        reversedAt
       }
       fulfillments {
         id
@@ -3310,10 +3339,12 @@ export const GET_APPROVAL_REQUESTS = graphql(`
         channelId
         type
         status
+        dueAt
         requestedById
         reviewedById
         reviewedAt
         message
+        rejectionReasonCode
         metadata
         entityType
         entityId
@@ -3332,10 +3363,12 @@ export const GET_APPROVAL_REQUEST = graphql(`
       channelId
       type
       status
+      dueAt
       requestedById
       reviewedById
       reviewedAt
       message
+      rejectionReasonCode
       metadata
       entityType
       entityId
@@ -3353,10 +3386,12 @@ export const GET_MY_APPROVAL_REQUESTS = graphql(`
         channelId
         type
         status
+        dueAt
         requestedById
         reviewedById
         reviewedAt
         message
+        rejectionReasonCode
         metadata
         entityType
         entityId

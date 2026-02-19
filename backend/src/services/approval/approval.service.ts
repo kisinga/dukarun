@@ -1,19 +1,25 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { EventBus, RequestContext, TransactionalConnection, UserInputError } from '@vendure/core';
 import { ApprovalRequest } from '../../domain/approval/approval-request.entity';
+import { AuditService } from '../../infrastructure/audit/audit.service';
 import { ApprovalRequestEvent } from '../../infrastructure/events/custom-events';
+import { ApprovalHandlerRegistry } from './approval-handler.registry';
 
 export interface CreateApprovalRequestInput {
   type: string;
   metadata?: Record<string, any>;
   entityType?: string;
   entityId?: string;
+  /** Optional due date for SLA/reminders */
+  dueAt?: Date | string;
 }
 
 export interface ReviewApprovalRequestInput {
   id: string;
   action: 'approved' | 'rejected';
   message?: string;
+  /** Structured reason when rejecting: policy | insufficient_info | other */
+  rejectionReasonCode?: string;
 }
 
 export interface ApprovalRequestListOptions {
@@ -29,7 +35,9 @@ export class ApprovalService {
 
   constructor(
     private readonly connection: TransactionalConnection,
-    private readonly eventBus: EventBus
+    private readonly eventBus: EventBus,
+    private readonly approvalHandlerRegistry: ApprovalHandlerRegistry,
+    @Optional() private readonly auditService?: AuditService
   ) {}
 
   /**
@@ -45,10 +53,17 @@ export class ApprovalService {
     }
 
     const repo = this.connection.getRepository(ctx, ApprovalRequest);
+    const dueAt =
+      input.dueAt != null
+        ? typeof input.dueAt === 'string'
+          ? new Date(input.dueAt)
+          : input.dueAt
+        : null;
     const request = repo.create({
       channelId: ctx.channelId as number,
       type: input.type,
       status: 'pending',
+      dueAt: dueAt ?? undefined,
       requestedById: String(userId),
       metadata: input.metadata ?? {},
       entityType: input.entityType ?? null,
@@ -115,9 +130,26 @@ export class ApprovalService {
     request.reviewedById = String(reviewerId);
     request.reviewedAt = new Date();
     request.message = input.message ?? null;
+    request.rejectionReasonCode =
+      input.action === 'rejected' && input.rejectionReasonCode ? input.rejectionReasonCode : null;
 
     const saved = await repo.save(request);
     this.logger.log(`Approval request ${saved.id} ${saved.status} by user ${reviewerId}`);
+
+    if (this.auditService) {
+      await this.auditService.log(ctx, 'approval.reviewed', {
+        entityType: 'ApprovalRequest',
+        entityId: saved.id,
+        data: {
+          approvalId: saved.id,
+          type: saved.type,
+          status: saved.status,
+          reviewedById: String(reviewerId),
+          message: saved.message ?? undefined,
+          rejectionReasonCode: saved.rejectionReasonCode ?? undefined,
+        },
+      });
+    }
 
     // Publish event for notifications
     this.eventBus.publish(
@@ -131,12 +163,18 @@ export class ApprovalService {
         String(reviewerId),
         {
           message: saved.message,
+          rejectionReasonCode: saved.rejectionReasonCode ?? undefined,
           metadata: saved.metadata,
           entityType: saved.entityType,
           entityId: saved.entityId,
         }
       )
     );
+
+    // Invoke type-specific handler when approved
+    if (saved.status === 'approved') {
+      await this.approvalHandlerRegistry.invokeApproved(ctx, saved);
+    }
 
     return saved;
   }

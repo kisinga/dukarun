@@ -1,4 +1,4 @@
-import { PluginCommonModule, VendurePlugin } from '@vendure/core';
+import { PluginCommonModule, StockMovementService, VendurePlugin } from '@vendure/core';
 import { gql } from 'graphql-tag';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
 import { AuditCorePlugin } from '../audit/audit-core.plugin';
@@ -25,6 +25,7 @@ import { PurchasePostingStrategy } from '../../services/financial/strategies/pur
 import { SalePostingStrategy } from '../../services/financial/strategies/sale-posting.strategy';
 import { InventoryReconciliationService } from '../../services/financial/inventory-reconciliation.service';
 import { LedgerQueryService } from '../../services/financial/ledger-query.service';
+import { StockValuationService } from '../../services/financial/stock-valuation.service';
 import { AnalyticsQueryService } from '../../services/analytics/analytics-query.service';
 import { PeriodEndClosingService } from '../../services/financial/period-end-closing.service';
 import { PeriodLockService } from '../../services/financial/period-lock.service';
@@ -46,6 +47,10 @@ import { LEDGER_VIEWER_SCHEMA } from './ledger-viewer.schema';
 import { ReconciliationResolver } from './reconciliation.resolver';
 import { PeriodManagementResolver } from './period-management.resolver';
 import { PERIOD_MANAGEMENT_SCHEMA } from './period-management.schema';
+import { CustomVendureStockMovementService } from '../../services/stock/custom-vendure-stock-movement.service';
+import { StockMovementService as LocalStockMovementServiceClass } from '../../services/stock/stock-movement.service';
+import { StockValueCacheSubscriber } from './stock-value-cache.subscriber';
+import { StockValueStatsResolver } from './stock-value-stats.resolver';
 import {
   CloseAccountingPeriodPermission,
   CreateInterAccountTransferPermission,
@@ -79,6 +84,8 @@ const COMBINED_SCHEMA = gql`
     SaleCogs,
   ],
   providers: [
+    { provide: 'LocalStockMovementService', useClass: LocalStockMovementServiceClass },
+    { provide: StockMovementService, useClass: CustomVendureStockMovementService },
     PostingService,
     InventoryStoreService,
     { provide: 'InventoryStore', useClass: InventoryStoreService },
@@ -98,6 +105,8 @@ const COMBINED_SCHEMA = gql`
     ReconciliationService,
     ReconciliationValidatorService,
     InventoryReconciliationService,
+    StockValuationService,
+    StockValueCacheSubscriber,
     PeriodEndClosingService,
     LedgerPostingService,
     PurchasePostingStrategy,
@@ -124,6 +133,7 @@ const COMBINED_SCHEMA = gql`
       LedgerViewerResolver,
       ReconciliationResolver,
       PeriodManagementResolver,
+      StockValueStatsResolver,
     ],
   },
   shopApiExtensions: {
@@ -133,6 +143,7 @@ const COMBINED_SCHEMA = gql`
       LedgerViewerResolver,
       ReconciliationResolver,
       PeriodManagementResolver,
+      StockValueStatsResolver,
     ],
   },
   compatibility: VENDURE_COMPATIBILITY_VERSION,

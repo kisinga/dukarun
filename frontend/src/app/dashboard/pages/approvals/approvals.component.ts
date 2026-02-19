@@ -114,7 +114,14 @@ import { PageHeaderComponent } from '../shared/components/page-header.component'
                   }
                 </div>
 
-                <!-- Reviewer message -->
+                <!-- Reviewer message and rejection reason -->
+                @if (approval.rejectionReasonCode) {
+                  <div class="mt-2 text-sm">
+                    <span class="font-medium"
+                      >{{ getRejectionReasonLabel(approval.rejectionReasonCode) }}:</span
+                    >
+                  </div>
+                }
                 @if (approval.message) {
                   <div class="mt-2 p-2 bg-base-300 rounded text-sm italic">
                     "{{ approval.message }}"
@@ -126,6 +133,17 @@ import { PageHeaderComponent } from '../shared/components/page-header.component'
                   <!-- Inline message input -->
                   @if (reviewingId() === approval.id) {
                     <div class="mt-3 space-y-2">
+                      <select
+                        class="select select-bordered select-sm w-full"
+                        [value]="reviewRejectionReason()"
+                        (change)="reviewRejectionReason.set($any($event.target).value)"
+                        aria-label="Rejection reason"
+                      >
+                        <option value="">Reason (optional when rejecting)</option>
+                        <option value="policy">Policy</option>
+                        <option value="insufficient_info">Insufficient information</option>
+                        <option value="other">Other</option>
+                      </select>
                       <textarea
                         class="textarea textarea-bordered textarea-sm w-full"
                         rows="2"
@@ -199,6 +217,7 @@ export class ApprovalsComponent implements OnInit {
   // Review state
   readonly reviewingId = signal<string | null>(null);
   readonly reviewMessage = signal('');
+  readonly reviewRejectionReason = signal('');
   readonly isReviewing = signal(false);
 
   async ngOnInit(): Promise<void> {
@@ -249,6 +268,7 @@ export class ApprovalsComponent implements OnInit {
   cancelReview(): void {
     this.reviewingId.set(null);
     this.reviewMessage.set('');
+    this.reviewRejectionReason.set('');
   }
 
   async submitReview(id: string, action: 'approved' | 'rejected'): Promise<void> {
@@ -259,6 +279,10 @@ export class ApprovalsComponent implements OnInit {
         id,
         action,
         message: this.reviewMessage().trim() || undefined,
+        rejectionReasonCode:
+          action === 'rejected' && this.reviewRejectionReason().trim()
+            ? this.reviewRejectionReason().trim()
+            : undefined,
       });
       this.cancelReview();
       await this.loadApprovals();
@@ -276,6 +300,15 @@ export class ApprovalsComponent implements OnInit {
 
   goBack(): void {
     this.router.navigate(['/dashboard']);
+  }
+
+  getRejectionReasonLabel(code: string): string {
+    const labels: Record<string, string> = {
+      policy: 'Policy',
+      insufficient_info: 'Insufficient information',
+      other: 'Other',
+    };
+    return labels[code] || code;
   }
 
   getTypeLabel(type: string): string {

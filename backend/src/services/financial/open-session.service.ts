@@ -43,7 +43,7 @@ export interface CashierSessionSummary {
     mpesaTotal: number;
     totalCollected: number;
   };
-  variance: number; // closingDeclared - (openingFloat + ledgerTotals.cashTotal)
+  variance: number; // closingDeclared - expectedCash, where expectedCash is the session-scoped ledger total
 }
 
 /**
@@ -405,36 +405,13 @@ export class OpenSessionService {
         })
         .catch(() => {});
 
-      // 4. Post per-account variance adjustments (mirrors opening pattern)
-      for (const { accountCode, amountCents } of input.closingBalances) {
-        const openingForAccount = await this.getOpeningBalanceForAccount(
-          txCtx,
-          sessionId,
-          accountCode
-        );
-        const sessionBalance = await this.ledgerQueryService.getSessionBalance(
-          channelId,
-          accountCode,
-          sessionId
-        );
-        const expected = openingForAccount + sessionBalance.balance;
-        const variance = amountCents - expected;
-        if (variance !== 0) {
-          await this.financialService.postVarianceAdjustment(
-            txCtx,
-            sessionId,
-            accountCode,
-            variance,
-            'Closing balance variance',
-            closingRecon.id
-          );
-        }
-      }
+      // 4. Post per-account variance adjustments (shared path with repair flow)
+      await this.postClosingVariance(txCtx, sessionId, closingRecon);
 
       // 5. Return summary
       const summary = await this.getSessionSummary(txCtx, sessionId);
       this.logger.log(
-        `Cashier session ${sessionId} closed. Expected: ${summary.openingFloat + summary.ledgerTotals.cashTotal}, Declared: ${totalDeclared}, Variance: ${summary.variance}, ClosingCountId: ${closingCount.count.id}`
+        `Cashier session ${sessionId} closed. Expected: ${summary.ledgerTotals.cashTotal}, Declared: ${totalDeclared}, Variance: ${summary.variance}, ClosingCountId: ${closingCount.count.id}`
       );
       return summary;
     });
@@ -461,7 +438,7 @@ export class OpenSessionService {
 
     const openingFloat = await this.getOpeningBalanceForSession(ctx, session.id);
     const closingDeclared = parseInt(session.closingDeclared, 10);
-    const expectedCash = openingFloat + ledgerTotals.cashTotal;
+    const expectedCash = ledgerTotals.cashTotal;
     const variance = session.status === 'closed' ? closingDeclared - expectedCash : 0;
 
     return {
@@ -663,13 +640,19 @@ export class OpenSessionService {
       return existingClosing;
     }
 
-    const expectedBalance = summary.openingFloat + summary.ledgerTotals.cashTotal;
     const total = summary.closingDeclared;
 
     const effectiveDeclaredAmounts: Array<{ accountCode: string; amountCents: string }> =
       declaredAmounts && declaredAmounts.length > 0
         ? declaredAmounts
         : await this.buildSyntheticDeclaredAmounts(ctx, channelId, Number(total));
+
+    const expectedBalance = await this.sumExpectedBalanceForAccounts(
+      ctx,
+      channelId,
+      sessionId,
+      effectiveDeclaredAmounts.map(d => d.accountCode)
+    );
 
     const actualBalance =
       effectiveDeclaredAmounts.length > 0
@@ -691,6 +674,78 @@ export class OpenSessionService {
     return this.reconciliationService.createReconciliation(ctx, input, {
       snapshotDate,
     });
+  }
+
+  /**
+   * Post per-account variance for a closing reconciliation (shared by close and repair).
+   * Loads declared amounts from ReconciliationAccount, computes expected via ledger, posts if non-zero.
+   */
+  private async postClosingVariance(
+    ctx: RequestContext,
+    sessionId: string,
+    closingRecon: Reconciliation
+  ): Promise<void> {
+    const channelId = closingRecon.channelId;
+    const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
+    const rows = await junctionRepo.find({
+      where: { reconciliationId: closingRecon.id },
+      relations: ['account'],
+    });
+    for (const row of rows) {
+      if (!row.account?.code) continue;
+      const declaredCents = row.declaredAmountCents ? parseInt(row.declaredAmountCents, 10) : 0;
+      const expected = await this.ledgerQueryService.getExpectedBalanceForReconciliation(
+        channelId,
+        'cash-session',
+        sessionId,
+        row.account.code
+      );
+      const variance = declaredCents - expected;
+      if (variance !== 0) {
+        await this.financialService.postVarianceAdjustment(
+          ctx,
+          sessionId,
+          row.account.code,
+          variance,
+          'Closing balance variance',
+          closingRecon.id
+        );
+      }
+    }
+  }
+
+  /**
+   * Create closing reconciliation record and post variance (repair flow).
+   * Same outcome as normal close: record + ledger adjustment. Idempotent on repeat calls.
+   */
+  async createSessionReconciliationWithVariancePosting(
+    ctx: RequestContext,
+    sessionId: string,
+    notes?: string
+  ): Promise<Reconciliation> {
+    const recon = await this.createSessionReconciliation(ctx, sessionId, notes);
+    await this.postClosingVariance(ctx, sessionId, recon);
+    return recon;
+  }
+
+  /** Sum session-scoped expected balance for the given account codes (for recon record). */
+  private async sumExpectedBalanceForAccounts(
+    ctx: RequestContext,
+    channelId: number,
+    sessionId: string,
+    accountCodes: string[]
+  ): Promise<number> {
+    if (accountCodes.length === 0) return 0;
+    let sum = 0;
+    for (const code of accountCodes) {
+      sum += await this.ledgerQueryService.getExpectedBalanceForReconciliation(
+        channelId,
+        'cash-session',
+        sessionId,
+        code
+      );
+    }
+    return sum;
   }
 
   /** Build synthetic declaredAmounts for standalone createCashierSessionReconciliation (first account gets total, rest 0). */
@@ -838,19 +893,18 @@ export class OpenSessionService {
   }
 
   /**
-   * Calculate expected cash for a session
+   * Calculate expected cash for a session (session-scoped ledger total only).
    * Internal method - not exposed to cashiers
    */
   private async calculateExpectedCash(
     ctx: RequestContext,
     session: CashierSession
   ): Promise<number> {
-    const openingTotal = await this.getOpeningBalanceForSession(ctx, session.id);
     const ledgerTotals = await this.ledgerQueryService.getCashierSessionTotals(
       session.channelId,
       session.id
     );
-    return openingTotal + ledgerTotals.cashTotal;
+    return ledgerTotals.cashTotal;
   }
 
   /**
@@ -1118,7 +1172,7 @@ export class OpenSessionService {
 
   /**
    * Get expected closing balances for an open session (per cashier-controlled account).
-   * Expected = opening declared + session ledger balance for that account.
+   * Expected = session-scoped ledger balance for that account.
    */
   async getExpectedClosingBalances(
     ctx: RequestContext,
@@ -1136,16 +1190,16 @@ export class OpenSessionService {
     }> = [];
 
     for (const pm of requirements.paymentMethods) {
-      const opening = await this.getOpeningBalanceForAccount(ctx, sessionId, pm.ledgerAccountCode);
-      const sessionBalance = await this.ledgerQueryService.getSessionBalance(
+      const expected = await this.ledgerQueryService.getExpectedBalanceForReconciliation(
         session.channelId,
-        pm.ledgerAccountCode,
-        sessionId
+        'cash-session',
+        sessionId,
+        pm.ledgerAccountCode
       );
       results.push({
         accountCode: pm.ledgerAccountCode,
         accountName: pm.paymentMethodName || pm.paymentMethodCode,
-        expectedBalanceCents: String(opening + sessionBalance.balance),
+        expectedBalanceCents: String(expected),
       });
     }
     return results;

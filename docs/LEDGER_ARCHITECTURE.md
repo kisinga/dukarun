@@ -29,6 +29,13 @@ Each Vendure channel (business) has its own:
 - **Journal entries** - all entries are channel-scoped
 - **Account balances** - computed per channel
 
+### 4. Expected balance and reconciliation
+
+All reconciliation "expected" balance must come from a single API so that ledger-derived values are never mixed with values from other sources (e.g. reconciliation or session tables).
+
+- **Use `LedgerQueryService.getExpectedBalanceForReconciliation(channelId, scope, scopeRefId, accountCode, asOfDate?)`** for any reconciliation expected balance. For `scope === 'cash-session'` this returns the session-scoped ledger balance; for `scope === 'manual'` it returns the full ledger balance as of `asOfDate`.
+- **Do not compute expected** as "value from reconciliation/session table + ledger value." That pattern causes double-counting (e.g. session balance already includes opening variance, so adding opening float again is wrong).
+
 ## Architecture Layers
 
 ```

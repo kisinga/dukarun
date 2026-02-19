@@ -156,6 +156,7 @@ await this.auditService.log(ctx, AUDIT_EVENTS.ORDER_CREATED, { ... });
 - `customer.credit.limit_changed` - Credit limit change
 - `admin.invited` - Admin invitation
 - `channel.settings.updated` - Channel settings change
+- `approval.reviewed` - Approval request approved or rejected (payload: approvalId, type, status, reviewedById, message)
 
 See `audit-events.catalog.ts` for the full list.
 

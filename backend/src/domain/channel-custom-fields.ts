@@ -29,8 +29,43 @@ export interface ChannelCustomFields {
    */
   status: ChannelStatus;
 
-  // Other custom fields can be added here as needed
-  // For now, we only type the status field since it's critical for access control
+  /** Cached stock value stats as JSON string; internal use only */
+  stockValueCache?: string | null;
+}
+
+/**
+ * Parsed shape of Channel.customFields.stockValueCache (amounts in cents as strings).
+ */
+export interface StockValueCache {
+  retail: string;
+  wholesale: string;
+  cost: string;
+  updatedAt: string;
+}
+
+/**
+ * Parse stock value cache from channel custom fields.
+ * Returns null if missing or invalid JSON.
+ */
+export function parseStockValueCache(customFields: any): StockValueCache | null {
+  const raw = customFields?.stockValueCache;
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof (parsed as StockValueCache).retail === 'string' &&
+      typeof (parsed as StockValueCache).wholesale === 'string' &&
+      typeof (parsed as StockValueCache).cost === 'string' &&
+      typeof (parsed as StockValueCache).updatedAt === 'string'
+    ) {
+      return parsed as StockValueCache;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 /**

@@ -8,6 +8,7 @@ declare global {
       serviceName?: string;
       serviceVersion?: string;
       vapidPublicKey?: string;
+      vendureAdminUrl?: string;
     };
   }
 }
@@ -27,6 +28,7 @@ import { BRAND_CONFIG } from '../app/core/constants/brand.constants';
 export const environment = {
   production: false,
   apiUrl: '/admin-api', // Proxied by dev server (see proxy.conf.json)
+  vendureAdminUrl: 'http://localhost:3000/admin', // Backend Admin UI (different origin in dev)
   // SigNoz Observability Configuration
   // ⚠️ NOTE: Tracing is NOT available in development mode (ng serve)
   // - proxy.conf.json is static and cannot proxy /signoz/ requests

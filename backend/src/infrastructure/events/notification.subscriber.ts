@@ -263,9 +263,16 @@ export class NotificationSubscriber implements OnModuleInit {
       } else {
         // Approved or rejected - notify the requester
         const statusLabel = event.action === 'approved' ? 'approved' : 'rejected';
-        const message = event.data.message
-          ? `Your ${typeLabel.toLowerCase()} request was ${statusLabel}: ${event.data.message}`
-          : `Your ${typeLabel.toLowerCase()} request was ${statusLabel}.`;
+        const reasonCode = event.data?.rejectionReasonCode as string | undefined;
+        const reasonLabel =
+          reasonCode &&
+          { policy: 'Policy', insufficient_info: 'Insufficient information', other: 'Other' }[
+            reasonCode
+          ];
+        const reasonPrefix = reasonLabel ? ` (${reasonLabel})` : '';
+        const message = event.data?.message
+          ? `Your ${typeLabel.toLowerCase()} request was ${statusLabel}${reasonPrefix}: ${event.data.message}`
+          : `Your ${typeLabel.toLowerCase()} request was ${statusLabel}${reasonPrefix}.`;
 
         // Determine where to navigate the author (back to the originating form)
         const navigateTo = this.getApprovalSourceRoute(event);

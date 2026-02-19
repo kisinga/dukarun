@@ -1,44 +1,41 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { EventBus } from '@vendure/core';
-import { ApprovalRequestEvent } from '../../infrastructure/events/custom-events';
+import { RequestContext } from '@vendure/core';
+import { ApprovalRequest } from '../../domain/approval/approval-request.entity';
+import { ApprovalHandlerRegistry } from '../../services/approval/approval-handler.registry';
 import { OrderReversalService } from '../../services/orders/order-reversal.service';
+import { OrderStateService } from '../../services/orders/order-state.service';
 
 /**
- * When an order_reversal approval request is approved, runs the actual reversal
- * (post ledger entry and mark order reversed).
+ * Registers the order_reversal approval handler.
+ * When an order_reversal approval is approved, the handler runs the actual reversal
+ * (post ledger entry and mark order reversed) and transitions the order to Cancelled.
  */
 @Injectable()
 export class OrderReversalApprovalSubscriber implements OnModuleInit {
   private readonly logger = new Logger(OrderReversalApprovalSubscriber.name);
 
   constructor(
-    private readonly eventBus: EventBus,
-    private readonly orderReversalService: OrderReversalService
+    private readonly approvalHandlerRegistry: ApprovalHandlerRegistry,
+    private readonly orderReversalService: OrderReversalService,
+    private readonly orderStateService: OrderStateService
   ) {}
 
   onModuleInit(): void {
-    this.eventBus.ofType(ApprovalRequestEvent).subscribe(event => this.handle(event));
+    this.approvalHandlerRegistry.register('order_reversal', {
+      onApproved: (ctx, request) => this.handleApproved(ctx, request),
+    });
   }
 
-  private async handle(event: ApprovalRequestEvent): Promise<void> {
-    if (event.approvalType !== 'order_reversal' || event.action !== 'approved') {
-      return;
-    }
-    const orderId = event.data?.entityId ?? event.data?.metadata?.orderId;
+  private async handleApproved(ctx: RequestContext, request: ApprovalRequest): Promise<void> {
+    const orderId = request.entityId ?? request.metadata?.orderId;
     if (!orderId) {
       this.logger.warn(
-        `Order reversal approval ${event.approvalId} approved but no entityId or metadata.orderId; skipping reversal.`
+        `Order reversal approval ${request.id} approved but no entityId or metadata.orderId; skipping reversal.`
       );
       return;
     }
-    try {
-      await this.orderReversalService.reverseOrder(event.ctx, orderId);
-      this.logger.log(`Order ${orderId} reversed via approval ${event.approvalId}.`);
-    } catch (err) {
-      this.logger.error(
-        `Failed to reverse order ${orderId} after approval ${event.approvalId}: ${err instanceof Error ? err.message : String(err)}`,
-        err instanceof Error ? err.stack : undefined
-      );
-    }
+    await this.orderReversalService.reverseOrder(ctx, orderId);
+    await this.orderStateService.transitionToState(ctx, orderId, 'Cancelled');
+    this.logger.log(`Order ${orderId} reversed via approval ${request.id}.`);
   }
 }

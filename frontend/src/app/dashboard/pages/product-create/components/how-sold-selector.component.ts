@@ -64,14 +64,14 @@ import { HowSoldPreset } from '../types/product-creation.types';
           <span class="text-[11px] font-medium">Sizes / Packs</span>
         </button>
 
-        <!-- By weight -->
+        <!-- Weight / Volume / Length: unit chosen from dropdown -->
         <button
           type="button"
           class="btn btn-sm h-auto py-2 flex-col gap-0.5 transition-all duration-200"
-          [class.btn-primary]="selected() === 'by-weight-kg'"
-          [class.btn-ghost]="selected() !== 'by-weight-kg'"
-          [class.border-base-300]="selected() !== 'by-weight-kg'"
-          (click)="onSelect('by-weight-kg')"
+          [class.btn-primary]="selected() === 'by-measure'"
+          [class.btn-ghost]="selected() !== 'by-measure'"
+          [class.border-base-300]="selected() !== 'by-measure'"
+          (click)="onSelect('by-measure')"
         >
           <!-- Scale/weight icon -->
           <svg
@@ -92,10 +92,10 @@ import { HowSoldPreset } from '../types/product-creation.types';
             <path d="M18 12h4" />
             <circle cx="12" cy="17" r="4" />
           </svg>
-          <span class="text-[11px] font-medium">Weight / Volume</span>
+          <span class="text-[11px] font-medium">Weight / Volume / Length</span>
         </button>
 
-        <!-- By volume -->
+        <!-- Custom -->
         <button
           type="button"
           class="btn btn-sm h-auto py-2 flex-col gap-0.5 transition-all duration-200"
@@ -121,14 +121,51 @@ import { HowSoldPreset } from '../types/product-creation.types';
           <span class="text-[11px] font-medium">Custom</span>
         </button>
       </div>
+
+      <!-- Unit dropdown when Weight/Volume/Length is selected (same options as measurement-unit-selector) -->
+      @if (selected() === 'by-measure') {
+        <div class="pt-1.5">
+          <select
+            class="select select-bordered select-sm w-full max-w-xs"
+            [value]="measurementUnit() ?? 'KG'"
+            (change)="onUnitChange($any($event.target).value)"
+          >
+            <option value="">Select unit...</option>
+            <optgroup label="Weight">
+              <option value="KG">Kilograms (kg)</option>
+              <option value="G">Grams (g)</option>
+              <option value="LB">Pounds (lb)</option>
+            </optgroup>
+            <optgroup label="Volume">
+              <option value="L">Liters (L)</option>
+              <option value="ML">Milliliters (mL)</option>
+              <option value="GAL">Gallons (gal)</option>
+            </optgroup>
+            <optgroup label="Length">
+              <option value="M">Meters (m)</option>
+              <option value="CM">Centimeters (cm)</option>
+              <option value="FT">Feet (ft)</option>
+            </optgroup>
+            <optgroup label="Area">
+              <option value="M2">Square Meters (m²)</option>
+            </optgroup>
+          </select>
+        </div>
+      }
     </div>
   `,
 })
 export class HowSoldSelectorComponent {
   readonly selected = input<HowSoldPreset | null>(null);
   readonly selectedChange = output<HowSoldPreset>();
+  readonly measurementUnit = input<string | null>(null);
+  readonly measurementUnitChange = output<string>();
 
   onSelect(preset: HowSoldPreset): void {
     this.selectedChange.emit(preset);
+  }
+
+  onUnitChange(unit: string): void {
+    this.measurementUnitChange.emit(unit);
   }
 }

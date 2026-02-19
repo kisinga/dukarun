@@ -338,6 +338,7 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     amount: Int!
     sourceAccountCode: String!
     memo: String
+    category: String
   }
 
   type RecordExpenseResult {

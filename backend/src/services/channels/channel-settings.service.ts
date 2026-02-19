@@ -177,6 +177,48 @@ export class ChannelSettingsService {
   }
 
   /**
+   * Update channel status from platform (Super Admin). Uses empty context for channel
+   * operations; uses callerCtx for audit so the superadmin user is attributed.
+   */
+  async updateChannelStatusForPlatform(
+    callerCtx: RequestContext,
+    channelId: string,
+    status: 'UNAPPROVED' | 'APPROVED' | 'DISABLED' | 'BANNED'
+  ): Promise<Channel> {
+    const emptyCtx = RequestContext.empty();
+    const channel = await this.channelService.findOne(emptyCtx, channelId);
+    if (!channel) {
+      throw new Error('Channel not found');
+    }
+
+    const currentStatus = getChannelStatus(channel.customFields);
+    const isBeingApproved = currentStatus !== 'APPROVED' && status === 'APPROVED';
+
+    await this.channelService.update(emptyCtx, {
+      id: channelId,
+      customFields: { status },
+    });
+
+    await this.auditService.log(callerCtx, 'channel.status.updated', {
+      entityType: 'Channel',
+      entityId: channelId.toString(),
+      channelId: parseInt(channelId, 10),
+      data: { status },
+    });
+
+    const updatedChannel = await this.channelService.findOne(emptyCtx, channelId);
+    if (!updatedChannel) {
+      throw new Error('Channel not found after update');
+    }
+
+    if (isBeingApproved) {
+      await this.sendApprovalNotification(emptyCtx, channelId, updatedChannel);
+    }
+
+    return updatedChannel;
+  }
+
+  /**
    * Send approval notification to channel administrators
    * Routes CHANNEL_APPROVED event via eventRouter to send SMS
    */

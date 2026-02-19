@@ -13,6 +13,7 @@ import { firstValueFrom } from 'rxjs';
 import { CashierSessionService } from '../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../core/services/company.service';
 import { CurrencyService } from '../../../core/services/currency.service';
+import { EXPENSE_CATEGORIES } from '../../../core/constants/expense-categories';
 import {
   ExpenseService,
   RecordExpenseResult,
@@ -119,6 +120,23 @@ import { LedgerService } from '../../../core/services/ledger/ledger.service';
             </div>
 
             <div class="form-control">
+              <label class="label" for="expenseCategory">
+                <span class="label-text font-semibold">Category</span>
+              </label>
+              <select
+                id="expenseCategory"
+                [value]="category()"
+                (change)="category.set($any($event.target).value)"
+                class="select select-bordered w-full"
+                [disabled]="isProcessing()"
+              >
+                @for (cat of expenseCategories; track cat.code) {
+                  <option [value]="cat.code">{{ cat.label }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="form-control">
               <label class="label" for="expenseMemo">
                 <span class="label-text font-semibold">Memo</span>
                 <span class="label-text-alt text-base-content/60">Optional</span>
@@ -188,8 +206,10 @@ export class RecordExpenseModalComponent {
   readonly error = signal<string | null>(null);
   readonly amountInput = signal('');
   readonly selectedAccountCode = signal('');
+  readonly category = signal('other');
   readonly memo = signal('');
   readonly eligibleAccounts = signal<{ code: string; name: string }[]>([]);
+  protected readonly expenseCategories = EXPENSE_CATEGORIES;
   readonly isLoadingAccounts = signal(false);
   readonly successResult = signal<RecordExpenseResult | null>(null);
 
@@ -216,6 +236,7 @@ export class RecordExpenseModalComponent {
     this.isProcessing.set(false);
     this.amountInput.set('');
     this.selectedAccountCode.set('');
+    this.category.set('other');
     this.memo.set('');
 
     const companyId = this.companyService.activeCompanyId();
@@ -264,6 +285,7 @@ export class RecordExpenseModalComponent {
         amountCents,
         sourceCode,
         this.memo()?.trim() || undefined,
+        this.category() || 'other',
       );
 
       if (result) {

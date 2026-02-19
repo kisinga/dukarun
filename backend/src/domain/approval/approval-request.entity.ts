@@ -33,6 +33,10 @@ export class ApprovalRequest {
   @Column({ type: 'varchar', length: 20, default: 'pending' })
   status: string; // 'pending' | 'approved' | 'rejected'
 
+  /** Optional due date for SLA/reminders; future scheduler can query pending where dueAt < now() */
+  @Column({ type: 'timestamp', nullable: true })
+  dueAt: Date | null;
+
   @Column({ type: 'varchar' })
   requestedById: string;
 
@@ -44,6 +48,10 @@ export class ApprovalRequest {
 
   @Column({ type: 'text', nullable: true })
   message: string | null;
+
+  /** Structured rejection reason: policy | insufficient_info | other */
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  rejectionReasonCode: string | null;
 
   @Column({ type: 'jsonb', default: '{}' })
   metadata: Record<string, any>;

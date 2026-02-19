@@ -21,12 +21,14 @@ export class ExpenseService {
    * @param amountCents - Amount in cents
    * @param sourceAccountCode - Account to debit (e.g. Cash, M-Pesa)
    * @param memo - Optional memo
+   * @param category - Optional expense category code (defaults to 'other' if not provided)
    * @returns Result with sourceId (journal entry id) or null if failed
    */
   async recordExpense(
     amountCents: number,
     sourceAccountCode: string,
     memo?: string,
+    category?: string,
   ): Promise<RecordExpenseResult | null> {
     try {
       const client = this.apolloService.getClient();
@@ -37,6 +39,7 @@ export class ExpenseService {
             amount: amountCents,
             sourceAccountCode: sourceAccountCode.trim(),
             memo: memo?.trim() || undefined,
+            category: category?.trim() || undefined,
           },
         },
       });

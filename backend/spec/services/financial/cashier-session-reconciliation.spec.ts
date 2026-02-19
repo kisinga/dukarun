@@ -39,6 +39,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
   let mockSessionRepo: any;
   let mockChannelRepo: any;
   let mockCountRepo: any;
+  let mockReconAccountRepo: any;
   let mockChannelPaymentMethodService: any;
   let mockAuditService: any;
 
@@ -65,11 +66,11 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       find: jest.fn<() => Promise<Reconciliation[]>>().mockResolvedValue([]),
       findOne: jest.fn<() => Promise<Reconciliation | null>>().mockResolvedValue(null),
     } as any;
-    // @ts-expect-error - jest.fn() generic inference for mockResolvedValue
-    const mockReconAccountRepo: any = { find: jest.fn().mockResolvedValue([]) };
+    mockReconAccountRepo = { find: (jest.fn() as any).mockResolvedValue([]) };
 
     const mockAccountRepo = {
       find: (jest.fn() as any).mockResolvedValue([{ id: 'acc-1', code: 'CASH_ON_HAND' }]),
+      findOne: (jest.fn() as any).mockResolvedValue({ id: 'acc-1', code: 'CASH_ON_HAND' }),
     };
     mockConnection = {
       getRepository: jest.fn((_ctx: any, entity: any) => {
@@ -93,6 +94,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         accountName: 'Cash on hand',
         balance: 0,
       }),
+      getExpectedBalanceForReconciliation: (jest.fn() as any).mockResolvedValue(0),
     } as any;
 
     mockReconciliationService = {
@@ -546,6 +548,79 @@ describe('CashierSessionService - Reconciliation Integration', () => {
 
       expect(result.blindCountRequired).toBe(true);
       expect(result.paymentMethods).toHaveLength(1);
+    });
+  });
+
+  describe('Expected balance and variance (no double-count)', () => {
+    it('getSessionSummary uses session-scoped ledger total only for expectedCash', async () => {
+      const sessionId = UUID_SESSION_1;
+      const channelId = 1;
+      const session: CashierSession = {
+        id: sessionId,
+        channelId,
+        cashierUserId: 1,
+        openedAt: new Date(),
+        status: 'closed',
+        closedAt: new Date(),
+        closingDeclared: '160',
+      } as CashierSession;
+      mockSessionRepo.findOne.mockResolvedValue(session);
+      mockLedgerQueryService.getCashierSessionTotals.mockResolvedValue({
+        cashTotal: 150,
+        mpesaTotal: 0,
+        totalCollected: 150,
+      });
+
+      const summary = await service.getSessionSummary(ctx, sessionId);
+
+      expect(summary.ledgerTotals.cashTotal).toBe(150);
+      expect(summary.variance).toBe(160 - 150);
+      expect(summary.closingDeclared).toBe(160);
+    });
+
+    it('createSessionReconciliationWithVariancePosting posts variance when declared != expected', async () => {
+      const sessionId = UUID_SESSION_1;
+      const channelId = 1;
+      const closedSession: CashierSession = {
+        id: sessionId,
+        channelId,
+        cashierUserId: 1,
+        openedAt: new Date(),
+        status: 'closed',
+        closedAt: new Date(),
+        closingDeclared: '200',
+      } as CashierSession;
+      mockSessionRepo.findOne.mockResolvedValue(closedSession);
+      mockLedgerQueryService.getCashierSessionTotals.mockResolvedValue({
+        cashTotal: 150,
+        mpesaTotal: 0,
+        totalCollected: 150,
+      });
+      mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([
+        { customFields: { ledgerAccountCode: 'CASH_ON_HAND' } },
+      ]);
+      const savedRecon = { id: 'rec-1', channelId } as Reconciliation;
+      mockReconciliationService.createReconciliation.mockResolvedValue(savedRecon);
+      mockReconAccountRepo.find.mockResolvedValue([
+        {
+          reconciliationId: 'rec-1',
+          accountId: 'acc-1',
+          declaredAmountCents: '200',
+          account: { id: 'acc-1', code: 'CASH_ON_HAND' },
+        },
+      ]);
+      mockLedgerQueryService.getExpectedBalanceForReconciliation.mockResolvedValue(150);
+
+      await service.createSessionReconciliationWithVariancePosting(ctx, sessionId, 'Repair');
+
+      expect(mockFinancialService.postVarianceAdjustment).toHaveBeenCalledWith(
+        ctx,
+        sessionId,
+        'CASH_ON_HAND',
+        50,
+        'Closing balance variance',
+        'rec-1'
+      );
     });
   });
 });

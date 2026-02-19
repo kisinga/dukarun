@@ -1,0 +1,35 @@
+---
+description: Consult Vendure migration docs when creating or editing database migrations
+globs: backend/src/migrations/**/*.ts
+alwaysApply: false
+---
+
+# Vendure database migrations
+
+When creating or editing migration files in `backend/src/migrations/`, **always consult the official Vendure documentation** so migrations match the schema Vendure expects.
+
+## Docs to use
+
+- **Migrations workflow**: [Database Migrations in Vendure](https://docs.vendure.io/guides/developer-guide/migrations)  
+  Use for: generating migrations, `up`/`down` shape, running/reverting.
+
+- **Custom field column types**: [CustomFieldType](https://docs.vendure.io/reference/typescript-api/custom-fields/custom-field-type)  
+  Use for: any migration that adds or changes columns for **custom fields** (e.g. on Channel, Product, ProductVariant). The CustomFieldType determines the DB column type:
+
+  | Config type   | PostgreSQL column           |
+  |---------------|-----------------------------|
+  | `string`      | `character varying(255)`    |
+  | `text`        | `text`                      |
+  | `int`         | `int`                       |
+  | `float`       | `double precision`          |
+  | `boolean`     | `bool`                      |
+  | `datetime`    | `timestamp`                 |
+  | `struct`      | `jsonb`                     |
+
+  If you add a custom field in `vendure-config.ts`, the migration column type **must** match this table (e.g. `type: 'string'` → `character varying(255)`, `type: 'text'` → `text`). Otherwise the server will report a schema mismatch.
+
+## Rule
+
+1. Before writing or changing a migration that touches Vendure entities or custom fields, open the relevant doc (migrations guide and/or CustomFieldType).
+2. Align column names with Vendure’s normalized names (e.g. `customFieldsStockvaluecache` for Channel custom field `stockValueCache`).
+3. Use the exact column types from the CustomFieldType table for custom-field columns so that `synchronize: false` does not report schema differences.

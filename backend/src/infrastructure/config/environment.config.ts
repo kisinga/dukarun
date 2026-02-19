@@ -46,6 +46,7 @@ export class EnvironmentConfig implements OnModuleInit {
     cookieSecret: '',
     cookieSecure: false,
     frontendUrl: '',
+    superAdminUrl: '', // Super Admin app origin for CORS (e.g. http://localhost:4201)
     assetUrlPrefix: '',
     assetUploadDir: '',
   };
@@ -221,6 +222,7 @@ export class EnvironmentConfig implements OnModuleInit {
     this.app.cookieSecret = process.env.COOKIE_SECRET || 'cookie-secret-change-in-production';
     this.app.cookieSecure = process.env.COOKIE_SECURE === 'true';
     this.app.frontendUrl = process.env.FRONTEND_URL || '';
+    this.app.superAdminUrl = process.env.SUPERADMIN_URL || '';
     this.app.assetUrlPrefix = process.env.ASSET_URL_PREFIX || '';
     this.app.assetUploadDir =
       process.env.ASSET_UPLOAD_DIR || path.join(process.cwd(), 'static/assets');

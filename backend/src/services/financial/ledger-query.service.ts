@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { RequestContext } from '@vendure/core';
 import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
+import { EXPENSE_CATEGORIES } from '../../ledger/expense-categories.constants';
 import { Account } from '../../ledger/account.entity';
 import { JournalEntry } from '../../ledger/journal-entry.entity';
 import { JournalLine } from '../../ledger/journal-line.entity';
@@ -272,6 +273,48 @@ export class LedgerQueryService {
     });
     // Expenses is expense (debit normal), so positive balance = total expenses
     return balance.balance;
+  }
+
+  /**
+   * Get expense breakdown by category for a period (for dashboard).
+   * Groups EXPENSES account lines from journal entries with sourceType 'Expense' by meta.expenseCategory.
+   */
+  async getExpenseBreakdown(
+    channelId: number,
+    startDate: string,
+    endDate: string
+  ): Promise<Array<{ label: string; value: number; icon: string }>> {
+    const lineRepo = this.dataSource.getRepository(JournalLine);
+    const qb = lineRepo
+      .createQueryBuilder('line')
+      .innerJoin('line.entry', 'entry')
+      .innerJoin('line.account', 'account')
+      .where('entry.channelId = :channelId', { channelId })
+      .andWhere('entry.sourceType = :sourceType', { sourceType: 'Expense' })
+      .andWhere('entry.entryDate >= :startDate', { startDate })
+      .andWhere('entry.entryDate <= :endDate', { endDate })
+      .andWhere('account.code = :expensesCode', { expensesCode: ACCOUNT_CODES.EXPENSES })
+      .select("COALESCE(line.meta->>'expenseCategory', 'uncategorized')", 'category')
+      .addSelect('SUM(CAST(line.debit AS BIGINT))', 'total')
+      .groupBy("COALESCE(line.meta->>'expenseCategory', 'uncategorized')");
+
+    const rows = await qb.getRawMany<{ category: string; total: string }>();
+
+    const byCode = new Map<string, number>();
+    for (const r of rows) {
+      byCode.set(r.category, parseInt(r.total || '0', 10));
+    }
+
+    const result: Array<{ label: string; value: number; icon: string }> = [];
+    for (const cat of EXPENSE_CATEGORIES) {
+      const value = byCode.get(cat.code) ?? 0;
+      result.push({ label: cat.label, value, icon: cat.icon });
+    }
+    const uncategorized = byCode.get('uncategorized') ?? 0;
+    if (uncategorized > 0) {
+      result.push({ label: 'Uncategorized', value: uncategorized, icon: '❓' });
+    }
+    return result;
   }
 
   /**
@@ -554,6 +597,33 @@ export class LedgerQueryService {
       accountCode,
       openSessionId,
     });
+  }
+
+  /**
+   * Get expected balance for reconciliation (single source of truth).
+   * All reconciliation "expected" must use this method; do not compute expected as
+   * "value from reconciliation/session table + ledger value".
+   *
+   * @param scope - 'cash-session': session-scoped ledger balance (includes opening variance)
+   * @param scope - 'manual': full ledger balance as of asOfDate
+   */
+  async getExpectedBalanceForReconciliation(
+    channelId: number,
+    scope: 'cash-session' | 'manual',
+    scopeRefId: string,
+    accountCode: string,
+    asOfDate?: string
+  ): Promise<number> {
+    if (scope === 'cash-session') {
+      const balance = await this.getSessionBalance(channelId, accountCode, scopeRefId);
+      return balance.balance;
+    }
+    const balance = await this.getAccountBalance({
+      channelId,
+      accountCode,
+      endDate: asOfDate,
+    });
+    return balance.balance;
   }
 
   /**

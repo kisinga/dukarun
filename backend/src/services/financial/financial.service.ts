@@ -359,7 +359,8 @@ export class FinancialService {
     ctx: RequestContext,
     amount: number,
     sourceAccountCode: string,
-    memo?: string
+    memo?: string,
+    category?: string
   ): Promise<{ sourceId: string }> {
     if (amount <= 0) {
       throw new Error('Expense amount must be greater than zero.');
@@ -374,6 +375,7 @@ export class FinancialService {
       amount,
       sourceAccountCode: code,
       memo,
+      category,
     });
     this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.EXPENSES);
     this.queryService.invalidateCache(ctx.channelId as number, code);

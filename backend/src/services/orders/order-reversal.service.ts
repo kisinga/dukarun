@@ -3,12 +3,14 @@ import {
   ID,
   Order,
   OrderService,
+  PaymentService,
   RequestContext,
   TransactionalConnection,
   UserInputError,
 } from '@vendure/core';
 import { LedgerPostingService } from '../financial/ledger-posting.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { OrderStateService } from './order-state.service';
 
 export interface OrderReversalResult {
   order: Order;
@@ -30,6 +32,8 @@ export class OrderReversalService {
 
   constructor(
     private readonly orderService: OrderService,
+    private readonly paymentService: PaymentService,
+    private readonly orderStateService: OrderStateService,
     private readonly ledgerPostingService: LedgerPostingService,
     private readonly connection: TransactionalConnection,
     private readonly inventoryService: InventoryService
@@ -90,6 +94,46 @@ export class OrderReversalService {
     return {
       order: updatedOrder ?? order,
       hadPayments,
+    };
+  }
+
+  /**
+   * Void an order: cancel payments (triggers credit repayment), run reversal (ledger + inventory),
+   * then transition order to Cancelled. Composes reverseOrder().
+   */
+  async voidOrder(ctx: RequestContext, orderId: ID): Promise<OrderReversalResult> {
+    const order = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
+    if (!order) {
+      throw new UserInputError(`Order ${orderId} not found`);
+    }
+
+    const customFields = (order.customFields as Record<string, unknown>) || {};
+    if (customFields.reversedAt) {
+      throw new UserInputError(`Order ${order.code} is already reversed.`);
+    }
+    if (order.state === 'Cancelled') {
+      throw new UserInputError(`Order ${order.code} is already cancelled.`);
+    }
+
+    const paymentsToCancel = (order.payments || []).filter(
+      p => p.state === 'Settled' || p.state === 'Authorized'
+    );
+    for (const payment of paymentsToCancel) {
+      const result = await this.paymentService.transitionToState(ctx, payment.id, 'Cancelled');
+      if (result && 'errorCode' in result) {
+        this.logger.warn(
+          `Failed to cancel payment ${payment.id} for order ${order.code}: ${result.message}`
+        );
+      }
+    }
+
+    const result = await this.reverseOrder(ctx, orderId);
+    await this.orderStateService.transitionToState(ctx, orderId, 'Cancelled');
+
+    const updatedOrder = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
+    return {
+      order: updatedOrder ?? result.order,
+      hadPayments: result.hadPayments,
     };
   }
 }

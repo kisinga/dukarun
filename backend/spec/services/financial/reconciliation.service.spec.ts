@@ -10,6 +10,9 @@ import { ReconciliationService } from '../../../src/services/financial/reconcili
 import { Reconciliation } from '../../../src/domain/recon/reconciliation.entity';
 import { AccountBalanceService } from '../../../src/services/financial/account-balance.service';
 import { FinancialService } from '../../../src/services/financial/financial.service';
+import { LedgerQueryService } from '../../../src/services/financial/ledger-query.service';
+import { Account } from '../../../src/ledger/account.entity';
+import { ReconciliationAccount } from '../../../src/domain/recon/reconciliation-account.entity';
 
 describe('ReconciliationService', () => {
   const ctx = {
@@ -20,7 +23,10 @@ describe('ReconciliationService', () => {
   let service: ReconciliationService;
   let mockConnection: jest.Mocked<TransactionalConnection>;
   let mockReconciliationRepo: any;
+  let mockAccountRepo: any;
+  let mockJunctionRepo: any;
   let mockAccountBalanceService: jest.Mocked<AccountBalanceService>;
+  let mockLedgerQueryService: jest.Mocked<LedgerQueryService>;
   let mockChannelPaymentMethodService: any;
   let mockFinancialService: any;
 
@@ -32,9 +38,16 @@ describe('ReconciliationService', () => {
       createQueryBuilder: jest.fn(),
     };
 
+    mockAccountRepo = {
+      find: (jest.fn() as any).mockResolvedValue([{ id: 'acc-1', code: 'CASH_ON_HAND' }]),
+    };
+    mockJunctionRepo = { create: jest.fn(), save: jest.fn() };
+
     mockConnection = {
       getRepository: jest.fn((_ctx: RequestContext, entity: any) => {
         if (entity === Reconciliation) return mockReconciliationRepo;
+        if (entity === Account) return mockAccountRepo;
+        if (entity === ReconciliationAccount) return mockJunctionRepo;
         return {};
       }),
       withTransaction: jest.fn(
@@ -44,6 +57,10 @@ describe('ReconciliationService', () => {
 
     mockAccountBalanceService = {
       getAccountBalance: jest.fn(),
+    } as any;
+
+    mockLedgerQueryService = {
+      getExpectedBalanceForReconciliation: (jest.fn() as any).mockResolvedValue(1000),
     } as any;
 
     mockFinancialService = {
@@ -58,7 +75,8 @@ describe('ReconciliationService', () => {
       mockConnection,
       mockAccountBalanceService,
       mockChannelPaymentMethodService,
-      mockFinancialService
+      mockFinancialService,
+      mockLedgerQueryService
     );
   });
 

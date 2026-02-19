@@ -10,6 +10,7 @@ import {
 import gql from 'graphql-tag';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
 import { ApprovalRequest } from '../../domain/approval/approval-request.entity';
+import { ApprovalHandlerRegistry } from '../../services/approval/approval-handler.registry';
 import {
   ApprovalService,
   CreateApprovalRequestInput,
@@ -28,10 +29,12 @@ const approvalSchema = gql`
     channelId: ID!
     type: String!
     status: String!
+    dueAt: DateTime
     requestedById: ID!
     reviewedById: ID
     reviewedAt: DateTime
     message: String
+    rejectionReasonCode: String
     metadata: JSON
     entityType: String
     entityId: String
@@ -49,12 +52,14 @@ const approvalSchema = gql`
     metadata: JSON
     entityType: String
     entityId: String
+    dueAt: DateTime
   }
 
   input ReviewApprovalRequestInput {
     id: ID!
     action: String!
     message: String
+    rejectionReasonCode: String
   }
 
   input ApprovalRequestListOptions {
@@ -116,8 +121,8 @@ class ApprovalResolver {
 @VendurePlugin({
   imports: [PluginCommonModule],
   entities: [ApprovalRequest],
-  providers: [ApprovalService, ApprovalResolver],
-  exports: [ApprovalService],
+  providers: [ApprovalHandlerRegistry, ApprovalService, ApprovalResolver],
+  exports: [ApprovalService, ApprovalHandlerRegistry],
   adminApiExtensions: {
     resolvers: [ApprovalResolver],
     schema: approvalSchema,

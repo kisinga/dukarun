@@ -8,6 +8,7 @@ import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import { AccountBalanceService } from './account-balance.service';
 import { ChannelPaymentMethodService } from './channel-payment-method.service';
 import { FinancialService } from './financial.service';
+import { LedgerQueryService } from './ledger-query.service';
 import {
   fromScopeRefId,
   ReconciliationStatus,
@@ -52,7 +53,8 @@ export class ReconciliationService {
     private readonly connection: TransactionalConnection,
     private readonly accountBalanceService: AccountBalanceService,
     private readonly channelPaymentMethodService: ChannelPaymentMethodService,
-    private readonly financialService: FinancialService
+    private readonly financialService: FinancialService,
+    private readonly ledgerQueryService: LedgerQueryService
   ) {}
 
   /**
@@ -152,13 +154,13 @@ export class ReconciliationService {
       for (const accountId of accountIds) {
         const account = accountById.get(accountId);
         if (!account) continue;
-        const balance = await this.accountBalanceService.getAccountBalance(
-          txCtx,
-          account.code,
+        const expectedCents = await this.ledgerQueryService.getExpectedBalanceForReconciliation(
           input.channelId,
+          'manual',
+          input.scopeRefId,
+          account.code,
           today
         );
-        const expectedCents = balance.balance;
         const declaredCents = parseInt(declared[accountId] ?? '0', 10) || 0;
         const varianceCents = declaredCents - expectedCents;
         expectedSum += expectedCents;

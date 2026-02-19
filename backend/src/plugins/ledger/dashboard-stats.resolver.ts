@@ -88,13 +88,15 @@ export class DashboardStatsResolver {
       this.ledgerQueryService.getPurchaseTotal(channelId, periods.startOfMonth, endDateStr),
     ]);
 
-    // Fetch expense stats and sales summary
-    const [expensesToday, expensesWeek, expensesMonth, salesSummary] = await Promise.all([
-      this.ledgerQueryService.getExpenseTotal(channelId, periods.startOfToday, endDateStr),
-      this.ledgerQueryService.getExpenseTotal(channelId, periods.startOfWeek, endDateStr),
-      this.ledgerQueryService.getExpenseTotal(channelId, periods.startOfMonth, endDateStr),
-      salesSummaryPromise,
-    ]);
+    // Fetch expense stats, expense breakdown by category, and sales summary
+    const [expensesToday, expensesWeek, expensesMonth, expenseBreakdown, salesSummary] =
+      await Promise.all([
+        this.ledgerQueryService.getExpenseTotal(channelId, periods.startOfToday, endDateStr),
+        this.ledgerQueryService.getExpenseTotal(channelId, periods.startOfWeek, endDateStr),
+        this.ledgerQueryService.getExpenseTotal(channelId, periods.startOfMonth, endDateStr),
+        this.ledgerQueryService.getExpenseBreakdown(channelId, periods.startOfMonth, endDateStr),
+        salesSummaryPromise,
+      ]);
 
     // All values in smallest currency unit (cents) - UI layer handles display conversion
     const sales: PeriodStats = {
@@ -132,23 +134,7 @@ export class DashboardStatsResolver {
       today: expensesToday,
       week: expensesWeek,
       month: expensesMonth,
-      accounts: [
-        {
-          label: 'Rent',
-          value: 0, // Expenses account doesn't break down by type yet
-          icon: '🏠',
-        },
-        {
-          label: 'Salaries',
-          value: 0,
-          icon: '👥',
-        },
-        {
-          label: 'Other',
-          value: expensesMonth,
-          icon: '📋',
-        },
-      ],
+      accounts: expenseBreakdown,
     };
 
     return {

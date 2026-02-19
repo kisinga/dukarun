@@ -4,6 +4,7 @@ import {
   GET_PRODUCT_STATS,
   GET_PRODUCTS,
   GET_RECENT_ORDERS,
+  GET_STOCK_VALUE_STATS,
 } from '../graphql/operations.graphql';
 import type { CacheSyncEntityHandler } from './cache/cache-sync-handler.interface';
 import { CacheSyncService } from './cache/cache-sync.service';
@@ -60,6 +61,13 @@ export interface AccountBreakdown {
   label: string;
   value: number;
   icon: string;
+}
+
+/** Stock value at retail, wholesale, and cost (cents). Cached per channel. */
+export interface StockValueStats {
+  retail: number;
+  wholesale: number;
+  cost: number;
 }
 
 /**
@@ -140,6 +148,8 @@ export class DashboardService {
   private readonly recentActivitySignal = signal<RecentActivity[]>([]);
   private readonly recentOrdersSignal = signal<any[]>([]);
   private readonly lowStockCountSignal = signal<number>(0);
+  private readonly stockValueStatsSignal = signal<StockValueStats | null>(null);
+  private readonly stockValueLoadingSignal = signal(false);
   private readonly isLoadingSignal = signal(false);
   private readonly errorSignal = signal<string | null>(null);
 
@@ -148,6 +158,8 @@ export class DashboardService {
   readonly recentActivity = this.recentActivitySignal.asReadonly();
   readonly recentOrders = this.recentOrdersSignal.asReadonly();
   readonly lowStockCount = this.lowStockCountSignal.asReadonly();
+  readonly stockValueStats = this.stockValueStatsSignal.asReadonly();
+  readonly stockValueLoading = this.stockValueLoadingSignal.asReadonly();
   readonly isLoading = this.isLoadingSignal.asReadonly();
   readonly error = this.errorSignal.asReadonly();
 
@@ -274,6 +286,28 @@ export class DashboardService {
     } catch (error) {
       console.error('Failed to fetch product stats:', error);
       return { productCount: 0, variantCount: 0 };
+    }
+  }
+
+  /**
+   * Fetch stock value stats (retail, wholesale, cost in cents). Cached per channel; use forceRefresh to recompute.
+   */
+  async loadStockValueStats(forceRefresh = false): Promise<void> {
+    if (!this.companyService.activeCompanyId()) return;
+    this.stockValueLoadingSignal.set(true);
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.query<{ stockValueStats: StockValueStats }>({
+        query: GET_STOCK_VALUE_STATS as import('graphql').DocumentNode,
+        variables: { forceRefresh },
+        fetchPolicy: 'network-only',
+      });
+      this.stockValueStatsSignal.set(result.data?.stockValueStats ?? null);
+    } catch (error) {
+      console.error('Failed to fetch stock value stats:', error);
+      this.stockValueStatsSignal.set(null);
+    } finally {
+      this.stockValueLoadingSignal.set(false);
     }
   }
 

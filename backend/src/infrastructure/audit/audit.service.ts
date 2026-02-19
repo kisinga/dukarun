@@ -261,4 +261,27 @@ export class AuditService {
       return [];
     }
   }
+
+  /**
+   * Query audit log for a specific channel by ID (e.g. for Super Admin).
+   * Does not use RequestContext channel; callers must enforce permission.
+   */
+  async getAuditTrailForChannel(
+    channelId: number | string,
+    filters: AuditTrailFilters & { limit?: number; skip?: number } = {}
+  ): Promise<AuditLog[]> {
+    if (!this.auditDbConnection.isAvailable()) {
+      this.logger.warn('Audit database not available, returning empty audit trail');
+      return [];
+    }
+    const numericChannelId = typeof channelId === 'string' ? parseInt(channelId, 10) : channelId;
+    if (Number.isNaN(numericChannelId)) {
+      return [];
+    }
+    const ctx = {} as RequestContext;
+    return this.getAuditTrail(
+      Object.assign(ctx, { channelId: numericChannelId, channel: { id: numericChannelId } }),
+      filters
+    );
+  }
 }

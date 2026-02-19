@@ -84,10 +84,22 @@ export class AuthPermissionsService {
     );
   });
 
+  readonly hasManageApprovalsPermission = computed(() => {
+    const user = this.sessionService.user();
+    if (!user?.user?.roles) return false;
+    return user.user.roles.some((role) => role.permissions.includes('ManageApprovals' as any));
+  });
+
   readonly hasUpdateProductPermission = computed(() => {
     const user = this.sessionService.user();
     if (!user?.user?.roles) return false;
     return user.user.roles.some((role) => role.permissions.includes(Permission.UpdateProduct));
+  });
+
+  readonly hasSuperAdminPermission = computed(() => {
+    const user = this.sessionService.user();
+    if (!user?.user?.roles) return false;
+    return user.user.roles.some((role) => role.permissions.includes(Permission.SuperAdmin));
   });
 
   /**

@@ -33,9 +33,10 @@ export interface OrderCardData {
     method: string;
     createdAt: string;
   }> | null;
+  customFields?: { reversedAt?: string | null } | null;
 }
 
-export type OrderAction = 'view' | 'print' | 'pay';
+export type OrderAction = 'view' | 'print' | 'pay' | 'void';
 
 @Component({
   selector: 'app-order-card',
@@ -96,7 +97,7 @@ export type OrderAction = 'view' | 'print' | 'pay';
         </div>
       </div>
 
-      @if (canPay() || canPrint()) {
+      @if (canPay() || canPrint() || canVoid()) {
         <div class="border-t border-base-300/50 px-4 py-2 flex justify-end gap-2">
           @if (canPay()) {
             <button
@@ -127,6 +128,15 @@ export type OrderAction = 'view' | 'print' | 'pay';
                 />
               </svg>
               Print
+            </button>
+          }
+          @if (canVoid()) {
+            <button
+              type="button"
+              (click)="onAction('void'); $event.stopPropagation()"
+              class="btn btn-ghost btn-error btn-xs gap-1"
+            >
+              Void
             </button>
           }
         </div>
@@ -167,6 +177,15 @@ export class OrderCardComponent {
 
   canPrint(): boolean {
     return this.order().state !== 'Draft';
+  }
+
+  canVoid(): boolean {
+    const order = this.order();
+    return (
+      order.state !== 'Draft' &&
+      order.state !== 'Cancelled' &&
+      !(order.customFields?.reversedAt != null)
+    );
   }
 
   readonly canPay = computed(() => {

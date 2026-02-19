@@ -9,6 +9,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { getExpenseCategoryLabel } from '../../../core/constants/expense-categories';
 import { CashierSessionService } from '../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../core/services/company.service';
 import { CurrencyService } from '../../../core/services/currency.service';
@@ -110,5 +111,11 @@ export class ExpensesComponent implements OnInit {
 
   getEntryAmount(entry: JournalEntry): number {
     return entry.lines.reduce((sum, line) => sum + line.debit, 0);
+  }
+
+  getCategoryLabel(entry: JournalEntry): string {
+    const expensesLine = entry.lines.find((l) => l.accountCode === 'EXPENSES');
+    const code = expensesLine?.meta?.['expenseCategory'];
+    return getExpenseCategoryLabel(code);
   }
 }

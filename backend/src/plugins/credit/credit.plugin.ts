@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
+import { ApprovalPlugin } from '../approval/approval.plugin';
 import { LedgerPlugin } from '../ledger/ledger.plugin';
 import { gql } from 'graphql-tag';
 
@@ -171,6 +172,7 @@ const COMBINED_SCHEMA = gql`
     allocateBulkPayment(input: PaymentAllocationInput!): PaymentAllocationResult!
     paySingleOrder(input: PaySingleOrderInput!): PaymentAllocationResult!
     reverseOrder(orderId: ID!): OrderReversalResult!
+    voidOrder(orderId: ID!): OrderReversalResult!
   }
 
   """
@@ -255,7 +257,7 @@ const COMBINED_SCHEMA = gql`
 `;
 
 @VendurePlugin({
-  imports: [PluginCommonModule, LedgerPlugin],
+  imports: [PluginCommonModule, LedgerPlugin, ApprovalPlugin],
   providers: [
     // Financial services (ledger infrastructure)
     LedgerQueryService,

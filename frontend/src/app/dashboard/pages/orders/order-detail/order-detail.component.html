@@ -294,6 +294,25 @@
       </div>
     </div>
 
+    <!-- Void order (hidden in modal and print mode) -->
+    @if (!modalMode() && canVoid()) {
+      <div class="no-print mt-4 sm:mt-6 pt-4 border-t border-base-300/50">
+        <button
+          type="button"
+          class="btn btn-outline btn-error btn-sm"
+          [disabled]="isVoiding()"
+          (click)="handleVoidOrder()"
+        >
+          @if (isVoiding()) {
+            <span class="loading loading-spinner loading-xs"></span>
+            Voiding...
+          } @else {
+            Void order
+          }
+        </button>
+      </div>
+    }
+
     <!-- Print Controls (at bottom, hidden in modal and print mode) -->
     @if (showPrintControls() && !modalMode() && canPrint()) {
       <div class="no-print mt-4 sm:mt-6 pt-4 border-t border-base-300/50">
