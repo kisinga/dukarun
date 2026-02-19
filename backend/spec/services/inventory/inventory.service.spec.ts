@@ -12,6 +12,7 @@ import { InventoryStore } from '../../../src/services/inventory/interfaces/inven
 import { CostingStrategy } from '../../../src/services/inventory/interfaces/costing-strategy.interface';
 import { ExpiryPolicy } from '../../../src/services/inventory/interfaces/expiry-policy.interface';
 import { LedgerPostingService } from '../../../src/services/financial/ledger-posting.service';
+import { StockValuationService } from '../../../src/services/financial/stock-valuation.service';
 import { MovementType } from '../../../src/services/inventory/entities/inventory-movement.entity';
 
 describe('InventoryService', () => {
@@ -50,6 +51,10 @@ describe('InventoryService', () => {
       postInventoryWriteOff: jest.fn(),
     } as unknown as LedgerPostingService;
 
+    const stockValuationService: StockValuationService = {
+      invalidateCache: jest.fn(),
+    } as unknown as StockValuationService;
+
     const mockRepo = {
       create: jest.fn((dto: any) => dto),
       save: jest.fn((entity: any) => Promise.resolve(entity)),
@@ -64,7 +69,8 @@ describe('InventoryService', () => {
       inventoryStore as unknown as InventoryStoreService,
       costingStrategy as any,
       expiryPolicy as any,
-      ledgerPostingService
+      ledgerPostingService,
+      stockValuationService
     );
 
     return {
@@ -73,6 +79,7 @@ describe('InventoryService', () => {
       costingStrategy,
       expiryPolicy,
       ledgerPostingService,
+      stockValuationService,
       connection,
     };
   };
