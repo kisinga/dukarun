@@ -143,52 +143,33 @@ services:
       retries: 3
       start_period: 30s
 
-  # ========================================
-  # Super Admin (Angular + Nginx, port 4201)
-  # ========================================
-  super-admin:
-    image: ghcr.io/kisinga/dukarun/super-admin:latest
-    platform: linux/amd64
-    restart: unless-stopped
-    networks:
-      - dukarun_services_network
-    environment:
-      # URL the browser uses for admin-api (set SUPERADMIN_API_URL in production, e.g. https://api.example.com/admin-api)
-      API_URL: ${SUPERADMIN_API_URL:-http://localhost:3000/admin-api}
-    ports:
-      - '127.0.0.1:4201:4201'
-    depends_on:
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test:
-        - CMD
-        - curl
-        - -f
-        - http://localhost:4201/health
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # ========================================
-  # ML Trainer Microservice (image built in CI; no build: here so Coolify deploy path matches services.yml)
-  # ========================================
-  # ml-trainer:
-  #   image: ghcr.io/kisinga/dukarun/ml-trainer:latest
+  # # ========================================
+  # # Super Admin (Angular + Nginx, port 4201)
+  # # ========================================
+  # super-admin:
+  #   image: ghcr.io/kisinga/dukarun/super-admin:latest
   #   platform: linux/amd64
   #   restart: unless-stopped
   #   networks:
   #     - dukarun_services_network
   #   environment:
-  #     ML_PORT: ${ML_PORT:-3005}
-  #     NODE_ENV: production
-  #     ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN}
+  #     # URL the browser uses for admin-api (set SUPERADMIN_API_URL in production, e.g. https://api.example.com/admin-api)
+  #     API_URL: ${SUPERADMIN_API_URL:-http://localhost:3000/admin-api}
+  #   ports:
+  #     - '127.0.0.1:4201:4201'
+  #   depends_on:
+  #     backend:
+  #       condition: service_healthy
   #   healthcheck:
-  #     test: ['CMD', 'curl', '-f', 'http://localhost:3005/health']
+  #     test:
+  #       - CMD
+  #       - curl
+  #       - -f
+  #       - http://localhost:4201/health
   #     interval: 30s
   #     timeout: 10s
   #     retries: 3
+  #     start_period: 30s
 
 # ========================================
 # Networks
