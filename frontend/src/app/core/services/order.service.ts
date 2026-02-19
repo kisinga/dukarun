@@ -8,7 +8,6 @@ import {
   CREATE_DRAFT_ORDER,
   CREATE_ORDER,
   GET_ORDER_DETAILS,
-  GET_PAYMENT_METHODS,
   REMOVE_DRAFT_ORDER_LINE,
   SET_ORDER_LINE_CUSTOM_PRICE,
   TRANSITION_ORDER_TO_STATE,
@@ -81,16 +80,6 @@ export class OrderService {
   async createOrder(input: CreateOrderInput): Promise<Order> {
     try {
       const client = this.apolloService.getClient();
-
-      // Test backend connection first
-      try {
-        await client.query({
-          query: GET_PAYMENT_METHODS,
-        });
-      } catch (error) {
-        console.error('❌ Backend connection failed:', error);
-        throw new Error(`Backend connection failed: ${error}`);
-      }
 
       // Call backend order creation mutation
       // Note: saveAsProforma is from credit plugin; generated types may not include it

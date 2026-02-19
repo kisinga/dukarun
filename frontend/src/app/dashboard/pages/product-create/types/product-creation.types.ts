@@ -7,7 +7,8 @@ export type HowSoldPreset =
   | 'single-item' // One discrete SKU (e.g. single bottle)
   | 'multi-variant' // Discrete variants (e.g. sizes / pack sizes)
   | 'by-weight-kg' // Measured by weight in KG
-  | 'by-volume-litre'; // Measured by volume in litres
+  | 'by-volume-litre' // Measured by volume in litres
+  | 'by-length-m'; // Measured by length in metres
 
 export interface VariantDimension {
   id: string;

@@ -105,7 +105,7 @@
         }
       </div>
       <div class="kpi-card kpi-card--margin rounded-lg p-3">
-        <span class="kpi-label">Profit margin ({{ getActivePeriodLabel() }})</span>
+        <span class="kpi-label">Profit margin</span>
         @if (analyticsLoading()) {
           <div class="skeleton h-7 w-14 rounded mt-1"></div>
         } @else if (profitMarginPercent() !== null) {

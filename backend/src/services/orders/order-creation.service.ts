@@ -96,7 +96,11 @@ export class OrderCreationService {
           const draftOrder = await this.orderService.createDraft(transactionCtx);
           this.logger.log(`Created draft order: ${draftOrder.code}`);
 
-          // 4. Add items with custom pricing
+          // 4. Add items with custom pricing.
+          // Order line price-affecting changes (custom prices, address, etc.) must go through
+          // Vendure OrderService APIs that invoke OrderItemPriceCalculationStrategy, so line and
+          // order totals stay in sync. Avoid updating only customFields or DB columns without
+          // triggering recalculation.
           await this.orderItemService.addItems(transactionCtx, draftOrder.id, input.cartItems);
 
           // 5. Set customer

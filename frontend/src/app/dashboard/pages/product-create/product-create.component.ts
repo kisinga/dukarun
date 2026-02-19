@@ -489,6 +489,10 @@ export class ProductCreateComponent implements OnInit {
       this.productType.set('measured');
       this.measurementUnit.set('KG');
       this.variantDimensions.set([]);
+    } else if (preset === 'by-length-m') {
+      this.productType.set('measured');
+      this.measurementUnit.set('M');
+      this.variantDimensions.set([]);
     } else if (preset === 'by-volume-litre') {
       // Custom: no pre-population — leave hints only; fractional toggle drives productType
       this.productType.set('discrete'); // fractional toggle defaults off
@@ -889,7 +893,7 @@ export class ProductCreateComponent implements OnInit {
             this.productType.set('measured');
             // Try to extract measurement unit from variant name (e.g., "Product - KG" or just "KG")
             const variantName = firstVariant.name || '';
-            const unitMatch = variantName.match(/\b(KG|L|G|ML|KG|LITRE|LITER)\b/i);
+            const unitMatch = variantName.match(/\b(KG|L|G|ML|M|LITRE|LITER)\b/i);
             if (unitMatch) {
               const unit = unitMatch[0].toUpperCase();
               // Normalize units

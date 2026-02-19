@@ -8,6 +8,9 @@ import { CartItemInput } from './order-creation.service';
  *
  * Handles adding items to orders and applying custom pricing.
  * Separated for single responsibility and testability.
+ *
+ * Applying a custom line price must trigger Vendure's price recalculation (e.g. via
+ * adjustOrderLine) so line and order totals stay in sync.
  */
 @Injectable()
 export class OrderItemService {
@@ -47,7 +50,8 @@ export class OrderItemService {
   }
 
   /**
-   * Apply custom price to an order line
+   * Apply custom price to an order line.
+   * Persist customFields then trigger recalculation so the strategy runs with updated customLinePrice.
    */
   private async applyCustomPrice(
     ctx: RequestContext,
@@ -68,6 +72,21 @@ export class OrderItemService {
         customLinePrice: item.customLinePrice!,
         reason: item.priceOverrideReason,
       });
+
+      // Trigger Vendure price recalculation so OrderItemPriceCalculationStrategy runs
+      // with updated customFields and line/order totals are updated.
+      const adjustResult = await this.orderService.adjustOrderLine(
+        ctx,
+        orderId as string,
+        orderLine.id.toString(),
+        item.quantity
+      );
+      if (adjustResult && typeof adjustResult === 'object' && 'errorCode' in adjustResult) {
+        const error = adjustResult as { errorCode: string; message?: string };
+        throw new UserInputError(
+          `Failed to apply custom price: ${error.message || error.errorCode || 'Unknown error'}`
+        );
+      }
     }
   }
 }

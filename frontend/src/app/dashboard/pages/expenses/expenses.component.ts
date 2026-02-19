@@ -115,7 +115,7 @@ export class ExpensesComponent implements OnInit {
 
   getCategoryLabel(entry: JournalEntry): string {
     const expensesLine = entry.lines.find((l) => l.accountCode === 'EXPENSES');
-    const code = expensesLine?.meta?.expenseCategory;
+    const code = expensesLine?.meta?.['expenseCategory'];
     return getExpenseCategoryLabel(code);
   }
 }

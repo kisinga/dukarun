@@ -2,14 +2,23 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { HowSoldPreset } from '../types/product-creation.types';
 
+const MEASURED_PRESETS: HowSoldPreset[] = ['by-weight-kg', 'by-volume-litre', 'by-length-m'];
+
+function isMeasured(
+  preset: HowSoldPreset | null,
+): preset is 'by-weight-kg' | 'by-volume-litre' | 'by-length-m' {
+  return preset !== null && MEASURED_PRESETS.includes(preset);
+}
+
 /**
  * How Sold Selector
  *
  * Lets the user pick how the item is sold. Clean grid with icons.
- * Focused on the 4 preset options only.
+ * Single item, Sizes/Packs, or Weight/Volume/Length with a unit dropdown (Kg, Litre, Metres).
  */
 @Component({
   selector: 'app-how-sold-selector',
+  standalone: true,
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -64,16 +73,15 @@ import { HowSoldPreset } from '../types/product-creation.types';
           <span class="text-[11px] font-medium">Sizes / Packs</span>
         </button>
 
-        <!-- By weight -->
+        <!-- Weight / Volume / Length (measured) -->
         <button
           type="button"
           class="btn btn-sm h-auto py-2 flex-col gap-0.5 transition-all duration-200"
-          [class.btn-primary]="selected() === 'by-weight-kg'"
-          [class.btn-ghost]="selected() !== 'by-weight-kg'"
-          [class.border-base-300]="selected() !== 'by-weight-kg'"
-          (click)="onSelect('by-weight-kg')"
+          [class.btn-primary]="isMeasured(selected())"
+          [class.btn-ghost]="!isMeasured(selected())"
+          [class.border-base-300]="!isMeasured(selected())"
+          (click)="onMeasuredClick()"
         >
-          <!-- Scale/weight icon -->
           <svg
             class="w-4 h-4"
             viewBox="0 0 24 24"
@@ -92,34 +100,23 @@ import { HowSoldPreset } from '../types/product-creation.types';
             <path d="M18 12h4" />
             <circle cx="12" cy="17" r="4" />
           </svg>
-          <span class="text-[11px] font-medium">Weight / Volume</span>
+          <span class="text-[11px] font-medium">Weight / Volume / Length</span>
         </button>
 
-        <!-- By volume -->
-        <button
-          type="button"
-          class="btn btn-sm h-auto py-2 flex-col gap-0.5 transition-all duration-200"
-          [class.btn-primary]="selected() === 'by-volume-litre'"
-          [class.btn-ghost]="selected() !== 'by-volume-litre'"
-          [class.border-base-300]="selected() !== 'by-volume-litre'"
-          (click)="onSelect('by-volume-litre')"
-        >
-          <!-- Beaker/liquid icon -->
-          <svg
-            class="w-4 h-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M4.5 3h15" />
-            <path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3" />
-            <path d="M6 14h12" />
-          </svg>
-          <span class="text-[11px] font-medium">Custom</span>
-        </button>
+        <!-- Unit dropdown (shown when measured is selected) -->
+        <div class="flex flex-col justify-end">
+          @if (isMeasured(selected())) {
+            <select
+              class="select select-bordered select-sm w-full"
+              [value]="measuredValue()"
+              (change)="onMeasuredUnitChange($event)"
+            >
+              <option value="by-weight-kg">Weight (kg)</option>
+              <option value="by-volume-litre">Volume (litre)</option>
+              <option value="by-length-m">Length (metres)</option>
+            </select>
+          }
+        </div>
       </div>
     </div>
   `,
@@ -128,7 +125,25 @@ export class HowSoldSelectorComponent {
   readonly selected = input<HowSoldPreset | null>(null);
   readonly selectedChange = output<HowSoldPreset>();
 
+  protected readonly isMeasured = isMeasured;
+
+  protected measuredValue(): HowSoldPreset {
+    const s = this.selected();
+    return isMeasured(s) ? s : 'by-weight-kg';
+  }
+
   onSelect(preset: HowSoldPreset): void {
     this.selectedChange.emit(preset);
+  }
+
+  onMeasuredClick(): void {
+    this.selectedChange.emit(this.measuredValue());
+  }
+
+  onMeasuredUnitChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as HowSoldPreset;
+    if (MEASURED_PRESETS.includes(value)) {
+      this.selectedChange.emit(value);
+    }
   }
 }
