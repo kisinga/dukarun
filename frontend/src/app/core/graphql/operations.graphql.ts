@@ -887,6 +887,29 @@ export const GET_STOCK_VALUE_STATS = graphql(`
   }
 `);
 
+export const GET_STOCK_VALUE_RANKING = graphql(`
+  query GetStockValueRanking(
+    $valuationType: StockValuationType!
+    $limit: Int
+    $stockLocationId: ID
+  ) {
+    stockValueRanking(
+      valuationType: $valuationType
+      limit: $limit
+      stockLocationId: $stockLocationId
+    ) {
+      items {
+        productVariantId
+        productId
+        productName
+        variantName
+        value
+      }
+      total
+    }
+  }
+`);
+
 export const GET_PRODUCT_STATS = graphql(`
   query GetProductStats {
     products(options: { take: 1 }) {

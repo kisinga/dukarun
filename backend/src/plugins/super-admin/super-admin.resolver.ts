@@ -5,6 +5,12 @@ import { AuditService } from '../../infrastructure/audit/audit.service';
 import { AuditTrailFilters } from '../../infrastructure/audit/audit.types';
 import { AnalyticsQueryService } from '../../services/analytics/analytics-query.service';
 import { ChannelSettingsService } from '../../services/channels/channel-settings.service';
+import {
+  NotificationService,
+  NotificationType,
+} from '../../services/notifications/notification.service';
+import { PendingRegistrationsService } from './pending-registrations.service';
+import { PlatformAdminService } from './platform-admin.service';
 import { PlatformStatsService } from './platform-stats.service';
 
 const VALID_STATUSES = ['UNAPPROVED', 'APPROVED', 'DISABLED', 'BANNED'] as const;
@@ -13,10 +19,13 @@ const VALID_STATUSES = ['UNAPPROVED', 'APPROVED', 'DISABLED', 'BANNED'] as const
 export class SuperAdminResolver {
   constructor(
     private readonly platformStatsService: PlatformStatsService,
+    private readonly platformAdminService: PlatformAdminService,
     private readonly analyticsQueryService: AnalyticsQueryService,
     private readonly auditService: AuditService,
     private readonly channelSettingsService: ChannelSettingsService,
-    private readonly channelService: ChannelService
+    private readonly channelService: ChannelService,
+    private readonly notificationService: NotificationService,
+    private readonly pendingRegistrationsService: PendingRegistrationsService
   ) {}
 
   @Query()
@@ -29,6 +38,48 @@ export class SuperAdminResolver {
   @Allow(Permission.SuperAdmin)
   async platformStats() {
     return this.platformStatsService.getPlatformStats();
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async administratorsForChannel(@Args('channelId') channelId: string) {
+    return this.platformAdminService.getAdministratorsForChannel(channelId);
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async platformAdministrators(
+    @Args('options', { nullable: true })
+    options?: {
+      skip?: number;
+      take?: number;
+      channelId?: string;
+      superAdminOnly?: boolean;
+    }
+  ) {
+    return this.platformAdminService.getPlatformAdministrators(options ?? {});
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async notificationsForChannel(
+    @Args('channelId') channelId: string,
+    @Args('options', { nullable: true })
+    options?: { skip?: number; take?: number; type?: string }
+  ) {
+    const opts = options ?? {};
+    const serviceOptions = {
+      skip: opts.skip,
+      take: opts.take,
+      type: opts.type as NotificationType | undefined,
+    };
+    return this.notificationService.getNotificationsForChannel(channelId, serviceOptions);
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async pendingRegistrations() {
+    return this.pendingRegistrationsService.getPendingRegistrations();
   }
 
   @Query()
@@ -201,5 +252,32 @@ export class SuperAdminResolver {
     const updated = await this.channelService.findOne(ctx, input.channelId);
     if (!updated) throw new Error('Channel not found after update');
     return updated;
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async approveUser(@Args('userId') userId: string) {
+    const user = await this.pendingRegistrationsService.approveUser(userId);
+    const cf = (user.customFields ?? {}) as Record<string, unknown>;
+    return {
+      id: user.id.toString(),
+      identifier: user.identifier ?? '',
+      authorizationStatus: (cf.authorizationStatus as string) ?? 'APPROVED',
+    };
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async rejectUser(
+    @Args('userId') userId: string,
+    @Args('reason', { nullable: true }) reason?: string
+  ) {
+    const user = await this.pendingRegistrationsService.rejectUser(userId, reason ?? undefined);
+    const cf = (user.customFields ?? {}) as Record<string, unknown>;
+    return {
+      id: user.id.toString(),
+      identifier: user.identifier ?? '',
+      authorizationStatus: (cf.authorizationStatus as string) ?? 'REJECTED',
+    };
   }
 }

@@ -76,6 +76,13 @@ export const routes: Routes = [
           import('./dashboard/pages/products/products.component').then((m) => m.ProductsComponent),
       },
       {
+        path: 'products/analytics',
+        loadComponent: () =>
+          import('./dashboard/pages/products/analytics/product-analytics-page.component').then(
+            (m) => m.ProductAnalyticsPageComponent,
+          ),
+      },
+      {
         path: 'products/create',
         canActivate: [productGuard],
         loadComponent: () =>

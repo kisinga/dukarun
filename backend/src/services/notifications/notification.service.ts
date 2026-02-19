@@ -186,6 +186,33 @@ export class NotificationService {
     return this.channelUserService.getChannelAdminUserIds(RequestContext.empty(), channelId);
   }
 
+  /**
+   * Get all notifications for a channel (any user). For SuperAdmin only.
+   */
+  async getNotificationsForChannel(
+    channelId: string,
+    options: { skip?: number; take?: number; type?: NotificationType } = {}
+  ): Promise<{ items: Notification[]; totalItems: number }> {
+    const skip = options.skip ?? 0;
+    const take = options.take ?? 50;
+
+    const where: Record<string, unknown> = { channelId };
+    if (options.type) {
+      where.type = options.type;
+    }
+
+    const [items, totalItems] = await this.connection.rawConnection
+      .getRepository(Notification)
+      .findAndCount({
+        where,
+        order: { createdAt: 'DESC' },
+        skip,
+        take,
+      });
+
+    return { items, totalItems };
+  }
+
   // ============================================================================
   // PREFERENCE-AWARE NOTIFICATION METHODS
   // Customization happens here in the notification layer, not the event layer.

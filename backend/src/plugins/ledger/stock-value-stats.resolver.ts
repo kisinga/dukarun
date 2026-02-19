@@ -1,6 +1,9 @@
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
-import { StockValuationService } from '../../services/financial/stock-valuation.service';
+import {
+  StockValuationService,
+  StockValuationType,
+} from '../../services/financial/stock-valuation.service';
 
 @Resolver()
 export class StockValueStatsResolver {
@@ -17,6 +20,22 @@ export class StockValueStatsResolver {
       ctx,
       stockLocationId != null ? Number(stockLocationId) : undefined,
       forceRefresh ?? false
+    );
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async stockValueRanking(
+    @Ctx() ctx: RequestContext,
+    @Args('valuationType') valuationType: StockValuationType,
+    @Args('limit', { nullable: true }) limit?: number,
+    @Args('stockLocationId', { nullable: true }) stockLocationId?: string
+  ) {
+    return this.stockValuationService.getStockValueRanking(
+      ctx,
+      valuationType,
+      limit ?? 20,
+      stockLocationId != null ? Number(stockLocationId) : undefined
     );
   }
 }

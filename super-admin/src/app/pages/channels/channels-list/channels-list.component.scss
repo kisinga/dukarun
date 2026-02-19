@@ -1,16 +1,3 @@
-h1 { margin: 0 0 1rem; font-size: 1.5rem; }
-.error { color: #b91c1c; }
-.table-wrap { overflow-x: auto; }
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-  th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
-  th { background: #f9fafb; font-weight: 600; }
-  .badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
-  .badge-approved { background: #d1fae5; color: #065f46; }
-  .badge-unapproved { background: #fef3c7; color: #92400e; }
-  .badge-disabled { background: #fee2e2; color: #991b1b; }
-  .badge-banned { background: #fecaca; color: #7f1d1d; }
-  a { color: #2563eb; text-decoration: none; &:hover { text-decoration: underline; } }
+:host {
+  display: block;
 }

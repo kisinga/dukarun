@@ -1,32 +1,37 @@
-<h1>Dashboard</h1>
+<h1 class="text-2xl font-bold mb-6">Dashboard</h1>
 @if (loading()) {
-  <p>Loading…</p>
+  <div class="flex items-center gap-2 text-base-content/70">
+    <span class="loading loading-spinner loading-md"></span>
+    <span>Loading…</span>
+  </div>
 }
 @if (error()) {
-  <p class="error">{{ error() }}</p>
+  <div role="alert" class="alert alert-error">
+    <span>{{ error() }}</span>
+  </div>
 }
 @if (stats(); as s) {
-  <div class="stats-grid">
-    <div class="stat-card">
-      <span class="stat-label">Total Channels</span>
-      <span class="stat-value">{{ s.totalChannels }}</span>
+  <div class="stats stats-vertical sm:stats-horizontal w-full bg-base-100 shadow border border-base-300 mb-6">
+    <div class="stat">
+      <div class="stat-title">Total Channels</div>
+      <div class="stat-value text-primary">{{ s.totalChannels }}</div>
     </div>
-    <div class="stat-card">
-      <span class="stat-label">Approved</span>
-      <span class="stat-value">{{ s.channelsByStatus.APPROVED }}</span>
+    <div class="stat">
+      <div class="stat-title">Approved</div>
+      <div class="stat-value text-success">{{ s.channelsByStatus.APPROVED }}</div>
     </div>
-    <div class="stat-card">
-      <span class="stat-label">Unapproved</span>
-      <span class="stat-value">{{ s.channelsByStatus.UNAPPROVED }}</span>
+    <div class="stat">
+      <div class="stat-title">Unapproved</div>
+      <div class="stat-value text-warning">{{ s.channelsByStatus.UNAPPROVED }}</div>
     </div>
-    <div class="stat-card">
-      <span class="stat-label">Trial expiring soon (7d)</span>
-      <span class="stat-value">{{ s.trialExpiringSoonCount }}</span>
+    <div class="stat">
+      <div class="stat-title">Trial expiring (7d)</div>
+      <div class="stat-value">{{ s.trialExpiringSoonCount }}</div>
     </div>
-    <div class="stat-card">
-      <span class="stat-label">Active subscriptions</span>
-      <span class="stat-value">{{ s.activeSubscriptionsCount }}</span>
+    <div class="stat">
+      <div class="stat-title">Active subscriptions</div>
+      <div class="stat-value">{{ s.activeSubscriptionsCount }}</div>
     </div>
   </div>
-  <p><a routerLink="/channels" class="link">View all channels →</a></p>
+  <a routerLink="/channels" class="btn btn-primary btn-outline btn-sm">View all channels</a>
 }

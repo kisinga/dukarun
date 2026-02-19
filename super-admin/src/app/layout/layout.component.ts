@@ -11,4 +11,9 @@ import { AuthService } from '../core/services/auth.service';
 })
 export class LayoutComponent {
   readonly auth = inject(AuthService);
+
+  closeDrawer(): void {
+    const el = document.getElementById('sa-drawer') as HTMLInputElement | null;
+    if (el) el.checked = false;
+  }
 }

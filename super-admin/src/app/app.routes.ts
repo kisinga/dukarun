@@ -12,6 +12,8 @@ export const routes: Routes = [
       { path: 'dashboard', loadComponent: () => import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent) },
       { path: 'channels', loadComponent: () => import('./pages/channels/channels-list/channels-list.component').then(m => m.ChannelsListComponent) },
       { path: 'channels/:id', loadComponent: () => import('./pages/channels/channel-detail/channel-detail.component').then(m => m.ChannelDetailComponent) },
+      { path: 'users', loadComponent: () => import('./pages/users/users-list/users-list.component').then(m => m.UsersListComponent) },
+      { path: 'pending-registrations', loadComponent: () => import('./pages/pending-registrations/pending-registrations.component').then(m => m.PendingRegistrationsComponent) },
       { path: 'subscription-tiers', loadComponent: () => import('./pages/subscription-tiers/subscription-tiers.component').then(m => m.SubscriptionTiersComponent) },
     ],
   },

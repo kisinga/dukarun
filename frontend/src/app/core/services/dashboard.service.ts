@@ -1,4 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
+import { gql } from '@apollo/client/core';
 import {
   GET_DASHBOARD_STATS,
   GET_PRODUCT_STATS,
@@ -6,6 +7,30 @@ import {
   GET_RECENT_ORDERS,
   GET_STOCK_VALUE_STATS,
 } from '../graphql/operations.graphql';
+
+/** Used until codegen includes GetStockValueRanking. Same as operations.graphql.ts GetStockValueRanking. */
+const GET_STOCK_VALUE_RANKING_DOC = gql`
+  query GetStockValueRanking(
+    $valuationType: StockValuationType!
+    $limit: Int
+    $stockLocationId: ID
+  ) {
+    stockValueRanking(
+      valuationType: $valuationType
+      limit: $limit
+      stockLocationId: $stockLocationId
+    ) {
+      items {
+        productVariantId
+        productId
+        productName
+        variantName
+        value
+      }
+      total
+    }
+  }
+`;
 import type { CacheSyncEntityHandler } from './cache/cache-sync-handler.interface';
 import { CacheSyncService } from './cache/cache-sync.service';
 import { ApolloService } from './apollo.service';
@@ -69,6 +94,23 @@ export interface StockValueStats {
   wholesale: number;
   cost: number;
 }
+
+/** Single item in stock value ranking (value in cents). */
+export interface StockValueRankingItem {
+  productVariantId: string;
+  productId: string;
+  productName: string;
+  variantName: string | null;
+  value: number;
+}
+
+/** Result of stockValueRanking query. */
+export interface StockValueRankingResult {
+  items: StockValueRankingItem[];
+  total: number;
+}
+
+export type StockValuationType = 'RETAIL' | 'WHOLESALE' | 'COST';
 
 /**
  * Recent activity item for the dashboard feed
@@ -309,6 +351,23 @@ export class DashboardService {
     } finally {
       this.stockValueLoadingSignal.set(false);
     }
+  }
+
+  /**
+   * Fetch top N products by stock value (retail, wholesale, or cost). On-demand; not cached.
+   */
+  async loadStockValueRanking(
+    valuationType: StockValuationType,
+    limit = 20,
+    stockLocationId?: string,
+  ): Promise<StockValueRankingResult> {
+    const client = this.apolloService.getClient();
+    const result = await client.query<{ stockValueRanking: StockValueRankingResult }>({
+      query: GET_STOCK_VALUE_RANKING_DOC,
+      variables: { valuationType, limit, stockLocationId: stockLocationId ?? null },
+      fetchPolicy: 'network-only',
+    });
+    return result.data?.stockValueRanking ?? { items: [], total: 0 };
   }
 
   /**

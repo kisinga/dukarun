@@ -44,6 +44,51 @@ export const SUPER_ADMIN_SCHEMA = gql`
     enablePrinter: Boolean
   }
 
+  type PlatformAdministrator {
+    id: ID!
+    firstName: String!
+    lastName: String!
+    emailAddress: String!
+    userId: ID!
+    identifier: String!
+    authorizationStatus: String!
+    roleCodes: [String!]!
+    channelIds: [ID!]
+    isSuperAdmin: Boolean
+  }
+
+  input PlatformAdministratorListOptions {
+    skip: Int
+    take: Int
+    channelId: ID
+    superAdminOnly: Boolean
+  }
+
+  type PlatformAdministratorList {
+    items: [PlatformAdministrator!]!
+    totalItems: Int!
+  }
+
+  type PendingRegistrationAdministrator {
+    id: ID!
+    firstName: String!
+    lastName: String!
+    emailAddress: String!
+  }
+
+  type PendingRegistration {
+    userId: ID!
+    identifier: String!
+    createdAt: DateTime!
+    administrator: PendingRegistrationAdministrator!
+  }
+
+  type UserAuthorizationResult {
+    id: ID!
+    identifier: String!
+    authorizationStatus: String!
+  }
+
   extend type Query {
     platformChannels: [PlatformChannel!]!
     platformStats: PlatformStats!
@@ -53,11 +98,17 @@ export const SUPER_ADMIN_SCHEMA = gql`
       limit: Int
     ): AnalyticsStats!
     auditLogsForChannel(channelId: ID!, options: AuditLogOptions): [AuditLog!]!
+    administratorsForChannel(channelId: ID!): [PlatformAdministrator!]!
+    platformAdministrators(options: PlatformAdministratorListOptions): PlatformAdministratorList!
+    notificationsForChannel(channelId: ID!, options: NotificationListOptions): NotificationList!
+    pendingRegistrations: [PendingRegistration!]!
   }
 
   extend type Mutation {
     updateChannelStatusPlatform(channelId: ID!, status: String!): Channel!
     extendTrialPlatform(channelId: ID!, trialEndsAt: DateTime!): Channel!
     updateChannelFeatureFlagsPlatform(input: UpdateChannelFeatureFlagsInput!): Channel!
+    approveUser(userId: ID!): UserAuthorizationResult!
+    rejectUser(userId: ID!, reason: String): UserAuthorizationResult!
   }
 `;
