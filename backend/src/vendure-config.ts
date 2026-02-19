@@ -371,7 +371,7 @@ export const config: VendureConfig = {
       },
       {
         name: 'stockValueCache',
-        type: 'string',
+        type: 'text',
         label: [{ languageCode: LanguageCode.en, value: 'Stock Value Cache' }],
         description: [
           {

@@ -94,14 +94,15 @@ export class StockValuationService {
 
     const rows = await this.dataSource.query(
       `SELECT
-        pv.price,
+        pvp.price,
         COALESCE(pv."customFieldsWholesaleprice", 0) AS wholesale,
         COALESCE(SUM(sl."stockOnHand"), 0) AS qty
       FROM product_variant pv
       INNER JOIN product_channels_channel pcc ON pcc."productId" = pv."productId"
+      INNER JOIN product_variant_price pvp ON pvp."variantId" = pv.id AND pvp."channelId" = $1
       ${joinClause}
       WHERE pcc."channelId" = $1
-      GROUP BY pv.id, pv.price, pv."customFieldsWholesaleprice"`,
+      GROUP BY pv.id, pvp.price, pv."customFieldsWholesaleprice"`,
       params
     );
 

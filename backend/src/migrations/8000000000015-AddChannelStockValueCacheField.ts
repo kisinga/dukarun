@@ -3,10 +3,12 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 /**
  * Add Channel Stock Value Cache field
  *
- * Adds stockValueCache (TEXT NULL) for caching stock value stats (retail, wholesale, cost) per channel.
+ * Adds stockValueCache for caching stock value stats (retail, wholesale, cost) per channel.
+ * Column type must match Vendure CustomFieldType: type 'text' -> PostgreSQL "text"
+ * (see https://docs.vendure.io/reference/typescript-api/custom-fields/custom-field-type).
  */
-export class AddChannelStockValueCache8000000000014 implements MigrationInterface {
-  name = 'AddChannelStockValueCache8000000000014';
+export class AddChannelStockValueCacheField8000000000015 implements MigrationInterface {
+  name = 'AddChannelStockValueCacheField8000000000015';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

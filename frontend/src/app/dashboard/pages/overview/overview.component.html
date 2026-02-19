@@ -247,62 +247,22 @@
     </div>
   </div>
 
-  <!-- ===== PRODUCT & INVENTORY (stats only, minimal) ===== -->
-  <div class="rounded-xl border border-base-300 bg-base-100 overflow-hidden">
-    <div class="px-4 py-3 border-b border-base-300/60">
-      <h2 class="text-sm font-bold text-base-content/70">Product & Inventory</h2>
-    </div>
-    <div
-      class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-base-300/40"
-    >
-      <div class="px-4 py-4">
-        <p class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 mb-1">
-          Products
-        </p>
-        <p class="text-xl font-bold tabular-nums text-accent">{{ productCount() }}</p>
-      </div>
-      <div class="px-4 py-4">
-        <p class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 mb-1">
-          Variants
-        </p>
-        <p class="text-xl font-bold tabular-nums">{{ variantCount() }}</p>
-      </div>
-      <div class="px-4 py-4">
-        <p class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 mb-1">
-          Low stock
-        </p>
-        @if (lowStockCount() > 0) {
-          <button
-            type="button"
-            class="text-left transition-colors hover:opacity-80"
-            (click)="navigateToInventory()"
-          >
-            <span class="text-xl font-bold tabular-nums text-warning">{{ lowStockCount() }}</span>
-            <span class="text-xs text-base-content/50 ml-1">items →</span>
-          </button>
-        } @else {
-          <p class="text-xl font-bold tabular-nums text-success">0</p>
-        }
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== STOCK VALUE (at hand) ===== -->
+  <!-- ===== PRODUCT & INVENTORY (unified counts + stock value at hand) ===== -->
   <div class="rounded-xl border border-base-300 bg-base-100 overflow-hidden">
     <div class="flex items-center justify-between px-4 py-3 border-b border-base-300/60">
-      <h2 class="text-sm font-bold text-base-content/70">Stock value (at hand)</h2>
+      <h2 class="text-sm font-bold text-base-content/70">Product & Inventory</h2>
       <button
         type="button"
-        class="btn btn-ghost btn-xs btn-square"
+        class="btn btn-ghost btn-sm btn-square"
         (click)="refreshStockValue()"
         [disabled]="stockValueLoading()"
-        title="Refresh"
+        title="Refresh stock value"
       >
         @if (stockValueLoading()) {
           <span class="loading loading-spinner loading-xs"></span>
         } @else {
           <svg
-            class="h-3.5 w-3.5"
+            class="h-4 w-4"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -317,42 +277,60 @@
         }
       </button>
     </div>
-    @if (stockValueLoading() && !stockValueStats()) {
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 px-4 py-4">
-        <div class="skeleton h-14 rounded-lg"></div>
-        <div class="skeleton h-14 rounded-lg"></div>
-        <div class="skeleton h-14 rounded-lg"></div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 px-4 py-4">
+      <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
+        <span class="inventory-stat__label">Products</span>
+        <p class="inventory-stat__value text-accent">{{ productCount() }}</p>
       </div>
-    } @else if (stockValueStats(); as sv) {
-      <div
-        class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-base-300/40"
-      >
-        <div class="px-4 py-4">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 mb-1">
-            Retail
-          </p>
-          <p class="text-xl font-bold tabular-nums text-primary">
-            {{ currencyService.format(sv.retail) }}
-          </p>
-        </div>
-        <div class="px-4 py-4">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 mb-1">
-            Wholesale
-          </p>
-          <p class="text-xl font-bold tabular-nums">{{ currencyService.format(sv.wholesale) }}</p>
-        </div>
-        <div class="px-4 py-4">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 mb-1">
-            Cost
-          </p>
-          <p class="text-xl font-bold tabular-nums text-success">
-            {{ currencyService.format(sv.cost) }}
-          </p>
-        </div>
+      <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
+        <span class="inventory-stat__label">Variants</span>
+        <p class="inventory-stat__value">{{ variantCount() }}</p>
       </div>
-    } @else {
-      <p class="text-sm text-base-content/50 px-4 py-4">Unable to load stock value.</p>
-    }
+      <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
+        <span class="inventory-stat__label">Low stock</span>
+        @if (lowStockCount() > 0) {
+          <button
+            type="button"
+            class="inventory-stat__value text-left text-warning hover:opacity-80"
+            (click)="navigateToInventory()"
+          >
+            {{ lowStockCount() }} <span class="text-xs font-normal text-base-content/50">→</span>
+          </button>
+        } @else {
+          <p class="inventory-stat__value text-success">0</p>
+        }
+      </div>
+      <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
+        <span class="inventory-stat__label">Stock value · Retail</span>
+        @if (stockValueLoading() && !stockValueStats()) {
+          <div class="skeleton h-7 w-20 rounded mt-0.5"></div>
+        } @else if (stockValueStats(); as sv) {
+          <p class="inventory-stat__value text-primary">{{ currencyService.format(sv.retail) }}</p>
+        } @else {
+          <p class="inventory-stat__value text-base-content/50">—</p>
+        }
+      </div>
+      <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
+        <span class="inventory-stat__label">Stock value · Wholesale</span>
+        @if (stockValueLoading() && !stockValueStats()) {
+          <div class="skeleton h-7 w-20 rounded mt-0.5"></div>
+        } @else if (stockValueStats(); as sv) {
+          <p class="inventory-stat__value">{{ currencyService.format(sv.wholesale) }}</p>
+        } @else {
+          <p class="inventory-stat__value text-base-content/50">—</p>
+        }
+      </div>
+      <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
+        <span class="inventory-stat__label">Stock value · Cost</span>
+        @if (stockValueLoading() && !stockValueStats()) {
+          <div class="skeleton h-7 w-20 rounded mt-0.5"></div>
+        } @else if (stockValueStats(); as sv) {
+          <p class="inventory-stat__value text-success">{{ currencyService.format(sv.cost) }}</p>
+        } @else {
+          <p class="inventory-stat__value text-base-content/50">—</p>
+        }
+      </div>
+    </div>
   </div>
 
   <!-- ===== RECENT SALES ===== -->
