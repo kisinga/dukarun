@@ -172,6 +172,7 @@ const COMBINED_SCHEMA = gql`
     allocateBulkPayment(input: PaymentAllocationInput!): PaymentAllocationResult!
     paySingleOrder(input: PaySingleOrderInput!): PaymentAllocationResult!
     reverseOrder(orderId: ID!): OrderReversalResult!
+    voidOrder(orderId: ID!): OrderReversalResult!
   }
 
   """

@@ -1,12 +1,17 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { ApolloService } from './apollo.service';
 import {
-  GET_APPROVAL_REQUESTS,
-  GET_APPROVAL_REQUEST,
-  GET_MY_APPROVAL_REQUESTS,
-  CREATE_APPROVAL_REQUEST,
-  REVIEW_APPROVAL_REQUEST,
-} from '../graphql/operations.graphql';
+  GetApprovalRequestsDocument,
+  GetApprovalRequestDocument,
+  GetMyApprovalRequestsDocument,
+  CreateApprovalRequestDocument,
+  ReviewApprovalRequestDocument,
+  type GetApprovalRequestsQuery,
+  type GetApprovalRequestQuery,
+  type GetMyApprovalRequestsQuery,
+  type CreateApprovalRequestMutation,
+  type ReviewApprovalRequestMutation,
+} from '../graphql/generated/graphql';
 
 export interface ApprovalRequest {
   id: string;
@@ -45,22 +50,26 @@ export class ApprovalService {
     type?: string;
   }): Promise<ApprovalRequestList> {
     const client = this.apolloService.getClient();
-    const result = await client.query({
-      query: GET_APPROVAL_REQUESTS,
+    const result = await client.query<GetApprovalRequestsQuery>({
+      query: GetApprovalRequestsDocument,
       variables: { options: options ?? {} },
       fetchPolicy: 'network-only',
     });
-    return result.data!.getApprovalRequests as unknown as ApprovalRequestList;
+    const data = result.data?.getApprovalRequests;
+    return data
+      ? { items: data.items as ApprovalRequest[], totalItems: data.totalItems }
+      : { items: [], totalItems: 0 };
   }
 
   async getApproval(id: string): Promise<ApprovalRequest | null> {
     const client = this.apolloService.getClient();
-    const result = await client.query({
-      query: GET_APPROVAL_REQUEST,
+    const result = await client.query<GetApprovalRequestQuery>({
+      query: GetApprovalRequestDocument,
       variables: { id },
       fetchPolicy: 'network-only',
     });
-    return (result.data!.getApprovalRequest as unknown as ApprovalRequest) ?? null;
+    const data = result.data?.getApprovalRequest;
+    return data ? (data as ApprovalRequest) : null;
   }
 
   async getMyApprovalRequests(options?: {
@@ -70,12 +79,15 @@ export class ApprovalService {
     type?: string;
   }): Promise<ApprovalRequestList> {
     const client = this.apolloService.getClient();
-    const result = await client.query({
-      query: GET_MY_APPROVAL_REQUESTS,
+    const result = await client.query<GetMyApprovalRequestsQuery>({
+      query: GetMyApprovalRequestsDocument,
       variables: { options: options ?? {} },
       fetchPolicy: 'network-only',
     });
-    return result.data!.getMyApprovalRequests as unknown as ApprovalRequestList;
+    const data = result.data?.getMyApprovalRequests;
+    return data
+      ? { items: data.items as ApprovalRequest[], totalItems: data.totalItems }
+      : { items: [], totalItems: 0 };
   }
 
   async createApprovalRequest(input: {
@@ -86,14 +98,16 @@ export class ApprovalService {
     dueAt?: string;
   }): Promise<ApprovalRequest> {
     const client = this.apolloService.getClient();
-    const result = await client.mutate({
-      mutation: CREATE_APPROVAL_REQUEST,
+    const result = await client.mutate<CreateApprovalRequestMutation>({
+      mutation: CreateApprovalRequestDocument,
       variables: { input },
     });
     if (result.error) {
       throw new Error(result.error.message || 'Failed to create approval request');
     }
-    return result.data!.createApprovalRequest as unknown as ApprovalRequest;
+    const data = result.data?.createApprovalRequest;
+    if (!data) throw new Error('No data returned from createApprovalRequest');
+    return data as ApprovalRequest;
   }
 
   async reviewApprovalRequest(input: {
@@ -103,13 +117,15 @@ export class ApprovalService {
     rejectionReasonCode?: string;
   }): Promise<ApprovalRequest> {
     const client = this.apolloService.getClient();
-    const result = await client.mutate({
-      mutation: REVIEW_APPROVAL_REQUEST,
+    const result = await client.mutate<ReviewApprovalRequestMutation>({
+      mutation: ReviewApprovalRequestDocument,
       variables: { input },
     });
     if (result.error) {
       throw new Error(result.error.message || 'Failed to review approval request');
     }
-    return result.data!.reviewApprovalRequest as unknown as ApprovalRequest;
+    const data = result.data?.reviewApprovalRequest;
+    if (!data) throw new Error('No data returned from reviewApprovalRequest');
+    return data as ApprovalRequest;
   }
 }

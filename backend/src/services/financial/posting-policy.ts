@@ -67,6 +67,7 @@ export interface ExpensePostingContext {
   amount: number; // in cents
   sourceAccountCode: string; // asset account to credit (source of funds)
   memo?: string;
+  category?: string; // expense category code for meta.expenseCategory
 }
 
 export interface InventoryPurchasePostingContext {
@@ -314,12 +315,16 @@ export function createSupplierPaymentEntry(
  * Credits: sourceAccountCode (asset decrease - source of funds)
  */
 export function createExpenseEntry(context: ExpensePostingContext): JournalEntryTemplate {
+  const expenseCategory = context.category ?? 'other';
   return {
     lines: [
       {
         accountCode: ACCOUNT_CODES.EXPENSES,
         debit: context.amount,
-        meta: { sourceAccountCode: context.sourceAccountCode },
+        meta: {
+          sourceAccountCode: context.sourceAccountCode,
+          expenseCategory,
+        },
       },
       {
         accountCode: context.sourceAccountCode,

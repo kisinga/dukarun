@@ -370,6 +370,19 @@ export const config: VendureConfig = {
         ui: { tab: 'Settings' },
       },
       {
+        name: 'stockValueCache',
+        type: 'string',
+        label: [{ languageCode: LanguageCode.en, value: 'Stock Value Cache' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'Cached stock value stats (retail, wholesale, cost) as JSON; internal use only',
+          },
+        ],
+        public: false,
+        nullable: true,
+      },
+      {
         name: 'status',
         type: 'string',
         label: [{ languageCode: LanguageCode.en, value: 'Channel Status' }],

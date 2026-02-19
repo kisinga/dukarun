@@ -1,5 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
+  EventBus,
   ID,
   ProductVariant,
   RequestContext,
@@ -7,6 +8,7 @@ import {
   TransactionalConnection,
   UserInputError,
 } from '@vendure/core';
+import { StockLevelChangedEvent } from '../../infrastructure/events/custom-events';
 import { InventoryService } from '../inventory/inventory.service';
 
 export interface StockMovementResult {
@@ -29,6 +31,7 @@ export class StockMovementService {
 
   constructor(
     private readonly connection: TransactionalConnection,
+    private readonly eventBus: EventBus,
     @Optional() private readonly inventoryService?: InventoryService
   ) {}
 
@@ -109,6 +112,11 @@ export class StockMovementService {
           `Opening stock batch creation failed for variant ${variantId}: ${err instanceof Error ? err.message : String(err)}`
         );
       }
+    }
+
+    const channelId = ctx.channelId?.toString();
+    if (channelId) {
+      this.eventBus.publish(new StockLevelChangedEvent(ctx, channelId));
     }
 
     return {

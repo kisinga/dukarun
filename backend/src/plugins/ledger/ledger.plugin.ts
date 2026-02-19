@@ -25,6 +25,7 @@ import { PurchasePostingStrategy } from '../../services/financial/strategies/pur
 import { SalePostingStrategy } from '../../services/financial/strategies/sale-posting.strategy';
 import { InventoryReconciliationService } from '../../services/financial/inventory-reconciliation.service';
 import { LedgerQueryService } from '../../services/financial/ledger-query.service';
+import { StockValuationService } from '../../services/financial/stock-valuation.service';
 import { AnalyticsQueryService } from '../../services/analytics/analytics-query.service';
 import { PeriodEndClosingService } from '../../services/financial/period-end-closing.service';
 import { PeriodLockService } from '../../services/financial/period-lock.service';
@@ -46,6 +47,8 @@ import { LEDGER_VIEWER_SCHEMA } from './ledger-viewer.schema';
 import { ReconciliationResolver } from './reconciliation.resolver';
 import { PeriodManagementResolver } from './period-management.resolver';
 import { PERIOD_MANAGEMENT_SCHEMA } from './period-management.schema';
+import { StockValueCacheSubscriber } from './stock-value-cache.subscriber';
+import { StockValueStatsResolver } from './stock-value-stats.resolver';
 import {
   CloseAccountingPeriodPermission,
   CreateInterAccountTransferPermission,
@@ -98,6 +101,8 @@ const COMBINED_SCHEMA = gql`
     ReconciliationService,
     ReconciliationValidatorService,
     InventoryReconciliationService,
+    StockValuationService,
+    StockValueCacheSubscriber,
     PeriodEndClosingService,
     LedgerPostingService,
     PurchasePostingStrategy,
@@ -124,6 +129,7 @@ const COMBINED_SCHEMA = gql`
       LedgerViewerResolver,
       ReconciliationResolver,
       PeriodManagementResolver,
+      StockValueStatsResolver,
     ],
   },
   shopApiExtensions: {
@@ -133,6 +139,7 @@ const COMBINED_SCHEMA = gql`
       LedgerViewerResolver,
       ReconciliationResolver,
       PeriodManagementResolver,
+      StockValueStatsResolver,
     ],
   },
   compatibility: VENDURE_COMPATIBILITY_VERSION,

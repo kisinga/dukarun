@@ -12,6 +12,7 @@ import {
   REMOVE_DRAFT_ORDER_LINE,
   SET_ORDER_LINE_CUSTOM_PRICE,
   TRANSITION_ORDER_TO_STATE,
+  VOID_ORDER,
 } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
 import { OrderSetupService } from './order-setup.service';
@@ -256,6 +257,30 @@ export class OrderService {
       console.error('❌ Order state transition failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Void an order: cancel payments, reverse ledger and inventory, transition to Cancelled.
+   * @param orderId Order ID to void
+   * @returns Result with updated order and hadPayments flag
+   */
+  async voidOrder(orderId: string): Promise<{ order: Order; hadPayments: boolean }> {
+    const client = this.apolloService.getClient();
+    const result = await client.mutate<{ voidOrder: { order: Order; hadPayments: boolean } }>({
+      mutation: VOID_ORDER as import('graphql').DocumentNode,
+      variables: { orderId },
+    });
+    if (result.error) {
+      throw new Error(result.error.message ?? 'Void order failed');
+    }
+    const data = result.data?.voidOrder;
+    if (!data) {
+      throw new Error('No data returned from voidOrder');
+    }
+    return {
+      order: data.order as Order,
+      hadPayments: data.hadPayments,
+    };
   }
 
   /**

@@ -18,4 +18,13 @@ export class OrderReversalResolver {
   ): Promise<OrderReversalResult> {
     return this.orderReversalService.reverseOrder(ctx, orderId);
   }
+
+  @Mutation()
+  @Allow(ReverseOrderPermission.Permission)
+  async voidOrder(
+    @Ctx() ctx: RequestContext,
+    @Args('orderId') orderId: string
+  ): Promise<OrderReversalResult> {
+    return this.orderReversalService.voidOrder(ctx, orderId);
+  }
 }

@@ -40,7 +40,17 @@ export const DASHBOARD_STATS_SCHEMA = gql`
     salesSummary: SalesSummary
   }
 
+  """
+  Stock value at retail, wholesale, and cost (cents). Cached per channel; use forceRefresh to recompute.
+  """
+  type StockValueStats {
+    retail: Float!
+    wholesale: Float!
+    cost: Float!
+  }
+
   extend type Query {
     dashboardStats(startDate: DateTime, endDate: DateTime): DashboardStats!
+    stockValueStats(stockLocationId: ID, forceRefresh: Boolean): StockValueStats!
   }
 `;

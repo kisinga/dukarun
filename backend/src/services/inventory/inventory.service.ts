@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ID, RequestContext, TransactionalConnection, UserInputError } from '@vendure/core';
 import { LedgerPostingService } from '../financial/ledger-posting.service';
+import { StockValuationService } from '../financial/stock-valuation.service';
 import {
   BatchAllocation,
   CostAllocationRequest,
@@ -159,7 +160,8 @@ export class InventoryService {
     private readonly inventoryStore: InventoryStoreService,
     private readonly costingStrategy: FifoCostingStrategy,
     private readonly expiryPolicy: DefaultExpiryPolicy,
-    private readonly ledgerPostingService: LedgerPostingService
+    private readonly ledgerPostingService: LedgerPostingService,
+    private readonly stockValuationService: StockValuationService
   ) {}
 
   /**
@@ -444,6 +446,8 @@ export class InventoryService {
         this.logger.log(
           `Recorded sale ${input.orderId}: ${allAllocations.length} allocations, total COGS: ${totalCogs}`
         );
+
+        await this.stockValuationService.invalidateCache(transactionCtx);
 
         return {
           orderId: input.orderId,

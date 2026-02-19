@@ -205,6 +205,7 @@
             <thead>
               <tr>
                 <th>Date</th>
+                <th>Category</th>
                 <th>Memo</th>
                 <th class="text-right">Amount</th>
               </tr>
@@ -213,6 +214,7 @@
               @for (entry of entries(); track entry.id) {
                 <tr>
                   <td>{{ formatDate(entry.entryDate) }}</td>
+                  <td>{{ getCategoryLabel(entry) }}</td>
                   <td>{{ entry.memo || '-' }}</td>
                   <td class="text-right font-semibold text-error tabular-nums">
                     {{ formatCurrency(getEntryAmount(entry)) }}

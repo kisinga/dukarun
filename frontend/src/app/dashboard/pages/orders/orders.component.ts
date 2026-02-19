@@ -11,7 +11,9 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { OrderService } from '../../../core/services/order.service';
 import { OrdersService } from '../../../core/services/orders.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { AnalyticsService } from '../../../core/services/analytics.service';
 import { PaginationComponent } from '../../components/shared/pagination.component';
 import { OrderAction, OrderCardComponent } from './components/order-card.component';
@@ -54,6 +56,8 @@ import { EchartContainerComponent } from '../../components/shared/charts/echart-
 })
 export class OrdersComponent implements OnInit {
   private readonly ordersService = inject(OrdersService);
+  private readonly orderService = inject(OrderService);
+  private readonly toastService = inject(ToastService);
   private readonly analyticsService = inject(AnalyticsService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -268,7 +272,7 @@ export class OrdersComponent implements OnInit {
   }
 
   /**
-   * Handle order actions (view, print, pay)
+   * Handle order actions (view, print, pay, void)
    */
   onOrderAction(event: { action: OrderAction; orderId: string }): void {
     const { action, orderId } = event;
@@ -285,6 +289,31 @@ export class OrdersComponent implements OnInit {
       case 'pay':
         this.handlePayOrder(orderId);
         break;
+
+      case 'void':
+        this.handleVoidOrder(orderId);
+        break;
+    }
+  }
+
+  /**
+   * Void order: confirm then call backend, refresh list, show toast.
+   */
+  private async handleVoidOrder(orderId: string): Promise<void> {
+    if (
+      !confirm(
+        'Void this order? Stock will be restored, ledger reversed, payments cancelled, and order marked as Cancelled.',
+      )
+    ) {
+      return;
+    }
+    try {
+      await this.orderService.voidOrder(orderId);
+      this.toastService.show('Order voided', 'The order has been voided successfully.', 'success');
+      await this.refreshOrders();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to void order';
+      this.toastService.show('Void failed', message, 'error');
     }
   }
 

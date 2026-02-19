@@ -48,7 +48,7 @@ interface CategoryData {
 export class OverviewComponent implements OnInit {
   private readonly dashboardService = inject(DashboardService);
   private readonly companyService = inject(CompanyService);
-  private readonly currencyService = inject(CurrencyService);
+  protected readonly currencyService = inject(CurrencyService);
   private readonly router = inject(Router);
   protected readonly cashierSessionService = inject(CashierSessionService);
   protected readonly shiftModalTrigger = inject(ShiftModalTriggerService);
@@ -194,6 +194,9 @@ export class OverviewComponent implements OnInit {
 
   protected readonly sessionOpen = this.cashierSessionService.hasActiveSession;
 
+  protected readonly stockValueStats = this.dashboardService.stockValueStats;
+  protected readonly stockValueLoading = this.dashboardService.stockValueLoading;
+
   constructor() {
     effect(
       () => {
@@ -201,6 +204,7 @@ export class OverviewComponent implements OnInit {
         if (companyId) {
           this.dashboardService.fetchDashboardData();
           void this.analyticsService.fetch('30d'); // 30d for profit margin + sales chart
+          void this.dashboardService.loadStockValueStats();
         }
       },
       { allowSignalWrites: true },
@@ -209,6 +213,10 @@ export class OverviewComponent implements OnInit {
 
   ngOnInit(): void {
     // Data fetching handled by constructor effect
+  }
+
+  refreshStockValue(): void {
+    void this.dashboardService.loadStockValueStats(true);
   }
 
   private createCategoryData(

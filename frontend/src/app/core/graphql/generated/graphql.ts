@@ -7271,6 +7271,7 @@ export type RecordCashCountInput = {
 
 export type RecordExpenseInput = {
   amount: Scalars['Int']['input'];
+  category?: InputMaybe<Scalars['String']['input']>;
   memo?: InputMaybe<Scalars['String']['input']>;
   sourceAccountCode: Scalars['String']['input'];
 };

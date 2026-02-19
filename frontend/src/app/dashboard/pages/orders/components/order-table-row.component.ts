@@ -33,9 +33,10 @@ export interface OrderTableRowData {
     method: string;
     createdAt: string;
   }> | null;
+  customFields?: { reversedAt?: string | null } | null;
 }
 
-export type OrderAction = 'view' | 'print' | 'pay';
+export type OrderAction = 'view' | 'print' | 'pay' | 'void';
 
 @Component({
   selector: 'tr[app-order-table-row]',
@@ -94,6 +95,14 @@ export type OrderAction = 'view' | 'print' | 'pay';
             </svg>
           </button>
         }
+        @if (canVoid()) {
+          <button
+            class="btn btn-xs btn-ghost btn-error"
+            (click)="onAction('void'); $event.stopPropagation()"
+          >
+            Void
+          </button>
+        }
       </div>
     </td>
   `,
@@ -131,6 +140,15 @@ export class OrderTableRowComponent {
 
   canPrint(): boolean {
     return this.order().state !== 'Draft';
+  }
+
+  canVoid(): boolean {
+    const order = this.order();
+    return (
+      order.state !== 'Draft' &&
+      order.state !== 'Cancelled' &&
+      !(order.customFields?.reversedAt != null)
+    );
   }
 
   readonly canPay = computed(() => {

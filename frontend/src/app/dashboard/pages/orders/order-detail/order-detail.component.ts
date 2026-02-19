@@ -17,6 +17,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { OrderService } from '../../../../core/services/order.service';
 import { OrdersService } from '../../../../core/services/orders.service';
+import { ToastService } from '../../../../core/services/toast.service';
 import { CustomerPaymentService } from '../../../../core/services/customer/customer-payment.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { PaymentMethodService } from '../../../../core/services/payment-method.service';
@@ -63,6 +64,7 @@ import { PrintControlsComponent } from '../../../../core/components/print-contro
 export class OrderDetailComponent implements OnInit, AfterViewInit {
   private readonly ordersService = inject(OrdersService);
   private readonly orderService = inject(OrderService);
+  private readonly toastService = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly paymentService = inject(CustomerPaymentService);
@@ -170,6 +172,15 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
     return this.isCreditOrder() && this.isUnpaidCreditOrder();
   });
 
+  readonly canVoid = computed(() => {
+    const order = this.order();
+    if (!order) return false;
+    const state = order.state;
+    const reversedAt = (order as { customFields?: { reversedAt?: string | null } }).customFields
+      ?.reversedAt;
+    return state !== 'Draft' && state !== 'Cancelled' && reversedAt == null;
+  });
+
   // Convert route query params to signal
   private readonly queryParams = toSignal(this.route.queryParams, { initialValue: {} });
   private readonly routeParams = toSignal(this.route.paramMap);
@@ -266,6 +277,7 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
   readonly selectedCompletePaymentCode = signal<string | null>(null);
   readonly isCompletingDraft = signal(false);
   readonly completeDraftError = signal<string | null>(null);
+  readonly isVoiding = signal(false);
 
   private async loadPaymentMethodsForDraft(): Promise<void> {
     try {
@@ -328,6 +340,30 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
       this.paymentError.set(error.message || 'Failed to process payment');
     } finally {
       this.isProcessingPayment.set(false);
+    }
+  }
+
+  async handleVoidOrder(): Promise<void> {
+    const order = this.order();
+    if (!order || !this.canVoid()) return;
+    if (
+      !confirm(
+        'Void this order? Stock will be restored, ledger reversed, payments cancelled, and order marked as Cancelled.',
+      )
+    ) {
+      return;
+    }
+    this.isVoiding.set(true);
+    this.ordersService.clearError();
+    try {
+      await this.orderService.voidOrder(order.id);
+      this.toastService.show('Order voided', 'The order has been voided successfully.', 'success');
+      await this.ordersService.fetchOrderById(order.id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to void order';
+      this.toastService.show('Void failed', message, 'error');
+    } finally {
+      this.isVoiding.set(false);
     }
   }
 }

@@ -8,6 +8,7 @@ declare global {
       serviceName?: string;
       serviceVersion?: string;
       vapidPublicKey?: string;
+      vendureAdminUrl?: string;
     };
   }
 }

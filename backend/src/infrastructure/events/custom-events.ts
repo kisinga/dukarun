@@ -121,6 +121,19 @@ export class ChannelStatusEvent extends DukaHubEvent {
 }
 
 /**
+ * Emitted when stock level changes (adjustment, purchase, sale).
+ * Used to invalidate stock value cache without Stock plugin depending on Ledger.
+ */
+export class StockLevelChangedEvent extends VendureEvent {
+  constructor(
+    public readonly ctx: RequestContext,
+    public readonly channelId: string
+  ) {
+    super();
+  }
+}
+
+/**
  * Stock-related alerts
  */
 export class StockAlertEvent extends DukaHubEvent {
