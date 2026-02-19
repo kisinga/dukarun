@@ -78,7 +78,9 @@
               <!-- How it's sold (presets) -->
               <app-how-sold-selector
                 [selected]="howSoldPreset()"
+                [measurementUnit]="measurementUnit()"
                 (selectedChange)="onHowSoldSelected($event)"
+                (measurementUnitChange)="setMeasurementUnit($event)"
               />
 
               <!-- Size template (for multi-variant) - Hidden in edit mode since template is not stored in DB -->
@@ -110,10 +112,10 @@
                 </div>
               }
 
-              <!-- Measurement unit (for measured presets) -->
+              <!-- Measurement unit (Custom only when fractional; by-measure uses dropdown in how-sold selector) -->
               <app-measurement-unit-selector
                 [measurementUnit]="measurementUnit()"
-                [visible]="productType() === 'measured'"
+                [visible]="productType() === 'measured' && howSoldPreset() !== 'by-measure'"
                 (unitChange)="setMeasurementUnit($event)"
               />
             }

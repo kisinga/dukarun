@@ -230,9 +230,19 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
       await this.inventoryService.recordSale(ctx, input);
       this.logger.log(`Recorded COGS for order ${order.code}`);
     } catch (err) {
-      this.logger.error(
-        `Failed to record COGS for order ${order.code}: ${err instanceof Error ? err.message : String(err)}`
-      );
+      const message = err instanceof Error ? err.message : String(err);
+      const isInsufficientStock =
+        message.includes('Insufficient stock') ||
+        message.includes('Insufficient quantity in batch') ||
+        (message.includes('Batch') && message.includes('not found or not available'));
+      if (isInsufficientStock) {
+        this.logger.warn(
+          `Skipping COGS for order ${order.code}: no batch stock (${message}). ` +
+            `Add stock via stock adjustment so future sales can record COGS.`
+        );
+        return;
+      }
+      this.logger.error(`Failed to record COGS for order ${order.code}: ${message}`);
       throw err;
     }
   }

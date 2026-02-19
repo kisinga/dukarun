@@ -485,13 +485,9 @@ export class ProductCreateComponent implements OnInit {
         options: [],
       };
       this.variantDimensions.set([baseDimension]);
-    } else if (preset === 'by-weight-kg') {
+    } else if (preset === 'by-measure') {
       this.productType.set('measured');
-      this.measurementUnit.set('KG');
-      this.variantDimensions.set([]);
-    } else if (preset === 'by-length-m') {
-      this.productType.set('measured');
-      this.measurementUnit.set('M');
+      this.measurementUnit.set(this.measurementUnit() ?? 'KG');
       this.variantDimensions.set([]);
     } else if (preset === 'by-volume-litre') {
       // Custom: no pre-population — leave hints only; fractional toggle drives productType
@@ -891,9 +887,9 @@ export class ProductCreateComponent implements OnInit {
           // Determine product type: measured vs discrete
           if (allowFractional) {
             this.productType.set('measured');
-            // Try to extract measurement unit from variant name (e.g., "Product - KG" or just "KG")
+            // Try to extract measurement unit from variant name (e.g., "Product - KG" or "Product - m")
             const variantName = firstVariant.name || '';
-            const unitMatch = variantName.match(/\b(KG|L|G|ML|M|LITRE|LITER)\b/i);
+            const unitMatch = variantName.match(/\b(KG|L|G|ML|M|LITRE|LITER|METRE|METER)\b/i);
             if (unitMatch) {
               const unit = unitMatch[0].toUpperCase();
               // Normalize units
@@ -903,6 +899,8 @@ export class ProductCreateComponent implements OnInit {
                 this.measurementUnit.set('G');
               } else if (unit === 'ML') {
                 this.measurementUnit.set('ML');
+              } else if (unit === 'METRE' || unit === 'METER') {
+                this.measurementUnit.set('M');
               } else {
                 this.measurementUnit.set(unit);
               }
@@ -910,6 +908,8 @@ export class ProductCreateComponent implements OnInit {
               // Default to KG if we can't determine
               this.measurementUnit.set('KG');
             }
+            // Show Weight/Volume/Length option when editing measured product
+            this.howSoldPreset.set('by-measure');
           } else {
             this.productType.set('discrete');
           }
