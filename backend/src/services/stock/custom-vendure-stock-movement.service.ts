@@ -1,3 +1,4 @@
+import { Inject } from '@nestjs/common';
 import {
   Cancellation,
   EventBus,
@@ -18,6 +19,7 @@ import {
 } from '@vendure/core';
 import { OrderLineInput, StockLevelInput } from '@vendure/common/lib/generated-types';
 import { In } from 'typeorm';
+import { StockMovementService as LocalStockMovementService } from './stock-movement.service';
 
 /**
  * Custom implementation of Vendure's StockMovementService so that:
@@ -28,10 +30,13 @@ import { In } from 'typeorm';
  * This ensures a single write path for quantity and prevents "stock without batch" after
  * the backfill migration.
  */
+const REASON_PRODUCT_CREATE_UPDATE = 'Product create/update';
+
 export class CustomVendureStockMovementService extends StockMovementService {
   private readonly conn: TransactionalConnection;
   private readonly bus: EventBus;
   private readonly stockLoc: StockLocationService;
+  private readonly localStock: LocalStockMovementService;
 
   constructor(
     connection: TransactionalConnection,
@@ -39,7 +44,8 @@ export class CustomVendureStockMovementService extends StockMovementService {
     globalSettingsService: GlobalSettingsService,
     stockLevelService: StockLevelService,
     eventBus: EventBus,
-    stockLocationService: StockLocationService
+    stockLocationService: StockLocationService,
+    @Inject('LocalStockMovementService') localStock: LocalStockMovementService
   ) {
     super(
       connection,
@@ -52,6 +58,7 @@ export class CustomVendureStockMovementService extends StockMovementService {
     this.conn = connection;
     this.bus = eventBus;
     this.stockLoc = stockLocationService;
+    this.localStock = localStock;
   }
 
   /**
@@ -173,15 +180,41 @@ export class CustomVendureStockMovementService extends StockMovementService {
   }
 
   /**
-   * No-op: do not update StockLevel on product create/update.
-   * All stock must be set via our StockManagementService → StockMovementService.adjustStockLevel
-   * so that batches are created and StockLevel is kept in sync.
+   * Delegate to local StockMovementService.adjustStockLevel so product create/update
+   * uses the same write path as purchases/adjustments and batches are created.
    */
   override async adjustProductVariantStock(
-    _ctx: RequestContext,
-    _productVariantId: unknown,
-    _stockOnHandNumberOrInput: number | StockLevelInput[]
+    ctx: RequestContext,
+    productVariantId: unknown,
+    stockOnHandNumberOrInput: number | StockLevelInput[]
   ): Promise<StockAdjustment[]> {
+    const variantId = productVariantId as string;
+    let stockOnHandInputs: Array<{ stockLocationId: string; stockOnHand: number }>;
+    if (typeof stockOnHandNumberOrInput === 'number') {
+      const defaultLocation = await this.stockLoc.defaultStockLocation(ctx);
+      stockOnHandInputs = [
+        { stockLocationId: defaultLocation.id as string, stockOnHand: stockOnHandNumberOrInput },
+      ];
+    } else {
+      stockOnHandInputs = stockOnHandNumberOrInput.map(input => ({
+        stockLocationId: input.stockLocationId as string,
+        stockOnHand: input.stockOnHand,
+      }));
+    }
+
+    for (const input of stockOnHandInputs) {
+      const current = await this.localStock.getCurrentStock(ctx, variantId, input.stockLocationId);
+      const delta = input.stockOnHand - current;
+      if (delta === 0) continue;
+      await this.localStock.adjustStockLevel(
+        ctx,
+        variantId,
+        input.stockLocationId,
+        delta,
+        REASON_PRODUCT_CREATE_UPDATE
+      );
+    }
+
     return [];
   }
 }

@@ -48,6 +48,7 @@ import { ReconciliationResolver } from './reconciliation.resolver';
 import { PeriodManagementResolver } from './period-management.resolver';
 import { PERIOD_MANAGEMENT_SCHEMA } from './period-management.schema';
 import { CustomVendureStockMovementService } from '../../services/stock/custom-vendure-stock-movement.service';
+import { StockMovementService as LocalStockMovementServiceClass } from '../../services/stock/stock-movement.service';
 import { StockValueCacheSubscriber } from './stock-value-cache.subscriber';
 import { StockValueStatsResolver } from './stock-value-stats.resolver';
 import {
@@ -83,6 +84,7 @@ const COMBINED_SCHEMA = gql`
     SaleCogs,
   ],
   providers: [
+    { provide: 'LocalStockMovementService', useClass: LocalStockMovementServiceClass },
     { provide: StockMovementService, useClass: CustomVendureStockMovementService },
     PostingService,
     InventoryStoreService,

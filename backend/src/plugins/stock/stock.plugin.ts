@@ -23,6 +23,7 @@ import { AuditPlugin } from '../audit/audit.plugin';
   providers: [
     StockValidationService,
     StockMovementService,
+    { provide: 'LocalStockMovementService', useClass: StockMovementService },
     PurchaseService,
     StockAdjustmentService,
     StockManagementService,
