@@ -1,0 +1,72 @@
+<h1 class="text-2xl font-bold mb-6">Users</h1>
+@if (loading()) {
+  <div class="flex items-center gap-2 text-base-content/70">
+    <span class="loading loading-spinner loading-md"></span>
+    <span>Loading…</span>
+  </div>
+}
+@if (error()) {
+  <div role="alert" class="alert alert-error">
+    <span>{{ error() }}</span>
+  </div>
+}
+<div class="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-base-300 bg-base-100 shadow mb-6">
+  <label class="form-control w-48">
+    <span class="label"><span class="label-text">Channel</span></span>
+    <select class="select select-bordered select-sm" [ngModel]="filterChannelId()" (ngModelChange)="filterChannelId.set($event)">
+      <option value="">All</option>
+      @for (ch of channels(); track ch.id) {
+        <option [value]="ch.id">{{ ch.code }}</option>
+      }
+    </select>
+  </label>
+  <label class="flex items-center gap-2 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-sm" [ngModel]="filterSuperAdminOnly()" (ngModelChange)="filterSuperAdminOnly.set($event)" />
+    <span class="label-text">Superadmins only</span>
+  </label>
+  <button type="button" class="btn btn-primary btn-sm" (click)="applyFilters()">Apply</button>
+</div>
+@if (items().length) {
+  <div class="overflow-x-auto rounded-xl border border-base-300 bg-base-100 shadow">
+    <table class="table table-zebra">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Identifier</th>
+          <th>Email</th>
+          <th>Auth status</th>
+          <th>Channels</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (admin of items(); track admin.id) {
+          <tr>
+            <td class="font-medium">{{ admin.firstName }} {{ admin.lastName }}</td>
+            <td>{{ admin.identifier }}</td>
+            <td>{{ admin.emailAddress || '—' }}</td>
+            <td><span class="badge badge-sm">{{ admin.authorizationStatus }}</span></td>
+            <td>{{ channelsLabel(admin) }}</td>
+            <td>
+              @if (admin.channelIds && admin.channelIds.length === 1) {
+                <a [routerLink]="['/channels', admin.channelIds[0]]" class="btn btn-ghost btn-xs">View channel</a>
+              } @else if (admin.channelIds && admin.channelIds.length > 1) {
+                <span class="flex flex-wrap gap-1">
+                  @for (cid of admin.channelIds.slice(0, 2); track cid) {
+                    <a [routerLink]="['/channels', cid]" class="link link-hover text-xs">{{ channelCode(cid) }}</a>
+                  }
+                  @if (admin.channelIds.length > 2) {
+                    <span class="text-base-content/50">…</span>
+                  }
+                </span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="text-sm text-base-content/60 mt-2">{{ totalItems() }} total</p>
+} @else if (!loading()) {
+  <p class="text-base-content/70">No users match the filters.</p>
+}

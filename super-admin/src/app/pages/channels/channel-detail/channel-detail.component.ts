@@ -6,6 +6,8 @@ import {
   PLATFORM_CHANNELS,
   ANALYTICS_STATS_FOR_CHANNEL,
   AUDIT_LOGS_FOR_CHANNEL,
+  ADMINISTRATORS_FOR_CHANNEL,
+  NOTIFICATIONS_FOR_CHANNEL,
   UPDATE_CHANNEL_STATUS_PLATFORM,
   EXTEND_TRIAL_PLATFORM,
   UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM,
@@ -26,6 +28,28 @@ interface PlatformChannel {
   };
 }
 
+export interface PlatformAdministrator {
+  id: string;
+  firstName: string;
+  lastName: string;
+  emailAddress: string;
+  userId: string;
+  identifier: string;
+  authorizationStatus: string;
+  roleCodes: string[];
+}
+
+export interface ChannelNotification {
+  id: string;
+  userId: string;
+  channelId: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+}
+
 @Component({
   selector: 'app-channel-detail',
   standalone: true,
@@ -40,6 +64,8 @@ export class ChannelDetailComponent implements OnInit {
   channel = signal<PlatformChannel | null>(null);
   analytics = signal<Record<string, unknown> | null>(null);
   auditLogs = signal<any[]>([]);
+  admins = signal<PlatformAdministrator[]>([]);
+  notifications = signal<ChannelNotification[]>([]);
   loading = signal(true);
   error = signal<string | null>(null);
 
@@ -55,7 +81,7 @@ export class ChannelDetailComponent implements OnInit {
     if (!id) return;
     const client = this.apollo.getClient();
     try {
-      const [chResult, analyticsResult, auditResult] = await Promise.all([
+      const [chResult, analyticsResult, auditResult, adminsResult, notificationsResult] = await Promise.all([
         client.query<{ platformChannels: PlatformChannel[] }>({ query: PLATFORM_CHANNELS, fetchPolicy: 'network-only' }),
         client.query({
           query: ANALYTICS_STATS_FOR_CHANNEL,
@@ -71,6 +97,16 @@ export class ChannelDetailComponent implements OnInit {
           variables: { channelId: id, options: { limit: 20 } },
           fetchPolicy: 'network-only',
         }).catch(() => ({ data: { auditLogsForChannel: [] } })),
+        client.query<{ administratorsForChannel: PlatformAdministrator[] }>({
+          query: ADMINISTRATORS_FOR_CHANNEL,
+          variables: { channelId: id },
+          fetchPolicy: 'network-only',
+        }).catch(() => ({ data: { administratorsForChannel: [] } })),
+        client.query<{ notificationsForChannel: { items: ChannelNotification[] } }>({
+          query: NOTIFICATIONS_FOR_CHANNEL,
+          variables: { channelId: id, options: { take: 50 } },
+          fetchPolicy: 'network-only',
+        }).catch(() => ({ data: { notificationsForChannel: { items: [] } } })),
       ]);
       const ch = chResult.data?.platformChannels?.find((c: PlatformChannel) => c.id === id) ?? null;
       this.channel.set(ch);
@@ -82,6 +118,10 @@ export class ChannelDetailComponent implements OnInit {
       }
       this.analytics.set((analyticsResult.data as any)?.analyticsStatsForChannel ?? null);
       this.auditLogs.set((auditResult.data as any)?.auditLogsForChannel ?? []);
+      this.admins.set(adminsResult.data?.administratorsForChannel ?? []);
+      this.notifications.set(
+        (notificationsResult.data as { notificationsForChannel?: { items: ChannelNotification[] } })?.notificationsForChannel?.items ?? []
+      );
     } catch (err: any) {
       this.error.set(err?.message ?? 'Failed to load');
     } finally {

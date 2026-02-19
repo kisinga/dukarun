@@ -1,64 +1,151 @@
-<a routerLink="/channels" class="back">← Channels</a>
+<a routerLink="/channels" class="btn btn-ghost btn-sm gap-1 mb-4">
+  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+  </svg>
+  Channels
+</a>
 @if (loading()) {
-  <p>Loading…</p>
+  <div class="flex items-center gap-2 text-base-content/70">
+    <span class="loading loading-spinner loading-md"></span>
+    <span>Loading…</span>
+  </div>
 }
 @if (error()) {
-  <p class="error">{{ error() }}</p>
+  <div role="alert" class="alert alert-error">
+    <span>{{ error() }}</span>
+  </div>
 }
 @if (channel(); as ch) {
-  <h1>Channel: {{ ch.code }}</h1>
-  <div class="grid">
-    <section class="card">
-      <h2>Info</h2>
-      <p><strong>Status</strong> {{ ch.customFields.status }}</p>
-      <p><strong>Trial ends</strong> {{ formatDate(ch.customFields.trialEndsAt) }}</p>
-      <p><strong>Subscription</strong> {{ ch.customFields.subscriptionStatus }}</p>
-      <p><strong>SMS</strong> N/A</p>
-    </section>
-    <section class="card">
-      <h2>Update status</h2>
-      <select [ngModel]="newStatus()" (ngModelChange)="newStatus.set($event)">
-        @for (opt of statusOptions; track opt) {
-          <option [value]="opt">{{ opt }}</option>
-        }
-      </select>
-      <button type="button" (click)="updateStatus()" [disabled]="saving()">Save</button>
-    </section>
-    <section class="card">
-      <h2>Extend trial</h2>
-      <input type="date" [ngModel]="newTrialEndsAt()" (ngModelChange)="newTrialEndsAt.set($event)" />
-      <button type="button" (click)="extendTrial()" [disabled]="saving()">Save</button>
-    </section>
+  <h1 class="text-2xl font-bold mb-6">Channel: {{ ch.code }}</h1>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+    <div class="card card-border bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-base">Info</h2>
+        <p class="text-sm"><span class="font-semibold">Status</span> {{ ch.customFields.status }}</p>
+        <p class="text-sm"><span class="font-semibold">Trial ends</span> {{ formatDate(ch.customFields.trialEndsAt) }}</p>
+        <p class="text-sm"><span class="font-semibold">Subscription</span> {{ ch.customFields.subscriptionStatus }}</p>
+      </div>
+    </div>
+    <div class="card card-border bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-base">Update status</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <select class="select select-bordered select-sm" [ngModel]="newStatus()" (ngModelChange)="newStatus.set($event)">
+            @for (opt of statusOptions; track opt) {
+              <option [value]="opt">{{ opt }}</option>
+            }
+          </select>
+          <button type="button" class="btn btn-primary btn-sm" (click)="updateStatus()" [disabled]="saving()">Save</button>
+        </div>
+      </div>
+    </div>
+    <div class="card card-border bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-base">Extend trial</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <input type="date" class="input input-bordered input-sm" [ngModel]="newTrialEndsAt()" (ngModelChange)="newTrialEndsAt.set($event)" />
+          <button type="button" class="btn btn-primary btn-sm" (click)="extendTrial()" [disabled]="saving()">Save</button>
+        </div>
+      </div>
+    </div>
   </div>
   @if (analytics(); as a) {
-    <section class="card">
-      <h2>Analytics (30d)</h2>
-      <p>Revenue: {{ revenue(a) }}</p>
-      <p>Orders: {{ orders(a) }}</p>
-      <p>Avg margin: {{ margin(a) }}%</p>
-    </section>
-  }
-  <section class="card">
-    <h2>Audit log</h2>
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Event</th>
-            <th>Entity</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (log of auditLogs(); track log.id) {
-            <tr>
-              <td>{{ formatDate(log.timestamp) }}</td>
-              <td>{{ log.eventType }}</td>
-              <td>{{ log.entityType }} {{ log.entityId ?? '' }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
+    <div class="card card-border bg-base-100 shadow mb-6">
+      <div class="card-body">
+        <h2 class="card-title text-base">Analytics (30d)</h2>
+        <p class="text-sm">Revenue: {{ revenue(a) }}</p>
+        <p class="text-sm">Orders: {{ orders(a) }}</p>
+        <p class="text-sm">Avg margin: {{ margin(a) }}%</p>
+      </div>
     </div>
-  </section>
+  }
+  <div class="card card-border bg-base-100 shadow mb-6">
+    <div class="card-body">
+      <h2 class="card-title text-base">Admins</h2>
+      <div class="overflow-x-auto">
+        <table class="table table-zebra table-sm">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Identifier</th>
+              <th>Auth status</th>
+              <th>Roles</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (admin of admins(); track admin.id) {
+              <tr>
+                <td>{{ admin.firstName }} {{ admin.lastName }}</td>
+                <td>{{ admin.emailAddress || '—' }}</td>
+                <td>{{ admin.identifier }}</td>
+                <td><span class="badge badge-sm">{{ admin.authorizationStatus }}</span></td>
+                <td>{{ admin.roleCodes.join(', ') || '—' }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5" class="text-base-content/60">No admins for this channel.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card card-border bg-base-100 shadow mb-6">
+    <div class="card-body">
+      <h2 class="card-title text-base">Notifications</h2>
+      <div class="overflow-x-auto">
+        <table class="table table-zebra table-sm">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Title</th>
+              <th>Message</th>
+              <th>Read</th>
+              <th>User</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (n of notifications(); track n.id) {
+              <tr>
+                <td>{{ formatDate(n.createdAt) }}</td>
+                <td><span class="badge badge-sm badge-ghost">{{ n.type }}</span></td>
+                <td>{{ n.title }}</td>
+                <td>{{ n.message }}</td>
+                <td>{{ n.read ? 'Yes' : 'No' }}</td>
+                <td class="text-base-content/70">{{ n.userId }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="6" class="text-base-content/60">No notifications.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card card-border bg-base-100 shadow">
+    <div class="card-body">
+      <h2 class="card-title text-base">Audit log</h2>
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Event</th>
+              <th>Entity</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (log of auditLogs(); track log.id) {
+              <tr>
+                <td>{{ formatDate(log.timestamp) }}</td>
+                <td>{{ log.eventType }}</td>
+                <td>{{ log.entityType }} {{ log.entityId ?? '' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 }

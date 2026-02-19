@@ -49,8 +49,32 @@ export const DASHBOARD_STATS_SCHEMA = gql`
     cost: Float!
   }
 
+  enum StockValuationType {
+    RETAIL
+    WHOLESALE
+    COST
+  }
+
+  type StockValueRankingItem {
+    productVariantId: ID!
+    productId: ID!
+    productName: String!
+    variantName: String
+    value: Float!
+  }
+
+  type StockValueRankingResult {
+    items: [StockValueRankingItem!]!
+    total: Float!
+  }
+
   extend type Query {
     dashboardStats(startDate: DateTime, endDate: DateTime): DashboardStats!
     stockValueStats(stockLocationId: ID, forceRefresh: Boolean): StockValueStats!
+    stockValueRanking(
+      valuationType: StockValuationType!
+      limit: Int
+      stockLocationId: ID
+    ): StockValueRankingResult!
   }
 `;

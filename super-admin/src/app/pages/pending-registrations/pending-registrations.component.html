@@ -1,0 +1,89 @@
+<h1 class="text-2xl font-bold mb-6">Pending registrations</h1>
+@if (loading()) {
+  <div class="flex items-center gap-2 text-base-content/70">
+    <span class="loading loading-spinner loading-md"></span>
+    <span>Loading…</span>
+  </div>
+}
+@if (error()) {
+  <div role="alert" class="alert alert-error">
+    <span>{{ error() }}</span>
+  </div>
+}
+@if (items().length) {
+  <div class="overflow-x-auto rounded-xl border border-base-300 bg-base-100 shadow">
+    <table class="table table-zebra">
+      <thead>
+        <tr>
+          <th>Identifier</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (reg of items(); track reg.userId) {
+          <tr>
+            <td class="font-medium">{{ reg.identifier }}</td>
+            <td>{{ fullName(reg) }}</td>
+            <td>{{ reg.administrator.emailAddress || '—' }}</td>
+            <td>{{ formatDate(reg.createdAt) }}</td>
+            <td>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  class="btn btn-success btn-sm"
+                  (click)="approve(reg.userId)"
+                  [disabled]="actionLoading() !== null"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-error btn-sm btn-outline"
+                  (click)="openReject(reg.userId)"
+                  [disabled]="actionLoading() !== null"
+                >
+                  Reject
+                </button>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+} @else if (!loading()) {
+  <p class="text-base-content/70">No pending registrations.</p>
+}
+
+@if (rejectUserId(); as uid) {
+  <dialog class="modal modal-open">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg">Reject registration</h3>
+      <p class="py-2 text-sm text-base-content/70">Optionally provide a reason (e.g. for audit):</p>
+      <textarea
+        class="textarea textarea-bordered w-full mt-2"
+        rows="3"
+        placeholder="Reason (optional)"
+        [ngModel]="rejectReason()"
+        (ngModelChange)="rejectReason.set($event)"
+      ></textarea>
+      <div class="modal-action">
+        <button type="button" class="btn btn-ghost" (click)="cancelReject()">Cancel</button>
+        <button
+          type="button"
+          class="btn btn-error"
+          (click)="confirmReject()"
+          [disabled]="actionLoading() !== null"
+        >
+          Reject
+        </button>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+      <button type="button" (click)="cancelReject()">close</button>
+    </form>
+  </dialog>
+}

@@ -45,6 +45,59 @@ export const PLATFORM_STATS = gql`
   }
 `;
 
+export const ADMINISTRATORS_FOR_CHANNEL = gql`
+  query AdministratorsForChannel($channelId: ID!) {
+    administratorsForChannel(channelId: $channelId) {
+      id
+      firstName
+      lastName
+      emailAddress
+      userId
+      identifier
+      authorizationStatus
+      roleCodes
+    }
+  }
+`;
+
+export const PLATFORM_ADMINISTRATORS = gql`
+  query PlatformAdministrators($options: PlatformAdministratorListOptions) {
+    platformAdministrators(options: $options) {
+      items {
+        id
+        firstName
+        lastName
+        emailAddress
+        userId
+        identifier
+        authorizationStatus
+        roleCodes
+        channelIds
+        isSuperAdmin
+      }
+      totalItems
+    }
+  }
+`;
+
+export const NOTIFICATIONS_FOR_CHANNEL = gql`
+  query NotificationsForChannel($channelId: ID!, $options: NotificationListOptions) {
+    notificationsForChannel(channelId: $channelId, options: $options) {
+      items {
+        id
+        userId
+        channelId
+        type
+        title
+        message
+        read
+        createdAt
+      }
+      totalItems
+    }
+  }
+`;
+
 export const ANALYTICS_STATS_FOR_CHANNEL = gql`
   query AnalyticsStatsForChannel($channelId: ID!, $timeRange: AnalyticsTimeRange!, $limit: Int) {
     analyticsStatsForChannel(channelId: $channelId, timeRange: $timeRange, limit: $limit) {
@@ -150,5 +203,41 @@ export const UPDATE_SUBSCRIPTION_TIER = gql`
 export const DEACTIVATE_SUBSCRIPTION_TIER = gql`
   mutation DeactivateSubscriptionTier($id: ID!) {
     deactivateSubscriptionTier(id: $id)
+  }
+`;
+
+export const PENDING_REGISTRATIONS = gql`
+  query PendingRegistrations {
+    pendingRegistrations {
+      userId
+      identifier
+      createdAt
+      administrator {
+        id
+        firstName
+        lastName
+        emailAddress
+      }
+    }
+  }
+`;
+
+export const APPROVE_USER = gql`
+  mutation ApproveUser($userId: ID!) {
+    approveUser(userId: $userId) {
+      id
+      identifier
+      authorizationStatus
+    }
+  }
+`;
+
+export const REJECT_USER = gql`
+  mutation RejectUser($userId: ID!, $reason: String) {
+    rejectUser(userId: $userId, reason: $reason) {
+      id
+      identifier
+      authorizationStatus
+    }
   }
 `;

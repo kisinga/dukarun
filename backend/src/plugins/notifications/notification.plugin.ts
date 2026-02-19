@@ -21,6 +21,7 @@ import { ChannelUserService } from '../../services/auth/channel-user.service';
     AdminNotificationService,
     ChannelUserService,
   ],
+  exports: [NotificationService],
   controllers: [NotificationTestController],
   entities: [Notification, PushSubscription],
   adminApiExtensions: {
