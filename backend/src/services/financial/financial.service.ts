@@ -335,19 +335,22 @@ export class FinancialService {
     originalPayment: Payment,
     amount: number
   ): Promise<void> {
+    const resolvedAccountCode =
+      (originalPayment.metadata?.debitAccountCode as string)?.trim() || undefined;
     const context: RefundPostingContext = {
       amount,
       orderId: order.id.toString(),
       orderCode: order.code,
       originalPaymentId: originalPayment.id.toString(),
       method: originalPayment.method,
+      resolvedAccountCode,
     };
 
     await this.postingService.postRefund(ctx, refundId, context);
 
     // Invalidate cache
     this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.SALES_RETURNS);
-    const clearingAccount = this.mapMethodToAccount(originalPayment.method);
+    const clearingAccount = resolvedAccountCode || this.mapMethodToAccount(originalPayment.method);
     this.queryService.invalidateCache(ctx.channelId as number, clearingAccount);
   }
 

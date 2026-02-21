@@ -147,6 +147,13 @@ export class SupplierPaymentAllocationService {
           selectedItemIds: input.purchaseIds,
         });
 
+        if (calculation.excessPayment > 0) {
+          throw new UserInputError(
+            `Payment amount (${paymentAmountInCents}) exceeds total owed (${calculation.totalAllocated}). ` +
+              `Please enter amount up to ${calculation.totalAllocated} or use exact amount.`
+          );
+        }
+
         // 6. Apply allocations: update paymentStatus, create PurchasePayment, post to ledger (single place)
         const purchasesPaid: Array<{
           purchaseId: string;
