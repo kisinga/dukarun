@@ -9,6 +9,8 @@ import {
 } from '@vendure/core';
 import { FinancialService } from '../financial/financial.service';
 import { LedgerTransactionService } from '../financial/ledger-transaction.service';
+import { CashSaleTransactionData } from '../financial/strategies/sale-posting.strategy';
+import { OpenSessionService } from '../financial/open-session.service';
 
 /**
  * Order Payment Service
@@ -24,7 +26,8 @@ export class OrderPaymentService {
     private readonly orderService: OrderService,
     private readonly paymentService: PaymentService,
     private readonly financialService: FinancialService,
-    private readonly ledgerTransactionService: LedgerTransactionService
+    private readonly ledgerTransactionService: LedgerTransactionService,
+    private readonly openSessionService: OpenSessionService
   ) {}
 
   /**
@@ -104,13 +107,17 @@ export class OrderPaymentService {
 
     try {
       // Post cash sale to ledger automatically (single source of truth)
-      const transactionData = {
+      // Tag with openSessionId when session exists for session-scoped reconciliation
+      const channelId = ctx.channelId as number;
+      const session = await this.openSessionService.getCurrentSession(ctx, channelId);
+      const transactionData: CashSaleTransactionData = {
         ctx,
         sourceId: settledPayment.id.toString(),
-        channelId: ctx.channelId as number,
+        channelId,
         payment: settledPayment,
         order,
         isCreditSale: false as const,
+        ...(session?.id && { openSessionId: session.id }),
       };
 
       const result = await this.ledgerTransactionService.postTransaction(transactionData);

@@ -162,6 +162,7 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
       orderCode: order.code,
       customerId: order.customer?.id?.toString(),
       resolvedAccountCode,
+      openSessionId: (data as Record<string, unknown>).openSessionId as string | undefined,
     };
 
     await this.postingService.postPayment(data.ctx, payment.id.toString(), context);

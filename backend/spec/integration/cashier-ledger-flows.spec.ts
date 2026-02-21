@@ -426,4 +426,199 @@ describe('Cashier-ledger flows', () => {
       expect(mockPostingService.post).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('Flow E: Ledger reconciliation fixes – no double posting', () => {
+    it('prior close then open same amount: no variance posting (opening uses actual ledger expected)', async () => {
+      const sessionId = 'e1b2c3d4-e5f6-4171-8111-111111111111';
+      const session: CashierSession = {
+        id: sessionId,
+        channelId: channel1Id,
+        cashierUserId: 1,
+        openedAt: new Date(),
+        status: 'open',
+        closingDeclared: '0',
+      } as CashierSession;
+      const mockSessionRepo = {
+        findOne: jest
+          .fn()
+          .mockResolvedValueOnce(null as never)
+          .mockResolvedValueOnce(session as never),
+        create: jest.fn().mockReturnValue(session),
+        save: jest.fn().mockResolvedValue(session as never),
+      } as any;
+      const mockChannelRepo = {
+        findOne: jest.fn().mockResolvedValue({ id: channel1Id, paymentMethods: [] } as never),
+      } as any;
+      const mockCountRepo = {
+        create: jest.fn().mockImplementation((o: any) => ({ ...o, id: 'c1' })),
+        save: jest.fn().mockResolvedValue({ id: 'c1' } as never),
+      } as any;
+      const mockReconRepo = {
+        find: jest.fn().mockResolvedValue([] as never),
+        findOne: jest.fn().mockResolvedValue(null as never),
+        create: jest.fn(),
+        save: jest.fn().mockImplementation((r: any) => Promise.resolve({ ...r, id: 'rec1' })),
+      } as any;
+      const mockReconAccountRepo = { find: jest.fn().mockResolvedValue([] as never) } as any;
+      const mockAccountRepo = {
+        find: jest.fn().mockResolvedValue([{ id: 'acc-1', code: 'CASH_ON_HAND' }] as never),
+        findOne: jest.fn().mockResolvedValue({ id: 'acc-1', code: 'CASH_ON_HAND' } as never),
+      } as any;
+      const mockConnection = {
+        getRepository: jest.fn((_ctx: any, entity: any): any => {
+          if (entity === CashierSession) return mockSessionRepo;
+          if (entity === Channel) return mockChannelRepo;
+          if (entity === CashDrawerCount) return mockCountRepo;
+          if (entity === Reconciliation) return mockReconRepo;
+          if (entity === ReconciliationAccount) return mockReconAccountRepo;
+          if (entity === Account) return mockAccountRepo;
+          return mockCountRepo;
+        }),
+        withTransaction: jest.fn((ctx: any, fn: (t: any) => Promise<any>) => fn(ctx)),
+      } as any;
+      const mockLedgerQueryService = {
+        getCashierSessionTotals: jest
+          .fn()
+          .mockResolvedValue({ cashTotal: 0, mpesaTotal: 0, totalCollected: 0 } as never),
+        getExpectedBalanceForReconciliation: jest.fn().mockResolvedValue(1000 as never),
+      } as any;
+      const mockPostVariance = jest.fn().mockResolvedValue(undefined as never);
+      const mockReconciliationService = {
+        createReconciliation: jest.fn().mockResolvedValue({ id: 'rec1' } as never),
+      } as any;
+      const mockChannelPaymentMethodService = {
+        getChannelPaymentMethods: jest
+          .fn()
+          .mockResolvedValue([
+            {
+              id: 1,
+              code: 'cash-1',
+              enabled: true,
+              customFields: { ledgerAccountCode: 'CASH_ON_HAND', isCashierControlled: true },
+            },
+          ] as never),
+        getPaymentMethodDisplayName: jest.fn((pm: { code: string }) => pm.code),
+      } as any;
+
+      const cashierSessionService = new (OpenSessionService as any)(
+        mockConnection,
+        mockLedgerQueryService,
+        mockReconciliationService,
+        { postVarianceAdjustment: mockPostVariance },
+        mockChannelPaymentMethodService,
+        { log: jest.fn().mockResolvedValue(undefined as never) }
+      );
+
+      await cashierSessionService.startSession(ctx1, {
+        channelId: channel1Id,
+        openingBalances: [{ accountCode: 'CASH_ON_HAND', amountCents: 1000 }],
+      });
+
+      expect(mockPostVariance).not.toHaveBeenCalled();
+      expect(mockLedgerQueryService.getExpectedBalanceForReconciliation).toHaveBeenCalledWith(
+        channel1Id,
+        'manual',
+        'opening',
+        'CASH_ON_HAND',
+        expect.any(String)
+      );
+    });
+
+    it('first session (ledger = 0): posts full opening as variance', async () => {
+      const sessionId = 'e2b3c4d5-f6a7-4272-8222-222222222222';
+      const savedSession = {
+        id: sessionId,
+        channelId: channel1Id,
+        status: 'open',
+        closingDeclared: '0',
+        openedAt: new Date(),
+        cashierUserId: 1,
+      };
+      const mockSessionRepo = {
+        findOne: jest
+          .fn()
+          .mockResolvedValueOnce(null as never)
+          .mockResolvedValueOnce(savedSession as never),
+        create: jest.fn().mockReturnValue(savedSession),
+        save: jest.fn().mockResolvedValue(savedSession as never),
+      } as any;
+      const mockChannelRepo = {
+        findOne: jest.fn().mockResolvedValue({ id: channel1Id } as never),
+      } as any;
+      const mockCountRepo = {
+        create: jest.fn().mockReturnValue({ id: 'c1' }),
+        save: jest.fn().mockResolvedValue({ id: 'c1' } as never),
+      } as any;
+      const mockReconRepo = {
+        find: jest.fn().mockResolvedValue([] as never),
+        findOne: jest.fn().mockResolvedValue(null as never),
+        create: jest.fn(),
+        save: jest.fn().mockImplementation((r: any) => Promise.resolve({ ...r, id: 'rec1' })),
+      } as any;
+      const mockReconAccountRepo = { find: jest.fn().mockResolvedValue([] as never) } as any;
+      const mockAccountRepo = {
+        find: jest.fn().mockResolvedValue([{ id: 'acc-1', code: 'CASH_ON_HAND' }] as never),
+        findOne: jest.fn().mockResolvedValue({ id: 'acc-1', code: 'CASH_ON_HAND' } as never),
+      } as any;
+      const mockConnection = {
+        getRepository: jest.fn((_ctx: any, entity: any): any => {
+          if (entity === CashierSession) return mockSessionRepo;
+          if (entity === Channel) return mockChannelRepo;
+          if (entity === CashDrawerCount) return mockCountRepo;
+          if (entity === Reconciliation) return mockReconRepo;
+          if (entity === ReconciliationAccount) return mockReconAccountRepo;
+          if (entity === Account) return mockAccountRepo;
+          return mockCountRepo;
+        }),
+        withTransaction: jest.fn((ctx: any, fn: (t: any) => Promise<any>) => fn(ctx)),
+      } as any;
+      const mockLedgerQueryService = {
+        getCashierSessionTotals: jest
+          .fn()
+          .mockResolvedValue({ cashTotal: 0, mpesaTotal: 0, totalCollected: 0 } as never),
+        getExpectedBalanceForReconciliation: jest.fn().mockResolvedValue(0 as never),
+      } as any;
+      const mockPostVariance = jest.fn().mockResolvedValue(undefined as never);
+      const mockReconciliationService = {
+        createReconciliation: jest.fn().mockResolvedValue({ id: 'rec1' } as never),
+      } as any;
+      const mockChannelPaymentMethodService = {
+        getChannelPaymentMethods: jest
+          .fn()
+          .mockResolvedValue([
+            {
+              id: 1,
+              code: 'cash-1',
+              enabled: true,
+              customFields: { ledgerAccountCode: 'CASH_ON_HAND', isCashierControlled: true },
+            },
+          ] as never),
+        getPaymentMethodDisplayName: jest.fn((pm: { code: string }) => pm.code),
+      } as any;
+
+      const cashierSessionService = new (OpenSessionService as any)(
+        mockConnection,
+        mockLedgerQueryService,
+        mockReconciliationService,
+        { postVarianceAdjustment: mockPostVariance },
+        mockChannelPaymentMethodService,
+        { log: jest.fn().mockResolvedValue(undefined as never) }
+      );
+
+      await cashierSessionService.startSession(ctx1, {
+        channelId: channel1Id,
+        openingBalances: [{ accountCode: 'CASH_ON_HAND', amountCents: 1000 }],
+      });
+
+      expect(mockPostVariance).toHaveBeenCalledTimes(1);
+      expect(mockPostVariance).toHaveBeenCalledWith(
+        ctx1,
+        sessionId,
+        'CASH_ON_HAND',
+        1000,
+        'Opening balance',
+        'rec1'
+      );
+    });
+  });
 });
