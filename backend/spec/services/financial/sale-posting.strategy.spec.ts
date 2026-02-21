@@ -89,4 +89,41 @@ describe('SalePostingStrategy', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('Database connection lost');
   });
+
+  it('passes openSessionId to postPayment when provided in transaction data', async () => {
+    const result = await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderWithLines,
+      isCreditSale: false,
+      openSessionId: 'session-123',
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockPostingService.postPayment).toHaveBeenCalledWith(
+      ctx,
+      String(settledPayment.id),
+      expect.objectContaining({
+        openSessionId: 'session-123',
+      })
+    );
+  });
+
+  it('passes undefined openSessionId when not provided', async () => {
+    const result = await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderWithLines,
+      isCreditSale: false,
+    });
+
+    expect(result.success).toBe(true);
+    const postPaymentCall = mockPostingService.postPayment.mock.calls[0];
+    const context = postPaymentCall[2];
+    expect(context.openSessionId).toBeUndefined();
+  });
 });

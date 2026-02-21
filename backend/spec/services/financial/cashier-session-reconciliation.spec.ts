@@ -551,6 +551,185 @@ describe('CashierSessionService - Reconciliation Integration', () => {
     });
   });
 
+  describe('Opening balance variance posting', () => {
+    const channelId = 1;
+    const defaultSession = {
+      id: UUID_SESSION_1,
+      channelId,
+      cashierUserId: 1,
+      openedAt: new Date(),
+      status: 'open',
+      closingDeclared: '0',
+    } as CashierSession;
+
+    function setupStartSessionMocks() {
+      mockSessionRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(defaultSession);
+      mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([
+        {
+          id: 1,
+          code: 'cash-1',
+          enabled: true,
+          customFields: { ledgerAccountCode: 'CASH_ON_HAND', isCashierControlled: true },
+        },
+        {
+          id: 2,
+          code: 'mpesa-1',
+          enabled: true,
+          customFields: { ledgerAccountCode: 'CLEARING_MPESA', isCashierControlled: true },
+        },
+      ]);
+      mockSessionRepo.create.mockReturnValue(defaultSession);
+      mockSessionRepo.save.mockResolvedValue(defaultSession);
+      mockLedgerQueryService.getCashierSessionTotals.mockResolvedValue({
+        cashTotal: 0,
+        mpesaTotal: 0,
+        totalCollected: 0,
+      });
+      mockCountRepo.create.mockImplementation((o: any) => ({ ...o, id: 'count-1' }));
+      mockCountRepo.save.mockResolvedValue({ id: 'count-1' });
+    }
+
+    it('first session (ledger = 0): posts full opening amount as variance', async () => {
+      setupStartSessionMocks();
+      mockLedgerQueryService.getExpectedBalanceForReconciliation
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0);
+      mockFinancialService.postVarianceAdjustment.mockClear();
+
+      await service.startSession(ctx, {
+        channelId,
+        openingBalances: [
+          { accountCode: 'CASH_ON_HAND', amountCents: 1000 },
+          { accountCode: 'CLEARING_MPESA', amountCents: 0 },
+        ],
+      });
+
+      expect(mockFinancialService.postVarianceAdjustment).toHaveBeenCalledTimes(1);
+      expect(mockFinancialService.postVarianceAdjustment).toHaveBeenCalledWith(
+        ctx,
+        defaultSession.id,
+        'CASH_ON_HAND',
+        1000,
+        'Opening balance',
+        'rec1'
+      );
+    });
+
+    it('subsequent session (ledger = prior close): no variance posting when declared equals expected', async () => {
+      setupStartSessionMocks();
+      mockLedgerQueryService.getExpectedBalanceForReconciliation
+        .mockResolvedValueOnce(1000)
+        .mockResolvedValueOnce(0);
+      mockFinancialService.postVarianceAdjustment.mockClear();
+
+      await service.startSession(ctx, {
+        channelId,
+        openingBalances: [
+          { accountCode: 'CASH_ON_HAND', amountCents: 1000 },
+          { accountCode: 'CLEARING_MPESA', amountCents: 0 },
+        ],
+      });
+
+      expect(mockFinancialService.postVarianceAdjustment).not.toHaveBeenCalled();
+    });
+
+    it('subsequent session with shortage: posts only the delta', async () => {
+      setupStartSessionMocks();
+      mockLedgerQueryService.getExpectedBalanceForReconciliation
+        .mockResolvedValueOnce(1000)
+        .mockResolvedValueOnce(0);
+      mockFinancialService.postVarianceAdjustment.mockClear();
+
+      await service.startSession(ctx, {
+        channelId,
+        openingBalances: [
+          { accountCode: 'CASH_ON_HAND', amountCents: 950 },
+          { accountCode: 'CLEARING_MPESA', amountCents: 0 },
+        ],
+      });
+
+      expect(mockFinancialService.postVarianceAdjustment).toHaveBeenCalledTimes(1);
+      expect(mockFinancialService.postVarianceAdjustment).toHaveBeenCalledWith(
+        ctx,
+        defaultSession.id,
+        'CASH_ON_HAND',
+        -50,
+        'Opening balance',
+        'rec1'
+      );
+    });
+
+    it('subsequent session with overage: posts only the delta', async () => {
+      setupStartSessionMocks();
+      mockLedgerQueryService.getExpectedBalanceForReconciliation
+        .mockResolvedValueOnce(1000)
+        .mockResolvedValueOnce(0);
+      mockFinancialService.postVarianceAdjustment.mockClear();
+
+      await service.startSession(ctx, {
+        channelId,
+        openingBalances: [
+          { accountCode: 'CASH_ON_HAND', amountCents: 1050 },
+          { accountCode: 'CLEARING_MPESA', amountCents: 0 },
+        ],
+      });
+
+      expect(mockFinancialService.postVarianceAdjustment).toHaveBeenCalledTimes(1);
+      expect(mockFinancialService.postVarianceAdjustment).toHaveBeenCalledWith(
+        ctx,
+        defaultSession.id,
+        'CASH_ON_HAND',
+        50,
+        'Opening balance',
+        'rec1'
+      );
+    });
+
+    it('all accounts zero: no variance posting', async () => {
+      setupStartSessionMocks();
+      mockLedgerQueryService.getExpectedBalanceForReconciliation
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0);
+      mockFinancialService.postVarianceAdjustment.mockClear();
+
+      await service.startSession(ctx, {
+        channelId,
+        openingBalances: [
+          { accountCode: 'CASH_ON_HAND', amountCents: 0 },
+          { accountCode: 'CLEARING_MPESA', amountCents: 0 },
+        ],
+      });
+
+      expect(mockFinancialService.postVarianceAdjustment).not.toHaveBeenCalled();
+    });
+
+    it('multiple accounts with mixed variance: posts only for accounts with non-zero variance', async () => {
+      setupStartSessionMocks();
+      mockLedgerQueryService.getExpectedBalanceForReconciliation
+        .mockResolvedValueOnce(1000)
+        .mockResolvedValueOnce(0);
+      mockFinancialService.postVarianceAdjustment.mockClear();
+
+      await service.startSession(ctx, {
+        channelId,
+        openingBalances: [
+          { accountCode: 'CASH_ON_HAND', amountCents: 1000 },
+          { accountCode: 'CLEARING_MPESA', amountCents: 100 },
+        ],
+      });
+
+      expect(mockFinancialService.postVarianceAdjustment).toHaveBeenCalledTimes(1);
+      expect(mockFinancialService.postVarianceAdjustment).toHaveBeenCalledWith(
+        ctx,
+        defaultSession.id,
+        'CLEARING_MPESA',
+        100,
+        'Opening balance',
+        'rec1'
+      );
+    });
+  });
+
   describe('Expected balance and variance (no double-count)', () => {
     it('getSessionSummary uses session-scoped ledger total only for expectedCash', async () => {
       const sessionId = UUID_SESSION_1;

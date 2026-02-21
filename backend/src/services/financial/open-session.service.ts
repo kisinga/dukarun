@@ -174,8 +174,35 @@ export class OpenSessionService {
       accountCode: b.accountCode,
       amountCents: String(b.amountCents),
     }));
-    const totalDeclared = input.openingBalances.reduce((s, b) => s + b.amountCents, 0);
 
+    // Group by accountCode and sum (handle duplicate accounts from multiple payment methods)
+    const declaredByAccount = new Map<string, number>();
+    for (const b of input.openingBalances) {
+      const existing = declaredByAccount.get(b.accountCode) ?? 0;
+      declaredByAccount.set(b.accountCode, existing + b.amountCents);
+    }
+    const totalDeclared = [...declaredByAccount.values()].reduce((s, v) => s + v, 0);
+
+    // Compute expected per account (full ledger as of today) and variance
+    const perAccount: Array<{
+      accountCode: string;
+      declaredCents: number;
+      expectedCents: number;
+      varianceCents: number;
+    }> = [];
+    let totalExpected = 0;
+    for (const [accountCode, declaredCents] of declaredByAccount) {
+      const expectedCents = await this.ledgerQueryService.getExpectedBalanceForReconciliation(
+        input.channelId,
+        'manual',
+        'opening',
+        accountCode,
+        today
+      );
+      const varianceCents = declaredCents - expectedCents;
+      totalExpected += expectedCents;
+      perAccount.push({ accountCode, declaredCents, expectedCents, varianceCents });
+    }
     const openingRecon = await this.reconciliationService.createReconciliation(
       ctx,
       {
@@ -186,7 +213,7 @@ export class OpenSessionService {
           sessionId: savedSession.id,
           kind: 'opening',
         }),
-        expectedBalance: '0',
+        expectedBalance: String(totalExpected),
         actualBalance: String(totalDeclared),
         notes: `Opening reconciliation for session ${savedSession.id}`,
         declaredAmounts,
@@ -203,13 +230,14 @@ export class OpenSessionService {
       })
       .catch(() => {});
 
-    for (const { accountCode, amountCents } of input.openingBalances) {
-      if (amountCents !== 0) {
+    // Post variance only when declared differs from expected (not full amount)
+    for (const { accountCode, varianceCents } of perAccount) {
+      if (varianceCents !== 0) {
         await this.financialService.postVarianceAdjustment(
           ctx,
           savedSession.id,
           accountCode,
-          amountCents,
+          varianceCents,
           'Opening balance',
           openingRecon.id
         );
