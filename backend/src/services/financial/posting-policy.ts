@@ -171,7 +171,7 @@ export function createCreditSaleEntry(context: SalePostingContext): JournalEntry
         },
       },
       {
-        accountCode: 'SALES',
+        accountCode: ACCOUNT_CODES.SALES,
         credit: context.amount,
         meta: {
           orderId: context.orderId,

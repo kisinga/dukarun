@@ -143,6 +143,13 @@ export class PaymentAllocationService {
           selectedItemIds: input.orderIds,
         });
 
+        if (calculation.excessPayment > 0) {
+          throw new UserInputError(
+            `Payment amount (${paymentAmountInCents}) exceeds total owed (${calculation.totalAllocated}). ` +
+              `Please enter amount up to ${calculation.totalAllocated} or use exact amount.`
+          );
+        }
+
         // 6. Apply allocations to orders
         const ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }> = [];
 

@@ -216,7 +216,7 @@ Accounts are initialized per channel via:
            └─> LedgerPostingService.postPayment()
                └─> PostingService.post()
                    ├─> Debit: CASH_ON_HAND (+amount)
-                   └─> Credit: CLEARING_CREDIT (-amount)
+                   └─> Credit: SALES (revenue)
 ```
 
 ### Credit Sale
