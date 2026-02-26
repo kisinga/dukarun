@@ -1,0 +1,166 @@
+<h1 class="text-2xl font-bold mb-6">ML Trainer</h1>
+
+@if (error()) {
+  <div role="alert" class="alert alert-error mb-6">
+    <span>{{ error() }}</span>
+  </div>
+}
+
+<div class="card card-border bg-base-100 shadow mb-6">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h2 class="card-title text-base">Service status</h2>
+        @if (health(); as h) {
+          @if (h.status === 'ok') {
+            <p class="text-success mt-1">OK · Uptime {{ formatUptime(h.uptimeSeconds) }}</p>
+          } @else {
+            <p class="text-error mt-1">Unavailable</p>
+            @if (h.error) {
+              <p class="text-sm text-base-content/80 mt-0.5">{{ h.error }}</p>
+            }
+          }
+        } @else {
+          <p class="text-base-content/70 mt-1">—</p>
+        }
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" (click)="refresh()" [disabled]="loading()">
+        @if (loading()) {
+          <span class="loading loading-spinner loading-sm"></span>
+        }
+        Refresh
+      </button>
+    </div>
+  </div>
+</div>
+
+@if (loading()) {
+  <div class="flex items-center gap-2 text-base-content/70">
+    <span class="loading loading-spinner loading-md"></span>
+    <span>Loading…</span>
+  </div>
+} @else {
+  <div class="overflow-x-auto rounded-xl border border-base-300 bg-base-100 shadow">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Channel</th>
+          <th>Status</th>
+          <th>Progress</th>
+          <th>Started</th>
+          <th>Error</th>
+          <th>Products</th>
+          <th>Images</th>
+          <th>Model</th>
+          <th>Last trained</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.channel.id) {
+          <tr>
+            <td class="font-medium">{{ row.channel.code }}</td>
+            <td>
+              @if (row.loadError) {
+                <span class="badge badge-ghost badge-sm">Error loading</span>
+              } @else if (row.trainingInfo) {
+                <span
+                  class="badge badge-sm"
+                  [class.badge-success]="row.trainingInfo.status === 'ready' || row.trainingInfo.status === 'active'"
+                  [class.badge-warning]="row.trainingInfo.status === 'training' || row.trainingInfo.status === 'extracting'"
+                  [class.badge-error]="row.trainingInfo.status === 'failed'"
+                  [class.badge-ghost]="row.trainingInfo.status === 'idle'"
+                >
+                  {{ row.trainingInfo.status }}
+                </span>
+              } @else {
+                <span class="badge badge-ghost badge-sm">—</span>
+              }
+            </td>
+            <td>
+              @if (row.trainingInfo && !row.loadError) {
+                <progress class="progress progress-primary w-20" [value]="row.trainingInfo.progress" max="100"></progress>
+                <span class="ml-1 text-sm">{{ row.trainingInfo.progress }}%</span>
+              } @else {
+                —
+              }
+            </td>
+            <td class="text-sm">{{ formatDate(row.trainingInfo?.startedAt ?? null) }}</td>
+            <td class="text-sm max-w-32 truncate" [title]="row.trainingInfo?.error ?? ''">
+              {{ row.trainingInfo?.error ?? '—' }}
+            </td>
+            <td>{{ row.trainingInfo?.productCount ?? '—' }}</td>
+            <td>{{ row.trainingInfo?.imageCount ?? '—' }}</td>
+            <td>
+              @if (row.trainingInfo?.hasActiveModel) {
+                <span class="badge badge-success badge-sm">Yes</span>
+              } @else {
+                <span class="badge badge-ghost badge-sm">No</span>
+              }
+            </td>
+            <td class="text-sm">{{ formatDate(row.trainingInfo?.lastTrainedAt ?? null) }}</td>
+            <td>
+              @if (row.loadError) {
+                <span class="text-base-content/60 text-sm">—</span>
+              } @else {
+                <div class="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    (click)="extractPhotos(row)"
+                    [disabled]="actionLoading() !== null"
+                    title="Extract photos for training"
+                  >
+                    @if (actionLoading() === row.channel.id) {
+                      <span class="loading loading-spinner loading-xs"></span>
+                    } @else {
+                      Extract
+                    }
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-xs"
+                    (click)="startTraining(row)"
+                    [disabled]="row.trainingInfo?.status === 'training' || actionLoading() !== null"
+                    title="Start training"
+                  >
+                    Train
+                  </button>
+                  @if (row.trainingInfo?.hasActiveModel) {
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-xs"
+                      (click)="setStatus(row, 'inactive')"
+                      [disabled]="actionLoading() !== null"
+                    >
+                      Inactive
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-xs"
+                      (click)="setStatus(row, 'active')"
+                      [disabled]="actionLoading() !== null"
+                    >
+                      Active
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-error btn-xs btn-outline"
+                      (click)="clearModel(row)"
+                      [disabled]="actionLoading() !== null"
+                    >
+                      Clear
+                    </button>
+                  }
+                </div>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  @if (rows().length === 0 && !loading()) {
+    <p class="text-base-content/70 mt-4">No channels.</p>
+  }
+}

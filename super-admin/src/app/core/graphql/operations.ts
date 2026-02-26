@@ -241,3 +241,52 @@ export const REJECT_USER = gql`
     }
   }
 `;
+
+export const ML_TRAINER_HEALTH = gql`
+  query MlTrainerHealth {
+    mlTrainerHealth {
+      status
+      uptimeSeconds
+      error
+    }
+  }
+`;
+
+export const ML_TRAINING_INFO = gql`
+  query MlTrainingInfo($channelId: ID!) {
+    mlTrainingInfo(channelId: $channelId) {
+      status
+      progress
+      startedAt
+      error
+      productCount
+      imageCount
+      hasActiveModel
+      lastTrainedAt
+    }
+  }
+`;
+
+export const START_TRAINING = gql`
+  mutation StartTraining($channelId: ID!) {
+    startTraining(channelId: $channelId)
+  }
+`;
+
+export const EXTRACT_PHOTOS_FOR_TRAINING = gql`
+  mutation ExtractPhotosForTraining($channelId: ID!) {
+    extractPhotosForTraining(channelId: $channelId)
+  }
+`;
+
+export const SET_ML_MODEL_STATUS = gql`
+  mutation SetMlModelStatus($channelId: ID!, $status: String!) {
+    setMlModelStatus(channelId: $channelId, status: $status)
+  }
+`;
+
+export const CLEAR_ML_MODEL = gql`
+  mutation ClearMlModel($channelId: ID!) {
+    clearMlModel(channelId: $channelId)
+  }
+`;

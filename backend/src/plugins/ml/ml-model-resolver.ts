@@ -1,5 +1,6 @@
 import { Logger, UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import axios from 'axios';
 import {
   Allow,
   AssetService,
@@ -59,6 +60,12 @@ export const ML_MODEL_SCHEMA = gql`
     filename: String!
   }
 
+  type MlTrainerHealth {
+    status: String!
+    uptimeSeconds: Float
+    error: String
+  }
+
   extend type Query {
     """
     Get ML model info for a specific channel
@@ -74,6 +81,11 @@ export const ML_MODEL_SCHEMA = gql`
     Get photo manifest for training (JSON with URLs)
     """
     mlTrainingManifest(channelId: ID!): MlTrainingManifest!
+
+    """
+    ML trainer service health (proxied from ml-trainer). Never throws; returns status ok or unavailable.
+    """
+    mlTrainerHealth: MlTrainerHealth!
   }
 
   extend type Mutation {
@@ -133,6 +145,31 @@ export class MlModelResolver {
     private mlTrainingService: MlTrainingService,
     private requestContextService: RequestContextService
   ) {}
+
+  @Query()
+  @Allow(Permission.ReadCatalog)
+  async mlTrainerHealth(): Promise<{ status: string; uptimeSeconds?: number; error?: string }> {
+    const trainerUrl = env.ml?.trainerUrl;
+    if (!trainerUrl) {
+      return { status: 'unavailable', error: 'ML_TRAINER_URL not configured' };
+    }
+    try {
+      const { data } = await axios.get<{ status?: string; uptime?: number }>(
+        `${trainerUrl}/health`,
+        {
+          timeout: 5000,
+        }
+      );
+      return {
+        status: data?.status === 'ok' ? 'ok' : 'unavailable',
+        uptimeSeconds: typeof data?.uptime === 'number' ? data.uptime : undefined,
+      };
+    } catch (err: any) {
+      const message = err?.response?.data?.error ?? err?.message ?? 'Health check failed';
+      this.logger.warn(`mlTrainerHealth: ${message}`);
+      return { status: 'unavailable', error: message };
+    }
+  }
 
   @Query()
   @Allow(Permission.ReadCatalog)
