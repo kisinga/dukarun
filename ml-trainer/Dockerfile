@@ -19,6 +19,12 @@ WORKDIR /app
 # Root workspace manifests (single source of truth for lockfile)
 COPY package.json package-lock.json ./
 
+# Workspace package.json files must exist before npm ci so workspaces are resolved
+COPY backend/package.json backend/
+COPY frontend/package.json frontend/
+COPY ml-trainer/package.json ml-trainer/
+COPY super-admin/package.json super-admin/
+
 RUN npm ci --quiet --no-audit --no-fund
 
 COPY . .
