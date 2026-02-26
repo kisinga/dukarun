@@ -1,14 +1,20 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
   Allow,
+  Channel,
   ChannelService,
   Ctx,
   Permission,
   RequestContext,
   RequestContextService,
+  TaxRate,
+  TaxRateService,
   TransactionalConnection,
   User,
+  Zone,
+  ZoneService,
 } from '@vendure/core';
+import { getChannelStatus } from '../../domain/channel-custom-fields';
 import { ChannelAdminService } from '../../services/channels/channel-admin.service';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { AuditTrailFilters } from '../../infrastructure/audit/audit.types';
@@ -40,13 +46,102 @@ export class SuperAdminResolver {
     private readonly roleTemplateService: RoleTemplateService,
     private readonly channelAdminService: ChannelAdminService,
     private readonly requestContextService: RequestContextService,
-    private readonly connection: TransactionalConnection
+    private readonly connection: TransactionalConnection,
+    private readonly zoneService: ZoneService,
+    private readonly taxRateService: TaxRateService
   ) {}
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async registrationSeedContext(@Ctx() ctx: RequestContext) {
+    const KENYA_ZONE_NAME = 'Kenya';
+    const zones = await this.zoneService.findAll(ctx);
+    const kenyaZone = zones.items.find(z => z.name === KENYA_ZONE_NAME);
+    if (!kenyaZone) {
+      throw new Error(
+        `Registration zone "${KENYA_ZONE_NAME}" not found. Run Kenya seed or create the zone in Settings → Zones.`
+      );
+    }
+    const zoneRepo = this.connection.getRepository(ctx, Zone);
+    const zoneWithMembers = await zoneRepo.findOne({
+      where: { id: kenyaZone.id },
+      relations: ['members'],
+    });
+    const members = (zoneWithMembers?.members ?? []).map(m => ({
+      id: String(m.id),
+      name: m.name ?? '',
+      code: m.code ?? '',
+    }));
+
+    const taxRateRepo = this.connection.getRepository(ctx, TaxRate);
+    const kenyaRates = await taxRateRepo.find({
+      where: { zone: { id: kenyaZone.id } },
+      relations: ['category'],
+    });
+    const kenyaRate = kenyaRates[0];
+    const taxRatePayload = kenyaRate
+      ? {
+          id: kenyaRate.id,
+          name: kenyaRate.name,
+          categoryName: kenyaRate.category?.name ?? '',
+          value: kenyaRate.value,
+        }
+      : null;
+
+    return {
+      zone: {
+        id: kenyaZone.id,
+        name: kenyaZone.name,
+        members,
+      },
+      taxRate: taxRatePayload,
+    };
+  }
 
   @Query()
   @Allow(Permission.SuperAdmin)
   async platformChannels() {
     return this.platformStatsService.getPlatformChannels();
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async platformZones(@Ctx() ctx: RequestContext) {
+    const result = await this.zoneService.findAll(ctx);
+    return result.items.map(z => ({ id: String(z.id), name: z.name ?? '' }));
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async channelDetailPlatform(@Ctx() ctx: RequestContext, @Args('channelId') channelId: string) {
+    const channelRepo = this.connection.getRepository(ctx, Channel);
+    const ch = await channelRepo.findOne({
+      where: { id: channelId as any },
+      relations: ['defaultShippingZone', 'defaultTaxZone'],
+    });
+    if (!ch) return null;
+    const cf = (ch.customFields ?? {}) as Record<string, unknown>;
+    const status = getChannelStatus(cf);
+    return {
+      id: String(ch.id),
+      code: ch.code ?? '',
+      token: ch.token ?? '',
+      customFields: {
+        status,
+        trialEndsAt: cf.trialEndsAt ?? null,
+        subscriptionStatus: cf.subscriptionStatus ?? 'trial',
+        maxAdminCount: typeof cf.maxAdminCount === 'number' ? cf.maxAdminCount : 5,
+        cashierFlowEnabled: cf.cashierFlowEnabled === true,
+        cashControlEnabled: cf.cashControlEnabled !== false,
+        enablePrinter: cf.enablePrinter !== false,
+      },
+      defaultShippingZone: ch.defaultShippingZone
+        ? { id: String(ch.defaultShippingZone.id), name: ch.defaultShippingZone.name ?? '' }
+        : null,
+      defaultTaxZone: ch.defaultTaxZone
+        ? { id: String(ch.defaultTaxZone.id), name: ch.defaultTaxZone.name ?? '' }
+        : null,
+    };
   }
 
   @Query()
@@ -223,6 +318,63 @@ export class SuperAdminResolver {
     if (options?.limit !== undefined) filters.limit = options.limit;
     if (options?.skip !== undefined) filters.skip = options.skip;
     return this.auditService.getAuditTrailForChannel(channelId, filters);
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async updateRegistrationTaxRate(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { percentage: number }
+  ) {
+    const KENYA_ZONE_NAME = 'Kenya';
+    const percentage = input.percentage;
+    if (typeof percentage !== 'number' || percentage < 0 || percentage > 100) {
+      throw new Error('Percentage must be a number between 0 and 100');
+    }
+    const zones = await this.zoneService.findAll(ctx);
+    const kenyaZone = zones.items.find(z => z.name === KENYA_ZONE_NAME);
+    if (!kenyaZone) {
+      throw new Error(`Registration zone "${KENYA_ZONE_NAME}" not found.`);
+    }
+    const taxRateRepo = this.connection.getRepository(ctx, TaxRate);
+    const kenyaRates = await taxRateRepo.find({
+      where: { zone: { id: kenyaZone.id } },
+      relations: ['category'],
+    });
+    const kenyaRate = kenyaRates[0];
+    if (!kenyaRate) {
+      throw new Error(`No tax rate found for zone "${KENYA_ZONE_NAME}". Run Kenya seed first.`);
+    }
+    const updated = await this.taxRateService.update(ctx, {
+      id: kenyaRate.id,
+      value: percentage,
+    });
+    return {
+      id: updated.id,
+      name: updated.name,
+      categoryName: updated.category?.name ?? '',
+      value: updated.value,
+    };
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async updateChannelZonesPlatform(
+    @Ctx() ctx: RequestContext,
+    @Args('input')
+    input: { channelId: string; defaultShippingZoneId?: string; defaultTaxZoneId?: string }
+  ) {
+    const updatePayload: { id: string; defaultShippingZoneId?: number; defaultTaxZoneId?: number } =
+      {
+        id: input.channelId,
+      };
+    if (input.defaultShippingZoneId != null) {
+      updatePayload.defaultShippingZoneId = Number(input.defaultShippingZoneId);
+    }
+    if (input.defaultTaxZoneId != null) {
+      updatePayload.defaultTaxZoneId = Number(input.defaultTaxZoneId);
+    }
+    return this.channelService.update(ctx, updatePayload as any);
   }
 
   @Mutation()

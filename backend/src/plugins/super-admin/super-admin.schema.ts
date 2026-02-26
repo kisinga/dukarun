@@ -12,6 +12,26 @@ export const SUPER_ADMIN_SCHEMA = gql`
     customFields: PlatformChannelCustomFields!
   }
 
+  type PlatformZone {
+    id: ID!
+    name: String!
+  }
+
+  type PlatformChannelDetail {
+    id: ID!
+    code: String!
+    token: String!
+    customFields: PlatformChannelCustomFields!
+    defaultShippingZone: PlatformZone
+    defaultTaxZone: PlatformZone
+  }
+
+  input UpdateChannelZonesInput {
+    channelId: ID!
+    defaultShippingZoneId: ID
+    defaultTaxZoneId: ID
+  }
+
   type PlatformChannelCustomFields {
     status: String!
     trialEndsAt: DateTime
@@ -108,6 +128,37 @@ export const SUPER_ADMIN_SCHEMA = gql`
     authorizationStatus: String!
   }
 
+  type RegistrationSeedContext {
+    zone: RegistrationZone!
+    """
+    Null when no tax rate exists for the registration zone (e.g. before seed).
+    """
+    taxRate: RegistrationTaxRate
+  }
+
+  type RegistrationZone {
+    id: ID!
+    name: String!
+    members: [RegistrationZoneMember!]!
+  }
+
+  type RegistrationZoneMember {
+    id: ID!
+    name: String!
+    code: String!
+  }
+
+  type RegistrationTaxRate {
+    id: ID!
+    name: String!
+    categoryName: String!
+    value: Float!
+  }
+
+  input UpdateRegistrationTaxRateInput {
+    percentage: Float!
+  }
+
   type PlatformRoleTemplate {
     id: ID!
     code: String!
@@ -130,7 +181,10 @@ export const SUPER_ADMIN_SCHEMA = gql`
   }
 
   extend type Query {
+    registrationSeedContext: RegistrationSeedContext!
+    platformZones: [PlatformZone!]!
     platformChannels: [PlatformChannel!]!
+    channelDetailPlatform(channelId: ID!): PlatformChannelDetail
     platformStats: PlatformStats!
     analyticsStatsForChannel(
       channelId: ID!
@@ -148,6 +202,8 @@ export const SUPER_ADMIN_SCHEMA = gql`
   }
 
   extend type Mutation {
+    updateRegistrationTaxRate(input: UpdateRegistrationTaxRateInput!): RegistrationTaxRate!
+    updateChannelZonesPlatform(input: UpdateChannelZonesInput!): Channel!
     updateChannelStatusPlatform(channelId: ID!, status: String!): Channel!
     extendTrialPlatform(channelId: ID!, trialEndsAt: DateTime!): Channel!
     updateChannelFeatureFlagsPlatform(input: UpdateChannelFeatureFlagsInput!): Channel!

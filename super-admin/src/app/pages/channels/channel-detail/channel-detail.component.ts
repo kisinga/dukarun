@@ -3,7 +3,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ApolloService } from '../../../core/services/apollo.service';
 import {
-  PLATFORM_CHANNELS,
+  PLATFORM_ZONES,
+  CHANNEL_DETAIL_PLATFORM,
   ANALYTICS_STATS_FOR_CHANNEL,
   AUDIT_LOGS_FOR_CHANNEL,
   ADMINISTRATORS_FOR_CHANNEL,
@@ -11,7 +12,13 @@ import {
   UPDATE_CHANNEL_STATUS_PLATFORM,
   EXTEND_TRIAL_PLATFORM,
   UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM,
+  UPDATE_CHANNEL_ZONES_PLATFORM,
 } from '../../../core/graphql/operations';
+
+interface PlatformZone {
+  id: string;
+  name: string;
+}
 
 interface PlatformChannel {
   id: string;
@@ -26,6 +33,8 @@ interface PlatformChannel {
     cashControlEnabled: boolean;
     enablePrinter: boolean;
   };
+  defaultShippingZone?: PlatformZone | null;
+  defaultTaxZone?: PlatformZone | null;
 }
 
 export interface PlatformAdministrator {
@@ -62,6 +71,7 @@ export class ChannelDetailComponent implements OnInit {
   private readonly apollo = inject(ApolloService);
 
   channel = signal<PlatformChannel | null>(null);
+  zones = signal<PlatformZone[]>([]);
   analytics = signal<Record<string, unknown> | null>(null);
   auditLogs = signal<any[]>([]);
   admins = signal<PlatformAdministrator[]>([]);
@@ -73,6 +83,11 @@ export class ChannelDetailComponent implements OnInit {
   newStatus = signal('');
   newTrialEndsAt = signal('');
   newMaxAdminCount = signal<number>(5);
+  selectedShippingZoneId = signal('');
+  selectedTaxZoneId = signal('');
+  cashierFlowEnabled = signal(false);
+  cashControlEnabled = signal(true);
+  enablePrinter = signal(true);
   saving = signal(false);
 
   id = computed(() => this.route.snapshot.paramMap.get('id') ?? '');
@@ -82,8 +97,13 @@ export class ChannelDetailComponent implements OnInit {
     if (!id) return;
     const client = this.apollo.getClient();
     try {
-      const [chResult, analyticsResult, auditResult, adminsResult, notificationsResult] = await Promise.all([
-        client.query<{ platformChannels: PlatformChannel[] }>({ query: PLATFORM_CHANNELS, fetchPolicy: 'network-only' }),
+      const [chResult, zonesResult, analyticsResult, auditResult, adminsResult, notificationsResult] = await Promise.all([
+        client.query<{ channelDetailPlatform: PlatformChannel | null }>({
+          query: CHANNEL_DETAIL_PLATFORM,
+          variables: { channelId: id },
+          fetchPolicy: 'network-only',
+        }),
+        client.query<{ platformZones: PlatformZone[] }>({ query: PLATFORM_ZONES, fetchPolicy: 'network-only' }),
         client.query({
           query: ANALYTICS_STATS_FOR_CHANNEL,
           variables: {
@@ -109,8 +129,9 @@ export class ChannelDetailComponent implements OnInit {
           fetchPolicy: 'network-only',
         }).catch(() => ({ data: { notificationsForChannel: { items: [] } } })),
       ]);
-      const ch = chResult.data?.platformChannels?.find((c: PlatformChannel) => c.id === id) ?? null;
+      const ch = chResult.data?.channelDetailPlatform ?? null;
       this.channel.set(ch);
+      this.zones.set(zonesResult.data?.platformZones ?? []);
       if (ch) {
         this.newStatus.set(ch.customFields.status);
         if (ch.customFields.trialEndsAt) {
@@ -118,6 +139,11 @@ export class ChannelDetailComponent implements OnInit {
         }
         const max = ch.customFields.maxAdminCount;
         this.newMaxAdminCount.set(typeof max === 'number' && max > 0 ? max : 5);
+        this.selectedShippingZoneId.set(ch.defaultShippingZone?.id ?? '');
+        this.selectedTaxZoneId.set(ch.defaultTaxZone?.id ?? '');
+        this.cashierFlowEnabled.set(ch.customFields.cashierFlowEnabled);
+        this.cashControlEnabled.set(ch.customFields.cashControlEnabled);
+        this.enablePrinter.set(ch.customFields.enablePrinter);
       }
       this.analytics.set((analyticsResult.data as any)?.analyticsStatsForChannel ?? null);
       this.auditLogs.set((auditResult.data as any)?.auditLogsForChannel ?? []);
@@ -206,6 +232,70 @@ export class ChannelDetailComponent implements OnInit {
       });
       const ch = this.channel();
       if (ch) this.channel.set({ ...ch, customFields: { ...ch.customFields, maxAdminCount: value } });
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  async updateZones(): Promise<void> {
+    const id = this.id();
+    if (!id) return;
+    this.saving.set(true);
+    try {
+      await this.apollo.getClient().mutate({
+        mutation: UPDATE_CHANNEL_ZONES_PLATFORM,
+        variables: {
+          input: {
+            channelId: id,
+            defaultShippingZoneId: this.selectedShippingZoneId() || undefined,
+            defaultTaxZoneId: this.selectedTaxZoneId() || undefined,
+          },
+        },
+      });
+      const ch = this.channel();
+      const zones = this.zones();
+      const shipId = this.selectedShippingZoneId();
+      const taxId = this.selectedTaxZoneId();
+      if (ch) {
+        this.channel.set({
+          ...ch,
+          defaultShippingZone: shipId ? (zones.find(z => z.id === shipId) ?? ch.defaultShippingZone) : null,
+          defaultTaxZone: taxId ? (zones.find(z => z.id === taxId) ?? ch.defaultTaxZone) : null,
+        });
+      }
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  async updateFeatureToggles(): Promise<void> {
+    const id = this.id();
+    if (!id) return;
+    this.saving.set(true);
+    try {
+      await this.apollo.getClient().mutate({
+        mutation: UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM,
+        variables: {
+          input: {
+            channelId: id,
+            cashierFlowEnabled: this.cashierFlowEnabled(),
+            cashControlEnabled: this.cashControlEnabled(),
+            enablePrinter: this.enablePrinter(),
+          },
+        },
+      });
+      const ch = this.channel();
+      if (ch) {
+        this.channel.set({
+          ...ch,
+          customFields: {
+            ...ch.customFields,
+            cashierFlowEnabled: this.cashierFlowEnabled(),
+            cashControlEnabled: this.cashControlEnabled(),
+            enablePrinter: this.enablePrinter(),
+          },
+        });
+      }
     } finally {
       this.saving.set(false);
     }

@@ -10,6 +10,50 @@ export const AUTHENTICATE = gql`
   }
 `;
 
+export const PLATFORM_ZONES = gql`
+  query PlatformZones {
+    platformZones {
+      id
+      name
+    }
+  }
+`;
+
+export const CHANNEL_DETAIL_PLATFORM = gql`
+  query ChannelDetailPlatform($channelId: ID!) {
+    channelDetailPlatform(channelId: $channelId) {
+      id
+      code
+      token
+      customFields {
+        status
+        trialEndsAt
+        subscriptionStatus
+        maxAdminCount
+        cashierFlowEnabled
+        cashControlEnabled
+        enablePrinter
+      }
+      defaultShippingZone {
+        id
+        name
+      }
+      defaultTaxZone {
+        id
+        name
+      }
+    }
+  }
+`;
+
+export const UPDATE_CHANNEL_ZONES_PLATFORM = gql`
+  mutation UpdateChannelZonesPlatform($input: UpdateChannelZonesInput!) {
+    updateChannelZonesPlatform(input: $input) {
+      id
+    }
+  }
+`;
+
 export const PLATFORM_CHANNELS = gql`
   query PlatformChannels {
     platformChannels {
@@ -288,6 +332,39 @@ export const SET_ML_MODEL_STATUS = gql`
 export const CLEAR_ML_MODEL = gql`
   mutation ClearMlModel($channelId: ID!) {
     clearMlModel(channelId: $channelId)
+  }
+`;
+
+export const REGISTRATION_SEED_CONTEXT = gql`
+  query RegistrationSeedContext {
+    registrationSeedContext {
+      zone {
+        id
+        name
+        members {
+          id
+          name
+          code
+        }
+      }
+      taxRate {
+        id
+        name
+        categoryName
+        value
+      }
+    }
+  }
+`;
+
+export const UPDATE_REGISTRATION_TAX_RATE = gql`
+  mutation UpdateRegistrationTaxRate($input: UpdateRegistrationTaxRateInput!) {
+    updateRegistrationTaxRate(input: $input) {
+      id
+      name
+      categoryName
+      value
+    }
   }
 `;
 
