@@ -39,6 +39,18 @@ app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
 
+app.get('/v1/jobs', (req: Request, res: Response) => {
+  const jobs = Array.from(activeJobs.entries()).map(([channelId, job]) => ({
+    channelId,
+    status: job.status,
+    startedAt: job.startedAt,
+    completedAt: job.completedAt,
+    failedAt: job.failedAt,
+    error: job.error,
+  }));
+  res.status(200).json(jobs);
+});
+
 app.post('/v1/train', async (req: Request, res: Response) => {
   const { channelId, manifestUrl, webhookUrl, authToken } = req.body;
 

@@ -11,6 +11,11 @@ import {
   PLATFORM_CHANNELS,
   ML_TRAINER_HEALTH,
   ML_TRAINING_INFO,
+  ML_TRAINING_DATA_SUMMARY,
+  ML_SCHEDULER_CONFIG,
+  ML_TRAINER_JOBS,
+  ML_MODEL_INFO,
+  QUEUE_TRAINING,
   START_TRAINING,
   EXTRACT_PHOTOS_FOR_TRAINING,
   SET_ML_MODEL_STATUS,
@@ -39,6 +44,37 @@ interface MlTrainingInfo {
   imageCount: number;
   hasActiveModel: boolean;
   lastTrainedAt: string | null;
+  queuedAt: string | null;
+}
+
+interface MlTrainingDataSummary {
+  extractedAt: string | null;
+  productCount: number;
+  imageCount: number;
+  products: Array<{ productName: string; imageCount: number }>;
+}
+
+interface MlSchedulerConfig {
+  intervalMinutes: number;
+  cooldownHours: number;
+}
+
+interface MlTrainerJob {
+  channelId: string;
+  status: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  failedAt: string | null;
+  error: string | null;
+}
+
+interface MlModelInfo {
+  hasModel: boolean;
+  version: string | null;
+  status: string;
+  modelJsonId: string | null;
+  modelBinId: string | null;
+  metadataId: string | null;
 }
 
 interface ChannelRow {
@@ -48,6 +84,7 @@ interface ChannelRow {
 }
 
 const POLL_INTERVAL_MS = 8000;
+const SUCCESS_MESSAGE_DURATION_MS = 4000;
 
 @Component({
   selector: 'app-ml-trainer-management',
@@ -59,18 +96,37 @@ const POLL_INTERVAL_MS = 8000;
 export class MlTrainerManagementComponent implements OnInit, OnDestroy {
   private readonly apollo = inject(ApolloService);
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private successMessageTimer: ReturnType<typeof setTimeout> | null = null;
 
   health = signal<MlTrainerHealth | null>(null);
+  schedulerConfig = signal<MlSchedulerConfig | null>(null);
+  trainerJobs = signal<MlTrainerJob[]>([]);
   channels = signal<PlatformChannel[]>([]);
   rows = signal<ChannelRow[]>([]);
   loading = signal(true);
   error = signal<string | null>(null);
+  successMessage = signal<string | null>(null);
   actionLoading = signal<string | null>(null);
+  detailModalChannelId = signal<string | null>(null);
+  detailSummary = signal<MlTrainingDataSummary | null>(null);
+  detailModelInfo = signal<MlModelInfo | null>(null);
+  detailLoading = signal(false);
+  errorModalRow = signal<ChannelRow | null>(null);
+
+  detailModalRow = computed(() => {
+    const id = this.detailModalChannelId();
+    if (!id) return null;
+    return this.rows().find((r) => r.channel.id === id) ?? null;
+  });
 
   hasTrainingInProgress = computed(() =>
     this.rows().some(
       (r) => r.trainingInfo?.status === 'training'
     )
+  );
+
+  runningJobsCount = computed(() =>
+    this.trainerJobs().filter((j) => j.status === 'running').length
   );
 
   async ngOnInit(): Promise<void> {
@@ -79,13 +135,21 @@ export class MlTrainerManagementComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.clearPolling();
+    if (this.successMessageTimer) {
+      clearTimeout(this.successMessageTimer);
+      this.successMessageTimer = null;
+    }
   }
 
   async refresh(): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
     try {
-      await Promise.all([this.loadHealth(), this.loadChannelsAndTraining()]);
+      await Promise.all([
+        this.loadHealth(),
+        this.loadSchedulerAndJobs(),
+        this.loadChannelsAndTraining(),
+      ]);
       this.maybeStartPolling();
     } catch (err: unknown) {
       this.error.set(err instanceof Error ? err.message : 'Refresh failed');
@@ -108,6 +172,27 @@ export class MlTrainerManagementComponent implements OnInit, OnDestroy {
         status: 'unavailable',
         error: 'Failed to load health',
       });
+    }
+  }
+
+  private async loadSchedulerAndJobs(): Promise<void> {
+    const client = this.apollo.getClient();
+    try {
+      const [configResult, jobsResult] = await Promise.all([
+        client.query<{ mlSchedulerConfig: MlSchedulerConfig }>({
+          query: ML_SCHEDULER_CONFIG,
+          fetchPolicy: 'network-only',
+        }),
+        client.query<{ mlTrainerJobs: MlTrainerJob[] }>({
+          query: ML_TRAINER_JOBS,
+          fetchPolicy: 'network-only',
+        }),
+      ]);
+      this.schedulerConfig.set(configResult.data?.mlSchedulerConfig ?? null);
+      this.trainerJobs.set(jobsResult.data?.mlTrainerJobs ?? []);
+    } catch {
+      this.schedulerConfig.set(null);
+      this.trainerJobs.set([]);
     }
   }
 
@@ -163,7 +248,10 @@ export class MlTrainerManagementComponent implements OnInit, OnDestroy {
     if (this.hasTrainingInProgress()) {
       if (!this.pollTimer) {
         this.pollTimer = setInterval(() => {
-          void this.loadChannelsAndTraining().then(() => {
+          void Promise.all([
+            this.loadChannelsAndTraining(),
+            this.loadSchedulerAndJobs(),
+          ]).then(() => {
             if (!this.hasTrainingInProgress()) this.clearPolling();
           });
         }, POLL_INTERVAL_MS);
@@ -198,6 +286,85 @@ export class MlTrainerManagementComponent implements OnInit, OnDestroy {
     return isNaN(d.getTime()) ? '—' : d.toLocaleString();
   }
 
+  private showSuccess(message: string): void {
+    if (this.successMessageTimer) clearTimeout(this.successMessageTimer);
+    this.successMessage.set(message);
+    this.successMessageTimer = setTimeout(() => {
+      this.successMessage.set(null);
+      this.successMessageTimer = null;
+    }, SUCCESS_MESSAGE_DURATION_MS);
+  }
+
+  openDetail(row: ChannelRow): void {
+    this.detailModalChannelId.set(row.channel.id);
+    this.detailSummary.set(null);
+    this.detailModelInfo.set(null);
+    this.loadDetailData(row.channel.id);
+  }
+
+  closeDetail(): void {
+    this.detailModalChannelId.set(null);
+    this.detailSummary.set(null);
+    this.detailModelInfo.set(null);
+  }
+
+  async loadDetailData(channelId: string): Promise<void> {
+    this.detailLoading.set(true);
+    const client = this.apollo.getClient();
+    try {
+      const [summaryResult, modelResult] = await Promise.all([
+        client.query<{ mlTrainingDataSummary: MlTrainingDataSummary }>({
+          query: ML_TRAINING_DATA_SUMMARY,
+          variables: { channelId },
+          fetchPolicy: 'network-only',
+        }),
+        client.query<{ mlModelInfo: MlModelInfo }>({
+          query: ML_MODEL_INFO,
+          variables: { channelId },
+          fetchPolicy: 'network-only',
+        }),
+      ]);
+      this.detailSummary.set(summaryResult.data?.mlTrainingDataSummary ?? null);
+      this.detailModelInfo.set(modelResult.data?.mlModelInfo ?? null);
+    } catch {
+      this.detailSummary.set(null);
+      this.detailModelInfo.set(null);
+    } finally {
+      this.detailLoading.set(false);
+    }
+  }
+
+  getTrainerJobForChannel(channelId: string): MlTrainerJob | null {
+    return this.trainerJobs().find((j) => j.channelId === channelId) ?? null;
+  }
+
+  openErrorModal(row: ChannelRow): void {
+    this.errorModalRow.set(row);
+  }
+
+  closeErrorModal(): void {
+    this.errorModalRow.set(null);
+  }
+
+  async queueTraining(row: ChannelRow): Promise<void> {
+    const id = row.channel.id;
+    this.actionLoading.set(id);
+    try {
+      await this.apollo.getClient().mutate({
+        mutation: QUEUE_TRAINING,
+        variables: { channelId: id },
+      });
+      await this.refetchTrainingInfo(id);
+      this.showSuccess('Queued for next scheduler run');
+    } catch (err: unknown) {
+      this.error.set(
+        err instanceof Error ? err.message : 'Queue training failed'
+      );
+    } finally {
+      this.actionLoading.set(null);
+    }
+  }
+
   async extractPhotos(row: ChannelRow): Promise<void> {
     const id = row.channel.id;
     this.actionLoading.set(id);
@@ -207,6 +374,10 @@ export class MlTrainerManagementComponent implements OnInit, OnDestroy {
         variables: { channelId: id },
       });
       await this.refetchTrainingInfo(id);
+      this.showSuccess('Photo extraction started');
+      if (this.detailModalChannelId() === id) {
+        this.loadDetailData(id);
+      }
     } catch (err: unknown) {
       this.error.set(
         err instanceof Error ? err.message : 'Extract photos failed'
@@ -218,6 +389,7 @@ export class MlTrainerManagementComponent implements OnInit, OnDestroy {
 
   async startTraining(row: ChannelRow): Promise<void> {
     if (row.trainingInfo?.status === 'training') return;
+    if (!confirm('Start training now? This may take several minutes.')) return;
     const id = row.channel.id;
     this.actionLoading.set(id);
     try {
@@ -226,7 +398,11 @@ export class MlTrainerManagementComponent implements OnInit, OnDestroy {
         variables: { channelId: id },
       });
       await this.refetchTrainingInfo(id);
+      this.showSuccess('Training started');
       this.maybeStartPolling();
+      if (this.detailModalChannelId() === id) {
+        this.loadChannelsAndTraining();
+      }
     } catch (err: unknown) {
       this.error.set(
         err instanceof Error ? err.message : 'Start training failed'
@@ -245,6 +421,10 @@ export class MlTrainerManagementComponent implements OnInit, OnDestroy {
         variables: { channelId: id, status },
       });
       await this.refetchTrainingInfo(id);
+      this.showSuccess(`Model set to ${status}`);
+      if (this.detailModalChannelId() === id) {
+        this.loadDetailData(id);
+      }
     } catch (err: unknown) {
       this.error.set(
         err instanceof Error ? err.message : 'Set status failed'
@@ -265,6 +445,10 @@ export class MlTrainerManagementComponent implements OnInit, OnDestroy {
         variables: { channelId: id },
       });
       await this.refetchTrainingInfo(id);
+      this.showSuccess('Model cleared');
+      if (this.detailModalChannelId() === id) {
+        this.loadDetailData(id);
+      }
     } catch (err: unknown) {
       this.error.set(
         err instanceof Error ? err.message : 'Clear model failed'

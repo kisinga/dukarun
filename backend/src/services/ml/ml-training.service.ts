@@ -281,6 +281,7 @@ export class MlTrainingService {
       imageCount: customFields.mlImageCount || 0,
       hasActiveModel: !!(modelJsonId && metadataId),
       lastTrainedAt: customFields.mlTrainingStartedAt, // Could be improved with separate field
+      queuedAt: customFields.mlTrainingQueuedAt ?? null,
     };
   }
 

@@ -325,7 +325,63 @@ export const ML_TRAINING_INFO = gql`
       imageCount
       hasActiveModel
       lastTrainedAt
+      queuedAt
     }
+  }
+`;
+
+export const ML_TRAINING_DATA_SUMMARY = gql`
+  query MlTrainingDataSummary($channelId: ID!) {
+    mlTrainingDataSummary(channelId: $channelId) {
+      extractedAt
+      productCount
+      imageCount
+      products {
+        productName
+        imageCount
+      }
+    }
+  }
+`;
+
+export const ML_SCHEDULER_CONFIG = gql`
+  query MlSchedulerConfig {
+    mlSchedulerConfig {
+      intervalMinutes
+      cooldownHours
+    }
+  }
+`;
+
+export const ML_TRAINER_JOBS = gql`
+  query MlTrainerJobs {
+    mlTrainerJobs {
+      channelId
+      status
+      startedAt
+      completedAt
+      failedAt
+      error
+    }
+  }
+`;
+
+export const ML_MODEL_INFO = gql`
+  query MlModelInfo($channelId: ID!) {
+    mlModelInfo(channelId: $channelId) {
+      hasModel
+      version
+      status
+      modelJsonId
+      modelBinId
+      metadataId
+    }
+  }
+`;
+
+export const QUEUE_TRAINING = gql`
+  mutation QueueTraining($channelId: ID!) {
+    queueTraining(channelId: $channelId)
   }
 `;
 
