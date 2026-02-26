@@ -169,6 +169,24 @@ export const AUDIT_LOGS_FOR_CHANNEL = gql`
   }
 `;
 
+export const ADMIN_LOGIN_ATTEMPTS = gql`
+  query AdminLoginAttempts($limit: Int, $skip: Int, $since: DateTime) {
+    adminLoginAttempts(limit: $limit, skip: $skip, since: $since) {
+      id
+      eventKind
+      timestamp
+      ipAddress
+      username
+      success
+      failureReason
+      userId
+      authMethod
+      userAgent
+      isSuperAdmin
+    }
+  }
+`;
+
 export const UPDATE_CHANNEL_STATUS_PLATFORM = gql`
   mutation UpdateChannelStatusPlatform($channelId: ID!, $status: String!) {
     updateChannelStatusPlatform(channelId: $channelId, status: $status) {

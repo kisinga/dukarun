@@ -128,6 +128,20 @@ export const SUPER_ADMIN_SCHEMA = gql`
     authorizationStatus: String!
   }
 
+  type AdminLoginAttempt {
+    id: ID!
+    eventKind: String!
+    timestamp: DateTime!
+    ipAddress: String
+    username: String!
+    success: Boolean!
+    failureReason: String
+    userId: Int
+    authMethod: String!
+    userAgent: String
+    isSuperAdmin: Boolean
+  }
+
   type RegistrationSeedContext {
     zone: RegistrationZone!
     """
@@ -197,6 +211,7 @@ export const SUPER_ADMIN_SCHEMA = gql`
     notificationsForChannel(channelId: ID!, options: NotificationListOptions): NotificationList!
     pendingRegistrations: [PendingRegistration!]!
     platformRoleTemplates: [PlatformRoleTemplate!]!
+    adminLoginAttempts(limit: Int, skip: Int, since: DateTime): [AdminLoginAttempt!]!
     assignablePermissions: [String!]!
     administratorDetail(administratorId: ID!): PlatformAdministratorDetail
   }

@@ -1,0 +1,84 @@
+<h1 class="text-2xl font-bold mb-6">Login attempts</h1>
+
+<div class="flex flex-wrap items-center gap-4 mb-4">
+  <label class="label gap-2">
+    <span class="label-text">Since</span>
+    <input
+      type="date"
+      class="input input-bordered input-sm w-40"
+      [ngModel]="since()"
+      (ngModelChange)="setSince($event)"
+    />
+  </label>
+  <button type="button" class="btn btn-sm btn-primary" (click)="load()" [disabled]="loading()">
+    Refresh
+  </button>
+</div>
+
+@if (loading()) {
+  <div class="flex items-center gap-2 text-base-content/70">
+    <span class="loading loading-spinner loading-md"></span>
+    <span>Loading…</span>
+  </div>
+}
+@if (error()) {
+  <div role="alert" class="alert alert-error">
+    <span>{{ error() }}</span>
+  </div>
+}
+@if (attempts().length) {
+  <div class="overflow-x-auto rounded-xl border border-base-300 bg-base-100 shadow">
+    <table class="table table-zebra table-sm">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Event</th>
+          <th>IP</th>
+          <th>Username</th>
+          <th>Result</th>
+          <th>Reason</th>
+          <th>Auth</th>
+          <th>Super admin</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (a of attempts(); track a.id) {
+          <tr [class.border-l-4]="isRateLimitRow(a)" [class.border-warning]="isRateLimitRow(a)" [attr.aria-label]="isRateLimitRow(a) ? 'Rate limited' : null">
+            <td>{{ formatDate(a.timestamp) }}</td>
+            <td>
+              @if (isRateLimitRow(a)) {
+                <span class="badge badge-warning badge-sm" aria-label="Rate limited (OTP)">Rate limited (OTP)</span>
+              } @else {
+                <span class="text-base-content/70">Login</span>
+              }
+            </td>
+            <td>{{ a.ipAddress ?? '—' }}</td>
+            <td class="font-medium">{{ a.username }}</td>
+            <td>
+              @if (isRateLimitRow(a)) {
+                <span class="badge badge-warning badge-sm">Rate limited</span>
+              } @else if (a.success) {
+                <span class="badge badge-success badge-sm">Success</span>
+              } @else {
+                <span class="badge badge-error badge-sm">Failed</span>
+              }
+            </td>
+            <td>{{ isRateLimitRow(a) ? 'OTP request rate limited' : (a.failureReason ?? '—') }}</td>
+            <td>{{ isRateLimitRow(a) ? 'OTP request' : a.authMethod }}</td>
+            <td>
+              @if (isRateLimitRow(a)) {
+                <span>—</span>
+              } @else if (a.isSuperAdmin) {
+                <span class="badge badge-neutral badge-sm">Yes</span>
+              } @else {
+                <span>—</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+} @else if (!loading()) {
+  <p class="text-base-content/70">No login attempts found.</p>
+}

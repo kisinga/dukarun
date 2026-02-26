@@ -16,6 +16,7 @@ import {
 } from '@vendure/core';
 import { getChannelStatus } from '../../domain/channel-custom-fields';
 import { ChannelAdminService } from '../../services/channels/channel-admin.service';
+import { AdminLoginAttemptService } from '../../infrastructure/audit/admin-login-attempt.service';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { AuditTrailFilters } from '../../infrastructure/audit/audit.types';
 import { AnalyticsQueryService } from '../../services/analytics/analytics-query.service';
@@ -39,6 +40,7 @@ export class SuperAdminResolver {
     private readonly platformAdminService: PlatformAdminService,
     private readonly analyticsQueryService: AnalyticsQueryService,
     private readonly auditService: AuditService,
+    private readonly adminLoginAttemptService: AdminLoginAttemptService,
     private readonly channelSettingsService: ChannelSettingsService,
     private readonly channelService: ChannelService,
     private readonly notificationService: NotificationService,
@@ -318,6 +320,20 @@ export class SuperAdminResolver {
     if (options?.limit !== undefined) filters.limit = options.limit;
     if (options?.skip !== undefined) filters.skip = options.skip;
     return this.auditService.getAuditTrailForChannel(channelId, filters);
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async adminLoginAttempts(
+    @Args('limit', { nullable: true }) limit?: number,
+    @Args('skip', { nullable: true }) skip?: number,
+    @Args('since', { nullable: true }) since?: Date
+  ) {
+    return this.adminLoginAttemptService.getAttempts({
+      limit,
+      skip,
+      since: since instanceof Date ? since : since ? new Date(since) : undefined,
+    });
   }
 
   @Mutation()

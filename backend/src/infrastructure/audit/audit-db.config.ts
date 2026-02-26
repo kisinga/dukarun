@@ -20,7 +20,10 @@ export const auditDbConfig: DataSourceOptions = {
   schema: 'public',
   synchronize: false, // Never use synchronize in production
   logging: false,
-  entities: [path.join(__dirname, 'audit-log.entity.{ts,js}')],
+  entities: [
+    path.join(__dirname, 'audit-log.entity.{ts,js}'),
+    path.join(__dirname, 'admin-login-attempt.entity.{ts,js}'),
+  ],
   migrations: [path.join(__dirname, '../migrations/audit-*.{ts,js}')],
   // Connection pool settings for better reliability
   extra: {
