@@ -57,6 +57,25 @@ export const SUPER_ADMIN_SCHEMA = gql`
     isSuperAdmin: Boolean
   }
 
+  type PlatformAdministratorRoleDetail {
+    id: ID!
+    code: String!
+    channelIds: [ID!]!
+    permissions: [String!]!
+  }
+
+  type PlatformAdministratorDetail {
+    id: ID!
+    firstName: String!
+    lastName: String!
+    emailAddress: String!
+    userId: ID!
+    identifier: String!
+    authorizationStatus: String!
+    isSuperAdmin: Boolean!
+    roles: [PlatformAdministratorRoleDetail!]!
+  }
+
   input PlatformAdministratorListOptions {
     skip: Int
     take: Int
@@ -89,6 +108,27 @@ export const SUPER_ADMIN_SCHEMA = gql`
     authorizationStatus: String!
   }
 
+  type PlatformRoleTemplate {
+    id: ID!
+    code: String!
+    name: String!
+    description: String
+    permissions: [String!]!
+  }
+
+  input CreateRoleTemplateInput {
+    code: String!
+    name: String!
+    description: String
+    permissions: [String!]!
+  }
+
+  input UpdateRoleTemplateInput {
+    name: String
+    description: String
+    permissions: [String!]
+  }
+
   extend type Query {
     platformChannels: [PlatformChannel!]!
     platformStats: PlatformStats!
@@ -102,6 +142,9 @@ export const SUPER_ADMIN_SCHEMA = gql`
     platformAdministrators(options: PlatformAdministratorListOptions): PlatformAdministratorList!
     notificationsForChannel(channelId: ID!, options: NotificationListOptions): NotificationList!
     pendingRegistrations: [PendingRegistration!]!
+    platformRoleTemplates: [PlatformRoleTemplate!]!
+    assignablePermissions: [String!]!
+    administratorDetail(administratorId: ID!): PlatformAdministratorDetail
   }
 
   extend type Mutation {
@@ -110,5 +153,13 @@ export const SUPER_ADMIN_SCHEMA = gql`
     updateChannelFeatureFlagsPlatform(input: UpdateChannelFeatureFlagsInput!): Channel!
     approveUser(userId: ID!): UserAuthorizationResult!
     rejectUser(userId: ID!, reason: String): UserAuthorizationResult!
+    createRoleTemplate(input: CreateRoleTemplateInput!): PlatformRoleTemplate!
+    updateRoleTemplate(id: ID!, input: UpdateRoleTemplateInput!): PlatformRoleTemplate!
+    deleteRoleTemplate(id: ID!): Boolean!
+    updateAdministratorPermissions(
+      administratorId: ID!
+      channelId: ID!
+      permissions: [String!]!
+    ): PlatformAdministratorDetail!
   }
 `;

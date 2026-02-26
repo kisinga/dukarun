@@ -349,6 +349,14 @@ export class RoleProvisionerService {
   }
 
   /**
+   * Returns the list of permission strings that can be assigned to roles/templates.
+   * Used by super-admin role template CRUD and assignablePermissions query.
+   */
+  static getAssignablePermissionStrings(): string[] {
+    return [...RoleProvisionerService.ALL_ADMIN_PERMISSIONS];
+  }
+
+  /**
    * Get role template by code
    */
   getRoleTemplate(code: string): RoleTemplate | undefined {

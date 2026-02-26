@@ -290,3 +290,94 @@ export const CLEAR_ML_MODEL = gql`
     clearMlModel(channelId: $channelId)
   }
 `;
+
+export const ROLE_TEMPLATES = gql`
+  query PlatformRoleTemplates {
+    platformRoleTemplates {
+      id
+      code
+      name
+      description
+      permissions
+    }
+  }
+`;
+
+export const ASSIGNABLE_PERMISSIONS = gql`
+  query AssignablePermissions {
+    assignablePermissions
+  }
+`;
+
+export const CREATE_ROLE_TEMPLATE = gql`
+  mutation CreateRoleTemplate($input: CreateRoleTemplateInput!) {
+    createRoleTemplate(input: $input) {
+      id
+      code
+      name
+      description
+      permissions
+    }
+  }
+`;
+
+export const UPDATE_ROLE_TEMPLATE = gql`
+  mutation UpdateRoleTemplate($id: ID!, $input: UpdateRoleTemplateInput!) {
+    updateRoleTemplate(id: $id, input: $input) {
+      id
+      code
+      name
+      description
+      permissions
+    }
+  }
+`;
+
+export const DELETE_ROLE_TEMPLATE = gql`
+  mutation DeleteRoleTemplate($id: ID!) {
+    deleteRoleTemplate(id: $id)
+  }
+`;
+
+export const ADMINISTRATOR_DETAIL = gql`
+  query AdministratorDetail($administratorId: ID!) {
+    administratorDetail(administratorId: $administratorId) {
+      id
+      firstName
+      lastName
+      emailAddress
+      userId
+      identifier
+      authorizationStatus
+      isSuperAdmin
+      roles {
+        id
+        code
+        channelIds
+        permissions
+      }
+    }
+  }
+`;
+
+export const UPDATE_ADMINISTRATOR_PERMISSIONS = gql`
+  mutation UpdateAdministratorPermissions(
+    $administratorId: ID!
+    $channelId: ID!
+    $permissions: [String!]!
+  ) {
+    updateAdministratorPermissions(
+      administratorId: $administratorId
+      channelId: $channelId
+      permissions: $permissions
+    ) {
+      id
+      roles {
+        id
+        code
+        channelIds
+        permissions
+      }
+    }
+  }
+`;

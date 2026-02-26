@@ -48,18 +48,23 @@
             <td><span class="badge badge-sm">{{ admin.authorizationStatus }}</span></td>
             <td>{{ channelsLabel(admin) }}</td>
             <td>
-              @if (admin.channelIds && admin.channelIds.length === 1) {
-                <a [routerLink]="['/channels', admin.channelIds[0]]" class="btn btn-ghost btn-xs">View channel</a>
-              } @else if (admin.channelIds && admin.channelIds.length > 1) {
-                <span class="flex flex-wrap gap-1">
-                  @for (cid of admin.channelIds.slice(0, 2); track cid) {
-                    <a [routerLink]="['/channels', cid]" class="link link-hover text-xs">{{ channelCode(cid) }}</a>
-                  }
-                  @if (admin.channelIds.length > 2) {
-                    <span class="text-base-content/50">…</span>
-                  }
-                </span>
-              }
+              <div class="flex flex-wrap items-center gap-2">
+                @if (!admin.isSuperAdmin) {
+                  <button type="button" class="btn btn-ghost btn-sm" (click)="openEditPermissions(admin)">Edit permissions</button>
+                }
+                @if (admin.channelIds && admin.channelIds.length === 1) {
+                  <a [routerLink]="['/channels', admin.channelIds[0]]" class="btn btn-ghost btn-xs">View channel</a>
+                } @else if (admin.channelIds && admin.channelIds.length > 1) {
+                  <span class="flex flex-wrap gap-1">
+                    @for (cid of admin.channelIds.slice(0, 2); track cid) {
+                      <a [routerLink]="['/channels', cid]" class="link link-hover text-xs">{{ channelCode(cid) }}</a>
+                    }
+                    @if (admin.channelIds.length > 2) {
+                      <span class="text-base-content/50">…</span>
+                    }
+                  </span>
+                }
+              </div>
             </td>
           </tr>
         }
@@ -69,4 +74,92 @@
   <p class="text-sm text-base-content/60 mt-2">{{ totalItems() }} total</p>
 } @else if (!loading()) {
   <p class="text-base-content/70">No users match the filters.</p>
+}
+
+@if (permModalOpen()) {
+  <dialog class="modal modal-open" (click)="$event.target === $event.currentTarget && closePermModal()">
+    <div class="modal-box max-w-3xl max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
+      <h3 class="font-bold text-lg mb-4">
+        Edit permissions
+        @if (permDetail(); as d) {
+          — {{ d.firstName }} {{ d.lastName }}
+        }
+      </h3>
+      @if (permError()) {
+        <div class="alert alert-error mb-4">
+          <span>{{ permError() }}</span>
+        </div>
+      }
+      @if (permLoading()) {
+        <div class="flex items-center gap-2 text-base-content/70">
+          <span class="loading loading-spinner loading-md"></span>
+          <span>Loading…</span>
+        </div>
+      } @else if (permDetail(); as detail) {
+        @if (permissionChannels().length > 1) {
+          <label class="form-control w-full mb-4">
+            <span class="label"><span class="label-text">Channel</span></span>
+            <select
+              class="select select-bordered select-sm w-full max-w-xs"
+              [ngModel]="selectedChannelId()"
+              (ngModelChange)="onPermChannelChange($event)"
+            >
+              @for (cid of permissionChannels(); track cid) {
+                <option [value]="cid">{{ channelCode(cid) }}</option>
+              }
+            </select>
+          </label>
+        }
+        @if (permTemplates().length) {
+          <div class="mb-4 p-3 bg-base-200 rounded-lg">
+            <span class="label-text font-semibold block mb-2">Apply template</span>
+            <select
+              class="select select-bordered select-sm w-full max-w-xs"
+              (change)="onTemplateSelect(+($any($event.target).value))"
+            >
+              <option [value]="-1">Choose a template…</option>
+              @for (t of permTemplates(); track t.id; let i = $index) {
+                <option [value]="i">{{ t.name }}</option>
+              }
+            </select>
+          </div>
+        }
+        <div class="space-y-4">
+          @for (group of permGroupKeys(); track group) {
+            <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+              <input type="checkbox" checked />
+              <div class="collapse-title font-medium">{{ group }}</div>
+              <div class="collapse-content">
+                <div class="flex flex-wrap gap-2">
+                  @for (perm of groupedPermissions()[group]; track perm) {
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        class="checkbox checkbox-sm checkbox-primary"
+                        [checked]="permHasPermission(perm)"
+                        (change)="permTogglePermission(perm)"
+                      />
+                      <span class="text-sm">{{ formatPermissionName(perm) }}</span>
+                    </label>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+        <div class="modal-action">
+          <button type="button" class="btn btn-ghost" (click)="closePermModal()">Cancel</button>
+          <button type="button" class="btn btn-primary" (click)="savePermissions()" [disabled]="permSaving() || !selectedChannelId()">
+            @if (permSaving()) {
+              <span class="loading loading-spinner loading-sm"></span>
+            }
+            Save permissions
+          </button>
+        </div>
+      }
+    </div>
+    <form method="dialog" class="modal-backdrop">
+      <button type="button" (click)="closePermModal()">close</button>
+    </form>
+  </dialog>
 }

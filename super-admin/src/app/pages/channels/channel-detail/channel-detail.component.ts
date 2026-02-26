@@ -72,6 +72,7 @@ export class ChannelDetailComponent implements OnInit {
   statusOptions = ['UNAPPROVED', 'APPROVED', 'DISABLED', 'BANNED'];
   newStatus = signal('');
   newTrialEndsAt = signal('');
+  newMaxAdminCount = signal<number>(5);
   saving = signal(false);
 
   id = computed(() => this.route.snapshot.paramMap.get('id') ?? '');
@@ -115,6 +116,8 @@ export class ChannelDetailComponent implements OnInit {
         if (ch.customFields.trialEndsAt) {
           this.newTrialEndsAt.set(ch.customFields.trialEndsAt.toString().slice(0, 10));
         }
+        const max = ch.customFields.maxAdminCount;
+        this.newMaxAdminCount.set(typeof max === 'number' && max > 0 ? max : 5);
       }
       this.analytics.set((analyticsResult.data as any)?.analyticsStatsForChannel ?? null);
       this.auditLogs.set((auditResult.data as any)?.auditLogsForChannel ?? []);
@@ -186,6 +189,23 @@ export class ChannelDetailComponent implements OnInit {
       });
       const ch = this.channel();
       if (ch) this.channel.set({ ...ch, customFields: { ...ch.customFields, trialEndsAt: dateStr } });
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  async updateMaxAdminCount(): Promise<void> {
+    const id = this.id();
+    const value = Math.max(1, Number(this.newMaxAdminCount()) || 1);
+    if (!id) return;
+    this.saving.set(true);
+    try {
+      await this.apollo.getClient().mutate({
+        mutation: UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM,
+        variables: { input: { channelId: id, maxAdminCount: value } },
+      });
+      const ch = this.channel();
+      if (ch) this.channel.set({ ...ch, customFields: { ...ch.customFields, maxAdminCount: value } });
     } finally {
       this.saving.set(false);
     }

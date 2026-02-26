@@ -1,0 +1,104 @@
+<h1 class="text-2xl font-bold mb-6">Permission templates</h1>
+@if (error()) {
+  <div role="alert" class="alert alert-error mb-6">
+    <span>{{ error() }}</span>
+  </div>
+}
+<div class="flex justify-end mb-4">
+  <button type="button" class="btn btn-primary" (click)="openCreate()">Create template</button>
+</div>
+@if (loading()) {
+  <div class="flex items-center gap-2 text-base-content/70">
+    <span class="loading loading-spinner loading-md"></span>
+    <span>Loading…</span>
+  </div>
+} @else {
+  <div class="overflow-x-auto rounded-xl border border-base-300 bg-base-100 shadow">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Permissions</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (t of templates(); track t.id) {
+          <tr>
+            <td><code class="text-sm">{{ t.code }}</code></td>
+            <td>{{ t.name }}</td>
+            <td class="text-base-content/70">{{ t.description || '—' }}</td>
+            <td>{{ t.permissions.length }}</td>
+            <td>
+              <div class="flex gap-2">
+                <button type="button" class="btn btn-ghost btn-sm" (click)="openEdit(t)">Edit</button>
+                <button type="button" class="btn btn-ghost btn-sm text-error" (click)="deleteTemplate(t)" [disabled]="saving()">Delete</button>
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="5" class="text-base-content/60">No templates. Create one to use as a base for channel admin roles.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (modalOpen()) {
+  <dialog class="modal modal-open" (click)="$event.target === $event.currentTarget && closeModal()">
+    <div class="modal-box max-w-3xl max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
+      <h3 class="font-bold text-lg mb-4">{{ isEditMode() ? 'Edit template' : 'Create template' }}</h3>
+      <div class="space-y-4">
+        <label class="form-control w-full">
+          <span class="label"><span class="label-text">Code</span></span>
+          <input type="text" class="input input-bordered w-full" [ngModel]="formCode()" (ngModelChange)="formCode.set($event)" [readonly]="isEditMode()" />
+        </label>
+        <label class="form-control w-full">
+          <span class="label"><span class="label-text">Name</span></span>
+          <input type="text" class="input input-bordered w-full" [ngModel]="formName()" (ngModelChange)="formName.set($event)" />
+        </label>
+        <label class="form-control w-full">
+          <span class="label"><span class="label-text">Description</span></span>
+          <input type="text" class="input input-bordered w-full" [ngModel]="formDescription()" (ngModelChange)="formDescription.set($event)" />
+        </label>
+        <div>
+          <span class="label-text font-semibold block mb-2">Permissions</span>
+          <div class="space-y-4">
+            @for (group of groupKeys(); track group) {
+              <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+                <input type="checkbox" checked />
+                <div class="collapse-title font-medium">{{ group }}</div>
+                <div class="collapse-content">
+                  <div class="flex flex-wrap gap-2">
+                    @for (perm of groupedPermissions()[group]; track perm) {
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" [checked]="hasPermission(perm)" (change)="togglePermission(perm)" />
+                        <span class="text-sm">{{ formatName(perm) }}</span>
+                      </label>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+      <div class="modal-action">
+        <button type="button" class="btn btn-ghost" (click)="closeModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving() || !formName().trim() || (!isEditMode() && !formCode().trim())">
+          @if (saving()) {
+            <span class="loading loading-spinner loading-sm"></span>
+          }
+          {{ isEditMode() ? 'Save' : 'Create' }}
+        </button>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+      <button type="button" (click)="closeModal()">close</button>
+    </form>
+  </dialog>
+}

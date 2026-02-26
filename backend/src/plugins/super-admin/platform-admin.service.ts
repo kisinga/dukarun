@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Administrator, RequestContext, TransactionalConnection, User } from '@vendure/core';
 
 export interface PlatformAdministratorDto {
@@ -14,6 +14,25 @@ export interface PlatformAdministratorDto {
   isSuperAdmin?: boolean;
 }
 
+export interface PlatformAdministratorRoleDetail {
+  id: string;
+  code: string;
+  channelIds: string[];
+  permissions: string[];
+}
+
+export interface PlatformAdministratorDetailDto {
+  id: string;
+  firstName: string;
+  lastName: string;
+  emailAddress: string;
+  userId: string;
+  identifier: string;
+  authorizationStatus: string;
+  isSuperAdmin: boolean;
+  roles: PlatformAdministratorRoleDetail[];
+}
+
 export interface PlatformAdministratorListOptions {
   skip?: number;
   take?: number;
@@ -27,15 +46,21 @@ export class PlatformAdminService {
 
   /**
    * Get all administrators for a given channel (channel-scoped only; excludes superadmins).
+   * Normalizes channelId to number so the TypeORM query matches Vendure's integer channel.id in the DB.
    */
   async getAdministratorsForChannel(channelId: string): Promise<PlatformAdministratorDto[]> {
+    const channelIdNum = parseInt(channelId, 10);
+    if (Number.isNaN(channelIdNum)) {
+      return [];
+    }
+
     const adminRepo = this.connection.rawConnection.getRepository(Administrator);
     const administrators = await adminRepo
       .createQueryBuilder('admin')
       .innerJoinAndSelect('admin.user', 'user')
       .innerJoinAndSelect('user.roles', 'role')
       .innerJoinAndSelect('role.channels', 'channel')
-      .where('channel.id = :channelId', { channelId })
+      .where('channel.id = :channelId', { channelId: channelIdNum })
       .andWhere('user.deletedAt IS NULL')
       .getMany();
 
@@ -49,7 +74,13 @@ export class PlatformAdminService {
 
       const roles = user.roles ?? [];
       const channelRoles = roles.filter(
-        r => r.channels?.length && r.channels.some(c => c.id.toString() === channelId)
+        r =>
+          r.channels?.length &&
+          r.channels.some(c =>
+            typeof c.id === 'number'
+              ? c.id === channelIdNum
+              : parseInt(String(c.id), 10) === channelIdNum
+          )
       );
       if (channelRoles.length === 0) continue;
 
@@ -145,5 +176,50 @@ export class PlatformAdminService {
     const totalItems = dtos.length;
     const items = dtos.slice(skip, skip + take);
     return { items, totalItems };
+  }
+
+  /**
+   * Get a single administrator with full role details (id, code, channelIds, permissions) for editing.
+   */
+  async getAdministratorDetail(
+    ctx: RequestContext,
+    administratorId: string
+  ): Promise<PlatformAdministratorDetailDto | null> {
+    const adminRepo = this.connection.getRepository(ctx, Administrator);
+    const admin = await adminRepo.findOne({
+      where: { id: parseInt(administratorId, 10) },
+      relations: ['user', 'user.roles', 'user.roles.channels'],
+    });
+    if (!admin?.user) return null;
+
+    const user = admin.user as User & {
+      roles?: Array<{
+        id: number;
+        code: string;
+        permissions: string[];
+        channels?: Array<{ id: number | string }>;
+      }>;
+    };
+    const roles = user.roles ?? [];
+    const isSuperAdmin = roles.some(r => !r.channels || r.channels.length === 0);
+    const customFields = (user.customFields ?? {}) as Record<string, unknown>;
+    const authorizationStatus = (customFields.authorizationStatus as string) ?? 'PENDING';
+
+    return {
+      id: admin.id.toString(),
+      firstName: admin.firstName ?? '',
+      lastName: admin.lastName ?? '',
+      emailAddress: admin.emailAddress ?? '',
+      userId: user.id.toString(),
+      identifier: user.identifier ?? '',
+      authorizationStatus,
+      isSuperAdmin,
+      roles: roles.map(r => ({
+        id: String(r.id),
+        code: r.code ?? '',
+        channelIds: (r.channels ?? []).map(c => c.id.toString()),
+        permissions: (r.permissions ?? []) as string[],
+      })),
+    };
   }
 }

@@ -13,6 +13,7 @@ export const routes: Routes = [
       { path: 'channels', loadComponent: () => import('./pages/channels/channels-list/channels-list.component').then(m => m.ChannelsListComponent) },
       { path: 'channels/:id', loadComponent: () => import('./pages/channels/channel-detail/channel-detail.component').then(m => m.ChannelDetailComponent) },
       { path: 'users', loadComponent: () => import('./pages/users/users-list/users-list.component').then(m => m.UsersListComponent) },
+      { path: 'role-templates', loadComponent: () => import('./pages/role-templates/role-templates-list.component').then(m => m.RoleTemplatesListComponent) },
       { path: 'pending-registrations', loadComponent: () => import('./pages/pending-registrations/pending-registrations.component').then(m => m.PendingRegistrationsComponent) },
       { path: 'subscription-tiers', loadComponent: () => import('./pages/subscription-tiers/subscription-tiers.component').then(m => m.SubscriptionTiersComponent) },
       { path: 'ml-trainer', loadComponent: () => import('./pages/ml-trainer-management/ml-trainer-management.component').then(m => m.MlTrainerManagementComponent) },

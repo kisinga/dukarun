@@ -1,10 +1,21 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
-import { ChannelService } from '@vendure/core';
+import {
+  Allow,
+  ChannelService,
+  Ctx,
+  Permission,
+  RequestContext,
+  RequestContextService,
+  TransactionalConnection,
+  User,
+} from '@vendure/core';
+import { ChannelAdminService } from '../../services/channels/channel-admin.service';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { AuditTrailFilters } from '../../infrastructure/audit/audit.types';
 import { AnalyticsQueryService } from '../../services/analytics/analytics-query.service';
 import { ChannelSettingsService } from '../../services/channels/channel-settings.service';
+import { RoleProvisionerService } from '../../services/auth/provisioning/role-provisioner.service';
+import { RoleTemplateService } from '../../services/channels/role-template.service';
 import {
   NotificationService,
   NotificationType,
@@ -25,7 +36,11 @@ export class SuperAdminResolver {
     private readonly channelSettingsService: ChannelSettingsService,
     private readonly channelService: ChannelService,
     private readonly notificationService: NotificationService,
-    private readonly pendingRegistrationsService: PendingRegistrationsService
+    private readonly pendingRegistrationsService: PendingRegistrationsService,
+    private readonly roleTemplateService: RoleTemplateService,
+    private readonly channelAdminService: ChannelAdminService,
+    private readonly requestContextService: RequestContextService,
+    private readonly connection: TransactionalConnection
   ) {}
 
   @Query()
@@ -80,6 +95,38 @@ export class SuperAdminResolver {
   @Allow(Permission.SuperAdmin)
   async pendingRegistrations() {
     return this.pendingRegistrationsService.getPendingRegistrations();
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async platformRoleTemplates(@Ctx() ctx: RequestContext) {
+    const templates = await this.roleTemplateService.getAllTemplates(ctx);
+    return templates.map(t => ({
+      id: t.id,
+      code: t.code,
+      name: t.name,
+      description: t.description ?? null,
+      permissions: t.permissions ?? [],
+    }));
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async assignablePermissions() {
+    return RoleProvisionerService.getAssignablePermissionStrings();
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async administratorDetail(
+    @Ctx() ctx: RequestContext,
+    @Args('administratorId') administratorId: string
+  ) {
+    const detail = await this.platformAdminService.getAdministratorDetail(ctx, administratorId);
+    if (!detail) {
+      throw new Error('Administrator not found');
+    }
+    return detail;
   }
 
   @Query()
@@ -279,5 +326,85 @@ export class SuperAdminResolver {
       identifier: user.identifier ?? '',
       authorizationStatus: (cf.authorizationStatus as string) ?? 'REJECTED',
     };
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async createRoleTemplate(
+    @Ctx() ctx: RequestContext,
+    @Args('input')
+    input: { code: string; name: string; description?: string; permissions: string[] }
+  ) {
+    const t = await this.roleTemplateService.create(ctx, input);
+    return {
+      id: t.id,
+      code: t.code,
+      name: t.name,
+      description: t.description ?? null,
+      permissions: t.permissions ?? [],
+    };
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async updateRoleTemplate(
+    @Ctx() ctx: RequestContext,
+    @Args('id') id: string,
+    @Args('input') input: { name?: string; description?: string; permissions?: string[] }
+  ) {
+    const t = await this.roleTemplateService.update(ctx, id, input);
+    return {
+      id: t.id,
+      code: t.code,
+      name: t.name,
+      description: t.description ?? null,
+      permissions: t.permissions ?? [],
+    };
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async deleteRoleTemplate(@Ctx() ctx: RequestContext, @Args('id') id: string) {
+    return this.roleTemplateService.delete(ctx, id);
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async updateAdministratorPermissions(
+    @Ctx() ctx: RequestContext,
+    @Args('administratorId') administratorId: string,
+    @Args('channelId') channelId: string,
+    @Args('permissions', { type: () => [String] }) permissions: string[]
+  ) {
+    const channel = await this.channelService.findOne(ctx, channelId);
+    if (!channel) {
+      throw new Error('Channel not found');
+    }
+    const userRepo = this.connection.getRepository(ctx, User);
+    const user = await userRepo.findOne({
+      where: { id: ctx.activeUserId! },
+      relations: ['roles', 'roles.channels'],
+    });
+    if (!user) {
+      throw new Error('Current user not found');
+    }
+    const channelCtx = await this.requestContextService.create({
+      apiType: 'admin',
+      user,
+      channelOrToken: channel,
+      languageCode: channel.defaultLanguageCode,
+    });
+    const updated = await this.channelAdminService.updateChannelAdministrator(channelCtx, {
+      id: administratorId,
+      permissions: permissions as import('@vendure/core').Permission[],
+    });
+    const detail = await this.platformAdminService.getAdministratorDetail(
+      ctx,
+      updated.id.toString()
+    );
+    if (!detail) {
+      throw new Error('Failed to load updated administrator');
+    }
+    return detail;
   }
 }
