@@ -1,0 +1,10 @@
+{
+  "$comment": "Dev server proxy: backend admin-api. Change target if backend runs elsewhere (e.g. localhost:3000).",
+  "/admin-api": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug",
+    "withCredentials": true
+  }
+}
