@@ -58,6 +58,49 @@ const customOrderProcess = configureDefaultOrderProcess({
   arrangingPaymentRequiresCustomer: true, // Keep customer requirement
 });
 
+// Allowed CORS origins (admin-api); always include localhost dev ports so super-admin works regardless of NODE_ENV
+const CORS_ALLOWED_ORIGINS = [
+  'http://localhost:4200',
+  'http://127.0.0.1:4200',
+  'http://localhost:4201',
+  'http://127.0.0.1:4201',
+  'http://localhost:4202',
+  'http://127.0.0.1:4202',
+  ...(env.app.frontendUrl
+    ?.split(',')
+    .map(u => u.trim())
+    .filter(Boolean) || []),
+  ...(env.app.superAdminUrl
+    ?.split(',')
+    .map(u => u.trim())
+    .filter(Boolean) || []),
+];
+
+function applyCorsHeaders(req: Request, res: Response, next: () => void): void {
+  const origin = req.headers.origin;
+  const allowOrigin =
+    origin && CORS_ALLOWED_ORIGINS.includes(origin)
+      ? origin
+      : CORS_ALLOWED_ORIGINS.length > 0
+        ? false
+        : '*';
+  // Only set CORS permission headers when the origin is allowed; avoid leaking credentials/methods to rejected origins
+  if (allowOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
+    const reqHeaders = req.headers['access-control-request-headers'];
+    if (reqHeaders) {
+      res.setHeader('Access-Control-Allow-Headers', reqHeaders);
+    }
+  }
+  if (req.method === 'OPTIONS') {
+    res.status(204).setHeader('Content-Length', '0').end();
+    return;
+  }
+  next();
+}
+
 export const config: VendureConfig = {
   apiOptions: {
     port: serverPort,
@@ -66,21 +109,40 @@ export const config: VendureConfig = {
     channelTokenKey: 'vendure-token',
     trustProxy: IS_PRODUCTION ? 1 : false,
     cors: {
-      origin: (() => {
-        if (IS_PRODUCTION) {
-          const origins = env.app.frontendUrl?.split(',').filter(Boolean) || [];
-          if (env.app.superAdminUrl) origins.push(env.app.superAdminUrl);
-          return origins.length ? origins : true;
-        }
-        const devOrigins = [
+      // Use a function so localhost:4200/4201/4202 are always allowed (avoids NODE_ENV/env timing issues)
+      origin: (
+        requestOrigin: string | undefined,
+        callback: (err: Error | null, allow?: boolean | string) => void
+      ) => {
+        const allowedLocalhost = [
           'http://localhost:4200',
           'http://127.0.0.1:4200',
           'http://localhost:4201',
           'http://127.0.0.1:4201',
+          'http://localhost:4202',
+          'http://127.0.0.1:4202',
         ];
-        if (env.app.superAdminUrl) devOrigins.push(env.app.superAdminUrl);
-        return devOrigins;
-      })(),
+        if (requestOrigin && allowedLocalhost.includes(requestOrigin)) {
+          return callback(null, requestOrigin);
+        }
+        const fromEnv = [
+          ...(env.app.frontendUrl
+            ?.split(',')
+            .map(u => u.trim())
+            .filter(Boolean) || []),
+          ...(env.app.superAdminUrl
+            ?.split(',')
+            .map(u => u.trim())
+            .filter(Boolean) || []),
+        ];
+        if (requestOrigin && fromEnv.includes(requestOrigin)) {
+          return callback(null, requestOrigin);
+        }
+        if (fromEnv.length > 0) {
+          return callback(null, false);
+        }
+        callback(null, true);
+      },
       credentials: true,
     },
     // Debug modes enabled only in development
@@ -92,6 +154,11 @@ export const config: VendureConfig = {
       : {}),
     // Custom middleware
     middleware: [
+      // CORS for admin-api (ensures preflight OPTIONS gets headers; apiOptions.cors may not run first)
+      {
+        route: 'admin-api',
+        handler: applyCorsHeaders,
+      },
       // Health check endpoint
       {
         handler: (req: Request, res: Response) => {
