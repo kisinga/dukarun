@@ -161,7 +161,7 @@ export async function runTeachableMachine(
         return b || null;
       });
       const h = byText as any;
-      if (h && (await page.evaluate((e) => e != null, h))) await h.click();
+      if (h && (await page.evaluate((e: unknown) => e != null, h))) await h.click();
       else throw new Error('Could not find Train button. Teachable Machine UI may have changed.');
     } else {
       await (trainButton as any).click();
@@ -187,7 +187,7 @@ export async function runTeachableMachine(
       }
       return null;
     });
-    const hasExport = await page.evaluate((e) => e != null, exportBtn as any);
+    const hasExport = await page.evaluate((e: unknown) => e != null, exportBtn as any);
     if (hasExport) await (exportBtn as any).click();
 
     await new Promise((r) => setTimeout(r, 2000));

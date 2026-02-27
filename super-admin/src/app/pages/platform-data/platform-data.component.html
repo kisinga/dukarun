@@ -1,0 +1,96 @@
+<h1 class="text-2xl font-bold mb-6">Platform data</h1>
+@if (error()) {
+  <div role="alert" class="alert alert-error mb-6">
+    <span>{{ error() }}</span>
+  </div>
+}
+@if (loading()) {
+  <div class="flex items-center gap-2 text-base-content/70">
+    <span class="loading loading-spinner loading-md"></span>
+    <span>Loading…</span>
+  </div>
+} @else {
+  @let ctx = context();
+  @if (ctx) {
+    <div class="space-y-8">
+      <section class="card card-border bg-base-100 shadow">
+        <div class="card-body">
+          <h2 class="card-title text-lg">Registration zone</h2>
+          <p class="text-sm text-base-content/70 mb-4">
+            Used for new channel registration. Zone name must remain “Kenya”.
+          </p>
+          <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <dt class="font-medium">Name</dt>
+            <dd>{{ ctx.zone.name }}</dd>
+            <dt class="font-medium">ID</dt>
+            <dd><code class="text-sm">{{ ctx.zone.id }}</code></dd>
+            <dt class="font-medium sm:col-span-2">Member countries</dt>
+            <dd class="sm:col-span-2">
+              @if (ctx.zone.members.length) {
+                <ul class="list list-disc list-inside">
+                  @for (m of ctx.zone.members; track m.id) {
+                    <li>{{ m.name }} ({{ m.code }})</li>
+                  }
+                </ul>
+              } @else {
+                <span class="text-base-content/60">None</span>
+              }
+            </dd>
+          </dl>
+        </div>
+      </section>
+
+      <section class="card card-border bg-base-100 shadow">
+        <div class="card-body">
+          <h2 class="card-title text-lg">Registration tax rate</h2>
+          <p class="text-sm text-base-content/70 mb-4">
+            Applies to all channels using this zone.
+          </p>
+          @if (ctx.taxRate) {
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+              <dt class="font-medium">Name</dt>
+              <dd>{{ ctx.taxRate.name }}</dd>
+              <dt class="font-medium">Category</dt>
+              <dd>{{ ctx.taxRate.categoryName }}</dd>
+              <dt class="font-medium">Current value</dt>
+              <dd>{{ ctx.taxRate.value }}%</dd>
+            </dl>
+            <form (ngSubmit)="updateTaxRate()" class="flex flex-wrap items-end gap-4">
+              <label class="form-control w-full max-w-xs">
+                <span class="label"><span class="label-text">Percentage</span></span>
+                <input
+                  type="number"
+                  class="input input-bordered w-full"
+                  [ngModel]="taxPercentage()"
+                  (ngModelChange)="taxPercentage.set($event)"
+                  name="percentage"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                />
+              </label>
+              <button type="submit" class="btn btn-primary" [disabled]="saving()">
+                @if (saving()) {
+                  <span class="loading loading-spinner loading-sm"></span>
+                }
+                Update tax rate
+              </button>
+            </form>
+          } @else {
+            <p class="text-base-content/60">No tax rate found for the registration zone. Run Kenya seed first.</p>
+          }
+        </div>
+      </section>
+
+      <section class="card card-border bg-base-100 shadow">
+        <div class="card-body">
+          <h2 class="card-title text-lg">Role templates</h2>
+          <p class="text-sm text-base-content/70 mb-4">
+            Changes apply only to new roles; existing channel roles keep their current permissions.
+          </p>
+          <a routerLink="/role-templates" class="btn btn-outline btn-sm">Manage permission templates</a>
+        </div>
+      </section>
+    </div>
+  }
+}

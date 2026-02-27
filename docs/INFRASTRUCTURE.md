@@ -491,6 +491,14 @@ The `RegistrationValidatorService` checks for these requirements before allowing
 - `getKenyaZone()` ensures the "Kenya" zone exists.
 - `validateDefaultZones()` ensures the default channel has shipping and tax zones configured.
 
+#### Platform data (Super-admin)
+
+Super-admin exposes a **Platform data** page to view and update some seeded data:
+
+- **Registration zone**: Read-only view of the zone used for new channel registration (name, member countries). The zone name must remain **"Kenya"** unless registration is updated to use a configurable zone name; changing it would break `getKenyaZone()` and registration.
+- **Registration tax rate**: View and update the tax percentage for the Kenya zone. Changing the percentage applies to **all channels** that use this zone.
+- **Role templates**: Managed via the linked **Permission templates** page. Edits to a template (name, description, permissions) apply only to **new** roles created from that template; existing channel roles keep their current permissions snapshot.
+
 ### Fresh Setup Troubleshooting
 
 #### Database Connection Issues

@@ -1,0 +1,319 @@
+<h1 class="text-2xl font-bold mb-6">ML Trainer</h1>
+
+@if (error()) {
+  <div role="alert" class="alert alert-error mb-6">
+    <span>{{ error() }}</span>
+  </div>
+}
+
+@if (successMessage()) {
+  <div role="alert" class="alert alert-success mb-6">
+    <span>{{ successMessage() }}</span>
+  </div>
+}
+
+<div class="card card-border bg-base-100 shadow mb-6">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h2 class="card-title text-base">Service status</h2>
+        @if (health(); as h) {
+          @if (h.status === 'ok') {
+            <p class="text-success mt-1">OK · Uptime {{ formatUptime(h.uptimeSeconds) }}</p>
+            @if (runningJobsCount() > 0) {
+              <p class="text-sm text-base-content/80 mt-0.5">Trainer jobs: {{ runningJobsCount() }} running</p>
+            }
+          } @else {
+            <p class="text-error mt-1">Unavailable</p>
+            @if (h.error) {
+              <p class="text-sm text-base-content/80 mt-0.5">{{ h.error }}</p>
+            }
+          }
+        } @else {
+          <p class="text-base-content/70 mt-1">—</p>
+        }
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" (click)="refresh()" [disabled]="loading()">
+        @if (loading()) {
+          <span class="loading loading-spinner loading-sm"></span>
+        }
+        Refresh
+      </button>
+    </div>
+  </div>
+</div>
+
+@if (schedulerConfig(); as config) {
+  <p class="text-sm text-base-content/70 mb-4">Runs every {{ config.intervalMinutes }} min; cooldown {{ config.cooldownHours }} h per channel.</p>
+}
+
+@if (loading()) {
+  <div class="flex items-center gap-2 text-base-content/70">
+    <span class="loading loading-spinner loading-md"></span>
+    <span>Loading…</span>
+  </div>
+} @else {
+  <div class="overflow-x-auto rounded-xl border border-base-300 bg-base-100 shadow">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Channel</th>
+          <th>Status</th>
+          <th>Progress</th>
+          <th>Started</th>
+          <th>Error</th>
+          <th>Products</th>
+          <th>Images</th>
+          <th>Model</th>
+          <th>Last trained</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.channel.id) {
+          <tr>
+            <td class="font-medium">
+              <button type="button" class="link link-primary text-left" (click)="openDetail(row)">
+                {{ row.channel.code }}
+              </button>
+            </td>
+            <td>
+              @if (row.loadError) {
+                <span class="badge badge-ghost badge-sm">Error loading</span>
+              } @else if (row.trainingInfo) {
+                <span
+                  class="badge badge-sm"
+                  [class.badge-success]="row.trainingInfo.status === 'ready' || row.trainingInfo.status === 'active'"
+                  [class.badge-warning]="row.trainingInfo.status === 'training' || row.trainingInfo.status === 'extracting'"
+                  [class.badge-error]="row.trainingInfo.status === 'failed'"
+                  [class.badge-ghost]="row.trainingInfo.status === 'idle'"
+                >
+                  {{ row.trainingInfo.status }}
+                </span>
+                @if (row.trainingInfo.queuedAt) {
+                  <span class="badge badge-outline badge-sm ml-1">Queued</span>
+                }
+              } @else {
+                <span class="badge badge-ghost badge-sm">—</span>
+              }
+            </td>
+            <td>
+              @if (row.trainingInfo && !row.loadError) {
+                <progress class="progress progress-primary w-20" [value]="row.trainingInfo.progress" max="100"></progress>
+                <span class="ml-1 text-sm">{{ row.trainingInfo.progress }}%</span>
+              } @else {
+                —
+              }
+            </td>
+            <td class="text-sm">{{ formatDate(row.trainingInfo?.startedAt ?? null) }}</td>
+            <td class="text-sm max-w-32">
+              @if (row.trainingInfo?.error; as err) {
+                <button type="button" class="truncate block text-left link link-secondary max-w-32" (click)="openErrorModal(row)" [title]="err">
+                  {{ err }}
+                </button>
+              } @else {
+                —
+              }
+            </td>
+            <td>{{ row.trainingInfo?.productCount ?? '—' }}</td>
+            <td>{{ row.trainingInfo?.imageCount ?? '—' }}</td>
+            <td>
+              @if (row.trainingInfo?.hasActiveModel) {
+                <span class="badge badge-success badge-sm">Yes</span>
+              } @else {
+                <span class="badge badge-ghost badge-sm">No</span>
+              }
+            </td>
+            <td class="text-sm">{{ formatDate(row.trainingInfo?.lastTrainedAt ?? null) }}</td>
+            <td>
+              @if (row.loadError) {
+                <span class="text-base-content/60 text-sm">—</span>
+              }               @else {
+                <div class="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    (click)="openDetail(row)"
+                    [disabled]="actionLoading() !== null"
+                    title="View details"
+                  >
+                    Details
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    (click)="queueTraining(row)"
+                    [disabled]="row.trainingInfo?.queuedAt || row.trainingInfo?.status === 'training' || actionLoading() !== null"
+                    title="Queue for next scheduler run"
+                  >
+                    Queue
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    (click)="extractPhotos(row)"
+                    [disabled]="actionLoading() !== null"
+                    title="Extract photos for training"
+                  >
+                    @if (actionLoading() === row.channel.id) {
+                      <span class="loading loading-spinner loading-xs"></span>
+                    } @else {
+                      Extract
+                    }
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-xs"
+                    (click)="startTraining(row)"
+                    [disabled]="row.trainingInfo?.status === 'training' || actionLoading() !== null"
+                    title="Start training now"
+                  >
+                    Train
+                  </button>
+                  @if (row.trainingInfo?.hasActiveModel) {
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-xs"
+                      (click)="setStatus(row, 'inactive')"
+                      [disabled]="actionLoading() !== null"
+                    >
+                      Inactive
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-xs"
+                      (click)="setStatus(row, 'active')"
+                      [disabled]="actionLoading() !== null"
+                    >
+                      Active
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-error btn-xs btn-outline"
+                      (click)="clearModel(row)"
+                      [disabled]="actionLoading() !== null"
+                    >
+                      Clear
+                    </button>
+                  }
+                </div>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  @if (rows().length === 0 && !loading()) {
+    <p class="text-base-content/70 mt-4">No channels.</p>
+  }
+}
+
+@if (errorModalRow(); as row) {
+  <dialog class="modal modal-open" id="error-modal">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg">Error — {{ row.channel.code }}</h3>
+      <p class="py-2 whitespace-pre-wrap break-words">{{ row.trainingInfo?.error ?? 'No message' }}</p>
+      <div class="modal-action">
+        <form method="dialog">
+          <button type="button" class="btn btn-primary" (click)="closeErrorModal()">Close</button>
+        </form>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop" (click)="closeErrorModal()">
+      <button type="button">close</button>
+    </form>
+  </dialog>
+}
+
+@if (detailModalRow(); as row) {
+  <dialog class="modal modal-open" id="detail-modal">
+    <div class="modal-box max-w-2xl max-h-[90vh] overflow-y-auto">
+      <h3 class="font-bold text-lg">ML — {{ row.channel.code }}</h3>
+
+      <div class="space-y-4 mt-4">
+        <div>
+          <h4 class="font-semibold text-base">Training info</h4>
+          @if (row.trainingInfo) {
+            <ul class="list list-disc list-inside text-sm mt-1">
+              <li>Status: {{ row.trainingInfo.status }}</li>
+              <li>Progress: {{ row.trainingInfo.progress }}%</li>
+              <li>Started: {{ formatDate(row.trainingInfo.startedAt) }}</li>
+              <li>Products: {{ row.trainingInfo.productCount }}, Images: {{ row.trainingInfo.imageCount }}</li>
+              <li>Model: {{ row.trainingInfo.hasActiveModel ? 'Yes' : 'No' }}</li>
+              <li>Last trained: {{ formatDate(row.trainingInfo.lastTrainedAt) }}</li>
+              @if (row.trainingInfo.queuedAt) {
+                <li>Queued at: {{ formatDate(row.trainingInfo.queuedAt) }}</li>
+              }
+              @if (row.trainingInfo.error) {
+                <li><button type="button" class="link link-error" (click)="closeDetail(); openErrorModal(row)">{{ row.trainingInfo.error }}</button></li>
+              }
+            </ul>
+          } @else {
+            <p class="text-base-content/70 text-sm">—</p>
+          }
+        </div>
+
+        <div>
+          <h4 class="font-semibold text-base">Training data summary</h4>
+          @if (detailLoading()) {
+            <span class="loading loading-spinner loading-sm"></span>
+          } @else if (detailSummary(); as summary) {
+            <p class="text-sm mt-1">Extracted: {{ formatDate(summary.extractedAt) }} · {{ summary.productCount }} products, {{ summary.imageCount }} images</p>
+            <ul class="list list-disc list-inside text-sm mt-1 max-h-32 overflow-y-auto">
+              @for (p of summary.products; track p.productName) {
+                <li>{{ p.productName }}: {{ p.imageCount }} images</li>
+              }
+            </ul>
+          } @else {
+            <p class="text-base-content/70 text-sm">—</p>
+          }
+        </div>
+
+        <div>
+          <h4 class="font-semibold text-base">Model info</h4>
+          @if (detailLoading()) {
+            <span class="loading loading-spinner loading-sm"></span>
+          } @else if (detailModelInfo(); as info) {
+            <p class="text-sm mt-1">Version: {{ info.version ?? '—' }} · Status: {{ info.status }}</p>
+            @if (info.hasModel) {
+              <p class="text-xs text-base-content/60 mt-0.5">IDs: modelJson {{ info.modelJsonId }}, weights {{ info.modelBinId }}, metadata {{ info.metadataId }}</p>
+            }
+          } @else {
+            <p class="text-base-content/70 text-sm">—</p>
+          }
+        </div>
+
+        @if (getTrainerJobForChannel(row.channel.id); as job) {
+          <div>
+            <h4 class="font-semibold text-base">Trainer job</h4>
+            <p class="text-sm mt-1">{{ job.status }} · Started: {{ formatDate(job.startedAt) }}</p>
+            @if (job.error) {
+              <p class="text-sm text-error">{{ job.error }}</p>
+            }
+          </div>
+        }
+
+        <div class="flex flex-wrap gap-2 pt-2">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="extractPhotos(row)" [disabled]="actionLoading() !== null">Extract</button>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="queueTraining(row)" [disabled]="row.trainingInfo?.queuedAt || row.trainingInfo?.status === 'training' || actionLoading() !== null">Queue</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="startTraining(row)" [disabled]="row.trainingInfo?.status === 'training' || actionLoading() !== null">Train</button>
+          @if (row.trainingInfo?.hasActiveModel) {
+            <button type="button" class="btn btn-ghost btn-sm" (click)="setStatus(row, 'inactive')" [disabled]="actionLoading() !== null">Inactive</button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="setStatus(row, 'active')" [disabled]="actionLoading() !== null">Active</button>
+            <button type="button" class="btn btn-error btn-sm btn-outline" (click)="clearModel(row)" [disabled]="actionLoading() !== null">Clear</button>
+          }
+        </div>
+      </div>
+
+      <div class="modal-action">
+        <form method="dialog">
+          <button type="button" class="btn btn-primary" (click)="closeDetail()">Close</button>
+        </form>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop" (click)="closeDetail()">
+      <button type="button">close</button>
+    </form>
+  </dialog>
+}

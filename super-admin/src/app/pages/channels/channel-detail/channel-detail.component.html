@@ -48,6 +48,62 @@
         </div>
       </div>
     </div>
+    <div class="card card-border bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-base">Max admins</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <input type="number" min="1" class="input input-bordered input-sm w-24" [ngModel]="newMaxAdminCount()" (ngModelChange)="newMaxAdminCount.set($event)" />
+          <button type="button" class="btn btn-primary btn-sm" (click)="updateMaxAdminCount()" [disabled]="saving()">Save</button>
+        </div>
+      </div>
+    </div>
+    <div class="card card-border bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-base">Zones</h2>
+        <p class="text-sm text-base-content/70 mb-2">Default shipping and tax zone for this channel.</p>
+        <div class="flex flex-col gap-3">
+          <label class="form-control w-full max-w-xs">
+            <span class="label label-text">Shipping zone</span>
+            <select class="select select-bordered select-sm w-full" [ngModel]="selectedShippingZoneId()" (ngModelChange)="selectedShippingZoneId.set($event)">
+              <option value="">—</option>
+              @for (z of zones(); track z.id) {
+                <option [value]="z.id">{{ z.name }}</option>
+              }
+            </select>
+          </label>
+          <label class="form-control w-full max-w-xs">
+            <span class="label label-text">Tax zone</span>
+            <select class="select select-bordered select-sm w-full" [ngModel]="selectedTaxZoneId()" (ngModelChange)="selectedTaxZoneId.set($event)">
+              <option value="">—</option>
+              @for (z of zones(); track z.id) {
+                <option [value]="z.id">{{ z.name }}</option>
+              }
+            </select>
+          </label>
+          <button type="button" class="btn btn-primary btn-sm" (click)="updateZones()" [disabled]="saving()">Save zones</button>
+        </div>
+      </div>
+    </div>
+    <div class="card card-border bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-base">Feature toggles</h2>
+        <div class="flex flex-col gap-2">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" class="toggle toggle-primary toggle-sm" [checked]="cashierFlowEnabled()" (change)="cashierFlowEnabled.set(!cashierFlowEnabled())" />
+            <span class="label-text">Cashier flow</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" class="toggle toggle-primary toggle-sm" [checked]="cashControlEnabled()" (change)="cashControlEnabled.set(!cashControlEnabled())" />
+            <span class="label-text">Cash control</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" class="toggle toggle-primary toggle-sm" [checked]="enablePrinter()" (change)="enablePrinter.set(!enablePrinter())" />
+            <span class="label-text">Enable printer</span>
+          </label>
+          <button type="button" class="btn btn-primary btn-sm mt-2" (click)="updateFeatureToggles()" [disabled]="saving()">Save toggles</button>
+        </div>
+      </div>
+    </div>
   </div>
   @if (analytics(); as a) {
     <div class="card card-border bg-base-100 shadow mb-6">
@@ -62,6 +118,7 @@
   <div class="card card-border bg-base-100 shadow mb-6">
     <div class="card-body">
       <h2 class="card-title text-base">Admins</h2>
+      <p class="text-sm text-base-content/70 mb-2">{{ admins().length }} / {{ ch.customFields.maxAdminCount }} admins</p>
       <div class="overflow-x-auto">
         <table class="table table-zebra table-sm">
           <thead>

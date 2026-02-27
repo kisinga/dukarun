@@ -1,8 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { RequestContext } from '@vendure/core';
 import Redis from 'ioredis';
 import { BRAND_CONFIG } from '../../constants/brand.constants';
 import { env } from '../../infrastructure/config/environment.config';
+import { AdminLoginAttemptService } from '../../infrastructure/audit/admin-login-attempt.service';
 import { CommunicationService } from '../../infrastructure/communication/communication.service';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 
@@ -25,7 +26,10 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
   private readonly RATE_LIMIT_COUNT: number;
   private readonly RATE_LIMIT_WINDOW_SECONDS: number;
 
-  constructor(private readonly communicationService: CommunicationService) {
+  constructor(
+    private readonly communicationService: CommunicationService,
+    @Optional() private readonly adminLoginAttemptService?: AdminLoginAttemptService
+  ) {
     // Initialize production mode check using EnvironmentConfig
     this.IS_PRODUCTION = env.isProduction();
     this.RATE_LIMIT_COUNT = this.IS_PRODUCTION ? 10 : 30;
@@ -187,7 +191,16 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
       storageKey = formatPhoneNumber(identifier);
     }
 
-    await this.isRateLimited(storageKey);
+    try {
+      await this.isRateLimited(storageKey);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Too many requests') && ctx) {
+        this.adminLoginAttemptService
+          ?.recordRateLimit(ctx, { identifier: storageKey })
+          .catch(() => {});
+      }
+      throw error;
+    }
 
     const otpCode = this.generateOTP();
     const expiresAt = Date.now() + this.OTP_EXPIRY_SECONDS * 1000;

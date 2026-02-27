@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RequestContext } from '@vendure/core';
-import * as requestIp from 'request-ip';
 import { AuditDbConnection } from './audit-db.connection';
 import { AuditLog } from './audit-log.entity';
 import { AuditLogOptions, AuditTrailFilters } from './audit.types';
 import { UserContextResolver } from './user-context.resolver';
+import { getClientIp } from './request-utils';
 
 /**
  * Audit Service
@@ -20,36 +20,6 @@ export class AuditService {
     private readonly auditDbConnection: AuditDbConnection,
     private readonly userContextResolver: UserContextResolver
   ) {}
-
-  /**
-   * Extract client IP address from RequestContext
-   * Handles reverse proxy headers (X-Forwarded-For, X-Real-IP) with fallback to direct connection
-   * Returns null if request object is not available or IP cannot be determined
-   */
-  private extractIpAddress(ctx: RequestContext): string | null {
-    try {
-      // Access the underlying HTTP request object from RequestContext
-      // In Vendure, RequestContext may have req property accessible via type assertion
-      const req = (ctx as any).req;
-
-      if (!req) {
-        // Request object not available (e.g., background/system events)
-        return null;
-      }
-
-      // Use request-ip library to extract IP from headers or direct connection
-      // This handles X-Forwarded-For, X-Real-IP, and falls back to socket.remoteAddress
-      const clientIp = requestIp.getClientIp(req);
-
-      return clientIp || null;
-    } catch (error) {
-      // Non-blocking: don't fail if IP extraction fails
-      this.logger.debug(
-        `Failed to extract IP address from RequestContext: ${error instanceof Error ? error.message : String(error)}`
-      );
-      return null;
-    }
-  }
 
   /**
    * Log a user action (primary method)
@@ -81,7 +51,7 @@ export class AuditService {
       const isSuperAdmin = userId ? await this.userContextResolver.isSuperAdmin(ctx) : false;
 
       // Extract IP address only when user is associated with the event
-      const ipAddress = userId ? this.extractIpAddress(ctx) : null;
+      const ipAddress = userId ? getClientIp(ctx) : null;
 
       const auditLog = new AuditLog();
       auditLog.channelId = typeof channelId === 'string' ? parseInt(channelId, 10) : channelId;
@@ -147,7 +117,7 @@ export class AuditService {
 
       // Extract IP address when user is associated with the event
       // For system events, IP may be null if triggered by background processes
-      const ipAddress = userId ? this.extractIpAddress(ctx) : null;
+      const ipAddress = userId ? getClientIp(ctx) : null;
 
       const auditLog = new AuditLog();
       auditLog.channelId = typeof channelId === 'string' ? parseInt(channelId, 10) : channelId;

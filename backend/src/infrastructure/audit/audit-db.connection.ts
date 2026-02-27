@@ -280,6 +280,60 @@ export class AuditDbConnection implements OnModuleInit, OnModuleDestroy {
         this.logger.log('TimescaleDB retention policy already exists');
       }
 
+      // admin_login_attempt table (no channelId; plain table for auth audit)
+      const loginAttemptTableExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.tables
+          WHERE table_name = 'admin_login_attempt'
+        )
+      `);
+      if (!loginAttemptTableExists[0]?.exists) {
+        await queryRunner.query(`
+          CREATE TABLE admin_login_attempt (
+            id uuid NOT NULL DEFAULT gen_random_uuid(),
+            "eventKind" character varying NOT NULL DEFAULT 'login',
+            timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "ipAddress" character varying,
+            username character varying NOT NULL,
+            success boolean NOT NULL,
+            "failureReason" character varying,
+            "userId" integer,
+            "authMethod" character varying NOT NULL,
+            "userAgent" character varying,
+            "isSuperAdmin" boolean,
+            CONSTRAINT "PK_admin_login_attempt" PRIMARY KEY (id)
+          )
+        `);
+        await queryRunner.query(`
+          CREATE INDEX IF NOT EXISTS "IDX_admin_login_attempt_timestamp"
+          ON admin_login_attempt (timestamp DESC)
+        `);
+        await queryRunner.query(`
+          CREATE INDEX IF NOT EXISTS "IDX_admin_login_attempt_ip_address"
+          ON admin_login_attempt ("ipAddress")
+        `);
+        await queryRunner.query(`
+          CREATE INDEX IF NOT EXISTS "IDX_admin_login_attempt_username"
+          ON admin_login_attempt (username)
+        `);
+        this.logger.log('Created admin_login_attempt table');
+      } else {
+        // Table exists (e.g. from earlier deploy or running dev): ensure eventKind column exists.
+        const eventKindExists = await queryRunner.query(`
+          SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'admin_login_attempt' AND column_name = 'eventKind'
+          )
+        `);
+        if (!eventKindExists[0]?.exists) {
+          await queryRunner.query(`
+            ALTER TABLE admin_login_attempt
+            ADD COLUMN "eventKind" character varying NOT NULL DEFAULT 'login'
+          `);
+          this.logger.log('Added eventKind column to admin_login_attempt table');
+        }
+      }
+
       await queryRunner.release();
     } catch (error) {
       // If TimescaleDB extension is not available, log warning but continue

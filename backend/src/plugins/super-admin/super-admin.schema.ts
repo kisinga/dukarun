@@ -12,6 +12,26 @@ export const SUPER_ADMIN_SCHEMA = gql`
     customFields: PlatformChannelCustomFields!
   }
 
+  type PlatformZone {
+    id: ID!
+    name: String!
+  }
+
+  type PlatformChannelDetail {
+    id: ID!
+    code: String!
+    token: String!
+    customFields: PlatformChannelCustomFields!
+    defaultShippingZone: PlatformZone
+    defaultTaxZone: PlatformZone
+  }
+
+  input UpdateChannelZonesInput {
+    channelId: ID!
+    defaultShippingZoneId: ID
+    defaultTaxZoneId: ID
+  }
+
   type PlatformChannelCustomFields {
     status: String!
     trialEndsAt: DateTime
@@ -57,6 +77,25 @@ export const SUPER_ADMIN_SCHEMA = gql`
     isSuperAdmin: Boolean
   }
 
+  type PlatformAdministratorRoleDetail {
+    id: ID!
+    code: String!
+    channelIds: [ID!]!
+    permissions: [String!]!
+  }
+
+  type PlatformAdministratorDetail {
+    id: ID!
+    firstName: String!
+    lastName: String!
+    emailAddress: String!
+    userId: ID!
+    identifier: String!
+    authorizationStatus: String!
+    isSuperAdmin: Boolean!
+    roles: [PlatformAdministratorRoleDetail!]!
+  }
+
   input PlatformAdministratorListOptions {
     skip: Int
     take: Int
@@ -89,8 +128,77 @@ export const SUPER_ADMIN_SCHEMA = gql`
     authorizationStatus: String!
   }
 
+  type AdminLoginAttempt {
+    id: ID!
+    eventKind: String!
+    timestamp: DateTime!
+    ipAddress: String
+    username: String!
+    success: Boolean!
+    failureReason: String
+    userId: Int
+    authMethod: String!
+    userAgent: String
+    isSuperAdmin: Boolean
+  }
+
+  type RegistrationSeedContext {
+    zone: RegistrationZone!
+    """
+    Null when no tax rate exists for the registration zone (e.g. before seed).
+    """
+    taxRate: RegistrationTaxRate
+  }
+
+  type RegistrationZone {
+    id: ID!
+    name: String!
+    members: [RegistrationZoneMember!]!
+  }
+
+  type RegistrationZoneMember {
+    id: ID!
+    name: String!
+    code: String!
+  }
+
+  type RegistrationTaxRate {
+    id: ID!
+    name: String!
+    categoryName: String!
+    value: Float!
+  }
+
+  input UpdateRegistrationTaxRateInput {
+    percentage: Float!
+  }
+
+  type PlatformRoleTemplate {
+    id: ID!
+    code: String!
+    name: String!
+    description: String
+    permissions: [String!]!
+  }
+
+  input CreateRoleTemplateInput {
+    code: String!
+    name: String!
+    description: String
+    permissions: [String!]!
+  }
+
+  input UpdateRoleTemplateInput {
+    name: String
+    description: String
+    permissions: [String!]
+  }
+
   extend type Query {
+    registrationSeedContext: RegistrationSeedContext!
+    platformZones: [PlatformZone!]!
     platformChannels: [PlatformChannel!]!
+    channelDetailPlatform(channelId: ID!): PlatformChannelDetail
     platformStats: PlatformStats!
     analyticsStatsForChannel(
       channelId: ID!
@@ -102,13 +210,27 @@ export const SUPER_ADMIN_SCHEMA = gql`
     platformAdministrators(options: PlatformAdministratorListOptions): PlatformAdministratorList!
     notificationsForChannel(channelId: ID!, options: NotificationListOptions): NotificationList!
     pendingRegistrations: [PendingRegistration!]!
+    platformRoleTemplates: [PlatformRoleTemplate!]!
+    adminLoginAttempts(limit: Int, skip: Int, since: DateTime): [AdminLoginAttempt!]!
+    assignablePermissions: [String!]!
+    administratorDetail(administratorId: ID!): PlatformAdministratorDetail
   }
 
   extend type Mutation {
+    updateRegistrationTaxRate(input: UpdateRegistrationTaxRateInput!): RegistrationTaxRate!
+    updateChannelZonesPlatform(input: UpdateChannelZonesInput!): Channel!
     updateChannelStatusPlatform(channelId: ID!, status: String!): Channel!
     extendTrialPlatform(channelId: ID!, trialEndsAt: DateTime!): Channel!
     updateChannelFeatureFlagsPlatform(input: UpdateChannelFeatureFlagsInput!): Channel!
     approveUser(userId: ID!): UserAuthorizationResult!
     rejectUser(userId: ID!, reason: String): UserAuthorizationResult!
+    createRoleTemplate(input: CreateRoleTemplateInput!): PlatformRoleTemplate!
+    updateRoleTemplate(id: ID!, input: UpdateRoleTemplateInput!): PlatformRoleTemplate!
+    deleteRoleTemplate(id: ID!): Boolean!
+    updateAdministratorPermissions(
+      administratorId: ID!
+      channelId: ID!
+      permissions: [String!]!
+    ): PlatformAdministratorDetail!
   }
 `;

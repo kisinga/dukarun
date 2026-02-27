@@ -11,6 +11,8 @@ import {
 import { DocumentNode } from 'graphql';
 import gql from 'graphql-tag';
 import { BRAND_CONFIG } from '../../constants/brand.constants';
+import { env } from '../../infrastructure/config/environment.config';
+import { AdminLoginAttemptService } from '../../infrastructure/audit/admin-login-attempt.service';
 import { OtpService } from '../../services/auth/otp.service';
 
 /**
@@ -19,9 +21,10 @@ import { OtpService } from '../../services/auth/otp.service';
  * Otherwise, fall back to native authentication
  */
 @Injectable()
-export class OtpTokenAuthStrategy
-  implements AuthenticationStrategy<{ username: string; password: string }>
-{
+export class OtpTokenAuthStrategy implements AuthenticationStrategy<{
+  username: string;
+  password: string;
+}> {
   name = 'native';
 
   private readonly tracer = trace.getTracer(`${BRAND_CONFIG.servicePrefix}-auth`);
@@ -39,6 +42,7 @@ export class OtpTokenAuthStrategy
   private nativeStrategy?: NativeAuthenticationStrategy;
   private userService?: UserService;
   private otpService?: OtpService;
+  private loginAttemptService?: AdminLoginAttemptService;
 
   constructor(
     private readonly otpServiceInject?: OtpService,
@@ -89,6 +93,37 @@ export class OtpTokenAuthStrategy
     } catch (error: any) {
       // OTP logins require OtpService.redis; failures will be reflected in spans.
     }
+
+    try {
+      this.loginAttemptService = injector.get(AdminLoginAttemptService);
+    } catch {
+      this.loginAttemptService = undefined;
+    }
+  }
+
+  private recordLoginAttempt(
+    ctx: RequestContext,
+    username: string,
+    isOtpToken: boolean,
+    result: User | false,
+    failureReason?: string
+  ): void {
+    const req = (ctx as any).req;
+    const userAgent = req?.headers?.['user-agent'] ?? undefined;
+    // Only set isSuperAdmin for successful logins; failed attempts stay undefined so they are distinguishable in audit.
+    const isSuperAdmin =
+      result && typeof result === 'object' ? env.superadmin.username === username : undefined;
+    this.loginAttemptService
+      ?.record(ctx, {
+        username,
+        success: !!result,
+        failureReason,
+        user: result || undefined,
+        authMethod: isOtpToken ? 'otp' : 'native',
+        userAgent,
+        isSuperAdmin,
+      })
+      .catch(() => {});
   }
 
   defineInputType(): DocumentNode {
@@ -133,6 +168,7 @@ export class OtpTokenAuthStrategy
             'auth.username': username,
             'auth.reason': 'native_strategy_unavailable',
           });
+          this.recordLoginAttempt(ctx, username, isOtpToken, false, 'native_strategy_unavailable');
           return false;
         }
 
@@ -154,7 +190,13 @@ export class OtpTokenAuthStrategy
             'auth.reason': 'native_auth_failed',
           });
         }
-
+        this.recordLoginAttempt(
+          ctx,
+          username,
+          isOtpToken,
+          result,
+          result ? undefined : 'native_auth_failed'
+        );
         return result;
       }
 
@@ -172,6 +214,7 @@ export class OtpTokenAuthStrategy
           'auth.username': username,
           'auth.reason': 'otp_redis_unavailable',
         });
+        this.recordLoginAttempt(ctx, username, isOtpToken, false, 'otp_redis_unavailable');
         return false;
       }
 
@@ -191,6 +234,13 @@ export class OtpTokenAuthStrategy
             'auth.username': username,
             'auth.reason': 'otp_session_missing_and_native_unavailable',
           });
+          this.recordLoginAttempt(
+            ctx,
+            username,
+            isOtpToken,
+            false,
+            'otp_session_missing_and_native_unavailable'
+          );
           return false;
         }
         const result = await this.nativeStrategy.authenticate(ctx, data);
@@ -208,6 +258,13 @@ export class OtpTokenAuthStrategy
             'auth.reason': 'native_auth_failed_after_otp_session_missing',
           });
         }
+        this.recordLoginAttempt(
+          ctx,
+          username,
+          isOtpToken,
+          result,
+          result ? undefined : 'native_auth_failed_after_otp_session_missing'
+        );
         return result;
       }
 
@@ -228,6 +285,13 @@ export class OtpTokenAuthStrategy
             'auth.username': username,
             'auth.reason': 'otp_session_mismatch_and_native_unavailable',
           });
+          this.recordLoginAttempt(
+            ctx,
+            username,
+            isOtpToken,
+            false,
+            'otp_session_mismatch_and_native_unavailable'
+          );
           return false;
         }
         const result = await this.nativeStrategy.authenticate(ctx, data);
@@ -245,6 +309,13 @@ export class OtpTokenAuthStrategy
             'auth.reason': 'native_auth_failed_after_otp_session_mismatch',
           });
         }
+        this.recordLoginAttempt(
+          ctx,
+          username,
+          isOtpToken,
+          result,
+          result ? undefined : 'native_auth_failed_after_otp_session_mismatch'
+        );
         return result;
       }
 
@@ -259,6 +330,7 @@ export class OtpTokenAuthStrategy
           'auth.username': username,
           'auth.reason': 'user_service_unavailable',
         });
+        this.recordLoginAttempt(ctx, username, isOtpToken, false, 'user_service_unavailable');
         return false;
       }
 
@@ -279,6 +351,13 @@ export class OtpTokenAuthStrategy
             'auth.username': username,
             'auth.reason': 'otp_user_mismatch_and_native_unavailable',
           });
+          this.recordLoginAttempt(
+            ctx,
+            username,
+            isOtpToken,
+            false,
+            'otp_user_mismatch_and_native_unavailable'
+          );
           return false;
         }
         const result = await this.nativeStrategy.authenticate(ctx, data);
@@ -296,6 +375,13 @@ export class OtpTokenAuthStrategy
             'auth.reason': 'native_auth_failed_after_otp_user_mismatch',
           });
         }
+        this.recordLoginAttempt(
+          ctx,
+          username,
+          isOtpToken,
+          result,
+          result ? undefined : 'native_auth_failed_after_otp_user_mismatch'
+        );
         return result;
       }
 
@@ -311,6 +397,7 @@ export class OtpTokenAuthStrategy
       span.setAttribute('auth.outcome', 'success');
       this.authSuccessCounter.add(1, { 'auth.username': username });
 
+      this.recordLoginAttempt(ctx, username, isOtpToken, user);
       return user;
     } catch (error: any) {
       span.recordException(error);
@@ -323,6 +410,7 @@ export class OtpTokenAuthStrategy
         'auth.username': username,
         'auth.reason': 'exception',
       });
+      this.recordLoginAttempt(ctx, username, isOtpToken, false, 'exception');
 
       if (!this.nativeStrategy) {
         return false;
@@ -330,6 +418,13 @@ export class OtpTokenAuthStrategy
 
       // On exception, last resort is to try native auth
       const result = await this.nativeStrategy.authenticate(ctx, data);
+      this.recordLoginAttempt(
+        ctx,
+        username,
+        isOtpToken,
+        result,
+        result ? undefined : 'exception_native_fallback'
+      );
       return result;
     } finally {
       span.end();

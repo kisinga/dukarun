@@ -1,5 +1,7 @@
 # ========================================
 # Super Admin Production Dockerfile
+# Build context: repository root (.)
+# Uses root package-lock.json for deterministic installs.
 # ========================================
 # Same pattern as main frontend: node build, nginx serve on port 4201.
 
@@ -8,17 +10,26 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci --quiet --no-audit --no-fund
+# Root workspace manifests (single source of truth for lockfile)
+COPY package.json package-lock.json ./
+
+# Workspace package.json files must exist before npm ci so workspaces are resolved
+COPY backend/package.json backend/
+COPY frontend/package.json frontend/
+COPY ml-trainer/package.json ml-trainer/
+COPY super-admin/package.json super-admin/
+
+RUN npm ci --quiet --no-audit --no-fund --include=dev
 
 COPY . .
-RUN npm run build -- --configuration production
 
-# Angular application builder outputs to dist/super-admin/browser
+RUN npm run build -w super-admin -- --configuration production
+
+# Angular application builder outputs to super-admin/dist/super-admin/browser
 RUN echo "Validating build output..." && \
-    BUILD_DIR="/app/dist/super-admin/browser" && \
+    BUILD_DIR="/app/super-admin/dist/super-admin/browser" && \
     if [ ! -d "$BUILD_DIR" ]; then \
-      echo "ERROR: Build directory not found at $BUILD_DIR" && find /app/dist -type d -maxdepth 3 2>/dev/null; exit 1; \
+      echo "ERROR: Build directory not found at $BUILD_DIR" && find /app/super-admin/dist -type d -maxdepth 3 2>/dev/null; exit 1; \
     fi && \
     if [ ! -f "$BUILD_DIR/index.html" ]; then \
       echo "ERROR: index.html not found"; exit 1; \
@@ -31,10 +42,10 @@ RUN apk add --no-cache curl
 
 RUN rm -rf /etc/nginx/conf.d/default.conf /usr/share/nginx/html/*
 
-COPY --from=builder /app/dist/super-admin/browser /usr/share/nginx/html
+COPY --from=builder /app/super-admin/dist/super-admin/browser /usr/share/nginx/html
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY docker-entrypoint.sh /docker-entrypoint.sh
+COPY --from=builder /app/super-admin/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/super-admin/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

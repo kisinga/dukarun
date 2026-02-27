@@ -1,5 +1,6 @@
 import { Logger, UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import axios from 'axios';
 import {
   Allow,
   AssetService,
@@ -38,6 +39,33 @@ export const ML_MODEL_SCHEMA = gql`
     imageCount: Int!
     hasActiveModel: Boolean!
     lastTrainedAt: DateTime
+    queuedAt: DateTime
+  }
+
+  type MlTrainingDataSummaryProduct {
+    productName: String!
+    imageCount: Int!
+  }
+
+  type MlTrainingDataSummary {
+    extractedAt: DateTime
+    productCount: Int!
+    imageCount: Int!
+    products: [MlTrainingDataSummaryProduct!]!
+  }
+
+  type MlSchedulerConfig {
+    intervalMinutes: Int!
+    cooldownHours: Int!
+  }
+
+  type MlTrainerJob {
+    channelId: String!
+    status: String!
+    startedAt: DateTime
+    completedAt: DateTime
+    failedAt: DateTime
+    error: String
   }
 
   type MlTrainingManifest {
@@ -59,6 +87,12 @@ export const ML_MODEL_SCHEMA = gql`
     filename: String!
   }
 
+  type MlTrainerHealth {
+    status: String!
+    uptimeSeconds: Float
+    error: String
+  }
+
   extend type Query {
     """
     Get ML model info for a specific channel
@@ -74,6 +108,26 @@ export const ML_MODEL_SCHEMA = gql`
     Get photo manifest for training (JSON with URLs)
     """
     mlTrainingManifest(channelId: ID!): MlTrainingManifest!
+
+    """
+    ML trainer service health (proxied from ml-trainer). Never throws; returns status ok or unavailable.
+    """
+    mlTrainerHealth: MlTrainerHealth!
+
+    """
+    Training data summary for a channel (admin-visible; no URLs). Composed from manifest.
+    """
+    mlTrainingDataSummary(channelId: ID!): MlTrainingDataSummary!
+
+    """
+    Scheduler config (interval and cooldown from env). Read-only.
+    """
+    mlSchedulerConfig: MlSchedulerConfig!
+
+    """
+    Active/recent jobs on the ML trainer service (proxied from ml-trainer).
+    """
+    mlTrainerJobs: [MlTrainerJob!]!
   }
 
   extend type Mutation {
@@ -117,6 +171,11 @@ export const ML_MODEL_SCHEMA = gql`
     Requires 'ready' status (photos extracted) or will trigger extraction.
     """
     startTraining(channelId: ID!): Boolean!
+
+    """
+    Queue a channel for training on the next scheduler run.
+    """
+    queueTraining(channelId: ID!): Boolean!
   }
 `;
 
@@ -133,6 +192,31 @@ export class MlModelResolver {
     private mlTrainingService: MlTrainingService,
     private requestContextService: RequestContextService
   ) {}
+
+  @Query()
+  @Allow(Permission.ReadCatalog)
+  async mlTrainerHealth(): Promise<{ status: string; uptimeSeconds?: number; error?: string }> {
+    const trainerUrl = env.ml?.trainerUrl;
+    if (!trainerUrl) {
+      return { status: 'unavailable', error: 'ML_TRAINER_URL not configured' };
+    }
+    try {
+      const { data } = await axios.get<{ status?: string; uptime?: number }>(
+        `${trainerUrl}/health`,
+        {
+          timeout: 5000,
+        }
+      );
+      return {
+        status: data?.status === 'ok' ? 'ok' : 'unavailable',
+        uptimeSeconds: typeof data?.uptime === 'number' ? data.uptime : undefined,
+      };
+    } catch (err: any) {
+      const message = err?.response?.data?.error ?? err?.message ?? 'Health check failed';
+      this.logger.warn(`mlTrainerHealth: ${message}`);
+      return { status: 'unavailable', error: message };
+    }
+  }
 
   @Query()
   @Allow(Permission.ReadCatalog)
@@ -269,6 +353,100 @@ export class MlModelResolver {
   @Allow(Permission.ReadCatalog)
   async mlTrainingInfo(@Ctx() ctx: RequestContext, @Args() args: { channelId: ID }): Promise<any> {
     return this.mlTrainingService.getTrainingInfo(ctx, args.channelId.toString());
+  }
+
+  @Query()
+  @Allow(Permission.ReadCatalog)
+  async mlTrainingDataSummary(
+    @Ctx() ctx: RequestContext,
+    @Args() args: { channelId: ID }
+  ): Promise<{
+    extractedAt: Date | null;
+    productCount: number;
+    imageCount: number;
+    products: Array<{ productName: string; imageCount: number }>;
+  }> {
+    const channel = await this.channelService.findOne(ctx, args.channelId);
+    if (!channel) {
+      throw new Error('Channel not found');
+    }
+    const channelCtx = new RequestContext({
+      apiType: ctx.apiType,
+      channel,
+      languageCode: ctx.languageCode,
+      isAuthorized: true,
+      authorizedAsOwnerOnly: false,
+    });
+    const manifest = await this.mlTrainingService.getTrainingManifest(
+      channelCtx,
+      args.channelId.toString()
+    );
+    const productCount = manifest.products?.length ?? 0;
+    let imageCount = 0;
+    const products = (manifest.products ?? []).map(p => {
+      const count = p.images?.length ?? 0;
+      imageCount += count;
+      return { productName: p.productName, imageCount: count };
+    });
+    return {
+      extractedAt: manifest.extractedAt ?? null,
+      productCount,
+      imageCount,
+      products,
+    };
+  }
+
+  @Query()
+  @Allow(Permission.ReadCatalog)
+  async mlSchedulerConfig(): Promise<{ intervalMinutes: number; cooldownHours: number }> {
+    return {
+      intervalMinutes: env.ml?.trainingIntervalMinutes ?? 60,
+      cooldownHours: env.ml?.trainingCooldownHours ?? 4,
+    };
+  }
+
+  @Query()
+  @Allow(Permission.ReadCatalog)
+  async mlTrainerJobs(): Promise<
+    Array<{
+      channelId: string;
+      status: string;
+      startedAt?: Date;
+      completedAt?: Date;
+      failedAt?: Date;
+      error?: string;
+    }>
+  > {
+    const trainerUrl = env.ml?.trainerUrl;
+    if (!trainerUrl) {
+      return [];
+    }
+    try {
+      const { data } = await axios.get<
+        Array<{
+          channelId: string;
+          status: string;
+          startedAt?: string;
+          completedAt?: string;
+          failedAt?: string;
+          error?: string;
+        }>
+      >(`${trainerUrl}/v1/jobs`, { timeout: 5000 });
+      if (!Array.isArray(data)) {
+        return [];
+      }
+      return data.map(job => ({
+        channelId: job.channelId,
+        status: job.status,
+        startedAt: job.startedAt ? new Date(job.startedAt) : undefined,
+        completedAt: job.completedAt ? new Date(job.completedAt) : undefined,
+        failedAt: job.failedAt ? new Date(job.failedAt) : undefined,
+        error: job.error ?? undefined,
+      }));
+    } catch (err) {
+      this.logger.warn(`mlTrainerJobs: ${err instanceof Error ? err.message : 'Failed to fetch'}`);
+      return [];
+    }
   }
 
   /**
@@ -520,6 +698,25 @@ export class MlModelResolver {
     }
   }
   @Transaction()
+  @Transaction()
+  @Mutation()
+  @Allow(Permission.UpdateCatalog)
+  async queueTraining(
+    @Ctx() ctx: RequestContext,
+    @Args() args: { channelId: ID }
+  ): Promise<boolean> {
+    const channel = await this.channelService.findOne(ctx, args.channelId);
+    if (!channel) {
+      throw new Error('Channel not found');
+    }
+    await this.channelService.update(ctx, {
+      id: args.channelId.toString(),
+      customFields: { mlTrainingQueuedAt: new Date() },
+    });
+    this.logger.debug('queueTraining called', args);
+    return true;
+  }
+
   @Mutation()
   @Allow(Permission.UpdateCatalog)
   async startTraining(

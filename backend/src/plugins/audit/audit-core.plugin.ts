@@ -1,5 +1,6 @@
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
+import { AdminLoginAttemptService } from '../../infrastructure/audit/admin-login-attempt.service';
 import { AuditDbConnection } from '../../infrastructure/audit/audit-db.connection';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { UserContextResolver } from '../../infrastructure/audit/user-context.resolver';
@@ -11,8 +12,8 @@ import { UserContextResolver } from '../../infrastructure/audit/user-context.res
  */
 @VendurePlugin({
   imports: [PluginCommonModule],
-  providers: [AuditDbConnection, UserContextResolver, AuditService],
-  exports: [AuditService, AuditDbConnection, UserContextResolver],
+  providers: [AuditDbConnection, UserContextResolver, AuditService, AdminLoginAttemptService],
+  exports: [AuditService, AuditDbConnection, UserContextResolver, AdminLoginAttemptService],
   compatibility: VENDURE_COMPATIBILITY_VERSION,
 })
 export class AuditCorePlugin {}

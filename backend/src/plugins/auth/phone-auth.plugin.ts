@@ -1,5 +1,6 @@
 import { NativeAuthenticationStrategy, PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
+import { AuditCorePlugin } from '../audit/audit-core.plugin';
 import { CommunicationPlugin } from '../communication/communication.plugin';
 import { RegistrationStorageService } from '../../infrastructure/storage/registration-storage.service';
 import { ChannelAccessGuardService } from '../../services/auth/channel-access-guard.service';
@@ -28,7 +29,7 @@ import { ChartOfAccountsService } from '../../services/financial/chart-of-accoun
 import { ProvisioningContextAdapter } from '../../services/provisioning/context-adapter.service';
 
 @VendurePlugin({
-  imports: [PluginCommonModule, CommunicationPlugin],
+  imports: [PluginCommonModule, AuditCorePlugin, CommunicationPlugin],
   providers: [
     // Registration Infrastructure
     RegistrationService,

@@ -141,10 +141,14 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix={{branch}}-
 
+      - name: Set dockerignore for super-admin
+        run: cp dockerignore.super-admin .dockerignore
+
       - name: Build and push super-admin
         uses: docker/build-push-action@v5
         with:
-          context: ./super-admin
+          context: .
+          file: ./super-admin/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
