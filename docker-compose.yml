@@ -50,6 +50,8 @@ services:
       # Admin credentials
       SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-superadmin}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-superadmin}
+      # Super-admin app origin(s) for CORS (comma-separated if multiple). Default matches typical Docker/local access.
+      SUPERADMIN_URL: ${SUPERADMIN_URL:-http://localhost:4201}
 
       # Security
       COOKIE_SECRET: ${COOKIE_SECRET:-default-secret-key}
@@ -88,7 +90,8 @@ services:
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-info}
 
-      # ML Training configuration
+      # ML Training configuration (URLs use Docker service names; override in .env only if needed)
+      ML_TRAINER_URL: http://ml-trainer:3005
       ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN}
       ML_TRAINING_INTERVAL_MINUTES: ${ML_TRAINING_INTERVAL_MINUTES:-60}
       ML_TRAINING_COOLDOWN_HOURS: ${ML_TRAINING_COOLDOWN_HOURS:-4}
@@ -143,33 +146,65 @@ services:
       retries: 3
       start_period: 30s
 
-  # # ========================================
-  # # Super Admin (Angular + Nginx, port 4201)
-  # # ========================================
-  # super-admin:
-  #   image: ghcr.io/kisinga/dukarun/super-admin:latest
-  #   platform: linux/amd64
-  #   restart: unless-stopped
-  #   networks:
-  #     - dukarun_services_network
-  #   environment:
-  #     # URL the browser uses for admin-api (set SUPERADMIN_API_URL in production, e.g. https://api.example.com/admin-api)
-  #     API_URL: ${SUPERADMIN_API_URL:-http://localhost:3000/admin-api}
-  #   ports:
-  #     - '127.0.0.1:4201:4201'
-  #   depends_on:
-  #     backend:
-  #       condition: service_healthy
-  #   healthcheck:
-  #     test:
-  #       - CMD
-  #       - curl
-  #       - -f
-  #       - http://localhost:4201/health
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 30s
+  # ========================================
+  # Super Admin (Angular + Nginx, port 4201)
+  # Image: same registry/prefix as backend/frontend (see .github/workflows/build-and-push.yml)
+  # ========================================
+  super-admin:
+    image: ghcr.io/kisinga/dukarun/super-admin:latest
+    platform: linux/amd64
+    restart: unless-stopped
+    networks:
+      - dukarun_services_network
+    environment:
+      # URL the browser uses for admin-api (set SUPERADMIN_API_URL in production, e.g. https://api.example.com/admin-api)
+      API_URL: ${SUPERADMIN_API_URL:-http://localhost:3000/admin-api}
+    ports:
+      - '127.0.0.1:4201:4201'
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://localhost:4201/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ========================================
+  # ML Trainer (Teachable Machine runner, port 3005)
+  # Backend calls this service at ML_TRAINER_URL (default http://ml-trainer:3005)
+  # ========================================
+  ml-trainer:
+    image: ghcr.io/kisinga/dukarun/ml-trainer:latest
+    platform: linux/amd64
+    restart: unless-stopped
+    networks:
+      - dukarun_services_network
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      ML_PORT: ${ML_PORT:-3005}
+      # Backend URL uses Docker service name so ml-trainer can reach backend on the same network
+      BACKEND_INTERNAL_URL: http://backend:3000
+      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN}
+    ports:
+      - '127.0.0.1:3005:3005'
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --spider
+        - http://localhost:3005/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 # ========================================
 # Networks
