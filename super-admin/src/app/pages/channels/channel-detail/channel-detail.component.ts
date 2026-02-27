@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { PageHeaderComponent } from '../../../shared/components/page-header';
 import { ApolloService } from '../../../core/services/apollo.service';
 import {
   PLATFORM_ZONES,
@@ -13,7 +14,7 @@ import {
   EXTEND_TRIAL_PLATFORM,
   UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM,
   UPDATE_CHANNEL_ZONES_PLATFORM,
-} from '../../../core/graphql/operations';
+} from '../../../core/graphql/operations.graphql';
 
 interface PlatformZone {
   id: string;
@@ -62,7 +63,7 @@ export interface ChannelNotification {
 @Component({
   selector: 'app-channel-detail',
   standalone: true,
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, PageHeaderComponent],
   templateUrl: './channel-detail.component.html',
   styleUrl: './channel-detail.component.scss',
 })

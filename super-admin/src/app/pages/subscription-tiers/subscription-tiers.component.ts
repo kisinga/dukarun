@@ -6,7 +6,8 @@ import {
   CREATE_SUBSCRIPTION_TIER,
   UPDATE_SUBSCRIPTION_TIER,
   DEACTIVATE_SUBSCRIPTION_TIER,
-} from '../../core/graphql/operations';
+} from '../../core/graphql/operations.graphql';
+import { PageHeaderComponent } from '../../shared/components/page-header';
 
 interface Tier {
   id: string;
@@ -24,7 +25,7 @@ interface Tier {
 @Component({
   selector: 'app-subscription-tiers',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, PageHeaderComponent],
   templateUrl: './subscription-tiers.component.html',
   styleUrl: './subscription-tiers.component.scss',
 })

@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ApolloService } from '../../../core/services/apollo.service';
+import { PageHeaderComponent } from '../../../shared/components/page-header';
 import {
   PLATFORM_CHANNELS,
   PLATFORM_ADMINISTRATORS,
@@ -9,7 +10,7 @@ import {
   ASSIGNABLE_PERMISSIONS,
   ROLE_TEMPLATES,
   UPDATE_ADMINISTRATOR_PERMISSIONS,
-} from '../../../core/graphql/operations';
+} from '../../../core/graphql/operations.graphql';
 import { groupPermissions, formatPermissionName } from '../../../core/utils/permission-grouping';
 
 interface PlatformAdministratorItem {
@@ -60,7 +61,7 @@ interface RoleTemplateItem {
 @Component({
   selector: 'app-users-list',
   standalone: true,
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, PageHeaderComponent],
   templateUrl: './users-list.component.html',
   styleUrl: './users-list.component.scss',
 })

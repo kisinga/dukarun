@@ -7,7 +7,8 @@ import {
   CREATE_ROLE_TEMPLATE,
   UPDATE_ROLE_TEMPLATE,
   DELETE_ROLE_TEMPLATE,
-} from '../../core/graphql/operations';
+} from '../../core/graphql/operations.graphql';
+import { PageHeaderComponent } from '../../shared/components/page-header';
 import { groupPermissions, formatPermissionName } from '../../core/utils/permission-grouping';
 
 export interface RoleTemplateItem {
@@ -21,7 +22,7 @@ export interface RoleTemplateItem {
 @Component({
   selector: 'app-role-templates-list',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, PageHeaderComponent],
   templateUrl: './role-templates-list.component.html',
   styleUrl: './role-templates-list.component.scss',
 })

@@ -1,6 +1,11 @@
-import gql from 'graphql-tag';
+import { graphql } from './generated';
 
-export const AUTHENTICATE = gql`
+/**
+ * All GraphQL operations for the super-admin app.
+ * Codegen processes this file and generates types into ./generated/
+ */
+
+export const AUTHENTICATE = graphql(`
   mutation Authenticate($username: String!, $password: String!) {
     authenticate(input: { native: { username: $username, password: $password } }) {
       ... on CurrentUser {
@@ -8,18 +13,18 @@ export const AUTHENTICATE = gql`
       }
     }
   }
-`;
+`);
 
-export const PLATFORM_ZONES = gql`
+export const PLATFORM_ZONES = graphql(`
   query PlatformZones {
     platformZones {
       id
       name
     }
   }
-`;
+`);
 
-export const CHANNEL_DETAIL_PLATFORM = gql`
+export const CHANNEL_DETAIL_PLATFORM = graphql(`
   query ChannelDetailPlatform($channelId: ID!) {
     channelDetailPlatform(channelId: $channelId) {
       id
@@ -44,17 +49,17 @@ export const CHANNEL_DETAIL_PLATFORM = gql`
       }
     }
   }
-`;
+`);
 
-export const UPDATE_CHANNEL_ZONES_PLATFORM = gql`
+export const UPDATE_CHANNEL_ZONES_PLATFORM = graphql(`
   mutation UpdateChannelZonesPlatform($input: UpdateChannelZonesInput!) {
     updateChannelZonesPlatform(input: $input) {
       id
     }
   }
-`;
+`);
 
-export const PLATFORM_CHANNELS = gql`
+export const PLATFORM_CHANNELS = graphql(`
   query PlatformChannels {
     platformChannels {
       id
@@ -71,9 +76,9 @@ export const PLATFORM_CHANNELS = gql`
       }
     }
   }
-`;
+`);
 
-export const PLATFORM_STATS = gql`
+export const PLATFORM_STATS = graphql(`
   query PlatformStats {
     platformStats {
       totalChannels
@@ -87,9 +92,9 @@ export const PLATFORM_STATS = gql`
       activeSubscriptionsCount
     }
   }
-`;
+`);
 
-export const ADMINISTRATORS_FOR_CHANNEL = gql`
+export const ADMINISTRATORS_FOR_CHANNEL = graphql(`
   query AdministratorsForChannel($channelId: ID!) {
     administratorsForChannel(channelId: $channelId) {
       id
@@ -102,9 +107,9 @@ export const ADMINISTRATORS_FOR_CHANNEL = gql`
       roleCodes
     }
   }
-`;
+`);
 
-export const PLATFORM_ADMINISTRATORS = gql`
+export const PLATFORM_ADMINISTRATORS = graphql(`
   query PlatformAdministrators($options: PlatformAdministratorListOptions) {
     platformAdministrators(options: $options) {
       items {
@@ -122,9 +127,9 @@ export const PLATFORM_ADMINISTRATORS = gql`
       totalItems
     }
   }
-`;
+`);
 
-export const NOTIFICATIONS_FOR_CHANNEL = gql`
+export const NOTIFICATIONS_FOR_CHANNEL = graphql(`
   query NotificationsForChannel($channelId: ID!, $options: NotificationListOptions) {
     notificationsForChannel(channelId: $channelId, options: $options) {
       items {
@@ -140,9 +145,9 @@ export const NOTIFICATIONS_FOR_CHANNEL = gql`
       totalItems
     }
   }
-`;
+`);
 
-export const ANALYTICS_STATS_FOR_CHANNEL = gql`
+export const ANALYTICS_STATS_FOR_CHANNEL = graphql(`
   query AnalyticsStatsForChannel($channelId: ID!, $timeRange: AnalyticsTimeRange!, $limit: Int) {
     analyticsStatsForChannel(channelId: $channelId, timeRange: $timeRange, limit: $limit) {
       totalRevenue
@@ -153,9 +158,9 @@ export const ANALYTICS_STATS_FOR_CHANNEL = gql`
       customerGrowthTrend { date value }
     }
   }
-`;
+`);
 
-export const AUDIT_LOGS_FOR_CHANNEL = gql`
+export const AUDIT_LOGS_FOR_CHANNEL = graphql(`
   query AuditLogsForChannel($channelId: ID!, $options: AuditLogOptions) {
     auditLogsForChannel(channelId: $channelId, options: $options) {
       id
@@ -167,9 +172,9 @@ export const AUDIT_LOGS_FOR_CHANNEL = gql`
       data
     }
   }
-`;
+`);
 
-export const ADMIN_LOGIN_ATTEMPTS = gql`
+export const ADMIN_LOGIN_ATTEMPTS = graphql(`
   query AdminLoginAttempts($limit: Int, $skip: Int, $since: DateTime) {
     adminLoginAttempts(limit: $limit, skip: $skip, since: $since) {
       id
@@ -185,27 +190,27 @@ export const ADMIN_LOGIN_ATTEMPTS = gql`
       isSuperAdmin
     }
   }
-`;
+`);
 
-export const UPDATE_CHANNEL_STATUS_PLATFORM = gql`
+export const UPDATE_CHANNEL_STATUS_PLATFORM = graphql(`
   mutation UpdateChannelStatusPlatform($channelId: ID!, $status: String!) {
     updateChannelStatusPlatform(channelId: $channelId, status: $status) {
       id
       customFields { status }
     }
   }
-`;
+`);
 
-export const EXTEND_TRIAL_PLATFORM = gql`
+export const EXTEND_TRIAL_PLATFORM = graphql(`
   mutation ExtendTrialPlatform($channelId: ID!, $trialEndsAt: DateTime!) {
     extendTrialPlatform(channelId: $channelId, trialEndsAt: $trialEndsAt) {
       id
       customFields { trialEndsAt }
     }
   }
-`;
+`);
 
-export const UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM = gql`
+export const UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM = graphql(`
   mutation UpdateChannelFeatureFlagsPlatform($input: UpdateChannelFeatureFlagsInput!) {
     updateChannelFeatureFlagsPlatform(input: $input) {
       id
@@ -217,9 +222,9 @@ export const UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM = gql`
       }
     }
   }
-`;
+`);
 
-export const GET_SUBSCRIPTION_TIERS = gql`
+export const GET_SUBSCRIPTION_TIERS = graphql(`
   query GetSubscriptionTiers {
     getSubscriptionTiers {
       id
@@ -234,9 +239,9 @@ export const GET_SUBSCRIPTION_TIERS = gql`
       updatedAt
     }
   }
-`;
+`);
 
-export const CREATE_SUBSCRIPTION_TIER = gql`
+export const CREATE_SUBSCRIPTION_TIER = graphql(`
   mutation CreateSubscriptionTier($input: CreateSubscriptionTierInput!) {
     createSubscriptionTier(input: $input) {
       id
@@ -247,9 +252,9 @@ export const CREATE_SUBSCRIPTION_TIER = gql`
       isActive
     }
   }
-`;
+`);
 
-export const UPDATE_SUBSCRIPTION_TIER = gql`
+export const UPDATE_SUBSCRIPTION_TIER = graphql(`
   mutation UpdateSubscriptionTier($input: UpdateSubscriptionTierInput!) {
     updateSubscriptionTier(input: $input) {
       id
@@ -260,15 +265,15 @@ export const UPDATE_SUBSCRIPTION_TIER = gql`
       isActive
     }
   }
-`;
+`);
 
-export const DEACTIVATE_SUBSCRIPTION_TIER = gql`
+export const DEACTIVATE_SUBSCRIPTION_TIER = graphql(`
   mutation DeactivateSubscriptionTier($id: ID!) {
     deactivateSubscriptionTier(id: $id)
   }
-`;
+`);
 
-export const PENDING_REGISTRATIONS = gql`
+export const PENDING_REGISTRATIONS = graphql(`
   query PendingRegistrations {
     pendingRegistrations {
       userId
@@ -282,9 +287,9 @@ export const PENDING_REGISTRATIONS = gql`
       }
     }
   }
-`;
+`);
 
-export const APPROVE_USER = gql`
+export const APPROVE_USER = graphql(`
   mutation ApproveUser($userId: ID!) {
     approveUser(userId: $userId) {
       id
@@ -292,9 +297,9 @@ export const APPROVE_USER = gql`
       authorizationStatus
     }
   }
-`;
+`);
 
-export const REJECT_USER = gql`
+export const REJECT_USER = graphql(`
   mutation RejectUser($userId: ID!, $reason: String) {
     rejectUser(userId: $userId, reason: $reason) {
       id
@@ -302,9 +307,9 @@ export const REJECT_USER = gql`
       authorizationStatus
     }
   }
-`;
+`);
 
-export const ML_TRAINER_HEALTH = gql`
+export const ML_TRAINER_HEALTH = graphql(`
   query MlTrainerHealth {
     mlTrainerHealth {
       status
@@ -312,9 +317,9 @@ export const ML_TRAINER_HEALTH = gql`
       error
     }
   }
-`;
+`);
 
-export const ML_TRAINING_INFO = gql`
+export const ML_TRAINING_INFO = graphql(`
   query MlTrainingInfo($channelId: ID!) {
     mlTrainingInfo(channelId: $channelId) {
       status
@@ -328,9 +333,9 @@ export const ML_TRAINING_INFO = gql`
       queuedAt
     }
   }
-`;
+`);
 
-export const ML_TRAINING_DATA_SUMMARY = gql`
+export const ML_TRAINING_DATA_SUMMARY = graphql(`
   query MlTrainingDataSummary($channelId: ID!) {
     mlTrainingDataSummary(channelId: $channelId) {
       extractedAt
@@ -342,18 +347,18 @@ export const ML_TRAINING_DATA_SUMMARY = gql`
       }
     }
   }
-`;
+`);
 
-export const ML_SCHEDULER_CONFIG = gql`
+export const ML_SCHEDULER_CONFIG = graphql(`
   query MlSchedulerConfig {
     mlSchedulerConfig {
       intervalMinutes
       cooldownHours
     }
   }
-`;
+`);
 
-export const ML_TRAINER_JOBS = gql`
+export const ML_TRAINER_JOBS = graphql(`
   query MlTrainerJobs {
     mlTrainerJobs {
       channelId
@@ -364,9 +369,9 @@ export const ML_TRAINER_JOBS = gql`
       error
     }
   }
-`;
+`);
 
-export const ML_MODEL_INFO = gql`
+export const ML_MODEL_INFO = graphql(`
   query MlModelInfo($channelId: ID!) {
     mlModelInfo(channelId: $channelId) {
       hasModel
@@ -377,39 +382,39 @@ export const ML_MODEL_INFO = gql`
       metadataId
     }
   }
-`;
+`);
 
-export const QUEUE_TRAINING = gql`
+export const QUEUE_TRAINING = graphql(`
   mutation QueueTraining($channelId: ID!) {
     queueTraining(channelId: $channelId)
   }
-`;
+`);
 
-export const START_TRAINING = gql`
+export const START_TRAINING = graphql(`
   mutation StartTraining($channelId: ID!) {
     startTraining(channelId: $channelId)
   }
-`;
+`);
 
-export const EXTRACT_PHOTOS_FOR_TRAINING = gql`
+export const EXTRACT_PHOTOS_FOR_TRAINING = graphql(`
   mutation ExtractPhotosForTraining($channelId: ID!) {
     extractPhotosForTraining(channelId: $channelId)
   }
-`;
+`);
 
-export const SET_ML_MODEL_STATUS = gql`
+export const SET_ML_MODEL_STATUS = graphql(`
   mutation SetMlModelStatus($channelId: ID!, $status: String!) {
     setMlModelStatus(channelId: $channelId, status: $status)
   }
-`;
+`);
 
-export const CLEAR_ML_MODEL = gql`
+export const CLEAR_ML_MODEL = graphql(`
   mutation ClearMlModel($channelId: ID!) {
     clearMlModel(channelId: $channelId)
   }
-`;
+`);
 
-export const REGISTRATION_SEED_CONTEXT = gql`
+export const REGISTRATION_SEED_CONTEXT = graphql(`
   query RegistrationSeedContext {
     registrationSeedContext {
       zone {
@@ -429,9 +434,9 @@ export const REGISTRATION_SEED_CONTEXT = gql`
       }
     }
   }
-`;
+`);
 
-export const UPDATE_REGISTRATION_TAX_RATE = gql`
+export const UPDATE_REGISTRATION_TAX_RATE = graphql(`
   mutation UpdateRegistrationTaxRate($input: UpdateRegistrationTaxRateInput!) {
     updateRegistrationTaxRate(input: $input) {
       id
@@ -440,9 +445,9 @@ export const UPDATE_REGISTRATION_TAX_RATE = gql`
       value
     }
   }
-`;
+`);
 
-export const ROLE_TEMPLATES = gql`
+export const ROLE_TEMPLATES = graphql(`
   query PlatformRoleTemplates {
     platformRoleTemplates {
       id
@@ -452,15 +457,15 @@ export const ROLE_TEMPLATES = gql`
       permissions
     }
   }
-`;
+`);
 
-export const ASSIGNABLE_PERMISSIONS = gql`
+export const ASSIGNABLE_PERMISSIONS = graphql(`
   query AssignablePermissions {
     assignablePermissions
   }
-`;
+`);
 
-export const CREATE_ROLE_TEMPLATE = gql`
+export const CREATE_ROLE_TEMPLATE = graphql(`
   mutation CreateRoleTemplate($input: CreateRoleTemplateInput!) {
     createRoleTemplate(input: $input) {
       id
@@ -470,9 +475,9 @@ export const CREATE_ROLE_TEMPLATE = gql`
       permissions
     }
   }
-`;
+`);
 
-export const UPDATE_ROLE_TEMPLATE = gql`
+export const UPDATE_ROLE_TEMPLATE = graphql(`
   mutation UpdateRoleTemplate($id: ID!, $input: UpdateRoleTemplateInput!) {
     updateRoleTemplate(id: $id, input: $input) {
       id
@@ -482,15 +487,15 @@ export const UPDATE_ROLE_TEMPLATE = gql`
       permissions
     }
   }
-`;
+`);
 
-export const DELETE_ROLE_TEMPLATE = gql`
+export const DELETE_ROLE_TEMPLATE = graphql(`
   mutation DeleteRoleTemplate($id: ID!) {
     deleteRoleTemplate(id: $id)
   }
-`;
+`);
 
-export const ADMINISTRATOR_DETAIL = gql`
+export const ADMINISTRATOR_DETAIL = graphql(`
   query AdministratorDetail($administratorId: ID!) {
     administratorDetail(administratorId: $administratorId) {
       id
@@ -509,9 +514,9 @@ export const ADMINISTRATOR_DETAIL = gql`
       }
     }
   }
-`;
+`);
 
-export const UPDATE_ADMINISTRATOR_PERMISSIONS = gql`
+export const UPDATE_ADMINISTRATOR_PERMISSIONS = graphql(`
   mutation UpdateAdministratorPermissions(
     $administratorId: ID!
     $channelId: ID!
@@ -531,4 +536,4 @@ export const UPDATE_ADMINISTRATOR_PERMISSIONS = gql`
       }
     }
   }
-`;
+`);

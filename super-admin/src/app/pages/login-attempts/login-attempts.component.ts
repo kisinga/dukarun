@@ -1,7 +1,8 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { PageHeaderComponent } from '../../shared/components/page-header';
 import { ApolloService } from '../../core/services/apollo.service';
-import { ADMIN_LOGIN_ATTEMPTS } from '../../core/graphql/operations';
+import { ADMIN_LOGIN_ATTEMPTS } from '../../core/graphql/operations.graphql';
 
 export interface AdminLoginAttempt {
   id: string;
@@ -20,7 +21,7 @@ export interface AdminLoginAttempt {
 @Component({
   selector: 'app-login-attempts',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, PageHeaderComponent],
   templateUrl: './login-attempts.component.html',
   styleUrl: './login-attempts.component.scss',
 })

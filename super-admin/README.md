@@ -1,27 +1,47 @@
-# SuperAdmin
+# Super Admin
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 18.2.21.
+Platform administration UI for Dukarun: channels, users, role templates, subscription tiers, platform data, login attempts, ML trainer.
 
-## Development server
+## Setup
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+```bash
+npm install   # from repo root (workspaces)
+cd super-admin && npm start   # or from root: npm run dev:super-admin
+```
 
-## Code scaffolding
+Dev server: **http://localhost:4201** (main frontend is 4200).
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+## GraphQL Codegen
 
-## Build
+Codegen reads the backend schema from `admin-api` and generates types and document nodes into `src/app/core/graphql/generated/`. **Start the backend first** so the schema is available, then run:
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+```bash
+# From repo root
+npm run codegen:super-admin        # generate once
+npm run codegen:super-admin:watch  # watch mode
 
-## Running unit tests
+# Or from super-admin/
+npm run codegen
+npm run codegen:watch
+```
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+To generate both frontend and super-admin: `npm run codegen:all` (root).
 
-## Running end-to-end tests
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for structure, auth, routing, and design notes.
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+## Scripts
 
-## Further help
+| Script | Description |
+|--------|-------------|
+| `npm start` | Dev server (port 4201) |
+| `npm run build` | Production build |
+| `npm run codegen` | Generate GraphQL types (backend must be running) |
+| `npm run codegen:watch` | Codegen in watch mode |
+| `npm test` | Unit tests (Karma) |
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## Structure
+
+- `src/app/core/` — Auth, Apollo, guards, GraphQL operations and generated types
+- `src/app/layout/` — Shell (drawer, navbar, sidebar driven by nav config)
+- `src/app/pages/` — Feature pages (dashboard, channels, users, etc.)
+- `src/app/shared/` — Shared components (e.g. PageHeader)

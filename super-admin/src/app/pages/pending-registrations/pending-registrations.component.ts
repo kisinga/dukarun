@@ -5,7 +5,8 @@ import {
   PENDING_REGISTRATIONS,
   APPROVE_USER,
   REJECT_USER,
-} from '../../core/graphql/operations';
+} from '../../core/graphql/operations.graphql';
+import { PageHeaderComponent } from '../../shared/components/page-header';
 
 interface PendingRegistration {
   userId: string;
@@ -22,7 +23,7 @@ interface PendingRegistration {
 @Component({
   selector: 'app-pending-registrations',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, PageHeaderComponent],
   templateUrl: './pending-registrations.component.html',
   styleUrl: './pending-registrations.component.scss',
 })
