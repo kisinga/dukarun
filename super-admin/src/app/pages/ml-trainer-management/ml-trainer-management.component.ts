@@ -6,6 +6,7 @@ import {
   signal,
   computed,
 } from '@angular/core';
+import { PageHeaderComponent } from '../../shared/components/page-header';
 import { ApolloService } from '../../core/services/apollo.service';
 import {
   PLATFORM_CHANNELS,
@@ -20,7 +21,7 @@ import {
   EXTRACT_PHOTOS_FOR_TRAINING,
   SET_ML_MODEL_STATUS,
   CLEAR_ML_MODEL,
-} from '../../core/graphql/operations';
+} from '../../core/graphql/operations.graphql';
 
 interface PlatformChannel {
   id: string;
@@ -89,7 +90,7 @@ const SUCCESS_MESSAGE_DURATION_MS = 4000;
 @Component({
   selector: 'app-ml-trainer-management',
   standalone: true,
-  imports: [],
+  imports: [PageHeaderComponent],
   templateUrl: './ml-trainer-management.component.html',
   styleUrl: './ml-trainer-management.component.scss',
 })

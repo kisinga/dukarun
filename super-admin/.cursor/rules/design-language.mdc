@@ -1,0 +1,27 @@
+# Super-Admin — Design Language
+
+Align with the main frontend dashboard where applicable. Use Tailwind 4 + daisyUI 5 and the same theme tokens (primary, base, semantic colors).
+
+## Tables & Lists
+
+### Row-click as primary action
+- **Desktop**: `<tr>` navigates on click (`cursor-pointer`, `hover:bg-base-200/30`). No standalone "View" button.
+- **Contextual actions**: Secondary actions (e.g. Edit, Delete) as small icon/ghost buttons in the last column; use `$event.stopPropagation()` so row-click does not fire.
+
+### Tables
+- Use daisyUI `table`, `table-zebra` where appropriate. Wrap in `overflow-x-auto` for small screens.
+- Stats/summaries: use daisyUI `stats` or card with `stat-title` / `stat-value` for KPIs.
+
+## No Redundant Information
+
+Do not show the same metric in two places on a page. Prefer one prominent location (e.g. stats row or card header).
+
+## Collapsible Sections
+
+Use daisyUI `collapse` (e.g. `collapse-arrow`) or a max-height transition for progressive disclosure when sections can be expanded/collapsed.
+
+## Responsive
+
+- **Mobile-first**: Default layout for small screens; enhance at `sm:` and `lg:`.
+- **Tables**: Use `overflow-x-auto`; consider card layout for very narrow viewports if needed.
+- **Layout**: Main content uses `dashboard-main`-style padding; page headers use shared `PageHeaderComponent`.

@@ -6,7 +6,9 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "codegen": "graphql-codegen --config codegen.ts",
+    "codegen:watch": "graphql-codegen --config codegen.ts --watch"
   },
   "private": true,
   "dependencies": {
@@ -26,6 +28,9 @@
     "zone.js": "~0.14.10"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "^6.1.1",
+    "@graphql-codegen/client-preset": "^5.2.0",
+    "@graphql-codegen/typescript": "^5.0.7",
     "@angular/build": "^21.0.5",
     "@tailwindcss/postcss": "^4.1.18",
     "@angular/cli": "^21.0.5",

@@ -21,8 +21,11 @@
     "dev:ml": "npm run dev -w @dukarun/ml-trainer",
     "dev:super-admin": "npm start -w super-admin",
     "codegen": "npm run codegen -w @dukarun/frontend",
-    "codegen:watch": "npm run codegen:watch -w @dukarun/frontend",
-    "services:up": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml up -d",
+"codegen:watch": "npm run codegen:watch -w @dukarun/frontend",
+    "codegen:super-admin": "npm run codegen -w super-admin",
+    "codegen:super-admin:watch": "npm run codegen:watch -w super-admin",
+    "codegen:all": "npm run codegen -w @dukarun/frontend && npm run codegen -w super-admin",
+  "services:up": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml up -d",
     "services:down": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml down",
     "test": "npm run test --workspaces --if-present",
     "prepare": "node -e \"if (process.env.CI === 'true' || process.env.HUSKY === '0') process.exit(0); require('child_process').execSync('npx husky install', {stdio:'inherit'})\""

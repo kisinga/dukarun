@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../../shared/components/page-header';
 import { ApolloService } from '../../core/services/apollo.service';
 import {
   PLATFORM_STATS,
@@ -8,7 +9,7 @@ import {
   PLATFORM_ADMINISTRATORS,
   ROLE_TEMPLATES,
   GET_SUBSCRIPTION_TIERS,
-} from '../../core/graphql/operations';
+} from '../../core/graphql/operations.graphql';
 
 interface PlatformStats {
   totalChannels: number;
@@ -52,7 +53,7 @@ function channelsNeedingAttention(channels: PlatformChannel[]): PlatformChannel[
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, PageHeaderComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })

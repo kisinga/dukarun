@@ -1,11 +1,12 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../../shared/components/page-header';
 import { ApolloService } from '../../core/services/apollo.service';
 import {
   REGISTRATION_SEED_CONTEXT,
   UPDATE_REGISTRATION_TAX_RATE,
-} from '../../core/graphql/operations';
+} from '../../core/graphql/operations.graphql';
 
 interface ZoneMember {
   id: string;
@@ -34,7 +35,7 @@ interface RegistrationSeedContext {
 @Component({
   selector: 'app-platform-data',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, PageHeaderComponent],
   templateUrl: './platform-data.component.html',
   styleUrl: './platform-data.component.scss',
 })
