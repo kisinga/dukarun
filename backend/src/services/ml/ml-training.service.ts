@@ -51,90 +51,83 @@ export class MlTrainingService {
   ) {}
 
   /**
-   * Extract photos for a channel and generate training manifest
+   * Build training manifest for a channel (read-only).
+   * No channel updates, no webhooks, no status changes. Single source of truth for manifest data.
+   */
+  async buildManifestForChannel(ctx: RequestContext, channelId: string): Promise<TrainingManifest> {
+    const products = await this.productService.findAll(ctx, {
+      take: 1000,
+    });
+
+    const manifestProducts: ProductManifestEntry[] = [];
+
+    for (const product of products.items) {
+      const productWithAssets = await this.productService.findOne(ctx, product.id, ['assets']);
+      if (!productWithAssets?.assets || productWithAssets.assets.length === 0) {
+        continue;
+      }
+
+      const images: ImageManifestEntry[] = [];
+      for (const asset of productWithAssets.assets) {
+        const publicUrl = this.generateAssetUrl(asset.asset.source);
+        images.push({
+          assetId: asset.asset.id.toString(),
+          url: publicUrl,
+          filename: asset.asset.name,
+        });
+      }
+
+      if (images.length > 0) {
+        manifestProducts.push({
+          productId: product.id.toString(),
+          productName: product.name,
+          images,
+        });
+      }
+    }
+
+    return {
+      channelId,
+      version: new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-'),
+      extractedAt: new Date(),
+      products: manifestProducts,
+    };
+  }
+
+  /**
+   * Extract photos for a channel and generate training manifest.
+   * Updates channel, status, and webhooks. Uses buildManifestForChannel for the manifest data.
    */
   async extractPhotosForChannel(ctx: RequestContext, channelId: string): Promise<TrainingManifest> {
     this.logger.log(`Extracting photos for channel ${channelId}`);
 
-    // Update status to extracting
     await this.updateTrainingStatus(ctx, channelId, 'extracting', 0);
-
-    // Send webhook notification
     await this.webhookService.notifyTrainingStarted(ctx, channelId);
 
     try {
-      // Query all products for the channel
-      const products = await this.productService.findAll(ctx, {
-        take: 1000, // Reasonable limit
-      });
+      const manifest = await this.buildManifestForChannel(ctx, channelId);
+      const totalImageCount = manifest.products.reduce((sum, p) => sum + p.images.length, 0);
 
-      const manifestProducts: ProductManifestEntry[] = [];
-      let totalImageCount = 0;
-
-      for (const product of products.items) {
-        // Get assets for this product
-        const productWithAssets = await this.productService.findOne(ctx, product.id, ['assets']);
-        if (!productWithAssets?.assets || productWithAssets.assets.length === 0) {
-          continue; // Skip products without images
-        }
-
-        const images: ImageManifestEntry[] = [];
-
-        for (const asset of productWithAssets.assets) {
-          // Generate public URL for the asset
-          const publicUrl = this.generateAssetUrl(asset.asset.source);
-
-          images.push({
-            assetId: asset.asset.id.toString(),
-            url: publicUrl,
-            filename: asset.asset.name,
-          });
-        }
-
-        if (images.length > 0) {
-          manifestProducts.push({
-            productId: product.id.toString(),
-            productName: product.name,
-            images,
-          });
-          totalImageCount += images.length;
-        }
-      }
-
-      const manifest: TrainingManifest = {
-        channelId,
-        version: new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-'),
-        extractedAt: new Date(),
-        products: manifestProducts,
-      };
-
-      // Update channel with extracted stats
       await this.channelService.update(ctx, {
         id: channelId,
         customFields: {
-          mlProductCount: manifestProducts.length,
+          mlProductCount: manifest.products.length,
           mlImageCount: totalImageCount,
         },
       });
 
-      // Update status to ready
       await this.updateTrainingStatus(ctx, channelId, 'ready', 100);
-
-      // Send webhook notification
       await this.webhookService.notifyTrainingReady(ctx, channelId);
 
       this.logger.log(
-        `Extracted ${manifestProducts.length} products with ${totalImageCount} images`
+        `Extracted ${manifest.products.length} products with ${totalImageCount} images`
       );
       return manifest;
     } catch (error) {
       this.logger.error(`Error extracting photos for channel ${channelId}:`, error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       await this.updateTrainingStatus(ctx, channelId, 'failed', 0, errorMessage);
-
-      // Send webhook notification
       await this.webhookService.notifyTrainingFailed(ctx, channelId, errorMessage);
-
       throw error;
     }
   }

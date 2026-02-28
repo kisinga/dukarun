@@ -53,25 +53,70 @@
     <span>Loading…</span>
   </div>
 } @else {
-  <div class="overflow-x-auto rounded-xl border border-base-300 bg-base-100 shadow">
-    <table class="table">
+  <!-- Mobile: cards. Desktop: table -->
+  <div class="flex flex-col gap-4 md:hidden">
+    @for (row of rows(); track row.channel.id) {
+      <div class="card card-border bg-base-100 shadow-sm">
+        <div class="card-body p-4 gap-3">
+          <div class="flex items-center justify-between">
+            <button type="button" class="link link-primary font-semibold text-left" (click)="openDetail(row)">
+              {{ row.channel.code }}
+            </button>
+            @if (row.loadError) {
+              <span class="badge badge-ghost badge-sm">Error</span>
+            } @else if (row.trainingInfo) {
+              <span
+                class="badge badge-sm"
+                [class.badge-success]="row.trainingInfo.status === 'ready' || row.trainingInfo.status === 'active'"
+                [class.badge-warning]="row.trainingInfo.status === 'training' || row.trainingInfo.status === 'extracting'"
+                [class.badge-error]="row.trainingInfo.status === 'failed'"
+                [class.badge-ghost]="row.trainingInfo.status === 'idle'"
+              >
+                {{ row.trainingInfo.status }}
+              </span>
+            }
+          </div>
+          @if (row.trainingInfo && !row.loadError) {
+            <div class="grid grid-cols-3 gap-2 text-sm">
+              <div><span class="text-base-content/60">Products</span><span class="block font-medium">{{ row.trainingInfo.productCount }}</span></div>
+              <div><span class="text-base-content/60">Images</span><span class="block font-medium">{{ row.trainingInfo.imageCount }}</span></div>
+              <div><span class="text-base-content/60">Model</span><span class="block">{{ row.trainingInfo.hasActiveModel ? 'Yes' : 'No' }}</span></div>
+            </div>
+            <progress class="progress progress-primary w-full" [value]="row.trainingInfo.progress" max="100"></progress>
+          }
+          @if (!row.loadError) {
+            <div class="flex flex-wrap gap-1 pt-1">
+              <button type="button" class="btn btn-ghost btn-xs" (click)="openDetail(row)" [disabled]="actionLoading() !== null">Details</button>
+              <button type="button" class="btn btn-ghost btn-xs" (click)="refreshCounts(row)" [disabled]="actionLoading() !== null">Refresh</button>
+              <button type="button" class="btn btn-ghost btn-xs" (click)="downloadImagesZip(row)" [disabled]="actionLoading() !== null">
+                @if (exportProgress(); as p) { Zip {{ p.current }}/{{ p.total }} } @else { Zip }
+              </button>
+              <button type="button" class="btn btn-primary btn-xs" (click)="startTraining(row)" [disabled]="row.trainingInfo?.status === 'training' || actionLoading() !== null">Train</button>
+              <button type="button" class="btn btn-ghost btn-xs" (click)="openUploadModal(row)" [disabled]="actionLoading() !== null">Upload</button>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+
+  <div class="hidden md:block overflow-x-auto rounded-xl border border-base-300 bg-base-100 shadow">
+    <table class="table table-pin-rows">
       <thead>
-        <tr>
-          <th>Channel</th>
-          <th>Status</th>
-          <th>Progress</th>
-          <th>Started</th>
-          <th>Error</th>
-          <th>Products</th>
-          <th>Images</th>
-          <th>Model</th>
-          <th>Last trained</th>
-          <th>Actions</th>
+        <tr class="bg-base-200">
+          <th class="font-semibold">Channel</th>
+          <th class="font-semibold">Status</th>
+          <th class="font-semibold">Progress</th>
+          <th class="font-semibold">Products</th>
+          <th class="font-semibold">Images</th>
+          <th class="font-semibold">Model</th>
+          <th class="font-semibold">Last trained</th>
+          <th class="font-semibold">Actions</th>
         </tr>
       </thead>
       <tbody>
         @for (row of rows(); track row.channel.id) {
-          <tr>
+          <tr class="hover:bg-base-200/50">
             <td class="font-medium">
               <button type="button" class="link link-primary text-left" (click)="openDetail(row)">
                 {{ row.channel.code }}
@@ -79,7 +124,7 @@
             </td>
             <td>
               @if (row.loadError) {
-                <span class="badge badge-ghost badge-sm">Error loading</span>
+                <span class="badge badge-ghost badge-sm">Error</span>
               } @else if (row.trainingInfo) {
                 <span
                   class="badge badge-sm"
@@ -99,24 +144,16 @@
             </td>
             <td>
               @if (row.trainingInfo && !row.loadError) {
-                <progress class="progress progress-primary w-20" [value]="row.trainingInfo.progress" max="100"></progress>
-                <span class="ml-1 text-sm">{{ row.trainingInfo.progress }}%</span>
+                <div class="flex items-center gap-2 min-w-[6rem]">
+                  <progress class="progress progress-primary flex-1 max-w-24" [value]="row.trainingInfo.progress" max="100"></progress>
+                  <span class="text-sm tabular-nums">{{ row.trainingInfo.progress }}%</span>
+                </div>
               } @else {
-                —
+                <span class="text-base-content/50">—</span>
               }
             </td>
-            <td class="text-sm">{{ formatDate(row.trainingInfo?.startedAt ?? null) }}</td>
-            <td class="text-sm max-w-32">
-              @if (row.trainingInfo?.error; as err) {
-                <button type="button" class="truncate block text-left link link-secondary max-w-32" (click)="openErrorModal(row)" [title]="err">
-                  {{ err }}
-                </button>
-              } @else {
-                —
-              }
-            </td>
-            <td>{{ row.trainingInfo?.productCount ?? '—' }}</td>
-            <td>{{ row.trainingInfo?.imageCount ?? '—' }}</td>
+            <td class="tabular-nums">{{ row.trainingInfo?.productCount ?? '—' }}</td>
+            <td class="tabular-nums">{{ row.trainingInfo?.imageCount ?? '—' }}</td>
             <td>
               @if (row.trainingInfo?.hasActiveModel) {
                 <span class="badge badge-success badge-sm">Yes</span>
@@ -124,77 +161,27 @@
                 <span class="badge badge-ghost badge-sm">No</span>
               }
             </td>
-            <td class="text-sm">{{ formatDate(row.trainingInfo?.lastTrainedAt ?? null) }}</td>
+            <td class="text-sm whitespace-nowrap">{{ formatDate(row.trainingInfo?.lastTrainedAt ?? null) }}</td>
             <td>
               @if (row.loadError) {
-                <span class="text-base-content/60 text-sm">—</span>
-              }               @else {
+                <span class="text-base-content/50 text-sm">—</span>
+              } @else {
                 <div class="flex flex-wrap gap-1">
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-xs"
-                    (click)="openDetail(row)"
-                    [disabled]="actionLoading() !== null"
-                    title="View details"
-                  >
-                    Details
+                  <button type="button" class="btn btn-ghost btn-xs" (click)="openDetail(row)" [disabled]="actionLoading() !== null" title="Details">Details</button>
+                  <button type="button" class="btn btn-ghost btn-xs" (click)="refreshCounts(row)" [disabled]="actionLoading() !== null" title="Refresh counts">
+                    @if (actionLoading() === row.channel.id) { <span class="loading loading-spinner loading-xs"></span> } @else { Refresh }
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-xs"
-                    (click)="queueTraining(row)"
-                    [disabled]="row.trainingInfo?.queuedAt || row.trainingInfo?.status === 'training' || actionLoading() !== null"
-                    title="Queue for next scheduler run"
-                  >
-                    Queue
+                  <button type="button" class="btn btn-ghost btn-xs" (click)="queueTraining(row)" [disabled]="row.trainingInfo?.queuedAt || row.trainingInfo?.status === 'training' || actionLoading() !== null" title="Queue">Queue</button>
+                  <button type="button" class="btn btn-ghost btn-xs" (click)="extractPhotos(row)" [disabled]="actionLoading() !== null" title="Extract">Extract</button>
+                  <button type="button" class="btn btn-ghost btn-xs" (click)="downloadImagesZip(row)" [disabled]="actionLoading() !== null" title="Download zip">
+                    @if (exportProgress(); as p) { Zip {{ p.current }}/{{ p.total }} } @else { Zip }
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-xs"
-                    (click)="extractPhotos(row)"
-                    [disabled]="actionLoading() !== null"
-                    title="Extract photos for training"
-                  >
-                    @if (actionLoading() === row.channel.id) {
-                      <span class="loading loading-spinner loading-xs"></span>
-                    } @else {
-                      Extract
-                    }
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-primary btn-xs"
-                    (click)="startTraining(row)"
-                    [disabled]="row.trainingInfo?.status === 'training' || actionLoading() !== null"
-                    title="Start training now"
-                  >
-                    Train
-                  </button>
+                  <button type="button" class="btn btn-primary btn-xs" (click)="startTraining(row)" [disabled]="row.trainingInfo?.status === 'training' || actionLoading() !== null" title="Train">Train</button>
+                  <button type="button" class="btn btn-ghost btn-xs" (click)="openUploadModal(row)" [disabled]="actionLoading() !== null" title="Upload model">Upload</button>
                   @if (row.trainingInfo?.hasActiveModel) {
-                    <button
-                      type="button"
-                      class="btn btn-ghost btn-xs"
-                      (click)="setStatus(row, 'inactive')"
-                      [disabled]="actionLoading() !== null"
-                    >
-                      Inactive
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-ghost btn-xs"
-                      (click)="setStatus(row, 'active')"
-                      [disabled]="actionLoading() !== null"
-                    >
-                      Active
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-error btn-xs btn-outline"
-                      (click)="clearModel(row)"
-                      [disabled]="actionLoading() !== null"
-                    >
-                      Clear
-                    </button>
+                    <button type="button" class="btn btn-ghost btn-xs" (click)="setStatus(row, 'inactive')" [disabled]="actionLoading() !== null">Inactive</button>
+                    <button type="button" class="btn btn-ghost btn-xs" (click)="setStatus(row, 'active')" [disabled]="actionLoading() !== null">Active</button>
+                    <button type="button" class="btn btn-error btn-xs btn-outline" (click)="clearModel(row)" [disabled]="actionLoading() !== null">Clear</button>
                   }
                 </div>
               }
@@ -295,9 +282,18 @@
         }
 
         <div class="flex flex-wrap gap-2 pt-2">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="refreshCounts(row)" [disabled]="actionLoading() !== null">Refresh counts</button>
           <button type="button" class="btn btn-ghost btn-sm" (click)="extractPhotos(row)" [disabled]="actionLoading() !== null">Extract</button>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="downloadImagesZip(row)" [disabled]="actionLoading() !== null">
+            @if (exportProgress(); as p) {
+              Download zip ({{ p.current }}/{{ p.total }})
+            } @else {
+              Download images zip
+            }
+          </button>
           <button type="button" class="btn btn-ghost btn-sm" (click)="queueTraining(row)" [disabled]="row.trainingInfo?.queuedAt || row.trainingInfo?.status === 'training' || actionLoading() !== null">Queue</button>
           <button type="button" class="btn btn-primary btn-sm" (click)="startTraining(row)" [disabled]="row.trainingInfo?.status === 'training' || actionLoading() !== null">Train</button>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="openUploadModal(row)" [disabled]="actionLoading() !== null">Upload model</button>
           @if (row.trainingInfo?.hasActiveModel) {
             <button type="button" class="btn btn-ghost btn-sm" (click)="setStatus(row, 'inactive')" [disabled]="actionLoading() !== null">Inactive</button>
             <button type="button" class="btn btn-ghost btn-sm" (click)="setStatus(row, 'active')" [disabled]="actionLoading() !== null">Active</button>
@@ -313,6 +309,64 @@
       </div>
     </div>
     <form method="dialog" class="modal-backdrop" (click)="closeDetail()">
+      <button type="button">close</button>
+    </form>
+  </dialog>
+}
+
+@if (uploadModalChannelId(); as channelId) {
+  <dialog class="modal modal-open" id="upload-model-modal">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg">Upload model</h3>
+      <p class="text-sm text-base-content/70 mt-1">Select model.json, weights.bin, and metadata.json.</p>
+      <div class="form-control gap-2 mt-4">
+        <label class="label">
+          <span class="label-text">model.json</span>
+        </label>
+        <input
+          type="file"
+          class="file-input file-input-bordered file-input-sm w-full"
+          accept=".json,application/json"
+          (change)="onUploadFileSelected('modelJson', $event)"
+        />
+        <label class="label">
+          <span class="label-text">weights.bin</span>
+        </label>
+        <input
+          type="file"
+          class="file-input file-input-bordered file-input-sm w-full"
+          accept=".bin,application/octet-stream"
+          (change)="onUploadFileSelected('weightsFile', $event)"
+        />
+        <label class="label">
+          <span class="label-text">metadata.json</span>
+        </label>
+        <input
+          type="file"
+          class="file-input file-input-bordered file-input-sm w-full"
+          accept=".json,application/json"
+          (change)="onUploadFileSelected('metadata', $event)"
+        />
+      </div>
+      <div class="modal-action">
+        <form method="dialog">
+          <button type="button" class="btn btn-ghost" (click)="closeUploadModal()">Cancel</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            (click)="uploadModel()"
+            [disabled]="!uploadFiles().modelJson || !uploadFiles().weightsFile || !uploadFiles().metadata || actionLoading() !== null"
+          >
+            @if (actionLoading() === channelId) {
+              <span class="loading loading-spinner loading-sm"></span>
+            } @else {
+              Upload
+            }
+          </button>
+        </form>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop" (click)="closeUploadModal()">
       <button type="button">close</button>
     </form>
   </dialog>
