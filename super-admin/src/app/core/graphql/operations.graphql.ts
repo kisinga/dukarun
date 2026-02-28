@@ -414,6 +414,26 @@ export const CLEAR_ML_MODEL = graphql(`
   }
 `);
 
+export const REFRESH_TRAINING_COUNTS = graphql(`
+  mutation RefreshTrainingCounts($channelId: ID!) {
+    refreshTrainingCounts(channelId: $channelId)
+  }
+`);
+
+export const TRAINING_MANIFEST_EXPORT = graphql(`
+  query TrainingManifestExport($channelId: ID!) {
+    trainingManifestExport(channelId: $channelId) {
+      manifestJson
+    }
+  }
+`);
+
+export const UPLOAD_MODEL_MANUALLY = graphql(`
+  mutation UploadModelManually($channelId: ID!, $modelJson: Upload!, $weightsFile: Upload!, $metadata: Upload!) {
+    uploadModelManually(channelId: $channelId, modelJson: $modelJson, weightsFile: $weightsFile, metadata: $metadata)
+  }
+`);
+
 export const REGISTRATION_SEED_CONTEXT = graphql(`
   query RegistrationSeedContext {
     registrationSeedContext {

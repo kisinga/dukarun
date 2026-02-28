@@ -142,6 +142,19 @@
                   <button
                     type="button"
                     class="btn btn-ghost btn-xs"
+                    (click)="refreshCounts(row)"
+                    [disabled]="actionLoading() !== null"
+                    title="Refresh product/image counts"
+                  >
+                    @if (actionLoading() === row.channel.id) {
+                      <span class="loading loading-spinner loading-xs"></span>
+                    } @else {
+                      Refresh
+                    }
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
                     (click)="queueTraining(row)"
                     [disabled]="row.trainingInfo?.queuedAt || row.trainingInfo?.status === 'training' || actionLoading() !== null"
                     title="Queue for next scheduler run"
@@ -155,10 +168,28 @@
                     [disabled]="actionLoading() !== null"
                     title="Extract photos for training"
                   >
-                    @if (actionLoading() === row.channel.id) {
-                      <span class="loading loading-spinner loading-xs"></span>
+                    Extract
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    (click)="downloadManifest(row)"
+                    [disabled]="actionLoading() !== null"
+                    title="Download manifest JSON"
+                  >
+                    Manifest
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    (click)="downloadImagesZip(row)"
+                    [disabled]="actionLoading() !== null"
+                    title="Download training images as zip"
+                  >
+                    @if (exportProgress(); as p) {
+                      Zip {{ p.current }}/{{ p.total }}
                     } @else {
-                      Extract
+                      Zip
                     }
                   </button>
                   <button
@@ -169,6 +200,15 @@
                     title="Start training now"
                   >
                     Train
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    (click)="openUploadModal(row)"
+                    [disabled]="actionLoading() !== null"
+                    title="Upload model files manually"
+                  >
+                    Upload
                   </button>
                   @if (row.trainingInfo?.hasActiveModel) {
                     <button
@@ -295,9 +335,19 @@
         }
 
         <div class="flex flex-wrap gap-2 pt-2">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="refreshCounts(row)" [disabled]="actionLoading() !== null">Refresh counts</button>
           <button type="button" class="btn btn-ghost btn-sm" (click)="extractPhotos(row)" [disabled]="actionLoading() !== null">Extract</button>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="downloadManifest(row)" [disabled]="actionLoading() !== null">Download manifest</button>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="downloadImagesZip(row)" [disabled]="actionLoading() !== null">
+            @if (exportProgress(); as p) {
+              Download zip ({{ p.current }}/{{ p.total }})
+            } @else {
+              Download images zip
+            }
+          </button>
           <button type="button" class="btn btn-ghost btn-sm" (click)="queueTraining(row)" [disabled]="row.trainingInfo?.queuedAt || row.trainingInfo?.status === 'training' || actionLoading() !== null">Queue</button>
           <button type="button" class="btn btn-primary btn-sm" (click)="startTraining(row)" [disabled]="row.trainingInfo?.status === 'training' || actionLoading() !== null">Train</button>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="openUploadModal(row)" [disabled]="actionLoading() !== null">Upload model</button>
           @if (row.trainingInfo?.hasActiveModel) {
             <button type="button" class="btn btn-ghost btn-sm" (click)="setStatus(row, 'inactive')" [disabled]="actionLoading() !== null">Inactive</button>
             <button type="button" class="btn btn-ghost btn-sm" (click)="setStatus(row, 'active')" [disabled]="actionLoading() !== null">Active</button>
@@ -313,6 +363,64 @@
       </div>
     </div>
     <form method="dialog" class="modal-backdrop" (click)="closeDetail()">
+      <button type="button">close</button>
+    </form>
+  </dialog>
+}
+
+@if (uploadModalChannelId(); as channelId) {
+  <dialog class="modal modal-open" id="upload-model-modal">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg">Upload model</h3>
+      <p class="text-sm text-base-content/70 mt-1">Select model.json, weights.bin, and metadata.json.</p>
+      <div class="form-control gap-2 mt-4">
+        <label class="label">
+          <span class="label-text">model.json</span>
+        </label>
+        <input
+          type="file"
+          class="file-input file-input-bordered file-input-sm w-full"
+          accept=".json,application/json"
+          (change)="onUploadFileSelected('modelJson', $event)"
+        />
+        <label class="label">
+          <span class="label-text">weights.bin</span>
+        </label>
+        <input
+          type="file"
+          class="file-input file-input-bordered file-input-sm w-full"
+          accept=".bin,application/octet-stream"
+          (change)="onUploadFileSelected('weightsFile', $event)"
+        />
+        <label class="label">
+          <span class="label-text">metadata.json</span>
+        </label>
+        <input
+          type="file"
+          class="file-input file-input-bordered file-input-sm w-full"
+          accept=".json,application/json"
+          (change)="onUploadFileSelected('metadata', $event)"
+        />
+      </div>
+      <div class="modal-action">
+        <form method="dialog">
+          <button type="button" class="btn btn-ghost" (click)="closeUploadModal()">Cancel</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            (click)="uploadModel()"
+            [disabled]="!uploadFiles().modelJson || !uploadFiles().weightsFile || !uploadFiles().metadata || actionLoading() !== null"
+          >
+            @if (actionLoading() === channelId) {
+              <span class="loading loading-spinner loading-sm"></span>
+            } @else {
+              Upload
+            }
+          </button>
+        </form>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop" (click)="closeUploadModal()">
       <button type="button">close</button>
     </form>
   </dialog>

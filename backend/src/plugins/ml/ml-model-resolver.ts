@@ -93,6 +93,10 @@ export const ML_MODEL_SCHEMA = gql`
     error: String
   }
 
+  type TrainingManifestExportResult {
+    manifestJson: String!
+  }
+
   extend type Query {
     """
     Get ML model info for a specific channel
@@ -128,6 +132,11 @@ export const ML_MODEL_SCHEMA = gql`
     Active/recent jobs on the ML trainer service (proxied from ml-trainer).
     """
     mlTrainerJobs: [MlTrainerJob!]!
+
+    """
+    Export training manifest as JSON (read-only; no channel update). For manual training or client-side zip.
+    """
+    trainingManifestExport(channelId: ID!): TrainingManifestExportResult!
   }
 
   extend type Mutation {
@@ -176,15 +185,33 @@ export const ML_MODEL_SCHEMA = gql`
     Queue a channel for training on the next scheduler run.
     """
     queueTraining(channelId: ID!): Boolean!
+
+    """
+    Refresh product/image counts from current catalog. Per-channel cooldown applies.
+    """
+    refreshTrainingCounts(channelId: ID!): Boolean!
+
+    """
+    Upload model files manually (model.json, weights.bin, metadata.json). Admin auth.
+    """
+    uploadModelManually(
+      channelId: ID!
+      modelJson: Upload!
+      weightsFile: Upload!
+      metadata: Upload!
+    ): Boolean!
   }
 `;
 
 /**
  * ML Model Resolver - Using NestJS decorators per Vendure docs
  */
+const REFRESH_COUNTS_COOLDOWN_MS = 60_000;
+
 @Resolver()
 export class MlModelResolver {
   private readonly logger = new Logger(MlModelResolver.name);
+  private readonly refreshCountsLastRun = new Map<string, number>();
 
   constructor(
     private channelService: ChannelService,
@@ -377,7 +404,7 @@ export class MlModelResolver {
       isAuthorized: true,
       authorizedAsOwnerOnly: false,
     });
-    const manifest = await this.mlTrainingService.getTrainingManifest(
+    const manifest = await this.mlTrainingService.buildManifestForChannel(
       channelCtx,
       args.channelId.toString()
     );
@@ -394,6 +421,46 @@ export class MlModelResolver {
       imageCount,
       products,
     };
+  }
+
+  @Transaction()
+  @Mutation()
+  @Allow(Permission.UpdateCatalog)
+  async refreshTrainingCounts(
+    @Ctx() ctx: RequestContext,
+    @Args() args: { channelId: ID }
+  ): Promise<boolean> {
+    const channelId = args.channelId.toString();
+    const now = Date.now();
+    const last = this.refreshCountsLastRun.get(channelId);
+    if (last != null && now - last < REFRESH_COUNTS_COOLDOWN_MS) {
+      throw new Error(
+        `Refresh counts is on cooldown for this channel. Please try again in ${Math.ceil((REFRESH_COUNTS_COOLDOWN_MS - (now - last)) / 1000)}s.`
+      );
+    }
+
+    const channel = await this.channelService.findOne(ctx, args.channelId);
+    if (!channel) {
+      throw new Error('Channel not found');
+    }
+    const channelCtx = new RequestContext({
+      apiType: ctx.apiType,
+      channel,
+      languageCode: ctx.languageCode,
+      isAuthorized: true,
+      authorizedAsOwnerOnly: false,
+    });
+    const manifest = await this.mlTrainingService.buildManifestForChannel(channelCtx, channelId);
+    const imageCount = manifest.products.reduce((sum, p) => sum + p.images.length, 0);
+    await this.channelService.update(channelCtx, {
+      id: channelId,
+      customFields: {
+        mlProductCount: manifest.products.length,
+        mlImageCount: imageCount,
+      },
+    });
+    this.refreshCountsLastRun.set(channelId, now);
+    return true;
   }
 
   @Query()
@@ -599,89 +666,11 @@ export class MlModelResolver {
     });
 
     try {
-      // Upload the three files as assets with proper tags
-      const trainingDate = new Date().toISOString().split('T')[0];
-      const version = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-      const tags = [
-        'ml-model',
-        `channel-${args.channelId}`,
-        `v${version}`,
-        `trained-${trainingDate}`,
-      ];
-
-      // Upload model.json (using internalCtx for proper permissions)
-      this.logger.log('completeTraining: Uploading model.json...');
-      const modelJsonResult = await this.assetService.create(internalCtx, {
-        file: args.modelJson,
-        tags,
+      await this.applyUploadedModelToChannel(internalCtx, args.channelId.toString(), {
+        modelJson: args.modelJson,
+        weightsFile: args.weightsFile,
+        metadata: args.metadata,
       });
-      this.logger.log('completeTraining: model.json uploaded');
-
-      // Upload weights.bin
-      this.logger.log('completeTraining: Uploading weights.bin...');
-      const weightsResult = await this.assetService.create(internalCtx, {
-        file: args.weightsFile,
-        tags,
-      });
-      this.logger.log('completeTraining: weights.bin uploaded');
-
-      // Upload metadata.json
-      this.logger.log('completeTraining: Uploading metadata.json...');
-      const metadataResult = await this.assetService.create(internalCtx, {
-        file: args.metadata,
-        tags,
-      });
-      this.logger.log('completeTraining: metadata.json uploaded');
-
-      // Check for errors in asset creation
-      if (
-        'message' in modelJsonResult ||
-        'message' in weightsResult ||
-        'message' in metadataResult
-      ) {
-        throw new Error('Failed to create assets');
-      }
-      this.logger.log('completeTraining: Asset error check passed');
-
-      // Parse metadata to get stats
-      let productCount = 0;
-      let imageCount = 0;
-      try {
-        const metadataContent = await args.metadata.text();
-        const metadataObj = JSON.parse(metadataContent);
-        productCount = metadataObj.productCount || 0;
-        imageCount = metadataObj.imageCount || 0;
-      } catch (e) {
-        this.logger.warn('Could not parse metadata.json for stats');
-      }
-      this.logger.log(
-        `completeTraining: Metadata parsed - products: ${productCount}, images: ${imageCount}`
-      );
-
-      // Update channel with new model assets and stats
-      // For relation custom fields, use *Id suffix (Vendure input convention)
-      this.logger.log('completeTraining: Updating channel with model assets...');
-      this.logger.log(
-        `Asset IDs - model: ${modelJsonResult.id}, weights: ${weightsResult.id}, metadata: ${metadataResult.id}`
-      );
-      await this.channelService.update(internalCtx, {
-        id: args.channelId.toString(),
-        customFields: {
-          mlModelJsonAssetId: modelJsonResult.id,
-          mlModelBinAssetId: weightsResult.id,
-          mlMetadataAssetId: metadataResult.id,
-          mlModelVersion: version,
-          mlModelStatus: 'active',
-          mlTrainingStatus: 'active',
-          mlTrainingProgress: 100,
-          mlTrainingError: null, // Clear any previous error
-          mlProductCount: productCount,
-          mlImageCount: imageCount,
-          mlLastTrainedAt: new Date(), // Set rate limit marker
-          mlTrainingQueuedAt: null, // Clear queue marker
-        },
-      });
-
       this.logger.log('completeTraining: Training completed successfully!');
       return true;
     } catch (error) {
@@ -697,7 +686,130 @@ export class MlModelResolver {
       throw error;
     }
   }
+
+  /**
+   * Shared logic: upload three model assets and update channel. Used by completeTraining and uploadModelManually.
+   * ctx must be channel-scoped to the target channel.
+   */
+  private async applyUploadedModelToChannel(
+    ctx: RequestContext,
+    channelId: string,
+    files: { modelJson: any; weightsFile: any; metadata: any }
+  ): Promise<void> {
+    const trainingDate = new Date().toISOString().split('T')[0];
+    const version = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+    const tags = ['ml-model', `channel-${channelId}`, `v${version}`, `trained-${trainingDate}`];
+
+    const modelJsonResult = await this.assetService.create(ctx, {
+      file: files.modelJson,
+      tags,
+    });
+    const weightsResult = await this.assetService.create(ctx, {
+      file: files.weightsFile,
+      tags,
+    });
+    const metadataResult = await this.assetService.create(ctx, {
+      file: files.metadata,
+      tags,
+    });
+
+    if ('message' in modelJsonResult || 'message' in weightsResult || 'message' in metadataResult) {
+      throw new Error('Failed to create assets');
+    }
+
+    let productCount = 0;
+    let imageCount = 0;
+    try {
+      const metadataContent = await files.metadata.text();
+      const metadataObj = JSON.parse(metadataContent);
+      productCount = metadataObj.productCount || 0;
+      imageCount = metadataObj.imageCount || 0;
+    } catch {
+      this.logger.warn('Could not parse metadata.json for stats');
+    }
+
+    await this.channelService.update(ctx, {
+      id: channelId,
+      customFields: {
+        mlModelJsonAssetId: modelJsonResult.id,
+        mlModelBinAssetId: weightsResult.id,
+        mlMetadataAssetId: metadataResult.id,
+        mlModelVersion: version,
+        mlModelStatus: 'active',
+        mlTrainingStatus: 'active',
+        mlTrainingProgress: 100,
+        mlTrainingError: null,
+        mlProductCount: productCount,
+        mlImageCount: imageCount,
+        mlLastTrainedAt: new Date(),
+        mlTrainingQueuedAt: null,
+      },
+    });
+  }
+
   @Transaction()
+  @Mutation()
+  @Allow(Permission.UpdateCatalog)
+  async uploadModelManually(
+    @Ctx() ctx: RequestContext,
+    @Args()
+    args: {
+      channelId: ID;
+      modelJson: any;
+      weightsFile: any;
+      metadata: any;
+    }
+  ): Promise<boolean> {
+    const channel = await this.channelService.findOne(ctx, args.channelId);
+    if (!channel) {
+      throw new Error('Channel not found');
+    }
+    const channelCtx = new RequestContext({
+      apiType: ctx.apiType,
+      channel,
+      languageCode: ctx.languageCode,
+      isAuthorized: true,
+      authorizedAsOwnerOnly: false,
+    });
+    await this.applyUploadedModelToChannel(channelCtx, args.channelId.toString(), {
+      modelJson: args.modelJson,
+      weightsFile: args.weightsFile,
+      metadata: args.metadata,
+    });
+    return true;
+  }
+
+  @Query()
+  @Allow(Permission.ReadCatalog)
+  async trainingManifestExport(
+    @Ctx() ctx: RequestContext,
+    @Args() args: { channelId: ID }
+  ): Promise<{ manifestJson: string }> {
+    const channel = await this.channelService.findOne(ctx, args.channelId);
+    if (!channel) {
+      throw new Error('Channel not found');
+    }
+    const channelCtx = new RequestContext({
+      apiType: ctx.apiType,
+      channel,
+      languageCode: ctx.languageCode,
+      isAuthorized: true,
+      authorizedAsOwnerOnly: false,
+    });
+    const manifest = await this.mlTrainingService.buildManifestForChannel(
+      channelCtx,
+      args.channelId.toString()
+    );
+    return {
+      manifestJson: JSON.stringify({
+        channelId: manifest.channelId,
+        version: manifest.version,
+        extractedAt: manifest.extractedAt,
+        products: manifest.products,
+      }),
+    };
+  }
+
   @Transaction()
   @Mutation()
   @Allow(Permission.UpdateCatalog)
