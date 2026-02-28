@@ -44,7 +44,7 @@ RUN rm -rf /etc/nginx/conf.d/default.conf /usr/share/nginx/html/*
 
 COPY --from=builder /app/super-admin/dist/super-admin/browser /usr/share/nginx/html
 
-COPY --from=builder /app/super-admin/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/super-admin/nginx.conf /etc/nginx/conf.d/default.conf.template
 COPY --from=builder /app/super-admin/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 

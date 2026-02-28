@@ -1,15 +1,20 @@
 #!/bin/sh
 set -e
 
-# Super Admin container: inject runtime config and start nginx (same pattern as frontend docker-entrypoint).
-# API_URL: use full URL when backend is different origin (e.g. Docker Compose); use /admin-api for same-origin (reverse proxy).
+# Super Admin container: same pattern as frontend — nginx proxies /admin-api to backend.
+# No API URL injection; app uses relative /admin-api. BACKEND_HOST/BACKEND_PORT from env (e.g. backend:3000).
 
-export API_URL="${API_URL:-/admin-api}"
+export BACKEND_HOST="${BACKEND_HOST:-backend}"
+export BACKEND_PORT="${BACKEND_PORT:-3000}"
 
-if [ -f /usr/share/nginx/html/index.html ]; then
-  CONFIG_SCRIPT="<script>window.__APP_CONFIG__={apiUrl:'${API_URL}'};</script>"
-  sed -i "s|</head>|${CONFIG_SCRIPT}</head>|" /usr/share/nginx/html/index.html
+echo "🔧 Configuring nginx for backend: ${BACKEND_HOST}:${BACKEND_PORT}"
+
+if [ ! -f /etc/nginx/conf.d/default.conf.template ]; then
+  echo "❌ Error: nginx template not found"
+  exit 1
 fi
+
+envsubst '${BACKEND_HOST} ${BACKEND_PORT}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
 
 nginx -t
 exec nginx -g 'daemon off;'

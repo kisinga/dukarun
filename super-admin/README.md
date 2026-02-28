@@ -29,6 +29,14 @@ To generate both frontend and super-admin: `npm run codegen:all` (root).
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for structure, auth, routing, and design notes.
 
+## Deployment (Docker / production)
+
+Same pattern as the main frontend: the app uses the relative URL `/admin-api`; **nginx in the container proxies** those requests to the backend (via `BACKEND_HOST` / `BACKEND_PORT`). No API URL is configured in the app — at admin.dukarun.com the browser hits admin.dukarun.com/admin-api and nginx forwards to the backend on the same network.
+
+Docker Compose sets `BACKEND_HOST: backend` and `BACKEND_PORT: 3000` so the super-admin container resolves the backend by service name. On Coolify or another orchestrator, ensure the super-admin container can reach the backend (same network or correct BACKEND_HOST/BACKEND_PORT).
+
+**`net::ERR_BLOCKED_BY_CLIENT`** is usually a browser extension (ad blocker). Try incognito or disable extensions if login fails despite correct setup.
+
 ## Scripts
 
 | Script | Description |

@@ -157,8 +157,9 @@ services:
     networks:
       - dukarun_services_network
     environment:
-      # URL the browser uses for admin-api (set SUPERADMIN_API_URL in production, e.g. https://api.example.com/admin-api)
-      API_URL: ${SUPERADMIN_API_URL:-http://localhost:3000/admin-api}
+      # Same pattern as frontend: nginx proxies /admin-api to backend; app uses relative URL only.
+      BACKEND_HOST: ${BACKEND_HOST:-backend}
+      BACKEND_PORT: ${BACKEND_PORT:-3000}
     ports:
       - '127.0.0.1:4201:4201'
     depends_on:
