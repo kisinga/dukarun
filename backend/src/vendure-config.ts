@@ -1015,6 +1015,36 @@ export const config: VendureConfig = {
         nullable: false,
         ui: { tab: 'Events' },
       },
+      // SMS credits (30-day period synced with subscription expiry)
+      {
+        name: 'smsUsedThisPeriod',
+        type: 'int',
+        label: [{ languageCode: LanguageCode.en, value: 'SMS Used This Period' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'Number of SMS sent in the current 30-day period (resets with subscription)',
+          },
+        ],
+        defaultValue: 0,
+        public: false,
+        nullable: false,
+        ui: { tab: 'Subscription' },
+      },
+      {
+        name: 'smsPeriodEnd',
+        type: 'datetime',
+        label: [{ languageCode: LanguageCode.en, value: 'SMS Period End' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'End of current SMS credit period (aligned with subscriptionExpiresAt)',
+          },
+        ],
+        public: false,
+        nullable: true,
+        ui: { tab: 'Subscription' },
+      },
     ],
     Order: [
       {

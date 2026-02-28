@@ -38,6 +38,9 @@ export const CHANNEL_DETAIL_PLATFORM = graphql(`
         cashierFlowEnabled
         cashControlEnabled
         enablePrinter
+        smsUsedThisPeriod
+        smsPeriodEnd
+        smsLimitFromTier
       }
       defaultShippingZone {
         id
@@ -73,6 +76,9 @@ export const PLATFORM_CHANNELS = graphql(`
         cashierFlowEnabled
         cashControlEnabled
         enablePrinter
+        smsUsedThisPeriod
+        smsPeriodEnd
+        smsLimitFromTier
       }
     }
   }
@@ -234,6 +240,7 @@ export const GET_SUBSCRIPTION_TIERS = graphql(`
       priceMonthly
       priceYearly
       features
+      smsLimit
       isActive
       createdAt
       updatedAt
@@ -249,6 +256,7 @@ export const CREATE_SUBSCRIPTION_TIER = graphql(`
       name
       priceMonthly
       priceYearly
+      smsLimit
       isActive
     }
   }
@@ -262,6 +270,7 @@ export const UPDATE_SUBSCRIPTION_TIER = graphql(`
       name
       priceMonthly
       priceYearly
+      smsLimit
       isActive
     }
   }

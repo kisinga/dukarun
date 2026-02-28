@@ -30,6 +30,7 @@ import {
 import { PendingRegistrationsService } from './pending-registrations.service';
 import { PlatformAdminService } from './platform-admin.service';
 import { PlatformStatsService } from './platform-stats.service';
+import { SubscriptionTier } from '../subscriptions/subscription.entity';
 
 const VALID_STATUSES = ['UNAPPROVED', 'APPROVED', 'DISABLED', 'BANNED'] as const;
 
@@ -124,6 +125,15 @@ export class SuperAdminResolver {
     if (!ch) return null;
     const cf = (ch.customFields ?? {}) as Record<string, unknown>;
     const status = getChannelStatus(cf);
+    let smsLimitFromTier: number | null = null;
+    const tierId = cf.subscriptionTierId ?? (cf as any).subscriptiontierid;
+    if (tierId) {
+      const tierRepo = this.connection.rawConnection.getRepository(SubscriptionTier);
+      const tier = await tierRepo.findOne({ where: { id: tierId as string } });
+      if (tier?.smsLimit != null && tier.smsLimit > 0) {
+        smsLimitFromTier = tier.smsLimit;
+      }
+    }
     return {
       id: String(ch.id),
       code: ch.code ?? '',
@@ -136,6 +146,9 @@ export class SuperAdminResolver {
         cashierFlowEnabled: cf.cashierFlowEnabled === true,
         cashControlEnabled: cf.cashControlEnabled !== false,
         enablePrinter: cf.enablePrinter !== false,
+        smsUsedThisPeriod: typeof cf.smsUsedThisPeriod === 'number' ? cf.smsUsedThisPeriod : 0,
+        smsPeriodEnd: cf.smsPeriodEnd ?? null,
+        smsLimitFromTier,
       },
       defaultShippingZone: ch.defaultShippingZone
         ? { id: String(ch.defaultShippingZone.id), name: ch.defaultShippingZone.name ?? '' }

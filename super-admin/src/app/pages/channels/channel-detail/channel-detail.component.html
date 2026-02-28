@@ -28,6 +28,14 @@
     </div>
     <div class="card card-border bg-base-100 shadow">
       <div class="card-body">
+        <h2 class="card-title text-base">SMS credits (30-day period)</h2>
+        <p class="text-sm"><span class="font-semibold">Used this period</span> {{ ch.customFields.smsUsedThisPeriod ?? 0 }}</p>
+        <p class="text-sm"><span class="font-semibold">Limit (from tier)</span> {{ ch.customFields.smsLimitFromTier ?? '—' }}</p>
+        <p class="text-sm"><span class="font-semibold">Period ends</span> {{ formatDate(ch.customFields.smsPeriodEnd ?? null) }}</p>
+      </div>
+    </div>
+    <div class="card card-border bg-base-100 shadow">
+      <div class="card-body">
         <h2 class="card-title text-base">Update status</h2>
         <div class="flex flex-wrap items-center gap-2">
           <select class="select select-bordered select-sm" [ngModel]="newStatus()" (ngModelChange)="newStatus.set($event)">

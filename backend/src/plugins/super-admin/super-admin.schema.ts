@@ -40,6 +40,9 @@ export const SUPER_ADMIN_SCHEMA = gql`
     cashierFlowEnabled: Boolean!
     cashControlEnabled: Boolean!
     enablePrinter: Boolean!
+    smsUsedThisPeriod: Int
+    smsPeriodEnd: DateTime
+    smsLimitFromTier: Int
   }
 
   type PlatformStats {

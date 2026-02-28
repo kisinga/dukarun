@@ -17,6 +17,7 @@ interface Tier {
   priceMonthly: number;
   priceYearly: number;
   features: unknown;
+  smsLimit: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -43,8 +44,12 @@ export class SubscriptionTiersComponent implements OnInit {
     description: '',
     priceMonthly: 0,
     priceYearly: 0,
+    smsLimit: 0 as number | null,
     isActive: true,
   };
+
+  editingTier = signal<Tier | null>(null);
+  editSmsLimit = signal<number | ''>('');
 
   async ngOnInit(): Promise<void> {
     await this.loadTiers();
@@ -79,11 +84,12 @@ export class SubscriptionTiersComponent implements OnInit {
             description: f.description.trim() || undefined,
             priceMonthly: f.priceMonthly,
             priceYearly: f.priceYearly,
+            smsLimit: f.smsLimit != null && f.smsLimit > 0 ? f.smsLimit : undefined,
             isActive: f.isActive,
           },
         },
       });
-      this.formModel = { code: '', name: '', description: '', priceMonthly: 0, priceYearly: 0, isActive: true };
+      this.formModel = { code: '', name: '', description: '', priceMonthly: 0, priceYearly: 0, smsLimit: 0, isActive: true };
       await this.loadTiers();
     } catch (err: any) {
       this.error.set(err?.message ?? 'Create failed');
@@ -101,6 +107,42 @@ export class SubscriptionTiersComponent implements OnInit {
         variables: { id },
       });
       await this.loadTiers();
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  openEditSmsLimit(tier: Tier): void {
+    this.editingTier.set(tier);
+    this.editSmsLimit.set(tier.smsLimit ?? '');
+  }
+
+  cancelEdit(): void {
+    this.editingTier.set(null);
+    this.editSmsLimit.set('');
+  }
+
+  async saveEditSmsLimit(): Promise<void> {
+    const tier = this.editingTier();
+    const val = this.editSmsLimit();
+    if (!tier) return;
+    const smsLimit = val === '' ? null : Number(val);
+    if (smsLimit !== null && (isNaN(smsLimit) || smsLimit < 0)) return;
+    this.saving.set(true);
+    try {
+      await this.apollo.getClient().mutate({
+        mutation: UPDATE_SUBSCRIPTION_TIER,
+        variables: {
+          input: {
+            id: tier.id,
+            smsLimit: smsLimit ?? 0,
+          },
+        },
+      });
+      this.cancelEdit();
+      await this.loadTiers();
+    } catch (err: any) {
+      this.error.set(err?.message ?? 'Update failed');
     } finally {
       this.saving.set(false);
     }

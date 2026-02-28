@@ -2,17 +2,21 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EventBus, RequestContext } from '@vendure/core';
 import { env } from '../config/environment.config';
 import { SmsService } from '../sms/sms.service';
+import { SmsUsageService } from '../../services/sms/sms-usage.service';
 import { maskEmail } from '../../utils/email.utils';
 import { isSentinelEmail } from '../../utils/email.utils';
 import { OtpEmailEvent } from '../events/otp-email.event';
 import { CommunicationChannel, DeliveryResult, SendRequest } from './send-request.types';
 
+/** Max SMS body length (GSM 7-bit single segment). */
+const SMS_MAX_LENGTH = 160;
+
 /**
  * Communication Service
  *
  * Single entry point for all delivery (SMS, email). Applies one dev gate: log payload first,
- * then optionally skip real send. All callers (OtpService, AdminNotificationService,
- * ChannelAdminService) use this layer so behavior is consistent regardless of NODE_ENV.
+ * then optionally skip real send. Channel-scoped SMS is subject to per-tier limits (SmsUsageService).
+ * SMS body is limited to 160 characters. OTP and platform-level SMS (no channelId) are not counted against channel limits.
  */
 @Injectable()
 export class CommunicationService {
@@ -20,7 +24,8 @@ export class CommunicationService {
 
   constructor(
     private readonly smsService: SmsService,
-    private readonly eventBus: EventBus
+    private readonly eventBus: EventBus,
+    private readonly smsUsageService: SmsUsageService
   ) {}
 
   /**
@@ -71,8 +76,31 @@ export class CommunicationService {
     if (channel === 'sms') {
       const message =
         typeof body === 'string' ? body : String((body as Record<string, unknown>)?.otp ?? body);
+      if (message.length > SMS_MAX_LENGTH) {
+        const errMsg = `SMS body exceeds ${SMS_MAX_LENGTH} characters (got ${message.length}). Message rejected.`;
+        this.logger.error(errMsg, new Error('SMS_LENGTH_EXCEEDED'));
+        return { success: false, channel: 'sms', error: errMsg };
+      }
       const isOtp = metadata?.purpose === 'otp';
-      return this.sendSms(recipient, message, isOtp);
+      const channelId = request.channelId ?? request.ctx?.channelId?.toString();
+      if (!isOtp && channelId && request.ctx) {
+        const { allowed, reason } = await this.smsUsageService.canSendSms(request.ctx, channelId);
+        if (!allowed) {
+          this.logger.warn(`SMS not sent (quota limit): channel=${channelId} - ${reason}`);
+          return { success: false, channel: 'sms', error: reason };
+        }
+      }
+      const result = await this.sendSms(recipient, message, isOtp);
+      if (!result.success && result.error) {
+        this.logger.error(
+          `SMS delivery failed to ${recipient}: ${result.error}`,
+          new Error(result.error)
+        );
+      }
+      if (result.success && !isOtp && channelId && request.ctx) {
+        await this.smsUsageService.recordSmsSent(request.ctx, channelId);
+      }
+      return result;
     }
 
     return this.sendEmail(recipient, body, ctx, request.template);
@@ -92,7 +120,10 @@ export class CommunicationService {
       };
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
-      this.logger.error(`SMS send error: ${errMsg}`, error);
+      this.logger.error(
+        `SMS send error to ${phoneNumber}: ${errMsg}`,
+        error instanceof Error ? error : new Error(errMsg)
+      );
       return { success: false, channel: 'sms', error: errMsg };
     }
   }

@@ -77,18 +77,19 @@ export class SubscriptionExpirySubscriber extends WorkerBackgroundTaskBase {
 
         // Check if expired
         if (expiresAt <= now) {
-          // Send exactly one "expired" notification, then never again
+          // Send exactly one "expired" notification, then never again.
+          // Mark before publish so a crash after emit does not cause duplicate on next run.
           const alreadySent = await this.subscriptionService.hasEverSentExpiredReminder(
             ctx,
             channelId
           );
           if (alreadySent) continue;
+          await this.subscriptionService.markExpiredReminderSent(ctx, channelId);
           this.eventBus.publish(
             new SubscriptionAlertEvent(ctx, channelId, 'expired', {
               expiresAt: expiresAt.toISOString(),
             })
           );
-          await this.subscriptionService.markExpiredReminderSent(ctx, channelId);
           notifiedCount++;
           continue;
         }

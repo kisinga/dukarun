@@ -33,6 +33,10 @@ export class SubscriptionTier {
   @Column('jsonb', { nullable: true })
   features: SubscriptionTierFeatures;
 
+  /** SMS credits per channel per 30-day period (synced with subscription expiry). Null/0 = no limit. */
+  @Column('int', { default: 0, nullable: true })
+  smsLimit: number | null;
+
   @Column({ default: true })
   isActive: boolean;
 

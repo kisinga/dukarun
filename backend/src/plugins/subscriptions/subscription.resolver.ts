@@ -18,6 +18,7 @@ export const SUBSCRIPTION_SCHEMA = gql`
     priceMonthly: Int!
     priceYearly: Int!
     features: JSON
+    smsLimit: Int
     isActive: Boolean!
     createdAt: DateTime!
     updatedAt: DateTime!
@@ -74,6 +75,7 @@ export const SUBSCRIPTION_SCHEMA = gql`
     priceMonthly: Int!
     priceYearly: Int!
     features: JSON
+    smsLimit: Int
     isActive: Boolean
   }
 
@@ -85,6 +87,7 @@ export const SUBSCRIPTION_SCHEMA = gql`
     priceMonthly: Int
     priceYearly: Int
     features: JSON
+    smsLimit: Int
     isActive: Boolean
   }
 
@@ -184,6 +187,7 @@ export class SubscriptionResolver {
       priceMonthly: number;
       priceYearly: number;
       features?: any;
+      smsLimit?: number | null;
       isActive?: boolean;
     }
   ): Promise<SubscriptionTier> {
@@ -203,6 +207,7 @@ export class SubscriptionResolver {
       priceMonthly?: number;
       priceYearly?: number;
       features?: any;
+      smsLimit?: number | null;
       isActive?: boolean;
     }
   ): Promise<SubscriptionTier> {

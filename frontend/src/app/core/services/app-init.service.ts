@@ -7,6 +7,7 @@ import { loadMlModelService } from './ml-model.loader';
 import type { MlModelService } from './ml-model/ml-model.service';
 import { ModelErrorType } from './ml-model/model-error.util';
 import { NotificationService } from './notification.service';
+import { NotificationStateService } from './notification/notification-state.service';
 import { PaymentMethodService } from './payment-method.service';
 import { ProductCacheService } from './product/product-cache.service';
 import { SalesSyncGuardService } from './sales-sync-guard.service';
@@ -42,6 +43,7 @@ export class AppInitService {
   private readonly salesSyncGuard = inject(SalesSyncGuardService);
   private readonly stockLocationService = inject(StockLocationService);
   private readonly notificationService = inject(NotificationService);
+  private readonly notificationStateService = inject(NotificationStateService);
   private readonly injector = inject(Injector);
   /** Injected so CacheSyncService is created and starts SSE when user has a channel */
   private readonly cacheSyncService = inject(CacheSyncService);
@@ -199,8 +201,7 @@ export class AppInitService {
    */
   private async prefetchNotifications(): Promise<boolean> {
     try {
-      await this.notificationService.loadNotifications();
-      await this.notificationService.loadUnreadCount();
+      await this.notificationService.loadAll();
       return true;
     } catch (error: any) {
       console.error('Failed to prefetch notifications:', error);
@@ -251,6 +252,7 @@ export class AppInitService {
    * Clear all cached data (on logout or channel switch)
    */
   clearCache(): void {
+    this.notificationStateService.clear();
     this.apolloService.clearCache();
     this.productCacheService.clearCache(this.lastInitChannelId() ?? undefined);
     this.salesSyncGuard.markSynced();

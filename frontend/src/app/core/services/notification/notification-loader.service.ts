@@ -74,7 +74,8 @@ export class NotificationLoaderService {
       }
     } catch (error: any) {
       console.error('Failed to load notifications:', error);
-      // Don't throw - let caller handle errors if needed
+      // Avoid showing stale list when current request fails
+      this.stateService.setNotifications([]);
     } finally {
       this.stateService.setLoading(false);
     }
@@ -101,14 +102,58 @@ export class NotificationLoaderService {
       }
     } catch (error: any) {
       console.error('Failed to load unread count:', error);
-      // Don't throw - let caller handle errors if needed
+      // Don't update count on failure so we don't show count without matching list
     }
   }
 
   /**
-   * Load both notifications and unread count
+   * Load both notifications and unread count.
+   * Only updates state when both requests succeed to avoid count-without-list mismatch.
    */
   async loadAll(): Promise<void> {
-    await Promise.all([this.loadNotifications(), this.loadUnreadCount()]);
+    if (!this.authService.isAuthenticated() || !this.apolloService.getChannelToken()) {
+      return;
+    }
+
+    this.stateService.setLoading(true);
+
+    try {
+      const client = this.apolloService.getClient();
+      const [listResult, countResult] = await Promise.all([
+        client.query({
+          query: GetUserNotificationsDocument,
+          variables: { options: {} },
+          fetchPolicy: 'network-only',
+        }),
+        client.query({
+          query: GetUnreadCountDocument,
+          fetchPolicy: 'network-only',
+        }),
+      ]);
+
+      const listData = listResult?.data?.getUserNotifications;
+      const count = countResult?.data?.getUnreadCount;
+
+      if (listData?.items && typeof count === 'number') {
+        const notifications: Notification[] = listData.items.map((item) => ({
+          id: item.id,
+          userId: item.userId,
+          channelId: item.channelId,
+          type: item.type as Notification['type'],
+          title: item.title,
+          message: item.message,
+          data: item.data,
+          read: item.read,
+          createdAt: item.createdAt,
+        }));
+        this.stateService.setNotifications(notifications);
+        this.stateService.setUnreadCount(count);
+      }
+    } catch (error: any) {
+      console.error('Failed to load notifications:', error);
+      this.stateService.setNotifications([]);
+    } finally {
+      this.stateService.setLoading(false);
+    }
   }
 }

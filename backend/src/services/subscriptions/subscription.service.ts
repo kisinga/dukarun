@@ -768,6 +768,7 @@ export class SubscriptionService {
       priceMonthly: number;
       priceYearly: number;
       features?: any;
+      smsLimit?: number | null;
       isActive?: boolean;
     }
   ): Promise<SubscriptionTier> {
@@ -786,6 +787,7 @@ export class SubscriptionService {
       priceMonthly: input.priceMonthly,
       priceYearly: input.priceYearly,
       features: input.features || { features: [] },
+      smsLimit: input.smsLimit ?? 0,
       isActive: input.isActive !== undefined ? input.isActive : true,
     });
 
@@ -807,6 +809,7 @@ export class SubscriptionService {
       priceMonthly?: number;
       priceYearly?: number;
       features?: any;
+      smsLimit?: number | null;
       isActive?: boolean;
     }
   ): Promise<SubscriptionTier> {
@@ -840,6 +843,9 @@ export class SubscriptionService {
     }
     if (input.features !== undefined) {
       tier.features = input.features;
+    }
+    if (input.smsLimit !== undefined) {
+      tier.smsLimit = input.smsLimit;
     }
     if (input.isActive !== undefined) {
       tier.isActive = input.isActive;
