@@ -41,6 +41,17 @@ So: **only the root `package-lock.json` is the source of truth.** Per-package lo
 
 ---
 
+## ml-trainer: two-stage image
+
+The ml-trainer image is built with a **two-stage** Dockerfile to keep the final image small:
+
+- **Stage 1 (builder):** Uses `node:20-bookworm-slim` (no Chromium). Installs and builds only the ml-trainer workspace (`npm ci --include=dev --workspace=@dukarun/ml-trainer`, then `npm run build -w @dukarun/ml-trainer`). Produces `ml-trainer/dist`.
+- **Stage 2 (runner):** Uses `node:20-bookworm-slim` plus Chromium and minimal Puppeteer runtime dependencies. Copies only root and workspace `package.json` files and `ml-trainer/dist` (no app source). Runs `npm ci --omit=dev --workspace=@dukarun/ml-trainer` so the final image has only production dependencies. The container runs `node ml-trainer/dist/server.js`.
+
+The final image does not contain source code or devDependencies.
+
+---
+
 ## Summary
 
 | Aspect | Usage |

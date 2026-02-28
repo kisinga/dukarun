@@ -451,11 +451,12 @@ export class MlModelResolver {
       authorizedAsOwnerOnly: false,
     });
     const manifest = await this.mlTrainingService.buildManifestForChannel(channelCtx, channelId);
-    const imageCount = manifest.products.reduce((sum, p) => sum + p.images.length, 0);
+    const products = manifest.products ?? [];
+    const imageCount = products.reduce((sum, p) => sum + (p.images?.length ?? 0), 0);
     await this.channelService.update(channelCtx, {
       id: channelId,
       customFields: {
-        mlProductCount: manifest.products.length,
+        mlProductCount: products.length,
         mlImageCount: imageCount,
       },
     });

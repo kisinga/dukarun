@@ -1,8 +1,15 @@
 import { Injectable, inject } from '@angular/core';
-import type { DocumentNode } from 'graphql';
+import gql from 'graphql-tag';
 import JSZip from 'jszip';
 import { ApolloService } from './apollo.service';
-import { TRAINING_MANIFEST_EXPORT } from '../graphql/operations.graphql';
+
+const TRAINING_MANIFEST_EXPORT_QUERY = gql`
+  query TrainingManifestExport($channelId: ID!) {
+    trainingManifestExport(channelId: $channelId) {
+      manifestJson
+    }
+  }
+`;
 
 export interface TrainingManifestProduct {
   productId: string;
@@ -22,28 +29,6 @@ export class TrainingExportService {
   private readonly apollo = inject(ApolloService);
 
   /**
-   * Fetch manifest JSON and trigger browser download.
-   */
-  async downloadManifestJson(channelId: string, channelCode: string): Promise<void> {
-    const result = await this.apollo.getClient().query<{ trainingManifestExport: { manifestJson: string } }>({
-      query: TRAINING_MANIFEST_EXPORT as DocumentNode,
-      variables: { channelId },
-      fetchPolicy: 'network-only',
-    });
-    const json = result.data?.trainingManifestExport?.manifestJson;
-    if (!json) {
-      throw new Error('No manifest data');
-    }
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `training-manifest-${channelCode}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  /**
    * Fetch manifest, download each image in the browser, build zip, trigger download.
    * onProgress(current, total) is called as images are fetched.
    */
@@ -53,7 +38,7 @@ export class TrainingExportService {
     onProgress?: (current: number, total: number) => void
   ): Promise<void> {
     const result = await this.apollo.getClient().query<{ trainingManifestExport: { manifestJson: string } }>({
-      query: TRAINING_MANIFEST_EXPORT as DocumentNode,
+      query: TRAINING_MANIFEST_EXPORT_QUERY,
       variables: { channelId },
       fetchPolicy: 'network-only',
     });
@@ -62,7 +47,12 @@ export class TrainingExportService {
       throw new Error('No manifest data');
     }
     const manifest: TrainingManifestExport = JSON.parse(json);
-    const total = manifest.products.reduce((sum, p) => sum + p.images.length, 0);
+    const products = manifest.products ?? [];
+    // Count only images with URLs so progress (current/total) matches actual work done
+    const total = products.reduce(
+      (sum, p) => sum + (p.images ?? []).filter((img) => img?.url).length,
+      0
+    );
     if (total === 0) {
       throw new Error('No images in manifest');
     }
@@ -70,19 +60,22 @@ export class TrainingExportService {
     const zip = new JSZip();
     let current = 0;
 
-    for (let i = 0; i < manifest.products.length; i++) {
-      const product = manifest.products[i];
-      const folderName = `${i}-${sanitizeFolderName(product.productName)}`;
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
+      if (!product) continue;
+      const images = product.images ?? [];
+      const folderName = `${i}-${sanitizeFolderName(product.productName ?? '')}`;
       const productFolder = zip.folder(folderName);
       if (!productFolder) continue;
 
-      for (let j = 0; j < product.images.length; j++) {
-        const img = product.images[j];
+      for (let j = 0; j < images.length; j++) {
+        const img = images[j];
+        if (!img?.url) continue;
         try {
           const res = await fetch(img.url, { mode: 'cors', credentials: 'include' });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const blob = await res.blob();
-          const ext = getExtension(img.filename);
+          const ext = getExtension(img.filename ?? '');
           productFolder.file(`${j}${ext}`, blob);
         } catch (err) {
           console.warn(`Failed to fetch image ${img.url}:`, err);

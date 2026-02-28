@@ -1,36 +1,31 @@
-# Used when building images with context: . (repo root).
-# See docs/DOCKER_WORKSPACE_BUILDS.md for the workspace Docker pattern.
-
-# Dependencies (reinstalled via npm ci in Dockerfile)
+# Base exclusions (from .dockerignore)
 node_modules/
 **/node_modules/
-
-# Version control and CI
 .git/
 .github/
-
-# Build outputs (rebuilt in container)
 dist/
 **/dist/
 .angular/
 **/.angular/
-
-# Tests and coverage
 **/*.spec.ts
 **/*.test.ts
 **/e2e/
 coverage/
 **/coverage/
-
-# Development and IDE
 .env*
 .vscode/
 .idea/
 *.log
 .DS_Store
 Thumbs.db
-
-# Docs and misc (not needed for build)
 docs/
 *.md
 !README.md
+
+# ML trainer build: exclude other apps (keep workspace package.json for npm)
+backend/*
+!backend/package.json
+frontend/*
+!frontend/package.json
+super-admin/*
+!super-admin/package.json

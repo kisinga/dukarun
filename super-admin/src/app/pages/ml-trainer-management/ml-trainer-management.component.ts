@@ -521,22 +521,6 @@ export class MlTrainerManagementComponent implements OnInit, OnDestroy {
     }
   }
 
-  async downloadManifest(row: ChannelRow): Promise<void> {
-    const id = row.channel.id;
-    const code = (row.channel as PlatformChannel).code ?? id;
-    this.actionLoading.set(id);
-    try {
-      await this.trainingExport.downloadManifestJson(id, code);
-      this.showSuccess('Manifest downloaded');
-    } catch (err: unknown) {
-      this.error.set(
-        err instanceof Error ? err.message : 'Download manifest failed'
-      );
-    } finally {
-      this.actionLoading.set(null);
-    }
-  }
-
   async downloadImagesZip(row: ChannelRow): Promise<void> {
     const id = row.channel.id;
     const code = (row.channel as PlatformChannel).code ?? id;
