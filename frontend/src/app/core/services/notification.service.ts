@@ -56,6 +56,13 @@ export class NotificationService {
   }
 
   /**
+   * Load both notifications list and unread count atomically (avoids count-without-list mismatch).
+   */
+  async loadAll(): Promise<void> {
+    return this.loaderService.loadAll();
+  }
+
+  /**
    * Mark a notification as read
    */
   async markAsRead(notificationId: string): Promise<boolean> {

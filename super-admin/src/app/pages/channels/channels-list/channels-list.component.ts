@@ -16,6 +16,9 @@ interface PlatformChannel {
     cashierFlowEnabled: boolean;
     cashControlEnabled: boolean;
     enablePrinter: boolean;
+    smsUsedThisPeriod?: number;
+    smsPeriodEnd?: string | null;
+    smsLimitFromTier?: number | null;
   };
 }
 

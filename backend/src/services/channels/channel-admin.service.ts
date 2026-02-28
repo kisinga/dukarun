@@ -713,6 +713,8 @@ export class ChannelAdminService {
         channel: 'sms',
         recipient: phoneNumber,
         body: message,
+        ctx,
+        channelId,
         metadata: { purpose: 'welcome_sms' },
       });
 

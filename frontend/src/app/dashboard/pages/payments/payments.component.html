@@ -33,6 +33,35 @@
     </div>
   </div>
 
+  <!-- Context banner: payments for a specific customer or order -->
+  @if (hasContextFilter()) {
+    <div class="alert alert-info shadow-sm flex flex-col sm:flex-row sm:items-center gap-2">
+      <div class="flex-1">
+        @if (contextCustomerId()) {
+          <span class="font-medium">Payments for customer:</span>
+          <span class="ml-1">{{ contextCustomerName() || 'Customer' }}</span>
+          <button type="button" class="link link-hover ml-2 text-sm" (click)="goToCustomersPage()">
+            View customer
+          </button>
+        }
+        @if (contextOrderId()) {
+          <span class="font-medium">Payments for order:</span>
+          <span class="ml-1">{{ contextOrderCode() || 'Order' }}</span>
+          <button
+            type="button"
+            class="link link-hover ml-2 text-sm"
+            (click)="goToOrder(contextOrderId()!)"
+          >
+            View order
+          </button>
+        }
+      </div>
+      <button type="button" class="btn btn-sm btn-ghost" (click)="clearContextFilter()">
+        Show all payments
+      </button>
+    </div>
+  }
+
   <!-- Statistics Cards -->
   <app-payment-stats
     [stats]="stats()"

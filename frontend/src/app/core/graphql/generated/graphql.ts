@@ -134,6 +134,21 @@ export enum AdjustmentType {
   PROMOTION = 'PROMOTION',
 }
 
+export type AdminLoginAttempt = {
+  __typename?: 'AdminLoginAttempt';
+  authMethod: Scalars['String']['output'];
+  eventKind: Scalars['String']['output'];
+  failureReason?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  ipAddress?: Maybe<Scalars['String']['output']>;
+  isSuperAdmin?: Maybe<Scalars['Boolean']['output']>;
+  success: Scalars['Boolean']['output'];
+  timestamp: Scalars['DateTime']['output'];
+  userAgent?: Maybe<Scalars['String']['output']>;
+  userId?: Maybe<Scalars['Int']['output']>;
+  username: Scalars['String']['output'];
+};
+
 export type Administrator = Node & {
   __typename?: 'Administrator';
   createdAt: Scalars['DateTime']['output'];
@@ -702,6 +717,9 @@ export type ChannelCustomFields = {
   paystackCustomerCode?: Maybe<Scalars['String']['output']>;
   paystackSubscriptionCode?: Maybe<Scalars['String']['output']>;
   requireOpeningCount?: Maybe<Scalars['Boolean']['output']>;
+  smsPeriodEnd?: Maybe<Scalars['DateTime']['output']>;
+  smsUsageByCategory?: Maybe<Scalars['String']['output']>;
+  smsUsedThisPeriod?: Maybe<Scalars['Int']['output']>;
   status?: Maybe<Scalars['String']['output']>;
   stockValueCache?: Maybe<Scalars['String']['output']>;
   subscriptionExpiredReminderSentAt?: Maybe<Scalars['DateTime']['output']>;
@@ -779,6 +797,9 @@ export type ChannelFilterParameter = {
   paystackSubscriptionCode?: InputMaybe<StringOperators>;
   pricesIncludeTax?: InputMaybe<BooleanOperators>;
   requireOpeningCount?: InputMaybe<BooleanOperators>;
+  smsPeriodEnd?: InputMaybe<DateOperators>;
+  smsUsageByCategory?: InputMaybe<StringOperators>;
+  smsUsedThisPeriod?: InputMaybe<NumberOperators>;
   status?: InputMaybe<StringOperators>;
   stockValueCache?: InputMaybe<StringOperators>;
   subscriptionExpiredReminderSentAt?: InputMaybe<DateOperators>;
@@ -870,6 +891,9 @@ export type ChannelSortParameter = {
   paystackCustomerCode?: InputMaybe<SortOrder>;
   paystackSubscriptionCode?: InputMaybe<SortOrder>;
   requireOpeningCount?: InputMaybe<SortOrder>;
+  smsPeriodEnd?: InputMaybe<SortOrder>;
+  smsUsageByCategory?: InputMaybe<SortOrder>;
+  smsUsedThisPeriod?: InputMaybe<SortOrder>;
   status?: InputMaybe<SortOrder>;
   stockValueCache?: InputMaybe<SortOrder>;
   subscriptionExpiredReminderSentAt?: InputMaybe<SortOrder>;
@@ -1278,6 +1302,9 @@ export type CreateChannelCustomFieldsInput = {
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
+  smsPeriodEnd?: InputMaybe<Scalars['DateTime']['input']>;
+  smsUsageByCategory?: InputMaybe<Scalars['String']['input']>;
+  smsUsedThisPeriod?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   stockValueCache?: InputMaybe<Scalars['String']['input']>;
   subscriptionExpiredReminderSentAt?: InputMaybe<Scalars['DateTime']['input']>;
@@ -1551,6 +1578,13 @@ export type CreateRoleInput = {
   permissions: Array<Permission>;
 };
 
+export type CreateRoleTemplateInput = {
+  code: Scalars['String']['input'];
+  description?: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
+  permissions: Array<Scalars['String']['input']>;
+};
+
 export type CreateSellerInput = {
   customFields?: InputMaybe<Scalars['JSON']['input']>;
   name: Scalars['String']['input'];
@@ -1579,6 +1613,7 @@ export type CreateSubscriptionTierInput = {
   name: Scalars['String']['input'];
   priceMonthly: Scalars['Int']['input'];
   priceYearly: Scalars['Int']['input'];
+  smsLimit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type CreateTagInput = {
@@ -3602,6 +3637,43 @@ export type MlModelInfo = {
   version?: Maybe<Scalars['String']['output']>;
 };
 
+export type MlSchedulerConfig = {
+  __typename?: 'MlSchedulerConfig';
+  cooldownHours: Scalars['Int']['output'];
+  intervalMinutes: Scalars['Int']['output'];
+};
+
+export type MlTrainerHealth = {
+  __typename?: 'MlTrainerHealth';
+  error?: Maybe<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
+  uptimeSeconds?: Maybe<Scalars['Float']['output']>;
+};
+
+export type MlTrainerJob = {
+  __typename?: 'MlTrainerJob';
+  channelId: Scalars['String']['output'];
+  completedAt?: Maybe<Scalars['DateTime']['output']>;
+  error?: Maybe<Scalars['String']['output']>;
+  failedAt?: Maybe<Scalars['DateTime']['output']>;
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: Scalars['String']['output'];
+};
+
+export type MlTrainingDataSummary = {
+  __typename?: 'MlTrainingDataSummary';
+  extractedAt?: Maybe<Scalars['DateTime']['output']>;
+  imageCount: Scalars['Int']['output'];
+  productCount: Scalars['Int']['output'];
+  products: Array<MlTrainingDataSummaryProduct>;
+};
+
+export type MlTrainingDataSummaryProduct = {
+  __typename?: 'MlTrainingDataSummaryProduct';
+  imageCount: Scalars['Int']['output'];
+  productName: Scalars['String']['output'];
+};
+
 export type MlTrainingInfo = {
   __typename?: 'MlTrainingInfo';
   error?: Maybe<Scalars['String']['output']>;
@@ -3610,6 +3682,7 @@ export type MlTrainingInfo = {
   lastTrainedAt?: Maybe<Scalars['DateTime']['output']>;
   productCount: Scalars['Int']['output'];
   progress: Scalars['Int']['output'];
+  queuedAt?: Maybe<Scalars['DateTime']['output']>;
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
 };
@@ -3720,6 +3793,7 @@ export type Mutation = {
   applyCouponCodeToDraftOrder: ApplyCouponCodeResult;
   approveCustomerCredit: CreditSummary;
   approveSupplierCredit: SupplierCreditSummary;
+  approveUser: UserAuthorizationResult;
   /** Assign assets to channel */
   assignAssetsToChannel: Array<Asset>;
   /** Assigns Collections to the specified Channel */
@@ -3807,6 +3881,7 @@ export type Mutation = {
   createReconciliation: Reconciliation;
   /** Create a new Role */
   createRole: Role;
+  createRoleTemplate: PlatformRoleTemplate;
   /** Create a new Seller */
   createSeller: Seller;
   /** Create a new ShippingMethod */
@@ -3884,6 +3959,7 @@ export type Mutation = {
   deleteProvince: DeletionResponse;
   /** Delete an existing Role */
   deleteRole: DeletionResponse;
+  deleteRoleTemplate: Scalars['Boolean']['output'];
   /** Delete multiple Roles */
   deleteRoles: Array<DeletionResponse>;
   /** Delete a Seller */
@@ -3948,13 +4024,18 @@ export type Mutation = {
   openCashierSession: CashierSession;
   paySingleOrder: PaymentAllocationResult;
   paySinglePurchase: SupplierPaymentAllocationResult;
+  /** Queue a channel for training on the next scheduler run. */
+  queueTraining: Scalars['Boolean']['output'];
   recordCashCount: CashCountResult;
   recordExpense: RecordExpenseResult;
   recordPurchase: StockPurchase;
   recordStockAdjustment: InventoryStockAdjustment;
   refreshAnalytics: Scalars['Boolean']['output'];
+  /** Refresh product/image counts from current catalog. Per-channel cooldown applies. */
+  refreshTrainingCounts: Scalars['Boolean']['output'];
   refundOrder: RefundOrderResult;
   reindex: Job;
+  rejectUser: UserAuthorizationResult;
   /** Removes Collections from the specified Channel */
   removeCollectionsFromChannel: Array<Collection>;
   /** Removes the given coupon code from the draft Order */
@@ -3997,6 +4078,8 @@ export type Mutation = {
   reviewCashCount: CashDrawerCount;
   runPendingSearchIndexUpdates: Success;
   runScheduledTask: Success;
+  sendCustomerStatementEmail: Scalars['Boolean']['output'];
+  sendCustomerStatementSms: Scalars['Boolean']['output'];
   setCustomerForDraftOrder: SetCustomerForDraftOrderResult;
   /** Sets the billing address for a draft Order */
   setDraftOrderBillingAddress: Order;
@@ -4037,6 +4120,7 @@ export type Mutation = {
   updateAdminProfile: Administrator;
   /** Update an existing Administrator */
   updateAdministrator: Administrator;
+  updateAdministratorPermissions: PlatformAdministratorDetail;
   /** Update an existing Asset */
   updateAsset: Asset;
   updateCashierSettings: ChannelSettings;
@@ -4048,6 +4132,7 @@ export type Mutation = {
   updateChannelPaymentMethod: PaymentMethod;
   updateChannelStatus: Channel;
   updateChannelStatusPlatform: Channel;
+  updateChannelZonesPlatform: Channel;
   /** Update an existing Collection */
   updateCollection: Collection;
   /** Update an existing Country */
@@ -4089,8 +4174,10 @@ export type Mutation = {
   updatePromotion: UpdatePromotionResult;
   /** Update an existing Province */
   updateProvince: Province;
+  updateRegistrationTaxRate: RegistrationTaxRate;
   /** Update an existing Role */
   updateRole: Role;
+  updateRoleTemplate: PlatformRoleTemplate;
   updateScheduledTask: ScheduledTask;
   /** Update an existing Seller */
   updateSeller: Seller;
@@ -4111,6 +4198,8 @@ export type Mutation = {
   updateTrainingStatus: Scalars['Boolean']['output'];
   /** Update an existing Zone */
   updateZone: Zone;
+  /** Upload model files manually (model.json, weights.bin, metadata.json). Admin auth. */
+  uploadModelManually: Scalars['Boolean']['output'];
   verifyEmailRegistrationOTP: RegistrationResult;
   verifyLoginOTP: LoginResult;
   verifyMpesaTransactions: MpesaVerification;
@@ -4181,6 +4270,10 @@ export type MutationApproveCustomerCreditArgs = {
 
 export type MutationApproveSupplierCreditArgs = {
   input: ApproveSupplierCreditInput;
+};
+
+export type MutationApproveUserArgs = {
+  userId: Scalars['ID']['input'];
 };
 
 export type MutationAssignAssetsToChannelArgs = {
@@ -4385,6 +4478,10 @@ export type MutationCreateRoleArgs = {
   input: CreateRoleInput;
 };
 
+export type MutationCreateRoleTemplateArgs = {
+  input: CreateRoleTemplateInput;
+};
+
 export type MutationCreateSellerArgs = {
   input: CreateSellerInput;
 };
@@ -4554,6 +4651,10 @@ export type MutationDeleteRoleArgs = {
   id: Scalars['ID']['input'];
 };
 
+export type MutationDeleteRoleTemplateArgs = {
+  id: Scalars['ID']['input'];
+};
+
 export type MutationDeleteRolesArgs = {
   ids: Array<Scalars['ID']['input']>;
 };
@@ -4695,6 +4796,10 @@ export type MutationPaySinglePurchaseArgs = {
   input: PaySinglePurchaseInput;
 };
 
+export type MutationQueueTrainingArgs = {
+  channelId: Scalars['ID']['input'];
+};
+
 export type MutationRecordCashCountArgs = {
   input: RecordCashCountInput;
 };
@@ -4711,8 +4816,17 @@ export type MutationRecordStockAdjustmentArgs = {
   input: RecordStockAdjustmentInput;
 };
 
+export type MutationRefreshTrainingCountsArgs = {
+  channelId: Scalars['ID']['input'];
+};
+
 export type MutationRefundOrderArgs = {
   input: RefundOrderInput;
+};
+
+export type MutationRejectUserArgs = {
+  reason?: InputMaybe<Scalars['String']['input']>;
+  userId: Scalars['ID']['input'];
 };
 
 export type MutationRemoveCollectionsFromChannelArgs = {
@@ -4811,6 +4925,14 @@ export type MutationReviewCashCountArgs = {
 
 export type MutationRunScheduledTaskArgs = {
   id: Scalars['String']['input'];
+};
+
+export type MutationSendCustomerStatementEmailArgs = {
+  customerId: Scalars['ID']['input'];
+};
+
+export type MutationSendCustomerStatementSmsArgs = {
+  customerId: Scalars['ID']['input'];
 };
 
 export type MutationSetCustomerForDraftOrderArgs = {
@@ -4915,6 +5037,12 @@ export type MutationUpdateAdministratorArgs = {
   input: UpdateAdministratorInput;
 };
 
+export type MutationUpdateAdministratorPermissionsArgs = {
+  administratorId: Scalars['ID']['input'];
+  channelId: Scalars['ID']['input'];
+  permissions: Array<Scalars['String']['input']>;
+};
+
 export type MutationUpdateAssetArgs = {
   input: UpdateAssetInput;
 };
@@ -4952,6 +5080,10 @@ export type MutationUpdateChannelStatusArgs = {
 export type MutationUpdateChannelStatusPlatformArgs = {
   channelId: Scalars['ID']['input'];
   status: Scalars['String']['input'];
+};
+
+export type MutationUpdateChannelZonesPlatformArgs = {
+  input: UpdateChannelZonesInput;
 };
 
 export type MutationUpdateCollectionArgs = {
@@ -5056,8 +5188,17 @@ export type MutationUpdateProvinceArgs = {
   input: UpdateProvinceInput;
 };
 
+export type MutationUpdateRegistrationTaxRateArgs = {
+  input: UpdateRegistrationTaxRateInput;
+};
+
 export type MutationUpdateRoleArgs = {
   input: UpdateRoleInput;
+};
+
+export type MutationUpdateRoleTemplateArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateRoleTemplateInput;
 };
 
 export type MutationUpdateScheduledTaskArgs = {
@@ -5109,6 +5250,13 @@ export type MutationUpdateTrainingStatusArgs = {
 
 export type MutationUpdateZoneArgs = {
   input: UpdateZoneInput;
+};
+
+export type MutationUploadModelManuallyArgs = {
+  channelId: Scalars['ID']['input'];
+  metadata: Scalars['Upload']['input'];
+  modelJson: Scalars['Upload']['input'];
+  weightsFile: Scalars['Upload']['input'];
 };
 
 export type MutationVerifyEmailRegistrationOtpArgs = {
@@ -5823,6 +5971,22 @@ export type PaymentStateTransitionError = ErrorResult & {
   transitionError: Scalars['String']['output'];
 };
 
+export type PendingRegistration = {
+  __typename?: 'PendingRegistration';
+  administrator: PendingRegistrationAdministrator;
+  createdAt: Scalars['DateTime']['output'];
+  identifier: Scalars['String']['output'];
+  userId: Scalars['ID']['output'];
+};
+
+export type PendingRegistrationAdministrator = {
+  __typename?: 'PendingRegistrationAdministrator';
+  emailAddress: Scalars['String']['output'];
+  firstName: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  lastName: Scalars['String']['output'];
+};
+
 export type PeriodEndCloseResult = {
   __typename?: 'PeriodEndCloseResult';
   period: AccountingPeriod;
@@ -6095,6 +6259,54 @@ export type PermissionDefinition = {
   name: Scalars['String']['output'];
 };
 
+export type PlatformAdministrator = {
+  __typename?: 'PlatformAdministrator';
+  authorizationStatus: Scalars['String']['output'];
+  channelIds?: Maybe<Array<Scalars['ID']['output']>>;
+  emailAddress: Scalars['String']['output'];
+  firstName: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  identifier: Scalars['String']['output'];
+  isSuperAdmin?: Maybe<Scalars['Boolean']['output']>;
+  lastName: Scalars['String']['output'];
+  roleCodes: Array<Scalars['String']['output']>;
+  userId: Scalars['ID']['output'];
+};
+
+export type PlatformAdministratorDetail = {
+  __typename?: 'PlatformAdministratorDetail';
+  authorizationStatus: Scalars['String']['output'];
+  emailAddress: Scalars['String']['output'];
+  firstName: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  identifier: Scalars['String']['output'];
+  isSuperAdmin: Scalars['Boolean']['output'];
+  lastName: Scalars['String']['output'];
+  roles: Array<PlatformAdministratorRoleDetail>;
+  userId: Scalars['ID']['output'];
+};
+
+export type PlatformAdministratorList = {
+  __typename?: 'PlatformAdministratorList';
+  items: Array<PlatformAdministrator>;
+  totalItems: Scalars['Int']['output'];
+};
+
+export type PlatformAdministratorListOptions = {
+  channelId?: InputMaybe<Scalars['ID']['input']>;
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  superAdminOnly?: InputMaybe<Scalars['Boolean']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type PlatformAdministratorRoleDetail = {
+  __typename?: 'PlatformAdministratorRoleDetail';
+  channelIds: Array<Scalars['ID']['output']>;
+  code: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  permissions: Array<Scalars['String']['output']>;
+};
+
 export type PlatformChannel = {
   __typename?: 'PlatformChannel';
   code: Scalars['String']['output'];
@@ -6109,9 +6321,31 @@ export type PlatformChannelCustomFields = {
   cashierFlowEnabled: Scalars['Boolean']['output'];
   enablePrinter: Scalars['Boolean']['output'];
   maxAdminCount: Scalars['Int']['output'];
+  smsLimitFromTier?: Maybe<Scalars['Int']['output']>;
+  smsPeriodEnd?: Maybe<Scalars['DateTime']['output']>;
+  smsUsedThisPeriod?: Maybe<Scalars['Int']['output']>;
   status: Scalars['String']['output'];
   subscriptionStatus?: Maybe<Scalars['String']['output']>;
   trialEndsAt?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type PlatformChannelDetail = {
+  __typename?: 'PlatformChannelDetail';
+  code: Scalars['String']['output'];
+  customFields: PlatformChannelCustomFields;
+  defaultShippingZone?: Maybe<PlatformZone>;
+  defaultTaxZone?: Maybe<PlatformZone>;
+  id: Scalars['ID']['output'];
+  token: Scalars['String']['output'];
+};
+
+export type PlatformRoleTemplate = {
+  __typename?: 'PlatformRoleTemplate';
+  code: Scalars['String']['output'];
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  permissions: Array<Scalars['String']['output']>;
 };
 
 export type PlatformStats = {
@@ -6120,6 +6354,12 @@ export type PlatformStats = {
   channelsByStatus: ChannelsByStatus;
   totalChannels: Scalars['Int']['output'];
   trialExpiringSoonCount: Scalars['Int']['output'];
+};
+
+export type PlatformZone = {
+  __typename?: 'PlatformZone';
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
 };
 
 export type PreviewCollectionVariantsInput = {
@@ -6688,20 +6928,25 @@ export type Query = {
   accountBalancesAsOf: Array<AccountBalanceAsOfItem>;
   activeAdministrator?: Maybe<Administrator>;
   activeChannel: Channel;
+  adminLoginAttempts: Array<AdminLoginAttempt>;
   administrator?: Maybe<Administrator>;
   administratorByUserId?: Maybe<Administrator>;
+  administratorDetail?: Maybe<PlatformAdministratorDetail>;
   administrators: AdministratorList;
+  administratorsForChannel: Array<PlatformAdministrator>;
   analyticsStats: AnalyticsStats;
   analyticsStatsForChannel: AnalyticsStats;
   /** Get a single Asset by id */
   asset?: Maybe<Asset>;
   /** Get a list of Assets */
   assets: AssetList;
+  assignablePermissions: Array<Scalars['String']['output']>;
   auditLogs: Array<AuditLog>;
   auditLogsForChannel: Array<AuditLog>;
   cashierSession?: Maybe<CashierSessionSummary>;
   cashierSessions: CashierSessionList;
   channel?: Maybe<Channel>;
+  channelDetailPlatform?: Maybe<PlatformChannelDetail>;
   channelReconciliationConfig: Array<PaymentMethodReconciliationConfig>;
   channels: ChannelList;
   checkAuthorizationStatus: AuthorizationStatus;
@@ -6766,10 +7011,19 @@ export type Query = {
   metricSummary: Array<MetricSummary>;
   /** Get ML model info for a specific channel */
   mlModelInfo: MlModelInfo;
+  /** Scheduler config (interval and cooldown from env). Read-only. */
+  mlSchedulerConfig: MlSchedulerConfig;
+  /** ML trainer service health (proxied from ml-trainer). Never throws; returns status ok or unavailable. */
+  mlTrainerHealth: MlTrainerHealth;
+  /** Active/recent jobs on the ML trainer service (proxied from ml-trainer). */
+  mlTrainerJobs: Array<MlTrainerJob>;
+  /** Training data summary for a channel (admin-visible; no URLs). Composed from manifest. */
+  mlTrainingDataSummary: MlTrainingDataSummary;
   /** Get detailed training info including status and stats */
   mlTrainingInfo: MlTrainingInfo;
   /** Get photo manifest for training (JSON with URLs) */
   mlTrainingManifest: MlTrainingManifest;
+  notificationsForChannel: NotificationList;
   /** Open batches for a variant (and optional location) for batch selection when recording a sale. */
   openBatchesForVariant: Array<OpenBatchForVariant>;
   order?: Maybe<Order>;
@@ -6778,11 +7032,15 @@ export type Query = {
   paymentMethodEligibilityCheckers: Array<ConfigurableOperationDefinition>;
   paymentMethodHandlers: Array<ConfigurableOperationDefinition>;
   paymentMethods: PaymentMethodList;
+  pendingRegistrations: Array<PendingRegistration>;
   pendingSearchIndexUpdates: Scalars['Int']['output'];
   pendingVarianceReviews: Array<CashDrawerCount>;
   periodReconciliationStatus: ReconciliationStatus;
+  platformAdministrators: PlatformAdministratorList;
   platformChannels: Array<PlatformChannel>;
+  platformRoleTemplates: Array<PlatformRoleTemplate>;
   platformStats: PlatformStats;
+  platformZones: Array<PlatformZone>;
   /** Used for real-time previews of the contents of a Collection */
   previewCollectionVariants: ProductVariantList;
   /** Get a Product either by id or slug. If neither id nor slug is specified, an error will result. */
@@ -6807,6 +7065,7 @@ export type Query = {
   purchases: StockPurchaseList;
   reconciliationDetails: Array<ReconciliationAccountDetail>;
   reconciliations: ReconciliationList;
+  registrationSeedContext: RegistrationSeedContext;
   role?: Maybe<Role>;
   roleTemplates: Array<RoleTemplate>;
   roles: RoleList;
@@ -6828,6 +7087,7 @@ export type Query = {
   stockAdjustments: InventoryStockAdjustmentList;
   stockLocation?: Maybe<StockLocation>;
   stockLocations: StockLocationList;
+  stockValueRanking: StockValueRankingResult;
   stockValueStats: StockValueStats;
   supplierCreditSummary: SupplierCreditSummary;
   tag: Tag;
@@ -6838,6 +7098,8 @@ export type Query = {
   taxRates: TaxRateList;
   testEligibleShippingMethods: Array<ShippingMethodQuote>;
   testShippingMethod: TestShippingMethodResult;
+  /** Export training manifest as JSON (read-only; no channel update). For manual training or client-side zip. */
+  trainingManifestExport: TrainingManifestExportResult;
   unpaidOrdersForCustomer: Array<Order>;
   unpaidPurchasesForSupplier: Array<StockPurchase>;
   validateCredit: CreditValidationResult;
@@ -6850,6 +7112,12 @@ export type QueryAccountBalancesAsOfArgs = {
   channelId: Scalars['Int']['input'];
 };
 
+export type QueryAdminLoginAttemptsArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+  skip?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type QueryAdministratorArgs = {
   id: Scalars['ID']['input'];
 };
@@ -6858,8 +7126,16 @@ export type QueryAdministratorByUserIdArgs = {
   userId?: InputMaybe<Scalars['ID']['input']>;
 };
 
+export type QueryAdministratorDetailArgs = {
+  administratorId: Scalars['ID']['input'];
+};
+
 export type QueryAdministratorsArgs = {
   options?: InputMaybe<AdministratorListOptions>;
+};
+
+export type QueryAdministratorsForChannelArgs = {
+  channelId: Scalars['ID']['input'];
 };
 
 export type QueryAnalyticsStatsArgs = {
@@ -6901,6 +7177,10 @@ export type QueryCashierSessionsArgs = {
 
 export type QueryChannelArgs = {
   id: Scalars['ID']['input'];
+};
+
+export type QueryChannelDetailPlatformArgs = {
+  channelId: Scalars['ID']['input'];
 };
 
 export type QueryChannelReconciliationConfigArgs = {
@@ -7085,12 +7365,21 @@ export type QueryMlModelInfoArgs = {
   channelId: Scalars['ID']['input'];
 };
 
+export type QueryMlTrainingDataSummaryArgs = {
+  channelId: Scalars['ID']['input'];
+};
+
 export type QueryMlTrainingInfoArgs = {
   channelId: Scalars['ID']['input'];
 };
 
 export type QueryMlTrainingManifestArgs = {
   channelId: Scalars['ID']['input'];
+};
+
+export type QueryNotificationsForChannelArgs = {
+  channelId: Scalars['ID']['input'];
+  options?: InputMaybe<NotificationListOptions>;
 };
 
 export type QueryOpenBatchesForVariantArgs = {
@@ -7121,6 +7410,10 @@ export type QueryPendingVarianceReviewsArgs = {
 export type QueryPeriodReconciliationStatusArgs = {
   channelId: Scalars['Int']['input'];
   periodEndDate: Scalars['DateTime']['input'];
+};
+
+export type QueryPlatformAdministratorsArgs = {
+  options?: InputMaybe<PlatformAdministratorListOptions>;
 };
 
 export type QueryPreviewCollectionVariantsArgs = {
@@ -7262,6 +7555,12 @@ export type QueryStockLocationsArgs = {
   options?: InputMaybe<StockLocationListOptions>;
 };
 
+export type QueryStockValueRankingArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  stockLocationId?: InputMaybe<Scalars['ID']['input']>;
+  valuationType: StockValuationType;
+};
+
 export type QueryStockValueStatsArgs = {
   forceRefresh?: InputMaybe<Scalars['Boolean']['input']>;
   stockLocationId?: InputMaybe<Scalars['ID']['input']>;
@@ -7301,6 +7600,10 @@ export type QueryTestEligibleShippingMethodsArgs = {
 
 export type QueryTestShippingMethodArgs = {
   input: TestShippingMethodInput;
+};
+
+export type QueryTrainingManifestExportArgs = {
+  channelId: Scalars['ID']['input'];
 };
 
 export type QueryUnpaidOrdersForCustomerArgs = {
@@ -7538,6 +7841,35 @@ export type RegistrationResult = {
   message: Scalars['String']['output'];
   success: Scalars['Boolean']['output'];
   userId?: Maybe<Scalars['ID']['output']>;
+};
+
+export type RegistrationSeedContext = {
+  __typename?: 'RegistrationSeedContext';
+  /** Null when no tax rate exists for the registration zone (e.g. before seed). */
+  taxRate?: Maybe<RegistrationTaxRate>;
+  zone: RegistrationZone;
+};
+
+export type RegistrationTaxRate = {
+  __typename?: 'RegistrationTaxRate';
+  categoryName: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  value: Scalars['Float']['output'];
+};
+
+export type RegistrationZone = {
+  __typename?: 'RegistrationZone';
+  id: Scalars['ID']['output'];
+  members: Array<RegistrationZoneMember>;
+  name: Scalars['String']['output'];
+};
+
+export type RegistrationZoneMember = {
+  __typename?: 'RegistrationZoneMember';
+  code: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
 };
 
 export type RelationCustomFieldConfig = CustomField & {
@@ -8227,6 +8559,27 @@ export type StockPurchaseList = {
   totalItems: Scalars['Int']['output'];
 };
 
+export enum StockValuationType {
+  COST = 'COST',
+  RETAIL = 'RETAIL',
+  WHOLESALE = 'WHOLESALE',
+}
+
+export type StockValueRankingItem = {
+  __typename?: 'StockValueRankingItem';
+  productId: Scalars['ID']['output'];
+  productName: Scalars['String']['output'];
+  productVariantId: Scalars['ID']['output'];
+  value: Scalars['Float']['output'];
+  variantName?: Maybe<Scalars['String']['output']>;
+};
+
+export type StockValueRankingResult = {
+  __typename?: 'StockValueRankingResult';
+  items: Array<StockValueRankingItem>;
+  total: Scalars['Float']['output'];
+};
+
 /** Stock value at retail, wholesale, and cost (cents). Cached per channel; use forceRefresh to recompute. */
 export type StockValueStats = {
   __typename?: 'StockValueStats';
@@ -8345,6 +8698,7 @@ export type SubscriptionTier = {
   name: Scalars['String']['output'];
   priceMonthly: Scalars['Int']['output'];
   priceYearly: Scalars['Int']['output'];
+  smsLimit?: Maybe<Scalars['Int']['output']>;
   updatedAt: Scalars['DateTime']['output'];
 };
 
@@ -8624,6 +8978,11 @@ export type TimeSeriesPoint = {
   value: Scalars['Float']['output'];
 };
 
+export type TrainingManifestExportResult = {
+  __typename?: 'TrainingManifestExportResult';
+  manifestJson: Scalars['String']['output'];
+};
+
 export type TransitionFulfillmentToStateResult = Fulfillment | FulfillmentStateTransitionError;
 
 export type TransitionOrderToStateResult = Order | OrderStateTransitionError;
@@ -8737,6 +9096,9 @@ export type UpdateChannelCustomFieldsInput = {
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
+  smsPeriodEnd?: InputMaybe<Scalars['DateTime']['input']>;
+  smsUsageByCategory?: InputMaybe<Scalars['String']['input']>;
+  smsUsedThisPeriod?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   stockValueCache?: InputMaybe<Scalars['String']['input']>;
   subscriptionExpiredReminderSentAt?: InputMaybe<Scalars['DateTime']['input']>;
@@ -8774,6 +9136,12 @@ export type UpdateChannelInput = {
 };
 
 export type UpdateChannelResult = Channel | LanguageNotAvailableError;
+
+export type UpdateChannelZonesInput = {
+  channelId: Scalars['ID']['input'];
+  defaultShippingZoneId?: InputMaybe<Scalars['ID']['input']>;
+  defaultTaxZoneId?: InputMaybe<Scalars['ID']['input']>;
+};
 
 export type UpdateCollectionInput = {
   assetIds?: InputMaybe<Array<Scalars['ID']['input']>>;
@@ -9046,12 +9414,22 @@ export type UpdateProvinceInput = {
   translations?: InputMaybe<Array<ProvinceTranslationInput>>;
 };
 
+export type UpdateRegistrationTaxRateInput = {
+  percentage: Scalars['Float']['input'];
+};
+
 export type UpdateRoleInput = {
   channelIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   code?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['ID']['input'];
   permissions?: InputMaybe<Array<Permission>>;
+};
+
+export type UpdateRoleTemplateInput = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  permissions?: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
 export type UpdateScheduledTaskInput = {
@@ -9091,6 +9469,7 @@ export type UpdateSubscriptionTierInput = {
   name?: InputMaybe<Scalars['String']['input']>;
   priceMonthly?: InputMaybe<Scalars['Int']['input']>;
   priceYearly?: InputMaybe<Scalars['Int']['input']>;
+  smsLimit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateSupplierCreditDurationInput = {
@@ -9144,6 +9523,13 @@ export type User = Node & {
   roles: Array<Role>;
   updatedAt: Scalars['DateTime']['output'];
   verified: Scalars['Boolean']['output'];
+};
+
+export type UserAuthorizationResult = {
+  __typename?: 'UserAuthorizationResult';
+  authorizationStatus: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  identifier: Scalars['String']['output'];
 };
 
 export type UserCustomFields = {
@@ -10168,6 +10554,28 @@ export type GetStockValueStatsQuery = {
     retail: number;
     wholesale: number;
     cost: number;
+  };
+};
+
+export type GetStockValueRankingQueryVariables = Exact<{
+  valuationType: StockValuationType;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  stockLocationId?: InputMaybe<Scalars['ID']['input']>;
+}>;
+
+export type GetStockValueRankingQuery = {
+  __typename?: 'Query';
+  stockValueRanking: {
+    __typename?: 'StockValueRankingResult';
+    total: number;
+    items: Array<{
+      __typename?: 'StockValueRankingItem';
+      productVariantId: string;
+      productId: string;
+      productName: string;
+      variantName?: string | null;
+      value: number;
+    }>;
   };
 };
 
@@ -11331,6 +11739,24 @@ export type PaySingleOrderMutation = {
       amountPaid: number;
     }>;
   };
+};
+
+export type SendCustomerStatementEmailMutationVariables = Exact<{
+  customerId: Scalars['ID']['input'];
+}>;
+
+export type SendCustomerStatementEmailMutation = {
+  __typename?: 'Mutation';
+  sendCustomerStatementEmail: boolean;
+};
+
+export type SendCustomerStatementSmsMutationVariables = Exact<{
+  customerId: Scalars['ID']['input'];
+}>;
+
+export type SendCustomerStatementSmsMutation = {
+  __typename?: 'Mutation';
+  sendCustomerStatementSms: boolean;
 };
 
 export type PaySinglePurchaseMutationVariables = Exact<{
@@ -16688,6 +17114,82 @@ export const GetStockValueStatsDocument = {
     },
   ],
 } as unknown as DocumentNode<GetStockValueStatsQuery, GetStockValueStatsQueryVariables>;
+export const GetStockValueRankingDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetStockValueRanking' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'valuationType' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'StockValuationType' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'limit' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'stockLocationId' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'stockValueRanking' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'valuationType' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'valuationType' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'limit' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'limit' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'stockLocationId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'stockLocationId' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'items' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'productVariantId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'productId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'productName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'variantName' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'value' } },
+                    ],
+                  },
+                },
+                { kind: 'Field', name: { kind: 'Name', value: 'total' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetStockValueRankingQuery, GetStockValueRankingQueryVariables>;
 export const GetProductStatsDocument = {
   kind: 'Document',
   definitions: [
@@ -20084,6 +20586,84 @@ export const PaySingleOrderDocument = {
     },
   ],
 } as unknown as DocumentNode<PaySingleOrderMutation, PaySingleOrderMutationVariables>;
+export const SendCustomerStatementEmailDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'SendCustomerStatementEmail' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'customerId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'sendCustomerStatementEmail' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'customerId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'customerId' } },
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  SendCustomerStatementEmailMutation,
+  SendCustomerStatementEmailMutationVariables
+>;
+export const SendCustomerStatementSmsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'SendCustomerStatementSms' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'customerId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'sendCustomerStatementSms' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'customerId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'customerId' } },
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  SendCustomerStatementSmsMutation,
+  SendCustomerStatementSmsMutationVariables
+>;
 export const PaySinglePurchaseDocument = {
   kind: 'Document',
   definitions: [

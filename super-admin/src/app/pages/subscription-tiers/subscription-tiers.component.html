@@ -32,6 +32,10 @@
           <input type="number" class="input input-bordered w-full" [(ngModel)]="formModel.priceYearly" name="priceYearly" placeholder="0" min="0" />
         </label>
       </div>
+      <label class="form-control w-full max-w-xs">
+        <span class="label"><span class="label-text">SMS limit per 30 days</span></span>
+        <input type="number" class="input input-bordered w-full" [(ngModel)]="formModel.smsLimit" name="smsLimit" placeholder="0 = no limit" min="0" />
+      </label>
       <button type="submit" class="btn btn-primary" [disabled]="saving()">
         @if (saving()) {
           <span class="loading loading-spinner loading-sm"></span>
@@ -54,6 +58,7 @@
           <th>Code</th>
           <th>Name</th>
           <th>Price (mo / yr)</th>
+          <th>SMS limit</th>
           <th>Active</th>
           <th></th>
         </tr>
@@ -64,6 +69,21 @@
             <td class="font-medium">{{ t.code }}</td>
             <td>{{ t.name }}</td>
             <td>{{ t.priceMonthly }} / {{ t.priceYearly }}</td>
+            <td>
+              @if (editingTier()?.id === t.id) {
+                <div class="flex items-center gap-2">
+                  <input type="number" class="input input-bordered input-sm w-24" [ngModel]="editSmsLimit()" (ngModelChange)="editSmsLimit.set($event)" min="0" />
+                  <button type="button" class="btn btn-primary btn-sm" (click)="saveEditSmsLimit()" [disabled]="saving()">Save</button>
+                  <button type="button" class="btn btn-ghost btn-sm" (click)="cancelEdit()">Cancel</button>
+                </div>
+              } @else {
+                {{ t.smsLimit ?? 0 }} @if (t.smsLimit && t.smsLimit > 0) {
+                  <button type="button" class="btn btn-ghost btn-xs ml-1" (click)="openEditSmsLimit(t)">Edit</button>
+                } @else {
+                  <button type="button" class="btn btn-ghost btn-xs ml-1" (click)="openEditSmsLimit(t)">Set</button>
+                }
+              }
+            </td>
             <td>
               @if (t.isActive) {
                 <span class="badge badge-success badge-sm">Yes</span>

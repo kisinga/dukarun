@@ -141,6 +141,12 @@
         <div class="collapse-title text-sm font-semibold px-3 py-2.5">Payment Information</div>
         <div class="collapse-content px-3 pb-3">
           <app-order-payment-info [payments]="order()!.payments" />
+          <a
+            [routerLink]="['/dashboard/payments']"
+            [queryParams]="{ orderId: order()!.id }"
+            class="link link-hover text-sm mt-2 inline-block"
+            >View in payments</a
+          >
           @if (showPayOrderButton()) {
             <div class="divider my-3"></div>
             <div class="space-y-2">
@@ -216,6 +222,12 @@
         <div class="card bg-base-100 shadow-sm border border-base-300/60">
           <div class="card-body p-3 sm:p-4">
             <app-order-payment-info [payments]="order()!.payments" />
+            <a
+              [routerLink]="['/dashboard/payments']"
+              [queryParams]="{ orderId: order()!.id }"
+              class="link link-hover text-sm mt-2 inline-block"
+              >View in payments</a
+            >
             @if (showPayOrderButton()) {
               <div class="divider my-3"></div>
               <div class="space-y-2">

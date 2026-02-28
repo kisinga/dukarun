@@ -19,6 +19,7 @@
           <th>Status</th>
           <th>Trial ends</th>
           <th>Subscription</th>
+          <th>SMS (used / limit)</th>
           <th>Max admins</th>
           <th>Cashier</th>
           <th>Printer</th>
@@ -36,6 +37,7 @@
             </td>
             <td>{{ formatDate(ch.customFields.trialEndsAt) }}</td>
             <td>{{ ch.customFields.subscriptionStatus }}</td>
+            <td>{{ ch.customFields.smsUsedThisPeriod ?? 0 }} / {{ ch.customFields.smsLimitFromTier ?? '—' }}</td>
             <td>{{ ch.customFields.maxAdminCount }}</td>
             <td>{{ ch.customFields.cashierFlowEnabled ? 'Yes' : 'No' }}</td>
             <td>{{ ch.customFields.enablePrinter ? 'Yes' : 'No' }}</td>

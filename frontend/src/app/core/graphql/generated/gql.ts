@@ -58,6 +58,7 @@ type Documents = {
   '\n  query GetOrdersForPeriod($startDate: DateTime!) {\n    orders(options: { filter: { orderPlacedAt: { after: $startDate } }, take: 100 }) {\n      items {\n        id\n        total\n        totalWithTax\n        orderPlacedAt\n        state\n        payments {\n          id\n          amount\n          method\n          state\n        }\n      }\n    }\n  }\n': typeof types.GetOrdersForPeriodDocument;
   '\n  query GetDashboardStats($startDate: DateTime, $endDate: DateTime) {\n    dashboardStats(startDate: $startDate, endDate: $endDate) {\n      sales {\n        today\n        week\n        month\n        accounts {\n          label\n          value\n          icon\n        }\n      }\n      purchases {\n        today\n        week\n        month\n        accounts {\n          label\n          value\n          icon\n        }\n      }\n      expenses {\n        today\n        week\n        month\n        accounts {\n          label\n          value\n          icon\n        }\n      }\n      salesSummary {\n        today {\n          revenue\n          cogs\n          margin\n          orderCount\n        }\n        week {\n          revenue\n          cogs\n          margin\n          orderCount\n        }\n        month {\n          revenue\n          cogs\n          margin\n          orderCount\n        }\n      }\n    }\n  }\n': typeof types.GetDashboardStatsDocument;
   '\n  query GetStockValueStats($stockLocationId: ID, $forceRefresh: Boolean) {\n    stockValueStats(stockLocationId: $stockLocationId, forceRefresh: $forceRefresh) {\n      retail\n      wholesale\n      cost\n    }\n  }\n': typeof types.GetStockValueStatsDocument;
+  '\n  query GetStockValueRanking(\n    $valuationType: StockValuationType!\n    $limit: Int\n    $stockLocationId: ID\n  ) {\n    stockValueRanking(\n      valuationType: $valuationType\n      limit: $limit\n      stockLocationId: $stockLocationId\n    ) {\n      items {\n        productVariantId\n        productId\n        productName\n        variantName\n        value\n      }\n      total\n    }\n  }\n': typeof types.GetStockValueRankingDocument;
   '\n  query GetProductStats {\n    products(options: { take: 1 }) {\n      totalItems\n    }\n    productVariants(options: { take: 1 }) {\n      totalItems\n    }\n  }\n': typeof types.GetProductStatsDocument;
   '\n  query GetRecentOrders {\n    orders(options: { take: 10, sort: { createdAt: DESC } }) {\n      items {\n        id\n        code\n        total\n        totalWithTax\n        state\n        createdAt\n        orderPlacedAt\n        currencyCode\n        customer {\n          id\n          firstName\n          lastName\n          emailAddress\n        }\n        lines {\n          id\n          quantity\n          productVariant {\n            id\n            name\n            sku\n            product {\n              id\n              name\n            }\n          }\n        }\n        payments {\n          id\n          state\n          amount\n          method\n          createdAt\n        }\n      }\n    }\n  }\n': typeof types.GetRecentOrdersDocument;
   '\n  mutation CreateDraftOrder {\n    createDraftOrder {\n      id\n      code\n      state\n      total\n      totalWithTax\n    }\n  }\n': typeof types.CreateDraftOrderDocument;
@@ -103,6 +104,8 @@ type Documents = {
   '\n  query GetUnpaidOrdersForCustomer($customerId: ID!) {\n    unpaidOrdersForCustomer(customerId: $customerId) {\n      id\n      code\n      state\n      total\n      totalWithTax\n      createdAt\n      payments {\n        id\n        state\n        amount\n        method\n      }\n    }\n  }\n': typeof types.GetUnpaidOrdersForCustomerDocument;
   '\n  mutation AllocateBulkPayment($input: PaymentAllocationInput!) {\n    allocateBulkPayment(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n': typeof types.AllocateBulkPaymentDocument;
   '\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n': typeof types.PaySingleOrderDocument;
+  '\n  mutation SendCustomerStatementEmail($customerId: ID!) {\n    sendCustomerStatementEmail(customerId: $customerId)\n  }\n': typeof types.SendCustomerStatementEmailDocument;
+  '\n  mutation SendCustomerStatementSms($customerId: ID!) {\n    sendCustomerStatementSms(customerId: $customerId)\n  }\n': typeof types.SendCustomerStatementSmsDocument;
   '\n  mutation PaySinglePurchase($input: PaySinglePurchaseInput!) {\n    paySinglePurchase(input: $input) {\n      purchasesPaid {\n        purchaseId\n        purchaseReference\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n      excessPayment\n    }\n  }\n': typeof types.PaySinglePurchaseDocument;
   '\n  query GetSupplierCreditSummary($supplierId: ID!) {\n    supplierCreditSummary(supplierId: $supplierId) {\n      supplierId\n      isSupplierCreditApproved\n      supplierCreditLimit\n      outstandingAmount\n      availableCredit\n      lastRepaymentDate\n      lastRepaymentAmount\n      supplierCreditDuration\n    }\n  }\n': typeof types.GetSupplierCreditSummaryDocument;
   '\n  mutation ApproveSupplierCredit($input: ApproveSupplierCreditInput!) {\n    approveSupplierCredit(input: $input) {\n      supplierId\n      isSupplierCreditApproved\n      supplierCreditLimit\n      outstandingAmount\n      availableCredit\n      lastRepaymentDate\n      lastRepaymentAmount\n      supplierCreditDuration\n    }\n  }\n': typeof types.ApproveSupplierCreditDocument;
@@ -274,6 +277,8 @@ const documents: Documents = {
     types.GetDashboardStatsDocument,
   '\n  query GetStockValueStats($stockLocationId: ID, $forceRefresh: Boolean) {\n    stockValueStats(stockLocationId: $stockLocationId, forceRefresh: $forceRefresh) {\n      retail\n      wholesale\n      cost\n    }\n  }\n':
     types.GetStockValueStatsDocument,
+  '\n  query GetStockValueRanking(\n    $valuationType: StockValuationType!\n    $limit: Int\n    $stockLocationId: ID\n  ) {\n    stockValueRanking(\n      valuationType: $valuationType\n      limit: $limit\n      stockLocationId: $stockLocationId\n    ) {\n      items {\n        productVariantId\n        productId\n        productName\n        variantName\n        value\n      }\n      total\n    }\n  }\n':
+    types.GetStockValueRankingDocument,
   '\n  query GetProductStats {\n    products(options: { take: 1 }) {\n      totalItems\n    }\n    productVariants(options: { take: 1 }) {\n      totalItems\n    }\n  }\n':
     types.GetProductStatsDocument,
   '\n  query GetRecentOrders {\n    orders(options: { take: 10, sort: { createdAt: DESC } }) {\n      items {\n        id\n        code\n        total\n        totalWithTax\n        state\n        createdAt\n        orderPlacedAt\n        currencyCode\n        customer {\n          id\n          firstName\n          lastName\n          emailAddress\n        }\n        lines {\n          id\n          quantity\n          productVariant {\n            id\n            name\n            sku\n            product {\n              id\n              name\n            }\n          }\n        }\n        payments {\n          id\n          state\n          amount\n          method\n          createdAt\n        }\n      }\n    }\n  }\n':
@@ -364,6 +369,10 @@ const documents: Documents = {
     types.AllocateBulkPaymentDocument,
   '\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n':
     types.PaySingleOrderDocument,
+  '\n  mutation SendCustomerStatementEmail($customerId: ID!) {\n    sendCustomerStatementEmail(customerId: $customerId)\n  }\n':
+    types.SendCustomerStatementEmailDocument,
+  '\n  mutation SendCustomerStatementSms($customerId: ID!) {\n    sendCustomerStatementSms(customerId: $customerId)\n  }\n':
+    types.SendCustomerStatementSmsDocument,
   '\n  mutation PaySinglePurchase($input: PaySinglePurchaseInput!) {\n    paySinglePurchase(input: $input) {\n      purchasesPaid {\n        purchaseId\n        purchaseReference\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n      excessPayment\n    }\n  }\n':
     types.PaySinglePurchaseDocument,
   '\n  query GetSupplierCreditSummary($supplierId: ID!) {\n    supplierCreditSummary(supplierId: $supplierId) {\n      supplierId\n      isSupplierCreditApproved\n      supplierCreditLimit\n      outstandingAmount\n      availableCredit\n      lastRepaymentDate\n      lastRepaymentAmount\n      supplierCreditDuration\n    }\n  }\n':
@@ -808,6 +817,12 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
+  source: '\n  query GetStockValueRanking(\n    $valuationType: StockValuationType!\n    $limit: Int\n    $stockLocationId: ID\n  ) {\n    stockValueRanking(\n      valuationType: $valuationType\n      limit: $limit\n      stockLocationId: $stockLocationId\n    ) {\n      items {\n        productVariantId\n        productId\n        productName\n        variantName\n        value\n      }\n      total\n    }\n  }\n',
+): (typeof documents)['\n  query GetStockValueRanking(\n    $valuationType: StockValuationType!\n    $limit: Int\n    $stockLocationId: ID\n  ) {\n    stockValueRanking(\n      valuationType: $valuationType\n      limit: $limit\n      stockLocationId: $stockLocationId\n    ) {\n      items {\n        productVariantId\n        productId\n        productName\n        variantName\n        value\n      }\n      total\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
   source: '\n  query GetProductStats {\n    products(options: { take: 1 }) {\n      totalItems\n    }\n    productVariants(options: { take: 1 }) {\n      totalItems\n    }\n  }\n',
 ): (typeof documents)['\n  query GetProductStats {\n    products(options: { take: 1 }) {\n      totalItems\n    }\n    productVariants(options: { take: 1 }) {\n      totalItems\n    }\n  }\n'];
 /**
@@ -1074,6 +1089,18 @@ export function graphql(
 export function graphql(
   source: '\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n',
 ): (typeof documents)['\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation SendCustomerStatementEmail($customerId: ID!) {\n    sendCustomerStatementEmail(customerId: $customerId)\n  }\n',
+): (typeof documents)['\n  mutation SendCustomerStatementEmail($customerId: ID!) {\n    sendCustomerStatementEmail(customerId: $customerId)\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation SendCustomerStatementSms($customerId: ID!) {\n    sendCustomerStatementSms(customerId: $customerId)\n  }\n',
+): (typeof documents)['\n  mutation SendCustomerStatementSms($customerId: ID!) {\n    sendCustomerStatementSms(customerId: $customerId)\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

@@ -1,0 +1,146 @@
+<div class="space-y-6">
+  <!-- Header -->
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <button type="button" (click)="goBack()" class="btn btn-ghost btn-sm mb-2">
+        ← Back to Customers
+      </button>
+      <h1 class="text-2xl font-bold">Customer Statement</h1>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div role="alert" class="alert alert-error">
+      <span class="flex-1">{{ error() }}</span>
+    </div>
+  }
+
+  @if (isLoading() && !customer()) {
+    <div class="flex justify-center py-12">
+      <span class="loading loading-spinner loading-lg text-primary"></span>
+    </div>
+  }
+
+  @if (customer() && !isLoading()) {
+    <!-- Statement content (printable) -->
+    <div class="statement-content">
+      <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body">
+          <h2 class="card-title text-lg">{{ customerName() }}</h2>
+          @if (customer()?.emailAddress && hasEmail()) {
+            <p class="text-sm text-base-content/70">{{ customer()!.emailAddress }}</p>
+          }
+          @if (customer()?.phoneNumber) {
+            <p class="text-sm text-base-content/70">{{ customer()!.phoneNumber }}</p>
+          }
+          <p class="text-sm text-base-content/60 mt-2">Statement · {{ totalOrders() }} order(s)</p>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 shadow-sm border border-base-300 mt-4">
+        <div class="card-body p-0">
+          <div class="overflow-x-auto">
+            <table class="table table-zebra">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Order</th>
+                  <th class="text-right">Total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (order of orders(); track order.id) {
+                  <tr>
+                    <td class="whitespace-nowrap">
+                      {{ formatDate(order.orderPlacedAt || order.createdAt) }}
+                    </td>
+                    <td>
+                      <a
+                        [routerLink]="['/dashboard/orders', order.id]"
+                        class="link link-hover font-mono"
+                      >
+                        {{ order.code }}
+                      </a>
+                    </td>
+                    <td class="text-right font-medium">
+                      {{ currencyService.format(order.totalWithTax ?? order.total ?? 0, false) }}
+                    </td>
+                    <td>
+                      <a
+                        [routerLink]="['/dashboard/payments']"
+                        [queryParams]="{ orderId: order.id }"
+                        class="link link-hover text-sm"
+                      >
+                        Payments
+                      </a>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (orders().length === 0) {
+            <p class="p-4 text-base-content/60 text-center">No orders for this customer.</p>
+          }
+        </div>
+      </div>
+
+      @if (customer()?.outstandingAmount != null && customer()!.outstandingAmount !== 0) {
+        <div class="mt-4 p-4 bg-base-200 rounded-lg">
+          <p class="font-semibold">
+            Outstanding balance:
+            <span [class.text-warning]="(customer()!.outstandingAmount ?? 0) > 0">
+              {{ currencyService.format(customer()!.outstandingAmount ?? 0, false) }}
+            </span>
+          </p>
+        </div>
+      }
+    </div>
+
+    <!-- Actions (hidden when printing) -->
+    <div class="no-print flex flex-wrap items-center gap-2 pt-4 border-t border-base-300">
+      <button type="button" class="btn btn-primary btn-sm" (click)="printStatement()">
+        Download PDF
+      </button>
+      @if (hasEmail()) {
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          [disabled]="emailSending()"
+          (click)="sendStatementEmail()"
+        >
+          @if (emailSending()) {
+            <span class="loading loading-spinner loading-xs"></span>
+          }
+          Email statement
+        </button>
+      }
+      @if (hasPhone()) {
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          [disabled]="smsSending()"
+          (click)="sendMiniStatementSms()"
+        >
+          @if (smsSending()) {
+            <span class="loading loading-spinner loading-xs"></span>
+          }
+          Send mini statement (SMS)
+        </button>
+      }
+    </div>
+
+    @if (toastMessage()) {
+      <div
+        role="alert"
+        class="alert no-print mt-4"
+        [class.alert-success]="toastMessage()?.type === 'success'"
+        [class.alert-error]="toastMessage()?.type === 'error'"
+      >
+        <span class="flex-1">{{ toastMessage()!.text }}</span>
+        <button type="button" class="btn btn-ghost btn-xs" (click)="dismissToast()">Dismiss</button>
+      </div>
+    }
+  }
+</div>

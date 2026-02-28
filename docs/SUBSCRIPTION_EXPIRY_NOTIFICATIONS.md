@@ -21,7 +21,7 @@ The expiry checker runs daily (worker process only). It finds channels with tria
 When a subscription expires:
 
 - Send **exactly one** `expired` event the first time the expiry is detected.
-- After emitting, update `subscriptionExpiredReminderSentAt` on the channel.
+- **Mark before emit:** Update `subscriptionExpiredReminderSentAt` on the channel *before* publishing the event, so a crash after publish does not cause a duplicate notification on the next run.
 - On subsequent checks, `hasEverSentExpiredReminder()` returns true and the channel is skipped.
 - **No reminders are ever sent after the subscription has expired.** The single notification informs the admin; no nagging.
 - The event flows through `NotificationSubscriber.handleSubscription` which respects user notification preferences via `createNotificationIfEnabled`.
@@ -53,7 +53,7 @@ For each trial/active channel with expiry date:
 
   if expired:
     if hasEverSentExpiredReminder: skip (already notified once)
-    else: emit expired event, mark sent
+    else: mark sent, then emit expired event
 
   if expiring soon (1, 3, or 7 days):
     if no admin has inApp.PAYMENT enabled: skip

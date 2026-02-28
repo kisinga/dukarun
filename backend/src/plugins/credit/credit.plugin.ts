@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
 import { ApprovalPlugin } from '../approval/approval.plugin';
+import { CommunicationPlugin } from '../communication/communication.plugin';
 import { LedgerPlugin } from '../ledger/ledger.plugin';
 import { gql } from 'graphql-tag';
 
@@ -24,11 +25,13 @@ import { OrderStateService } from '../../services/orders/order-state.service';
 import { PriceOverrideService } from '../../services/orders/price-override.service';
 import { PaymentAllocationService } from '../../services/payments/payment-allocation.service';
 import { PaymentEventsAdapter } from '../../services/payments/payment-events.adapter';
+import { CustomerStatementService } from '../../services/customers/customer-statement.service';
 import { createCreditPaymentHandler } from '../../services/payments/payment-handlers';
 import { SupplierPaymentAllocationService } from '../../services/payments/supplier-payment-allocation.service';
 import { CreditPaymentSubscriber } from './credit-payment.subscriber';
 import { CreditResolver } from './credit.resolver';
 import { CustomerFieldResolver } from './customer.resolver';
+import { CustomerStatementResolver } from './customer-statement.resolver';
 import { PaymentAllocationResolver } from './payment-allocation.resolver';
 import {
   ApproveCustomerCreditPermission,
@@ -173,6 +176,8 @@ const COMBINED_SCHEMA = gql`
     paySingleOrder(input: PaySingleOrderInput!): PaymentAllocationResult!
     reverseOrder(orderId: ID!): OrderReversalResult!
     voidOrder(orderId: ID!): OrderReversalResult!
+    sendCustomerStatementEmail(customerId: ID!): Boolean!
+    sendCustomerStatementSms(customerId: ID!): Boolean!
   }
 
   """
@@ -257,7 +262,7 @@ const COMBINED_SCHEMA = gql`
 `;
 
 @VendurePlugin({
-  imports: [PluginCommonModule, LedgerPlugin, ApprovalPlugin],
+  imports: [PluginCommonModule, LedgerPlugin, ApprovalPlugin, CommunicationPlugin],
   providers: [
     // Financial services (ledger infrastructure)
     LedgerQueryService,
@@ -292,6 +297,7 @@ const COMBINED_SCHEMA = gql`
     SupplierCreditResolver,
     SupplierPaymentAllocationResolver,
     PaymentEventsAdapter, // Moved from LedgerPlugin - needs FinancialService
+    CustomerStatementService,
   ],
   exports: [
     // Export for use by other plugins (StockPlugin, etc.)
@@ -328,6 +334,7 @@ const COMBINED_SCHEMA = gql`
       CustomerFieldResolver,
       OrderReversalResolver,
       PaymentAllocationResolver,
+      CustomerStatementResolver,
       SupplierCreditResolver,
       SupplierPaymentAllocationResolver,
     ],

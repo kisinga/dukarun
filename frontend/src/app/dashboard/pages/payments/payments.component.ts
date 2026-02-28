@@ -7,7 +7,8 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { PaymentsService, PaymentWithOrder } from '../../../core/services/payments.service';
 import { calculatePaymentStats } from '../../../core/services/stats/payment-stats.util';
 import { PaginationComponent } from '../../components/shared/pagination.component';
@@ -42,12 +43,37 @@ import { PaymentTableRowComponent } from './components/payment-table-row.compone
 export class PaymentsComponent implements OnInit {
   private readonly paymentsService = inject(PaymentsService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+
+  private readonly queryParams = toSignal(this.route.queryParams, { initialValue: {} });
 
   // State from service
   readonly payments = this.paymentsService.payments;
   readonly isLoading = this.paymentsService.isLoading;
   readonly error = this.paymentsService.error;
   readonly totalItems = this.paymentsService.totalItems;
+
+  // Context filter from route (payments by customer or by order)
+  readonly contextCustomerId = computed(
+    () => (this.queryParams() as Record<string, string>)['customerId'] ?? null,
+  );
+  readonly contextOrderId = computed(
+    () => (this.queryParams() as Record<string, string>)['orderId'] ?? null,
+  );
+  readonly contextCustomerName = computed(() => {
+    const id = this.contextCustomerId();
+    if (!id) return null;
+    const p = this.payments().find((x) => x.order.customer?.id === id);
+    return p?.order.customer
+      ? `${p.order.customer.firstName ?? ''} ${p.order.customer.lastName ?? ''}`.trim() || null
+      : null;
+  });
+  readonly contextOrderCode = computed(() => {
+    const id = this.contextOrderId();
+    if (!id) return null;
+    return this.payments().find((x) => x.order.id === id)?.order.code ?? null;
+  });
+  readonly hasContextFilter = computed(() => !!this.contextCustomerId() || !!this.contextOrderId());
 
   // Local UI state
   readonly searchQuery = signal('');
@@ -58,13 +84,22 @@ export class PaymentsComponent implements OnInit {
   readonly pageOptions = [10, 25, 50, 100];
   readonly selectedOrderId = signal<string | null>(null);
 
-  // Computed: filtered payments
+  // Computed: filtered payments (search + state + context customer/order)
   readonly filteredPayments = computed(() => {
     const query = this.searchQuery().toLowerCase().trim();
     const stateFilter = this.stateFilter();
+    const customerId = this.contextCustomerId();
+    const orderId = this.contextOrderId();
     const allPayments = this.payments();
 
     let filtered = allPayments;
+
+    if (customerId) {
+      filtered = filtered.filter((p) => p.order.customer?.id === customerId);
+    }
+    if (orderId) {
+      filtered = filtered.filter((p) => p.order.id === orderId);
+    }
 
     // Apply state filter
     if (stateFilter) {
@@ -232,6 +267,22 @@ export class PaymentsComponent implements OnInit {
     this.stateFilter.set('');
     this.stateFilterColor.set('primary');
     this.currentPage.set(1);
+  }
+
+  /**
+   * Clear context filter (customer/order) and show all payments
+   */
+  clearContextFilter(): void {
+    this.router.navigate(['/dashboard/payments'], { queryParams: {} });
+    this.currentPage.set(1);
+  }
+
+  goToCustomersPage(): void {
+    this.router.navigate(['/dashboard/customers']);
+  }
+
+  goToOrder(orderId: string): void {
+    this.router.navigate(['/dashboard/orders', orderId]);
   }
 
   /**
