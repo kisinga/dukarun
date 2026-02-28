@@ -5,6 +5,7 @@ import { Account } from '../../ledger/account.entity';
 /**
  * Junction: which accounts a reconciliation covers (freeze-frame scope).
  * declaredAmountCents: per-account declared amount at opening/closing (nullable for legacy).
+ * expectedAmountCents, varianceCents: persisted at create time for audit; variance = declared - expected (nullable for legacy).
  */
 @Entity('reconciliation_account')
 @Index('IDX_reconciliation_account_reconciliationId', ['reconciliationId'])
@@ -18,6 +19,12 @@ export class ReconciliationAccount {
 
   @Column({ type: 'bigint', nullable: true })
   declaredAmountCents?: string | null;
+
+  @Column({ type: 'bigint', nullable: true })
+  expectedAmountCents?: string | null;
+
+  @Column({ type: 'bigint', nullable: true })
+  varianceCents?: string | null;
 
   @ManyToOne(() => Reconciliation, { onDelete: 'CASCADE' })
   @JoinColumn({

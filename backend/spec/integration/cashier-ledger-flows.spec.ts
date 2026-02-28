@@ -487,16 +487,14 @@ describe('Cashier-ledger flows', () => {
         createReconciliation: jest.fn().mockResolvedValue({ id: 'rec1' } as never),
       } as any;
       const mockChannelPaymentMethodService = {
-        getChannelPaymentMethods: jest
-          .fn()
-          .mockResolvedValue([
-            {
-              id: 1,
-              code: 'cash-1',
-              enabled: true,
-              customFields: { ledgerAccountCode: 'CASH_ON_HAND', isCashierControlled: true },
-            },
-          ] as never),
+        getChannelPaymentMethods: jest.fn().mockResolvedValue([
+          {
+            id: 1,
+            code: 'cash-1',
+            enabled: true,
+            customFields: { ledgerAccountCode: 'CASH_ON_HAND', isCashierControlled: true },
+          },
+        ] as never),
         getPaymentMethodDisplayName: jest.fn((pm: { code: string }) => pm.code),
       } as any;
 
@@ -583,16 +581,14 @@ describe('Cashier-ledger flows', () => {
         createReconciliation: jest.fn().mockResolvedValue({ id: 'rec1' } as never),
       } as any;
       const mockChannelPaymentMethodService = {
-        getChannelPaymentMethods: jest
-          .fn()
-          .mockResolvedValue([
-            {
-              id: 1,
-              code: 'cash-1',
-              enabled: true,
-              customFields: { ledgerAccountCode: 'CASH_ON_HAND', isCashierControlled: true },
-            },
-          ] as never),
+        getChannelPaymentMethods: jest.fn().mockResolvedValue([
+          {
+            id: 1,
+            code: 'cash-1',
+            enabled: true,
+            customFields: { ledgerAccountCode: 'CASH_ON_HAND', isCashierControlled: true },
+          },
+        ] as never),
         getPaymentMethodDisplayName: jest.fn((pm: { code: string }) => pm.code),
       } as any;
 
@@ -619,6 +615,94 @@ describe('Cashier-ledger flows', () => {
         'Opening balance',
         'rec1'
       );
+    });
+
+    it('opening a new session must use scope manual (full-ledger) for expected balance, not cash-session', async () => {
+      const sessionId = 'a1b2c3d4-e5f6-4171-8111-111111111111';
+      const savedSession = {
+        id: sessionId,
+        channelId: channel1Id,
+        cashierUserId: 1,
+        openedAt: new Date(),
+        status: 'open',
+        closingDeclared: '0',
+      };
+      const mockSessionRepo = {
+        findOne: jest
+          .fn()
+          .mockResolvedValueOnce(null as never)
+          .mockResolvedValueOnce(savedSession as never),
+        create: jest.fn().mockReturnValue(savedSession),
+        save: jest.fn().mockResolvedValue(savedSession as never),
+      } as any;
+      const mockChannelRepo = {
+        findOne: jest.fn().mockResolvedValue({ id: channel1Id } as never),
+      } as any;
+      const mockCountRepo = {
+        create: jest.fn().mockReturnValue({ id: 'c1' }),
+        save: jest.fn().mockResolvedValue({ id: 'c1' } as never),
+      } as any;
+      const mockReconRepo = {
+        find: jest.fn().mockResolvedValue([] as never),
+        findOne: jest.fn().mockResolvedValue(null as never),
+      } as any;
+      const mockReconAccountRepo = { find: jest.fn().mockResolvedValue([] as never) } as any;
+      const mockAccountRepo = {
+        find: jest.fn().mockResolvedValue([{ id: 'acc-1', code: 'CASH_ON_HAND' }] as never),
+      } as any;
+      const mockConnection = {
+        getRepository: jest.fn((_ctx: any, entity: any): any => {
+          if (entity === CashierSession) return mockSessionRepo;
+          if (entity === Channel) return mockChannelRepo;
+          if (entity === CashDrawerCount) return mockCountRepo;
+          if (entity === Reconciliation) return mockReconRepo;
+          if (entity === ReconciliationAccount) return mockReconAccountRepo;
+          if (entity === Account) return mockAccountRepo;
+          return mockCountRepo;
+        }),
+        withTransaction: jest.fn((ctx: any, fn: (t: any) => Promise<any>) => fn(ctx)),
+      } as any;
+      const getExpectedSpy = jest.fn().mockResolvedValue(95000 as never);
+      const mockLedgerQueryService = {
+        getCashierSessionTotals: jest
+          .fn()
+          .mockResolvedValue({ cashTotal: 0, mpesaTotal: 0, totalCollected: 0 } as never),
+        getExpectedBalanceForReconciliation: getExpectedSpy,
+      } as any;
+      const mockPostVariance = jest.fn().mockResolvedValue(undefined as never);
+      const mockReconciliationService = {
+        createReconciliation: jest.fn().mockResolvedValue({ id: 'rec1' } as never),
+      } as any;
+      const mockChannelPaymentMethodService = {
+        getChannelPaymentMethods: jest.fn().mockResolvedValue([
+          {
+            id: 1,
+            code: 'cash-1',
+            enabled: true,
+            customFields: { ledgerAccountCode: 'CASH_ON_HAND', isCashierControlled: true },
+          },
+        ] as never),
+        getPaymentMethodDisplayName: jest.fn((pm: { code: string }) => pm.code),
+      } as any;
+
+      const cashierSessionService = new (OpenSessionService as any)(
+        mockConnection,
+        mockLedgerQueryService,
+        mockReconciliationService,
+        { postVarianceAdjustment: mockPostVariance },
+        mockChannelPaymentMethodService,
+        { log: jest.fn().mockResolvedValue(undefined as never) }
+      );
+
+      await cashierSessionService.startSession(ctx1, {
+        channelId: channel1Id,
+        openingBalances: [{ accountCode: 'CASH_ON_HAND', amountCents: 95000 }],
+      });
+
+      expect(getExpectedSpy).toHaveBeenCalled();
+      const calls = getExpectedSpy.mock.calls as Array<[number, string, string, string, string?]>;
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls.every(c => c[1] === 'manual')).toBe(true);
     });
   });
 });

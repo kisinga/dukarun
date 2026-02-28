@@ -675,11 +675,13 @@ export class OpenSessionService {
         ? declaredAmounts
         : await this.buildSyntheticDeclaredAmounts(ctx, channelId, Number(total));
 
+    const accountCodes = effectiveDeclaredAmounts.map(d => d.accountCode);
     const expectedBalance = await this.sumExpectedBalanceForAccounts(
       ctx,
       channelId,
       sessionId,
-      effectiveDeclaredAmounts.map(d => d.accountCode)
+      accountCodes,
+      snapshotDate
     );
 
     const actualBalance =
@@ -688,6 +690,21 @@ export class OpenSessionService {
             .reduce((s, d) => s + BigInt(d.amountCents || '0'), BigInt(0))
             .toString()
         : total.toString();
+
+    const codeToId = await this.getAccountIdsByCode(ctx, channelId, accountCodes);
+    const expectedAmountCentsByAccountId: Record<string, string> = {};
+    for (const d of effectiveDeclaredAmounts) {
+      const accountId = codeToId[d.accountCode];
+      if (!accountId) continue;
+      const expected = await this.ledgerQueryService.getExpectedBalanceForReconciliation(
+        channelId,
+        'manual',
+        scopeRefId,
+        d.accountCode,
+        snapshotDate
+      );
+      expectedAmountCentsByAccountId[accountId] = String(expected);
+    }
 
     const input: CreateReconciliationInput = {
       channelId,
@@ -701,12 +718,14 @@ export class OpenSessionService {
 
     return this.reconciliationService.createReconciliation(ctx, input, {
       snapshotDate,
+      expectedAmountCentsByAccountId,
     });
   }
 
   /**
    * Post per-account variance for a closing reconciliation (shared by close and repair).
-   * Loads declared amounts from ReconciliationAccount, computes expected via ledger, posts if non-zero.
+   * Uses full-ledger expected as of reconciliation snapshot so variance aligns ledger with declared;
+   * next session open then shows correct expected. Variance = declared - expected (shortage negative).
    */
   private async postClosingVariance(
     ctx: RequestContext,
@@ -714,6 +733,7 @@ export class OpenSessionService {
     closingRecon: Reconciliation
   ): Promise<void> {
     const channelId = closingRecon.channelId;
+    const snapshotAt = closingRecon.snapshotAt ?? new Date().toISOString().slice(0, 10);
     const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
     const rows = await junctionRepo.find({
       where: { reconciliationId: closingRecon.id },
@@ -724,9 +744,10 @@ export class OpenSessionService {
       const declaredCents = row.declaredAmountCents ? parseInt(row.declaredAmountCents, 10) : 0;
       const expected = await this.ledgerQueryService.getExpectedBalanceForReconciliation(
         channelId,
-        'cash-session',
-        sessionId,
-        row.account.code
+        'manual',
+        closingRecon.scopeRefId,
+        row.account.code,
+        snapshotAt
       );
       const variance = declaredCents - expected;
       if (variance !== 0) {
@@ -756,21 +777,29 @@ export class OpenSessionService {
     return recon;
   }
 
-  /** Sum session-scoped expected balance for the given account codes (for recon record). */
+  /**
+   * Sum expected balance for the given account codes (for recon record).
+   * When asOfDate is provided (e.g. closing recon): full-ledger as of that date (scope 'manual').
+   * When not provided: session-scoped balance (scope 'cash-session', for backward compatibility).
+   */
   private async sumExpectedBalanceForAccounts(
     ctx: RequestContext,
     channelId: number,
     sessionId: string,
-    accountCodes: string[]
+    accountCodes: string[],
+    asOfDate?: string
   ): Promise<number> {
     if (accountCodes.length === 0) return 0;
+    const scope = asOfDate ? 'manual' : 'cash-session';
+    const scopeRefId = asOfDate ? '' : sessionId;
     let sum = 0;
     for (const code of accountCodes) {
       sum += await this.ledgerQueryService.getExpectedBalanceForReconciliation(
         channelId,
-        'cash-session',
-        sessionId,
-        code
+        scope,
+        scopeRefId,
+        code,
+        asOfDate
       );
     }
     return sum;

@@ -41,7 +41,11 @@ describe('ReconciliationService', () => {
     mockAccountRepo = {
       find: (jest.fn() as any).mockResolvedValue([{ id: 'acc-1', code: 'CASH_ON_HAND' }]),
     };
-    mockJunctionRepo = { create: jest.fn(), save: jest.fn() };
+    mockJunctionRepo = {
+      create: jest.fn(),
+      save: jest.fn(),
+      find: (jest.fn() as any).mockResolvedValue([]),
+    };
 
     mockConnection = {
       getRepository: jest.fn((_ctx: RequestContext, entity: any) => {
@@ -139,6 +143,127 @@ describe('ReconciliationService', () => {
 
       expect(result.varianceAmount).toBe('-50');
       expect(result.status).toBe('verified');
+    });
+
+    it('cash-session with expectedAmountCentsByAccountId persists expected and variance on junction rows (variance = declared - expected)', async () => {
+      const snapshotDate = '2026-02-28';
+      const acc1 = 'acc-1';
+      const acc2 = 'acc-2';
+      mockAccountRepo.find.mockResolvedValue([
+        { id: acc1, code: 'CASH_ON_HAND' },
+        { id: acc2, code: 'CLEARING_MPESA' },
+      ]);
+      const savedRecon = {
+        id: 'rec-close-1',
+        channelId: 1,
+        scope: 'cash-session',
+        scopeRefId: 'session-1:closing',
+        snapshotAt: snapshotDate,
+        status: 'verified',
+      } as Reconciliation;
+      mockReconciliationRepo.create.mockImplementation((o: any) => ({ ...o }));
+      mockReconciliationRepo.save.mockResolvedValue(savedRecon);
+      mockJunctionRepo.create.mockImplementation((o: any) => o);
+      mockJunctionRepo.save.mockResolvedValue([]);
+
+      const input = {
+        channelId: 1,
+        scope: 'cash-session' as const,
+        scopeRefId: 'session-1:closing',
+        expectedBalance: '13000',
+        actualBalance: '15200',
+        notes: 'Closing reconciliation',
+        declaredAmounts: [
+          { accountCode: 'CASH_ON_HAND', amountCents: '3200' },
+          { accountCode: 'CLEARING_MPESA', amountCents: '12000' },
+        ],
+      };
+      const expectedByAccount: Record<string, string> = {
+        [acc1]: '-453807',
+        [acc2]: '3667666',
+      };
+
+      await service.createReconciliation(ctx, input, {
+        snapshotDate,
+        expectedAmountCentsByAccountId: expectedByAccount,
+      });
+
+      expect(mockJunctionRepo.create).toHaveBeenCalled();
+      const createCalls = mockJunctionRepo.create.mock.calls as Array<[Record<string, unknown>]>;
+      const byAccountId = new Map<string, Record<string, unknown>>();
+      for (const [arg] of createCalls) {
+        byAccountId.set(arg.accountId as string, arg);
+      }
+      expect(byAccountId.get(acc1)?.expectedAmountCents).toBe('-453807');
+      expect(byAccountId.get(acc1)?.varianceCents).toBe(String(3200 - -453807));
+      expect(byAccountId.get(acc2)?.expectedAmountCents).toBe('3667666');
+      expect(byAccountId.get(acc2)?.varianceCents).toBe(String(12000 - 3667666));
+    });
+  });
+
+  describe('getReconciliationDetails', () => {
+    it('when junction row has expectedAmountCents uses persisted value and does not call getAccountBalance', async () => {
+      const reconId = 'rec-1';
+      mockReconciliationRepo.findOne.mockResolvedValue({
+        id: reconId,
+        channelId: 1,
+        scope: 'cash-session',
+        snapshotAt: '2026-02-28',
+      } as Reconciliation);
+      mockJunctionRepo.find.mockResolvedValue([
+        {
+          reconciliationId: reconId,
+          accountId: 'acc-1',
+          declaredAmountCents: '320000',
+          expectedAmountCents: '-453807',
+          varianceCents: '773807',
+          account: { id: 'acc-1', code: 'CASH_ON_HAND', name: 'Cash on Hand' },
+        },
+      ]);
+
+      const result = await service.getReconciliationDetails(ctx, reconId);
+
+      expect(mockAccountBalanceService.getAccountBalance).not.toHaveBeenCalled();
+      expect(result).toHaveLength(1);
+      expect(result[0].expectedBalanceCents).toBe('-453807');
+      expect(result[0].varianceCents).toBe('773807');
+      expect(result[0].declaredAmountCents).toBe('320000');
+    });
+
+    it('when junction row lacks expectedAmountCents recomputes via getAccountBalance', async () => {
+      const reconId = 'rec-legacy';
+      mockReconciliationRepo.findOne.mockResolvedValue({
+        id: reconId,
+        channelId: 1,
+        scope: 'method',
+        snapshotAt: '2026-01-15',
+      } as Reconciliation);
+      mockJunctionRepo.find.mockResolvedValue([
+        {
+          reconciliationId: reconId,
+          accountId: 'acc-1',
+          declaredAmountCents: '1000',
+          expectedAmountCents: null,
+          varianceCents: null,
+          account: { id: 'acc-1', code: 'CASH_ON_HAND', name: 'Cash on Hand' },
+        },
+      ]);
+      mockAccountBalanceService.getAccountBalance.mockResolvedValue({
+        balance: 1200,
+        accountCode: 'CASH_ON_HAND',
+      } as any);
+
+      const result = await service.getReconciliationDetails(ctx, reconId);
+
+      expect(mockAccountBalanceService.getAccountBalance).toHaveBeenCalledWith(
+        ctx,
+        'CASH_ON_HAND',
+        1,
+        '2026-01-15'
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].expectedBalanceCents).toBe('1200');
+      expect(result[0].varianceCents).toBe(String(1200 - 1000));
     });
   });
 
