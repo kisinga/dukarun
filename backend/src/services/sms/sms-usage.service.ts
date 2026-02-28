@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ChannelService, RequestContext, TransactionalConnection } from '@vendure/core';
 import { SubscriptionTier } from '../../plugins/subscriptions/subscription.entity';
+import {
+  type SmsCategory,
+  type SmsUsageByCategory,
+  isCountedCategory,
+} from '../../domain/sms-categories';
 
 export interface SmsUsageInfo {
   used: number;
@@ -8,11 +13,37 @@ export interface SmsUsageInfo {
   periodEnd: Date | null;
   allowed: boolean;
   reason?: string;
+  usedByCategory?: SmsUsageByCategory;
+}
+
+function parseUsageByCategory(raw: unknown): SmsUsageByCategory {
+  if (raw == null || raw === '') return {};
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as SmsUsageByCategory;
+      }
+    } catch {
+      // ignore
+    }
+    return {};
+  }
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as SmsUsageByCategory;
+  return {};
+}
+
+function totalCounted(byCategory: SmsUsageByCategory): number {
+  let sum = 0;
+  for (const [cat, n] of Object.entries(byCategory)) {
+    if (isCountedCategory(cat as SmsCategory) && typeof n === 'number' && n > 0) sum += n;
+  }
+  return sum;
 }
 
 /**
  * SMS usage and limit per channel (30-day period synced with subscription expiry).
- * Limit comes from the channel's subscription tier; usage is stored on the channel.
+ * Usage can be stored per category (smsUsageByCategory) or legacy single counter (smsUsedThisPeriod).
  */
 @Injectable()
 export class SmsUsageService {
@@ -25,7 +56,7 @@ export class SmsUsageService {
 
   /**
    * Get current usage and limit for a channel, resetting the period if needed.
-   * Period end is aligned with subscriptionExpiresAt or trialEndsAt.
+   * Prefers smsUsageByCategory when present (sum of counted categories); falls back to smsUsedThisPeriod.
    */
   async getOrResetUsage(ctx: RequestContext, channelId: string): Promise<SmsUsageInfo> {
     const channel = await this.channelService.findOne(ctx, channelId);
@@ -45,12 +76,16 @@ export class SmsUsageService {
     }
 
     const now = new Date();
-    let used =
+    const byCategory = parseUsageByCategory(customFields.smsUsageByCategory);
+    const hasCategoryData = Object.keys(byCategory).length > 0;
+    const usedFromCategory = totalCounted(byCategory);
+    const usedLegacy =
       typeof customFields.smsUsedThisPeriod === 'number' ? customFields.smsUsedThisPeriod : 0;
+    let used = hasCategoryData ? usedFromCategory : usedLegacy;
+
     let periodEnd: Date | null = customFields.smsPeriodEnd
       ? new Date(customFields.smsPeriodEnd)
       : null;
-
     const expiresAtStr = customFields.subscriptionExpiresAt || customFields.trialEndsAt;
     const periodEndFromSubscription = expiresAtStr ? new Date(expiresAtStr) : null;
 
@@ -60,8 +95,10 @@ export class SmsUsageService {
       await this.channelService.update(ctx, {
         id: channelId,
         customFields: {
+          ...customFields,
           smsUsedThisPeriod: 0,
           smsPeriodEnd: periodEnd ?? undefined,
+          smsUsageByCategory: JSON.stringify({}),
         },
       });
     }
@@ -73,12 +110,10 @@ export class SmsUsageService {
       periodEnd,
       allowed,
       reason: !allowed ? `SMS limit reached (${used}/${limit}) for this period` : undefined,
+      usedByCategory: hasCategoryData ? byCategory : undefined,
     };
   }
 
-  /**
-   * Check if the channel can send an SMS (under limit). Does not increment.
-   */
   async canSendSms(
     ctx: RequestContext,
     channelId: string
@@ -88,22 +123,30 @@ export class SmsUsageService {
   }
 
   /**
-   * Record that one SMS was sent (increment usage). Call after successful send.
+   * Record one SMS sent for the given category. Uses read-modify-write on smsUsageByCategory
+   * so other categories are never overwritten.
    */
-  async recordSmsSent(ctx: RequestContext, channelId: string): Promise<void> {
+  async recordSmsSent(
+    ctx: RequestContext,
+    channelId: string,
+    category: SmsCategory
+  ): Promise<void> {
     const channel = await this.channelService.findOne(ctx, channelId);
     if (!channel) return;
 
-    const customFields = (channel as any).customFields || {};
-    const used =
-      (typeof customFields.smsUsedThisPeriod === 'number' ? customFields.smsUsedThisPeriod : 0) + 1;
+    const customFields = { ...((channel as any).customFields || {}) };
+    const current = parseUsageByCategory(customFields.smsUsageByCategory);
+    const next: SmsUsageByCategory = { ...current, [category]: (current[category] ?? 0) + 1 };
+    const totalCountedNow = totalCounted(next);
 
     await this.channelService.update(ctx, {
       id: channelId,
       customFields: {
-        smsUsedThisPeriod: used,
+        ...customFields,
+        smsUsageByCategory: JSON.stringify(next),
+        smsUsedThisPeriod: totalCountedNow,
       },
     });
-    this.logger.debug(`Channel ${channelId} SMS usage: ${used}`);
+    this.logger.debug(`Channel ${channelId} SMS usage: ${totalCountedNow} (${category}+1)`);
   }
 }

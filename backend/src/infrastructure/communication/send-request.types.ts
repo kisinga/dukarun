@@ -1,4 +1,5 @@
 import { RequestContext } from '@vendure/core';
+import type { SmsCategory } from '../../domain/sms-categories';
 
 /**
  * Delivery channel for communication
@@ -36,4 +37,6 @@ export interface SendRequest {
   metadata?: { purpose?: string; [key: string]: unknown };
   /** When set, SMS is counted against this channel's tier limit. If unset but ctx.channelId exists, channelId from ctx is used for limit check. */
   channelId?: string;
+  /** SMS category for type-scoped usage; if omitted, derived from metadata.purpose. */
+  smsCategory?: SmsCategory;
 }

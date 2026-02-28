@@ -6,6 +6,7 @@ import { SmsUsageService } from '../../services/sms/sms-usage.service';
 import { maskEmail } from '../../utils/email.utils';
 import { isSentinelEmail } from '../../utils/email.utils';
 import { OtpEmailEvent } from '../events/otp-email.event';
+import { resolveSmsCategory, isCountedCategory } from '../../domain/sms-categories';
 import { CommunicationChannel, DeliveryResult, SendRequest } from './send-request.types';
 
 /** Max SMS body length (GSM 7-bit single segment). */
@@ -81,24 +82,25 @@ export class CommunicationService {
         this.logger.error(errMsg, new Error('SMS_LENGTH_EXCEEDED'));
         return { success: false, channel: 'sms', error: errMsg };
       }
-      const isOtp = metadata?.purpose === 'otp';
+      const smsCategory = resolveSmsCategory(metadata?.purpose, request.smsCategory);
+      const isCounted = isCountedCategory(smsCategory);
       const channelId = request.channelId ?? request.ctx?.channelId?.toString();
-      if (!isOtp && channelId && request.ctx) {
+      if (isCounted && channelId && request.ctx) {
         const { allowed, reason } = await this.smsUsageService.canSendSms(request.ctx, channelId);
         if (!allowed) {
           this.logger.warn(`SMS not sent (quota limit): channel=${channelId} - ${reason}`);
           return { success: false, channel: 'sms', error: reason };
         }
       }
-      const result = await this.sendSms(recipient, message, isOtp);
+      const result = await this.sendSms(recipient, message, smsCategory === 'OTP');
       if (!result.success && result.error) {
         this.logger.error(
           `SMS delivery failed to ${recipient}: ${result.error}`,
           new Error(result.error)
         );
       }
-      if (result.success && !isOtp && channelId && request.ctx) {
-        await this.smsUsageService.recordSmsSent(request.ctx, channelId);
+      if (result.success && isCounted && channelId && request.ctx) {
+        await this.smsUsageService.recordSmsSent(request.ctx, channelId, smsCategory);
       }
       return result;
     }

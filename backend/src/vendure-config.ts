@@ -1045,6 +1045,21 @@ export const config: VendureConfig = {
         nullable: true,
         ui: { tab: 'Subscription' },
       },
+      {
+        name: 'smsUsageByCategory',
+        type: 'text',
+        label: [{ languageCode: LanguageCode.en, value: 'SMS Usage By Category' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value:
+              'JSON object of SMS counts per category (e.g. ACCOUNT_NOTIFICATION, WELCOME) for current period',
+          },
+        ],
+        public: false,
+        nullable: true,
+        ui: { tab: 'Subscription' },
+      },
     ],
     Order: [
       {

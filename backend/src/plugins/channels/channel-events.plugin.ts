@@ -5,6 +5,7 @@ import { NotificationService } from '../../services/notifications/notification.s
 import { PushNotificationService } from '../../services/notifications/push-notification.service';
 import { AdminNotificationService } from '../../services/notifications/admin-notification.service';
 import { ChannelCommunicationService } from '../../services/channels/channel-communication.service';
+import { AccountNotificationDeliveryService } from '../../services/channels/account-notification-delivery.service';
 import { NotificationSubscriber } from '../../infrastructure/events/notification.subscriber';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { AuditDbConnection } from '../../infrastructure/audit/audit-db.connection';
@@ -42,6 +43,9 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
     NotificationService,
     PushNotificationService,
     AdminNotificationService,
+
+    // Account balance notifications to customer (SMS/email; composable for supplier later)
+    AccountNotificationDeliveryService,
 
     // Channel communication (publishes events; NotificationSubscriber handles delivery)
     ChannelCommunicationService,
