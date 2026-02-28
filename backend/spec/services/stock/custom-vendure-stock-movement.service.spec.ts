@@ -122,6 +122,51 @@ describe('CustomVendureStockMovementService', () => {
       expect(published).toBeInstanceOf(StockMovementEvent);
       expect(published.ctx).toBe(ctx);
     });
+
+    it('integration-style: creates Sale entities and publishes StockMovementEvent without updating StockLevel', async () => {
+      const orderLine = {
+        id: 'ol1',
+        productVariantId: 'pv1',
+        productVariant: { id: 'pv1' },
+      };
+      const productVariant = { id: 'pv1' };
+      const location = { id: 'loc1' };
+      const savedSalesCapture: any[] = [];
+      const saleSave = jest.fn().mockImplementation((entities: unknown) => {
+        const arr = Array.isArray(entities) ? entities : [];
+        savedSalesCapture.push(...arr);
+        return Promise.resolve(entities ?? []);
+      });
+
+      (connection.getRepository as jest.Mock).mockImplementation((_ctx: any, entity: any) => {
+        if (entity === OrderLine)
+          return { find: jest.fn().mockImplementation(() => Promise.resolve([orderLine])) };
+        if (entity === Sale) return { save: saleSave };
+        return {};
+      });
+      (connection as any).getEntityOrThrow = jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(productVariant));
+      (stockLocationService as any).getSaleLocations = jest
+        .fn()
+        .mockImplementation(() => Promise.resolve([{ location }]));
+
+      const result = await service.createSalesForOrder(ctx, [{ orderLineId: 'ol1', quantity: 2 }]);
+
+      expect(result.length).toBe(1);
+      expect(savedSalesCapture.length).toBe(1);
+      const sale = savedSalesCapture[0];
+      expect(sale.quantity).toBe(-2);
+      expect(sale.productVariant).toEqual(productVariant);
+      expect(sale.orderLine).toEqual(orderLine);
+      expect(sale.stockLocation).toEqual(location);
+      expect(stockLevelService.updateStockOnHandForLocation).not.toHaveBeenCalled();
+      expect(stockLevelService.updateStockAllocatedForLocation).not.toHaveBeenCalled();
+      expect(eventBus.publish).toHaveBeenCalledTimes(1);
+      const published = (eventBus.publish as jest.Mock).mock.calls[0][0] as StockMovementEvent;
+      expect(published).toBeInstanceOf(StockMovementEvent);
+      expect(published.ctx).toBe(ctx);
+    });
   });
 
   describe('adjustProductVariantStock', () => {
