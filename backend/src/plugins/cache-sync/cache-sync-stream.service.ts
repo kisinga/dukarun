@@ -1,5 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { EventBus, OrderEvent, ProductEvent, RequestContext } from '@vendure/core';
+import {
+  CustomerEvent,
+  EventBus,
+  OrderEvent,
+  ProductEvent,
+  ProductVariantEvent,
+  RequestContext,
+} from '@vendure/core';
 import { Observable, Subject } from 'rxjs';
 import { PaymentMethodChangedEvent } from '../../infrastructure/events/cache-invalidation.events';
 import { CacheSyncRecentBufferService } from './cache-sync-recent-buffer.service';
@@ -16,13 +23,8 @@ interface CustomerEventLike {
 }
 
 /**
- * ProductVariantEvent entity shape (variant has productId for parent product).
+ * ProductVariantEvent has entity: ProductVariant[]; we need productId from the first variant for cache invalidation.
  */
-interface ProductVariantEventLike {
-  type: 'created' | 'updated' | 'deleted';
-  entity: { id: string; productId?: string };
-  ctx: RequestContext;
-}
 
 /**
  * Multicasts entity change events to SSE clients. Subscribes to EventBus
@@ -56,28 +58,21 @@ export class CacheSyncStreamService implements OnModuleInit {
       this.recentBuffer.push(msg).catch(() => {});
     });
 
-    try {
-      const { ProductVariantEvent } = require('@vendure/core');
-      this.eventBus.ofType(ProductVariantEvent).subscribe((event: unknown) => {
-        const e = event as ProductVariantEventLike;
-        const channelId = e.ctx?.channelId?.toString();
-        if (!channelId) return;
-        const action = this.toAction(e.type);
-        if (!action) return;
-        const productId = e.entity?.productId?.toString();
-        if (!productId) return;
-        this.logger.log(
-          `CacheSync: event received entityType=product (from variant) action=${action} channelId=${channelId} productId=${productId}`
-        );
-        const msg: CacheSyncMessage = { entityType: 'product', action, channelId, id: productId };
-        this.message$.next(msg);
-        this.recentBuffer.push(msg).catch(() => {});
-      });
-    } catch {
-      this.logger.warn(
-        'ProductVariantEvent not available; variant (e.g. price) cache sync disabled'
+    this.eventBus.ofType(ProductVariantEvent).subscribe((event: ProductVariantEvent) => {
+      const channelId = event.ctx?.channelId?.toString();
+      if (!channelId) return;
+      const action = this.toAction(event.type);
+      if (!action) return;
+      const firstVariant = event.entity?.[0] ?? event.variants?.[0];
+      const productId = firstVariant?.product?.id?.toString();
+      if (!productId) return;
+      this.logger.log(
+        `CacheSync: event received entityType=product (from variant) action=${action} channelId=${channelId} productId=${productId}`
       );
-    }
+      const msg: CacheSyncMessage = { entityType: 'product', action, channelId, id: productId };
+      this.message$.next(msg);
+      this.recentBuffer.push(msg).catch(() => {});
+    });
 
     this.eventBus
       .ofType(PaymentMethodChangedEvent)
@@ -97,29 +92,24 @@ export class CacheSyncStreamService implements OnModuleInit {
         this.recentBuffer.push(msg).catch(() => {});
       });
 
-    try {
-      const { CustomerEvent } = require('@vendure/core');
-      this.eventBus.ofType(CustomerEvent).subscribe((event: unknown) => {
-        const e = event as CustomerEventLike;
-        const channelId = e.ctx?.channelId?.toString();
-        if (!channelId) return;
-        const action = this.toAction(e.type);
-        if (!action) return;
-        const id = e.entity?.id?.toString();
-        this.logger.log(
-          `CacheSync: event received entityType=customer action=${action} channelId=${channelId} id=${id ?? 'n/a'}`
-        );
-        const customerMsg: CacheSyncMessage = { entityType: 'customer', action, channelId, id };
-        this.message$.next(customerMsg);
-        this.recentBuffer.push(customerMsg).catch(() => {});
-        // Suppliers are customers; emit supplier so supplier list cache invalidates too
-        const supplierMsg: CacheSyncMessage = { entityType: 'supplier', action, channelId, id };
-        this.message$.next(supplierMsg);
-        this.recentBuffer.push(supplierMsg).catch(() => {});
-      });
-    } catch {
-      this.logger.warn('CustomerEvent not available; customer cache sync disabled');
-    }
+    this.eventBus.ofType(CustomerEvent).subscribe((event: CustomerEvent) => {
+      const e = event as CustomerEventLike;
+      const channelId = e.ctx?.channelId?.toString();
+      if (!channelId) return;
+      const action = this.toAction(e.type);
+      if (!action) return;
+      const id = e.entity?.id?.toString();
+      this.logger.log(
+        `CacheSync: event received entityType=customer action=${action} channelId=${channelId} id=${id ?? 'n/a'}`
+      );
+      const customerMsg: CacheSyncMessage = { entityType: 'customer', action, channelId, id };
+      this.message$.next(customerMsg);
+      this.recentBuffer.push(customerMsg).catch(() => {});
+      // Suppliers are customers; emit supplier so supplier list cache invalidates too
+      const supplierMsg: CacheSyncMessage = { entityType: 'supplier', action, channelId, id };
+      this.message$.next(supplierMsg);
+      this.recentBuffer.push(supplierMsg).catch(() => {});
+    });
 
     this.eventBus.ofType(OrderEvent).subscribe((event: OrderEvent) => {
       const channelId = event.ctx?.channelId?.toString();

@@ -28,6 +28,7 @@
 4. **Custom-field relations require a non-relational companion**
    - Vendure inserts `customFields__fix_relational_custom_fields__` if you only declare relations.
    - Always add at least one scalar custom field (`boolean`, `int`, `string`, `datetime`) next to relations to prevent schema drift.
+   - **Administrator profilePicture**: Administrator has a dummy boolean custom field only to satisfy Vendure/TypeORM when the only other custom field is the profilePicture relation (see migration `9000000000003-AddAdministratorProfilePicture.ts`).
 
 5. **Standalone entities (not custom fields)**
    - Some schema is implemented as standalone tables and entities (e.g. `role_template`, `role_template_assignment`) because Vendure does not support custom fields on every core entity (e.g. Role).

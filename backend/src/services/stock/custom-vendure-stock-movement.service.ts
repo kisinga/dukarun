@@ -29,6 +29,8 @@ import { StockMovementService as LocalStockMovementService } from './stock-movem
  *
  * This ensures a single write path for quantity and prevents "stock without batch" after
  * the backfill migration.
+ *
+ * @see STOCK_MOVEMENT_OVERRIDE.md for full documentation and upgrade notes.
  */
 const REASON_PRODUCT_CREATE_UPDATE = 'Product create/update';
 

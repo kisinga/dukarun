@@ -109,6 +109,10 @@ export const config: VendureConfig = {
 - **Maintainability**: Less code, fewer edge cases
 - **User Experience**: Faster checkout for walk-in customers
 
+### Payment handlers
+
+The credit payment handler is registered in CreditPlugin's `configure()` because it needs CreditService (dependency injection). Handlers that depend on injectable services are typically built via a factory and appended to `config.paymentOptions.paymentMethodHandlers` in the plugin.
+
 ### Order Flow
 
 ```
@@ -846,6 +850,14 @@ The price override UI is optimized for mobile POS usage:
 
 - Implement proper custom field relation loading in custom resolvers
 - Either use Vendure's built-in relation loading mechanisms or manually load relations using `TransactionalConnection`
+
+### Vendure upgrade
+
+After upgrading `@vendure/core`, confirm that `ProductVariantEvent` and `CustomerEvent` are still exported and that the cache-sync and stock-value-cache subscribers (CacheSyncStreamService, StockValueCacheSubscriber) still receive these events as expected.
+
+### Channel access
+
+Channel lookups use `findChannelById` in `backend/src/utils/channel-access.util.ts`. When the request has no seller association (e.g. in guards or auth flows), call it with `bypassSellerFilter: true` so the channel is loaded via the repository instead of `ChannelService`; otherwise seller filtering can cause CHANNEL_NOT_FOUND. All such bypass usage should go through this util—do not add new ad-hoc `getRepository(ctx, Channel).findOne` for the same purpose.
 
 ## Product Creation Workflow
 
