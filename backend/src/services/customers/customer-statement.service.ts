@@ -85,7 +85,12 @@ export class CustomerStatementService {
     customerId: string
   ): Promise<{
     summary: { name: string; outstanding: number };
-    lines: Array<{ date: string; orderCode: string; total: number }>;
+    lines: Array<{
+      date: string;
+      orderCode: string;
+      total: number;
+      payments: Array<{ method: string; amount: number; date: string }>;
+    }>;
   }> {
     const customer = await this.customerService.findOne(ctx, customerId);
     const name = customer
@@ -102,15 +107,25 @@ export class CustomerStatementService {
     const orderRepo = this.connection.getRepository(ctx, Order);
     const orders = await orderRepo.find({
       where: { customer: { id: customerId } },
-      relations: ['customer'],
+      relations: ['customer', 'payments'],
       order: { orderPlacedAt: 'DESC' as any },
       take: 100,
     });
-    const lines = orders.map((o: any) => ({
-      date: o.orderPlacedAt ?? o.createdAt,
-      orderCode: o.code ?? '',
-      total: o.totalWithTax ?? o.total ?? 0,
-    }));
+    const lines = orders.map((o: any) => {
+      const payList = (o.payments || [])
+        .filter((p: any) => p.state === 'Settled')
+        .map((p: any) => ({
+          method: p.method ?? 'Payment',
+          amount: p.amount ?? 0,
+          date: p.createdAt ? new Date(p.createdAt).toISOString() : '',
+        }));
+      return {
+        date: o.orderPlacedAt ?? o.createdAt,
+        orderCode: o.code ?? '',
+        total: o.totalWithTax ?? o.total ?? 0,
+        payments: payList,
+      };
+    });
 
     return {
       summary: { name, outstanding },
@@ -120,7 +135,12 @@ export class CustomerStatementService {
 
   private formatStatementText(
     summary: { name: string; outstanding: number },
-    lines: Array<{ date: string; orderCode: string; total: number }>
+    lines: Array<{
+      date: string;
+      orderCode: string;
+      total: number;
+      payments: Array<{ method: string; amount: number; date: string }>;
+    }>
   ): string {
     const out = summary.outstanding / 100;
     let s = `Statement for ${summary.name}\n`;
@@ -128,17 +148,43 @@ export class CustomerStatementService {
     for (const l of lines.slice(0, 30)) {
       const d = l.date ? new Date(l.date).toLocaleDateString('en-KE', { dateStyle: 'short' }) : '';
       s += `${d} ${l.orderCode} KES ${(l.total / 100).toFixed(2)}\n`;
+      for (const p of l.payments) {
+        const pd = p.date
+          ? new Date(p.date).toLocaleDateString('en-KE', { dateStyle: 'short' })
+          : '';
+        s += `  – ${p.method} KES ${(p.amount / 100).toFixed(2)}${pd ? ` (${pd})` : ''}\n`;
+      }
     }
     return s;
   }
 
   private formatMiniStatementSms(
     summary: { name: string; outstanding: number },
-    lines: Array<{ date: string; orderCode: string; total: number }>
+    lines: Array<{
+      date: string;
+      orderCode: string;
+      total: number;
+      payments: Array<{ method: string; amount: number; date: string }>;
+    }>
   ): string {
     const out = summary.outstanding / 100;
+    const allPayments: Array<{ method: string; amount: number; date: string }> = [];
+    for (const l of lines) {
+      for (const p of l.payments) {
+        allPayments.push({ method: p.method, amount: p.amount, date: p.date });
+      }
+    }
+    allPayments.sort((a, b) => (b.date > a.date ? 1 : -1));
+    const lastTwo = allPayments.slice(0, 2);
+    const payText =
+      lastTwo.length > 0
+        ? ` Last payts: ${lastTwo.map(p => `${p.method} KES ${(p.amount / 100).toFixed(0)}`).join(', ')}.`
+        : '';
     const last = lines[0];
-    const lastPay = last ? `Last: ${last.orderCode} KES ${(last.total / 100).toFixed(0)}. ` : '';
-    return `Dukahub: ${summary.name}. Balance KES ${out.toFixed(0)}. ${lastPay}${lines.length} order(s).`;
+    const lastOrder = last ? ` Order ${last.orderCode} KES ${(last.total / 100).toFixed(0)}.` : '';
+    return `Dukahub: ${summary.name}. Bal KES ${out.toFixed(0)}.${lastOrder}${payText} ${lines.length} order(s).`.slice(
+      0,
+      SMS_MAX
+    );
   }
 }

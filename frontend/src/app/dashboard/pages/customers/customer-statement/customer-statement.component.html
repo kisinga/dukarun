@@ -46,16 +46,17 @@
                   <th>Date</th>
                   <th>Order</th>
                   <th class="text-right">Total</th>
+                  <th>Payments</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 @for (order of orders(); track order.id) {
                   <tr>
-                    <td class="whitespace-nowrap">
+                    <td class="whitespace-nowrap align-top">
                       {{ formatDate(order.orderPlacedAt || order.createdAt) }}
                     </td>
-                    <td>
+                    <td class="align-top">
                       <a
                         [routerLink]="['/dashboard/orders', order.id]"
                         class="link link-hover font-mono"
@@ -63,16 +64,33 @@
                         {{ order.code }}
                       </a>
                     </td>
-                    <td class="text-right font-medium">
+                    <td class="text-right font-medium align-top">
                       {{ currencyService.format(order.totalWithTax ?? order.total ?? 0, false) }}
                     </td>
-                    <td>
+                    <td class="align-top">
+                      @if (getSettledPayments(order).length > 0) {
+                        <ul class="list-none p-0 m-0 text-sm text-base-content/80 space-y-1">
+                          @for (p of getSettledPayments(order); track p.id) {
+                            <li>
+                              {{ p.method }}
+                              {{ currencyService.format(p.amount ?? 0, false) }}
+                              <span class="text-base-content/50">{{
+                                formatDate(p.createdAt)
+                              }}</span>
+                            </li>
+                          }
+                        </ul>
+                      } @else {
+                        <span class="text-base-content/50 text-sm">—</span>
+                      }
+                    </td>
+                    <td class="align-top">
                       <a
                         [routerLink]="['/dashboard/payments']"
                         [queryParams]="{ orderId: order.id }"
                         class="link link-hover text-sm"
                       >
-                        Payments
+                        View
                       </a>
                     </td>
                   </tr>
