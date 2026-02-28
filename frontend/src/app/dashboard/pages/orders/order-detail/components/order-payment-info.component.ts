@@ -3,42 +3,58 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../../core/services/currency.service';
 import type { OrderPaymentInfoInput } from '../order-detail.types';
+
 /**
  * Order Payment Info Component
  *
- * Displays all payments for the order with method, status, and link to payment detail.
+ * Displays all payments for the order in a table-like layout with method, amount, date,
+ * and a total row. Links to payment detail.
  */
 @Component({
   selector: 'app-order-payment-info',
   imports: [CommonModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="mb-6">
-      <h3 class="font-semibold mb-2">Payment</h3>
+    <div>
+      <h3 class="font-semibold mb-3">Payments</h3>
       @if (paymentList().length === 0) {
         <p class="text-sm text-base-content/60">No payments</p>
       } @else {
-        <ul class="space-y-2">
-          @for (p of paymentList(); track p.id) {
-            <li
-              class="flex flex-wrap items-center justify-between gap-2 py-1.5 border-b border-base-300/50 last:border-0"
-            >
-              <div class="min-w-0">
-                <span class="font-medium">{{ p.method }}</span>
-                <span class="text-sm text-base-content/60 ml-2">{{ formatAmount(p.amount) }}</span>
-                <span class="text-sm text-base-content/50 ml-1"
-                  >· {{ formatDate(p.createdAt) }}</span
-                >
-              </div>
-              <a [routerLink]="['/dashboard/payments', p.id]" class="btn btn-ghost btn-xs">
-                View
-              </a>
-            </li>
-          }
-        </ul>
-        <p class="text-sm text-base-content/60 mt-2">
-          <strong>Status:</strong> {{ primaryPayment()?.state ?? 'N/A' }}
-        </p>
+        <div class="overflow-x-auto rounded-lg border border-base-300/60">
+          <table class="table table-sm table-zebra">
+            <thead>
+              <tr>
+                <th class="w-0">Method</th>
+                <th class="text-right">Amount</th>
+                <th class="text-base-content/70">Date</th>
+                <th class="w-0"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of paymentList(); track p.id) {
+                <tr>
+                  <td class="font-medium">{{ p.method }}</td>
+                  <td class="text-right">{{ formatAmount(p.amount) }}</td>
+                  <td class="text-sm text-base-content/70">{{ formatDate(p.createdAt) }}</td>
+                  <td>
+                    <a [routerLink]="['/dashboard/payments', p.id]" class="btn btn-ghost btn-xs">
+                      View
+                    </a>
+                  </td>
+                </tr>
+              }
+            </tbody>
+            @if (totalPaid() > 0) {
+              <tfoot>
+                <tr class="border-t-2 border-base-300 font-semibold">
+                  <td>Total paid</td>
+                  <td class="text-right">{{ formatAmount(totalPaid()) }}</td>
+                  <td colspan="2"></td>
+                </tr>
+              </tfoot>
+            }
+          </table>
+        </div>
       }
     </div>
   `,
@@ -52,9 +68,8 @@ export class OrderPaymentInfoComponent {
     return Array.isArray(p) ? p : [];
   });
 
-  readonly primaryPayment = computed(() => {
-    const payments = this.paymentList();
-    return payments.length > 0 ? payments[0] : null;
+  readonly totalPaid = computed(() => {
+    return this.paymentList().reduce((sum, payment) => sum + (Number(payment.amount) ?? 0), 0);
   });
 
   formatDate(dateString: string | null | undefined): string {

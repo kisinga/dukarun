@@ -134,6 +134,25 @@ export class CustomerStatementComponent implements OnInit {
     return payments.filter((p) => p.state === 'Settled');
   }
 
+  /** Total of settled payments for an order (cents). */
+  getPaymentsTotal(order: { payments?: Array<{ state?: string; amount?: number }> }): number {
+    return this.getSettledPayments(order).reduce((sum, p) => sum + (p.amount ?? 0), 0);
+  }
+
+  /** Order total in cents (totalWithTax or total). */
+  getOrderTotal(order: { totalWithTax?: number; total?: number }): number {
+    return order.totalWithTax ?? order.total ?? 0;
+  }
+
+  /** Outstanding balance for an order in cents. */
+  getOrderBalance(order: {
+    totalWithTax?: number;
+    total?: number;
+    payments?: Array<{ state?: string; amount?: number }>;
+  }): number {
+    return Math.max(0, this.getOrderTotal(order) - this.getPaymentsTotal(order));
+  }
+
   dismissToast(): void {
     this.toastMessage.set(null);
   }

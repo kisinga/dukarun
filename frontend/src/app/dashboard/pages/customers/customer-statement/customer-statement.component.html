@@ -1,12 +1,20 @@
-<div class="space-y-6">
-  <!-- Header -->
-  <div class="flex flex-wrap items-center justify-between gap-3">
-    <div>
-      <button type="button" (click)="goBack()" class="btn btn-ghost btn-sm mb-2">
-        ← Back to Customers
-      </button>
-      <h1 class="text-2xl font-bold">Customer Statement</h1>
-    </div>
+<div class="space-y-4 lg:space-y-6">
+  <!-- Header (matches order detail pattern) -->
+  <div class="no-print">
+    <button type="button" (click)="goBack()" class="btn btn-ghost btn-sm mb-3">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+      Back to Customers
+    </button>
+    <h1 class="text-xl sm:text-2xl font-bold text-base-content">Customer Statement</h1>
   </div>
 
   @if (error()) {
@@ -24,8 +32,8 @@
   @if (customer() && !isLoading()) {
     <!-- Statement content (printable) -->
     <div class="statement-content">
-      <div class="card bg-base-100 shadow-sm border border-base-300">
-        <div class="card-body">
+      <div class="card bg-base-100 shadow-sm border border-base-300/60">
+        <div class="card-body p-3 sm:p-4">
           <h2 class="card-title text-lg">{{ customerName() }}</h2>
           @if (customer()?.emailAddress && hasEmail()) {
             <p class="text-sm text-base-content/70">{{ customer()!.emailAddress }}</p>
@@ -37,7 +45,7 @@
         </div>
       </div>
 
-      <div class="card bg-base-100 shadow-sm border border-base-300 mt-4">
+      <div class="card bg-base-100 shadow-sm border border-base-300/60 mt-4">
         <div class="card-body p-0">
           <div class="overflow-x-auto">
             <table class="table table-zebra">
@@ -45,9 +53,10 @@
                 <tr>
                   <th>Date</th>
                   <th>Order</th>
-                  <th class="text-right">Total</th>
+                  <th class="text-right">Order total</th>
                   <th>Payments</th>
-                  <th></th>
+                  <th class="text-right">Balance / Status</th>
+                  <th class="w-0"></th>
                 </tr>
               </thead>
               <tbody>
@@ -59,29 +68,62 @@
                     <td class="align-top">
                       <a
                         [routerLink]="['/dashboard/orders', order.id]"
-                        class="link link-hover font-mono"
+                        class="link link-hover font-mono font-medium"
                       >
                         {{ order.code }}
                       </a>
                     </td>
                     <td class="text-right font-medium align-top">
-                      {{ currencyService.format(order.totalWithTax ?? order.total ?? 0, false) }}
+                      {{ currencyService.format(getOrderTotal(order), false) }}
                     </td>
                     <td class="align-top">
                       @if (getSettledPayments(order).length > 0) {
-                        <ul class="list-none p-0 m-0 text-sm text-base-content/80 space-y-1">
-                          @for (p of getSettledPayments(order); track p.id) {
-                            <li>
-                              {{ p.method }}
-                              {{ currencyService.format(p.amount ?? 0, false) }}
-                              <span class="text-base-content/50">{{
-                                formatDate(p.createdAt)
-                              }}</span>
-                            </li>
-                          }
-                        </ul>
+                        <div
+                          class="min-w-[12rem] rounded border border-base-300/60 overflow-hidden"
+                        >
+                          <table class="table table-xs table-zebra">
+                            <thead>
+                              <tr>
+                                <th class="py-1">Method</th>
+                                <th class="text-right py-1">Amount</th>
+                                <th class="text-base-content/70 py-1">Date</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              @for (p of getSettledPayments(order); track p.id) {
+                                <tr>
+                                  <td class="py-1">{{ p.method }}</td>
+                                  <td class="text-right py-1">
+                                    {{ currencyService.format(p.amount ?? 0, false) }}
+                                  </td>
+                                  <td class="text-base-content/70 text-xs py-1">
+                                    {{ formatDate(p.createdAt) }}
+                                  </td>
+                                </tr>
+                              }
+                            </tbody>
+                            <tfoot>
+                              <tr class="border-t border-base-300 font-semibold bg-base-200/50">
+                                <td class="py-1">Total</td>
+                                <td class="text-right py-1">
+                                  {{ currencyService.format(getPaymentsTotal(order), false) }}
+                                </td>
+                                <td class="py-1"></td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
                       } @else {
                         <span class="text-base-content/50 text-sm">—</span>
+                      }
+                    </td>
+                    <td class="text-right align-top">
+                      @if (getOrderBalance(order) === 0) {
+                        <span class="badge badge-sm badge-success">Paid</span>
+                      } @else {
+                        <span class="badge badge-sm badge-warning">
+                          Balance {{ currencyService.format(getOrderBalance(order), false) }}
+                        </span>
                       }
                     </td>
                     <td class="align-top">
@@ -90,7 +132,7 @@
                         [queryParams]="{ orderId: order.id }"
                         class="link link-hover text-sm"
                       >
-                        View
+                        View payments
                       </a>
                     </td>
                   </tr>
@@ -105,19 +147,21 @@
       </div>
 
       @if (customer()?.outstandingAmount != null && customer()!.outstandingAmount !== 0) {
-        <div class="mt-4 p-4 bg-base-200 rounded-lg">
-          <p class="font-semibold">
-            Outstanding balance:
-            <span [class.text-warning]="(customer()!.outstandingAmount ?? 0) > 0">
-              {{ currencyService.format(customer()!.outstandingAmount ?? 0, false) }}
-            </span>
-          </p>
+        <div class="mt-4 card bg-base-200/50 border border-base-300/60 shadow-sm">
+          <div class="card-body py-3 px-4">
+            <p class="font-semibold text-base-content">
+              Outstanding balance:
+              <span class="text-warning">{{
+                currencyService.format(customer()!.outstandingAmount ?? 0, false)
+              }}</span>
+            </p>
+          </div>
         </div>
       }
     </div>
 
     <!-- Actions (hidden when printing) -->
-    <div class="no-print flex flex-wrap items-center gap-2 pt-4 border-t border-base-300">
+    <div class="no-print flex flex-wrap items-center gap-2 pt-4 mt-4 border-t border-base-300/50">
       <button type="button" class="btn btn-primary btn-sm" (click)="printStatement()">
         Download PDF
       </button>
