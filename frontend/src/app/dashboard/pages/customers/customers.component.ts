@@ -442,6 +442,14 @@ export class CustomersComponent implements OnInit {
     this.router.navigate(['/dashboard/orders'], { queryParams: { customerId } });
   }
 
+  onViewPaymentsRequested(customerId: string): void {
+    this.router.navigate(['/dashboard/payments'], { queryParams: { customerId } });
+  }
+
+  onStatementRequested(customerId: string): void {
+    this.router.navigate(['/dashboard/customers', customerId, 'statement']);
+  }
+
   /**
    * Handle filter click from stats component
    */

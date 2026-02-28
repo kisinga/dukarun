@@ -133,6 +133,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'customers/:id/statement',
+        loadComponent: () =>
+          import('./dashboard/pages/customers/customer-statement/customer-statement.component').then(
+            (m) => m.CustomerStatementComponent,
+          ),
+      },
+      {
         path: 'orders',
         loadComponent: () =>
           import('./dashboard/pages/orders/orders.component').then((m) => m.OrdersComponent),

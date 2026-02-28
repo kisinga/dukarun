@@ -695,6 +695,7 @@ export type ChannelCustomFields = {
   paystackSubscriptionCode?: Maybe<Scalars['String']['output']>;
   requireOpeningCount?: Maybe<Scalars['Boolean']['output']>;
   smsPeriodEnd?: Maybe<Scalars['DateTime']['output']>;
+  smsUsageByCategory?: Maybe<Scalars['String']['output']>;
   smsUsedThisPeriod?: Maybe<Scalars['Int']['output']>;
   status?: Maybe<Scalars['String']['output']>;
   stockValueCache?: Maybe<Scalars['String']['output']>;
@@ -774,6 +775,7 @@ export type ChannelFilterParameter = {
   pricesIncludeTax?: InputMaybe<BooleanOperators>;
   requireOpeningCount?: InputMaybe<BooleanOperators>;
   smsPeriodEnd?: InputMaybe<DateOperators>;
+  smsUsageByCategory?: InputMaybe<StringOperators>;
   smsUsedThisPeriod?: InputMaybe<NumberOperators>;
   status?: InputMaybe<StringOperators>;
   stockValueCache?: InputMaybe<StringOperators>;
@@ -867,6 +869,7 @@ export type ChannelSortParameter = {
   paystackSubscriptionCode?: InputMaybe<SortOrder>;
   requireOpeningCount?: InputMaybe<SortOrder>;
   smsPeriodEnd?: InputMaybe<SortOrder>;
+  smsUsageByCategory?: InputMaybe<SortOrder>;
   smsUsedThisPeriod?: InputMaybe<SortOrder>;
   status?: InputMaybe<SortOrder>;
   stockValueCache?: InputMaybe<SortOrder>;
@@ -1277,6 +1280,7 @@ export type CreateChannelCustomFieldsInput = {
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
   smsPeriodEnd?: InputMaybe<Scalars['DateTime']['input']>;
+  smsUsageByCategory?: InputMaybe<Scalars['String']['input']>;
   smsUsedThisPeriod?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   stockValueCache?: InputMaybe<Scalars['String']['input']>;
@@ -4033,6 +4037,8 @@ export type Mutation = {
   reviewCashCount: CashDrawerCount;
   runPendingSearchIndexUpdates: Success;
   runScheduledTask: Success;
+  sendCustomerStatementEmail: Scalars['Boolean']['output'];
+  sendCustomerStatementSms: Scalars['Boolean']['output'];
   setCustomerForDraftOrder: SetCustomerForDraftOrderResult;
   /** Sets the billing address for a draft Order */
   setDraftOrderBillingAddress: Order;
@@ -5046,6 +5052,16 @@ export type MutationReviewCashCountArgs = {
 
 export type MutationRunScheduledTaskArgs = {
   id: Scalars['String']['input'];
+};
+
+
+export type MutationSendCustomerStatementEmailArgs = {
+  customerId: Scalars['ID']['input'];
+};
+
+
+export type MutationSendCustomerStatementSmsArgs = {
+  customerId: Scalars['ID']['input'];
 };
 
 
@@ -9379,6 +9395,7 @@ export type UpdateChannelCustomFieldsInput = {
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
   smsPeriodEnd?: InputMaybe<Scalars['DateTime']['input']>;
+  smsUsageByCategory?: InputMaybe<Scalars['String']['input']>;
   smsUsedThisPeriod?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   stockValueCache?: InputMaybe<Scalars['String']['input']>;

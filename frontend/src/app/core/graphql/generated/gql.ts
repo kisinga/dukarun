@@ -104,6 +104,8 @@ type Documents = {
   '\n  query GetUnpaidOrdersForCustomer($customerId: ID!) {\n    unpaidOrdersForCustomer(customerId: $customerId) {\n      id\n      code\n      state\n      total\n      totalWithTax\n      createdAt\n      payments {\n        id\n        state\n        amount\n        method\n      }\n    }\n  }\n': typeof types.GetUnpaidOrdersForCustomerDocument;
   '\n  mutation AllocateBulkPayment($input: PaymentAllocationInput!) {\n    allocateBulkPayment(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n': typeof types.AllocateBulkPaymentDocument;
   '\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n': typeof types.PaySingleOrderDocument;
+  '\n  mutation SendCustomerStatementEmail($customerId: ID!) {\n    sendCustomerStatementEmail(customerId: $customerId)\n  }\n': typeof types.SendCustomerStatementEmailDocument;
+  '\n  mutation SendCustomerStatementSms($customerId: ID!) {\n    sendCustomerStatementSms(customerId: $customerId)\n  }\n': typeof types.SendCustomerStatementSmsDocument;
   '\n  mutation PaySinglePurchase($input: PaySinglePurchaseInput!) {\n    paySinglePurchase(input: $input) {\n      purchasesPaid {\n        purchaseId\n        purchaseReference\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n      excessPayment\n    }\n  }\n': typeof types.PaySinglePurchaseDocument;
   '\n  query GetSupplierCreditSummary($supplierId: ID!) {\n    supplierCreditSummary(supplierId: $supplierId) {\n      supplierId\n      isSupplierCreditApproved\n      supplierCreditLimit\n      outstandingAmount\n      availableCredit\n      lastRepaymentDate\n      lastRepaymentAmount\n      supplierCreditDuration\n    }\n  }\n': typeof types.GetSupplierCreditSummaryDocument;
   '\n  mutation ApproveSupplierCredit($input: ApproveSupplierCreditInput!) {\n    approveSupplierCredit(input: $input) {\n      supplierId\n      isSupplierCreditApproved\n      supplierCreditLimit\n      outstandingAmount\n      availableCredit\n      lastRepaymentDate\n      lastRepaymentAmount\n      supplierCreditDuration\n    }\n  }\n': typeof types.ApproveSupplierCreditDocument;
@@ -367,6 +369,10 @@ const documents: Documents = {
     types.AllocateBulkPaymentDocument,
   '\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n':
     types.PaySingleOrderDocument,
+  '\n  mutation SendCustomerStatementEmail($customerId: ID!) {\n    sendCustomerStatementEmail(customerId: $customerId)\n  }\n':
+    types.SendCustomerStatementEmailDocument,
+  '\n  mutation SendCustomerStatementSms($customerId: ID!) {\n    sendCustomerStatementSms(customerId: $customerId)\n  }\n':
+    types.SendCustomerStatementSmsDocument,
   '\n  mutation PaySinglePurchase($input: PaySinglePurchaseInput!) {\n    paySinglePurchase(input: $input) {\n      purchasesPaid {\n        purchaseId\n        purchaseReference\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n      excessPayment\n    }\n  }\n':
     types.PaySinglePurchaseDocument,
   '\n  query GetSupplierCreditSummary($supplierId: ID!) {\n    supplierCreditSummary(supplierId: $supplierId) {\n      supplierId\n      isSupplierCreditApproved\n      supplierCreditLimit\n      outstandingAmount\n      availableCredit\n      lastRepaymentDate\n      lastRepaymentAmount\n      supplierCreditDuration\n    }\n  }\n':
@@ -1083,6 +1089,18 @@ export function graphql(
 export function graphql(
   source: '\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n',
 ): (typeof documents)['\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation SendCustomerStatementEmail($customerId: ID!) {\n    sendCustomerStatementEmail(customerId: $customerId)\n  }\n',
+): (typeof documents)['\n  mutation SendCustomerStatementEmail($customerId: ID!) {\n    sendCustomerStatementEmail(customerId: $customerId)\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation SendCustomerStatementSms($customerId: ID!) {\n    sendCustomerStatementSms(customerId: $customerId)\n  }\n',
+): (typeof documents)['\n  mutation SendCustomerStatementSms($customerId: ID!) {\n    sendCustomerStatementSms(customerId: $customerId)\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

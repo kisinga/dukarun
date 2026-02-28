@@ -1,0 +1,8 @@
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .statement-content {
+    print-color-adjust: exact;
+  }
+}

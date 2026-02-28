@@ -718,6 +718,7 @@ export type ChannelCustomFields = {
   paystackSubscriptionCode?: Maybe<Scalars['String']['output']>;
   requireOpeningCount?: Maybe<Scalars['Boolean']['output']>;
   smsPeriodEnd?: Maybe<Scalars['DateTime']['output']>;
+  smsUsageByCategory?: Maybe<Scalars['String']['output']>;
   smsUsedThisPeriod?: Maybe<Scalars['Int']['output']>;
   status?: Maybe<Scalars['String']['output']>;
   stockValueCache?: Maybe<Scalars['String']['output']>;
@@ -797,6 +798,7 @@ export type ChannelFilterParameter = {
   pricesIncludeTax?: InputMaybe<BooleanOperators>;
   requireOpeningCount?: InputMaybe<BooleanOperators>;
   smsPeriodEnd?: InputMaybe<DateOperators>;
+  smsUsageByCategory?: InputMaybe<StringOperators>;
   smsUsedThisPeriod?: InputMaybe<NumberOperators>;
   status?: InputMaybe<StringOperators>;
   stockValueCache?: InputMaybe<StringOperators>;
@@ -890,6 +892,7 @@ export type ChannelSortParameter = {
   paystackSubscriptionCode?: InputMaybe<SortOrder>;
   requireOpeningCount?: InputMaybe<SortOrder>;
   smsPeriodEnd?: InputMaybe<SortOrder>;
+  smsUsageByCategory?: InputMaybe<SortOrder>;
   smsUsedThisPeriod?: InputMaybe<SortOrder>;
   status?: InputMaybe<SortOrder>;
   stockValueCache?: InputMaybe<SortOrder>;
@@ -1300,6 +1303,7 @@ export type CreateChannelCustomFieldsInput = {
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
   smsPeriodEnd?: InputMaybe<Scalars['DateTime']['input']>;
+  smsUsageByCategory?: InputMaybe<Scalars['String']['input']>;
   smsUsedThisPeriod?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   stockValueCache?: InputMaybe<Scalars['String']['input']>;
@@ -4074,6 +4078,8 @@ export type Mutation = {
   reviewCashCount: CashDrawerCount;
   runPendingSearchIndexUpdates: Success;
   runScheduledTask: Success;
+  sendCustomerStatementEmail: Scalars['Boolean']['output'];
+  sendCustomerStatementSms: Scalars['Boolean']['output'];
   setCustomerForDraftOrder: SetCustomerForDraftOrderResult;
   /** Sets the billing address for a draft Order */
   setDraftOrderBillingAddress: Order;
@@ -4919,6 +4925,14 @@ export type MutationReviewCashCountArgs = {
 
 export type MutationRunScheduledTaskArgs = {
   id: Scalars['String']['input'];
+};
+
+export type MutationSendCustomerStatementEmailArgs = {
+  customerId: Scalars['ID']['input'];
+};
+
+export type MutationSendCustomerStatementSmsArgs = {
+  customerId: Scalars['ID']['input'];
 };
 
 export type MutationSetCustomerForDraftOrderArgs = {
@@ -9083,6 +9097,7 @@ export type UpdateChannelCustomFieldsInput = {
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
   smsPeriodEnd?: InputMaybe<Scalars['DateTime']['input']>;
+  smsUsageByCategory?: InputMaybe<Scalars['String']['input']>;
   smsUsedThisPeriod?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   stockValueCache?: InputMaybe<Scalars['String']['input']>;
@@ -11724,6 +11739,24 @@ export type PaySingleOrderMutation = {
       amountPaid: number;
     }>;
   };
+};
+
+export type SendCustomerStatementEmailMutationVariables = Exact<{
+  customerId: Scalars['ID']['input'];
+}>;
+
+export type SendCustomerStatementEmailMutation = {
+  __typename?: 'Mutation';
+  sendCustomerStatementEmail: boolean;
+};
+
+export type SendCustomerStatementSmsMutationVariables = Exact<{
+  customerId: Scalars['ID']['input'];
+}>;
+
+export type SendCustomerStatementSmsMutation = {
+  __typename?: 'Mutation';
+  sendCustomerStatementSms: boolean;
 };
 
 export type PaySinglePurchaseMutationVariables = Exact<{
@@ -20553,6 +20586,84 @@ export const PaySingleOrderDocument = {
     },
   ],
 } as unknown as DocumentNode<PaySingleOrderMutation, PaySingleOrderMutationVariables>;
+export const SendCustomerStatementEmailDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'SendCustomerStatementEmail' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'customerId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'sendCustomerStatementEmail' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'customerId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'customerId' } },
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  SendCustomerStatementEmailMutation,
+  SendCustomerStatementEmailMutationVariables
+>;
+export const SendCustomerStatementSmsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'SendCustomerStatementSms' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'customerId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'sendCustomerStatementSms' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'customerId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'customerId' } },
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  SendCustomerStatementSmsMutation,
+  SendCustomerStatementSmsMutationVariables
+>;
 export const PaySinglePurchaseDocument = {
   kind: 'Document',
   definitions: [

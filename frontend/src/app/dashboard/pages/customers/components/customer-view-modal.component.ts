@@ -34,6 +34,8 @@ export class CustomerViewModalComponent {
   readonly editRequested = output<string>();
   readonly recordPaymentRequested = output<string>();
   readonly viewOrdersRequested = output<string>();
+  readonly viewPaymentsRequested = output<string>();
+  readonly statementRequested = output<string>();
 
   // Modal reference
   readonly modalRef = viewChild<ElementRef<HTMLDialogElement>>('modal');
@@ -245,6 +247,16 @@ export class CustomerViewModalComponent {
 
   onViewOrders(): void {
     this.viewOrdersRequested.emit(this.customer().id);
+    this.hide();
+  }
+
+  onViewPayments(): void {
+    this.viewPaymentsRequested.emit(this.customer().id);
+    this.hide();
+  }
+
+  onStatement(): void {
+    this.statementRequested.emit(this.customer().id);
     this.hide();
   }
 }
