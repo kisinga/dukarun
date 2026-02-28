@@ -135,7 +135,15 @@ export class CustomerStatementComponent implements OnInit {
   }
 
   /** Total of settled payments for an order (cents). */
-  getPaymentsTotal(order: { payments?: Array<{ state?: string; amount?: number }> }): number {
+  getPaymentsTotal(order: {
+    payments?: Array<{
+      id: string;
+      state?: string;
+      amount?: number;
+      method?: string;
+      createdAt?: string;
+    }>;
+  }): number {
     return this.getSettledPayments(order).reduce((sum, p) => sum + (p.amount ?? 0), 0);
   }
 
@@ -148,7 +156,13 @@ export class CustomerStatementComponent implements OnInit {
   getOrderBalance(order: {
     totalWithTax?: number;
     total?: number;
-    payments?: Array<{ state?: string; amount?: number }>;
+    payments?: Array<{
+      id: string;
+      state?: string;
+      amount?: number;
+      method?: string;
+      createdAt?: string;
+    }>;
   }): number {
     return Math.max(0, this.getOrderTotal(order) - this.getPaymentsTotal(order));
   }
