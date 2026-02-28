@@ -120,6 +120,20 @@ export class CustomerStatementComponent implements OnInit {
     });
   }
 
+  /** Settled payments for an order (for statement display). */
+  getSettledPayments(order: {
+    payments?: Array<{
+      id: string;
+      state?: string;
+      amount?: number;
+      method?: string;
+      createdAt?: string;
+    }>;
+  }): Array<{ id: string; state?: string; amount?: number; method?: string; createdAt?: string }> {
+    const payments = order.payments ?? [];
+    return payments.filter((p) => p.state === 'Settled');
+  }
+
   dismissToast(): void {
     this.toastMessage.set(null);
   }
