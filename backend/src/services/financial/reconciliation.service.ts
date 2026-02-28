@@ -44,6 +44,7 @@ export interface CreateReconciliationInput {
  * This service uses AccountBalanceService which queries journal lines directly from the ledger.
  *
  * Manages reconciliation records for all scopes.
+ * Variance convention (per-account): variance = declared - expected; positive = overage, negative = shortage.
  */
 @Injectable()
 export class ReconciliationService {
@@ -94,17 +95,23 @@ export class ReconciliationService {
    * Create reconciliation record.
    * Reconciliation is a snapshot in time; the service derives the snapshot date internally.
    * For scope=manual: snapshot = today. For scope=cash-session: pass snapshotDate in options.
+   * When expectedAmountCentsByAccountId is provided (e.g. closing recon), per-account expected and variance are persisted.
    */
   async createReconciliation(
     ctx: RequestContext,
     input: CreateReconciliationInput,
-    options?: { snapshotDate?: string }
+    options?: { snapshotDate?: string; expectedAmountCentsByAccountId?: Record<string, string> }
   ): Promise<Reconciliation> {
     if (input.scope === 'manual') {
       return this.createManualReconciliationWithPosting(ctx, input);
     }
     const snapshotDate = options?.snapshotDate ?? new Date().toISOString().slice(0, 10);
-    return this.createReconciliationRecordOnly(ctx, input, snapshotDate);
+    return this.createReconciliationRecordOnly(
+      ctx,
+      input,
+      snapshotDate,
+      options?.expectedAmountCentsByAccountId
+    );
   }
 
   /**
@@ -130,7 +137,8 @@ export class ReconciliationService {
             ...input,
             actualBalance: '0',
           },
-          today
+          today,
+          undefined
         );
       }
 
@@ -193,13 +201,16 @@ export class ReconciliationService {
       const saved = await reconciliationRepo.save(reconciliation);
 
       const junctionRepo = this.connection.getRepository(txCtx, ReconciliationAccount);
-      const rows = accountIds.map(id =>
-        junctionRepo.create({
+      const rows = accountIds.map(id => {
+        const p = perAccount.find(a => a.accountId === id);
+        return junctionRepo.create({
           reconciliationId: saved.id,
           accountId: id,
           declaredAmountCents: declared[id] ?? null,
-        })
-      );
+          expectedAmountCents: p != null ? String(p.expectedCents) : null,
+          varianceCents: p != null ? String(p.varianceCents) : null,
+        });
+      });
       await junctionRepo.save(rows);
 
       for (const { code, varianceCents } of perAccount) {
@@ -221,11 +232,13 @@ export class ReconciliationService {
 
   /**
    * Create reconciliation record only (no ledger posting). Used for non-manual scopes.
+   * When expectedAmountCentsByAccountId is provided, persists expected and variance per account (variance = declared - expected).
    */
   private async createReconciliationRecordOnly(
     ctx: RequestContext,
     input: CreateReconciliationInput,
-    snapshotDate: string
+    snapshotDate: string,
+    expectedAmountCentsByAccountId?: Record<string, string>
   ): Promise<Reconciliation> {
     const { accountIds, accountDeclaredAmounts } = await this.resolveDeclaredAmounts(
       ctx,
@@ -236,6 +249,7 @@ export class ReconciliationService {
     const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
     const expectedBalance = input.expectedBalance ? BigInt(input.expectedBalance) : BigInt(0);
     const actualBalance = BigInt(input.actualBalance);
+    // Header variance: expected - actual (legacy). Per-account convention is variance = declared - expected (positive = overage, negative = shortage).
     const varianceAmount = (expectedBalance - actualBalance).toString();
     const createdBy = ctx.activeUserId ? parseInt(ctx.activeUserId.toString(), 10) : 0;
     const reconciliation = reconciliationRepo.create({
@@ -255,13 +269,23 @@ export class ReconciliationService {
     if (accountIds.length > 0) {
       const junctionRepo = this.connection.getRepository(ctx, ReconciliationAccount);
       const declared = accountDeclaredAmounts;
-      const rows = accountIds.map(accountId =>
-        junctionRepo.create({
+      const rows = accountIds.map(accountId => {
+        const declaredStr = declared[accountId] ?? null;
+        const expectedStr = expectedAmountCentsByAccountId?.[accountId] ?? null;
+        let varianceStr: string | null = null;
+        if (declaredStr != null && expectedStr != null) {
+          const d = parseInt(declaredStr, 10);
+          const e = parseInt(expectedStr, 10);
+          if (!Number.isNaN(d) && !Number.isNaN(e)) varianceStr = String(d - e);
+        }
+        return junctionRepo.create({
           reconciliationId: saved.id,
           accountId,
-          declaredAmountCents: declared[accountId] ?? null,
-        })
-      );
+          declaredAmountCents: declaredStr,
+          expectedAmountCents: expectedStr,
+          varianceCents: varianceStr,
+        });
+      });
       await junctionRepo.save(rows);
     }
 
@@ -597,19 +621,24 @@ export class ReconciliationService {
         const declaredStr = row.declaredAmountCents ?? null;
         let expectedStr: string | null = null;
         let varianceStr: string | null = null;
-        try {
-          const balance = await this.accountBalanceService.getAccountBalance(
-            ctx,
-            account.code,
-            reconciliation.channelId,
-            reconciliation.snapshotAt
-          );
-          expectedStr = String(balance.balance);
-          const expected = BigInt(expectedStr);
-          const declared = declaredStr !== null ? BigInt(declaredStr) : BigInt(0);
-          varianceStr = (expected - declared).toString();
-        } catch {
-          // Account may be deleted or balance unavailable
+        if (row.expectedAmountCents != null) {
+          expectedStr = row.expectedAmountCents;
+          varianceStr = row.varianceCents ?? null;
+        } else {
+          try {
+            const balance = await this.accountBalanceService.getAccountBalance(
+              ctx,
+              account.code,
+              reconciliation.channelId,
+              reconciliation.snapshotAt
+            );
+            expectedStr = String(balance.balance);
+            const expected = BigInt(expectedStr);
+            const declared = declaredStr !== null ? BigInt(declaredStr) : BigInt(0);
+            varianceStr = (expected - declared).toString();
+          } catch {
+            // Account may be deleted or balance unavailable
+          }
         }
         result.push({
           accountId: account.id,
