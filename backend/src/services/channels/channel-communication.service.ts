@@ -1,14 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Customer, CustomerService, EventBus, RequestContext } from '@vendure/core';
+import { CustomerService, EventBus, RequestContext } from '@vendure/core';
 import { CustomerNotificationEvent } from '../../infrastructure/events/custom-events';
-import { AccountNotificationDeliveryService } from './account-notification-delivery.service';
 
 /**
  * Channel Communication Service
  *
  * Business logic service for credit-related customer communications.
- * Handles sending notifications for credit events (approval, balance changes, repayment deadlines).
- * Balance-change notifications are delivered to the customer via SMS/email (AccountNotificationDeliveryService).
+ * Publishes events; NotificationSubscriber delivers in-app and SMS/email via OutboundDeliveryService.
  */
 @Injectable()
 export class ChannelCommunicationService {
@@ -16,8 +14,7 @@ export class ChannelCommunicationService {
 
   constructor(
     private readonly customerService: CustomerService,
-    private readonly eventBus: EventBus,
-    private readonly accountNotificationDelivery: AccountNotificationDeliveryService
+    private readonly eventBus: EventBus
   ) {}
 
   /**
@@ -120,18 +117,10 @@ export class ChannelCommunicationService {
       this.eventBus.publish(
         new CustomerNotificationEvent(ctx, channelId, 'balance_changed', customerId, {
           outstandingAmount,
+          oldBalance: 0,
           isStartingBalance: true,
           targetUserId: customer.user?.id?.toString(),
         })
-      );
-
-      const amountCents = Math.round(Number(outstandingAmount));
-      await this.accountNotificationDelivery.deliverBalanceChange(
-        ctx,
-        channelId,
-        'customer',
-        customerId,
-        { oldBalanceCents: 0, newBalanceCents: amountCents }
       );
 
       this.logger.log(`Sent starting balance notification for customer ${customerId}`);
@@ -144,7 +133,7 @@ export class ChannelCommunicationService {
   }
 
   /**
-   * Send balance change notification (in-app event + SMS/email to customer via AccountNotificationDeliveryService).
+   * Send balance change notification. Publishes event; subscriber delivers in-app and SMS via outbound.
    */
   async sendBalanceChangeNotification(
     ctx: RequestContext,
@@ -153,20 +142,13 @@ export class ChannelCommunicationService {
     newBalance: number
   ): Promise<void> {
     try {
-      // Only send if balance changed significantly (avoid spam)
-      if (Math.abs(newBalance - oldBalance) < 0.01) {
-        return;
-      }
+      if (Math.abs(newBalance - oldBalance) < 0.01) return;
 
       const customer = await this.customerService.findOne(ctx, customerId);
-      if (!customer) {
-        return;
-      }
+      if (!customer) return;
 
       const channelId = ctx.channelId?.toString();
-      if (!channelId) {
-        return;
-      }
+      if (!channelId) return;
 
       this.eventBus.publish(
         new CustomerNotificationEvent(ctx, channelId, 'balance_changed', customerId, {
@@ -175,14 +157,6 @@ export class ChannelCommunicationService {
           change: newBalance - oldBalance,
           targetUserId: customer.user?.id?.toString(),
         })
-      );
-
-      await this.accountNotificationDelivery.deliverBalanceChange(
-        ctx,
-        channelId,
-        'customer',
-        customerId,
-        { oldBalanceCents: Math.round(oldBalance), newBalanceCents: Math.round(newBalance) }
       );
 
       this.logger.log(

@@ -95,7 +95,8 @@ describe('Cashier-ledger flows', () => {
         { createReconciliation: jest.fn().mockResolvedValue({ id: 'rec1' }) },
         mockOpenSessionFinancial,
         mockChannelPaymentMethodService,
-        { log: jest.fn().mockImplementation(() => Promise.resolve()) }
+        { log: jest.fn().mockImplementation(() => Promise.resolve()) },
+        { publish: jest.fn() }
       );
 
       const opened = await cashierSessionService.startSession(ctx1, {
@@ -138,6 +139,11 @@ describe('Cashier-ledger flows', () => {
         createPayment: () => Promise.resolve(payment),
         settlePayment: () => Promise.resolve({ ...payment, state: 'Settled' }),
       } as any;
+      const mockChannelPaymentMethodForAllocation = {
+        getChannelPaymentMethods: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
+      } as any;
       const paymentAllocationService = new PaymentAllocationService(
         {
           withTransaction: (c: any, fn: (t: any) => Promise<any>) => fn(c),
@@ -151,6 +157,7 @@ describe('Cashier-ledger flows', () => {
           validatePaymentSourceAccount: jest.fn().mockImplementation(() => Promise.resolve()),
         } as any,
         cashierSessionService,
+        mockChannelPaymentMethodForAllocation,
         undefined as any
       );
 
@@ -167,7 +174,7 @@ describe('Cashier-ledger flows', () => {
         ctx1,
         expect.any(String),
         expect.any(Object),
-        'credit',
+        'credit-1',
         5000,
         ACCOUNT_CODES.CASH_ON_HAND,
         FLOW_A_SESSION_ID
@@ -216,6 +223,11 @@ describe('Cashier-ledger flows', () => {
         createPayment: () => Promise.resolve(paymentFlowB),
         settlePayment: () => Promise.resolve({ ...paymentFlowB, state: 'Settled' }),
       } as any;
+      const mockChannelPaymentMethodServiceFlowB = {
+        getChannelPaymentMethods: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
+      } as any;
       const paymentAllocationServiceFlowB = new PaymentAllocationService(
         {
           withTransaction: (c: any, fn: (t: any) => Promise<any>) => fn(c),
@@ -229,6 +241,7 @@ describe('Cashier-ledger flows', () => {
           validatePaymentSourceAccount: jest.fn().mockImplementation(() => Promise.resolve()),
         } as any,
         mockCashierSessionServiceFlowB,
+        mockChannelPaymentMethodServiceFlowB,
         undefined as any
       );
 
@@ -504,7 +517,8 @@ describe('Cashier-ledger flows', () => {
         mockReconciliationService,
         { postVarianceAdjustment: mockPostVariance },
         mockChannelPaymentMethodService,
-        { log: jest.fn().mockResolvedValue(undefined as never) }
+        { log: jest.fn().mockResolvedValue(undefined as never) },
+        { publish: jest.fn() }
       );
 
       await cashierSessionService.startSession(ctx1, {
@@ -598,7 +612,8 @@ describe('Cashier-ledger flows', () => {
         mockReconciliationService,
         { postVarianceAdjustment: mockPostVariance },
         mockChannelPaymentMethodService,
-        { log: jest.fn().mockResolvedValue(undefined as never) }
+        { log: jest.fn().mockResolvedValue(undefined as never) },
+        { publish: jest.fn() }
       );
 
       await cashierSessionService.startSession(ctx1, {
@@ -691,7 +706,8 @@ describe('Cashier-ledger flows', () => {
         mockReconciliationService,
         { postVarianceAdjustment: mockPostVariance },
         mockChannelPaymentMethodService,
-        { log: jest.fn().mockResolvedValue(undefined as never) }
+        { log: jest.fn().mockResolvedValue(undefined as never) },
+        { publish: jest.fn() }
       );
 
       await cashierSessionService.startSession(ctx1, {

@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { OtpService } from '../../services/auth/otp.service';
 import { RegistrationInput } from '../../services/auth/registration.service';
@@ -34,9 +35,9 @@ export class RegistrationStorageService {
       throw new Error('Redis not available. Cannot store registration data.');
     }
 
-    // Generate unique session ID (phone number + timestamp + random)
+    // Generate unique session ID (phone number + timestamp + crypto-random)
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 9);
+    const random = crypto.randomBytes(8).toString('hex');
     const sessionId = `${phoneNumber}:${timestamp}:${random}`;
     const storageKey = this.getStorageKey(sessionId);
 

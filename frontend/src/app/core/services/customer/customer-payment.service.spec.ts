@@ -1,8 +1,8 @@
 /**
  * CustomerPaymentService tests
  *
- * Ensures paySingleOrder calls the mutation with correct variables
- * (orderId, paymentAmount in cents, debitAccountCode when provided).
+ * Ensures recordPayment (single API) and paySingleOrder/recordBulkPayment call the correct
+ * mutations with expected variables.
  */
 
 import { provideZonelessChangeDetection } from '@angular/core';
@@ -12,6 +12,12 @@ import { APOLLO_TEST_CLIENT } from '../apollo-test-client.token';
 import { CustomerPaymentService } from './customer-payment.service';
 import { CustomerStateService } from './customer-state.service';
 
+const successResult = {
+  ordersPaid: [{ orderId: '1', orderCode: 'ORD-001', amountPaid: 5000 }],
+  remainingBalance: 0,
+  totalAllocated: 5000,
+};
+
 describe('CustomerPaymentService', () => {
   let mutateSpy: jasmine.Spy;
   let service: CustomerPaymentService;
@@ -20,11 +26,9 @@ describe('CustomerPaymentService', () => {
     mutateSpy = jasmine.createSpy('mutate').and.returnValue(
       Promise.resolve({
         data: {
-          paySingleOrder: {
-            ordersPaid: [{ orderId: '1', orderCode: 'ORD-001', amountPaid: 5000 }],
-            remainingBalance: 0,
-            totalAllocated: 5000,
-          },
+          paySingleOrder: successResult,
+          recordPayment: successResult,
+          allocateBulkPayment: successResult,
         },
       }),
     );
@@ -40,6 +44,49 @@ describe('CustomerPaymentService', () => {
     });
 
     service = TestBed.inject(CustomerPaymentService);
+  });
+
+  describe('recordPayment', () => {
+    it('should call recordPayment mutation with customerId, paymentAmount, paymentMethodCode', async () => {
+      await service.recordPayment({
+        customerId: 'cust-1',
+        paymentAmount: 5000,
+        paymentMethodCode: 'credit-1',
+      });
+
+      expect(mutateSpy).toHaveBeenCalled();
+      const call = mutateSpy.calls.mostRecent().args[0];
+      expect(call.variables.input.customerId).toBe('cust-1');
+      expect(call.variables.input.paymentAmount).toBe(5000);
+      expect(call.variables.input.paymentMethodCode).toBe('credit-1');
+      expect(call.variables.input.orderId).toBeUndefined();
+    });
+
+    it('should include orderId when provided (single order)', async () => {
+      await service.recordPayment({
+        customerId: 'cust-1',
+        paymentAmount: 3000,
+        paymentMethodCode: 'cash-1',
+        referenceNumber: 'REF-X',
+        orderId: 'order-99',
+      });
+
+      const call = mutateSpy.calls.mostRecent().args[0];
+      expect(call.variables.input.orderId).toBe('order-99');
+      expect(call.variables.input.referenceNumber).toBe('REF-X');
+    });
+
+    it('should return result when mutation succeeds', async () => {
+      const result = await service.recordPayment({
+        customerId: 'cust-1',
+        paymentAmount: 5000,
+        paymentMethodCode: 'credit-1',
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.totalAllocated).toBe(5000);
+      expect(result!.ordersPaid.length).toBe(1);
+    });
   });
 
   describe('paySingleOrder', () => {

@@ -490,6 +490,11 @@ export class MlModelResolver {
       return [];
     }
     try {
+      const serviceToken = env.ml?.serviceToken;
+      const headers: Record<string, string> = {};
+      if (serviceToken) {
+        headers.Authorization = `Bearer ${serviceToken}`;
+      }
       const { data } = await axios.get<
         Array<{
           channelId: string;
@@ -499,7 +504,7 @@ export class MlModelResolver {
           failedAt?: string;
           error?: string;
         }>
-      >(`${trainerUrl}/v1/jobs`, { timeout: 5000 });
+      >(`${trainerUrl}/v1/jobs`, { timeout: 5000, headers });
       if (!Array.isArray(data)) {
         return [];
       }

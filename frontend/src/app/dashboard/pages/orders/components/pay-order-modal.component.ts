@@ -16,26 +16,32 @@ import { CompanyService } from '../../../../core/services/company.service';
 import { CustomerPaymentService } from '../../../../core/services/customer/customer-payment.service';
 import { CustomerStateService } from '../../../../core/services/customer/customer-state.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
-import { LedgerService } from '../../../../core/services/ledger/ledger.service';
 import { OrdersService } from '../../../../core/services/orders.service';
 import {
   PaymentMethod,
   PaymentMethodService,
 } from '../../../../core/services/payment-method.service';
 
+/**
+ * Data for the unified Record Payment modal. When orderId is set, pays that order; when omitted, allocates across customer's unpaid orders (bulk).
+ */
 export interface PayOrderModalData {
-  orderId: string;
-  orderCode: string;
+  /** Required for recordPayment API */
+  customerId: string;
   customerName: string;
-  totalAmount: number;
   /** Outstanding amount in smallest currency unit (cents). Used for partial payment cap. */
   outstandingAmount: number;
+  totalAmount?: number;
+  /** When set, pay this order only; when omitted, bulk allocate. */
+  orderId?: string;
+  orderCode?: string;
 }
 
 /**
- * Pay Order Modal Component
+ * Record Payment Modal Component
  *
- * Mobile-optimized modal for paying a single order
+ * Single modal for recording a payment: with orderId (single order) or without (bulk for customer).
+ * Uses recordPayment API. Payment method required; no separate "receive into" dropdown.
  */
 @Component({
   selector: 'app-pay-order-modal',
@@ -49,7 +55,9 @@ export interface PayOrderModalData {
       >
         <!-- Header -->
         <div class="flex items-center justify-between mb-4 pb-3 border-b border-base-300">
-          <h3 class="text-lg font-bold text-base-content">Pay Order</h3>
+          <h3 class="text-lg font-bold text-base-content">
+            {{ orderData()?.orderId ? 'Pay Order' : 'Record Payment' }}
+          </h3>
           <form method="dialog">
             <button
               class="btn btn-sm btn-circle btn-ghost"
@@ -69,12 +77,17 @@ export interface PayOrderModalData {
           </form>
         </div>
 
-        <!-- Order Info -->
+        <!-- Context: order or customer -->
         <div class="mb-4 p-3 sm:p-4 bg-base-200 rounded-lg">
-          <div class="text-sm sm:text-base font-semibold text-base-content mb-1">
-            {{ orderData()?.orderCode }}
-          </div>
+          @if (orderData()?.orderId) {
+            <div class="text-sm sm:text-base font-semibold text-base-content mb-1">
+              {{ orderData()?.orderCode }}
+            </div>
+          }
           <div class="text-xs text-base-content/70">{{ orderData()?.customerName }}</div>
+          <div class="text-xs text-base-content/60 mt-1">
+            Outstanding: {{ formatCurrency(orderData()?.outstandingAmount ?? 0) }}
+          </div>
         </div>
 
         <!-- Success Message -->
@@ -140,10 +153,7 @@ export interface PayOrderModalData {
               <label class="label" for="paymentAmount">
                 <span class="label-text font-semibold">Amount to Pay</span>
                 <span class="label-text-alt text-base-content/60">
-                  Outstanding:
-                  {{
-                    formatCurrency(orderData()?.outstandingAmount ?? orderData()?.totalAmount ?? 0)
-                  }}
+                  Outstanding: {{ formatCurrency(orderData()?.outstandingAmount ?? 0) }}
                 </span>
               </label>
               <input
@@ -161,32 +171,6 @@ export interface PayOrderModalData {
                 <span class="label-text-alt text-base-content/60">
                   Enter amount in {{ currencyService.currency() }} (e.g. 500.00) or leave empty for
                   full
-                </span>
-              </label>
-            </div>
-
-            <!-- Destination account (where payment is received) -->
-            <div class="form-control">
-              <label class="label" for="debitAccount">
-                <span class="label-text font-semibold">Receive payment into</span>
-                <span class="label-text-alt text-base-content/60">Optional</span>
-              </label>
-              <select
-                id="debitAccount"
-                [value]="selectedDebitAccountCode()"
-                (change)="selectedDebitAccountCode.set($any($event.target).value)"
-                name="debitAccount"
-                class="select select-bordered w-full"
-                [disabled]="isProcessing() || isLoadingEligibleDebitAccounts()"
-              >
-                <option value="">Default (from payment method)</option>
-                @for (acc of eligibleDebitAccounts(); track acc.code) {
-                  <option [value]="acc.code">{{ acc.name }} ({{ acc.code }})</option>
-                }
-              </select>
-              <label class="label">
-                <span class="label-text-alt text-base-content/60">
-                  Account where this payment will be recorded (e.g. Cash, M-Pesa).
                 </span>
               </label>
             </div>
@@ -378,7 +362,6 @@ export class PayOrderModalComponent {
   readonly currencyService = inject(CurrencyService);
   private readonly ordersService = inject(OrdersService);
   private readonly paymentMethodService = inject(PaymentMethodService);
-  private readonly ledgerService = inject(LedgerService);
   protected readonly cashierSessionService = inject(CashierSessionService);
   private readonly companyService = inject(CompanyService);
 
@@ -401,9 +384,6 @@ export class PayOrderModalComponent {
   readonly isLoadingPaymentMethods = signal(false);
   readonly paymentMethodsError = signal<string | null>(null);
   readonly paymentAmountInput = signal<string>('');
-  readonly selectedDebitAccountCode = signal<string>('');
-  readonly eligibleDebitAccounts = signal<{ code: string; name: string }[]>([]);
-  readonly isLoadingEligibleDebitAccounts = signal(false);
   readonly successResult = signal<{
     ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
     remainingBalance: number;
@@ -441,7 +421,6 @@ export class PayOrderModalComponent {
     this.selectedPaymentMethod.set(null);
     this.paymentMethodsError.set(null);
     this.paymentAmountInput.set('');
-    this.selectedDebitAccountCode.set('');
 
     const companyId = this.companyService.activeCompanyId();
     if (companyId) {
@@ -451,22 +430,10 @@ export class PayOrderModalComponent {
       }
     }
 
-    await Promise.all([this.loadPaymentMethods(), this.loadEligibleDebitAccounts()]);
+    await this.loadPaymentMethods();
 
     const modal = this.modalRef()?.nativeElement;
     modal?.showModal();
-  }
-
-  async loadEligibleDebitAccounts(): Promise<void> {
-    this.isLoadingEligibleDebitAccounts.set(true);
-    try {
-      const items = await firstValueFrom(this.ledgerService.loadEligibleDebitAccounts());
-      this.eligibleDebitAccounts.set(items.map((a) => ({ code: a.code, name: a.name })));
-    } catch {
-      this.eligibleDebitAccounts.set([]);
-    } finally {
-      this.isLoadingEligibleDebitAccounts.set(false);
-    }
   }
 
   /**
@@ -517,14 +484,12 @@ export class PayOrderModalComponent {
     const data = this.orderData();
     if (!data) return;
 
-    // Validate payment method
     const paymentMethodCode = this.selectedPaymentMethod();
     if (!paymentMethodCode) {
       this.error.set('Please select a payment method');
       return;
     }
 
-    // Validate reference code
     const refCode = this.referenceCode().trim();
     if (!refCode || refCode.length === 0) {
       this.error.set('Please enter a payment reference code');
@@ -532,19 +497,17 @@ export class PayOrderModalComponent {
     }
 
     const amountCents = this.getEffectivePaymentAmountCents();
-    const debitAccountCode = this.selectedDebitAccountCode()?.trim() || undefined;
-
     this.isProcessing.set(true);
     this.error.set(null);
 
     try {
-      const result = await this.paymentService.paySingleOrder(
-        data.orderId,
-        amountCents,
+      const result = await this.paymentService.recordPayment({
+        customerId: data.customerId,
+        paymentAmount: amountCents,
         paymentMethodCode,
-        refCode,
-        debitAccountCode,
-      );
+        referenceNumber: refCode,
+        orderId: data.orderId,
+      });
 
       if (result) {
         this.successResult.set(result);

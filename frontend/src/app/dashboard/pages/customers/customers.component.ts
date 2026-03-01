@@ -4,6 +4,7 @@ import {
   Component,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
@@ -15,7 +16,10 @@ import {
   calculateCustomerStats,
   isCustomerCreditFrozen,
 } from '../../../core/services/stats/customer-stats.util';
-import { BulkPaymentModalComponent } from './components/bulk-payment-modal.component';
+import {
+  PayOrderModalComponent,
+  PayOrderModalData,
+} from '../orders/components/pay-order-modal.component';
 import { CustomerAction, CustomerCardComponent } from './components/customer-card.component';
 import type { CustomerStats } from '../../../core/services/stats/customer-stats.util';
 import { PageHeaderComponent } from '../../components/shared/page-header.component';
@@ -54,7 +58,7 @@ import { EchartContainerComponent } from '../../components/shared/charts/echart-
     CustomerTableRowComponent,
     PaginationComponent,
     DeleteConfirmationModalComponent,
-    BulkPaymentModalComponent,
+    PayOrderModalComponent,
     CustomerViewModalComponent,
     PeriodSelectorComponent,
     EchartContainerComponent,
@@ -67,6 +71,16 @@ export class CustomersComponent implements OnInit {
   private readonly analyticsService = inject(AnalyticsService);
   readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
+  constructor() {
+    effect(() => {
+      const data = this.recordPaymentModalData();
+      const modal = this.recordPaymentModal();
+      if (data && modal) {
+        setTimeout(() => void modal.show(), 0);
+      }
+    });
+  }
 
   // Customer growth trend (lazy, MV-backed)
   readonly trendOpen = signal(false);
@@ -88,7 +102,8 @@ export class CustomersComponent implements OnInit {
 
   // View references
   readonly deleteModal = viewChild<DeleteConfirmationModalComponent>('deleteModal');
-  readonly bulkPaymentModal = viewChild<BulkPaymentModalComponent>('bulkPaymentModal');
+  readonly recordPaymentModalData = signal<PayOrderModalData | null>(null);
+  private readonly recordPaymentModal = viewChild(PayOrderModalComponent);
   readonly viewModal = viewChild<CustomerViewModalComponent>('viewModal');
 
   // State from service
@@ -114,12 +129,6 @@ export class CustomersComponent implements OnInit {
   readonly pageOptions = [10, 25, 50, 100];
   readonly deleteModalData = signal<DeleteConfirmationData>({ entityName: '', relatedCount: 0 });
   readonly customerToDelete = signal<string | null>(null);
-  readonly customerForPayment = signal<{
-    id: string;
-    name: string;
-    outstandingAmount: number;
-    availableCredit: number;
-  } | null>(null);
   readonly customerToView = signal<any | null>(null);
 
   // Computed: filtered customers
@@ -363,42 +372,30 @@ export class CustomersComponent implements OnInit {
     const customer = this.customers().find((c) => c.id === customerId);
     if (!customer) return;
 
-    // Use snapshot data for initial display
-    // The bulk payment modal will fetch fresh data via getCreditSummary() for validation
     const outstandingAmount = Number(customer.outstandingAmount ?? 0);
-    const creditLimit = Number(customer.customFields?.creditLimit ?? 0);
-    const availableCredit = Math.max(creditLimit - Math.abs(outstandingAmount), 0);
+    const customerName =
+      `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Customer';
 
-    this.customerForPayment.set({
-      id: customerId,
-      name: `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
-      outstandingAmount,
-      availableCredit,
+    this.recordPaymentModalData.set({
+      customerId,
+      customerName,
+      outstandingAmount: Math.abs(outstandingAmount),
     });
-
-    // Wait for the modal component to be rendered before showing it
-    setTimeout(() => {
-      const modal = this.bulkPaymentModal();
-      if (modal) {
-        modal.show();
-      }
-    }, 0);
   }
 
   /**
    * Handle payment recorded
    */
   async onPaymentRecorded(): Promise<void> {
-    // Refresh customer list to show updated balances
+    this.recordPaymentModalData.set(null);
     await this.refreshCustomers();
-    this.customerForPayment.set(null);
   }
 
   /**
    * Handle payment cancelled
    */
   onPaymentCancelled(): void {
-    this.customerForPayment.set(null);
+    this.recordPaymentModalData.set(null);
   }
 
   /**

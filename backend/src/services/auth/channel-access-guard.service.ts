@@ -102,11 +102,11 @@ export class ChannelAccessGuardService implements CanActivate {
         throw error;
       }
 
-      // For other errors, log and allow (fail-safe)
+      // For unexpected errors, fail closed: deny access and log
       this.logger.error(
         `Error checking channel access: ${error instanceof Error ? error.message : String(error)}`
       );
-      return true;
+      return false;
     }
   }
 

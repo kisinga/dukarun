@@ -450,3 +450,11 @@
     <ng-container [ngTemplateOutlet]="orderDetailsContent"></ng-container>
   }
 </ng-template>
+
+<!-- Record Payment modal (same as orders list) -->
+<app-pay-order-modal
+  #payOrderModal
+  [orderData]="payOrderModalData()"
+  (paymentRecorded)="onPayOrderRecorded()"
+  (cancelled)="onPayOrderModalCancelled()"
+/>

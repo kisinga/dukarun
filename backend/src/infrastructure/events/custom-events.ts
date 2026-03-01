@@ -179,6 +179,22 @@ export class ApprovalRequestEvent extends DukaHubEvent {
 }
 
 /**
+ * Shift (cashier session) open/close events.
+ * Used to notify channel admins in-app.
+ */
+export class ShiftSessionEvent extends VendureEvent {
+  constructor(
+    public readonly ctx: RequestContext,
+    public readonly channelId: string,
+    public readonly action: 'opened' | 'closed',
+    public readonly sessionId: string,
+    public readonly data: Record<string, unknown> = {}
+  ) {
+    super();
+  }
+}
+
+/**
  * Company registration event
  * Fired when a new company completes registration
  * Used to notify platform admins for approval

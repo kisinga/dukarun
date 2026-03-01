@@ -55,6 +55,7 @@ describe('Audit Coverage', () => {
       { resolver: 'PeriodManagementResolver', mutation: 'explainVariance' },
       { resolver: 'PeriodManagementResolver', mutation: 'reviewCashCount' },
       { resolver: 'PeriodManagementResolver', mutation: 'verifyMpesaTransactions' },
+      { resolver: 'PaymentAllocationResolver', mutation: 'recordPayment' },
       { resolver: 'PaymentAllocationResolver', mutation: 'allocateBulkPayment' },
       { resolver: 'PaymentAllocationResolver', mutation: 'paySingleOrder' },
       { resolver: 'SupplierPaymentAllocationResolver', mutation: 'allocateBulkSupplierPayment' },

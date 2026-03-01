@@ -113,12 +113,26 @@ const COMBINED_SCHEMA = gql`
   }
 
   """
+  Single endpoint for recording a payment. When orderId is set, pays that order; when omitted, allocates across customer's unpaid orders.
+  paymentAmount in smallest currency unit (cents).
+  """
+  input RecordPaymentInput {
+    customerId: ID!
+    paymentAmount: Float!
+    paymentMethodCode: String!
+    referenceNumber: String
+    orderId: ID
+  }
+
+  """
   paymentAmount in smallest currency unit (cents)
   """
   input PaymentAllocationInput {
     customerId: ID!
     paymentAmount: Float!
     orderIds: [ID!]
+    paymentMethodCode: String
+    referenceNumber: String
   }
 
   """
@@ -172,6 +186,7 @@ const COMBINED_SCHEMA = gql`
     updateCustomerCreditLimit(input: UpdateCustomerCreditLimitInput!): CreditSummary!
     updateCreditDuration(input: UpdateCreditDurationInput!): CreditSummary!
     createOrder(input: CreateOrderInput!): Order!
+    recordPayment(input: RecordPaymentInput!): PaymentAllocationResult!
     allocateBulkPayment(input: PaymentAllocationInput!): PaymentAllocationResult!
     paySingleOrder(input: PaySingleOrderInput!): PaymentAllocationResult!
     reverseOrder(orderId: ID!): OrderReversalResult!

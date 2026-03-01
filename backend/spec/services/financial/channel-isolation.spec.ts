@@ -163,7 +163,8 @@ describe('Ledger Channel Isolation', () => {
         mockReconciliationService,
         mockFinancialService,
         mockChannelPaymentMethodService,
-        { log: jest.fn().mockImplementation(() => Promise.resolve()) } as any
+        { log: jest.fn().mockImplementation(() => Promise.resolve()) } as any,
+        { publish: jest.fn() } as any
       );
       const ctx1 = { channelId: channel1Id } as RequestContext;
       const ctx2 = { channelId: channel2Id } as RequestContext;

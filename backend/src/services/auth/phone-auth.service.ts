@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Injectable } from '@nestjs/common';
 import {
   Asset,
@@ -497,8 +498,8 @@ export class PhoneAuthService {
     const accessLevel = AccessLevel.FULL;
     const channelId = approvedChannel.channel.id.toString();
 
-    // Create session token with access level and channel ID
-    const sessionToken = `otp_session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    // Create session token with access level and channel ID (crypto-random for unpredictability)
+    const sessionToken = `otp_session_${Date.now()}_${crypto.randomBytes(12).toString('hex')}`;
 
     if (!this.otpService.redis) {
       throw new Error('Redis not available');

@@ -333,7 +333,8 @@ export class EnvironmentConfig implements OnModuleInit {
   }
 
   /**
-   * Validate that required environment variables are set
+   * Validate that required environment variables are set.
+   * In production, also rejects default/weak secrets (cookie, DB passwords).
    */
   validate(): void {
     const required: string[] = [];
@@ -348,6 +349,25 @@ export class EnvironmentConfig implements OnModuleInit {
 
     if (required.length > 0) {
       throw new Error(`Missing required environment variables: ${required.join(', ')}`);
+    }
+
+    if (this.isProduction()) {
+      const weak: string[] = [];
+      if (
+        !this.app.cookieSecret ||
+        this.app.cookieSecret === 'cookie-secret-change-in-production'
+      ) {
+        weak.push('COOKIE_SECRET must be set to a strong value (e.g. openssl rand -base64 32)');
+      }
+      if (this.db.password === 'vendure') {
+        weak.push('DB_PASSWORD must be changed from default');
+      }
+      if (this.auditDb.password === 'audit_password') {
+        weak.push('AUDIT_DB_PASSWORD must be changed from default');
+      }
+      if (weak.length > 0) {
+        throw new Error(`Production security: ${weak.join('; ')}`);
+      }
     }
   }
 }

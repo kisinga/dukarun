@@ -2,6 +2,7 @@ import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
 import { CommunicationPlugin } from '../communication/communication.plugin';
 import { NotificationService } from '../../services/notifications/notification.service';
+import { OutboundDeliveryService } from '../../services/notifications/outbound-delivery.service';
 import { PushNotificationService } from '../../services/notifications/push-notification.service';
 import { AdminNotificationService } from '../../services/notifications/admin-notification.service';
 import { ChannelCommunicationService } from '../../services/channels/channel-communication.service';
@@ -41,6 +42,7 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
 
     // Notification services
     NotificationService,
+    OutboundDeliveryService,
     PushNotificationService,
     AdminNotificationService,
 

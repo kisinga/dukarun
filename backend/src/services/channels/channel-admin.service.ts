@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   Administrator,
@@ -729,6 +730,6 @@ export class ChannelAdminService {
   }
 
   private generateTemporaryPassword(): string {
-    return Math.random().toString(36).slice(-12) + '!A1';
+    return crypto.randomBytes(9).toString('base64url').slice(0, 12) + '!A1';
   }
 }

@@ -115,7 +115,7 @@ const COMBINED_SCHEMA = gql`
     FinancialService,
     OpenSessionService,
   ],
-  exports: [PostingService, AccountBalanceService, OpenSessionService],
+  exports: [PostingService, AccountBalanceService, OpenSessionService, ChannelPaymentMethodService],
   configuration: config => {
     // Register custom permissions
     config.authOptions.customPermissions = [

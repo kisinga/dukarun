@@ -16,6 +16,8 @@ export class EnvironmentConfig {
   readonly app = {
     nodeEnv: 'development',
     ML_PORT: 3005,
+    /** Comma-separated origins for CORS (e.g. http://localhost:3000,http://backend:3000). Empty = no browser CORS. */
+    corsOrigins: '',
   };
 
   // ML Service configuration
@@ -79,6 +81,7 @@ export class EnvironmentConfig {
     // Load application configuration
     this.app.nodeEnv = process.env.NODE_ENV || 'development';
     this.app.ML_PORT = +(process.env.ML_PORT || 3005);
+    this.app.corsOrigins = process.env.ML_CORS_ORIGINS || '';
 
     // Load ML service configuration
     this.ml.serviceToken = process.env.ML_SERVICE_TOKEN || '';
@@ -103,18 +106,17 @@ export class EnvironmentConfig {
   }
 
   /**
-   * Validate that required environment variables are set
+   * Validate that required environment variables are set.
+   * In production, ML_SERVICE_TOKEN is required (service must not start without auth).
    */
   validate(): void {
-    const required: string[] = [];
-
-    if (!this.ml.serviceToken) {
-      required.push('ML_SERVICE_TOKEN');
+    if (this.isProduction() && !this.ml.serviceToken) {
+      throw new Error(
+        'ML_SERVICE_TOKEN is required in production. Set it in your environment to authenticate service-to-service calls.'
+      );
     }
-
-    if (required.length > 0) {
-      console.warn(`⚠️  Missing recommended environment variables: ${required.join(', ')}`);
-      console.warn('   Service will still run but may have limited functionality.');
+    if (!this.isProduction() && !this.ml.serviceToken) {
+      console.warn('⚠️  ML_SERVICE_TOKEN not set. /v1/train and /v1/jobs will reject requests.');
     }
   }
 }

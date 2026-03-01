@@ -3987,6 +3987,7 @@ export type Mutation = {
   queueTraining: Scalars['Boolean']['output'];
   recordCashCount: CashCountResult;
   recordExpense: RecordExpenseResult;
+  recordPayment: PaymentAllocationResult;
   recordPurchase: StockPurchase;
   recordStockAdjustment: InventoryStockAdjustment;
   refreshAnalytics: Scalars['Boolean']['output'];
@@ -4906,6 +4907,11 @@ export type MutationRecordCashCountArgs = {
 
 export type MutationRecordExpenseArgs = {
   input: RecordExpenseInput;
+};
+
+
+export type MutationRecordPaymentArgs = {
+  input: RecordPaymentInput;
 };
 
 
@@ -6020,6 +6026,8 @@ export type PaymentAllocationInput = {
   customerId: Scalars['ID']['input'];
   orderIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   paymentAmount: Scalars['Float']['input'];
+  paymentMethodCode?: InputMaybe<Scalars['String']['input']>;
+  referenceNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** All monetary amounts in PaymentAllocationResult are in smallest currency unit (cents) */
@@ -8027,6 +8035,18 @@ export type RecordExpenseInput = {
 export type RecordExpenseResult = {
   __typename?: 'RecordExpenseResult';
   sourceId: Scalars['String']['output'];
+};
+
+/**
+ * Single endpoint for recording a payment. When orderId is set, pays that order; when omitted, allocates across customer's unpaid orders.
+ * paymentAmount in smallest currency unit (cents).
+ */
+export type RecordPaymentInput = {
+  customerId: Scalars['ID']['input'];
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+  paymentAmount: Scalars['Float']['input'];
+  paymentMethodCode: Scalars['String']['input'];
+  referenceNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type RecordPurchaseInput = {
@@ -10578,6 +10598,13 @@ export type GetUnpaidOrdersForCustomerQueryVariables = Exact<{
 
 export type GetUnpaidOrdersForCustomerQuery = { __typename?: 'Query', unpaidOrdersForCustomer: Array<{ __typename?: 'Order', id: string, code: string, state: string, total: number, totalWithTax: number, createdAt: any, payments?: Array<{ __typename?: 'Payment', id: string, state: string, amount: number, method: string }> | null }> };
 
+export type RecordPaymentMutationVariables = Exact<{
+  input: RecordPaymentInput;
+}>;
+
+
+export type RecordPaymentMutation = { __typename?: 'Mutation', recordPayment: { __typename?: 'PaymentAllocationResult', remainingBalance: number, totalAllocated: number, ordersPaid: Array<{ __typename?: 'OrderPayment', orderId: string, orderCode: string, amountPaid: number }> } };
+
 export type AllocateBulkPaymentMutationVariables = Exact<{
   input: PaymentAllocationInput;
 }>;
@@ -11284,6 +11311,7 @@ export const ApproveCustomerCreditDocument = {"kind":"Document","definitions":[{
 export const UpdateCustomerCreditLimitDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateCustomerCreditLimit"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateCustomerCreditLimitInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateCustomerCreditLimit"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"customerId"}},{"kind":"Field","name":{"kind":"Name","value":"isCreditApproved"}},{"kind":"Field","name":{"kind":"Name","value":"creditLimit"}},{"kind":"Field","name":{"kind":"Name","value":"outstandingAmount"}},{"kind":"Field","name":{"kind":"Name","value":"availableCredit"}},{"kind":"Field","name":{"kind":"Name","value":"lastRepaymentDate"}},{"kind":"Field","name":{"kind":"Name","value":"lastRepaymentAmount"}},{"kind":"Field","name":{"kind":"Name","value":"creditDuration"}}]}}]}}]} as unknown as DocumentNode<UpdateCustomerCreditLimitMutation, UpdateCustomerCreditLimitMutationVariables>;
 export const UpdateCreditDurationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateCreditDuration"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateCreditDurationInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateCreditDuration"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"customerId"}},{"kind":"Field","name":{"kind":"Name","value":"isCreditApproved"}},{"kind":"Field","name":{"kind":"Name","value":"creditLimit"}},{"kind":"Field","name":{"kind":"Name","value":"outstandingAmount"}},{"kind":"Field","name":{"kind":"Name","value":"availableCredit"}},{"kind":"Field","name":{"kind":"Name","value":"lastRepaymentDate"}},{"kind":"Field","name":{"kind":"Name","value":"lastRepaymentAmount"}},{"kind":"Field","name":{"kind":"Name","value":"creditDuration"}}]}}]}}]} as unknown as DocumentNode<UpdateCreditDurationMutation, UpdateCreditDurationMutationVariables>;
 export const GetUnpaidOrdersForCustomerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetUnpaidOrdersForCustomer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"customerId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"unpaidOrdersForCustomer"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"customerId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"customerId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"total"}},{"kind":"Field","name":{"kind":"Name","value":"totalWithTax"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"payments"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"state"}},{"kind":"Field","name":{"kind":"Name","value":"amount"}},{"kind":"Field","name":{"kind":"Name","value":"method"}}]}}]}}]}}]} as unknown as DocumentNode<GetUnpaidOrdersForCustomerQuery, GetUnpaidOrdersForCustomerQueryVariables>;
+export const RecordPaymentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RecordPayment"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"RecordPaymentInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"recordPayment"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ordersPaid"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"orderId"}},{"kind":"Field","name":{"kind":"Name","value":"orderCode"}},{"kind":"Field","name":{"kind":"Name","value":"amountPaid"}}]}},{"kind":"Field","name":{"kind":"Name","value":"remainingBalance"}},{"kind":"Field","name":{"kind":"Name","value":"totalAllocated"}}]}}]}}]} as unknown as DocumentNode<RecordPaymentMutation, RecordPaymentMutationVariables>;
 export const AllocateBulkPaymentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AllocateBulkPayment"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"PaymentAllocationInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"allocateBulkPayment"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ordersPaid"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"orderId"}},{"kind":"Field","name":{"kind":"Name","value":"orderCode"}},{"kind":"Field","name":{"kind":"Name","value":"amountPaid"}}]}},{"kind":"Field","name":{"kind":"Name","value":"remainingBalance"}},{"kind":"Field","name":{"kind":"Name","value":"totalAllocated"}}]}}]}}]} as unknown as DocumentNode<AllocateBulkPaymentMutation, AllocateBulkPaymentMutationVariables>;
 export const PaySingleOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"PaySingleOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"PaySingleOrderInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"paySingleOrder"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ordersPaid"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"orderId"}},{"kind":"Field","name":{"kind":"Name","value":"orderCode"}},{"kind":"Field","name":{"kind":"Name","value":"amountPaid"}}]}},{"kind":"Field","name":{"kind":"Name","value":"remainingBalance"}},{"kind":"Field","name":{"kind":"Name","value":"totalAllocated"}}]}}]}}]} as unknown as DocumentNode<PaySingleOrderMutation, PaySingleOrderMutationVariables>;
 export const SendCustomerStatementEmailDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SendCustomerStatementEmail"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"customerId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sendCustomerStatementEmail"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"customerId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"customerId"}}}]}]}}]} as unknown as DocumentNode<SendCustomerStatementEmailMutation, SendCustomerStatementEmailMutationVariables>;

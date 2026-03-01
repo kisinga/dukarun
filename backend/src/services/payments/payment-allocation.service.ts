@@ -16,6 +16,7 @@ import { OpenSessionService } from '../financial/open-session.service';
 import { ChartOfAccountsService } from '../financial/chart-of-accounts.service';
 import { FinancialService } from '../financial/financial.service';
 import { CreditService } from '../credit/credit.service';
+import { ChannelPaymentMethodService } from '../financial/channel-payment-method.service';
 import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
 import {
   PaymentAllocationItem,
@@ -27,7 +28,21 @@ export interface PaymentAllocationInput {
   customerId: string;
   paymentAmount: number; // In smallest currency unit (cents)
   orderIds?: string[]; // Optional - if not provided, auto-select oldest
+  paymentMethodCode?: string; // Optional - defaults to credit (resolved to channel PaymentMethod.code)
+  referenceNumber?: string; // Optional - stored in payment metadata
   debitAccountCode?: string; // Optional - overrides method-based debit account
+}
+
+/**
+ * Single unified input for recording a payment. When orderId is set, pays that order;
+ * when omitted, allocates payment across customer's unpaid orders (bulk).
+ */
+export interface RecordPaymentInput {
+  customerId: string;
+  paymentAmount: number; // In smallest currency unit (cents)
+  paymentMethodCode: string; // Channel PaymentMethod.code or handler (e.g. credit) - resolved to full code
+  referenceNumber?: string;
+  orderId?: string; // Optional - when set, pay this order only; when omitted, allocate across unpaid orders
 }
 
 export interface PaymentAllocationResult {
@@ -53,8 +68,60 @@ export class PaymentAllocationService {
     private readonly creditService: CreditService,
     private readonly chartOfAccountsService: ChartOfAccountsService,
     private readonly cashierSessionService: OpenSessionService,
+    private readonly channelPaymentMethodService: ChannelPaymentMethodService,
     @Optional() private readonly auditService?: AuditService
   ) {}
+
+  /**
+   * Resolve payment method code to channel's PaymentMethod.code so createPayment receives a valid code.
+   * Accepts either full code (e.g. credit-1) or handler (e.g. credit); returns full code.
+   */
+  private async resolvePaymentMethodCode(ctx: RequestContext, methodCode: string): Promise<string> {
+    const channelId = ctx.channelId as number;
+    const methods = await this.channelPaymentMethodService.getChannelPaymentMethods(ctx, channelId);
+    const trimmed = methodCode?.trim() || '';
+    const fullMatch = methods.find(pm => pm.code === trimmed);
+    if (fullMatch) return fullMatch.code;
+    const handler = trimmed || PAYMENT_METHOD_CODES.CREDIT;
+    const byHandler = methods.find(
+      pm => pm.code === `${handler}-${channelId}` || pm.code.startsWith(handler + '-')
+    );
+    if (byHandler) return byHandler.code;
+    throw new UserInputError(
+      `Payment method not found for channel. Provide a valid payment method code (e.g. from channel payment methods).`
+    );
+  }
+
+  /**
+   * Single endpoint: record payment. When orderId is set, pays that order; when omitted, allocates across customer's unpaid orders.
+   */
+  async recordPayment(
+    ctx: RequestContext,
+    input: RecordPaymentInput
+  ): Promise<PaymentAllocationResult> {
+    if (input.orderId) {
+      const order = await this.orderService.findOne(ctx, input.orderId, ['customer', 'payments']);
+      if (!order) throw new UserInputError(`Order ${input.orderId} not found`);
+      if (!order.customer) throw new UserInputError(`Order ${input.orderId} has no customer`);
+      if (order.customer.id.toString() !== input.customerId) {
+        throw new UserInputError(`Order does not belong to customer ${input.customerId}`);
+      }
+      return this.paySingleOrder(
+        ctx,
+        input.orderId,
+        input.paymentAmount,
+        input.paymentMethodCode,
+        input.referenceNumber,
+        undefined
+      );
+    }
+    return this.allocatePaymentToOrders(ctx, {
+      customerId: input.customerId,
+      paymentAmount: input.paymentAmount,
+      paymentMethodCode: input.paymentMethodCode,
+      referenceNumber: input.referenceNumber,
+    });
+  }
 
   /**
    * Get unpaid orders for a customer (oldest first)
@@ -97,6 +164,10 @@ export class PaymentAllocationService {
         input.debitAccountCode.trim()
       );
     }
+    const resolvedMethodCode = await this.resolvePaymentMethodCode(
+      ctx,
+      input.paymentMethodCode || PAYMENT_METHOD_CODES.CREDIT
+    );
     const session = await this.cashierSessionService.requireOpenSession(
       ctx,
       ctx.channelId as number
@@ -165,23 +236,26 @@ export class PaymentAllocationService {
           const amountToAllocate = allocation.amountToAllocate;
           paymentAllocationsByOrderId.set(allocation.itemId, amountToAllocate);
 
+          const metadata: Record<string, unknown> = {
+            paymentType: 'credit',
+            customerId: input.customerId,
+            allocatedAmount: amountToAllocate,
+          };
+          if (input.referenceNumber) metadata.referenceNumber = input.referenceNumber;
+
           const payment = await this.addAllocatedPaymentToOrder(
             transactionCtx,
             order,
             amountToAllocate,
-            PAYMENT_METHOD_CODES.CREDIT,
-            {
-              paymentType: 'credit',
-              customerId: input.customerId,
-              allocatedAmount: amountToAllocate,
-            }
+            resolvedMethodCode,
+            metadata
           );
 
           await this.financialService.recordPaymentAllocation(
             transactionCtx,
             payment.id.toString(),
             order,
-            PAYMENT_METHOD_CODES.CREDIT,
+            resolvedMethodCode,
             amountToAllocate,
             input.debitAccountCode?.trim(),
             session.id
@@ -331,8 +405,10 @@ export class PaymentAllocationService {
     // Store customer ID before transaction (TypeScript safety)
     const customerId = order.customer.id.toString();
 
-    // Use payment method code if provided, otherwise default to credit
-    const actualPaymentMethodCode = paymentMethodCode || PAYMENT_METHOD_CODES.CREDIT;
+    const actualPaymentMethodCode = await this.resolvePaymentMethodCode(
+      ctx,
+      paymentMethodCode || PAYMENT_METHOD_CODES.CREDIT
+    );
 
     if (debitAccountCode?.trim()) {
       await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, debitAccountCode.trim());

@@ -208,6 +208,11 @@ describe('PaymentAllocationService.paySingleOrder', () => {
         .fn()
         .mockImplementation(() => Promise.resolve({ id: 'session-123', channelId: 1 })),
     } as any;
+    const mockChannelPaymentMethodService = {
+      getChannelPaymentMethods: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
+    } as any;
     service = new PaymentAllocationService(
       mockConnection,
       mockOrderService,
@@ -216,6 +221,7 @@ describe('PaymentAllocationService.paySingleOrder', () => {
       {} as any,
       mockChartOfAccountsService,
       mockCashierSessionService,
+      mockChannelPaymentMethodService,
       undefined
     );
   });
@@ -346,6 +352,133 @@ describe('PaymentAllocationService.paySingleOrder', () => {
     const recordCall = mockFinancialService.recordPaymentAllocation.mock.calls[0];
     expect(recordCall[5]).toBeUndefined();
     expect(recordCall[6]).toBe('session-123');
+  });
+});
+
+describe('PaymentAllocationService.recordPayment', () => {
+  const ctx = { channelId: 1, activeUserId: '1' } as RequestContext;
+  let service: PaymentAllocationService;
+  let mockOrderService: any;
+  let mockPaymentService: any;
+  let mockFinancialService: any;
+  let mockConnection: any;
+  let mockChartOfAccountsService: any;
+
+  beforeEach(() => {
+    const mockOrderRepo = {
+      find: jest.fn().mockImplementation(() => Promise.resolve([])),
+      findOne: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve({ id: 'order-1', customFields: {} })),
+      update: jest.fn().mockImplementation(() => Promise.resolve()),
+    } as any;
+    mockOrderService = {
+      findOne: jest.fn(),
+    };
+    mockPaymentService = {
+      createPayment: jest.fn(),
+      settlePayment: jest.fn(),
+    };
+    mockFinancialService = {
+      recordPaymentAllocation: jest.fn().mockImplementation(() => Promise.resolve()),
+    } as any;
+    mockConnection = {
+      withTransaction: jest.fn((_ctx: any, fn: (t: any) => Promise<any>) => fn(_ctx)),
+      getRepository: jest.fn((_ctx: any, entity: any) =>
+        entity === Order ? mockOrderRepo : ({} as any)
+      ),
+    };
+    mockChartOfAccountsService = {
+      validatePaymentSourceAccount: jest.fn(),
+    };
+    const mockCashierSessionService = {
+      requireOpenSession: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve({ id: 'session-123', channelId: 1 })),
+    } as any;
+    const mockChannelPaymentMethodService = {
+      getChannelPaymentMethods: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
+    } as any;
+    service = new PaymentAllocationService(
+      mockConnection,
+      mockOrderService,
+      mockPaymentService,
+      mockFinancialService,
+      {} as any,
+      mockChartOfAccountsService,
+      mockCashierSessionService,
+      mockChannelPaymentMethodService,
+      undefined
+    );
+  });
+
+  it('with orderId: delegates to paySingleOrder and returns result when customerId matches', async () => {
+    const order = {
+      id: 'order-1',
+      code: 'ORD-001',
+      state: 'ArrangingPayment',
+      total: 10000,
+      totalWithTax: 10000,
+      payments: [],
+      customer: { id: 'cust-1' },
+    };
+    const payment = {
+      id: 'pay-1',
+      method: 'credit-1',
+      amount: 5000,
+      state: 'Authorized',
+      metadata: { allocatedAmount: 5000 },
+      createdAt: new Date(),
+    };
+    mockOrderService.findOne.mockResolvedValue(order);
+    mockPaymentService.createPayment.mockResolvedValue(payment);
+    mockPaymentService.settlePayment.mockResolvedValue({ ...payment, state: 'Settled' });
+
+    const result = await service.recordPayment(ctx, {
+      customerId: 'cust-1',
+      paymentAmount: 5000,
+      paymentMethodCode: 'credit-1',
+      referenceNumber: 'REF-001',
+      orderId: 'order-1',
+    });
+
+    expect(result.ordersPaid).toHaveLength(1);
+    expect(result.ordersPaid[0].orderId).toBe('order-1');
+    expect(result.ordersPaid[0].amountPaid).toBe(5000);
+    expect(mockOrderService.findOne).toHaveBeenCalledWith(ctx, 'order-1', ['customer', 'payments']);
+    expect(mockPaymentService.createPayment).toHaveBeenCalledWith(
+      ctx,
+      order,
+      5000,
+      'credit-1',
+      expect.objectContaining({ referenceNumber: 'REF-001', allocatedAmount: 5000 })
+    );
+  });
+
+  it('with orderId: throws when customerId does not match order customer', async () => {
+    const order = {
+      id: 'order-1',
+      code: 'ORD-001',
+      state: 'ArrangingPayment',
+      total: 10000,
+      totalWithTax: 10000,
+      payments: [],
+      customer: { id: 'cust-1' },
+    };
+    mockOrderService.findOne.mockResolvedValue(order);
+
+    await expect(
+      service.recordPayment(ctx, {
+        customerId: 'other-cust',
+        paymentAmount: 5000,
+        paymentMethodCode: 'credit-1',
+        orderId: 'order-1',
+      })
+    ).rejects.toThrow(/does not belong to customer/);
+
+    expect(mockPaymentService.createPayment).not.toHaveBeenCalled();
   });
 });
 
