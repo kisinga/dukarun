@@ -30,16 +30,49 @@ interface JobStatus {
 
 const activeJobs = new Map<string, JobStatus>();
 
-// Middleware
-app.use(cors());
+// CORS: restrict to allowed origins (backend URL, localhost). Empty = no browser CORS.
+const corsOrigins = env.app.corsOrigins
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+const corsOptions: cors.CorsOptions = {
+  origin:
+    corsOrigins.length > 0
+      ? corsOrigins
+      : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://backend:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// Service token auth for /v1/train and /v1/jobs
+function requireServiceToken(req: Request, res: Response, next: NextFunction): void {
+  const expected = env.ml.serviceToken;
+  if (!expected) {
+    res.status(503).json({ error: 'Service not configured: ML_SERVICE_TOKEN not set' });
+    return;
+  }
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Authorization required: Bearer token expected' });
+    return;
+  }
+  const token = authHeader.slice(7);
+  if (token !== expected) {
+    res.status(403).json({ error: 'Invalid service token' });
+    return;
+  }
+  next();
+}
 
 // Routes
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
 
-app.get('/v1/jobs', (req: Request, res: Response) => {
+app.get('/v1/jobs', requireServiceToken, (req: Request, res: Response) => {
   const jobs = Array.from(activeJobs.entries()).map(([channelId, job]) => ({
     channelId,
     status: job.status,
@@ -51,7 +84,7 @@ app.get('/v1/jobs', (req: Request, res: Response) => {
   res.status(200).json(jobs);
 });
 
-app.post('/v1/train', async (req: Request, res: Response) => {
+app.post('/v1/train', requireServiceToken, async (req: Request, res: Response) => {
   const { channelId, manifestUrl, webhookUrl, authToken } = req.body;
 
   if (!channelId || !manifestUrl || !webhookUrl) {

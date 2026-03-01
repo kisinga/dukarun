@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { RequestContext } from '@vendure/core';
 import Redis from 'ioredis';
@@ -89,10 +90,10 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Generate a random 6-digit OTP code
+   * Generate a cryptographically random 6-digit OTP code
    */
   private generateOTP(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return crypto.randomInt(100000, 1000000).toString();
   }
 
   /**

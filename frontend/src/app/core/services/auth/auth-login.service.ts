@@ -69,12 +69,6 @@ export class AuthLoginService {
       // Use token to complete login
       // Ensure phone number is normalized for login (must match format used during OTP verification)
       const normalizedPhone = formatPhoneNumber(phoneNumber);
-      console.log('[AUTH SERVICE] Attempting login with:', {
-        username: normalizedPhone,
-        originalPhone: phoneNumber,
-        tokenPrefix: verifyResult.token?.substring(0, 20),
-        tokenLength: verifyResult.token?.length,
-      });
 
       const loginResult = await client.mutate<LoginMutation, LoginMutationVariables>({
         mutation: LOGIN,

@@ -312,12 +312,20 @@ export class MlTrainingService {
 
       this.logger.log(`Invoking ML trainer at ${trainerUrl}/v1/train`);
 
-      await axios.post(`${trainerUrl}/v1/train`, {
-        channelId,
-        manifestUrl,
-        webhookUrl: `${backendUrl}/admin-api`, // The GraphQL endpoint for callbacks
-        authToken,
-      });
+      await axios.post(
+        `${trainerUrl}/v1/train`,
+        {
+          channelId,
+          manifestUrl,
+          webhookUrl: `${backendUrl}/admin-api`, // The GraphQL endpoint for callbacks
+          authToken,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
 
       return true;
     } catch (error) {

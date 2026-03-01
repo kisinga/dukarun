@@ -52,9 +52,9 @@ export class MlServiceAuthGuard implements CanActivate {
     }
 
     if (token !== expectedToken) {
-      // Token doesn't match - let other guards handle it
-      this.logger.debug('Token does not match ML_SERVICE_TOKEN, passing to other guards');
-      return true;
+      // Bearer was sent but invalid - reject to avoid confusion and ensure service auth is all-or-nothing
+      this.logger.warn('Invalid ML service token in Authorization header');
+      return false;
     }
 
     // Valid service token - modify RequestContext to have superadmin permissions

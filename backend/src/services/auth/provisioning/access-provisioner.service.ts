@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   Administrator,
@@ -297,12 +298,11 @@ export class AccessProvisionerService {
   }
 
   private generateSecurePassword(): string {
-    // Generate a secure random password that will never be used
-    // Since we're using passwordless auth, this password is just a placeholder
+    // Generate a cryptographically secure random password (placeholder for passwordless auth)
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
     let password = '';
     for (let i = 0; i < 32; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
+      password += chars.charAt(crypto.randomInt(0, chars.length));
     }
     return password;
   }
