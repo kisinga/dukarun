@@ -8,6 +8,7 @@ import {
   Payment,
   PaymentService,
   ID,
+  idsAreEqual,
   isGraphQlErrorResult,
 } from '@vendure/core';
 import { In } from 'typeorm';
@@ -103,7 +104,7 @@ export class PaymentAllocationService {
       const order = await this.orderService.findOne(ctx, input.orderId, ['customer', 'payments']);
       if (!order) throw new UserInputError(`Order ${input.orderId} not found`);
       if (!order.customer) throw new UserInputError(`Order ${input.orderId} has no customer`);
-      if (order.customer.id.toString() !== input.customerId) {
+      if (!idsAreEqual(order.customer.id, input.customerId)) {
         throw new UserInputError(`Order does not belong to customer ${input.customerId}`);
       }
       return this.paySingleOrder(
@@ -377,14 +378,9 @@ export class PaymentAllocationService {
       );
     }
 
-    // Calculate outstanding amount for this order
-    const settledPayments = (order.payments || [])
-      .filter(p => p.state === 'Settled')
-      .reduce((sum, p) => sum + p.amount, 0);
-
-    // Use totalWithTax for tax-inclusive pricing
-    const orderTotal = order.totalWithTax || order.total;
-    const outstandingAmount = orderTotal - settledPayments;
+    // Use ledger as source of truth for order-level outstanding (AR balance for this order)
+    const status = await this.financialService.getOrderPaymentStatus(ctx, orderId);
+    const outstandingAmount = status.amountOwing;
 
     if (outstandingAmount <= 0) {
       throw new UserInputError(`Order ${order.code} has no outstanding payment.`);

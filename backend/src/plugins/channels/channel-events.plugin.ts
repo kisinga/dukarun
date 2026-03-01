@@ -1,5 +1,6 @@
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
+import { LedgerPlugin } from '../ledger/ledger.plugin';
 import { CommunicationPlugin } from '../communication/communication.plugin';
 import { NotificationService } from '../../services/notifications/notification.service';
 import { OutboundDeliveryService } from '../../services/notifications/outbound-delivery.service';
@@ -27,7 +28,7 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
  * - NotificationService handles user preferences
  */
 @VendurePlugin({
-  imports: [PluginCommonModule, CommunicationPlugin],
+  imports: [PluginCommonModule, LedgerPlugin, CommunicationPlugin],
   providers: [
     // Worker context service (required for background tasks)
     WorkerContextService,
