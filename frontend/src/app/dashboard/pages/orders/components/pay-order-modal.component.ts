@@ -105,6 +105,9 @@ export interface PayOrderModalData {
               <div class="text-xs mt-1">
                 Total allocated: {{ formatCurrency(successResult()!.totalAllocated) }}
               </div>
+              <div class="text-xs mt-1">
+                Remaining balance: {{ formatCurrency(successResult()!.remainingBalance) }}
+              </div>
             </div>
           </div>
         }
