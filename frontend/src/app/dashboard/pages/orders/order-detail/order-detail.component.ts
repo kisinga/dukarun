@@ -281,6 +281,7 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
 
   readonly payOrderModalData = signal<PayOrderModalData | null>(null);
   private readonly payOrderModal = viewChild(PayOrderModalComponent);
+  readonly isProcessingPayment = signal(false);
   readonly paymentError = signal<string | null>(null);
   readonly paymentSuccess = signal<string | null>(null);
 
@@ -326,6 +327,7 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
     const order = this.order();
     if (!order || !this.isUnpaidCreditOrder() || !order.customer) return;
 
+    this.isProcessingPayment.set(true);
     const customerName =
       `${order.customer.firstName ?? ''} ${order.customer.lastName ?? ''}`.trim() || 'Customer';
     this.payOrderModalData.set({
@@ -341,6 +343,7 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
   async onPayOrderRecorded(): Promise<void> {
     const order = this.order();
     this.payOrderModalData.set(null);
+    this.isProcessingPayment.set(false);
     this.paymentError.set(null);
     if (order) {
       await this.ordersService.fetchOrderById(order.id);
@@ -351,6 +354,7 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
 
   onPayOrderModalCancelled(): void {
     this.payOrderModalData.set(null);
+    this.isProcessingPayment.set(false);
   }
 
   async handleVoidOrder(): Promise<void> {
