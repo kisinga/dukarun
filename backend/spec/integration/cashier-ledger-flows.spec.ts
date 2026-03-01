@@ -95,7 +95,8 @@ describe('Cashier-ledger flows', () => {
         { createReconciliation: jest.fn().mockResolvedValue({ id: 'rec1' }) },
         mockOpenSessionFinancial,
         mockChannelPaymentMethodService,
-        { log: jest.fn().mockImplementation(() => Promise.resolve()) }
+        { log: jest.fn().mockImplementation(() => Promise.resolve()) },
+        { publish: jest.fn() }
       );
 
       const opened = await cashierSessionService.startSession(ctx1, {
@@ -516,7 +517,8 @@ describe('Cashier-ledger flows', () => {
         mockReconciliationService,
         { postVarianceAdjustment: mockPostVariance },
         mockChannelPaymentMethodService,
-        { log: jest.fn().mockResolvedValue(undefined as never) }
+        { log: jest.fn().mockResolvedValue(undefined as never) },
+        { publish: jest.fn() }
       );
 
       await cashierSessionService.startSession(ctx1, {
@@ -610,7 +612,8 @@ describe('Cashier-ledger flows', () => {
         mockReconciliationService,
         { postVarianceAdjustment: mockPostVariance },
         mockChannelPaymentMethodService,
-        { log: jest.fn().mockResolvedValue(undefined as never) }
+        { log: jest.fn().mockResolvedValue(undefined as never) },
+        { publish: jest.fn() }
       );
 
       await cashierSessionService.startSession(ctx1, {
@@ -703,7 +706,8 @@ describe('Cashier-ledger flows', () => {
         mockReconciliationService,
         { postVarianceAdjustment: mockPostVariance },
         mockChannelPaymentMethodService,
-        { log: jest.fn().mockResolvedValue(undefined as never) }
+        { log: jest.fn().mockResolvedValue(undefined as never) },
+        { publish: jest.fn() }
       );
 
       await cashierSessionService.startSession(ctx1, {

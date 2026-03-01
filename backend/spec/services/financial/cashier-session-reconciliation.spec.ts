@@ -116,13 +116,16 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       log: jest.fn().mockImplementation(() => Promise.resolve()),
     };
 
+    const mockEventBus = { publish: jest.fn() };
+
     service = new (OpenSessionService as any)(
       mockConnection,
       mockLedgerQueryService,
       mockReconciliationService,
       mockFinancialService,
       mockChannelPaymentMethodService,
-      mockAuditService
+      mockAuditService,
+      mockEventBus
     );
   });
 

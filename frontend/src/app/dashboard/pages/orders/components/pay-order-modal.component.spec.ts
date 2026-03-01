@@ -5,6 +5,7 @@
  */
 
 import { provideZonelessChangeDetection, signal } from '@angular/core';
+import { of } from 'rxjs';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CashierSessionService } from '../../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../../core/services/company.service';
