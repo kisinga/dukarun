@@ -378,8 +378,9 @@ export class PaymentAllocationService {
       );
     }
 
-    // Use ledger as source of truth for order-level outstanding (AR balance for this order)
-    const status = await this.financialService.getOrderPaymentStatus(ctx, orderId);
+    // Use ledger as source of truth for order-level outstanding (AR balance for this order).
+    // Query by order entity id (not API id) so we match how journal lines were written.
+    const status = await this.financialService.getOrderPaymentStatus(ctx, order.id.toString());
     const outstandingAmount = status.amountOwing;
 
     if (outstandingAmount <= 0) {
