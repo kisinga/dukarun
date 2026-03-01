@@ -88,6 +88,7 @@
           [orderCode]="order()!.code"
           [orderState]="order()!.state"
           [orderDate]="order()!.orderPlacedAt || order()!.createdAt"
+          [outstandingAmount]="outstandingAmount()"
         />
       </div>
     </div>

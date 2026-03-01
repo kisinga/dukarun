@@ -6,7 +6,7 @@ import type { OrderDetailHeaderInput } from '../order-detail.types';
 /**
  * Order Detail Header Component
  *
- * Displays order code, state badge, and order date
+ * Displays order code, state badge (balance-aware), and order date
  */
 @Component({
   selector: 'app-order-detail-header',
@@ -19,7 +19,10 @@ import type { OrderDetailHeaderInput } from '../order-detail.types';
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
           <h2 class="text-xl sm:text-2xl font-bold text-base-content">Order {{ orderCode() }}</h2>
-          <app-order-state-badge [state]="orderState()" />
+          <app-order-state-badge
+            [state]="orderState()"
+            [outstandingAmount]="outstandingAmount() ?? 0"
+          />
         </div>
         <p class="text-xs sm:text-sm text-base-content/60">Placed: {{ formattedDate() }}</p>
       </div>
@@ -30,6 +33,8 @@ export class OrderDetailHeaderComponent {
   readonly orderCode = input.required<string>();
   readonly orderState = input.required<string>();
   readonly orderDate = input<string | null | undefined>(null);
+  /** Outstanding balance in cents; when > 0, badge shows "Balance due" instead of "Paid". */
+  readonly outstandingAmount = input<number | undefined>(undefined);
 
   readonly formattedDate = computed(() => {
     const date = this.orderDate();

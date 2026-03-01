@@ -200,6 +200,8 @@ Repository Bootstrap is used for initial provisioning of system-critical entitie
 - **Administrator Creation**: Initial admin user for new channel
 - **User Creation**: Initial user account during provisioning
 
+**Upgrade checklist:** On Vendure upgrade, verify that RoleService and AdministratorService still do not offer a supported bootstrap/system context; if they do, consider migrating to it and removing repository bootstrap.
+
 ### Example: Role Creation
 
 ```typescript
@@ -221,7 +223,7 @@ await eventBus.publish(new RoleEvent(ctx, role, 'created', ...));
 
 **Why**: Vendure doesn't provide service methods for M2M assignments. TypeORM relation manager is the framework-standard approach.
 
-**Generic Utility**: Use `assignEntityToChannel()` from `backend/src/utils/entity-relation.util.ts` for consistency.
+All channel M2M assignment (stockLocations, paymentMethods, etc.) must go through `assignEntityToChannel` / `verifyEntityChannelAssignment` for consistency.
 
 **Direct Usage** (when utility is not available):
 
