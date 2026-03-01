@@ -44,6 +44,10 @@ export class EnvironmentConfig {
       return;
     }
 
+    // Capture container-injected env before any .env load so it is never overwritten
+    // (docker-compose, Coolify, Kubernetes set env on the process before startup)
+    const containerServiceToken = process.env.ML_SERVICE_TOKEN || '';
+
     // Try multiple paths to handle both development and production scenarios
     // Similar to backend: when running `npm run dev` from ml-trainer/, process.cwd() is ml-trainer/
     // So we check ../.env (project root) first, then ml-trainer/.env
@@ -83,8 +87,8 @@ export class EnvironmentConfig {
     this.app.ML_PORT = +(process.env.ML_PORT || 3005);
     this.app.corsOrigins = process.env.ML_CORS_ORIGINS || '';
 
-    // Load ML service configuration
-    this.ml.serviceToken = process.env.ML_SERVICE_TOKEN || '';
+    // ML service token: prefer container-injected value so it is never overwritten by .env
+    this.ml.serviceToken = containerServiceToken || process.env.ML_SERVICE_TOKEN || '';
 
     this.initialized = true;
     this.validate();

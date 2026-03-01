@@ -318,9 +318,9 @@ export class OrdersComponent implements OnInit {
   }
 
   /**
-   * Handle pay order action - prepare modal data and show modal
+   * Handle pay order action - fetch ledger-based outstanding and show modal
    */
-  private handlePayOrder(orderId: string): void {
+  private async handlePayOrder(orderId: string): Promise<void> {
     const order = this.orders().find((o) => o.id === orderId);
     if (!order) return;
 
@@ -333,7 +333,11 @@ export class OrdersComponent implements OnInit {
     const settled = (order.payments || [])
       .filter((p: { state: string }) => p.state === 'Settled')
       .reduce((sum: number, p: { amount: number }) => sum + p.amount, 0);
-    const outstanding = Math.max(0, total - settled);
+    const orderBasedOutstanding = Math.max(0, total - settled);
+
+    const status = await this.ordersService.getOrderPaymentStatus(orderId);
+    const outstanding =
+      status != null && status.amountOwing >= 0 ? status.amountOwing : orderBasedOutstanding;
 
     const modalData: PayOrderModalData = {
       customerId: order.customer?.id ?? '',

@@ -7,8 +7,14 @@ import type {
   OrderListOptions,
 } from '../graphql/generated/graphql';
 import { GetOrderFullDocument } from '../graphql/generated/graphql';
-import { GET_ORDERS } from '../graphql/operations.graphql';
+import { GET_ORDERS, ORDER_PAYMENT_STATUS } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
+
+export interface OrderPaymentStatusResult {
+  totalOwed: number;
+  amountPaid: number;
+  amountOwing: number;
+}
 
 /**
  * Service for order management operations
@@ -114,6 +120,25 @@ export class OrdersService {
   async refreshOrders(): Promise<void> {
     // Re-fetch with current options (could be enhanced to store last options)
     await this.fetchOrders();
+  }
+
+  /**
+   * Get order payment status from the ledger (AR by orderId). Use for pay modal outstanding amount.
+   */
+  async getOrderPaymentStatus(orderId: string): Promise<OrderPaymentStatusResult | null> {
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.query<{
+        orderPaymentStatus: OrderPaymentStatusResult;
+      }>({
+        query: ORDER_PAYMENT_STATUS as any,
+        variables: { orderId },
+        fetchPolicy: 'network-only',
+      });
+      return result.data?.orderPaymentStatus ?? null;
+    } catch {
+      return null;
+    }
   }
 
   /**

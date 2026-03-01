@@ -167,9 +167,19 @@ const COMBINED_SCHEMA = gql`
     supplierOutstandingAmount: Float!
   }
 
+  """
+  Order payment status from the ledger (AR account by orderId). Amounts in smallest currency unit (cents).
+  """
+  type OrderPaymentStatus {
+    totalOwed: Int!
+    amountPaid: Int!
+    amountOwing: Int!
+  }
+
   extend type Query {
     creditSummary(customerId: ID!): CreditSummary!
     unpaidOrdersForCustomer(customerId: ID!): [Order!]!
+    orderPaymentStatus(orderId: ID!): OrderPaymentStatus
     validateCredit(input: ValidateCreditInput!): CreditValidationResult!
   }
 

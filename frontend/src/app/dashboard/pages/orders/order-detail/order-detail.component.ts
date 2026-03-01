@@ -323,21 +323,25 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
     }
   }
 
-  handlePayOrder(): void {
+  async handlePayOrder(): Promise<void> {
     const order = this.order();
     if (!order || !this.isUnpaidCreditOrder() || !order.customer) return;
 
     this.isProcessingPayment.set(true);
     const customerName =
       `${order.customer.firstName ?? ''} ${order.customer.lastName ?? ''}`.trim() || 'Customer';
+    const status = await this.ordersService.getOrderPaymentStatus(order.id);
+    const outstanding =
+      status != null && status.amountOwing >= 0 ? status.amountOwing : this.outstandingAmount();
     this.payOrderModalData.set({
       customerId: order.customer.id,
       customerName,
-      outstandingAmount: this.outstandingAmount(),
+      outstandingAmount: outstanding,
       totalAmount: order.totalWithTax ?? order.total ?? 0,
       orderId: order.id,
       orderCode: order.code ?? '',
     });
+    this.isProcessingPayment.set(false);
   }
 
   async onPayOrderRecorded(): Promise<void> {

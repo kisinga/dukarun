@@ -19,11 +19,7 @@ import { FinancialService } from '../financial/financial.service';
 import { CreditService } from '../credit/credit.service';
 import { ChannelPaymentMethodService } from '../financial/channel-payment-method.service';
 import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
-import {
-  PaymentAllocationItem,
-  calculatePaymentAllocation,
-  calculateRemainingBalance,
-} from './payment-allocation-base.types';
+import { PaymentAllocationItem, calculatePaymentAllocation } from './payment-allocation-base.types';
 
 export interface PaymentAllocationInput {
   customerId: string;
@@ -125,7 +121,8 @@ export class PaymentAllocationService {
   }
 
   /**
-   * Get unpaid orders for a customer (oldest first)
+   * Get unpaid orders for a customer (oldest first).
+   * Uses ledger (AR balance by orderId) as source of truth: only orders with amountOwing > 0 are included.
    */
   async getUnpaidOrdersForCustomer(ctx: RequestContext, customerId: string): Promise<Order[]> {
     const orderRepo = this.connection.getRepository(ctx, Order);
@@ -141,15 +138,14 @@ export class PaymentAllocationService {
       },
     });
 
-    // Filter to only orders that are not fully paid
-    return orders.filter(order => {
-      const settledPayments = (order.payments || [])
-        .filter(p => p.state === 'Settled')
-        .reduce((sum, p) => sum + p.amount, 0);
-      // Use totalWithTax for tax-inclusive pricing
-      const orderTotal = order.totalWithTax || order.total;
-      return orderTotal > settledPayments;
-    });
+    const unpaid: Order[] = [];
+    for (const order of orders) {
+      const status = await this.financialService.getOrderPaymentStatus(ctx, order.id.toString());
+      if (status.amountOwing > 0) {
+        unpaid.push(order);
+      }
+    }
+    return unpaid;
   }
 
   /**
@@ -192,21 +188,21 @@ export class PaymentAllocationService {
         // 3. Payment amount is already in cents
         const paymentAmountInCents = input.paymentAmount;
 
-        // 4. Convert orders to PaymentAllocationItem format
-        const allocationItems: PaymentAllocationItem[] = unpaidOrders.map(order => {
-          const settledPayments = (order.payments || [])
-            .filter(p => p.state === 'Settled')
-            .reduce((sum, p) => sum + p.amount, 0);
-          // Use totalWithTax for tax-inclusive pricing
-          const orderTotal = order.totalWithTax || order.total;
-          return {
+        // 4. Build allocation items from ledger (AR balance per order) as source of truth
+        const allocationItems: PaymentAllocationItem[] = [];
+        for (const order of unpaidOrders) {
+          const status = await this.financialService.getOrderPaymentStatus(
+            transactionCtx,
+            order.id.toString()
+          );
+          allocationItems.push({
             id: order.id.toString(),
             code: order.code,
-            totalAmount: orderTotal,
-            paidAmount: settledPayments,
+            totalAmount: status.totalOwed,
+            paidAmount: status.amountPaid,
             createdAt: order.createdAt,
-          };
-        });
+          });
+        }
 
         // 5. Calculate allocation using shared utility
         const calculation = calculatePaymentAllocation({
@@ -273,30 +269,11 @@ export class PaymentAllocationService {
           });
         }
 
-        // 7. Calculate remaining balance
-        // Note: We need to re-fetch unpaid orders to get accurate remaining balance
-        // because: (1) if orderIds was provided, we only processed selected orders,
-        // so remaining balance should include all unpaid orders; (2) payments may have
-        // been updated in the database, so we need fresh data
-        const remainingUnpaidOrders = await this.getUnpaidOrdersForCustomer(
+        // 7. Remaining balance from ledger (AR by customerId) as source of truth
+        const remainingBalance = await this.financialService.getCustomerBalance(
           transactionCtx,
           input.customerId
         );
-        const remainingItems: PaymentAllocationItem[] = remainingUnpaidOrders.map(order => {
-          const settledPayments = (order.payments || [])
-            .filter(p => p.state === 'Settled')
-            .reduce((sum, p) => sum + p.amount, 0);
-          // Use totalWithTax for tax-inclusive pricing
-          const orderTotal = order.totalWithTax || order.total;
-          return {
-            id: order.id.toString(),
-            code: order.code,
-            totalAmount: orderTotal,
-            paidAmount: settledPayments,
-            createdAt: order.createdAt,
-          };
-        });
-        const remainingBalance = calculateRemainingBalance(remainingItems);
         const totalAllocated = calculation.totalAllocated;
         const excessPayment = calculation.excessPayment;
 
@@ -452,29 +429,11 @@ export class PaymentAllocationService {
         lastModifiedByUserId: transactionCtx.activeUserId || undefined,
       });
 
-      // Calculate remaining balance (optimized - fetch only if needed for other orders)
-      // For single order payment, we can calculate from the updated order state
-      // But we still need to check other unpaid orders for the customer
-      const remainingUnpaidOrders = await this.getUnpaidOrdersForCustomer(
+      // Remaining balance from ledger (AR by customerId) as source of truth
+      const remainingBalance = await this.financialService.getCustomerBalance(
         transactionCtx,
         customerId
       );
-
-      const remainingItems = remainingUnpaidOrders.map(o => {
-        const settled = (o.payments || [])
-          .filter(p => p.state === 'Settled')
-          .reduce((sum, p) => sum + p.amount, 0);
-        const total = o.totalWithTax || o.total;
-        return {
-          id: o.id.toString(),
-          code: o.code,
-          totalAmount: total,
-          paidAmount: settled,
-          createdAt: o.createdAt,
-        };
-      });
-
-      const remainingBalance = calculateRemainingBalance(remainingItems);
 
       // Log audit event
       if (this.auditService) {

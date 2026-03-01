@@ -2,6 +2,7 @@ import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext, Order } from '@vendure/core';
 import { AuditLog as AuditLogDecorator } from '../../infrastructure/audit/audit-log.decorator';
 import { AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
+import { FinancialService } from '../../services/financial/financial.service';
 import {
   PaymentAllocationService,
   PaymentAllocationInput,
@@ -19,7 +20,19 @@ interface PaySingleOrderInput {
 
 @Resolver()
 export class PaymentAllocationResolver {
-  constructor(private readonly paymentAllocationService: PaymentAllocationService) {}
+  constructor(
+    private readonly paymentAllocationService: PaymentAllocationService,
+    private readonly financialService: FinancialService
+  ) {}
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async orderPaymentStatus(
+    @Ctx() ctx: RequestContext,
+    @Args('orderId') orderId: string
+  ): Promise<{ totalOwed: number; amountPaid: number; amountOwing: number }> {
+    return this.financialService.getOrderPaymentStatus(ctx, orderId);
+  }
 
   @Query()
   @Allow(Permission.ReadOrder)
