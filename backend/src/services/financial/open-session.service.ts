@@ -1,5 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Channel, PaymentMethod, RequestContext, TransactionalConnection } from '@vendure/core';
+import {
+  Channel,
+  EventBus,
+  PaymentMethod,
+  RequestContext,
+  TransactionalConnection,
+} from '@vendure/core';
+import { ShiftSessionEvent } from '../../infrastructure/events/custom-events';
 import { In } from 'typeorm';
 import { CashDrawerCount, CashCountType } from '../../domain/cashier/cash-drawer-count.entity';
 import { CashierSession } from '../../domain/cashier/cashier-session.entity';
@@ -123,7 +130,8 @@ export class OpenSessionService {
     private readonly reconciliationService: ReconciliationService,
     private readonly financialService: FinancialService,
     private readonly channelPaymentMethodService: ChannelPaymentMethodService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly eventBus: EventBus
   ) {}
 
   /**
@@ -246,6 +254,12 @@ export class OpenSessionService {
 
     this.logger.log(
       `Cashier session ${savedSession.id} started for channel ${input.channelId} by user ${cashierUserId} (per-account opening)`
+    );
+    this.eventBus.publish(
+      new ShiftSessionEvent(ctx, String(input.channelId), 'opened', savedSession.id, {
+        sessionId: savedSession.id,
+        openedAt: savedSession.openedAt?.toISOString?.(),
+      })
     );
     return savedSession;
   }
@@ -440,6 +454,13 @@ export class OpenSessionService {
       const summary = await this.getSessionSummary(txCtx, sessionId);
       this.logger.log(
         `Cashier session ${sessionId} closed. Expected: ${summary.ledgerTotals.cashTotal}, Declared: ${totalDeclared}, Variance: ${summary.variance}, ClosingCountId: ${closingCount.count.id}`
+      );
+      this.eventBus.publish(
+        new ShiftSessionEvent(txCtx, String(channelId), 'closed', sessionId, {
+          sessionId,
+          closedAt: summary.closedAt?.toISOString?.(),
+          variance: summary.variance,
+        })
       );
       return summary;
     });
