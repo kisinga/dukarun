@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { CustomerService } from '../../../core/services/customer.service';
 import { OrderService } from '../../../core/services/order.service';
 import { OrdersService } from '../../../core/services/orders.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -57,6 +58,7 @@ import { EchartContainerComponent } from '../../components/shared/charts/echart-
 export class OrdersComponent implements OnInit {
   private readonly ordersService = inject(OrdersService);
   private readonly orderService = inject(OrderService);
+  private readonly customerService = inject(CustomerService);
   private readonly toastService = inject(ToastService);
   private readonly analyticsService = inject(AnalyticsService);
   private readonly router = inject(Router);
@@ -359,11 +361,14 @@ export class OrdersComponent implements OnInit {
   }
 
   /**
-   * Handle payment recorded - refresh orders
+   * Handle payment recorded - refresh orders and customer list so balance heals everywhere
    */
   async onPaymentRecorded(): Promise<void> {
     this.selectedOrderForPayment.set(null);
     await this.refreshOrders();
+    this.customerService
+      .fetchCustomers({ take: 100, skip: 0 }, { fetchPolicy: 'network-only' })
+      .catch(() => {});
   }
 
   /**

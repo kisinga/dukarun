@@ -2,12 +2,15 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   OnInit,
   computed,
   inject,
   signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { filter, skip } from 'rxjs';
+import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { CustomerService, CreditCustomerSummary } from '../../../core/services/customer.service';
@@ -465,9 +468,26 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
 export class CreditComponent implements OnInit {
   private readonly customerService = inject(CustomerService);
   private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
   readonly currencyService = inject(CurrencyService);
 
   readonly isLoading = signal(false);
+
+  constructor() {
+    this.router.events
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        filter((e) => e.urlAfterRedirects.includes('credit')),
+        skip(1),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => {
+        if (this.hasPermission()) {
+          void this.reloadCustomers();
+        }
+      });
+  }
   readonly customers = signal<CreditCustomerSummary[]>([]);
   readonly searchTerm = signal('');
   readonly approvedFilter = signal(false);

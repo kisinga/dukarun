@@ -15,6 +15,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { CustomerService } from '../../../../core/services/customer.service';
 import { OrderService } from '../../../../core/services/order.service';
 import { OrdersService } from '../../../../core/services/orders.service';
 import { ToastService } from '../../../../core/services/toast.service';
@@ -66,6 +67,7 @@ import { PayOrderModalComponent, PayOrderModalData } from '../components/pay-ord
 export class OrderDetailComponent implements OnInit, AfterViewInit {
   private readonly ordersService = inject(OrdersService);
   private readonly orderService = inject(OrderService);
+  private readonly customerService = inject(CustomerService);
   private readonly toastService = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -354,6 +356,9 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
       this.paymentSuccess.set('Payment recorded.');
       setTimeout(() => this.paymentSuccess.set(null), 3000);
     }
+    this.customerService
+      .fetchCustomers({ take: 100, skip: 0 }, { fetchPolicy: 'network-only' })
+      .catch(() => {});
   }
 
   onPayOrderModalCancelled(): void {
