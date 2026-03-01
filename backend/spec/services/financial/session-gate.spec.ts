@@ -25,6 +25,11 @@ describe('Session gate (requireOpenSession)', () => {
       findOne: jest.fn(),
     };
     mockFinancialService = {
+      getOrderPaymentStatus: jest
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve({ totalOwed: 10000, amountPaid: 0, amountOwing: 10000 })
+        ),
       recordPaymentAllocation: jest.fn().mockImplementation(() => Promise.resolve()),
     } as any;
     mockConnection = {

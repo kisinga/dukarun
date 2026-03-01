@@ -192,6 +192,11 @@ describe('PaymentAllocationService.paySingleOrder', () => {
       settlePayment: jest.fn(),
     };
     mockFinancialService = {
+      getOrderPaymentStatus: jest
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve({ totalOwed: 10000, amountPaid: 0, amountOwing: 10000 })
+        ),
       recordPaymentAllocation: jest.fn(),
     };
     mockConnection = {
@@ -273,6 +278,10 @@ describe('PaymentAllocationService.paySingleOrder', () => {
       payments: [{ id: 'p1', method: 'credit', amount: 2000, state: 'Settled' }],
     });
     mockOrderService.findOne.mockResolvedValue(order);
+    // Ledger source of truth: order has 8000 outstanding (10000 - 2000 paid)
+    mockFinancialService.getOrderPaymentStatus.mockImplementationOnce(() =>
+      Promise.resolve({ totalOwed: 10000, amountPaid: 2000, amountOwing: 8000 })
+    );
 
     await expect(service.paySingleOrder(ctx, 'order-1', 10000)).rejects.toThrow(
       /cannot exceed outstanding/
@@ -380,6 +389,11 @@ describe('PaymentAllocationService.recordPayment', () => {
       settlePayment: jest.fn(),
     };
     mockFinancialService = {
+      getOrderPaymentStatus: jest
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve({ totalOwed: 10000, amountPaid: 0, amountOwing: 10000 })
+        ),
       recordPaymentAllocation: jest.fn().mockImplementation(() => Promise.resolve()),
     } as any;
     mockConnection = {
