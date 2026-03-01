@@ -29,6 +29,7 @@ import { OrderTotalsComponent } from './components/order-totals.component';
 import { OrderPaymentInfoComponent } from './components/order-payment-info.component';
 import { OrderFulfillmentInfoComponent } from './components/order-fulfillment-info.component';
 import { PrintControlsComponent } from '../../../../core/components/print-controls/print-controls.component';
+import { PayOrderModalComponent, PayOrderModalData } from '../components/pay-order-modal.component';
 
 /**
  * Order Detail Component (Container)
@@ -56,6 +57,7 @@ import { PrintControlsComponent } from '../../../../core/components/print-contro
     OrderPaymentInfoComponent,
     OrderFulfillmentInfoComponent,
     PrintControlsComponent,
+    PayOrderModalComponent,
   ],
   templateUrl: './order-detail.component.html',
   styleUrl: './order-detail.component.scss',
@@ -219,6 +221,15 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
         modal.close();
       }
     });
+
+    // Open Record Payment modal when data is set
+    effect(() => {
+      const data = this.payOrderModalData();
+      const modal = this.payOrderModal();
+      if (data && modal) {
+        setTimeout(() => void modal.show(), 0);
+      }
+    });
   }
 
   ngOnInit(): void {
@@ -268,7 +279,8 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
     this.ordersService.clearError();
   }
 
-  readonly isProcessingPayment = signal(false);
+  readonly payOrderModalData = signal<PayOrderModalData | null>(null);
+  private readonly payOrderModal = viewChild(PayOrderModalComponent);
   readonly paymentError = signal<string | null>(null);
   readonly paymentSuccess = signal<string | null>(null);
 
@@ -310,37 +322,35 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
     }
   }
 
-  async handlePayOrder(): Promise<void> {
+  handlePayOrder(): void {
     const order = this.order();
-    if (!order || !this.isUnpaidCreditOrder()) return;
+    if (!order || !this.isUnpaidCreditOrder() || !order.customer) return;
 
-    this.isProcessingPayment.set(true);
+    const customerName =
+      `${order.customer.firstName ?? ''} ${order.customer.lastName ?? ''}`.trim() || 'Customer';
+    this.payOrderModalData.set({
+      customerId: order.customer.id,
+      customerName,
+      outstandingAmount: this.outstandingAmount(),
+      totalAmount: order.totalWithTax ?? order.total ?? 0,
+      orderId: order.id,
+      orderCode: order.code ?? '',
+    });
+  }
+
+  async onPayOrderRecorded(): Promise<void> {
+    const order = this.order();
+    this.payOrderModalData.set(null);
     this.paymentError.set(null);
-    this.paymentSuccess.set(null);
-
-    try {
-      const result = await this.paymentService.paySingleOrder(
-        order.id,
-        this.outstandingAmount(), // Pass cents
-      );
-
-      if (result) {
-        this.paymentSuccess.set(
-          `Payment recorded: ${result.totalAllocated > 0 ? this.currencyService.format(result.totalAllocated) : 'Payment recorded'}`,
-        );
-        // Refresh order data
-        await this.ordersService.fetchOrderById(order.id);
-        // Clear success message after 3 seconds
-        setTimeout(() => this.paymentSuccess.set(null), 3000);
-      } else {
-        this.paymentError.set('Failed to process payment. Please try again.');
-      }
-    } catch (error: any) {
-      console.error('Payment error:', error);
-      this.paymentError.set(error.message || 'Failed to process payment');
-    } finally {
-      this.isProcessingPayment.set(false);
+    if (order) {
+      await this.ordersService.fetchOrderById(order.id);
+      this.paymentSuccess.set('Payment recorded.');
+      setTimeout(() => this.paymentSuccess.set(null), 3000);
     }
+  }
+
+  onPayOrderModalCancelled(): void {
+    this.payOrderModalData.set(null);
   }
 
   async handleVoidOrder(): Promise<void> {

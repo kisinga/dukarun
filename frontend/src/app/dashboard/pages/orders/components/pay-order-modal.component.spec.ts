@@ -1,19 +1,16 @@
 /**
- * PayOrderModalComponent tests
+ * PayOrderModalComponent (Record Payment modal) tests
  *
- * Amount capping at outstanding, submit with amount and debitAccountCode,
- * and loading payment source accounts on show.
+ * Amount capping at outstanding, submit via recordPayment (single order or bulk).
  */
 
 import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
 import { CashierSessionService } from '../../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../../core/services/company.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { CustomerPaymentService } from '../../../../core/services/customer/customer-payment.service';
 import { CustomerStateService } from '../../../../core/services/customer/customer-state.service';
-import { LedgerService } from '../../../../core/services/ledger/ledger.service';
 import { OrdersService } from '../../../../core/services/orders.service';
 import { PaymentMethodService } from '../../../../core/services/payment-method.service';
 import { PayOrderModalComponent, PayOrderModalData } from './pay-order-modal.component';
@@ -21,40 +18,26 @@ import { PayOrderModalComponent, PayOrderModalData } from './pay-order-modal.com
 describe('PayOrderModalComponent', () => {
   let component: PayOrderModalComponent;
   let fixture: ComponentFixture<PayOrderModalComponent>;
-  let paymentServiceSpy: jasmine.SpyObj<Pick<CustomerPaymentService, 'paySingleOrder'>>;
-  let ledgerServiceSpy: jasmine.SpyObj<Pick<LedgerService, 'loadEligibleDebitAccounts'>>;
+  let paymentServiceSpy: jasmine.SpyObj<Pick<CustomerPaymentService, 'recordPayment'>>;
+  let paymentMethodServiceGetMethodsSpy: jasmine.Spy;
 
   const defaultModalData: PayOrderModalData = {
+    customerId: 'cust-1',
+    customerName: 'Test Customer',
+    outstandingAmount: 10000,
+    totalAmount: 10000,
     orderId: 'order-1',
     orderCode: 'ORD-001',
-    customerName: 'Test Customer',
-    totalAmount: 10000,
-    outstandingAmount: 10000,
   };
 
   beforeEach(async () => {
-    paymentServiceSpy = jasmine.createSpyObj('CustomerPaymentService', ['paySingleOrder']);
-    paymentServiceSpy.paySingleOrder.and.returnValue(
+    paymentServiceSpy = jasmine.createSpyObj('CustomerPaymentService', ['recordPayment']);
+    paymentServiceSpy.recordPayment.and.returnValue(
       Promise.resolve({
         ordersPaid: [{ orderId: 'order-1', orderCode: 'ORD-001', amountPaid: 5000 }],
         remainingBalance: 5000,
         totalAllocated: 5000,
       }),
-    );
-
-    ledgerServiceSpy = jasmine.createSpyObj('LedgerService', ['loadEligibleDebitAccounts']);
-    ledgerServiceSpy.loadEligibleDebitAccounts.and.returnValue(
-      of([
-        {
-          id: '1',
-          code: 'CASH_ON_HAND',
-          name: 'Cash on Hand',
-          type: 'asset',
-          isActive: true,
-          balance: 0,
-          isParent: false,
-        },
-      ]),
     );
 
     await TestBed.configureTestingModule({
@@ -70,7 +53,6 @@ describe('PayOrderModalComponent', () => {
           provide: CurrencyService,
           useValue: { format: (n: number) => `${n}`, currency: () => 'KES' },
         },
-        { provide: LedgerService, useValue: ledgerServiceSpy },
         {
           provide: OrdersService,
           useValue: { fetchOrders: jasmine.createSpy().and.returnValue(Promise.resolve()) },
@@ -78,17 +60,19 @@ describe('PayOrderModalComponent', () => {
         {
           provide: PaymentMethodService,
           useValue: {
-            getPaymentMethods: jasmine.createSpy().and.returnValue(
-              Promise.resolve([
-                {
-                  id: '1',
-                  code: 'credit',
-                  name: 'Credit',
-                  enabled: true,
-                  customFields: { isActive: true },
-                },
-              ]),
-            ),
+            getPaymentMethods: (paymentMethodServiceGetMethodsSpy = jasmine
+              .createSpy('getPaymentMethods')
+              .and.returnValue(
+                Promise.resolve([
+                  {
+                    id: '1',
+                    code: 'credit',
+                    name: 'Credit',
+                    enabled: true,
+                    customFields: { isActive: true },
+                  },
+                ]),
+              )),
           },
         },
         {
@@ -145,29 +129,49 @@ describe('PayOrderModalComponent', () => {
   });
 
   describe('show', () => {
-    it('should load payment source accounts when show is called', async () => {
+    it('should load payment methods when show is called', async () => {
       await component.show();
-      expect(ledgerServiceSpy.loadEligibleDebitAccounts).toHaveBeenCalled();
+      expect(paymentMethodServiceGetMethodsSpy).toHaveBeenCalled();
     });
   });
 
   describe('onConfirmPayment', () => {
-    it('should call paySingleOrder with amount in cents and debitAccountCode when set', async () => {
+    it('should call recordPayment with customerId, amount, paymentMethodCode, referenceNumber, and orderId', async () => {
       setOrderData(defaultModalData);
       component.paymentAmountInput.set('25'); // 2500 cents
       component.selectedPaymentMethod.set('credit');
       component.referenceCode.set('REF-123');
-      component.selectedDebitAccountCode.set('CASH_ON_HAND');
 
       await component.onConfirmPayment();
 
-      expect(paymentServiceSpy.paySingleOrder).toHaveBeenCalledWith(
-        'order-1',
-        2500,
-        'credit',
-        'REF-123',
-        'CASH_ON_HAND',
-      );
+      expect(paymentServiceSpy.recordPayment).toHaveBeenCalledWith({
+        customerId: 'cust-1',
+        paymentAmount: 2500,
+        paymentMethodCode: 'credit',
+        referenceNumber: 'REF-123',
+        orderId: 'order-1',
+      });
+    });
+
+    it('should call recordPayment without orderId when data has no orderId (bulk)', async () => {
+      setOrderData({
+        customerId: 'cust-1',
+        customerName: 'Test Customer',
+        outstandingAmount: 8000,
+      });
+      component.paymentAmountInput.set('');
+      component.selectedPaymentMethod.set('credit');
+      component.referenceCode.set('BULK-REF');
+
+      await component.onConfirmPayment();
+
+      expect(paymentServiceSpy.recordPayment).toHaveBeenCalledWith({
+        customerId: 'cust-1',
+        paymentAmount: 8000,
+        paymentMethodCode: 'credit',
+        referenceNumber: 'BULK-REF',
+        orderId: undefined,
+      });
     });
   });
 });

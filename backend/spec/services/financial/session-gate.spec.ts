@@ -43,6 +43,11 @@ describe('Session gate (requireOpenSession)', () => {
     mockCashierSessionService = {
       requireOpenSession: jest.fn().mockImplementation(requireOpenSessionImpl),
     } as any;
+    const mockChannelPaymentMethodService = {
+      getChannelPaymentMethods: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
+    } as any;
     const payment = {
       id: 'pay-1',
       method: 'credit',
@@ -64,6 +69,7 @@ describe('Session gate (requireOpenSession)', () => {
       {} as any,
       mockChartOfAccountsService,
       mockCashierSessionService,
+      mockChannelPaymentMethodService,
       undefined
     );
   }

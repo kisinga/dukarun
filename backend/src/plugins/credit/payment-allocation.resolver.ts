@@ -6,6 +6,7 @@ import {
   PaymentAllocationService,
   PaymentAllocationInput,
   PaymentAllocationResult,
+  RecordPaymentInput,
 } from '../../services/payments/payment-allocation.service';
 
 interface PaySingleOrderInput {
@@ -27,6 +28,22 @@ export class PaymentAllocationResolver {
     @Args('customerId') customerId: string
   ): Promise<Order[]> {
     return this.paymentAllocationService.getUnpaidOrdersForCustomer(ctx, customerId);
+  }
+
+  @Mutation()
+  @Allow(Permission.UpdateOrder)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.PAYMENT_ALLOCATED,
+    extractEntityId: (_result, args) =>
+      (args.input as RecordPaymentInput).orderId ??
+      (args.input as RecordPaymentInput).customerId ??
+      null,
+  })
+  async recordPayment(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: RecordPaymentInput
+  ): Promise<PaymentAllocationResult> {
+    return this.paymentAllocationService.recordPayment(ctx, input);
   }
 
   @Mutation()

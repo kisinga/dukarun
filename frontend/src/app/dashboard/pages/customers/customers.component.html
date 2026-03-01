@@ -318,18 +318,13 @@
   (cancel)="onDeleteCancelled()"
 />
 
-<!-- Bulk Payment Modal -->
-@if (customerForPayment()) {
-  <app-bulk-payment-modal
-    #bulkPaymentModal
-    [customerId]="customerForPayment()!.id"
-    [customerName]="customerForPayment()!.name"
-    [outstandingAmount]="customerForPayment()!.outstandingAmount"
-    [availableCredit]="customerForPayment()!.availableCredit"
-    (paymentRecorded)="onPaymentRecorded()"
-    (cancelled)="onPaymentCancelled()"
-  />
-}
+<!-- Record Payment modal (same as orders list / order detail) -->
+<app-pay-order-modal
+  #recordPaymentModal
+  [orderData]="recordPaymentModalData()"
+  (paymentRecorded)="onPaymentRecorded()"
+  (cancelled)="onPaymentCancelled()"
+/>
 
 <!-- Customer View Modal -->
 @if (customerToView()) {

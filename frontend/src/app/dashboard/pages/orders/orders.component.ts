@@ -336,11 +336,12 @@ export class OrdersComponent implements OnInit {
     const outstanding = Math.max(0, total - settled);
 
     const modalData: PayOrderModalData = {
+      customerId: order.customer?.id ?? '',
+      customerName,
+      outstandingAmount: outstanding,
+      totalAmount: total,
       orderId: order.id,
       orderCode: order.code || '',
-      customerName,
-      totalAmount: total,
-      outstandingAmount: outstanding,
     };
 
     this.selectedOrderForPayment.set(modalData);

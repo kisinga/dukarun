@@ -3987,6 +3987,7 @@ export type Mutation = {
   queueTraining: Scalars['Boolean']['output'];
   recordCashCount: CashCountResult;
   recordExpense: RecordExpenseResult;
+  recordPayment: PaymentAllocationResult;
   recordPurchase: StockPurchase;
   recordStockAdjustment: InventoryStockAdjustment;
   refreshAnalytics: Scalars['Boolean']['output'];
@@ -4906,6 +4907,11 @@ export type MutationRecordCashCountArgs = {
 
 export type MutationRecordExpenseArgs = {
   input: RecordExpenseInput;
+};
+
+
+export type MutationRecordPaymentArgs = {
+  input: RecordPaymentInput;
 };
 
 
@@ -6020,6 +6026,8 @@ export type PaymentAllocationInput = {
   customerId: Scalars['ID']['input'];
   orderIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   paymentAmount: Scalars['Float']['input'];
+  paymentMethodCode?: InputMaybe<Scalars['String']['input']>;
+  referenceNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** All monetary amounts in PaymentAllocationResult are in smallest currency unit (cents) */
@@ -8027,6 +8035,18 @@ export type RecordExpenseInput = {
 export type RecordExpenseResult = {
   __typename?: 'RecordExpenseResult';
   sourceId: Scalars['String']['output'];
+};
+
+/**
+ * Single endpoint for recording a payment. When orderId is set, pays that order; when omitted, allocates across customer's unpaid orders.
+ * paymentAmount in smallest currency unit (cents).
+ */
+export type RecordPaymentInput = {
+  customerId: Scalars['ID']['input'];
+  orderId?: InputMaybe<Scalars['ID']['input']>;
+  paymentAmount: Scalars['Float']['input'];
+  paymentMethodCode: Scalars['String']['input'];
+  referenceNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type RecordPurchaseInput = {

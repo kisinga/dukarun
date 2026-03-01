@@ -1976,6 +1976,20 @@ export const GET_UNPAID_ORDERS_FOR_CUSTOMER = graphql(`
   }
 `);
 
+export const RECORD_PAYMENT = graphql(`
+  mutation RecordPayment($input: RecordPaymentInput!) {
+    recordPayment(input: $input) {
+      ordersPaid {
+        orderId
+        orderCode
+        amountPaid
+      }
+      remainingBalance
+      totalAllocated
+    }
+  }
+`);
+
 export const ALLOCATE_BULK_PAYMENT = graphql(`
   mutation AllocateBulkPayment($input: PaymentAllocationInput!) {
     allocateBulkPayment(input: $input) {

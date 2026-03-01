@@ -1,13 +1,25 @@
 import { inject, Injectable } from '@angular/core';
-import { ALLOCATE_BULK_PAYMENT, PAY_SINGLE_ORDER } from '../../graphql/operations.graphql';
+import {
+  ALLOCATE_BULK_PAYMENT,
+  PAY_SINGLE_ORDER,
+  RECORD_PAYMENT,
+} from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { CustomerStateService } from './customer-state.service';
+
+export interface RecordPaymentParams {
+  customerId: string;
+  paymentAmount: number;
+  paymentMethodCode: string;
+  referenceNumber?: string;
+  orderId?: string;
+}
 
 /**
  * Customer Payment Service
  *
  * Handles payment allocation operations for customers.
- * Pure API layer for payment management.
+ * Prefer recordPayment() for a single API; paySingleOrder/recordBulkPayment remain for backward compatibility.
  */
 @Injectable({
   providedIn: 'root',
@@ -15,6 +27,53 @@ import { CustomerStateService } from './customer-state.service';
 export class CustomerPaymentService {
   private readonly apolloService = inject(ApolloService);
   private readonly stateService = inject(CustomerStateService);
+
+  /**
+   * Single endpoint: record a payment. When orderId is set, pays that order; when omitted, allocates across customer's unpaid orders.
+   */
+  async recordPayment(params: RecordPaymentParams): Promise<{
+    ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
+    remainingBalance: number;
+    totalAllocated: number;
+  } | null> {
+    this.stateService.setError(null);
+    try {
+      const client = this.apolloService.getClient();
+      const input: Record<string, unknown> = {
+        customerId: params.customerId,
+        paymentAmount: params.paymentAmount,
+        paymentMethodCode: params.paymentMethodCode,
+      };
+      if (params.referenceNumber != null) input['referenceNumber'] = params.referenceNumber;
+      if (params.orderId != null) input['orderId'] = params.orderId;
+
+      const result = await client.mutate<{
+        recordPayment: {
+          ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
+          remainingBalance: number;
+          totalAllocated: number;
+        };
+      }>({
+        mutation: RECORD_PAYMENT as any,
+        variables: { input },
+      });
+
+      if (result.error) {
+        const msg = result.error.message || 'Unknown error';
+        this.stateService.setError(`Failed to record payment: ${msg}`);
+        return null;
+      }
+      const paymentResult = result.data?.recordPayment;
+      if (!paymentResult) {
+        this.stateService.setError('Failed to record payment: No data returned.');
+        return null;
+      }
+      return paymentResult;
+    } catch (error: any) {
+      this.stateService.setError(error.message || 'Failed to record payment');
+      return null;
+    }
+  }
 
   /**
    * Record a bulk payment for a credit-approved customer
