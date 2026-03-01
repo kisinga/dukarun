@@ -106,6 +106,11 @@ describe('Cashier-ledger flows', () => {
       expect(opened.channelId).toBe(channel1Id);
 
       const mockPaymentFinancialService = {
+        getOrderPaymentStatus: jest
+          .fn()
+          .mockImplementation(() =>
+            Promise.resolve({ totalOwed: 10000, amountPaid: 0, amountOwing: 10000 })
+          ),
         recordPaymentAllocation: jest.fn().mockImplementation(() => Promise.resolve()),
       } as any;
       const mockOrderRepo = {
@@ -185,6 +190,11 @@ describe('Cashier-ledger flows', () => {
   describe('Flow B: Two channels – payment in channel 1 does not affect channel 2', () => {
     it('pay order in channel 1; recordPaymentAllocation receives channelId 1', async () => {
       const mockFinancialService = {
+        getOrderPaymentStatus: jest
+          .fn()
+          .mockImplementation(() =>
+            Promise.resolve({ totalOwed: 10000, amountPaid: 0, amountOwing: 10000 })
+          ),
         recordPaymentAllocation: jest.fn().mockImplementation(() => Promise.resolve()),
       } as any;
       const mockOrderRepo = {

@@ -1,12 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CustomerService, EventBus, RequestContext } from '@vendure/core';
 import { CustomerNotificationEvent } from '../../infrastructure/events/custom-events';
+import { FinancialService } from '../financial/financial.service';
 
 /**
  * Channel Communication Service
  *
  * Business logic service for credit-related customer communications.
  * Publishes events; NotificationSubscriber delivers in-app and SMS/email via OutboundDeliveryService.
+ * Customer balance is read from the ledger (FinancialService) as the single source of truth.
  */
 @Injectable()
 export class ChannelCommunicationService {
@@ -14,6 +16,7 @@ export class ChannelCommunicationService {
 
   constructor(
     private readonly customerService: CustomerService,
+    private readonly financialService: FinancialService,
     private readonly eventBus: EventBus
   ) {}
 
@@ -94,6 +97,7 @@ export class ChannelCommunicationService {
 
   /**
    * Send starting balance notification (in-app event + SMS/email to customer).
+   * Uses ledger as source of truth for customer balance.
    */
   async sendStartingBalanceNotification(ctx: RequestContext, customerId: string): Promise<void> {
     try {
@@ -102,8 +106,8 @@ export class ChannelCommunicationService {
         return;
       }
 
-      const customFields = (customer.customFields as any) || {};
-      const outstandingAmount = customFields.outstandingAmount ?? 0;
+      const balanceCents = await this.financialService.getCustomerBalance(ctx, customerId);
+      const outstandingAmount = balanceCents / 100;
 
       if (outstandingAmount === 0) {
         return; // No balance to notify about
@@ -176,6 +180,7 @@ export class ChannelCommunicationService {
    * Checks both:
    * - creditDuration days after last repayment date
    * - When outstanding balance exceeds threshold (e.g., 80% of credit limit)
+   * Uses ledger as source of truth for customer balance.
    */
   async sendRepaymentDeadlineNotification(ctx: RequestContext, customerId: string): Promise<void> {
     try {
@@ -185,7 +190,8 @@ export class ChannelCommunicationService {
       }
 
       const customFields = (customer.customFields as any) || {};
-      const outstandingAmount = Math.abs(customFields.outstandingAmount ?? 0);
+      const balanceCents = await this.financialService.getCustomerBalance(ctx, customerId);
+      const outstandingAmount = Math.abs(balanceCents / 100);
       const creditLimit = customFields.creditLimit ?? 0;
       const creditDuration = customFields.creditDuration ?? 30;
       const lastRepaymentDate = customFields.lastRepaymentDate
