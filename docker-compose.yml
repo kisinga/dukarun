@@ -52,7 +52,7 @@ services:
       SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-superadmin}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-superadmin}
       # Super-admin app origin(s) for CORS (comma-separated if multiple). Default matches typical Docker/local access.
-      SUPERADMIN_URL: ${SUPERADMIN_URL:-http://localhost:4201}
+      SUPERADMIN_URL: ${SUPERADMIN_URL}
 
       # Security
       COOKIE_SECRET: ${COOKIE_SECRET:-default-secret-key}
