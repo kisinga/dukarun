@@ -5916,6 +5916,14 @@ export type OrderPayment = {
   orderId: Scalars['ID']['output'];
 };
 
+/** Order payment status from the ledger (AR account by orderId). Amounts in smallest currency unit (cents). */
+export type OrderPaymentStatus = {
+  __typename?: 'OrderPaymentStatus';
+  amountOwing: Scalars['Int']['output'];
+  amountPaid: Scalars['Int']['output'];
+  totalOwed: Scalars['Int']['output'];
+};
+
 export type OrderProcessState = {
   __typename?: 'OrderProcessState';
   name: Scalars['String']['output'];
@@ -7245,6 +7253,7 @@ export type Query = {
   /** Open batches for a variant (and optional location) for batch selection when recording a sale. */
   openBatchesForVariant: Array<OpenBatchForVariant>;
   order?: Maybe<Order>;
+  orderPaymentStatus?: Maybe<OrderPaymentStatus>;
   orders: OrderList;
   paymentMethod?: Maybe<PaymentMethod>;
   paymentMethodEligibilityCheckers: Array<ConfigurableOperationDefinition>;
@@ -7673,6 +7682,11 @@ export type QueryOpenBatchesForVariantArgs = {
 
 export type QueryOrderArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryOrderPaymentStatusArgs = {
+  orderId: Scalars['ID']['input'];
 };
 
 

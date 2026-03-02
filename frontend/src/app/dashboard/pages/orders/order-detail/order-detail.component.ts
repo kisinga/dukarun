@@ -172,6 +172,14 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
     return Math.max(0, orderTotal - settledPayments); // Keep in cents for consistency
   });
 
+  readonly orderReversedAt = computed(() => {
+    const order = this.order();
+    return (
+      (order as { customFields?: { reversedAt?: string | null } } | undefined)?.customFields
+        ?.reversedAt ?? null
+    );
+  });
+
   readonly showPayOrderButton = computed(() => {
     return this.isCreditOrder() && this.isUnpaidCreditOrder();
   });
@@ -292,6 +300,7 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
   readonly selectedCompletePaymentCode = signal<string | null>(null);
   readonly isCompletingDraft = signal(false);
   readonly completeDraftError = signal<string | null>(null);
+  readonly isDeletingDraft = signal(false);
   readonly isVoiding = signal(false);
 
   private async loadPaymentMethodsForDraft(): Promise<void> {
@@ -322,6 +331,24 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
       this.completeDraftError.set(error?.message || 'Failed to complete order');
     } finally {
       this.isCompletingDraft.set(false);
+    }
+  }
+
+  async handleDeleteDraft(): Promise<void> {
+    const order = this.order();
+    if (!order || !this.isDraftOrder()) return;
+    if (!confirm('Delete this draft order? This cannot be undone.')) return;
+
+    this.isDeletingDraft.set(true);
+    try {
+      await this.orderService.deleteDraftOrder(order.id);
+      this.toastService.show('Draft deleted', 'The draft order has been deleted.', 'success');
+      this.router.navigate(['/dashboard/orders']);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete draft order';
+      this.toastService.show('Delete failed', message, 'error');
+    } finally {
+      this.isDeletingDraft.set(false);
     }
   }
 

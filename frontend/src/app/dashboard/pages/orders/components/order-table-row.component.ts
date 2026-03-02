@@ -63,7 +63,10 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
     <td class="text-center">{{ getItemCount() }}</td>
     <td class="text-right font-medium">{{ formatCurrency(order().totalWithTax) }}</td>
     <td>
-      <app-order-state-badge [state]="order().state" />
+      <app-order-state-badge
+        [state]="order().state"
+        [reversedAt]="order().customFields?.reversedAt ?? null"
+      />
     </td>
     <td class="text-right">
       <div class="flex justify-end gap-1">

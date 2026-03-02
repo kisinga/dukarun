@@ -126,6 +126,11 @@ export class StockAdjustmentsComponent implements OnInit {
     return this.reasonOptions.find((r) => r.value === value)?.label ?? value;
   }
 
+  /** Display name for who posted the adjustment (identifier or —) */
+  getPostedByDisplay(adj: { adjustedBy?: { identifier?: string } | null }): string {
+    return adj.adjustedBy?.identifier?.trim() ?? '—';
+  }
+
   formatDate(value: unknown): string {
     if (value == null) return '—';
     const d = new Date(value as string);

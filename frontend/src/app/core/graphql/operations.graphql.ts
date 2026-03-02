@@ -1061,6 +1061,15 @@ export const REMOVE_DRAFT_ORDER_LINE = graphql(`
   }
 `);
 
+export const DELETE_DRAFT_ORDER = graphql(`
+  mutation DeleteDraftOrder($orderId: ID!) {
+    deleteDraftOrder(orderId: $orderId) {
+      result
+      message
+    }
+  }
+`);
+
 export const ADJUST_DRAFT_ORDER_LINE = graphql(`
   mutation AdjustDraftOrderLine($orderId: ID!, $input: AdjustDraftOrderLineInput!) {
     adjustDraftOrderLine(orderId: $orderId, input: $input) {
@@ -2897,6 +2906,10 @@ export const GET_STOCK_ADJUSTMENTS = graphql(`
         reason
         notes
         adjustedByUserId
+        adjustedBy {
+          id
+          identifier
+        }
         lines {
           id
           variantId

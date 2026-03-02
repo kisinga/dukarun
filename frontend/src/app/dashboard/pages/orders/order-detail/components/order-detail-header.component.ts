@@ -22,6 +22,7 @@ import type { OrderDetailHeaderInput } from '../order-detail.types';
           <app-order-state-badge
             [state]="orderState()"
             [outstandingAmount]="outstandingAmount() ?? 0"
+            [reversedAt]="reversedAt() ?? null"
           />
         </div>
         <p class="text-xs sm:text-sm text-base-content/60">Placed: {{ formattedDate() }}</p>
@@ -35,6 +36,8 @@ export class OrderDetailHeaderComponent {
   readonly orderDate = input<string | null | undefined>(null);
   /** Outstanding balance in cents; when > 0, badge shows "Balance due" instead of "Paid". */
   readonly outstandingAmount = input<number | undefined>(undefined);
+  /** When set, order was reversed; badge shows "Reversed" instead of "Cancelled". */
+  readonly reversedAt = input<string | null | undefined>(null);
 
   readonly formattedDate = computed(() => {
     const date = this.orderDate();

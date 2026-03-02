@@ -234,6 +234,9 @@
               <div class="flex-1 min-w-0">
                 <p class="font-semibold">{{ getReasonLabel(adj.reason) }}</p>
                 <p class="text-sm text-base-content/60">{{ formatDate(adj.createdAt) }}</p>
+                <p class="text-xs text-base-content/50 mt-0.5">
+                  Posted by {{ getPostedByDisplay(adj) }}
+                </p>
               </div>
               <span class="badge badge-ghost shrink-0">{{ adj.lines?.length ?? 0 }} line(s)</span>
             </div>
@@ -279,6 +282,7 @@
               <th class="w-12"></th>
               <th>Date</th>
               <th>Reason</th>
+              <th>Posted by</th>
               <th>Lines</th>
               <th>Notes</th>
             </tr>
@@ -329,12 +333,13 @@
                 </td>
                 <td>{{ formatDate(adj.createdAt) }}</td>
                 <td>{{ getReasonLabel(adj.reason) }}</td>
+                <td>{{ getPostedByDisplay(adj) }}</td>
                 <td>{{ adj.lines?.length ?? 0 }}</td>
                 <td class="max-w-xs truncate">{{ adj.notes ?? '—' }}</td>
               </tr>
               @if (isExpanded(adj.id) && adj.lines?.length) {
                 <tr>
-                  <td colspan="5" class="bg-base-200 p-0">
+                  <td colspan="6" class="bg-base-200 p-0">
                     <div class="p-4">
                       <h4 class="font-semibold mb-2 text-sm">Line items</h4>
                       <div class="overflow-x-auto">
