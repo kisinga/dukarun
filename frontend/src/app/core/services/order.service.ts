@@ -7,6 +7,7 @@ import {
   ADD_MANUAL_PAYMENT_TO_ORDER,
   CREATE_DRAFT_ORDER,
   CREATE_ORDER,
+  DELETE_DRAFT_ORDER,
   GET_ORDER_DETAILS,
   REMOVE_DRAFT_ORDER_LINE,
   SET_ORDER_LINE_CUSTOM_PRICE,
@@ -485,5 +486,20 @@ export class OrderService {
       throw new Error('Failed to add item to draft order');
     }
     return data as Order;
+  }
+
+  /**
+   * Delete a draft order. Only orders in Draft state can be deleted.
+   */
+  async deleteDraftOrder(orderId: string): Promise<{ result: string; message?: string | null }> {
+    const client = this.apolloService.getClient();
+    const result = await client.mutate({
+      mutation: DELETE_DRAFT_ORDER as any,
+      variables: { orderId },
+    });
+    if (result.error) throw new Error(result.error.message);
+    const data = (result.data as any)?.deleteDraftOrder;
+    if (!data) throw new Error('Failed to delete draft order');
+    return { result: data.result, message: data.message };
   }
 }

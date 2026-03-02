@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { OrderService } from '../../../../core/services/order.service';
 import { OrdersService } from '../../../../core/services/orders.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
+import { ToastService } from '../../../../core/services/toast.service';
 import {
   ProductSearchService,
   ProductSearchResult,
@@ -27,6 +28,20 @@ import { ProductSearchViewComponent } from '../../shared/components/product-sear
         <a actions [routerLink]="['/dashboard/orders', orderId()]" class="btn btn-ghost btn-sm">
           Back to order
         </a>
+        <button
+          actions
+          type="button"
+          class="btn btn-outline btn-sm btn-error gap-1.5"
+          [disabled]="isDeletingDraft()"
+          (click)="handleDeleteDraft()"
+        >
+          @if (isDeletingDraft()) {
+            <span class="loading loading-spinner loading-xs"></span>
+            Deleting...
+          } @else {
+            Delete draft
+          }
+        </button>
       </app-page-header>
 
       @if (error()) {
@@ -129,6 +144,7 @@ export class OrderEditComponent implements OnInit {
   private readonly ordersService = inject(OrdersService);
   private readonly orderService = inject(OrderService);
   private readonly productSearchService = inject(ProductSearchService);
+  private readonly toastService = inject(ToastService);
 
   readonly currencyService = inject(CurrencyService);
 
@@ -137,6 +153,7 @@ export class OrderEditComponent implements OnInit {
   readonly isLoading = this.ordersService.isLoading;
   readonly error = signal<string | null>(null);
   readonly isRemovingLine = signal<string | null>(null);
+  readonly isDeletingDraft = signal(false);
 
   readonly productSearchResults = signal<ProductSearchResult[]>([]);
   readonly isSearchingProducts = signal(false);
@@ -236,6 +253,25 @@ export class OrderEditComponent implements OnInit {
       this.productSearchResults.set([]);
     } catch (e: any) {
       this.error.set(e?.message ?? 'Failed to add item');
+    }
+  }
+
+  async handleDeleteDraft(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    if (!confirm('Delete this draft order? This cannot be undone.')) return;
+
+    this.isDeletingDraft.set(true);
+    this.error.set(null);
+    try {
+      await this.orderService.deleteDraftOrder(id);
+      this.toastService.show('Draft deleted', 'The draft order has been deleted.', 'success');
+      this.router.navigate(['/dashboard/orders']);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete draft order';
+      this.toastService.show('Delete failed', message, 'error');
+    } finally {
+      this.isDeletingDraft.set(false);
     }
   }
 }

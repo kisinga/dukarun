@@ -1,4 +1,9 @@
-import { PluginCommonModule, StockMovementService, VendurePlugin } from '@vendure/core';
+import {
+  PluginCommonModule,
+  StockLevelService,
+  StockMovementService,
+  VendurePlugin,
+} from '@vendure/core';
 import { gql } from 'graphql-tag';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
 import { AuditCorePlugin } from '../audit/audit-core.plugin';
@@ -47,6 +52,7 @@ import { LEDGER_VIEWER_SCHEMA } from './ledger-viewer.schema';
 import { ReconciliationResolver } from './reconciliation.resolver';
 import { PeriodManagementResolver } from './period-management.resolver';
 import { PERIOD_MANAGEMENT_SCHEMA } from './period-management.schema';
+import { BatchAwareStockLevelService } from '../../services/stock/batch-aware-stock-level.service';
 import { CustomVendureStockMovementService } from '../../services/stock/custom-vendure-stock-movement.service';
 import { StockMovementService as LocalStockMovementServiceClass } from '../../services/stock/stock-movement.service';
 import { StockValueCacheSubscriber } from './stock-value-cache.subscriber';
@@ -85,6 +91,7 @@ const COMBINED_SCHEMA = gql`
   ],
   providers: [
     { provide: 'LocalStockMovementService', useClass: LocalStockMovementServiceClass },
+    { provide: StockLevelService, useClass: BatchAwareStockLevelService },
     { provide: StockMovementService, useClass: CustomVendureStockMovementService },
     PostingService,
     InventoryStoreService,
