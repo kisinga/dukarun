@@ -55,21 +55,21 @@ Both share the `dukarun_services_network` for inter-service communication.
 
 #### When was the image built?
 
-To inspect which commit and when an image was built:
+Images are built by Coolify (or locally) from the repo; there is no registry. To inspect a running container’s image:
 
 ```bash
-docker inspect ghcr.io/kisinga/dukarun/frontend:latest --format='{{json .Config.Labels}}' | jq
+docker inspect <container_name_or_id> --format='{{json .Config.Labels}}' | jq
 ```
 
-- `org.opencontainers.image.revision` — git SHA of the commit used to build the image
-- `org.opencontainers.image.created` — build timestamp (ISO 8601)
+If images were built with OCI label conventions you may see:
 
-Same for backend: replace `frontend` with `backend` in the image name.
+- `org.opencontainers.image.revision` — git SHA used to build
+- `org.opencontainers.image.created` — build timestamp (ISO 8601)
 
 #### Why is prod not updating?
 
-1. **Check the Build and Push workflow** — Images are built by the "Build and Push" workflow, which runs only after the "Test Suite" workflow succeeds on `main`. In GitHub Actions, these are separate workflow runs. If the frontend build fails (e.g. Angular budget exceeded), only the Build and Push run fails; the Test Suite may still show success.
-2. **Check whether Coolify pulls the new image** — On redeploy, Coolify must pull the latest image. Ensure the deployment step includes `docker compose pull` (or equivalent) before recreating containers, otherwise the previous image keeps running.
+1. **Coolify must rebuild** — On redeploy, Coolify should run a build (e.g. `docker compose build`) from the current commit, then recreate containers. If it only restarts existing containers without rebuilding, code changes will not appear.
+2. **Check build logs** — If the frontend or backend build fails (e.g. Angular budget exceeded, npm install failure), the new image is not created and the previous one keeps running.
 
 ### Post-Deployment Verification
 
