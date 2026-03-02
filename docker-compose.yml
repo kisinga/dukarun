@@ -2,9 +2,9 @@
 # Dukarun Application Services
 # =====================================
 #
-# This file contains only application services (backend, frontend, ml-trainer).
+# This file contains only application services (backend, frontend, super-admin, ml-trainer).
 # Infrastructure services (databases, cache, observability) are in docker-compose.services.yml
-# All images are built in CI (build-and-push.yml); no build: here so Coolify uses deploy-only path.
+# Images are built by Coolify (or locally) from Dockerfiles; no registry pull.
 #
 # Usage:
 #   # Start infrastructure first:
@@ -19,8 +19,9 @@ services:
   # Backend Service (Vendure)
   # ========================================
   backend:
-    image: ghcr.io/kisinga/dukarun/backend:latest
-    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
     restart: unless-stopped
     networks:
       - dukarun_services_network
@@ -117,8 +118,9 @@ services:
   # Frontend Service (Angular + Nginx)
   # ========================================
   frontend:
-    image: ghcr.io/kisinga/dukarun/frontend:latest
-    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: ./frontend/Dockerfile
     restart: unless-stopped
     networks:
       - dukarun_services_network
@@ -148,11 +150,11 @@ services:
 
   # ========================================
   # Super Admin (Angular + Nginx, port 4201)
-  # Image: same registry/prefix as backend/frontend (see .github/workflows/build-and-push.yml)
   # ========================================
   super-admin:
-    image: ghcr.io/kisinga/dukarun/super-admin:latest
-    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: ./super-admin/Dockerfile
     restart: unless-stopped
     networks:
       - dukarun_services_network
@@ -181,8 +183,9 @@ services:
   # Backend calls this service at ML_TRAINER_URL (default http://ml-trainer:3005)
   # ========================================
   ml-trainer:
-    image: ghcr.io/kisinga/dukarun/ml-trainer:latest
-    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: ./ml-trainer/Dockerfile
     restart: unless-stopped
     networks:
       - dukarun_services_network

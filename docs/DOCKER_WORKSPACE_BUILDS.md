@@ -1,6 +1,6 @@
 # Docker builds for workspace projects
 
-This document describes how Docker images for **backend**, **frontend**, and **ml-trainer** are built and why the build context is the repository root.
+This document describes how Docker images for **backend**, **frontend**, **super-admin**, and **ml-trainer** are built and why the build context is the repository root.
 
 ---
 
@@ -19,7 +19,7 @@ Example (frontend):
 docker build -f frontend/Dockerfile -t dukarun/frontend .
 ```
 
-CI does the same: context `.`, file `frontend/Dockerfile` (see `.github/workflows/build-and-push.yml`).
+Coolify and local `docker compose build` use the same: context `.`, file `frontend/Dockerfile` (see `docker-compose.yml`).
 
 ---
 
@@ -62,4 +62,4 @@ The final image does not contain source code or devDependencies.
 | **Build in Dockerfile** | `npm run build -w @dukarun/backend` (or frontend / ml-trainer) |
 | **Local dependency changes** | Run `npm install` at repo root so root lockfile is updated |
 
-See also: root `.dockerignore` (reduces build context size) and `.github/workflows/build-and-push.yml` for the exact `context` and `file` used for each image.
+See also: root `.dockerignore` (reduces build context size) and `docker-compose.yml` for the exact `context` and `dockerfile` used for each service.

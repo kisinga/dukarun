@@ -22,10 +22,5 @@ docs/
 *.md
 !README.md
 
-# ML trainer build: exclude other apps (keep workspace package.json for npm)
-backend/*
-!backend/package.json
-frontend/*
-!frontend/package.json
-super-admin/*
-!super-admin/package.json
+# Coolify/local: single context for all services; each Dockerfile COPYs only what it needs.
+# Service-specific dockerignore.* files exist for CI if you reintroduce build-and-push.

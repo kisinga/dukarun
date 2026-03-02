@@ -639,10 +639,10 @@ Deploy using Docker Compose with hosted images for a complete, self-contained se
 
 ### Service Overview
 
-| Service                   | Image/Version                                | Port      | Requirements           |
+| Service                   | Build / image source                          | Port      | Requirements           |
 | ------------------------- | -------------------------------------------- | --------- | ---------------------- |
-| **Frontend**              | `ghcr.io/kisinga/dukarun/frontend:latest`    | 4200      | Backend API            |
-| **Backend**               | `ghcr.io/kisinga/dukarun/backend:latest`     | 3000      | Postgres 17, Redis 7   |
+| **Frontend**              | Built from `./frontend/Dockerfile` (Coolify) | 4200      | Backend API            |
+| **Backend**               | Built from `./backend/Dockerfile` (Coolify)  | 3000      | Postgres 17, Redis 7   |
 | **Postgres**              | `postgres:17`                                | 5432      | Persistent storage     |
 | **Redis**                 | `redis:7-alpine`                             | 6379      | Persistent storage     |
 | **TimescaleDB**           | `timescale/timescaledb:latest-pg17`          | 5433      | Persistent storage     |

@@ -15,14 +15,9 @@ This directory contains the CI/CD workflows for the dukarun project.
 - **Environment**: Both test jobs run with `HUSKY=0` so git hooks are not installed in CI (root `prepare` also skips when `CI=true` or `HUSKY=0`).
 - **Node.js**: v20 for all jobs.
 
-### 2. Build and Push (`build-and-push.yml`)
+### 2. Docker image builds
 
-- **Purpose**: Builds and pushes Docker images to GitHub Container Registry.
-- **Triggers**:
-  - `workflow_run`: runs when the **Test Suite** workflow completes on the `main` branch. Build jobs run only when Test Suite conclusion is `success`.
-  - `workflow_dispatch`: manual trigger (e.g. for ad-hoc builds).
-- **Branches**: `workflow_run` is limited to `main` so builds follow test runs on main.
-- **Output**: Docker images for backend and frontend to `ghcr.io/<owner>/dukarun/*`.
+Docker images are built by **Coolify** (or locally via `docker compose build`) from the Dockerfiles defined in `docker-compose.yml`. There is no separate CI workflow that builds and pushes to a registry.
 
 ## Branch Protection Setup
 
