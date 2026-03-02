@@ -19,7 +19,9 @@ services:
   # Backend Service (Vendure)
   # ========================================
   backend:
-    image: ghcr.io/kisinga/dukarun/backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     platform: linux/amd64
     restart: unless-stopped
     networks:
@@ -117,7 +119,9 @@ services:
   # Frontend Service (Angular + Nginx)
   # ========================================
   frontend:
-    image: ghcr.io/kisinga/dukarun/frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     platform: linux/amd64
     restart: unless-stopped
     networks:
@@ -150,7 +154,9 @@ services:
   # Super Admin (Angular + Nginx, port 4201)
   # ========================================
   super-admin:
-    image: ghcr.io/kisinga/dukarun/super-admin:latest
+    build:
+      context: ./super-admin
+      dockerfile: Dockerfile
     platform: linux/amd64
     restart: unless-stopped
     networks:
@@ -180,7 +186,9 @@ services:
   # Backend calls this service at ML_TRAINER_URL (default http://ml-trainer:3005)
   # ========================================
   ml-trainer:
-    image: ghcr.io/kisinga/dukarun/ml-trainer:latest
+    build:
+      context: ./ml-trainer
+      dockerfile: Dockerfile
     platform: linux/amd64
     restart: unless-stopped
     networks:
