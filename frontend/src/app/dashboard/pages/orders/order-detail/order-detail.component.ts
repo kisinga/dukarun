@@ -172,6 +172,14 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
     return Math.max(0, orderTotal - settledPayments); // Keep in cents for consistency
   });
 
+  readonly orderReversedAt = computed(() => {
+    const order = this.order();
+    return (
+      (order as { customFields?: { reversedAt?: string | null } } | undefined)?.customFields
+        ?.reversedAt ?? null
+    );
+  });
+
   readonly showPayOrderButton = computed(() => {
     return this.isCreditOrder() && this.isUnpaidCreditOrder();
   });

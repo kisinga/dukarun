@@ -72,7 +72,10 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
           <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between gap-2 mb-1">
               <h3 class="text-base font-bold line-clamp-1 leading-tight">{{ order().code }}</h3>
-              <app-order-state-badge [state]="order().state" />
+              <app-order-state-badge
+                [state]="order().state"
+                [reversedAt]="order().customFields?.reversedAt ?? null"
+              />
             </div>
             <div class="flex items-center gap-2 mb-1 text-xs text-base-content/60">
               <span>{{ getItemCount() }} items</span>

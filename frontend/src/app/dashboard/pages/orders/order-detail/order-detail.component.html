@@ -89,6 +89,7 @@
           [orderState]="order()!.state"
           [orderDate]="order()!.orderPlacedAt || order()!.createdAt"
           [outstandingAmount]="outstandingAmount()"
+          [reversedAt]="orderReversedAt()"
         />
       </div>
     </div>
