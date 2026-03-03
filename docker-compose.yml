@@ -166,7 +166,7 @@ services:
       BACKEND_HOST: ${BACKEND_HOST}
       BACKEND_PORT: ${BACKEND_PORT}
     ports:
-      - '127.0.0.1:4201:4201'
+      - '127.0.0.1:${SUPERADMIN_PORT:-4201}:4201'
     depends_on:
       backend:
         condition: service_healthy
