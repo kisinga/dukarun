@@ -274,21 +274,21 @@ export class InventoryService {
           let allocationResult: CostAllocationResult;
 
           if (line.batchId) {
-            // Single-batch path: sell from the specified batch only
-            const batches = await this.inventoryStore.getOpenBatches(transactionCtx, {
+            // Single-batch path: sell from the specified batch only (locked read for concurrency safety)
+            const batches = await this.inventoryStore.getOpenBatchesForConsumption(transactionCtx, {
               channelId: input.channelId,
               stockLocationId: input.stockLocationId,
               productVariantId: line.productVariantId,
+              batchId: line.batchId,
+              maxQuantity: line.quantity,
+              orderBy: 'createdAt',
             });
-            const batch = batches.find(b => String(b.id) === String(line.batchId));
-            if (!batch) {
+            const batch = batches[0];
+            if (!batch || batch.quantity < line.quantity) {
               throw new UserInputError(
-                `Batch ${line.batchId} not found or not available for variant ${line.productVariantId}`
-              );
-            }
-            if (batch.quantity < line.quantity) {
-              throw new UserInputError(
-                `Insufficient quantity in batch ${line.batchId}. Available: ${batch.quantity}, requested: ${line.quantity}`
+                !batch
+                  ? `Batch ${line.batchId} not found or not available for variant ${line.productVariantId}`
+                  : `Insufficient quantity in batch ${line.batchId}. Available: ${batch.quantity}, requested: ${line.quantity}`
               );
             }
             const expiryValidation = await this.expiryPolicy.validateBeforeConsume(

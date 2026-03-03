@@ -33,7 +33,10 @@ describe('SalePostingStrategy', () => {
   } as unknown as Order;
 
   beforeEach(() => {
-    mockPostingService = { postPayment: jest.fn().mockImplementation(() => Promise.resolve()) };
+    mockPostingService = {
+      postPayment: jest.fn().mockImplementation(() => Promise.resolve()),
+      postCreditSale: jest.fn().mockImplementation(() => Promise.resolve()),
+    };
     mockQueryService = {
       hasInventorySaleCogsForOrder: jest.fn().mockImplementation(() => Promise.resolve(false)),
       invalidateCache: jest.fn().mockImplementation(() => Promise.resolve()),
@@ -41,9 +44,9 @@ describe('SalePostingStrategy', () => {
     mockChartService = {
       validatePaymentSourceAccount: jest.fn().mockImplementation(() => Promise.resolve()),
     };
-    mockInventoryService = { recordSale: jest.fn() };
+    mockInventoryService = { recordSale: (jest.fn() as any).mockResolvedValue(undefined) };
     mockStockLocationService = {
-      findAll: jest.fn().mockImplementation(() => Promise.resolve({ items: [{ id: 1 }] })),
+      defaultStockLocation: jest.fn().mockImplementation(() => Promise.resolve({ id: 1 })),
     };
 
     strategy = new SalePostingStrategy(
@@ -125,5 +128,177 @@ describe('SalePostingStrategy', () => {
     const postPaymentCall = mockPostingService.postPayment.mock.calls[0];
     const context = postPaymentCall[2];
     expect(context.openSessionId).toBeUndefined();
+  });
+
+  it('does not call recordSale when defaultStockLocation returns no id (skip COGS)', async () => {
+    mockStockLocationService.defaultStockLocation.mockResolvedValue(null);
+
+    const result = await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderWithLines,
+      isCreditSale: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockPostingService.postPayment).toHaveBeenCalled();
+    expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
+  });
+
+  it('does not call recordSale when defaultStockLocation returns object without id', async () => {
+    mockStockLocationService.defaultStockLocation.mockResolvedValue({ name: 'Loc' });
+
+    const result = await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderWithLines,
+      isCreditSale: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
+  });
+
+  it('treats "Insufficient quantity in batch" as non-fatal (skip COGS)', async () => {
+    mockInventoryService.recordSale.mockRejectedValue(
+      new Error('Insufficient quantity in batch X. Available: 0, requested: 1')
+    );
+
+    const result = await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderWithLines,
+      isCreditSale: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockInventoryService.recordSale).toHaveBeenCalled();
+  });
+
+  it('treats "Batch not found or not available" as non-fatal (skip COGS)', async () => {
+    mockInventoryService.recordSale.mockRejectedValue(
+      new Error('Batch batch-1 not found or not available for variant 16')
+    );
+
+    const result = await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderWithLines,
+      isCreditSale: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockInventoryService.recordSale).toHaveBeenCalled();
+  });
+
+  it('calls recordSale with stockLocationId from defaultStockLocation (location consistency)', async () => {
+    const locationId = 99;
+    mockStockLocationService.defaultStockLocation.mockResolvedValue({ id: locationId });
+
+    await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderWithLines,
+      isCreditSale: false,
+    });
+
+    expect(mockInventoryService.recordSale).toHaveBeenCalledWith(
+      ctx,
+      expect.objectContaining({
+        stockLocationId: locationId,
+        orderId: String(orderWithLines.id),
+        lines: expect.any(Array),
+      })
+    );
+  });
+
+  it('does not call recordSale when COGS already posted (idempotency)', async () => {
+    mockQueryService.hasInventorySaleCogsForOrder.mockResolvedValue(true);
+
+    const result = await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderWithLines,
+      isCreditSale: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
+  });
+
+  it('does not call recordSale when order has no lines with quantity > 0', async () => {
+    const orderNoLines = {
+      ...orderWithLines,
+      lines: [],
+    } as unknown as Order;
+
+    const result = await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderNoLines,
+      isCreditSale: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
+  });
+
+  it('does not call recordSale when all line quantities are zero', async () => {
+    const orderZeroQty = {
+      ...orderWithLines,
+      lines: [{ productVariantId: 16, quantity: 0, productVariant: { id: 16 } }],
+    } as unknown as Order;
+
+    const result = await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderZeroQty,
+      isCreditSale: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
+  });
+
+  it('credit sale calls recordSale when location present', async () => {
+    const orderCredit = {
+      ...orderWithLines,
+      totalWithTax: 10000,
+      total: 10000,
+      customer: { id: '1' },
+    } as unknown as Order;
+
+    const result = await strategy.post({
+      ctx,
+      sourceId: String(orderCredit.id),
+      channelId: ctx.channelId as number,
+      order: orderCredit,
+      isCreditSale: true,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockInventoryService.recordSale).toHaveBeenCalledWith(
+      ctx,
+      expect.objectContaining({
+        orderId: String(orderCredit.id),
+        stockLocationId: 1,
+      })
+    );
   });
 });

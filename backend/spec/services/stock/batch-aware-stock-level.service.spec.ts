@@ -97,6 +97,59 @@ describe('BatchAwareStockLevelService', () => {
       expect(inventoryStore.getOpenBatches).not.toHaveBeenCalled();
       expect(result).toEqual({ stockOnHand: 0, stockAllocated: 0 });
     });
+
+    it('falls back to super when defaultStockLocation returns object without id', async () => {
+      stockLocationService.defaultStockLocation.mockImplementation(() =>
+        Promise.resolve({ name: 'Loc' })
+      );
+      connection.getRepository = jest.fn().mockReturnValue({
+        find: jest.fn().mockImplementation(() => Promise.resolve([])),
+      });
+      const service = new BatchAwareStockLevelService(
+        connection,
+        stockLocationService,
+        configService,
+        inventoryStore
+      );
+
+      const result = await service.getAvailableStock(ctx, 'variant_100');
+
+      expect(inventoryStore.getOpenBatches).not.toHaveBeenCalled();
+      expect(result).toEqual({ stockOnHand: 0, stockAllocated: 0 });
+    });
+
+    it('returns correct sum and zero allocated for single batch', async () => {
+      inventoryStore.getOpenBatches.mockImplementation(() =>
+        Promise.resolve([{ id: 'b1', quantity: 10, productVariantId: 100 }])
+      );
+      const service = new BatchAwareStockLevelService(
+        connection,
+        stockLocationService,
+        configService,
+        inventoryStore
+      );
+
+      const result = await service.getAvailableStock(ctx, 'variant_100');
+
+      expect(result).toEqual({ stockOnHand: 10, stockAllocated: 0 });
+    });
+
+    it('returns fractional batch quantity as stockOnHand with zero allocated', async () => {
+      inventoryStore.getOpenBatches.mockImplementation(() =>
+        Promise.resolve([{ id: 'b1', quantity: 2.5, productVariantId: 100 }])
+      );
+      const service = new BatchAwareStockLevelService(
+        connection,
+        stockLocationService,
+        configService,
+        inventoryStore
+      );
+
+      const result = await service.getAvailableStock(ctx, 'variant_100');
+
+      expect(result.stockOnHand).toBe(2.5);
+      expect(result.stockAllocated).toBe(0);
+    });
   });
 
   describe('getAvailableStock without InventoryStore (fallback)', () => {

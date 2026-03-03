@@ -19,6 +19,7 @@ import {
   CreateBatchInput,
   CreateMovementInput,
   BatchFilters,
+  ConsumptionFilters,
   MovementFilters,
 } from '../../../src/services/inventory/interfaces/inventory-store.interface';
 
@@ -204,6 +205,147 @@ describe('InventoryStoreService', () => {
       expect(result).toEqual(mockBatches);
       expect(queryBuilder.where).toHaveBeenCalled();
       expect(queryBuilder.andWhere).toHaveBeenCalled();
+    });
+  });
+
+  describe('getOpenBatchesForConsumption', () => {
+    const mockBatch = {
+      id: 'bid-1',
+      channelId: 1,
+      stockLocationId: 2,
+      productVariantId: 3,
+      quantity: 10,
+      unitCost: 5000,
+      expiryDate: null as Date | null,
+      sourceType: 'Purchase',
+      sourceId: 'purchase-1',
+      metadata: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('applies batchId filter and returns matching batch', async () => {
+      const { service, batchRepo } = buildService();
+
+      const queryBuilder = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: (jest.fn() as any).mockResolvedValue([mockBatch]),
+      };
+
+      (batchRepo.createQueryBuilder as any).mockReturnValue(queryBuilder);
+
+      const filters: ConsumptionFilters = {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        batchId: 'bid-1',
+        orderBy: 'createdAt',
+      };
+
+      const result = await service.getOpenBatchesForConsumption(ctx, filters);
+
+      expect(result).toEqual([mockBatch]);
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith('batch.id = :batchId', {
+        batchId: 'bid-1',
+      });
+      expect(queryBuilder.orderBy).toHaveBeenCalledWith('batch.createdAt', 'ASC');
+    });
+
+    it('applies maxQuantity trimming when provided', async () => {
+      const { service, batchRepo } = buildService();
+
+      const batch1 = { ...mockBatch, id: 'b1', quantity: 3 };
+      const batch2 = { ...mockBatch, id: 'b2', quantity: 5 };
+      const allBatches = [batch1, batch2];
+
+      const queryBuilder = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: (jest.fn() as any).mockResolvedValue(allBatches),
+      };
+
+      (batchRepo.createQueryBuilder as any).mockReturnValue(queryBuilder);
+
+      const filters: ConsumptionFilters = {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        maxQuantity: 4,
+        orderBy: 'createdAt',
+      };
+
+      const result = await service.getOpenBatchesForConsumption(ctx, filters);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].quantity).toBe(3);
+      expect(result[1].quantity).toBe(5);
+      expect(result.reduce((sum, b) => sum + b.quantity, 0)).toBe(8);
+    });
+
+    it('applies both batchId and maxQuantity when provided', async () => {
+      const { service, batchRepo } = buildService();
+
+      const singleBatch = [mockBatch];
+      const queryBuilder = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: (jest.fn() as any).mockResolvedValue(singleBatch),
+      };
+
+      (batchRepo.createQueryBuilder as any).mockReturnValue(queryBuilder);
+
+      const filters: ConsumptionFilters = {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        batchId: 'bid-1',
+        maxQuantity: 5,
+        orderBy: 'createdAt',
+      };
+
+      const result = await service.getOpenBatchesForConsumption(ctx, filters);
+
+      expect(result).toEqual(singleBatch);
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith('batch.id = :batchId', {
+        batchId: 'bid-1',
+      });
+    });
+
+    it('orders by createdAt when orderBy is createdAt', async () => {
+      const { service, batchRepo } = buildService();
+
+      const queryBuilder = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: (jest.fn() as any).mockResolvedValue([mockBatch]),
+      };
+
+      (batchRepo.createQueryBuilder as any).mockReturnValue(queryBuilder);
+
+      const filters: ConsumptionFilters = {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        orderBy: 'createdAt',
+      };
+
+      await service.getOpenBatchesForConsumption(ctx, filters);
+
+      expect(queryBuilder.orderBy).toHaveBeenCalledWith('batch.createdAt', 'ASC');
+      expect(queryBuilder.addOrderBy).not.toHaveBeenCalled();
     });
   });
 

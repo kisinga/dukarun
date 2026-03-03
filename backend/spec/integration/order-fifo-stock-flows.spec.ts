@@ -1,0 +1,372 @@
+/**
+ * Order qty / FIFO / stock integration flows
+ *
+ * Verifies that stock check (BatchAwareStockLevelService) and COGS recording
+ * (SalePostingStrategy → recordSale) use the same stock location, and that
+ * end-to-end flows behave correctly when recordSale succeeds or fails.
+ */
+
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { RequestContext } from '@vendure/core';
+import { BatchAwareStockLevelService } from '../../src/services/stock/batch-aware-stock-level.service';
+import { SalePostingStrategy } from '../../src/services/financial/strategies/sale-posting.strategy';
+
+describe('Order FIFO / stock integration flows', () => {
+  const channelId = 1;
+  const ctx = { channelId } as RequestContext;
+  const DEFAULT_LOCATION_ID = 99;
+
+  let stockLocationService: any;
+  let inventoryStore: any;
+  let batchAwareStock: BatchAwareStockLevelService;
+  let mockPostingService: any;
+  let mockQueryService: any;
+  let mockChartService: any;
+  let mockInventoryService: any;
+  let salePostingStrategy: SalePostingStrategy;
+
+  beforeEach(() => {
+    stockLocationService = {
+      defaultStockLocation: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve({ id: DEFAULT_LOCATION_ID })),
+    };
+
+    inventoryStore = {
+      getOpenBatches: jest
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve([{ id: 'b1', quantity: 10, productVariantId: 100 }])
+        ),
+    };
+
+    const connection = {};
+    const configService = {
+      catalogOptions: {
+        stockLocationStrategy: {
+          getAvailableStock: jest
+            .fn()
+            .mockImplementation(() => Promise.resolve({ stockOnHand: 0, stockAllocated: 0 })),
+        },
+      },
+    } as any;
+
+    batchAwareStock = new BatchAwareStockLevelService(
+      connection as any,
+      stockLocationService,
+      configService,
+      inventoryStore
+    );
+
+    mockPostingService = {
+      postPayment: jest.fn().mockImplementation(() => Promise.resolve()),
+      postCreditSale: jest.fn().mockImplementation(() => Promise.resolve()),
+    };
+    mockQueryService = {
+      hasInventorySaleCogsForOrder: jest.fn().mockImplementation(() => Promise.resolve(false)),
+      invalidateCache: jest.fn().mockImplementation(() => Promise.resolve()),
+    };
+    mockChartService = {
+      validatePaymentSourceAccount: jest.fn().mockImplementation(() => Promise.resolve()),
+    };
+    mockInventoryService = {
+      recordSale: (jest.fn() as any).mockResolvedValue(undefined),
+    };
+
+    salePostingStrategy = new SalePostingStrategy(
+      mockPostingService as any,
+      mockQueryService as any,
+      mockChartService as any,
+      mockInventoryService as any,
+      stockLocationService
+    );
+  });
+
+  describe('location consistency', () => {
+    it('BatchAwareStockLevelService and SalePostingStrategy use same defaultStockLocation for stock and COGS', async () => {
+      const variantId = 'variant_100';
+
+      const stockResult = await batchAwareStock.getAvailableStock(ctx, variantId);
+
+      expect(stockLocationService.defaultStockLocation).toHaveBeenCalledWith(ctx);
+      expect(inventoryStore.getOpenBatches).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          channelId,
+          stockLocationId: DEFAULT_LOCATION_ID,
+          productVariantId: variantId,
+        })
+      );
+      expect(stockResult.stockOnHand).toBe(10);
+      expect(stockResult.stockAllocated).toBe(0);
+
+      const order = {
+        id: 'order-1',
+        code: 'ORD-001',
+        lines: [{ productVariantId: 100, quantity: 2, productVariant: { id: 100 } }],
+        customer: { id: 'cust-1' },
+        orderPlacedAt: new Date(),
+      } as any;
+      const payment = {
+        id: 'pay-1',
+        state: 'Settled',
+        method: 'cash',
+        amount: 5000,
+        metadata: {},
+      } as any;
+
+      await salePostingStrategy.post({
+        ctx,
+        sourceId: payment.id,
+        channelId,
+        payment,
+        order,
+        isCreditSale: false,
+      });
+
+      expect(mockInventoryService.recordSale).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          stockLocationId: DEFAULT_LOCATION_ID,
+          orderId: 'order-1',
+          lines: expect.arrayContaining([
+            expect.objectContaining({ productVariantId: '100', quantity: 2 }),
+          ]),
+        })
+      );
+    });
+
+    it('when defaultStockLocation returns different id, both stock check and recordSale receive that id', async () => {
+      const customLocationId = 42;
+      stockLocationService.defaultStockLocation.mockResolvedValue({ id: customLocationId });
+
+      await batchAwareStock.getAvailableStock(ctx, 'v1');
+      expect(inventoryStore.getOpenBatches).toHaveBeenLastCalledWith(
+        ctx,
+        expect.objectContaining({ stockLocationId: customLocationId })
+      );
+
+      const order = {
+        id: 'o2',
+        code: 'ORD-002',
+        lines: [{ productVariantId: 1, quantity: 1, productVariant: { id: 1 } }],
+        customer: { id: 'c1' },
+        orderPlacedAt: new Date(),
+      } as any;
+      await salePostingStrategy.post({
+        ctx,
+        sourceId: 'pay-2',
+        channelId,
+        payment: {
+          id: 'pay-2',
+          state: 'Settled',
+          method: 'cash',
+          amount: 100,
+          metadata: {},
+        } as any,
+        order,
+        isCreditSale: false,
+      });
+
+      expect(mockInventoryService.recordSale).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({ stockLocationId: customLocationId })
+      );
+    });
+  });
+
+  describe('cash sale flow', () => {
+    it('posting cash sale calls recordSale with order lines and default location', async () => {
+      const order = {
+        id: 'order-3',
+        code: 'ORD-003',
+        lines: [
+          { productVariantId: 10, quantity: 3, productVariant: { id: 10 } },
+          { productVariantId: 20, quantity: 1, productVariant: { id: 20 } },
+        ],
+        customer: { id: 'cust-1' },
+        orderPlacedAt: new Date(),
+      } as any;
+
+      const result = await salePostingStrategy.post({
+        ctx,
+        sourceId: 'pay-3',
+        channelId,
+        payment: {
+          id: 'pay-3',
+          state: 'Settled',
+          method: 'cash',
+          amount: 10000,
+          metadata: {},
+        } as any,
+        order,
+        isCreditSale: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockPostingService.postPayment).toHaveBeenCalled();
+      expect(mockInventoryService.recordSale).toHaveBeenCalledTimes(1);
+      const recordSaleInput = mockInventoryService.recordSale.mock.calls[0][1];
+      expect(recordSaleInput.orderId).toBe('order-3');
+      expect(recordSaleInput.stockLocationId).toBe(DEFAULT_LOCATION_ID);
+      expect(recordSaleInput.lines).toHaveLength(2);
+      expect(recordSaleInput.lines.map((l: any) => l.quantity)).toEqual([3, 1]);
+    });
+
+    it('when recordSale fails with insufficient stock, posting still succeeds and COGS is skipped', async () => {
+      mockInventoryService.recordSale.mockRejectedValueOnce(
+        new Error('Insufficient stock for variant 10. Requested: 5')
+      );
+
+      const order = {
+        id: 'order-4',
+        code: 'ORD-004',
+        lines: [{ productVariantId: 10, quantity: 5, productVariant: { id: 10 } }],
+        customer: { id: 'cust-1' },
+        orderPlacedAt: new Date(),
+      } as any;
+
+      const result = await salePostingStrategy.post({
+        ctx,
+        sourceId: 'pay-4',
+        channelId,
+        payment: {
+          id: 'pay-4',
+          state: 'Settled',
+          method: 'cash',
+          amount: 5000,
+          metadata: {},
+        } as any,
+        order,
+        isCreditSale: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockPostingService.postPayment).toHaveBeenCalled();
+      expect(mockInventoryService.recordSale).toHaveBeenCalled();
+    });
+
+    it('when recordSale fails with non-stock error, posting fails', async () => {
+      mockInventoryService.recordSale.mockRejectedValueOnce(new Error('Database connection lost'));
+
+      const order = {
+        id: 'order-5',
+        code: 'ORD-005',
+        lines: [{ productVariantId: 10, quantity: 1, productVariant: { id: 10 } }],
+        customer: { id: 'cust-1' },
+        orderPlacedAt: new Date(),
+      } as any;
+
+      const result = await salePostingStrategy.post({
+        ctx,
+        sourceId: 'pay-5',
+        channelId,
+        payment: {
+          id: 'pay-5',
+          state: 'Settled',
+          method: 'cash',
+          amount: 1000,
+          metadata: {},
+        } as any,
+        order,
+        isCreditSale: false,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Database connection lost');
+    });
+  });
+
+  describe('credit sale flow', () => {
+    it('posting credit sale calls recordSale with order and default location', async () => {
+      const order = {
+        id: 'order-6',
+        code: 'ORD-006',
+        totalWithTax: 8000,
+        total: 8000,
+        lines: [{ productVariantId: 30, quantity: 2, productVariant: { id: 30 } }],
+        customer: { id: 'cust-1' },
+        orderPlacedAt: new Date(),
+      } as any;
+
+      const result = await salePostingStrategy.post({
+        ctx,
+        sourceId: order.id,
+        channelId,
+        order,
+        isCreditSale: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockPostingService.postCreditSale).toHaveBeenCalled();
+      expect(mockInventoryService.recordSale).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          orderId: 'order-6',
+          stockLocationId: DEFAULT_LOCATION_ID,
+          lines: expect.any(Array),
+        })
+      );
+    });
+  });
+
+  describe('idempotency and skip conditions', () => {
+    it('when COGS already posted for order, recordSale is not called', async () => {
+      mockQueryService.hasInventorySaleCogsForOrder.mockResolvedValue(true);
+
+      const order = {
+        id: 'order-7',
+        code: 'ORD-007',
+        lines: [{ productVariantId: 40, quantity: 1, productVariant: { id: 40 } }],
+        customer: { id: 'cust-1' },
+        orderPlacedAt: new Date(),
+      } as any;
+
+      await salePostingStrategy.post({
+        ctx,
+        sourceId: 'pay-7',
+        channelId,
+        payment: {
+          id: 'pay-7',
+          state: 'Settled',
+          method: 'cash',
+          amount: 500,
+          metadata: {},
+        } as any,
+        order,
+        isCreditSale: false,
+      });
+
+      expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
+    });
+
+    it('when defaultStockLocation returns null, recordSale is not called', async () => {
+      stockLocationService.defaultStockLocation.mockResolvedValue(null);
+
+      const order = {
+        id: 'order-8',
+        code: 'ORD-008',
+        lines: [{ productVariantId: 50, quantity: 1, productVariant: { id: 50 } }],
+        customer: { id: 'cust-1' },
+        orderPlacedAt: new Date(),
+      } as any;
+
+      await salePostingStrategy.post({
+        ctx,
+        sourceId: 'pay-8',
+        channelId,
+        payment: {
+          id: 'pay-8',
+          state: 'Settled',
+          method: 'cash',
+          amount: 500,
+          metadata: {},
+        } as any,
+        order,
+        isCreditSale: false,
+      });
+
+      expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
+    });
+  });
+});
