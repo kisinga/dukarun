@@ -36,24 +36,25 @@ RUN echo "Build verification:" && \
 # Stage 2: Production runtime
 FROM node:22-alpine
 
-RUN apk add --no-cache wget dumb-init
+RUN apk add --no-cache wget dumb-init && \
+    addgroup -g 1001 -S vendure && \
+    adduser -u 1001 -S vendure -G vendure
 
 ENV NODE_ENV=production
 
 # Preserve workspace layout so Node resolves backend/node_modules (p-limit, etc.)
-COPY --from=builder /app/node_modules /usr/src/app/node_modules
-COPY --from=builder /app/backend /usr/src/app/backend
-RUN mkdir -p /usr/src/app/backend/static/assets/cache /usr/src/app/backend/static/uploads
+# Copy with ownership so we avoid slow chown -R over node_modules
+COPY --from=builder --chown=vendure:vendure /app/node_modules /usr/src/app/node_modules
+COPY --from=builder --chown=vendure:vendure /app/backend /usr/src/app/backend
+
+RUN mkdir -p /usr/src/app/backend/static/assets/cache /usr/src/app/backend/static/uploads && \
+    chown -R vendure:vendure /usr/src/app/backend/static
 
 WORKDIR /usr/src/app/backend
 
 RUN echo "Verifying production files:" && \
     test -f dist/src/index.js && test -f dist/src/entrypoint.js && \
     echo "✅ Production stage verification successful"
-
-RUN addgroup -g 1001 -S vendure && \
-    adduser -u 1001 -S vendure -G vendure && \
-    chown -R vendure:vendure /usr/src/app
 
 USER vendure
 
