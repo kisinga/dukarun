@@ -61,6 +61,9 @@ export class BatchAwareStockLevelService extends StockLevelService {
 
     const stockOnHand = batches.reduce((sum, batch) => sum + batch.quantity, 0);
 
+    // Batch inventory is the source of truth; Vendure's allocation is not synced to batches,
+    // so we intentionally report no allocated stock here. See Vendure Stock Control:
+    // saleable = stockOnHand - allocated - outOfStockThreshold (docs.vendure.io/guides/core-concepts/stock-control).
     return {
       stockOnHand,
       stockAllocated: 0,
