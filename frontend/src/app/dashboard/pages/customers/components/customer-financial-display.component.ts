@@ -40,7 +40,7 @@ export class CustomerFinancialDisplayComponent {
   balanceColorClass = computed(() => {
     const amount = this.outstandingAmount();
     if (amount < 0) return 'text-warning';
-    if (amount > 0) return 'text-success';
+    if (amount > 0) return 'text-error';
     return '';
   });
 
