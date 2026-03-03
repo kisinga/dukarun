@@ -36,7 +36,7 @@ export class OrderDetailHeaderComponent {
   readonly orderDate = input<string | null | undefined>(null);
   /** Outstanding balance in cents; when > 0, badge shows "Balance due" instead of "Paid". */
   readonly outstandingAmount = input<number | undefined>(undefined);
-  /** When set, order was reversed; badge shows "Reversed" instead of "Cancelled". */
+  /** When set, order was voided; badge shows "Voided" with error styling. */
   readonly reversedAt = input<string | null | undefined>(null);
 
   readonly formattedDate = computed(() => {
