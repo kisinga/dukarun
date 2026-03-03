@@ -266,5 +266,134 @@ describe('FifoCostingStrategy', () => {
       const allocatedQuantity = result.allocations.reduce((sum, a) => sum + a.quantity, 0);
       expect(allocatedQuantity).toBe(request.quantity);
     });
+
+    it('allocates exact quantity across two batches', async () => {
+      const { strategy, inventoryStore } = buildService();
+
+      const batches: InventoryBatch[] = [
+        {
+          id: 'batch-1',
+          channelId: 1,
+          stockLocationId: 2,
+          productVariantId: 3,
+          quantity: 20,
+          unitCost: 5000,
+          expiryDate: null,
+          sourceType: 'Purchase',
+          sourceId: 'purchase-1',
+          metadata: null,
+          createdAt: new Date('2024-01-01'),
+          updatedAt: new Date('2024-01-01'),
+        },
+        {
+          id: 'batch-2',
+          channelId: 1,
+          stockLocationId: 2,
+          productVariantId: 3,
+          quantity: 30,
+          unitCost: 6000,
+          expiryDate: null,
+          sourceType: 'Purchase',
+          sourceId: 'purchase-2',
+          metadata: null,
+          createdAt: new Date('2024-01-02'),
+          updatedAt: new Date('2024-01-02'),
+        },
+      ];
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue(batches);
+
+      const request: CostAllocationRequest = {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 50,
+        sourceType: 'Order',
+        sourceId: 'order-123',
+      };
+
+      const result = await strategy.allocateCost(ctx, request);
+
+      expect(result.allocations).toHaveLength(2);
+      expect(result.allocations[0].quantity).toBe(20);
+      expect(result.allocations[1].quantity).toBe(30);
+      expect(result.totalCost).toBe(20 * 5000 + 30 * 6000);
+    });
+
+    it('allocates full quantity when request equals single batch quantity', async () => {
+      const { strategy, inventoryStore } = buildService();
+
+      const batches: InventoryBatch[] = [
+        {
+          id: 'batch-1',
+          channelId: 1,
+          stockLocationId: 2,
+          productVariantId: 3,
+          quantity: 10,
+          unitCost: 5000,
+          expiryDate: null,
+          sourceType: 'Purchase',
+          sourceId: 'purchase-1',
+          metadata: null,
+          createdAt: new Date('2024-01-01'),
+          updatedAt: new Date('2024-01-01'),
+        },
+      ];
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue(batches);
+
+      const request: CostAllocationRequest = {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 10,
+        sourceType: 'Order',
+        sourceId: 'order-123',
+      };
+
+      const result = await strategy.allocateCost(ctx, request);
+
+      expect(result.allocations).toHaveLength(1);
+      expect(result.allocations[0].quantity).toBe(10);
+      expect(result.totalCost).toBe(10 * 5000);
+    });
+
+    it('supports fractional quantity allocation', async () => {
+      const { strategy, inventoryStore } = buildService();
+
+      const batches: InventoryBatch[] = [
+        {
+          id: 'batch-1',
+          channelId: 1,
+          stockLocationId: 2,
+          productVariantId: 3,
+          quantity: 5.5,
+          unitCost: 100,
+          expiryDate: null,
+          sourceType: 'Purchase',
+          sourceId: 'purchase-1',
+          metadata: null,
+          createdAt: new Date('2024-01-01'),
+          updatedAt: new Date('2024-01-01'),
+        },
+      ];
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue(batches);
+
+      const request: CostAllocationRequest = {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 2.5,
+        sourceType: 'Order',
+        sourceId: 'order-123',
+      };
+
+      const result = await strategy.allocateCost(ctx, request);
+
+      expect(result.allocations).toHaveLength(1);
+      expect(result.allocations[0].quantity).toBe(2.5);
+      expect(result.totalCost).toBe(250);
+    });
   });
 });
