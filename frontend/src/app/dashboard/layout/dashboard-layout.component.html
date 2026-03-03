@@ -282,7 +282,14 @@
           #productsLink="routerLinkActive"
           class="nav-link-ripple flex flex-col items-center justify-center gap-0.5 py-2 px-4 min-w-[64px] transition-colors rounded-lg"
         >
-          <div class="relative">
+          <div
+            class="relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200"
+            [class.bg-gradient-to-br]="productsLink.isActive"
+            [class.from-primary/20]="productsLink.isActive"
+            [class.to-accent/20]="productsLink.isActive"
+            [class.shadow-md]="productsLink.isActive"
+            [class.shadow-primary/20]="productsLink.isActive"
+          >
             @if (productsLink.isActive) {
               <span
                 class="absolute -top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary"
@@ -321,7 +328,14 @@
           #homeLink="routerLinkActive"
           class="nav-link-ripple flex flex-col items-center justify-center gap-0.5 py-2 px-4 min-w-[64px] transition-colors rounded-lg"
         >
-          <div class="relative">
+          <div
+            class="relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200"
+            [class.bg-gradient-to-br]="homeLink.isActive"
+            [class.from-primary/20]="homeLink.isActive"
+            [class.to-accent/20]="homeLink.isActive"
+            [class.shadow-md]="homeLink.isActive"
+            [class.shadow-primary/20]="homeLink.isActive"
+          >
             @if (homeLink.isActive) {
               <span
                 class="absolute -top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary"
@@ -359,7 +373,14 @@
           #sellLink="routerLinkActive"
           class="nav-link-ripple flex flex-col items-center justify-center gap-0.5 py-2 px-4 min-w-[64px] transition-colors rounded-lg"
         >
-          <div class="relative">
+          <div
+            class="relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200"
+            [class.bg-gradient-to-br]="sellLink.isActive"
+            [class.from-primary/20]="sellLink.isActive"
+            [class.to-accent/20]="sellLink.isActive"
+            [class.shadow-md]="sellLink.isActive"
+            [class.shadow-primary/20]="sellLink.isActive"
+          >
             @if (sellLink.isActive) {
               <span
                 class="absolute -top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary"
@@ -813,13 +834,13 @@
           <!-- Overview -->
           <a
             [routerLink]="overviewItem.route"
-            routerLinkActive="bg-base-200 text-primary font-bold border-l-2 border-primary"
+            routerLinkActive="nav-link-active bg-base-200 text-primary font-bold border-l-2 border-primary"
             [routerLinkActiveOptions]="{ exact: true }"
             (click)="closeDrawer()"
-            class="nav-link-ripple flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-base-content min-h-[2.75rem] active:bg-base-200 transition-colors"
+            class="group nav-link-ripple flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-base-content min-h-[2.75rem] active:bg-base-200 transition-colors"
           >
             <span
-              class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-base-100 text-base-content/70"
+              class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-base-100 text-base-content/70 transition-all duration-200 group-[.nav-link-active]:bg-gradient-to-br group-[.nav-link-active]:from-primary/25 group-[.nav-link-active]:to-accent/25 group-[.nav-link-active]:text-primary group-[.nav-link-active]:shadow-md group-[.nav-link-active]:shadow-primary/20"
             >
               <app-nav-icon [name]="overviewItem.icon" />
             </span>
@@ -839,13 +860,13 @@
                 <a
                   [routerLink]="item.route"
                   [queryParams]="item.queryParams"
-                  routerLinkActive="bg-base-200 text-primary font-bold border-l-2 border-primary"
+                  routerLinkActive="nav-link-active bg-base-200 text-primary font-bold border-l-2 border-primary"
                   [routerLinkActiveOptions]="{ exact: false }"
                   (click)="closeDrawer()"
-                  class="nav-link-ripple flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-base-content min-h-[2.75rem] active:bg-base-200 transition-colors"
+                  class="group nav-link-ripple flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-base-content min-h-[2.75rem] active:bg-base-200 transition-colors"
                 >
                   <span
-                    class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-base-100 text-base-content/70"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-base-100 text-base-content/70 transition-all duration-200 group-[.nav-link-active]:bg-gradient-to-br group-[.nav-link-active]:from-primary/25 group-[.nav-link-active]:to-accent/25 group-[.nav-link-active]:text-primary group-[.nav-link-active]:shadow-md group-[.nav-link-active]:shadow-primary/20"
                   >
                     <app-nav-icon [name]="item.icon" />
                   </span>
@@ -862,13 +883,13 @@
         @if (hasSettingsForFooter()) {
           <a
             routerLink="/dashboard/settings"
-            routerLinkActive="bg-base-200 text-primary font-bold"
+            routerLinkActive="nav-link-active bg-base-200 text-primary font-bold"
             [routerLinkActiveOptions]="{ exact: false }"
             (click)="closeDrawer()"
-            class="nav-link-ripple flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold text-base-content hover:bg-base-200 transition-colors"
+            class="group nav-link-ripple flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold text-base-content hover:bg-base-200 transition-colors"
           >
             <span
-              class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-base-100 text-base-content/70"
+              class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-base-100 text-base-content/70 transition-all duration-200 group-[.nav-link-active]:bg-gradient-to-br group-[.nav-link-active]:from-primary/25 group-[.nav-link-active]:to-accent/25 group-[.nav-link-active]:text-primary group-[.nav-link-active]:shadow-md group-[.nav-link-active]:shadow-primary/20"
             >
               <app-nav-icon name="settings" />
             </span>
