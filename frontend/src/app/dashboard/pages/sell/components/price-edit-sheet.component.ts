@@ -2,13 +2,14 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
+  DestroyRef,
   effect,
   inject,
   input,
   output,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CurrencyService } from '../../../../core/services/currency.service';
 
@@ -90,7 +91,9 @@ export interface PriceEditData {
           </div>
         </div>
 
-        <!-- Price Input -->
+        <!-- Total and per-item inputs: editing either updates the other -->
+        <p class="text-xs text-base-content/50 mb-3">Editing either field updates the other.</p>
+
         <div class="mb-4">
           <label class="text-sm font-medium text-base-content/70 mb-1.5 block"
             >Total line price</label
@@ -115,12 +118,19 @@ export interface PriceEditData {
           }
         </div>
 
-        <!-- Computed per-item price -->
-        <div class="bg-primary/10 rounded-lg p-3 mb-4">
-          <div class="flex justify-between items-center text-sm">
-            <span class="text-base-content/70">Per item</span>
-            <span class="font-bold text-primary">@{{ getFormattedPerItem() }}</span>
-          </div>
+        <div class="mb-4">
+          <label class="text-sm font-medium text-base-content/70 mb-1.5 block"
+            >Price per item</label
+          >
+          <input
+            type="text"
+            inputmode="decimal"
+            class="input input-bordered w-full text-xl font-bold text-center"
+            [formControl]="perItemControl"
+            placeholder="0.00"
+            (keydown.enter)="submit()"
+            (keydown.escape)="close()"
+          />
         </div>
 
         <!-- Quick presets: base price, and reset -->
@@ -145,6 +155,7 @@ export interface PriceEditData {
 export class PriceEditSheetComponent {
   private readonly fb = inject(FormBuilder);
   private readonly currencyService = inject(CurrencyService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly isOpen = input<boolean>(false);
   readonly data = input<PriceEditData | null>(null);
@@ -154,6 +165,7 @@ export class PriceEditSheetComponent {
   readonly closed = output<void>();
 
   readonly priceControl = this.fb.control('', [Validators.required]);
+  readonly perItemControl = this.fb.control('', [Validators.required]);
   readonly priceError = signal<string | null>(null);
 
   constructor() {
@@ -161,11 +173,35 @@ export class PriceEditSheetComponent {
       const d = this.data();
       const open = this.isOpen();
       if (d && open) {
-        // Prefill with the currently shown (line) price in currency units
-        const value = Number.isFinite(d.currentLinePrice) ? d.currentLinePrice : 0;
-        this.priceControl.setValue(value.toFixed(2));
+        const total = Number.isFinite(d.currentLinePrice) ? d.currentLinePrice : 0;
+        this.priceControl.setValue(total.toFixed(2));
+        const qty = d.quantity;
+        if (qty > 0) {
+          this.perItemControl.setValue((total / qty).toFixed(2), { emitEvent: false });
+        } else {
+          this.perItemControl.setValue('', { emitEvent: false });
+        }
         this.priceError.set(null);
       }
+    });
+
+    this.priceControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      const d = this.data();
+      if (!d || !this.isOpen()) return;
+      if (d.quantity === 0) return;
+      const total = this.parsePrice();
+      if (total === null) return;
+      const perItem = total / d.quantity;
+      this.perItemControl.setValue(perItem.toFixed(2), { emitEvent: false });
+    });
+
+    this.perItemControl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      const d = this.data();
+      if (!d || !this.isOpen()) return;
+      const perItem = this.parsePerItem();
+      if (perItem === null || perItem <= 0) return;
+      const total = Math.round(perItem * d.quantity * 100) / 100;
+      this.priceControl.setValue(total.toFixed(2), { emitEvent: false });
     });
   }
 
@@ -194,19 +230,12 @@ export class PriceEditSheetComponent {
     return this.currencyService.format(Math.round(d.basePrice * 100), false);
   }
 
-  getFormattedPerItem(): string {
-    const sh = this.parsePrice();
-    const d = this.data();
-    if (!sh || !d || d.quantity === 0) return '–';
-    const perItemSh = sh / d.quantity;
-    return this.currencyService.format(Math.round(perItemSh * 100), false);
-  }
-
   resetToBase(): void {
     const d = this.data();
     if (!d) return;
     const lineTotal = d.basePrice * d.quantity;
     this.priceControl.setValue(lineTotal.toFixed(2));
+    this.perItemControl.setValue(d.basePrice.toFixed(2), { emitEvent: false });
     this.priceError.set(null);
   }
 
@@ -229,9 +258,18 @@ export class PriceEditSheetComponent {
     this.closed.emit();
   }
 
-  /** Parse input value as price in currency units (sh). */
+  /** Parse total input value as price in currency units (sh). */
   private parsePrice(): number | null {
     const raw = this.priceControl.value?.toString().trim();
+    if (!raw) return null;
+    const num = parseFloat(raw);
+    if (Number.isNaN(num)) return null;
+    return num;
+  }
+
+  /** Parse per-item input value in currency units (sh). */
+  private parsePerItem(): number | null {
+    const raw = this.perItemControl.value?.toString().trim();
     if (!raw) return null;
     const num = parseFloat(raw);
     if (Number.isNaN(num)) return null;
