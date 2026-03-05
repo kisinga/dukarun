@@ -149,9 +149,18 @@ export class MlTrainingService {
       throw new Error('Channel not found');
     }
 
+    // Use a context scoped to the target channel so product queries return that channel's products
+    const channelCtx = new RequestContext({
+      apiType: ctx.apiType,
+      channel,
+      languageCode: ctx.languageCode,
+      isAuthorized: true,
+      authorizedAsOwnerOnly: false,
+    });
+
     // Always extract to get fresh manifest data
     // This is necessary since we don't store the full manifest, only counts
-    return this.extractPhotosForChannel(ctx, channelId);
+    return this.extractPhotosForChannel(channelCtx, channelId);
   }
 
   /**
