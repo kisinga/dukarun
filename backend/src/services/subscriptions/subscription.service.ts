@@ -757,6 +757,48 @@ export class SubscriptionService {
   }
 
   /**
+   * Get active subscription tiers for public/marketing use (shop API).
+   * Returns only display-safe fields; no id, isActive, smsLimit, or timestamps.
+   */
+  async getActiveSubscriptionTiersForPublic(): Promise<
+    {
+      code: string;
+      name: string;
+      description: string | null;
+      priceMonthly: number;
+      priceYearly: number;
+      features: string[];
+    }[]
+  > {
+    const tierRepo = this.connection.rawConnection.getRepository(SubscriptionTier);
+    const tiers = await tierRepo.find({
+      where: { isActive: true },
+      order: { priceMonthly: 'ASC' },
+    });
+    const MAX_DESCRIPTION_LENGTH = 500;
+    return tiers.map(tier => {
+      const priceMonthly = Math.max(0, tier.priceMonthly);
+      const priceYearly = Math.max(0, tier.priceYearly);
+      let description: string | null = tier.description ?? null;
+      if (description && description.length > MAX_DESCRIPTION_LENGTH) {
+        description = description.slice(0, MAX_DESCRIPTION_LENGTH);
+      }
+      const rawFeatures = tier.features?.features;
+      const features = Array.isArray(rawFeatures)
+        ? rawFeatures.filter((f): f is string => typeof f === 'string')
+        : [];
+      return {
+        code: tier.code,
+        name: tier.name,
+        description,
+        priceMonthly,
+        priceYearly,
+        features,
+      };
+    });
+  }
+
+  /**
    * Create a new subscription tier
    */
   async createSubscriptionTier(

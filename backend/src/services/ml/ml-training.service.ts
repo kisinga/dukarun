@@ -8,6 +8,7 @@ import {
   RequestContext,
   TransactionalConnection,
 } from '@vendure/core';
+import { findChannelById } from '../../utils/channel-access.util';
 import { env } from '../../infrastructure/config/environment.config';
 import { MlWebhookService } from './ml-webhook.service';
 import { MLStatusEvent } from '../../infrastructure/events/custom-events';
@@ -255,10 +256,18 @@ export class MlTrainingService {
   }
 
   /**
-   * Get training info for a channel
+   * Get training info for a channel.
+   * Loads channel by ID with seller filter bypass so we always get the requested channel's
+   * counts (mlProductCount, mlImageCount) regardless of the request's active channel.
    */
   async getTrainingInfo(ctx: RequestContext, channelId: string): Promise<any> {
-    const channel = await this.channelService.findOne(ctx, channelId);
+    const channel = await findChannelById(
+      ctx,
+      channelId,
+      this.connection,
+      this.channelService,
+      true
+    );
     if (!channel) {
       throw new Error('Channel not found');
     }
