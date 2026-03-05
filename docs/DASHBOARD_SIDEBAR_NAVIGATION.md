@@ -45,22 +45,23 @@ interface NavItem {
 
 ### NavIcon
 
-Union type: `overview`, `sell`, `orders`, `payments`, `products`, `credit`, `customers`, `suppliers`, `purchases`, `accounting`, `stock-adjustments`, `settings`, `admin`, `upgrade`.
+Union type: `overview`, `sell`, `sales`, `payments`, `products`, `credit`, `customers`, `suppliers`, `purchases`, `accounting`, `stock-adjustments`, `settings`, `admin`, `upgrade`, `approvals`.
 
 ## Current Sidebar Structure
 
 | Order | Section | Items |
 |-------|---------|-------|
 | 1 | — | Overview |
-| 2 | — | Sell, Products, Orders, Purchases, Stock Adjustments |
-| 3 | Finance | Payments, Credit, Accounting |
+| 2 | Operations | Sell, Products, Sales, Purchases, Stock Adjustments |
+| 3 | Finance | Payments, Credit, Accounting, Approvals |
 | 4 | People | Customers, Suppliers |
 | 5 | — | Admin, Upgrade (if trial) |
 | Footer | — | Settings (when `hasUpdateSettingsPermission`), Company selector, Help |
 
 - **Stock Adjustments**: `visible: hasManageStockAdjustmentsPermission`
 - **Credit**: `visible: hasCreditManagementPermission`
-- **Accounting**: `visible: hasUpdateSettingsPermission` — links to `/dashboard/admin/accounting`
+- **Accounting**: `visible: hasUpdateSettingsPermission` — `/dashboard/accounting`
+- **Approvals**: `visible: hasManageApprovalsPermission`
 - **Admin section**: Only when `hasUpdateSettingsPermission`
 - **Upgrade**: `visible: isTrialActive`
 - **Settings**: In footer, only when `hasUpdateSettingsPermission`
@@ -72,12 +73,13 @@ Union type: `overview`, `sell`, `orders`, `payments`, `products`, `credit`, `cus
 | Overview | `/dashboard` |
 | Sell | `/dashboard/sell` |
 | Products | `/dashboard/products` |
-| Orders | `/dashboard/orders` |
+| Sales | `/dashboard/orders` |
 | Purchases | `/dashboard/purchases` |
 | Stock Adjustments | `/dashboard/stock-adjustments` |
-| Payments | `/dashboard/payments` (cashier) |
+| Payments | `/dashboard/payments` |
 | Credit | `/dashboard/credit` |
-| Accounting | `/dashboard/admin/accounting` (redirect from `/dashboard/accounting`) |
+| Accounting | `/dashboard/accounting` |
+| Approvals | `/dashboard/approvals` |
 | Customers | `/dashboard/customers` |
 | Suppliers | `/dashboard/suppliers` |
 | Admin | `/dashboard/admin` |
@@ -86,13 +88,16 @@ Union type: `overview`, `sell`, `orders`, `payments`, `products`, `credit`, `cus
 
 ## Settings
 
-- **Settings** (`/dashboard/settings`): Layout with tabs — Notifications, Test Notifications
-- Settings is segregated at the bottom of the sidebar with the company selector
+- **Settings** (`/dashboard/settings`): Tabs — Notifications, Test Notifications. In footer with company selector.
+
+## Accounting
+
+- **Accounting** (`/dashboard/accounting`): Layout tabs — Ledger, Expenses, Inter-account transfers. Default redirect: `ledger`. `/dashboard/expenses` redirects to `accounting/expenses`.
+- **Ledger** view (`/dashboard/accounting/ledger`): Internal tabs (query param) — Overview, Accounts, Transactions, Reconciliation.
 
 ## Admin
 
-- **Admin** (`/dashboard/admin`): Layout with tabs — General, Shifts, Audit Trail, Accounting, Subscription, ML Model, Payment Methods, Team
-- **Accounting** (`/dashboard/admin/accounting`): Uses query param `?tab=` for Overview, Accounts, Transactions, Reconciliation
+- **Admin** (`/dashboard/admin`): Tabs — General, Shifts, Audit Trail, Subscription, ML Model, Payment Methods, Team.
 
 ## Adding a New Nav Item
 
