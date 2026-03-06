@@ -21,7 +21,7 @@ export class SupportComponent {
     {
       question: 'How do I get started with dukarun?',
       answer:
-        "Sign up for a free 30-day trial. No credit card required. Add your products by scanning barcodes or taking photos, and you're ready to start selling.",
+        "Sign up for a free trial. No credit card required. Add your products by scanning barcodes or taking photos, and you're ready to start selling.",
       open: false,
     },
     {
@@ -57,7 +57,7 @@ export class SupportComponent {
     {
       question: 'What happens after my trial ends?',
       answer:
-        'After your free 30-day trial, you can upgrade to Pro (KES 1,500/month) to keep using all features, or pause your account. You can upgrade anytime.',
+        'After your free trial, you can upgrade to a paid plan to keep using all features, or pause your account. You can upgrade anytime.',
       open: false,
     },
     {

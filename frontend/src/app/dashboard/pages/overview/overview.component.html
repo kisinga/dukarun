@@ -222,10 +222,21 @@
       }
     }
 
-    <!-- Sales (revenue) chart — same period as tabs above, visually linked -->
-    <div class="border-t border-base-300/60 px-4 py-3 bg-base-200/20">
-      <div class="flex flex-wrap items-center gap-2 mb-2">
-        <h3 class="text-sm font-bold text-base-content/70">Sales (revenue)</h3>
+    <!-- Sales (revenue) chart — collapsible, default open on md+ -->
+    <div
+      class="collapse collapse-arrow border-t border-base-300/60 bg-base-200/20"
+      [class.collapse-open]="salesChartExpanded()"
+      [class.collapse-close]="!salesChartExpanded()"
+    >
+      <div
+        role="button"
+        tabindex="0"
+        class="collapse-title min-h-0 py-3 flex flex-wrap items-center gap-2 cursor-pointer"
+        (click)="toggleSalesChartExpanded()"
+        (keydown.enter)="toggleSalesChartExpanded(); $event.preventDefault()"
+        (keydown.space)="toggleSalesChartExpanded(); $event.preventDefault()"
+      >
+        <h3 class="text-sm font-bold text-base-content/70">Sales graph</h3>
         <span
           class="badge badge-sm badge-ghost text-base-content/60"
           aria-label="Chart follows period"
@@ -233,16 +244,18 @@
           {{ getActivePeriodLabel() }}
         </span>
       </div>
-      <div class="min-h-[200px]">
-        @if (salesChartHasData()) {
-          <app-echart-container [option]="salesChartOption()" height="220px" />
-        } @else if (analyticsLoading()) {
-          <div class="skeleton h-[220px] w-full rounded-lg"></div>
-        } @else {
-          <p class="text-sm text-base-content/50 py-8 text-center">
-            No sales data for {{ getActivePeriodLabel() }}.
-          </p>
-        }
+      <div class="collapse-content">
+        <div class="min-h-[200px] px-4 pb-3 pt-0">
+          @if (salesChartHasData()) {
+            <app-echart-container [option]="salesChartOption()" height="220px" />
+          } @else if (analyticsLoading()) {
+            <div class="skeleton h-[220px] w-full rounded-lg"></div>
+          } @else {
+            <p class="text-sm text-base-content/50 py-8 text-center">
+              No sales data for {{ getActivePeriodLabel() }}.
+            </p>
+          }
+        </div>
       </div>
     </div>
   </div>

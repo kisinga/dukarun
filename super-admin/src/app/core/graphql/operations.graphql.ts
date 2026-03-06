@@ -100,6 +100,30 @@ export const PLATFORM_STATS = graphql(`
   }
 `);
 
+export const PLATFORM_MONITORING = graphql(`
+  query PlatformMonitoring {
+    platformMonitoring {
+      processMemory {
+        heapUsedMB
+        heapTotalMB
+        rssMB
+      }
+      systemMemory {
+        totalMB
+        freeMB
+        usedMB
+      }
+      uptimeSeconds
+      loadAvg
+      services {
+        name
+        status
+        error
+      }
+    }
+  }
+`);
+
 export const ADMINISTRATORS_FOR_CHANNEL = graphql(`
   query AdministratorsForChannel($channelId: ID!) {
     administratorsForChannel(channelId: $channelId) {
@@ -277,7 +301,7 @@ export const UPDATE_SUBSCRIPTION_TIER = graphql(`
 `);
 
 export const DEACTIVATE_SUBSCRIPTION_TIER = graphql(`
-  mutation DeactivateSubscriptionTier($id: ID!) {
+  mutation DeactivateSubscriptionTier($id: String!) {
     deactivateSubscriptionTier(id: $id)
   }
 `);
@@ -472,6 +496,22 @@ export const UPDATE_REGISTRATION_TAX_RATE = graphql(`
       name
       categoryName
       value
+    }
+  }
+`);
+
+export const PLATFORM_SETTINGS = graphql(`
+  query PlatformSettings {
+    platformSettings {
+      trialDays
+    }
+  }
+`);
+
+export const UPDATE_PLATFORM_SETTINGS = graphql(`
+  mutation UpdatePlatformSettings($trialDays: Int!) {
+    updatePlatformSettings(trialDays: $trialDays) {
+      trialDays
     }
   }
 `);

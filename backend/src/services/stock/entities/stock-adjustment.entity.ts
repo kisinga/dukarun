@@ -77,4 +77,8 @@ export class InventoryStockAdjustmentLine {
 
   @ManyToOne(() => StockLocation)
   stockLocation: StockLocation;
+
+  /** Batch id used when multiple batches existed and user selected one. */
+  @Column({ type: 'varchar', nullable: true })
+  batchId: string | null;
 }

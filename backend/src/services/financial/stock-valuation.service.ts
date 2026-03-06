@@ -103,15 +103,15 @@ export class StockValuationService {
   ): Promise<StockValueRankingResult> {
     const joinClause =
       stockLocationId != null
-        ? `LEFT JOIN stock_level sl ON sl."productVariantId" = pv.id AND sl."stockLocationId" = $2`
-        : `LEFT JOIN stock_level sl ON sl."productVariantId" = pv.id`;
+        ? `LEFT JOIN inventory_batch b ON b.\"productVariantId\" = pv.id AND b.\"channelId\" = $1 AND b.\"stockLocationId\" = $2 AND b.quantity > 0`
+        : `LEFT JOIN inventory_batch b ON b.\"productVariantId\" = pv.id AND b.\"channelId\" = $1 AND b.quantity > 0`;
     const params: (number | string)[] = [channelId];
     if (stockLocationId != null) params.push(stockLocationId);
 
     const valueExpr =
       valuationType === 'RETAIL'
-        ? `(pvp.price * COALESCE(SUM(sl."stockOnHand"), 0))`
-        : `(COALESCE(pv."customFieldsWholesaleprice", 0) * COALESCE(SUM(sl."stockOnHand"), 0))`;
+        ? `(pvp.price * COALESCE(SUM(b.quantity), 0))`
+        : `(COALESCE(pv."customFieldsWholesaleprice", 0) * COALESCE(SUM(b.quantity), 0))`;
 
     const limitVal = Math.max(1, Math.min(limit, 100));
 
@@ -279,8 +279,8 @@ export class StockValuationService {
   ): Promise<{ retail: number; wholesale: number }> {
     const joinClause =
       stockLocationId != null
-        ? `LEFT JOIN stock_level sl ON sl."productVariantId" = pv.id AND sl."stockLocationId" = $2`
-        : `LEFT JOIN stock_level sl ON sl."productVariantId" = pv.id`;
+        ? `LEFT JOIN inventory_batch b ON b.\"productVariantId\" = pv.id AND b.\"channelId\" = $1 AND b.\"stockLocationId\" = $2 AND b.quantity > 0`
+        : `LEFT JOIN inventory_batch b ON b.\"productVariantId\" = pv.id AND b.\"channelId\" = $1 AND b.quantity > 0`;
     const params: number[] = [channelId];
     if (stockLocationId != null) params.push(stockLocationId);
 
@@ -288,7 +288,7 @@ export class StockValuationService {
       `SELECT
         pvp.price,
         COALESCE(pv."customFieldsWholesaleprice", 0) AS wholesale,
-        COALESCE(SUM(sl."stockOnHand"), 0) AS qty
+        COALESCE(SUM(b.quantity), 0) AS qty
       FROM product_variant pv
       INNER JOIN product_channels_channel pcc ON pcc."productId" = pv."productId"
       INNER JOIN product_variant_price pvp ON pvp."variantId" = pv.id AND pvp."channelId" = $1

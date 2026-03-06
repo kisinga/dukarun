@@ -108,6 +108,10 @@ export const STOCK_ADMIN_SCHEMA = gql`
     variantId: ID!
     quantityChange: Float!
     stockLocationId: ID!
+    """
+    When multiple open batches exist, required to select which batch to apply to. UUID (use String!, not ID!, per GRAPHQL_IDS_AND_UUIDS.md).
+    """
+    batchId: String
   }
 
   input PurchaseListOptions {

@@ -1,5 +1,9 @@
 <app-navbar />
 
+<a href="#hero" class="skip-link rounded-lg bg-primary px-4 py-2 text-primary-content">
+  Skip to main content
+</a>
+
 <!-- Structured Data for SEO -->
 <script type="application/ld+json">
   {
@@ -23,17 +27,18 @@
       "bestRating": "5",
       "worstRating": "1"
     },
-    "description": "Point and sell POS system for Kenyan businesses. Works offline, accepts M-Pesa, requires no training.",
+    "description": "POS for retail and service businesses in Kenya. Works on desktop and mobile, offline-ready, and supports M-Pesa.",
     "url": "https://dukarun.com",
     "logo": "https://dukarun.com/assets/logo/dukarun-withtext-light.svg",
     "screenshot": "https://dukarun.com/assets/logo/dukarun-withtext-light.svg",
     "featureList": [
-      "Point-and-sell product recognition",
-      "Offline-first POS with auto-sync",
+      "Desktop and mobile POS",
+      "Camera label recognition and barcode scanning",
       "Real-time inventory tracking",
       "M-Pesa payment integration",
-      "Customer credit tracking",
-      "Business intelligence dashboards"
+      "Customer and supplier balances",
+      "Ledger and simple reporting",
+      "Audit log of key changes"
     ],
     "areaServed": {
       "@type": "Country",
@@ -80,10 +85,10 @@
     "mainEntity": [
       {
         "@type": "Question",
-        "name": "What happens after my 30-day trial ends?",
+        "name": "What happens after my trial ends?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "After your free 30-day trial, you can upgrade to Pro (KES 1,500/month) to keep using all features, or pause your account. You can upgrade anytime. No credit card needed to start."
+          "text": "After your free trial, you can upgrade to a paid plan to keep using all features, or pause your account. You can upgrade anytime. No credit card needed to start."
         }
       },
       {
@@ -91,7 +96,7 @@
         "name": "How does the product recognition work?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Take a few photos of each product labels. When you sell, just point your camera at the label and it recognizes it in seconds. Works great for items without barcodes. Barcode scanning also works if available."
+          "text": "Take a few photos of each product label. When you sell, point your camera at the label and it recognizes it in seconds. Works great for items without barcodes. Barcode scanning also works if available."
         }
       },
       {
@@ -99,48 +104,7 @@
         "name": "Does it work without internet?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes! You can record up to 30 sales without internet. Everything is stored safely on your device. When you reconnect, it syncs automatically. Perfect for areas with unreliable internet."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Is my data safe?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Yes. Your business data is encrypted and kept private. We never share your information. Security is a top priority."
-        }
-      }
-    ]
-  }
-</script>
-
-<script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": [
-      {
-        "@type": "Question",
-        "name": "What happens after my 30-day trial ends?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "After your free 30-day trial, you can upgrade to Pro (KES 1,500/month) to keep using all features, or pause your account. You can upgrade anytime. No credit card needed to start."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "How does the product recognition work?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Take a few photos of each product labels. When you sell, just point your camera at the label and it recognizes it in seconds. Works great for items without barcodes. Barcode scanning also works if available."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Does it work without internet?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Yes! You can record up to 30 sales without internet. Everything is stored safely on your device. When you reconnect, it syncs automatically. Perfect for areas with unreliable internet."
+          "text": "Yes! You can record sales without internet. Everything is stored safely on your device. When you reconnect, it syncs automatically. Perfect for areas with unreliable internet."
         }
       },
       {
@@ -178,21 +142,6 @@
   }
 </script>
 
-<script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      {
-        "@type": "ListItem",
-        "position": 1,
-        "name": "Home",
-        "item": "https://dukarun.com"
-      }
-    ]
-  }
-</script>
-
 <main class="bg-base-100 text-base-content overflow-x-hidden w-full">
   <section id="hero" class="section scroll-mt-28 bg-base-100 pb-16 overflow-x-hidden">
     <div
@@ -200,25 +149,26 @@
     >
       <div class="home-hero-intro flex flex-col gap-4 sm:gap-6 md:gap-7 w-full min-w-0">
         <h1 class="w-full text-3xl font-bold leading-tight sm:text-4xl md:text-5xl lg:text-6xl">
-          DUKARUN - Point and Sell
+          Dukarun POS for Retail & Services
         </h1>
         <p class="w-full text-base md:text-lg text-base-content/70">
-          Your phone is a powerful computer. Dukarun makes it a fast and efficient point of sale.
-          Point your camera at the product and sell it in seconds. No complex hardware, no training
-          needed. <br />
-          Already have a desktop computer? Great! Dukarun works on your computer too.
+          Run a fast, modern POS on <strong>desktop or phone</strong>. Sell with camera label
+          recognition, barcode scanning, or search. Track inventory, payments, and credit in one
+          place.
+          <br />
+          Works offline, supports M-Pesa, and stays simple for your whole team.
         </p>
         <div class="flex flex-col gap-4 w-full sm:max-w-md sm:flex-row sm:items-center sm:gap-3">
           <a
             routerLink="/signup"
             [queryParams]="{ plan: 'pro', trial: 'true' }"
-            class="btn btn-primary btn-lg shadow-lg shadow-primary/20 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl"
+            class="btn btn-primary btn-lg shadow-lg shadow-primary/20 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
-            Start free 30-day trial
+            {{ trialCtaText() }}
           </a>
           <a
             href="#journey"
-            class="btn btn-ghost btn-lg border border-transparent transition-all duration-200 hover:-translate-y-0.5 hover:border-base-300 hover:bg-base-100"
+            class="btn btn-ghost btn-lg border border-transparent transition-all duration-200 hover:-translate-y-0.5 hover:border-base-300 hover:bg-base-100 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             See how it works
           </a>
@@ -346,7 +296,11 @@
       </h2>
       <p class="mx-auto max-w-2xl text-base text-base-content/70">
         Dukarun makes the things that should be simple actually simple. From recording up a sale to
-        knowing who owes what, all on your phone.
+        knowing who owes what on desktop or phone.
+      </p>
+      <p class="mx-auto max-w-2xl text-sm text-base-content/60">
+        An audit log keeps a record of who made a change where and when. sales, stock adjustments,
+        payments, settings, reconcilliations, so you can review and stay accountable.
       </p>
     </div>
     <div class="container-app mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
@@ -741,59 +695,74 @@
         </p>
       </div>
       <div class="mt-10 grid gap-6 lg:grid-cols-3 lg:items-start">
-        @for (plan of pricingPlans; track plan.name) {
-          <div
-            class="group relative flex flex-col rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
-            [class.border-primary]="plan.popular"
-            [class.bg-base-100]="!plan.popular"
-            [class.bg-base-200/30]="plan.popular"
-            [class.shadow-lg]="plan.popular"
-            [class.border-base-300]="!plan.popular"
-          >
-            @if (plan.popular) {
-              <div class="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span class="badge badge-primary badge-sm font-semibold uppercase tracking-wider">
-                  Most Popular
-                </span>
+        @if (pricingLoading()) {
+          <div class="grid gap-6 lg:grid-cols-3 lg:items-stretch w-full">
+            @for (s of [1, 2, 3]; track s) {
+              <div class="rounded-3xl border border-base-300 bg-base-200/50 p-8 flex flex-col">
+                <div class="skeleton h-7 w-24 mb-4"></div>
+                <div class="skeleton h-9 w-28 mb-2"></div>
+                <div class="skeleton h-4 w-full mb-4"></div>
+                <div class="skeleton h-4 w-full mb-2"></div>
+                <div class="skeleton h-4 w-full mb-8 flex-1 max-w-[85%]"></div>
+                <div class="skeleton h-12 w-full rounded-lg"></div>
               </div>
             }
-
-            <div class="mb-6 space-y-2">
-              <h3 class="text-xl font-bold">{{ plan.name }}</h3>
-              <div class="flex items-baseline gap-1">
-                <span class="text-3xl font-bold">{{ plan.monthlyPrice }}</span>
-                @if (plan.monthlyPrice !== 'Custom') {
-                  <span class="text-base md:text-sm text-base-content/70">/month</span>
-                }
-              </div>
-              <p class="text-base md:text-sm text-base-content/70">{{ plan.description }}</p>
-            </div>
-
-            <ul class="mb-8 flex-1 space-y-3 text-base md:text-sm">
-              @for (feature of plan.features; track feature.text) {
-                <li class="flex items-start gap-3">
-                  <span class="text-success text-lg leading-none">✓</span>
-                  <span [class.text-base-content]="feature.included" class="text-base-content/80">
-                    {{ feature.text }}
-                  </span>
-                </li>
-              }
-            </ul>
-
-            <a
-              [routerLink]="plan.ctaLink.split('?')[0]"
-              [queryParams]="
-                plan.ctaLink.includes('?')
-                  ? { plan: plan.ctaLink.split('=')[1].split('&')[0], trial: 'true' }
-                  : null
-              "
-              class="btn w-full transition-transform duration-200 hover:-translate-y-0.5"
-              [class.btn-primary]="plan.popular"
-              [class.btn-outline]="!plan.popular"
-            >
-              {{ plan.ctaText }}
-            </a>
           </div>
+        } @else {
+          @for (plan of pricingPlans(); track plan.name) {
+            <div
+              class="group relative flex flex-col rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+              [class.border-primary]="plan.popular"
+              [class.bg-base-100]="!plan.popular"
+              [class.bg-base-200/30]="plan.popular"
+              [class.shadow-lg]="plan.popular"
+              [class.border-base-300]="!plan.popular"
+            >
+              @if (plan.popular) {
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <span class="badge badge-primary badge-sm font-semibold uppercase tracking-wider">
+                    Most Popular
+                  </span>
+                </div>
+              }
+
+              <div class="mb-6 space-y-2">
+                <h3 class="text-xl font-bold">{{ plan.name }}</h3>
+                <div class="flex items-baseline gap-1">
+                  <span class="text-3xl font-bold">{{ plan.monthlyPrice }}</span>
+                  @if (plan.monthlyPrice !== 'Custom') {
+                    <span class="text-base md:text-sm text-base-content/70">/month</span>
+                  }
+                </div>
+                <p class="text-base md:text-sm text-base-content/70">{{ plan.description }}</p>
+              </div>
+
+              <ul class="mb-8 flex-1 space-y-3 text-base md:text-sm">
+                @for (feature of plan.features; track feature.text) {
+                  <li class="flex items-start gap-3">
+                    <span class="text-success text-lg leading-none">✓</span>
+                    <span [class.text-base-content]="feature.included" class="text-base-content/80">
+                      {{ feature.text }}
+                    </span>
+                  </li>
+                }
+              </ul>
+
+              <a
+                [routerLink]="plan.ctaLink.split('?')[0]"
+                [queryParams]="
+                  plan.ctaLink.includes('?')
+                    ? { plan: plan.ctaLink.split('=')[1].split('&')[0], trial: 'true' }
+                    : null
+                "
+                class="btn w-full transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                [class.btn-primary]="plan.popular"
+                [class.btn-outline]="!plan.popular"
+              >
+                {{ plan.ctaText }}
+              </a>
+            </div>
+          }
         }
       </div>
     </div>
@@ -880,7 +849,7 @@
             [open]="faq.open"
           >
             <summary
-              class="collapse-title text-base font-semibold hover:text-primary"
+              class="collapse-title text-base font-semibold hover:text-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset focus-visible:outline-none"
               (click)="toggleFAQ($index)"
             >
               {{ faq.question }}
@@ -904,16 +873,16 @@
       <div class="flex flex-col gap-3 md:flex-row md:justify-end">
         <a
           routerLink="/features"
-          class="btn btn-lg btn-outline border border-transparent transition-all duration-200 hover:-translate-y-0.5 hover:border-base-300 hover:bg-base-100"
+          class="btn btn-lg btn-outline border border-transparent transition-all duration-200 hover:-translate-y-0.5 hover:border-base-300 hover:bg-base-100 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           Explore the full feature tour
         </a>
         <a
           routerLink="/signup"
           [queryParams]="{ plan: 'pro', trial: 'true' }"
-          class="btn btn-lg btn-primary shadow-lg shadow-primary/20 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl"
+          class="btn btn-lg btn-primary shadow-lg shadow-primary/20 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
-          Start free 30-day trial
+          {{ trialCtaText() }}
         </a>
       </div>
     </div>

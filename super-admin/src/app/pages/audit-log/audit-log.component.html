@@ -1,0 +1,72 @@
+<app-page-header title="Audit log" class="mb-6" />
+
+<p class="text-base-content/70 mb-4">
+  Platform-level actions performed in the super-admin (subscription tiers, channel settings, user approval, role templates, etc.).
+</p>
+
+<div class="flex flex-wrap items-center gap-4 mb-4">
+  <button type="button" class="btn btn-sm btn-primary" (click)="load()" [disabled]="loading()">
+    Refresh
+  </button>
+</div>
+
+@if (loading()) {
+  <div class="flex items-center gap-2 text-base-content/70">
+    <span class="loading loading-spinner loading-md"></span>
+    <span>Loading…</span>
+  </div>
+}
+@if (error()) {
+  <div role="alert" class="alert alert-error">
+    <span>{{ error() }}</span>
+  </div>
+}
+@if (logs().length) {
+  <div class="overflow-x-auto rounded-xl border border-base-300 bg-base-100 shadow">
+    <table class="table table-zebra table-sm">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Event</th>
+          <th>Entity</th>
+          <th>User ID</th>
+          <th>IP</th>
+          <th>Data</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (log of logs(); track log.id) {
+          <tr>
+            <td class="whitespace-nowrap">{{ formatDate(log.timestamp) }}</td>
+            <td><code class="text-xs bg-base-200 px-1 rounded">{{ log.eventType }}</code></td>
+            <td>
+              @if (log.entityType) {
+                <span>{{ log.entityType }}@if (log.entityId) {<span class="text-base-content/70">/{{ log.entityId }}</span>}</span>
+              } @else {
+                —
+              }
+            </td>
+            <td>{{ log.userId ?? '—' }}</td>
+            <td>{{ log.ipAddress ?? '—' }}</td>
+            <td class="max-w-xs truncate" [title]="formatData(log.data)">{{ formatData(log.data) }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  @if (hasMore() && !loadingMore()) {
+    <div class="mt-4">
+      <button type="button" class="btn btn-sm btn-ghost" (click)="loadMore()">
+        Load more
+      </button>
+    </div>
+  }
+  @if (loadingMore()) {
+    <div class="mt-4 flex items-center gap-2 text-base-content/70">
+      <span class="loading loading-spinner loading-sm"></span>
+      <span>Loading more…</span>
+    </div>
+  }
+} @else if (!loading()) {
+  <p class="text-base-content/70">No audit entries yet.</p>
+}
