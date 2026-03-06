@@ -1,0 +1,635 @@
+<a href="#onboarding-main" class="skip-link rounded-lg bg-primary px-4 py-2 text-primary-content">
+  Skip to main content
+</a>
+
+<app-navbar />
+
+<main
+  id="onboarding-main"
+  class="bg-base-100 text-base-content"
+  role="main"
+  aria-labelledby="onboarding-title"
+  tabindex="-1"
+>
+  <section
+    class="section scroll-mt-28 bg-base-100 py-12 md:py-16"
+    aria-labelledby="onboarding-title"
+  >
+    <div class="container-app space-y-6">
+      <header class="text-center space-y-4">
+        <span
+          class="badge badge-primary badge-soft badge-sm font-semibold uppercase tracking-wider"
+        >
+          Guide
+        </span>
+        <h1 id="onboarding-title" class="text-3xl font-bold sm:text-4xl md:text-5xl">
+          Dukarun onboarding and reference
+        </h1>
+        <p class="mx-auto max-w-2xl text-base text-base-content/70">
+          How to set up products, stock, shifts, selling, purchasing, credit, accounting, and admin
+          — in the order a business runs.
+        </p>
+      </header>
+
+      <!-- Table of contents -->
+      <nav
+        class="rounded-xl border border-base-300 bg-base-200/60 p-4 md:p-6 onboarding-toc"
+        aria-label="Page contents"
+        aria-labelledby="toc-heading"
+      >
+        <h2 class="text-lg font-semibold mb-3" id="toc-heading">Contents</h2>
+        <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" role="list">
+          @for (section of sections; track section.id) {
+            <li>
+              <a
+                [href]="'#' + section.id"
+                class="link link-hover link-primary text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
+                (click)="scrollToSection(section.id, $event)"
+                [attr.aria-label]="'Jump to section: ' + section.label"
+              >
+                {{ section.label }}
+              </a>
+            </li>
+          }
+        </ul>
+      </nav>
+
+      <div class="prose-onboarding space-y-12">
+        <!-- Prerequisites -->
+        <article id="prerequisites" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">Prerequisites and flow</h2>
+          <p>Before you can sell, certain things must be in place. The following chain applies:</p>
+          <ol class="list-decimal list-inside space-y-2 text-base-content/90">
+            <li>
+              <strong>Channel approved</strong> — Your business (channel) must be approved. If the
+              account is pending approval, you can log in but mutations are blocked (read-only).
+            </li>
+            <li>
+              <strong>Products and pricing</strong> — You need at least one product (or service)
+              with at least one variant and a price to sell anything.
+            </li>
+            <li>
+              <strong>Stock (for physical products)</strong> — Quantity on hand must be greater than
+              zero at the chosen stock location. Stock comes from opening stock or purchases.
+            </li>
+            <li>
+              <strong>Open shift</strong> — To record any payment (complete a sale, pay a supplier,
+              record an expense, or create an inter-account transfer), you must have an open cashier
+              session. You can add items to the cart without an open shift, but you cannot complete
+              checkout until a shift is open.
+            </li>
+            <li>
+              <strong>Credit sales</strong> — To sell on credit, the customer must exist and be
+              credit-approved with a limit; the user may need credit management permission.
+            </li>
+          </ol>
+          <p class="mt-4">
+            <strong>Flow summary:</strong> Channel → Products (with pricing) → Stock (opening or
+            purchases) → Open shift → Sell / Record payment. For credit: customer + approval +
+            limit.
+          </p>
+        </article>
+
+        <!-- Creating a product -->
+        <article id="creating-product" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">Creating a product</h2>
+          <p>
+            Adding a sellable product (or service) to your catalog so it appears on the Sell page
+            and in reports.
+          </p>
+          <p><strong>Prerequisites:</strong> Channel approved; permission to create products.</p>
+          <ol class="list-decimal list-inside space-y-2 text-base-content/90">
+            <li>Go to <strong>Products</strong> → <strong>Create product</strong>.</li>
+            <li>Choose <strong>item type</strong>: Product or Service.</li>
+            <li>
+              Choose <strong>how it's sold</strong> (for products): Measured (e.g. by weight/volume)
+              or Discrete (e.g. by unit). Services do not use stock.
+            </li>
+            <li>
+              Enter <strong>details</strong>: name, optional description, barcode if applicable,
+              measurement unit or size template, and variants (e.g. 1 kg, 2 kg).
+            </li>
+            <li>
+              For each <strong>variant/SKU</strong>: set <strong>price</strong> and optionally
+              <strong>opening stock</strong>. SKU can be auto-generated.
+            </li>
+            <li>Save. The product appears in the catalog and on the Sell screen.</li>
+          </ol>
+          <div class="rounded-lg bg-warning/10 border border-warning/30 p-4 mt-4">
+            <p class="font-semibold text-warning-content">Common pitfalls</p>
+            <ul class="list-disc list-inside mt-1 text-sm">
+              <li>Without at least one variant and a price, the product cannot be sold.</li>
+              <li>
+                For physical products, if you never set opening stock or record a purchase, quantity
+                on hand is zero and the system may prevent or warn when selling.
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <!-- Types of products -->
+        <article id="types-of-products" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">Types of products</h2>
+          <ul class="space-y-2 text-base-content/90">
+            <li>
+              <strong>Item type:</strong> <strong>Product</strong> — physical goods, can have stock
+              (measured or discrete). <strong>Service</strong> — no stock tracked; you still track
+              revenue.
+            </li>
+            <li>
+              <strong>Product type (for products):</strong> <strong>Measured</strong> — sold by
+              weight, volume, or other continuous measure. <strong>Discrete</strong> — sold by unit
+              (e.g. bottles, packets).
+            </li>
+            <li>
+              <strong>How sold presets:</strong> Single item, multi-variant (e.g. size/colour), by
+              measure, or by volume. These affect how variants and quantities are entered at the
+              POS.
+            </li>
+          </ul>
+        </article>
+
+        <!-- Pricing -->
+        <article id="pricing" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">Pricing</h2>
+          <p>
+            Setting the selling price (and optional tax, wholesale) for each variant so the POS and
+            orders use correct amounts.
+          </p>
+          <p>
+            <strong>Where it's set:</strong> On product create or edit, in the variant/SKU step.
+            Each variant has price (and optionally price with tax), optional wholesale price, and
+            optional allow fractional quantity for measured products.
+          </p>
+          <div class="rounded-lg bg-warning/10 border border-warning/30 p-4 mt-4">
+            <p class="font-semibold text-warning-content">Common pitfalls</p>
+            <ul class="list-disc list-inside mt-1 text-sm">
+              <li>
+                If price is missing or zero, the product may not be sellable or may show incorrect
+                totals.
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <!-- Opening stock -->
+        <article id="opening-stock" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">Opening stock</h2>
+          <p>
+            Recording the inventory you <strong>already have</strong> when you first set up, or when
+            you add a new product that is already in your store.
+          </p>
+          <p>
+            <strong>When to use:</strong> For existing inventory at go-live. For ongoing restock
+            from suppliers, use <strong>Purchases</strong> instead.
+          </p>
+          <p>
+            <strong>Where:</strong> When creating or editing a product, set stock on hand per
+            variant and, if applicable, per stock location.
+          </p>
+          <div class="rounded-lg bg-warning/10 border border-warning/30 p-4 mt-4">
+            <p class="font-semibold text-warning-content">Common pitfalls</p>
+            <ul class="list-disc list-inside mt-1 text-sm">
+              <li>
+                If you don't set opening stock and don't record a purchase, quantity on hand stays
+                zero and you may not be able to sell.
+              </li>
+              <li>
+                Stock is per <strong>location</strong>; ensure the correct location is selected.
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <!-- Opening a shift -->
+        <article id="opening-shift" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">Opening a shift</h2>
+          <p>
+            A <strong>shift</strong> is one cashier session: you <strong>open</strong> it
+            (optionally with opening cash/account balances) and <strong>close</strong> it (with a
+            closing count and reconciliation).
+          </p>
+          <p><strong>You must have an open shift to:</strong></p>
+          <ul class="list-disc list-inside space-y-1">
+            <li>Record payment for a sale (complete checkout)</li>
+            <li>Record a supplier payment (pay a purchase)</li>
+            <li>Record an expense</li>
+            <li>Create an inter-account transfer</li>
+          </ul>
+          <p class="mt-4"><strong>You do not need an open shift to:</strong></p>
+          <ul class="list-disc list-inside space-y-1">
+            <li>Create or edit products, customers, or suppliers</li>
+            <li>Add items to the cart or create a draft order</li>
+            <li>View reports or accounting</li>
+          </ul>
+          <p class="mt-4">
+            <strong>Where:</strong> Dashboard — click <strong>Open shift</strong>. On the Sell page,
+            if no shift is open, a banner appears with <strong>Open shift</strong>; clicking it
+            opens the shift modal.
+          </p>
+          <div class="rounded-lg bg-warning/10 border border-warning/30 p-4 mt-4">
+            <p class="font-semibold text-warning-content">Common pitfalls</p>
+            <ul class="list-disc list-inside mt-1 text-sm">
+              <li>
+                <strong>"Open a session to record payments"</strong> — You tried to complete
+                checkout, pay a supplier, record an expense, or create a transfer without an open
+                shift. Fix: open a shift from the Dashboard or Sell page banner, then retry.
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <!-- Selling the product -->
+        <article id="selling" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">Selling the product</h2>
+          <p>
+            Using the <strong>Sell</strong> page (POS) to add items to the cart and complete a sale
+            with a payment method.
+          </p>
+          <p>
+            <strong>Prerequisites:</strong> At least one product with price (and, for physical
+            products, stock if enforced). <strong>Open shift</strong> to record payment. Payment
+            methods configured (Settings → Admin → Payment Methods). For credit sales:
+            credit-approved customer.
+          </p>
+          <ol class="list-decimal list-inside space-y-2 text-base-content/90">
+            <li>Open <strong>Sell</strong> from the main nav.</li>
+            <li>
+              <strong>Add items</strong> by Camera (AI recognition), Barcode (scan SKU), or Search
+              (name/SKU). In the confirmation modal, choose variant and quantity; item is added to
+              the cart.
+            </li>
+            <li>
+              Open the <strong>cart</strong>, review items and total. Optionally attach a
+              <strong>customer</strong> (for credit or history).
+            </li>
+            <li>
+              <strong>Checkout:</strong> Choose payment method (Cash, M-Pesa, Credit, or others).
+              Apply payment; the order is completed when a shift is open.
+            </li>
+          </ol>
+          <div class="rounded-lg bg-warning/10 border border-warning/30 p-4 mt-4">
+            <p class="font-semibold text-warning-content">Common pitfalls</p>
+            <ul class="list-disc list-inside mt-1 text-sm">
+              <li>
+                Checkout disabled or "Open a session to record payments" — No open shift. Open a
+                shift and try again.
+              </li>
+              <li>Credit option not available — Customer not credit-approved or over limit.</li>
+              <li>Low stock / quantity not available — Add opening stock or record a purchase.</li>
+              <li>
+                Payment method missing — Add methods under Settings → Admin → Payment Methods.
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <!-- Purchasing -->
+        <article id="purchasing" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">
+            Purchasing (supplier management)
+          </h2>
+          <p>
+            Recording stock you buy from suppliers. Each purchase updates stock on hand; you can
+            then pay the supplier (which requires an open shift).
+          </p>
+          <p>
+            <strong>Suppliers</strong> are customers with an "is supplier" flag. Create them via
+            <strong>Suppliers</strong> → Create; they appear in purchase creation.
+          </p>
+          <p>
+            <strong>Prerequisites:</strong> At least one supplier, and a stock location. Open shift
+            is required to record a payment against a purchase.
+          </p>
+          <ol class="list-decimal list-inside space-y-2 text-base-content/90">
+            <li>
+              <strong>Create supplier:</strong> Suppliers → Create; enter name, contact. Save.
+            </li>
+            <li>
+              <strong>Create purchase:</strong> Purchases → Create purchase; select supplier, stock
+              location, add variants and quantities. Confirm; stock is increased.
+            </li>
+            <li>
+              <strong>Pay purchase:</strong> Use the pay-purchase flow from the purchase detail.
+              <strong>Requires an open shift.</strong>
+            </li>
+          </ol>
+          <div class="rounded-lg bg-warning/10 border border-warning/30 p-4 mt-4">
+            <p class="font-semibold text-warning-content">Common pitfalls</p>
+            <ul class="list-disc list-inside mt-1 text-sm">
+              <li>Cannot record supplier payment — No open shift. Open a shift first.</li>
+              <li>Supplier not in list — Ensure the customer is created with "Is supplier" set.</li>
+            </ul>
+          </div>
+        </article>
+
+        <!-- Selling on credit -->
+        <article id="credit" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">
+            Selling on credit (customer management)
+          </h2>
+          <p>
+            Letting selected customers buy now and pay later, within a
+            <strong>credit limit</strong>. The system checks approval and limit before allowing a
+            credit sale.
+          </p>
+          <p>
+            <strong>Prerequisites:</strong> A customer must exist and be
+            <strong>credit-approved</strong> with a <strong>credit limit</strong>. The user may need
+            credit management permission.
+          </p>
+          <ol class="list-decimal list-inside space-y-2 text-base-content/90">
+            <li>
+              <strong>Create customer:</strong> Customers → Create customer; enter name, phone.
+              Save.
+            </li>
+            <li>
+              <strong>Set credit:</strong> In Customers → edit the customer (or Credit → Manage),
+              set <strong>credit limit</strong> and <strong>approve</strong> for credit. Optionally
+              set credit duration (days).
+            </li>
+            <li>
+              <strong>Sell on credit:</strong> On Sell, add items, open cart, select the
+              credit-approved customer, choose <strong>Credit</strong>. Complete the order; amount
+              is recorded as outstanding.
+            </li>
+            <li>
+              <strong>Receive payments:</strong> Record payments against the customer (Credit page
+              or Customers → customer → record payment, or against orders in Orders). Outstanding
+              balance decreases.
+            </li>
+          </ol>
+          <p class="mt-4">
+            <strong>Frozen state:</strong> If a customer is not approved for credit and has an
+            outstanding balance, they are "frozen": no new credit can be extended, but payments are
+            still accepted.
+          </p>
+          <div class="rounded-lg bg-warning/10 border border-warning/30 p-4 mt-4">
+            <p class="font-semibold text-warning-content">Common pitfalls</p>
+            <ul class="list-disc list-inside mt-1 text-sm">
+              <li>
+                Credit option not available — Customer not credit-approved, or over limit, or
+                frozen. Edit customer and approve / increase limit.
+              </li>
+              <li>Permission denied — Credit management may require a specific permission.</li>
+            </ul>
+          </div>
+        </article>
+
+        <!-- Accounting -->
+        <article id="accounting" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">
+            Accounting and reconciliation
+          </h2>
+          <p>
+            The <strong>ledger</strong> (chart of accounts, journal entries),
+            <strong>expenses</strong>, and <strong>reconciliation</strong> so you can see where
+            money is and match it to real account balances.
+          </p>
+          <p>
+            <strong>Where:</strong> <strong>Accounting</strong> in the main nav. Tabs: Ledger
+            (Overview, Accounts, Transactions, Reconciliation), Expenses, Inter-account transfers.
+            Recording an expense requires an open shift.
+          </p>
+          <p><strong>Reconciliation:</strong></p>
+          <ul class="list-disc list-inside space-y-1">
+            <li>
+              <strong>Opening a shift</strong> — You can enter opening balances; creates an opening
+              reconciliation record.
+            </li>
+            <li>
+              <strong>Closing a shift</strong> — When you close a cashier session, a closing
+              reconciliation is created. Every closed session should have one.
+            </li>
+            <li>
+              <strong>Manual reconciliation</strong> — Accounting → Ledger → Reconciliation tab →
+              Create manual reconciliation. Record declared amounts for accounts for a date range.
+            </li>
+          </ul>
+          <div class="rounded-lg bg-warning/10 border border-warning/30 p-4 mt-4">
+            <p class="font-semibold text-warning-content">Common pitfalls</p>
+            <ul class="list-disc list-inside mt-1 text-sm">
+              <li>
+                Missing closing reconciliation — Use the repair flow (query closed sessions missing
+                reconciliation and create reconciliation for each).
+              </li>
+              <li>Cannot record expense — Open a shift first.</li>
+            </ul>
+          </div>
+        </article>
+
+        <!-- Inter-account transfers -->
+        <article id="transfers" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">Inter-account transfers</h2>
+          <p>
+            Moving value from one ledger account to another (e.g. Cash to Bank). Each transfer
+            creates a journal entry and is audited.
+          </p>
+          <p>
+            <strong>Prerequisites:</strong> <strong>Open shift</strong> and permission to create
+            inter-account transfers.
+          </p>
+          <p>
+            <strong>Where:</strong> Accounting → Inter-account transfers. Use Create transfer;
+            choose from account, to account, amount, optional memo.
+          </p>
+          <div class="rounded-lg bg-warning/10 border border-warning/30 p-4 mt-4">
+            <p class="font-semibold text-warning-content">Common pitfalls</p>
+            <ul class="list-disc list-inside mt-1 text-sm">
+              <li>
+                Cannot create transfer — No open shift, or missing permission. Open a shift and
+                check your role.
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <!-- Admin features -->
+        <article id="admin" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">Admin features</h2>
+          <p>
+            Settings and configuration available to users with admin/settings permission. Accessed
+            via <strong>Settings</strong> → <strong>Admin</strong>.
+          </p>
+          <div class="overflow-x-auto">
+            <table class="table table-zebra table-sm">
+              <thead>
+                <tr>
+                  <th scope="col">Tab</th>
+                  <th scope="col">Purpose</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>General</td>
+                  <td>Channel/store-level settings (name, address).</td>
+                </tr>
+                <tr>
+                  <td>Shifts</td>
+                  <td>View and manage cashier sessions (open/close, history).</td>
+                </tr>
+                <tr>
+                  <td>Audit Trail</td>
+                  <td>View audit log (who did what, when). Filter by event type, entity, user.</td>
+                </tr>
+                <tr>
+                  <td>Subscription</td>
+                  <td>Trial and subscription status; upgrade or renew.</td>
+                </tr>
+                <tr>
+                  <td>ML Model</td>
+                  <td>Status of the ML model for camera recognition (training, ready).</td>
+                </tr>
+                <tr>
+                  <td>Payment Methods</td>
+                  <td>Configure tenders (Cash, M-Pesa, etc.) for checkout.</td>
+                </tr>
+                <tr>
+                  <td>Team</td>
+                  <td>Invite administrators, assign roles and permissions.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-4">
+            <strong>Stock adjustments</strong> are under a separate menu item and require
+            <strong>ManageStockAdjustments</strong> permission.
+          </p>
+          <div class="rounded-lg bg-warning/10 border border-warning/30 p-4 mt-4">
+            <p class="font-semibold text-warning-content">Common pitfalls</p>
+            <ul class="list-disc list-inside mt-1 text-sm">
+              <li>
+                Cannot see Admin or a tab — Your user may not have the required permission. Contact
+                the channel owner.
+              </li>
+              <li>Cannot add payment methods — Must have access to Admin → Payment Methods.</li>
+            </ul>
+          </div>
+        </article>
+
+        <!-- Audit logs -->
+        <article id="audit-logs" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">Audit logs</h2>
+          <p>
+            A log of important actions (who did what, when) for compliance, troubleshooting, and
+            security.
+          </p>
+          <p>
+            <strong>Where:</strong> Settings → Admin → <strong>Audit Trail</strong>. Filter by event
+            type, entity type, source; view user and timestamp details.
+          </p>
+          <p><strong>What's logged (examples):</strong></p>
+          <ul class="list-disc list-inside space-y-1">
+            <li>Financial: expense, transfer, reconciliation, period</li>
+            <li>Payments: payment allocated, supplier payment allocated</li>
+            <li>Credit: customer credit approved, limit/duration changed</li>
+            <li>Shift: session opened/closed, cash count, variance, M-Pesa verified</li>
+            <li>Admin: admin invited/updated/disabled, role created</li>
+            <li>Orders: order created, state changed</li>
+            <li>Products: created, updated, deleted</li>
+            <li>Stock: movement, purchase recorded, adjustment recorded</li>
+            <li>Channel: settings/status updated</li>
+          </ul>
+        </article>
+
+        <!-- Common pitfalls summary -->
+        <article id="pitfalls" class="scroll-mt-28">
+          <h2 class="text-2xl font-bold border-b border-base-300 pb-2">
+            Common pitfalls and troubleshooting (summary)
+          </h2>
+          <div class="overflow-x-auto">
+            <table class="table table-zebra table-sm">
+              <thead>
+                <tr>
+                  <th scope="col">Problem</th>
+                  <th scope="col">Cause</th>
+                  <th scope="col">Fix</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Cannot complete sale / "Open a session to record payments"</td>
+                  <td>No open shift</td>
+                  <td>Open shift from Dashboard or Sell page banner.</td>
+                </tr>
+                <tr>
+                  <td>Credit option not available at checkout</td>
+                  <td>Customer not credit-approved, over limit, or frozen</td>
+                  <td>Customers → edit customer → set limit and approve; or Credit page.</td>
+                </tr>
+                <tr>
+                  <td>Read-only / cannot edit</td>
+                  <td>Channel pending approval or subscription expired</td>
+                  <td>Check approval status or Settings → Admin → Subscription.</td>
+                </tr>
+                <tr>
+                  <td>Low stock / can't sell (quantity not available)</td>
+                  <td>Insufficient stock at location</td>
+                  <td>Add opening stock (product edit) or record a purchase.</td>
+                </tr>
+                <tr>
+                  <td>Payment method missing at checkout</td>
+                  <td>No payment methods configured</td>
+                  <td>Settings → Admin → Payment Methods (admin/owner).</td>
+                </tr>
+                <tr>
+                  <td>Cannot record supplier payment / expense / transfer</td>
+                  <td>No open shift</td>
+                  <td>Open a shift first, then retry.</td>
+                </tr>
+                <tr>
+                  <td>Order created but payment not recorded</td>
+                  <td>Tried to pay without opening shift</td>
+                  <td>Open shift, then record payment against the order (Orders → order → Pay).</td>
+                </tr>
+                <tr>
+                  <td>OTP not received (development)</td>
+                  <td>Dev mode: OTP not sent by SMS/email</td>
+                  <td>
+                    Check backend terminal for
+                    <code class="bg-base-300 px-1 rounded"
+                      >[COMMUNICATION DEV] otp | ... body=123456</code
+                    >; use the 6-digit code from body=.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+
+      <!-- Back to top -->
+      <div class="flex justify-center pt-8">
+        <a
+          href="#onboarding-main"
+          class="btn btn-ghost btn-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
+          (click)="scrollToTop($event)"
+          aria-label="Back to top of page"
+        >
+          Back to top
+        </a>
+      </div>
+
+      <!-- CTA -->
+      <div
+        class="mt-12 grid gap-6 rounded-3xl border border-base-300 bg-base-100 p-8 shadow-xl md:grid-cols-[2fr,1fr] md:items-center"
+      >
+        <div class="space-y-4">
+          <h2 class="text-2xl font-bold sm:text-3xl">Ready to get started?</h2>
+          <p class="text-base-content/70">
+            Sign up for a free trial and follow this guide to set up your first products and make
+            your first sale.
+          </p>
+        </div>
+        <div class="flex flex-col gap-3 md:flex-row md:justify-end">
+          <a routerLink="/signup" class="btn btn-primary"> Start free trial </a>
+          <a routerLink="/support" class="btn btn-ghost border border-base-300">
+            Help &amp; support
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<app-footer />
