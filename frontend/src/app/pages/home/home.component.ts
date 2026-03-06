@@ -407,7 +407,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     {
       question: 'Does it work without internet?',
       answer:
-        'Yes! You can record up to 30 sales without internet. Everything is stored safely on your device. When you reconnect, it syncs automatically. Perfect for areas with unreliable internet.',
+        'Yes! Products, customers amd suppliers are cached on devicea allowing you to search, view, and you can even record a few sales without internet. When you reconnect, changes sync automatically. Perfect for areas with unreliable internet.',
       open: false,
     },
     {
