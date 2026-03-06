@@ -1,3 +1,24 @@
 :host {
   display: block;
 }
+
+// Quick Select: cap expanded height so it stays a small fraction of the page on all screens.
+// Content scrolls inside this area instead of growing with the list.
+:host .quick-select-content {
+  max-height: 32vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+// Short viewports: use an even smaller share of the screen.
+@media (max-height: 600px) {
+  :host .quick-select-content {
+    max-height: 28vh;
+  }
+}
+
+@media (max-height: 500px) {
+  :host .quick-select-content {
+    max-height: 22vh;
+  }
+}
