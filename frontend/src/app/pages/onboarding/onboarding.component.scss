@@ -1,0 +1,35 @@
+// Onboarding page styles
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  z-index: 9999;
+  &:focus-visible {
+    left: 1rem;
+    top: 1rem;
+    position: fixed;
+  }
+}
+
+.prose-onboarding {
+  max-width: none;
+}
+
+.prose-onboarding article {
+  scroll-margin-top: 7rem;
+}
+
+// Inline code in pitfalls table
+.prose-onboarding code {
+  font-size: 0.875em;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  background-color: oklch(var(--b3));
+  word-break: break-all;
+}
+
+// TOC: ensure links are keyboard-focusable and have visible focus
+.onboarding-toc a {
+  display: inline-block;
+  border-radius: 0.25rem;
+  padding: 0.125rem 0;
+}
