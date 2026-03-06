@@ -24,14 +24,18 @@
       </label>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label class="form-control w-full">
-          <span class="label"><span class="label-text">Price monthly (cents)</span></span>
-          <input type="number" class="input input-bordered w-full" [(ngModel)]="formModel.priceMonthly" name="priceMonthly" placeholder="0" min="0" />
+          <span class="label"><span class="label-text">Price monthly (KES)</span></span>
+          <input type="number" class="input input-bordered w-full" [(ngModel)]="formModel.priceMonthly" name="priceMonthly" placeholder="e.g. 1500" min="0" step="1" />
         </label>
         <label class="form-control w-full">
-          <span class="label"><span class="label-text">Price yearly (cents)</span></span>
-          <input type="number" class="input input-bordered w-full" [(ngModel)]="formModel.priceYearly" name="priceYearly" placeholder="0" min="0" />
+          <span class="label"><span class="label-text">Price yearly (KES)</span></span>
+          <input type="number" class="input input-bordered w-full" [(ngModel)]="formModel.priceYearly" name="priceYearly" placeholder="e.g. 14400" min="0" step="1" />
         </label>
       </div>
+      <label class="form-control w-full">
+        <span class="label"><span class="label-text">Features (JSON, optional)</span></span>
+        <textarea class="textarea textarea-bordered w-full font-mono text-sm min-h-24" [(ngModel)]="formModel.featuresJson" name="featuresJson" placeholder='{"features": ["Feature one", "Feature two"]} — use double quotes'></textarea>
+      </label>
       <label class="form-control w-full max-w-xs">
         <span class="label"><span class="label-text">SMS limit per 30 days</span></span>
         <input type="number" class="input input-bordered w-full" [(ngModel)]="formModel.smsLimit" name="smsLimit" placeholder="0 = no limit" min="0" />
@@ -68,7 +72,7 @@
           <tr [class.opacity-60]="!t.isActive">
             <td class="font-medium">{{ t.code }}</td>
             <td>{{ t.name }}</td>
-            <td>{{ t.priceMonthly }} / {{ t.priceYearly }}</td>
+            <td>KES {{ t.priceMonthly / 100 | number:'1.0-0' }} / KES {{ t.priceYearly / 100 | number:'1.0-0' }}</td>
             <td>
               @if (editingTier()?.id === t.id) {
                 <div class="flex items-center gap-2">
@@ -93,7 +97,12 @@
             </td>
             <td>
               @if (t.isActive) {
-                <button type="button" class="btn btn-error btn-sm btn-outline" (click)="deactivate(t.id)" [disabled]="saving()">Deactivate</button>
+                <div class="flex flex-wrap gap-1">
+                  <button type="button" class="btn btn-primary btn-sm btn-outline" (click)="openEditTier(t)" [disabled]="saving()">Edit</button>
+                  <button type="button" class="btn btn-error btn-sm btn-outline" (click)="deactivate(t.id)" [disabled]="saving()">Deactivate</button>
+                </div>
+              } @else {
+                <button type="button" class="btn btn-primary btn-sm btn-outline" (click)="openEditTier(t)" [disabled]="saving()">Edit</button>
               }
             </td>
           </tr>
@@ -101,4 +110,63 @@
       </tbody>
     </table>
   </div>
+}
+
+<!-- Full edit modal (daisyUI), outside table -->
+@if (editingTierFull(); as tier) {
+  <dialog id="edit-tier-modal" class="modal" [class.modal-open]="true">
+    <div class="modal-box max-w-2xl">
+      <h3 class="font-bold text-lg">Edit tier: {{ tier.name }}</h3>
+      <form (ngSubmit)="saveEditTier()" class="space-y-4 mt-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label class="form-control w-full">
+            <span class="label"><span class="label-text">Code</span></span>
+            <input type="text" class="input input-bordered w-full" [(ngModel)]="editFormModel.code" name="editCode" required />
+          </label>
+          <label class="form-control w-full">
+            <span class="label"><span class="label-text">Name</span></span>
+            <input type="text" class="input input-bordered w-full" [(ngModel)]="editFormModel.name" name="editName" required />
+          </label>
+        </div>
+        <label class="form-control w-full">
+          <span class="label"><span class="label-text">Description</span></span>
+          <input type="text" class="input input-bordered w-full" [(ngModel)]="editFormModel.description" name="editDescription" />
+        </label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label class="form-control w-full">
+            <span class="label"><span class="label-text">Price monthly (KES)</span></span>
+            <input type="number" class="input input-bordered w-full" [(ngModel)]="editFormModel.priceMonthly" name="editPriceMonthly" min="0" step="1" />
+          </label>
+          <label class="form-control w-full">
+            <span class="label"><span class="label-text">Price yearly (KES)</span></span>
+            <input type="number" class="input input-bordered w-full" [(ngModel)]="editFormModel.priceYearly" name="editPriceYearly" min="0" step="1" />
+          </label>
+        </div>
+        <label class="form-control w-full">
+          <span class="label"><span class="label-text">Features (JSON)</span></span>
+          <textarea class="textarea textarea-bordered w-full font-mono text-sm min-h-24" [(ngModel)]="editFormModel.featuresJson" name="editFeaturesJson" placeholder='{"features": ["Item one", "Item two"]}'></textarea>
+        </label>
+        <label class="form-control w-full max-w-xs">
+          <span class="label"><span class="label-text">SMS limit per 30 days</span></span>
+          <input type="number" class="input input-bordered w-full" [(ngModel)]="editFormModel.smsLimit" name="editSmsLimit" min="0" />
+        </label>
+        <label class="form-control flex-row gap-2 items-center">
+          <input type="checkbox" class="checkbox checkbox-primary" [(ngModel)]="editFormModel.isActive" name="editIsActive" />
+          <span class="label-text">Active</span>
+        </label>
+        <div class="modal-action">
+          <button type="button" class="btn btn-ghost" (click)="cancelEditTier()">Cancel</button>
+          <button type="submit" class="btn btn-primary" [disabled]="saving()">
+            @if (saving()) {
+              <span class="loading loading-spinner loading-sm"></span>
+            }
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+      <button type="button" (click)="cancelEditTier()">close</button>
+    </form>
+  </dialog>
 }

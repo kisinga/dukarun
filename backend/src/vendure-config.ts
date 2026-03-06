@@ -1610,6 +1610,22 @@ export const config: VendureConfig = {
         },
       },
     ],
+    // Schema only; runtime value is in DB (super-admin Platform data, channel provisioning, shop API getPublicPlatformConfig).
+    GlobalSettings: [
+      {
+        name: 'trialDays',
+        type: 'int',
+        label: [{ languageCode: LanguageCode.en, value: 'Default trial duration (days)' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value: 'Days for new business trial. Used when creating channels.',
+          },
+        ],
+        defaultValue: 30,
+        nullable: false,
+      },
+    ],
   },
   orderOptions: {
     process: [customOrderProcess],

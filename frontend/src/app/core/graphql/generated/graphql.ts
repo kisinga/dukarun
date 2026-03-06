@@ -2715,12 +2715,17 @@ export type GlobalSettings = {
   __typename?: 'GlobalSettings';
   availableLanguages: Array<LanguageCode>;
   createdAt: Scalars['DateTime']['output'];
-  customFields?: Maybe<Scalars['JSON']['output']>;
+  customFields?: Maybe<GlobalSettingsCustomFields>;
   id: Scalars['ID']['output'];
   outOfStockThreshold: Scalars['Int']['output'];
   serverConfig: ServerConfig;
   trackInventory: Scalars['Boolean']['output'];
   updatedAt: Scalars['DateTime']['output'];
+};
+
+export type GlobalSettingsCustomFields = {
+  __typename?: 'GlobalSettingsCustomFields';
+  trialDays?: Maybe<Scalars['Int']['output']>;
 };
 
 /** Returned when attempting to set the Customer on a guest checkout when the configured GuestCheckoutStrategy does not allow it. */
@@ -4118,6 +4123,7 @@ export type Mutation = {
   updateOrderNote: HistoryEntry;
   /** Update an existing PaymentMethod */
   updatePaymentMethod: PaymentMethod;
+  updatePlatformSettings: PlatformSettings;
   updatePrinterSettings: ChannelSettings;
   /** Update an existing Product */
   updateProduct: Product;
@@ -4548,7 +4554,7 @@ export type MutationCreateZoneArgs = {
 
 
 export type MutationDeactivateSubscriptionTierArgs = {
-  id: Scalars['ID']['input'];
+  id: Scalars['String']['input'];
 };
 
 
@@ -5335,6 +5341,11 @@ export type MutationUpdateOrderNoteArgs = {
 
 export type MutationUpdatePaymentMethodArgs = {
   input: UpdatePaymentMethodInput;
+};
+
+
+export type MutationUpdatePlatformSettingsArgs = {
+  trialDays: Scalars['Int']['input'];
 };
 
 
@@ -6532,6 +6543,30 @@ export type PlatformAdministratorRoleDetail = {
   permissions: Array<Scalars['String']['output']>;
 };
 
+export type PlatformAuditLog = {
+  __typename?: 'PlatformAuditLog';
+  data: Scalars['JSON']['output'];
+  entityId?: Maybe<Scalars['String']['output']>;
+  entityType?: Maybe<Scalars['String']['output']>;
+  eventType: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  ipAddress?: Maybe<Scalars['String']['output']>;
+  source: Scalars['String']['output'];
+  timestamp: Scalars['DateTime']['output'];
+  userId?: Maybe<Scalars['ID']['output']>;
+};
+
+export type PlatformAuditLogOptions = {
+  endDate?: InputMaybe<Scalars['DateTime']['input']>;
+  entityId?: InputMaybe<Scalars['String']['input']>;
+  entityType?: InputMaybe<Scalars['String']['input']>;
+  eventType?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  startDate?: InputMaybe<Scalars['DateTime']['input']>;
+  userId?: InputMaybe<Scalars['ID']['input']>;
+};
+
 export type PlatformChannel = {
   __typename?: 'PlatformChannel';
   code: Scalars['String']['output'];
@@ -6564,6 +6599,16 @@ export type PlatformChannelDetail = {
   token: Scalars['String']['output'];
 };
 
+/** Platform monitoring: process/host metrics and service health. */
+export type PlatformMonitoring = {
+  __typename?: 'PlatformMonitoring';
+  loadAvg: Array<Scalars['Float']['output']>;
+  processMemory: ProcessMemory;
+  services: Array<ServiceHealth>;
+  systemMemory: SystemMemory;
+  uptimeSeconds: Scalars['Float']['output'];
+};
+
 export type PlatformRoleTemplate = {
   __typename?: 'PlatformRoleTemplate';
   code: Scalars['String']['output'];
@@ -6571,6 +6616,12 @@ export type PlatformRoleTemplate = {
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
   permissions: Array<Scalars['String']['output']>;
+};
+
+/** Platform-wide settings (e.g. default trial length for new channels). */
+export type PlatformSettings = {
+  __typename?: 'PlatformSettings';
+  trialDays: Scalars['Int']['output'];
 };
 
 export type PlatformStats = {
@@ -6598,6 +6649,14 @@ export type PriceRange = {
   __typename?: 'PriceRange';
   max: Scalars['Money']['output'];
   min: Scalars['Money']['output'];
+};
+
+/** Process memory usage (Node.js process). */
+export type ProcessMemory = {
+  __typename?: 'ProcessMemory';
+  heapTotalMB: Scalars['Float']['output'];
+  heapUsedMB: Scalars['Float']['output'];
+  rssMB: Scalars['Float']['output'];
 };
 
 export type Product = Node & {
@@ -7264,8 +7323,11 @@ export type Query = {
   pendingVarianceReviews: Array<CashDrawerCount>;
   periodReconciliationStatus: ReconciliationStatus;
   platformAdministrators: PlatformAdministratorList;
+  platformAuditLogs: Array<PlatformAuditLog>;
   platformChannels: Array<PlatformChannel>;
+  platformMonitoring: PlatformMonitoring;
   platformRoleTemplates: Array<PlatformRoleTemplate>;
+  platformSettings: PlatformSettings;
   platformStats: PlatformStats;
   platformZones: Array<PlatformZone>;
   /** Used for real-time previews of the contents of a Collection */
@@ -7718,6 +7780,11 @@ export type QueryPeriodReconciliationStatusArgs = {
 
 export type QueryPlatformAdministratorsArgs = {
   options?: InputMaybe<PlatformAdministratorListOptions>;
+};
+
+
+export type QueryPlatformAuditLogsArgs = {
+  options?: InputMaybe<PlatformAuditLogOptions>;
 };
 
 
@@ -8552,6 +8619,14 @@ export type ServerConfig = {
   permittedAssetTypes: Array<Scalars['String']['output']>;
 };
 
+/** Health status of a service (e.g. backend, ml-trainer). */
+export type ServiceHealth = {
+  __typename?: 'ServiceHealth';
+  error?: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+};
+
 export type SessionReconciliationRequirements = {
   __typename?: 'SessionReconciliationRequirements';
   blindCountRequired: Scalars['Boolean']['output'];
@@ -8749,6 +8824,8 @@ export type StockAdjustmentFilterInput = {
 };
 
 export type StockAdjustmentLineInput = {
+  /** When multiple open batches exist, required to select which batch to apply to. UUID (use String!, not ID!, per GRAPHQL_IDS_AND_UUIDS.md). */
+  batchId?: InputMaybe<Scalars['String']['input']>;
   quantityChange: Scalars['Float']['input'];
   stockLocationId: Scalars['ID']['input'];
   variantId: Scalars['ID']['input'];
@@ -9025,7 +9102,7 @@ export type SubscriptionTier = {
   createdAt: Scalars['DateTime']['output'];
   description?: Maybe<Scalars['String']['output']>;
   features?: Maybe<Scalars['JSON']['output']>;
-  id: Scalars['ID']['output'];
+  id: Scalars['String']['output'];
   isActive: Scalars['Boolean']['output'];
   name: Scalars['String']['output'];
   priceMonthly: Scalars['Int']['output'];
@@ -9097,6 +9174,14 @@ export type SurchargeInput = {
   sku?: InputMaybe<Scalars['String']['input']>;
   taxDescription?: InputMaybe<Scalars['String']['input']>;
   taxRate?: InputMaybe<Scalars['Float']['input']>;
+};
+
+/** System memory (host/container). */
+export type SystemMemory = {
+  __typename?: 'SystemMemory';
+  freeMB: Scalars['Float']['output'];
+  totalMB: Scalars['Float']['output'];
+  usedMB: Scalars['Float']['output'];
 };
 
 export type Tag = Node & {
@@ -9581,9 +9666,13 @@ export type UpdateFacetValueInput = {
   translations?: InputMaybe<Array<FacetValueTranslationInput>>;
 };
 
+export type UpdateGlobalSettingsCustomFieldsInput = {
+  trialDays?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type UpdateGlobalSettingsInput = {
   availableLanguages?: InputMaybe<Array<LanguageCode>>;
-  customFields?: InputMaybe<Scalars['JSON']['input']>;
+  customFields?: InputMaybe<UpdateGlobalSettingsCustomFieldsInput>;
   outOfStockThreshold?: InputMaybe<Scalars['Int']['input']>;
   trackInventory?: InputMaybe<Scalars['Boolean']['input']>;
 };
@@ -9785,7 +9874,7 @@ export type UpdateSubscriptionTierInput = {
   code?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   features?: InputMaybe<Scalars['JSON']['input']>;
-  id: Scalars['ID']['input'];
+  id: Scalars['String']['input'];
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   priceMonthly?: InputMaybe<Scalars['Int']['input']>;

@@ -31,6 +31,7 @@ import {
 ])
 @Index('IDX_inventory_batch_channel_source', ['channelId', 'sourceType', 'sourceId'])
 @Index('IDX_inventory_batch_expiry', ['expiryDate'])
+@Index('UQ_inventory_batch_channel_batchNumber', ['channelId', 'batchNumber'], { unique: true })
 export class InventoryBatch {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

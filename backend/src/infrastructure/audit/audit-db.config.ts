@@ -23,6 +23,7 @@ export const auditDbConfig: DataSourceOptions = {
   entities: [
     path.join(__dirname, 'audit-log.entity.{ts,js}'),
     path.join(__dirname, 'admin-login-attempt.entity.{ts,js}'),
+    path.join(__dirname, 'platform-audit-log.entity.{ts,js}'),
   ],
   migrations: [path.join(__dirname, '../migrations/audit-*.{ts,js}')],
   // Connection pool settings for better reliability

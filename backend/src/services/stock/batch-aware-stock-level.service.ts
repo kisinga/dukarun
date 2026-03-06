@@ -13,10 +13,9 @@ import { InventoryStore } from '../inventory/interfaces/inventory-store.interfac
  * StockLevelService override that resolves available stock from FIFO batch inventory
  * instead of Vendure's stock_level table.
  *
- * Used by ProductVariantService.getSaleableStockLevel and getFulfillableStockLevel,
- * so add-item-to-order, adjust-order-line, and create-fulfillment stock checks all
- * use batch-based quantity. Fixes INSUFFICIENT_STOCK_ERROR when batch qty is
- * sufficient but stock_level is out of sync.
+ * Source of truth for stock is batch inventory; Vendure stock_level is never read
+ * for availability. Used by ProductVariantService.getSaleableStockLevel and
+ * getFulfillableStockLevel (add-item, adjust-line, fulfillment).
  *
  * When InventoryStore is not available (e.g. tests or plugin order), falls back
  * to default Vendure behavior (stock_level).

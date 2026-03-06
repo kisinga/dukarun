@@ -61,3 +61,28 @@ export const AUDIT_EVENTS = {
 } as const;
 
 export type AuditEventType = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
+
+/**
+ * Platform (super-admin) audit event types.
+ * Use for actions performed in the super-admin that are not scoped to a channel.
+ */
+export const PLATFORM_AUDIT_EVENTS = {
+  SUBSCRIPTION_TIER_CREATED: 'platform.subscription_tier.created',
+  SUBSCRIPTION_TIER_UPDATED: 'platform.subscription_tier.updated',
+  SUBSCRIPTION_TIER_DEACTIVATED: 'platform.subscription_tier.deactivated',
+  PLATFORM_SETTINGS_UPDATED: 'platform.settings.updated',
+  REGISTRATION_TAX_UPDATED: 'platform.registration_tax.updated',
+  CHANNEL_ZONES_UPDATED: 'platform.channel.zones_updated',
+  CHANNEL_STATUS_UPDATED: 'platform.channel.status_updated',
+  CHANNEL_TRIAL_EXTENDED: 'platform.channel.trial_extended',
+  CHANNEL_FEATURE_FLAGS_UPDATED: 'platform.channel.feature_flags_updated',
+  USER_APPROVED: 'platform.user.approved',
+  USER_REJECTED: 'platform.user.rejected',
+  ROLE_TEMPLATE_CREATED: 'platform.role_template.created',
+  ROLE_TEMPLATE_UPDATED: 'platform.role_template.updated',
+  ROLE_TEMPLATE_DELETED: 'platform.role_template.deleted',
+  ADMINISTRATOR_PERMISSIONS_UPDATED: 'platform.administrator.permissions_updated',
+} as const;
+
+export type PlatformAuditEventType =
+  (typeof PLATFORM_AUDIT_EVENTS)[keyof typeof PLATFORM_AUDIT_EVENTS];

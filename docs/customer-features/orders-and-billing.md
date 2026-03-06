@@ -218,7 +218,7 @@ This section is about **your subscription to Dukarun itself**, not your customer
 
 Per `SUBSCRIPTION_INTEGRATION.md`:
 
-- Each channel (business) gets a **30-day trial** on creation.
+- Each channel (business) gets a **platform-configured trial** on creation.
 - Custom fields on the channel store:
   - `subscriptionStatus` (e.g. `trial`, `active`, `expired`, `cancelled`).
   - `trialEndsAt`, `subscriptionStartedAt`, `subscriptionExpiresAt`.

@@ -5,6 +5,18 @@
   width: 100%;
 }
 
+// Skip link: off-screen until focused (a11y)
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  z-index: 9999;
+  &:focus-visible {
+    left: 1rem;
+    top: 1rem;
+    position: fixed;
+  }
+}
+
 // ============================================
 // MOBILE-FIRST: Condensed, punchy layouts
 // ============================================
@@ -295,5 +307,26 @@
   .hover\:-translate-y-1:hover,
   .hover\:-translate-y-0\.5:hover {
     transform: none;
+  }
+}
+
+// ============================================
+// REDUCED MOTION (a11y)
+// ============================================
+
+@media (prefers-reduced-motion: reduce) {
+  .section *,
+  .carousel,
+  .journey-step,
+  article {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .hover\:-translate-y-1:hover,
+  .hover\:-translate-y-0\.5:hover,
+  .group:hover .group-hover\:-translate-y-1 {
+    transform: none !important;
   }
 }

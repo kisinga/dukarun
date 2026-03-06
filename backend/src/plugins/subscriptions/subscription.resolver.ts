@@ -2,6 +2,8 @@ import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, ID, Permission, RequestContext } from '@vendure/core';
 import { Logger } from '@nestjs/common';
 import gql from 'graphql-tag';
+import { PlatformAuditService } from '../../infrastructure/audit/platform-audit.service';
+import { PLATFORM_AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
 import { PaystackService } from '../../services/payments/paystack.service';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
 import { SubscriptionTier } from './subscription.entity';
@@ -11,7 +13,7 @@ import { SubscriptionTier } from './subscription.entity';
  */
 export const SUBSCRIPTION_SCHEMA = gql`
   type SubscriptionTier {
-    id: ID!
+    id: String!
     code: String!
     name: String!
     description: String
@@ -80,7 +82,7 @@ export const SUBSCRIPTION_SCHEMA = gql`
   }
 
   input UpdateSubscriptionTierInput {
-    id: ID!
+    id: String!
     code: String
     name: String
     description: String
@@ -105,7 +107,7 @@ export const SUBSCRIPTION_SCHEMA = gql`
     """
     Deactivate subscription tier (SuperAdmin only)
     """
-    deactivateSubscriptionTier(id: ID!): Boolean!
+    deactivateSubscriptionTier(id: String!): Boolean!
 
     """
     Initiate subscription purchase
@@ -137,7 +139,8 @@ export class SubscriptionResolver {
 
   constructor(
     private subscriptionService: SubscriptionService,
-    private paystackService: PaystackService
+    private paystackService: PaystackService,
+    private platformAuditService: PlatformAuditService
   ) {}
 
   @Query()
@@ -191,7 +194,13 @@ export class SubscriptionResolver {
       isActive?: boolean;
     }
   ): Promise<SubscriptionTier> {
-    return this.subscriptionService.createSubscriptionTier(ctx, input);
+    const tier = await this.subscriptionService.createSubscriptionTier(ctx, input);
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.SUBSCRIPTION_TIER_CREATED, {
+      entityType: 'SubscriptionTier',
+      entityId: tier.id,
+      data: { code: tier.code, name: tier.name },
+    });
+    return tier;
   }
 
   @Mutation()
@@ -211,7 +220,13 @@ export class SubscriptionResolver {
       isActive?: boolean;
     }
   ): Promise<SubscriptionTier> {
-    return this.subscriptionService.updateSubscriptionTier(ctx, input);
+    const tier = await this.subscriptionService.updateSubscriptionTier(ctx, input);
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.SUBSCRIPTION_TIER_UPDATED, {
+      entityType: 'SubscriptionTier',
+      entityId: tier.id,
+      data: { code: tier.code, name: tier.name },
+    });
+    return tier;
   }
 
   @Mutation()
@@ -220,7 +235,15 @@ export class SubscriptionResolver {
     @Ctx() ctx: RequestContext,
     @Args('id') id: string
   ): Promise<boolean> {
-    return this.subscriptionService.deleteSubscriptionTier(ctx, id);
+    const result = await this.subscriptionService.deleteSubscriptionTier(ctx, id);
+    if (result) {
+      await this.platformAuditService.log(
+        ctx,
+        PLATFORM_AUDIT_EVENTS.SUBSCRIPTION_TIER_DEACTIVATED,
+        { entityType: 'SubscriptionTier', entityId: id, data: {} }
+      );
+    }
+    return result;
   }
 
   @Mutation()

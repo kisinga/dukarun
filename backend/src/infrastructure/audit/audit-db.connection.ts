@@ -334,6 +334,51 @@ export class AuditDbConnection implements OnModuleInit, OnModuleDestroy {
         }
       }
 
+      // platform_audit_log table (super-admin / platform-level actions, no channelId)
+      const platformAuditTableExists = await queryRunner.query(`
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.tables
+          WHERE table_name = 'platform_audit_log'
+        )
+      `);
+      if (!platformAuditTableExists[0]?.exists) {
+        await queryRunner.query(`
+          CREATE TABLE platform_audit_log (
+            id uuid NOT NULL DEFAULT gen_random_uuid(),
+            timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "eventType" character varying NOT NULL,
+            "entityType" character varying,
+            "entityId" character varying,
+            "userId" integer,
+            "ipAddress" character varying,
+            data jsonb NOT NULL DEFAULT '{}',
+            source character varying NOT NULL,
+            CONSTRAINT "PK_platform_audit_log" PRIMARY KEY (id, timestamp)
+          )
+        `);
+        await queryRunner.query(`
+          CREATE INDEX IF NOT EXISTS "IDX_platform_audit_log_timestamp"
+          ON platform_audit_log (timestamp DESC)
+        `);
+        await queryRunner.query(`
+          CREATE INDEX IF NOT EXISTS "IDX_platform_audit_log_event_type"
+          ON platform_audit_log ("eventType")
+        `);
+        await queryRunner.query(`
+          CREATE INDEX IF NOT EXISTS "IDX_platform_audit_log_user_id"
+          ON platform_audit_log ("userId")
+        `);
+        await queryRunner.query(`
+          CREATE INDEX IF NOT EXISTS "IDX_platform_audit_log_entity"
+          ON platform_audit_log ("entityType", "entityId")
+        `);
+        await queryRunner.query(`
+          CREATE INDEX IF NOT EXISTS "IDX_platform_audit_log_ip_address"
+          ON platform_audit_log ("ipAddress")
+        `);
+        this.logger.log('Created platform_audit_log table');
+      }
+
       await queryRunner.release();
     } catch (error) {
       // If TimescaleDB extension is not available, log warning but continue

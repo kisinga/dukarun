@@ -42,6 +42,35 @@
 
       <section class="card card-border bg-base-100 shadow">
         <div class="card-body">
+          <h2 class="card-title text-lg">Default trial duration</h2>
+          <p class="text-sm text-base-content/70 mb-4">
+            Number of days for new business trials. Used when creating channels.
+          </p>
+          <form (ngSubmit)="updateTrialDays()" class="flex flex-wrap items-end gap-4">
+            <label class="form-control w-full max-w-xs">
+              <span class="label"><span class="label-text">Trial days</span></span>
+              <input
+                type="number"
+                class="input input-bordered w-full"
+                [ngModel]="trialDays()"
+                (ngModelChange)="trialDays.set($event)"
+                name="trialDays"
+                min="0"
+                step="1"
+              />
+            </label>
+            <button type="submit" class="btn btn-primary" [disabled]="savingTrialDays()">
+              @if (savingTrialDays()) {
+                <span class="loading loading-spinner loading-sm"></span>
+              }
+              Save
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <section class="card card-border bg-base-100 shadow">
+        <div class="card-body">
           <h2 class="card-title text-lg">Registration tax rate</h2>
           <p class="text-sm text-base-content/70 mb-4">
             Applies to all channels using this zone.

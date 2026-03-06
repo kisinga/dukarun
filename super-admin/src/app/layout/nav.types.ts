@@ -4,6 +4,7 @@ export type NavIcon =
   | 'users'
   | 'platform-data'
   | 'login-attempts'
+  | 'audit-log'
   | 'role-templates'
   | 'pending'
   | 'subscription-tiers'

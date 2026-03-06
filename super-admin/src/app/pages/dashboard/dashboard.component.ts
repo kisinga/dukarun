@@ -1,15 +1,18 @@
+import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '../../shared/components/page-header';
 import { ApolloService } from '../../core/services/apollo.service';
 import {
   PLATFORM_STATS,
+  PLATFORM_MONITORING,
   PLATFORM_CHANNELS,
   PENDING_REGISTRATIONS,
   PLATFORM_ADMINISTRATORS,
   ROLE_TEMPLATES,
   GET_SUBSCRIPTION_TIERS,
 } from '../../core/graphql/operations.graphql';
+import type { PlatformMonitoringQuery } from '../../core/graphql/generated/graphql';
 
 interface PlatformStats {
   totalChannels: number;
@@ -53,12 +56,13 @@ function channelsNeedingAttention(channels: PlatformChannel[]): PlatformChannel[
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, PageHeaderComponent],
+  imports: [DecimalPipe, RouterLink, PageHeaderComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent implements OnInit {
   private readonly apollo = inject(ApolloService);
+  private readonly router = inject(Router);
 
   stats = signal<PlatformStats | null>(null);
   pendingCount = signal<number>(0);
@@ -66,6 +70,7 @@ export class DashboardComponent implements OnInit {
   roleTemplatesCount = signal<number>(0);
   subscriptionTiersCount = signal<number>(0);
   channelsNeedingAttention = signal<PlatformChannel[]>([]);
+  monitoring = signal<PlatformMonitoringQuery['platformMonitoring'] | null>(null);
   loading = signal(true);
   error = signal<string | null>(null);
 
@@ -83,6 +88,7 @@ export class DashboardComponent implements OnInit {
     try {
       const [
         statsResult,
+        monitoringResult,
         pendingResult,
         adminsResult,
         roleTemplatesResult,
@@ -90,6 +96,7 @@ export class DashboardComponent implements OnInit {
         channelsResult,
       ] = await Promise.all([
         client.query<{ platformStats: PlatformStats }>({ query: PLATFORM_STATS, fetchPolicy: 'network-only' }),
+        client.query<PlatformMonitoringQuery>({ query: PLATFORM_MONITORING, fetchPolicy: 'network-only' }),
         client.query<{ pendingRegistrations: unknown[] }>({ query: PENDING_REGISTRATIONS, fetchPolicy: 'network-only' }),
         client.query<{ platformAdministrators: { totalItems: number } }>({
           query: PLATFORM_ADMINISTRATORS,
@@ -102,6 +109,7 @@ export class DashboardComponent implements OnInit {
       ]);
 
       this.stats.set(statsResult.data?.platformStats ?? null);
+      this.monitoring.set(monitoringResult.data?.platformMonitoring ?? null);
       this.pendingCount.set(pendingResult.data?.pendingRegistrations?.length ?? 0);
       this.adminsCount.set(adminsResult.data?.platformAdministrators?.totalItems ?? 0);
       this.roleTemplatesCount.set(roleTemplatesResult.data?.platformRoleTemplates?.length ?? 0);
@@ -119,5 +127,20 @@ export class DashboardComponent implements OnInit {
     if (!val) return '—';
     const d = new Date(val);
     return isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
+  }
+
+  navigateToChannel(channelId: string): void {
+    this.router.navigate(['/channels', channelId]);
+  }
+
+  /** Format uptime seconds as e.g. "2d 5h" or "45m". */
+  formatUptime(seconds: number): string {
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+    const hours = Math.floor(seconds / 3600);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    const remainderHours = hours % 24;
+    return remainderHours > 0 ? `${days}d ${remainderHours}h` : `${days}d`;
   }
 }

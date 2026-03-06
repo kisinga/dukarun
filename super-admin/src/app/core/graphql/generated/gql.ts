@@ -20,6 +20,7 @@ type Documents = {
     "\n  mutation UpdateChannelZonesPlatform($input: UpdateChannelZonesInput!) {\n    updateChannelZonesPlatform(input: $input) {\n      id\n    }\n  }\n": typeof types.UpdateChannelZonesPlatformDocument,
     "\n  query PlatformChannels {\n    platformChannels {\n      id\n      code\n      token\n      customFields {\n        status\n        trialEndsAt\n        subscriptionStatus\n        maxAdminCount\n        cashierFlowEnabled\n        cashControlEnabled\n        enablePrinter\n        smsUsedThisPeriod\n        smsPeriodEnd\n        smsLimitFromTier\n      }\n    }\n  }\n": typeof types.PlatformChannelsDocument,
     "\n  query PlatformStats {\n    platformStats {\n      totalChannels\n      channelsByStatus {\n        UNAPPROVED\n        APPROVED\n        DISABLED\n        BANNED\n      }\n      trialExpiringSoonCount\n      activeSubscriptionsCount\n    }\n  }\n": typeof types.PlatformStatsDocument,
+    "\n  query PlatformMonitoring {\n    platformMonitoring {\n      processMemory {\n        heapUsedMB\n        heapTotalMB\n        rssMB\n      }\n      systemMemory {\n        totalMB\n        freeMB\n        usedMB\n      }\n      uptimeSeconds\n      loadAvg\n      services {\n        name\n        status\n        error\n      }\n    }\n  }\n": typeof types.PlatformMonitoringDocument,
     "\n  query AdministratorsForChannel($channelId: ID!) {\n    administratorsForChannel(channelId: $channelId) {\n      id\n      firstName\n      lastName\n      emailAddress\n      userId\n      identifier\n      authorizationStatus\n      roleCodes\n    }\n  }\n": typeof types.AdministratorsForChannelDocument,
     "\n  query PlatformAdministrators($options: PlatformAdministratorListOptions) {\n    platformAdministrators(options: $options) {\n      items {\n        id\n        firstName\n        lastName\n        emailAddress\n        userId\n        identifier\n        authorizationStatus\n        roleCodes\n        channelIds\n        isSuperAdmin\n      }\n      totalItems\n    }\n  }\n": typeof types.PlatformAdministratorsDocument,
     "\n  query NotificationsForChannel($channelId: ID!, $options: NotificationListOptions) {\n    notificationsForChannel(channelId: $channelId, options: $options) {\n      items {\n        id\n        userId\n        channelId\n        type\n        title\n        message\n        read\n        createdAt\n      }\n      totalItems\n    }\n  }\n": typeof types.NotificationsForChannelDocument,
@@ -32,7 +33,7 @@ type Documents = {
     "\n  query GetSubscriptionTiers {\n    getSubscriptionTiers {\n      id\n      code\n      name\n      description\n      priceMonthly\n      priceYearly\n      features\n      smsLimit\n      isActive\n      createdAt\n      updatedAt\n    }\n  }\n": typeof types.GetSubscriptionTiersDocument,
     "\n  mutation CreateSubscriptionTier($input: CreateSubscriptionTierInput!) {\n    createSubscriptionTier(input: $input) {\n      id\n      code\n      name\n      priceMonthly\n      priceYearly\n      smsLimit\n      isActive\n    }\n  }\n": typeof types.CreateSubscriptionTierDocument,
     "\n  mutation UpdateSubscriptionTier($input: UpdateSubscriptionTierInput!) {\n    updateSubscriptionTier(input: $input) {\n      id\n      code\n      name\n      priceMonthly\n      priceYearly\n      smsLimit\n      isActive\n    }\n  }\n": typeof types.UpdateSubscriptionTierDocument,
-    "\n  mutation DeactivateSubscriptionTier($id: ID!) {\n    deactivateSubscriptionTier(id: $id)\n  }\n": typeof types.DeactivateSubscriptionTierDocument,
+    "\n  mutation DeactivateSubscriptionTier($id: String!) {\n    deactivateSubscriptionTier(id: $id)\n  }\n": typeof types.DeactivateSubscriptionTierDocument,
     "\n  query PendingRegistrations {\n    pendingRegistrations {\n      userId\n      identifier\n      createdAt\n      administrator {\n        id\n        firstName\n        lastName\n        emailAddress\n      }\n    }\n  }\n": typeof types.PendingRegistrationsDocument,
     "\n  mutation ApproveUser($userId: ID!) {\n    approveUser(userId: $userId) {\n      id\n      identifier\n      authorizationStatus\n    }\n  }\n": typeof types.ApproveUserDocument,
     "\n  mutation RejectUser($userId: ID!, $reason: String) {\n    rejectUser(userId: $userId, reason: $reason) {\n      id\n      identifier\n      authorizationStatus\n    }\n  }\n": typeof types.RejectUserDocument,
@@ -52,6 +53,8 @@ type Documents = {
     "\n  mutation UploadModelManually($channelId: ID!, $modelJson: Upload!, $weightsFile: Upload!, $metadata: Upload!) {\n    uploadModelManually(channelId: $channelId, modelJson: $modelJson, weightsFile: $weightsFile, metadata: $metadata)\n  }\n": typeof types.UploadModelManuallyDocument,
     "\n  query RegistrationSeedContext {\n    registrationSeedContext {\n      zone {\n        id\n        name\n        members {\n          id\n          name\n          code\n        }\n      }\n      taxRate {\n        id\n        name\n        categoryName\n        value\n      }\n    }\n  }\n": typeof types.RegistrationSeedContextDocument,
     "\n  mutation UpdateRegistrationTaxRate($input: UpdateRegistrationTaxRateInput!) {\n    updateRegistrationTaxRate(input: $input) {\n      id\n      name\n      categoryName\n      value\n    }\n  }\n": typeof types.UpdateRegistrationTaxRateDocument,
+    "\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n    }\n  }\n": typeof types.PlatformSettingsDocument,
+    "\n  mutation UpdatePlatformSettings($trialDays: Int!) {\n    updatePlatformSettings(trialDays: $trialDays) {\n      trialDays\n    }\n  }\n": typeof types.UpdatePlatformSettingsDocument,
     "\n  query PlatformRoleTemplates {\n    platformRoleTemplates {\n      id\n      code\n      name\n      description\n      permissions\n    }\n  }\n": typeof types.PlatformRoleTemplatesDocument,
     "\n  query AssignablePermissions {\n    assignablePermissions\n  }\n": typeof types.AssignablePermissionsDocument,
     "\n  mutation CreateRoleTemplate($input: CreateRoleTemplateInput!) {\n    createRoleTemplate(input: $input) {\n      id\n      code\n      name\n      description\n      permissions\n    }\n  }\n": typeof types.CreateRoleTemplateDocument,
@@ -59,6 +62,7 @@ type Documents = {
     "\n  mutation DeleteRoleTemplate($id: ID!) {\n    deleteRoleTemplate(id: $id)\n  }\n": typeof types.DeleteRoleTemplateDocument,
     "\n  query AdministratorDetail($administratorId: ID!) {\n    administratorDetail(administratorId: $administratorId) {\n      id\n      firstName\n      lastName\n      emailAddress\n      userId\n      identifier\n      authorizationStatus\n      isSuperAdmin\n      roles {\n        id\n        code\n        channelIds\n        permissions\n      }\n    }\n  }\n": typeof types.AdministratorDetailDocument,
     "\n  mutation UpdateAdministratorPermissions(\n    $administratorId: ID!\n    $channelId: ID!\n    $permissions: [String!]!\n  ) {\n    updateAdministratorPermissions(\n      administratorId: $administratorId\n      channelId: $channelId\n      permissions: $permissions\n    ) {\n      id\n      roles {\n        id\n        code\n        channelIds\n        permissions\n      }\n    }\n  }\n": typeof types.UpdateAdministratorPermissionsDocument,
+    "\n  query PlatformAuditLogs($options: PlatformAuditLogOptions) {\n    platformAuditLogs(options: $options) {\n      id\n      timestamp\n      eventType\n      entityType\n      entityId\n      userId\n      ipAddress\n      data\n      source\n    }\n  }\n": typeof types.PlatformAuditLogsDocument,
 };
 const documents: Documents = {
     "\n  mutation Authenticate($username: String!, $password: String!) {\n    authenticate(input: { native: { username: $username, password: $password } }) {\n      ... on CurrentUser {\n        id\n      }\n    }\n  }\n": types.AuthenticateDocument,
@@ -67,6 +71,7 @@ const documents: Documents = {
     "\n  mutation UpdateChannelZonesPlatform($input: UpdateChannelZonesInput!) {\n    updateChannelZonesPlatform(input: $input) {\n      id\n    }\n  }\n": types.UpdateChannelZonesPlatformDocument,
     "\n  query PlatformChannels {\n    platformChannels {\n      id\n      code\n      token\n      customFields {\n        status\n        trialEndsAt\n        subscriptionStatus\n        maxAdminCount\n        cashierFlowEnabled\n        cashControlEnabled\n        enablePrinter\n        smsUsedThisPeriod\n        smsPeriodEnd\n        smsLimitFromTier\n      }\n    }\n  }\n": types.PlatformChannelsDocument,
     "\n  query PlatformStats {\n    platformStats {\n      totalChannels\n      channelsByStatus {\n        UNAPPROVED\n        APPROVED\n        DISABLED\n        BANNED\n      }\n      trialExpiringSoonCount\n      activeSubscriptionsCount\n    }\n  }\n": types.PlatformStatsDocument,
+    "\n  query PlatformMonitoring {\n    platformMonitoring {\n      processMemory {\n        heapUsedMB\n        heapTotalMB\n        rssMB\n      }\n      systemMemory {\n        totalMB\n        freeMB\n        usedMB\n      }\n      uptimeSeconds\n      loadAvg\n      services {\n        name\n        status\n        error\n      }\n    }\n  }\n": types.PlatformMonitoringDocument,
     "\n  query AdministratorsForChannel($channelId: ID!) {\n    administratorsForChannel(channelId: $channelId) {\n      id\n      firstName\n      lastName\n      emailAddress\n      userId\n      identifier\n      authorizationStatus\n      roleCodes\n    }\n  }\n": types.AdministratorsForChannelDocument,
     "\n  query PlatformAdministrators($options: PlatformAdministratorListOptions) {\n    platformAdministrators(options: $options) {\n      items {\n        id\n        firstName\n        lastName\n        emailAddress\n        userId\n        identifier\n        authorizationStatus\n        roleCodes\n        channelIds\n        isSuperAdmin\n      }\n      totalItems\n    }\n  }\n": types.PlatformAdministratorsDocument,
     "\n  query NotificationsForChannel($channelId: ID!, $options: NotificationListOptions) {\n    notificationsForChannel(channelId: $channelId, options: $options) {\n      items {\n        id\n        userId\n        channelId\n        type\n        title\n        message\n        read\n        createdAt\n      }\n      totalItems\n    }\n  }\n": types.NotificationsForChannelDocument,
@@ -79,7 +84,7 @@ const documents: Documents = {
     "\n  query GetSubscriptionTiers {\n    getSubscriptionTiers {\n      id\n      code\n      name\n      description\n      priceMonthly\n      priceYearly\n      features\n      smsLimit\n      isActive\n      createdAt\n      updatedAt\n    }\n  }\n": types.GetSubscriptionTiersDocument,
     "\n  mutation CreateSubscriptionTier($input: CreateSubscriptionTierInput!) {\n    createSubscriptionTier(input: $input) {\n      id\n      code\n      name\n      priceMonthly\n      priceYearly\n      smsLimit\n      isActive\n    }\n  }\n": types.CreateSubscriptionTierDocument,
     "\n  mutation UpdateSubscriptionTier($input: UpdateSubscriptionTierInput!) {\n    updateSubscriptionTier(input: $input) {\n      id\n      code\n      name\n      priceMonthly\n      priceYearly\n      smsLimit\n      isActive\n    }\n  }\n": types.UpdateSubscriptionTierDocument,
-    "\n  mutation DeactivateSubscriptionTier($id: ID!) {\n    deactivateSubscriptionTier(id: $id)\n  }\n": types.DeactivateSubscriptionTierDocument,
+    "\n  mutation DeactivateSubscriptionTier($id: String!) {\n    deactivateSubscriptionTier(id: $id)\n  }\n": types.DeactivateSubscriptionTierDocument,
     "\n  query PendingRegistrations {\n    pendingRegistrations {\n      userId\n      identifier\n      createdAt\n      administrator {\n        id\n        firstName\n        lastName\n        emailAddress\n      }\n    }\n  }\n": types.PendingRegistrationsDocument,
     "\n  mutation ApproveUser($userId: ID!) {\n    approveUser(userId: $userId) {\n      id\n      identifier\n      authorizationStatus\n    }\n  }\n": types.ApproveUserDocument,
     "\n  mutation RejectUser($userId: ID!, $reason: String) {\n    rejectUser(userId: $userId, reason: $reason) {\n      id\n      identifier\n      authorizationStatus\n    }\n  }\n": types.RejectUserDocument,
@@ -99,6 +104,8 @@ const documents: Documents = {
     "\n  mutation UploadModelManually($channelId: ID!, $modelJson: Upload!, $weightsFile: Upload!, $metadata: Upload!) {\n    uploadModelManually(channelId: $channelId, modelJson: $modelJson, weightsFile: $weightsFile, metadata: $metadata)\n  }\n": types.UploadModelManuallyDocument,
     "\n  query RegistrationSeedContext {\n    registrationSeedContext {\n      zone {\n        id\n        name\n        members {\n          id\n          name\n          code\n        }\n      }\n      taxRate {\n        id\n        name\n        categoryName\n        value\n      }\n    }\n  }\n": types.RegistrationSeedContextDocument,
     "\n  mutation UpdateRegistrationTaxRate($input: UpdateRegistrationTaxRateInput!) {\n    updateRegistrationTaxRate(input: $input) {\n      id\n      name\n      categoryName\n      value\n    }\n  }\n": types.UpdateRegistrationTaxRateDocument,
+    "\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n    }\n  }\n": types.PlatformSettingsDocument,
+    "\n  mutation UpdatePlatformSettings($trialDays: Int!) {\n    updatePlatformSettings(trialDays: $trialDays) {\n      trialDays\n    }\n  }\n": types.UpdatePlatformSettingsDocument,
     "\n  query PlatformRoleTemplates {\n    platformRoleTemplates {\n      id\n      code\n      name\n      description\n      permissions\n    }\n  }\n": types.PlatformRoleTemplatesDocument,
     "\n  query AssignablePermissions {\n    assignablePermissions\n  }\n": types.AssignablePermissionsDocument,
     "\n  mutation CreateRoleTemplate($input: CreateRoleTemplateInput!) {\n    createRoleTemplate(input: $input) {\n      id\n      code\n      name\n      description\n      permissions\n    }\n  }\n": types.CreateRoleTemplateDocument,
@@ -106,6 +113,7 @@ const documents: Documents = {
     "\n  mutation DeleteRoleTemplate($id: ID!) {\n    deleteRoleTemplate(id: $id)\n  }\n": types.DeleteRoleTemplateDocument,
     "\n  query AdministratorDetail($administratorId: ID!) {\n    administratorDetail(administratorId: $administratorId) {\n      id\n      firstName\n      lastName\n      emailAddress\n      userId\n      identifier\n      authorizationStatus\n      isSuperAdmin\n      roles {\n        id\n        code\n        channelIds\n        permissions\n      }\n    }\n  }\n": types.AdministratorDetailDocument,
     "\n  mutation UpdateAdministratorPermissions(\n    $administratorId: ID!\n    $channelId: ID!\n    $permissions: [String!]!\n  ) {\n    updateAdministratorPermissions(\n      administratorId: $administratorId\n      channelId: $channelId\n      permissions: $permissions\n    ) {\n      id\n      roles {\n        id\n        code\n        channelIds\n        permissions\n      }\n    }\n  }\n": types.UpdateAdministratorPermissionsDocument,
+    "\n  query PlatformAuditLogs($options: PlatformAuditLogOptions) {\n    platformAuditLogs(options: $options) {\n      id\n      timestamp\n      eventType\n      entityType\n      entityId\n      userId\n      ipAddress\n      data\n      source\n    }\n  }\n": types.PlatformAuditLogsDocument,
 };
 
 /**
@@ -146,6 +154,10 @@ export function graphql(source: "\n  query PlatformChannels {\n    platformChann
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query PlatformStats {\n    platformStats {\n      totalChannels\n      channelsByStatus {\n        UNAPPROVED\n        APPROVED\n        DISABLED\n        BANNED\n      }\n      trialExpiringSoonCount\n      activeSubscriptionsCount\n    }\n  }\n"): (typeof documents)["\n  query PlatformStats {\n    platformStats {\n      totalChannels\n      channelsByStatus {\n        UNAPPROVED\n        APPROVED\n        DISABLED\n        BANNED\n      }\n      trialExpiringSoonCount\n      activeSubscriptionsCount\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query PlatformMonitoring {\n    platformMonitoring {\n      processMemory {\n        heapUsedMB\n        heapTotalMB\n        rssMB\n      }\n      systemMemory {\n        totalMB\n        freeMB\n        usedMB\n      }\n      uptimeSeconds\n      loadAvg\n      services {\n        name\n        status\n        error\n      }\n    }\n  }\n"): (typeof documents)["\n  query PlatformMonitoring {\n    platformMonitoring {\n      processMemory {\n        heapUsedMB\n        heapTotalMB\n        rssMB\n      }\n      systemMemory {\n        totalMB\n        freeMB\n        usedMB\n      }\n      uptimeSeconds\n      loadAvg\n      services {\n        name\n        status\n        error\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -197,7 +209,7 @@ export function graphql(source: "\n  mutation UpdateSubscriptionTier($input: Upd
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation DeactivateSubscriptionTier($id: ID!) {\n    deactivateSubscriptionTier(id: $id)\n  }\n"): (typeof documents)["\n  mutation DeactivateSubscriptionTier($id: ID!) {\n    deactivateSubscriptionTier(id: $id)\n  }\n"];
+export function graphql(source: "\n  mutation DeactivateSubscriptionTier($id: String!) {\n    deactivateSubscriptionTier(id: $id)\n  }\n"): (typeof documents)["\n  mutation DeactivateSubscriptionTier($id: String!) {\n    deactivateSubscriptionTier(id: $id)\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -277,6 +289,14 @@ export function graphql(source: "\n  mutation UpdateRegistrationTaxRate($input: 
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
+export function graphql(source: "\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n    }\n  }\n"): (typeof documents)["\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation UpdatePlatformSettings($trialDays: Int!) {\n    updatePlatformSettings(trialDays: $trialDays) {\n      trialDays\n    }\n  }\n"): (typeof documents)["\n  mutation UpdatePlatformSettings($trialDays: Int!) {\n    updatePlatformSettings(trialDays: $trialDays) {\n      trialDays\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
 export function graphql(source: "\n  query PlatformRoleTemplates {\n    platformRoleTemplates {\n      id\n      code\n      name\n      description\n      permissions\n    }\n  }\n"): (typeof documents)["\n  query PlatformRoleTemplates {\n    platformRoleTemplates {\n      id\n      code\n      name\n      description\n      permissions\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
@@ -302,6 +322,10 @@ export function graphql(source: "\n  query AdministratorDetail($administratorId:
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation UpdateAdministratorPermissions(\n    $administratorId: ID!\n    $channelId: ID!\n    $permissions: [String!]!\n  ) {\n    updateAdministratorPermissions(\n      administratorId: $administratorId\n      channelId: $channelId\n      permissions: $permissions\n    ) {\n      id\n      roles {\n        id\n        code\n        channelIds\n        permissions\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation UpdateAdministratorPermissions(\n    $administratorId: ID!\n    $channelId: ID!\n    $permissions: [String!]!\n  ) {\n    updateAdministratorPermissions(\n      administratorId: $administratorId\n      channelId: $channelId\n      permissions: $permissions\n    ) {\n      id\n      roles {\n        id\n        code\n        channelIds\n        permissions\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query PlatformAuditLogs($options: PlatformAuditLogOptions) {\n    platformAuditLogs(options: $options) {\n      id\n      timestamp\n      eventType\n      entityType\n      entityId\n      userId\n      ipAddress\n      data\n      source\n    }\n  }\n"): (typeof documents)["\n  query PlatformAuditLogs($options: PlatformAuditLogOptions) {\n    platformAuditLogs(options: $options) {\n      id\n      timestamp\n      eventType\n      entityType\n      entityId\n      userId\n      ipAddress\n      data\n      source\n    }\n  }\n"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};

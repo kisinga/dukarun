@@ -4,6 +4,10 @@
 
 The Dukarun inventory framework provides a composable, extensible system for tracking inventory with FIFO (First-In-First-Out) costing and COGS (Cost of Goods Sold) calculation. The framework is designed with data integrity and composability as core principles.
 
+### Source of truth: batch inventory (ledger)
+
+**We never read Vendure `stock_level` for availability or as source of truth.** All saleable stock and COGS come from `inventory_batch` and `inventory_movement`. Vendure’s `stock_level` table may be written (e.g. from batch sum after adjustments) for compatibility only; it is not read for stock checks or reporting.
+
 ## Architecture
 
 ### Core Components

@@ -53,6 +53,7 @@ interface RecordStockAdjustmentInput {
     variantId: string;
     quantityChange: number;
     stockLocationId: string;
+    batchId?: string | null;
   }>;
 }
 

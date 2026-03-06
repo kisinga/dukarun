@@ -93,7 +93,7 @@ How Dukarun handles **trials, subscriptions, and read-only mode**.
 
 | Feature                           | What it does                                                                                             | Who uses it                        | Origin            | More details                                                         |
 | --------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------- | ----------------- | -------------------------------------------------------------------- |
-| 30-day free trial per business    | New businesses start on a full-feature trial, controlled by channel-level dates.                         | Dukarun back-office, new customers | Dukarun-Exclusive | [Orders & Billing](./orders-and-billing.md#trial-periods)            |
+| Free trial per business           | New businesses start on a full-feature trial. Trial duration is configured by the platform.             | Dukarun back-office, new customers | Dukarun-Exclusive | [Orders & Billing](./orders-and-billing.md#trial-periods)            |
 | Paystack subscription integration | Charge businesses via Paystack (including STK push), track subscription tier and renewals.               | Dukarun back-office, finance       | Dukarun-Exclusive | [Orders & Billing](./orders-and-billing.md#paystack-subscriptions)   |
 | Read-only mode on expiry          | When a subscription expires, users can still log in and view data but **cannot create or edit** records. | All business users                 | Dukarun-Exclusive | [Orders & Billing](./orders-and-billing.md#read-only-mode-on-expiry) |
 

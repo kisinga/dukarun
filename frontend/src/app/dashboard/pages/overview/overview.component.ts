@@ -5,8 +5,10 @@ import {
   computed,
   effect,
   inject,
+  PLATFORM_ID,
   signal,
 } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { CashierSessionService } from '../../../core/services/cashier-session/cashier-session.service';
 import { ShiftModalTriggerService } from '../../../core/services/cashier-session/shift-modal-trigger.service';
@@ -46,6 +48,7 @@ interface CategoryData {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class OverviewComponent implements OnInit {
+  private readonly platformId = inject(PLATFORM_ID);
   private readonly dashboardService = inject(DashboardService);
   private readonly companyService = inject(CompanyService);
   protected readonly currencyService = inject(CurrencyService);
@@ -55,6 +58,13 @@ export class OverviewComponent implements OnInit {
 
   protected readonly selectedPeriod = signal<Period>('today');
   protected readonly expandedCategory = signal<string | null>(null);
+
+  /** Sales (revenue) chart section: collapsible, default expanded on viewport >= 768px (md). */
+  protected readonly salesChartExpanded = signal(true);
+
+  protected toggleSalesChartExpanded(): void {
+    this.salesChartExpanded.update((v) => !v);
+  }
 
   protected readonly isLoading = this.dashboardService.isLoading;
   protected readonly error = this.dashboardService.error;
@@ -213,6 +223,10 @@ export class OverviewComponent implements OnInit {
 
   ngOnInit(): void {
     // Data fetching handled by constructor effect
+    // Sales chart: default collapsed on viewports < 1080 (md), expanded on larger
+    if (isPlatformBrowser(this.platformId) && !window.matchMedia('(min-width: 1080px)').matches) {
+      this.salesChartExpanded.set(false);
+    }
   }
 
   refreshStockValue(): void {

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ID, RequestContext, TransactionalConnection, UserInputError } from '@vendure/core';
 import { AuditService } from '../../infrastructure/audit/audit.service';
@@ -227,6 +228,7 @@ export class StockManagementService {
               stockLocationId: input.lines[0]?.stockLocationId || 0,
               supplierId: String(input.supplierId),
               purchaseReference: purchase.referenceNumber || purchase.id,
+              purchaseDate: input.purchaseDate,
               isCreditPurchase: input.isCreditPurchase ?? false,
               lines: input.lines.map(line => ({
                 productVariantId: line.variantId,
@@ -334,8 +336,9 @@ export class StockManagementService {
   }
 
   /**
-   * Record a stock adjustment and update stock levels
-   * All operations are wrapped in a transaction for atomicity
+   * Record a stock adjustment. Source of truth is batch inventory: we apply to batches first,
+   * then sync Vendure stock_level from batch sum (we never read stock_level as truth).
+   * When exactly one open batch exists we use it; when multiple exist, line.batchId is required (UI selector).
    */
   async recordStockAdjustment(
     ctx: RequestContext,
@@ -343,30 +346,67 @@ export class StockManagementService {
   ): Promise<InventoryStockAdjustment> {
     return this.connection.withTransaction(ctx, async transactionCtx => {
       try {
-        // 1. Validate input
         this.validationService.validateAdjustmentInput(input);
 
-        // 2. Update stock levels first (to get previous/new stock values)
-        const stockMovements = [];
-        for (const line of input.lines) {
-          const movement = await this.stockMovementService.adjustStockLevel(
-            transactionCtx,
-            line.variantId,
-            line.stockLocationId,
-            line.quantityChange,
-            `Stock adjustment: ${input.reason}`
-          );
-          stockMovements.push(movement);
+        const channelId = transactionCtx.channelId as number;
+        const stockMovements: Array<{
+          variantId: ID;
+          locationId: ID;
+          previousStock: number;
+          newStock: number;
+          batchId?: string | null;
+        }> = [];
+        const uuid = randomUUID();
+
+        if (this.inventoryService) {
+          for (const line of input.lines) {
+            const result = await this.inventoryService.applyAdjustmentToBatches(transactionCtx, {
+              channelId,
+              stockLocationId: line.stockLocationId,
+              productVariantId: line.variantId,
+              quantityChange: line.quantityChange,
+              adjustmentId: uuid,
+              batchId: line.batchId ?? undefined,
+            });
+            stockMovements.push({
+              variantId: line.variantId,
+              locationId: line.stockLocationId,
+              previousStock: result.previousStock,
+              newStock: result.newStock,
+              batchId: result.batchId ?? null,
+            });
+            await this.stockMovementService.setStockLevelFromBatchSum(
+              transactionCtx,
+              line.variantId,
+              line.stockLocationId,
+              result.newStock
+            );
+          }
+        } else {
+          for (const line of input.lines) {
+            const movement = await this.stockMovementService.adjustStockLevel(
+              transactionCtx,
+              line.variantId,
+              line.stockLocationId,
+              line.quantityChange,
+              `Stock adjustment: ${input.reason}`
+            );
+            stockMovements.push({
+              variantId: movement.variantId,
+              locationId: movement.locationId,
+              previousStock: movement.previousStock,
+              newStock: movement.newStock,
+            });
+          }
         }
 
-        // 3. Create adjustment record with stock movement data
         const adjustment = await this.stockAdjustmentService.createAdjustmentRecord(
           transactionCtx,
           input,
-          stockMovements
+          stockMovements,
+          this.inventoryService ? uuid : undefined
         );
 
-        // 4. Log audit event
         await this.logAdjustmentAudit(transactionCtx, adjustment, stockMovements);
 
         this.logger.log(`Stock adjustment recorded successfully: ${adjustment.id}`);

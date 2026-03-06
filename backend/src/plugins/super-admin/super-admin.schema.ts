@@ -52,6 +52,13 @@ export const SUPER_ADMIN_SCHEMA = gql`
     activeSubscriptionsCount: Int!
   }
 
+  """
+  Platform-wide settings (e.g. default trial length for new channels).
+  """
+  type PlatformSettings {
+    trialDays: Int!
+  }
+
   type ChannelsByStatus {
     UNAPPROVED: Int!
     APPROVED: Int!
@@ -145,6 +152,29 @@ export const SUPER_ADMIN_SCHEMA = gql`
     isSuperAdmin: Boolean
   }
 
+  type PlatformAuditLog {
+    id: ID!
+    timestamp: DateTime!
+    eventType: String!
+    entityType: String
+    entityId: String
+    userId: ID
+    ipAddress: String
+    data: JSON!
+    source: String!
+  }
+
+  input PlatformAuditLogOptions {
+    entityType: String
+    entityId: String
+    userId: ID
+    eventType: String
+    startDate: DateTime
+    endDate: DateTime
+    limit: Int
+    skip: Int
+  }
+
   type RegistrationSeedContext {
     zone: RegistrationZone!
     """
@@ -197,6 +227,44 @@ export const SUPER_ADMIN_SCHEMA = gql`
     permissions: [String!]
   }
 
+  """
+  Process memory usage (Node.js process).
+  """
+  type ProcessMemory {
+    heapUsedMB: Float!
+    heapTotalMB: Float!
+    rssMB: Float!
+  }
+
+  """
+  System memory (host/container).
+  """
+  type SystemMemory {
+    totalMB: Float!
+    freeMB: Float!
+    usedMB: Float!
+  }
+
+  """
+  Health status of a service (e.g. backend, ml-trainer).
+  """
+  type ServiceHealth {
+    name: String!
+    status: String!
+    error: String
+  }
+
+  """
+  Platform monitoring: process/host metrics and service health.
+  """
+  type PlatformMonitoring {
+    processMemory: ProcessMemory!
+    systemMemory: SystemMemory!
+    uptimeSeconds: Float!
+    loadAvg: [Float!]!
+    services: [ServiceHealth!]!
+  }
+
   extend type Query {
     registrationSeedContext: RegistrationSeedContext!
     platformZones: [PlatformZone!]!
@@ -215,8 +283,11 @@ export const SUPER_ADMIN_SCHEMA = gql`
     pendingRegistrations: [PendingRegistration!]!
     platformRoleTemplates: [PlatformRoleTemplate!]!
     adminLoginAttempts(limit: Int, skip: Int, since: DateTime): [AdminLoginAttempt!]!
+    platformAuditLogs(options: PlatformAuditLogOptions): [PlatformAuditLog!]!
     assignablePermissions: [String!]!
     administratorDetail(administratorId: ID!): PlatformAdministratorDetail
+    platformSettings: PlatformSettings!
+    platformMonitoring: PlatformMonitoring!
   }
 
   extend type Mutation {
@@ -235,5 +306,6 @@ export const SUPER_ADMIN_SCHEMA = gql`
       channelId: ID!
       permissions: [String!]!
     ): PlatformAdministratorDetail!
+    updatePlatformSettings(trialDays: Int!): PlatformSettings!
   }
 `;
