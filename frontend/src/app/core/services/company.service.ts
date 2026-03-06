@@ -170,13 +170,15 @@ export class CompanyService {
   }
 
   /**
-   * Activate a company by id. Fetches channel data and persists session.
+   * Activate a company by id. Persists session (awaitable so caller can reload after).
+   * Resolves after the new company is persisted; channel data is fetched in the background.
    */
-  activateCompany(companyId: string): void {
+  async activateCompany(companyId: string): Promise<void> {
     const company = this.companiesSignal().find((c) => c.id === companyId);
     if (!company) return;
     this.activeCompanyIdSignal.set(companyId);
-    this.applyActiveCompany();
+    await this.persistAndSync();
+    void this.fetchActiveChannel();
   }
 
   /**

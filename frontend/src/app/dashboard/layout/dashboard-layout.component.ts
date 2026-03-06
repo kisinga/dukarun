@@ -223,21 +223,16 @@ export class DashboardLayoutComponent implements OnInit {
     // Note: Company session is now restored in AuthService before channels are fetched
     // This ensures the selected company persists across page refreshes
 
-    // Watch for active company changes and initialize dashboard
-    // Uses reinitialize() on company switch to clear cache first
+    // Watch for active company changes: first load only runs init (company switch triggers reload in selectCompany)
     effect(() => {
       const companyId = this.activeCompanyId();
       if (companyId && companyId !== this.lastCompanyId) {
-        const isSwitch = this.lastCompanyId !== null;
+        const isFirstLoad = this.lastCompanyId === null;
         this.lastCompanyId = companyId;
-
-        if (isSwitch) {
-          // Company switch: clear cache and reinitialize
-          this.appInitService.reinitialize(companyId);
-        } else {
-          // First load: just initialize
+        if (isFirstLoad) {
           this.appInitService.initializeDashboard(companyId);
         }
+        // On company switch, selectCompany() awaits persist then reloads; no reinitialize here
       }
     });
 
@@ -271,9 +266,9 @@ export class DashboardLayoutComponent implements OnInit {
     }
   }
 
-  selectCompany(companyId: string): void {
-    this.companyService.activateCompany(companyId);
-    // Effect in constructor handles cache clearing and reinitialization
+  async selectCompany(companyId: string): Promise<void> {
+    await this.companyService.activateCompany(companyId);
+    window.location.reload();
   }
 
   async logout(): Promise<void> {

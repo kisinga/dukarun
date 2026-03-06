@@ -1,6 +1,7 @@
 import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import { ApolloService } from './apollo.service';
 import { CacheSyncService } from './cache/cache-sync.service';
+import { CashierSessionService } from './cashier-session/cashier-session.service';
 import { CompanyService } from './company.service';
 import { CustomerSearchService } from './customer/customer-search.service';
 import { loadMlModelService } from './ml-model.loader';
@@ -47,6 +48,7 @@ export class AppInitService {
   private readonly injector = inject(Injector);
   /** Injected so CacheSyncService is created and starts SSE when user has a channel */
   private readonly cacheSyncService = inject(CacheSyncService);
+  private readonly cashierSessionService = inject(CashierSessionService);
   private mlModelService: MlModelService | null = null;
 
   private readonly initStatusSignal = signal<InitStatus>({
@@ -130,6 +132,12 @@ export class AppInitService {
         console.log('⚠️ Dashboard initialized (ML unavailable)');
       } else {
         console.error('❌ Dashboard initialization incomplete');
+      }
+
+      // Load current cashier session so shift open/close badge is correct without visiting Overview
+      const channelIdNum = parseInt(channelId, 10);
+      if (!Number.isNaN(channelIdNum)) {
+        this.cashierSessionService.getCurrentSession(channelIdNum).subscribe();
       }
     } finally {
       this.isInitializingSignal.set(false);
