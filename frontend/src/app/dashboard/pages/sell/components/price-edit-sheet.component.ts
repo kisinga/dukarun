@@ -93,6 +93,20 @@ export interface PriceEditData {
 
         <!-- Total and per-item inputs: editing either updates the other -->
         <p class="text-xs text-base-content/50 mb-3">Editing either field updates the other.</p>
+        <div class="mb-4">
+          <label class="text-sm font-medium text-base-content/70 mb-1.5 block"
+            >Price per item</label
+          >
+          <input
+            type="text"
+            inputmode="decimal"
+            class="input input-bordered w-full text-xl font-bold text-center"
+            [formControl]="perItemControl"
+            placeholder="0.00"
+            (keydown.enter)="submit()"
+            (keydown.escape)="close()"
+          />
+        </div>
 
         <div class="mb-4">
           <label class="text-sm font-medium text-base-content/70 mb-1.5 block"
@@ -116,21 +130,6 @@ export interface PriceEditData {
           @if (isBelowWholesale()) {
             <div class="text-error text-xs mt-1 font-medium">Below wholesale price</div>
           }
-        </div>
-
-        <div class="mb-4">
-          <label class="text-sm font-medium text-base-content/70 mb-1.5 block"
-            >Price per item</label
-          >
-          <input
-            type="text"
-            inputmode="decimal"
-            class="input input-bordered w-full text-xl font-bold text-center"
-            [formControl]="perItemControl"
-            placeholder="0.00"
-            (keydown.enter)="submit()"
-            (keydown.escape)="close()"
-          />
         </div>
 
         <!-- Quick presets: base price, and reset -->
