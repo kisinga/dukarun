@@ -1,19 +1,32 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { HoverPreviewHostComponent } from '../../../../components/shared/hover-preview-host/hover-preview-host.component';
 import type { OrderCustomerInfoInput } from '../order-detail.types';
 
 /**
  * Order Customer Info Component
  *
- * Displays customer name, email, and phone with walk-in detection
+ * Displays customer name (link to customer detail when not walk-in), email, and phone.
+ * Customer link shows hover preview when available.
  */
 @Component({
   selector: 'app-order-customer-info',
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink, HoverPreviewHostComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>
-      <p class="text-base font-medium text-base-content mb-2">{{ customerName() }}</p>
+      @if (customer()?.id && !isWalkInCustomer()) {
+        <app-hover-preview-host previewKey="customer" [entityId]="customer()!.id">
+          <a
+            [routerLink]="['/dashboard/customers', customer()!.id]"
+            class="link link-hover text-base font-medium text-base-content mb-2 inline-block"
+            >{{ customerName() }}</a
+          >
+        </app-hover-preview-host>
+      } @else {
+        <p class="text-base font-medium text-base-content mb-2">{{ customerName() }}</p>
+      }
       @if (showContactInfo()) {
         <div class="space-y-1">
           @if (customer()?.emailAddress) {

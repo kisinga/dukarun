@@ -185,23 +185,23 @@
         </div>
       </div>
       <div class="home-hero-intro-delay flex justify-center w-full min-w-0">
-        <figure
-          class="w-full max-w-full sm:max-w-lg lg:max-w-xl xl:max-w-2xl rounded-2xl border border-base-300 bg-base-200 shadow-md overflow-hidden"
-        >
-          <!-- Mobile: Show mobile dashboard -->
-          <img
-            src="/assets/screenshots/dashboard_mobile2.png"
-            alt="Dukarun mobile dashboard showing business analytics and insights"
-            class="w-full h-auto object-contain lg:hidden"
-            loading="eager"
-          />
-          <!-- Desktop: Show smaller desktop dashboard -->
-          <img
-            src="/assets/screenshots/dashboard_720p.png"
-            alt="Dukarun desktop dashboard showing business analytics and insights"
-            class="hidden lg:block w-full h-auto object-contain"
-            loading="eager"
-          />
+        <figure class="home-hero-phone flex justify-center w-full">
+          <!-- Phone mockup: mobile screenshot (responsive scaling) -->
+          <div
+            class="mockup-phone w-full max-w-[min(280px,85vw)] sm:max-w-[300px] md:max-w-[320px] lg:max-w-[340px] xl:max-w-[360px] border-primary/20"
+          >
+            <div class="mockup-phone-camera"></div>
+            <div
+              class="mockup-phone-display flex items-center justify-center bg-neutral-900 overflow-hidden"
+            >
+              <img
+                src="/assets/screenshots/dashboard_mobile2.png"
+                alt="Dukarun mobile dashboard showing business analytics and insights"
+                class="w-full h-auto object-contain object-center"
+                loading="eager"
+              />
+            </div>
+          </div>
           <figcaption class="sr-only">
             Dukarun dashboard with business intelligence and analytics
           </figcaption>
@@ -259,19 +259,26 @@
       </div>
     </div> -->
     <div class="container-app mt-10 flex justify-center">
-      <figure
-        class="group relative w-full max-w-xs rounded-2xl border border-base-300 bg-base-200 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
-      >
-        <video
-          class="w-full h-auto object-contain"
-          controls
-          preload="metadata"
-          playsinline
-          aria-label="Real-world Dukarun usage screen recording from a Kenyan shop"
+      <figure class="group flex justify-center w-full">
+        <div
+          class="mockup-phone w-full max-w-[min(280px,85vw)] sm:max-w-[300px] md:max-w-[320px] border-primary/20 transition-transform duration-200 hover:-translate-y-1"
         >
-          <source src="/assets/screenshots/screen-20251208-130405.mp4" type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
+          <div class="mockup-phone-camera"></div>
+          <div
+            class="mockup-phone-display flex items-center justify-center bg-neutral-900 overflow-hidden p-0"
+          >
+            <video
+              class="w-full h-auto object-contain object-center"
+              controls
+              preload="metadata"
+              playsinline
+              aria-label="Real-world Dukarun usage screen recording from a Kenyan shop"
+            >
+              <source src="/assets/screenshots/screen-20251208-130405.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        </div>
         <figcaption class="sr-only">
           Screen recording showing Dukarun POS in action at a Kenyan retail shop
         </figcaption>
@@ -373,24 +380,31 @@
         </div>
       }
     </div>
-    <div class="container-app mt-12 flex justify-center">
-      <figure
-        class="group relative w-full max-w-xs rounded-2xl border border-base-300 bg-base-200 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
-      >
+    <div class="container-app mt-12 flex justify-center overflow-x-hidden">
+      <figure class="group relative w-full max-w-lg mx-auto">
         <div
           id="feature-carousel"
           class="carousel carousel-center w-full overflow-x-auto snap-x snap-mandatory"
         >
           @for (screenshot of allFeatureScreenshots; track screenshot.src) {
             <div
-              class="carousel-item w-full flex-shrink-0 snap-center flex items-center justify-center"
+              class="carousel-item w-full min-w-full flex-shrink-0 snap-center flex items-center justify-center"
             >
-              <img
-                [src]="screenshot.src"
-                [alt]="screenshot.alt"
-                loading="lazy"
-                class="w-full h-auto object-contain"
-              />
+              <div
+                class="mockup-phone w-full max-w-[min(280px,85vw)] sm:max-w-[300px] border-primary/20 transition-transform duration-200 group-hover:-translate-y-0.5"
+              >
+                <div class="mockup-phone-camera"></div>
+                <div
+                  class="mockup-phone-display flex items-center justify-center bg-neutral-900 overflow-hidden"
+                >
+                  <img
+                    [src]="screenshot.src"
+                    [alt]="screenshot.alt"
+                    loading="lazy"
+                    class="w-full h-auto object-contain object-center"
+                  />
+                </div>
+              </div>
             </div>
           }
         </div>
@@ -637,14 +651,14 @@
                 </article>
               }
 
-              <!-- Screenshot -->
+              <!-- Screenshot (phone mockup when real image, placeholder otherwise) -->
               @if (stage.screenshot) {
                 <figure
-                  class="group relative w-full overflow-hidden rounded-xl border border-base-300 bg-base-200 shadow-sm transition-transform transition-shadow duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-primary/30"
+                  class="journey-screenshot flex justify-center w-full max-w-[280px] mx-auto sm:max-w-[300px]"
                 >
                   @if (stage.screenshot.placeholder) {
                     <div
-                      class="aspect-video flex items-center justify-center bg-gradient-to-br from-base-200 to-base-300"
+                      class="aspect-video w-full rounded-xl border border-base-300 bg-base-200 flex items-center justify-center bg-gradient-to-br from-base-200 to-base-300"
                       [attr.aria-label]="stage.screenshot.alt"
                     >
                       <div class="flex flex-col items-center gap-2 text-base-content/60">
@@ -660,12 +674,19 @@
                       </div>
                     </div>
                   } @else {
-                    <img
-                      [src]="stage.screenshot.src"
-                      [alt]="stage.screenshot.alt"
-                      loading="lazy"
-                      class="w-full aspect-video object-cover"
-                    />
+                    <div class="mockup-phone w-full max-w-full border-primary/20">
+                      <div class="mockup-phone-camera"></div>
+                      <div
+                        class="mockup-phone-display flex items-center justify-center bg-neutral-900 overflow-hidden"
+                      >
+                        <img
+                          [src]="stage.screenshot.src"
+                          [alt]="stage.screenshot.alt"
+                          loading="lazy"
+                          class="w-full h-auto object-contain object-center"
+                        />
+                      </div>
+                    </div>
                   }
                   <figcaption class="sr-only">{{ stage.screenshot.alt }}</figcaption>
                 </figure>

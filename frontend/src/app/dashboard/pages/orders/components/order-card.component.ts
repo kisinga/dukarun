@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { OrderStateBadgeComponent } from './order-state-badge.component';
 
@@ -40,7 +41,7 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
 
 @Component({
   selector: 'app-order-card',
-  imports: [OrderStateBadgeComponent],
+  imports: [OrderStateBadgeComponent, RouterLink, HoverPreviewHostComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -80,13 +81,20 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
             <div class="flex items-center gap-2 mb-1 text-xs text-base-content/60">
               <span>{{ getItemCount() }} items</span>
               <span class="w-1 h-1 rounded-full bg-base-content/30"></span>
-              <span>
-                @if (order().customer) {
-                  {{ getCustomerName() }}
-                } @else {
-                  Walk-in
-                }
-              </span>
+              @if (order().customer?.id) {
+                <app-hover-preview-host previewKey="customer" [entityId]="order().customer!.id">
+                  <a
+                    [routerLink]="['/dashboard/customers', order().customer!.id]"
+                    class="link link-hover"
+                    (click)="$event.stopPropagation()"
+                    >{{ getCustomerName() }}</a
+                  >
+                </app-hover-preview-host>
+              } @else if (order().customer) {
+                <span>{{ getCustomerName() }}</span>
+              } @else {
+                <span>Walk-in</span>
+              }
             </div>
             <div class="flex items-center justify-between gap-2">
               <p class="text-xs text-base-content/50">

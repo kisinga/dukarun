@@ -31,8 +31,7 @@ const GET_STOCK_VALUE_RANKING_DOC = gql`
     }
   }
 `;
-import type { CacheSyncEntityHandler } from './cache/cache-sync-handler.interface';
-import { CacheSyncService } from './cache/cache-sync.service';
+import { OrderCacheService } from './order-cache.service';
 import { ApolloService } from './apollo.service';
 import { CompanyService } from './company.service';
 import { CurrencyService } from './currency.service';
@@ -170,19 +169,12 @@ export class DashboardService {
   private readonly companyService = inject(CompanyService);
   private readonly currencyService = inject(CurrencyService);
   private readonly orderMapper = inject(OrderMapperService);
-  private readonly cacheSyncService = inject(CacheSyncService);
-
-  private readonly orderSyncHandler: CacheSyncEntityHandler = {
-    entityType: 'order',
-    invalidateOne: (channelId: string) => {
-      if (this.companyService.activeCompanyId() === channelId) {
-        void this.refetchRecentOrdersOnly();
-      }
-    },
-  };
+  private readonly orderCacheService = inject(OrderCacheService);
 
   constructor() {
-    this.cacheSyncService.registerHandler(this.orderSyncHandler);
+    this.orderCacheService.orderInvalidated$.subscribe(() => {
+      void this.refetchRecentOrdersOnly();
+    });
   }
 
   // State signals

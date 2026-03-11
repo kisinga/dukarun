@@ -15,6 +15,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AppInitService } from '../../core/services/app-init.service';
 import { AuthService } from '../../core/services/auth.service';
+import { RegisterLinkPreviewsService } from '../../core/services/link-preview/register-link-previews.service';
 import { CompanyService } from '../../core/services/company.service';
 import { NetworkService } from '../../core/services/network.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -67,6 +68,8 @@ export class DashboardLayoutComponent implements OnInit {
   protected readonly cashierSessionService = inject(CashierSessionService);
   private readonly shiftModalTrigger = inject(ShiftModalTriggerService);
   private readonly destroyRef = inject(DestroyRef);
+  /** Ensures link preview loaders are registered when dashboard loads */
+  private readonly registerLinkPreviews = inject(RegisterLinkPreviewsService);
   private lastCompanyId: string | null = null;
 
   /** Open/close shift modal state (hosted in layout so it works from navbar badge). */

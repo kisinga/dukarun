@@ -1,0 +1,204 @@
+<div class="space-y-4 sm:space-y-6">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <a routerLink="/dashboard/customers" class="btn btn-ghost btn-sm mb-2 gap-1">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to Customers
+      </a>
+      <h1 class="text-xl sm:text-2xl font-bold text-base-content">Customer</h1>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div role="alert" class="alert alert-error">
+      <span class="flex-1">{{ error() }}</span>
+    </div>
+  }
+
+  @if (isLoading() && !customer()) {
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <div class="flex justify-center py-12">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (customer() && !isLoading()) {
+    <!-- Header card: profile + actions -->
+    <div class="card bg-base-100 shadow-sm border border-base-300/60">
+      <div class="card-body p-4 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div class="flex items-start gap-4">
+            <div class="avatar placeholder">
+              <div
+                class="bg-primary text-primary-content rounded-full w-14 h-14 sm:w-16 sm:h-16 text-lg font-semibold"
+              >
+                {{
+                  (customer().firstName?.charAt(0) || '') +
+                    (customer().lastName?.charAt(0) || '') || '?'
+                }}
+              </div>
+            </div>
+            <div>
+              <h2 class="text-lg sm:text-xl font-bold text-base-content">{{ customerName() }}</h2>
+              @if (customer().emailAddress && !isWalkIn()) {
+                <p class="text-sm text-base-content/70 mt-0.5">{{ customer().emailAddress }}</p>
+              }
+              @if (customer().phoneNumber && !isWalkIn()) {
+                <p class="text-sm text-base-content/70">{{ customer().phoneNumber }}</p>
+              }
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            @if (!isWalkIn()) {
+              <a
+                [routerLink]="['/dashboard/customers/edit', customerId()]"
+                class="btn btn-primary btn-sm"
+                >Edit</a
+              >
+              <a
+                [routerLink]="['/dashboard/customers', customerId(), 'statement']"
+                class="btn btn-outline btn-sm"
+                >Statement</a
+              >
+            }
+            <a
+              [routerLink]="['/dashboard/orders']"
+              [queryParams]="{ customerId: customerId() }"
+              class="btn btn-ghost btn-sm"
+              >View all orders</a
+            >
+            <a
+              [routerLink]="['/dashboard/payments']"
+              [queryParams]="{ customerId: customerId() }"
+              class="btn btn-ghost btn-sm"
+              >View payments</a
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Credit summary -->
+    @if (showCredit() && creditSummary(); as summary) {
+      <div class="card bg-base-100 shadow-sm border border-base-300/60">
+        <div class="card-body p-4">
+          <h3 class="font-bold text-base mb-3 text-base-content">Credit</h3>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            @if (summary.isCreditApproved) {
+              <div class="stat bg-base-200/50 rounded-lg p-3">
+                <div class="stat-title text-xs">Status</div>
+                <div class="stat-value text-sm">
+                  <span class="badge badge-success badge-sm">Approved</span>
+                </div>
+              </div>
+            }
+            @if (summary.creditLimit > 0) {
+              <div class="stat bg-base-200/50 rounded-lg p-3">
+                <div class="stat-title text-xs">Limit</div>
+                <div class="stat-value text-sm">{{ formatCurrency(summary.creditLimit) }}</div>
+              </div>
+            }
+            @if (summary.outstandingAmount !== 0) {
+              <div class="stat bg-base-200/50 rounded-lg p-3">
+                <div class="stat-title text-xs">Outstanding</div>
+                <div class="stat-value text-sm" [class.text-error]="summary.outstandingAmount > 0">
+                  {{ formatCurrency(getOutstandingAbs(summary)) }}
+                </div>
+              </div>
+            }
+            @if (summary.isCreditApproved && summary.creditLimit > 0) {
+              <div class="stat bg-base-200/50 rounded-lg p-3">
+                <div class="stat-title text-xs">Available</div>
+                <div class="stat-value text-sm">
+                  {{ formatCurrency(summary.availableCredit) }}
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Addresses -->
+    @if (customer().addresses?.length) {
+      <div class="card bg-base-100 shadow-sm border border-base-300/60">
+        <div class="card-body p-4">
+          <h3 class="font-bold text-base mb-3 text-base-content">Addresses</h3>
+          <ul class="space-y-2">
+            @for (addr of customer().addresses; track addr.id) {
+              <li class="text-sm text-base-content/80">{{ formatAddress(addr) }}</li>
+            }
+          </ul>
+        </div>
+      </div>
+    }
+
+    <!-- Recent orders -->
+    <div class="card bg-base-100 shadow-sm border border-base-300/60">
+      <div class="card-body p-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+          <h3 class="font-bold text-base text-base-content">Recent orders</h3>
+          <a
+            [routerLink]="['/dashboard/orders']"
+            [queryParams]="{ customerId: customerId() }"
+            class="link link-hover text-sm"
+            >View all orders</a
+          >
+        </div>
+        @if (recentOrders().length === 0) {
+          <p class="text-sm text-base-content/60">No orders yet.</p>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="table table-zebra table-sm">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Order</th>
+                  <th class="text-right">Total</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (order of recentOrders(); track order.id) {
+                  <tr>
+                    <td class="whitespace-nowrap text-sm text-base-content/70">
+                      {{ formatDate(order.orderPlacedAt || order.createdAt) }}
+                    </td>
+                    <td>
+                      <a
+                        [routerLink]="['/dashboard/orders', order.id]"
+                        class="link link-hover font-mono font-medium"
+                        >{{ order.code }}</a
+                      >
+                    </td>
+                    <td class="text-right font-medium">
+                      {{ formatCurrency(getOrderTotal(order)) }}
+                    </td>
+                    <td>
+                      <app-order-state-badge
+                        [state]="order.state"
+                        [reversedAt]="order.customFields?.reversedAt ?? null"
+                      />
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>

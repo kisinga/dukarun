@@ -145,6 +145,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'customers/:id',
+        loadComponent: () =>
+          import('./dashboard/pages/customers/customer-detail/customer-detail.component').then(
+            (m) => m.CustomerDetailComponent,
+          ),
+      },
+      {
         path: 'orders',
         loadComponent: () =>
           import('./dashboard/pages/orders/orders.component').then((m) => m.OrdersComponent),
@@ -195,6 +202,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./dashboard/pages/supplier-create/supplier-create.component').then(
             (m) => m.SupplierCreateComponent,
+          ),
+      },
+      {
+        path: 'suppliers/:id',
+        loadComponent: () =>
+          import('./dashboard/pages/suppliers/supplier-detail/supplier-detail.component').then(
+            (m) => m.SupplierDetailComponent,
           ),
       },
       {

@@ -7,6 +7,7 @@ import { CacheSyncService } from '../cache/cache-sync.service';
 import type { CacheSyncEntityHandler } from '../cache/cache-sync-handler.interface';
 import { CompanyService } from '../company.service';
 import { ApolloService } from '../apollo.service';
+import { SupplierApiService } from './supplier-api.service';
 import { SupplierStateService } from './supplier-state.service';
 
 const SUPPLIERS_CACHE_KEY = 'suppliers_list';
@@ -15,6 +16,12 @@ const SUPPLIERS_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 interface SuppliersCachePayload {
   items: any[];
   lastSync?: number;
+}
+
+/** By-id cache entry for supplier (preview/detail). */
+export interface SupplierCacheEntry {
+  supplier: any;
+  updatedAt: number;
 }
 
 export type SupplierQueryOptions = {
@@ -37,8 +44,12 @@ export class SupplierSearchService implements CacheSyncEntityHandler {
   private readonly apolloService = inject(ApolloService);
   private readonly appCache = inject(AppCacheService);
   private readonly companyService = inject(CompanyService);
+  private readonly apiService = inject(SupplierApiService);
   private readonly stateService = inject(SupplierStateService);
   private readonly cacheSyncService = inject(CacheSyncService);
+
+  /** By-id cache for preview/detail; hydrated on fetch and on SSE. */
+  private readonly suppliersById = new Map<string, SupplierCacheEntry>();
 
   constructor() {
     this.cacheSyncService.registerHandler(this);
@@ -163,6 +174,32 @@ export class SupplierSearchService implements CacheSyncEntityHandler {
   }
 
   /**
+   * Get supplier by id from by-id cache (for preview/detail). Returns null if not cached.
+   */
+  getSupplierById(id: string): SupplierCacheEntry | null {
+    return this.suppliersById.get(id) ?? null;
+  }
+
+  /**
+   * Write supplier into by-id cache. Call after fetch from detail or preview.
+   */
+  hydrateSupplier(supplier: any): void {
+    if (!supplier?.id) return;
+    this.suppliersById.set(supplier.id, { supplier, updatedAt: Date.now() });
+  }
+
+  /** CacheSyncEntityHandler: fetch one supplier and update by-id cache; also invalidate list. */
+  async hydrateOne(channelId: string, id: string): Promise<void> {
+    try {
+      const supplier = await this.apiService.getSupplierById(id);
+      if (!supplier) return;
+      this.hydrateSupplier(supplier);
+    } catch (err) {
+      console.warn('[SupplierSearch] hydrateOne failed', { channelId, id }, err);
+    }
+  }
+
+  /**
    * Invalidate suppliers cache and clear list state for the given (or current) channel.
    * Called when the backend signals a customer/supplier change (e.g. via SSE).
    */
@@ -176,8 +213,9 @@ export class SupplierSearchService implements CacheSyncEntityHandler {
     this.stateService.setTotalItems(0);
   }
 
-  /** CacheSyncEntityHandler: list-only; invalidate so next read refetches. */
-  invalidateOne(channelId: string, _id: string): void {
+  /** CacheSyncEntityHandler: remove from by-id cache and invalidate list. */
+  invalidateOne(channelId: string, id: string): void {
+    this.suppliersById.delete(id);
     void this.invalidateCache(channelId);
   }
 }

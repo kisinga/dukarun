@@ -10,6 +10,7 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { StockAdjustmentService } from '../../../core/services/stock-adjustment.service';
+import { HoverPreviewHostComponent } from '../../components/shared/hover-preview-host/hover-preview-host.component';
 import { PageHeaderComponent } from '../../components/shared/page-header.component';
 import { ListSearchBarComponent } from '../../components/shared/list-search-bar.component';
 import { PaginationComponent } from '../../components/shared/pagination.component';
@@ -20,6 +21,7 @@ import { ADJUSTMENT_REASONS } from './components/stock-adjustment-form-fields.co
   imports: [
     CommonModule,
     RouterLink,
+    HoverPreviewHostComponent,
     PageHeaderComponent,
     ListSearchBarComponent,
     PaginationComponent,

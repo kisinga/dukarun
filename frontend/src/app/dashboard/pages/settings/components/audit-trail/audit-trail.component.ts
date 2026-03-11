@@ -240,7 +240,9 @@ export class AuditTrailComponent {
     const routes: Record<string, string> = {
       Order: `/dashboard/orders/${entityId}`,
       Payment: `/dashboard/payments/${entityId}`,
-      Customer: `/dashboard/customers/edit/${entityId}`,
+      Customer: `/dashboard/customers/${entityId}`,
+      Supplier: `/dashboard/suppliers/${entityId}`,
+      Product: `/dashboard/products/${entityId}`,
     };
 
     const route = routes[entityType];
