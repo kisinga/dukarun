@@ -185,10 +185,10 @@
         </div>
       </div>
       <div class="home-hero-intro-delay flex justify-center w-full min-w-0">
-        <figure class="home-hero-phone flex justify-center w-full">
-          <!-- Phone mockup: mobile screenshot (responsive scaling) -->
+        <figure class="home-hero-visual flex justify-center w-full">
+          <!-- Mobile: phone mockup with mobile screenshot -->
           <div
-            class="mockup-phone w-full max-w-[min(280px,85vw)] sm:max-w-[300px] md:max-w-[320px] lg:max-w-[340px] xl:max-w-[360px] border-primary/20"
+            class="mockup-phone w-full max-w-[min(280px,85vw)] sm:max-w-[300px] md:max-w-[320px] border-primary/20 lg:hidden"
           >
             <div class="mockup-phone-camera"></div>
             <div
@@ -197,6 +197,26 @@
               <img
                 src="/assets/screenshots/dashboard_mobile2.png"
                 alt="Dukarun mobile dashboard showing business analytics and insights"
+                class="w-full h-auto object-contain object-center"
+                loading="eager"
+              />
+            </div>
+          </div>
+          <!-- Desktop: browser mockup with desktop screenshot -->
+          <div
+            class="mockup-browser border border-base-300 w-full max-w-full hidden lg:block lg:max-w-xl xl:max-w-2xl"
+          >
+            <div class="mockup-browser-toolbar">
+              <div
+                class="input input-sm w-full max-w-full bg-base-200 text-base-content/70 border-0"
+              >
+                https://app.dukarun.com
+              </div>
+            </div>
+            <div class="flex items-center justify-center bg-base-200 overflow-hidden min-h-[200px]">
+              <img
+                src="/assets/screenshots/dashboard_720p.png"
+                alt="Dukarun desktop dashboard showing business analytics and insights"
                 class="w-full h-auto object-contain object-center"
                 loading="eager"
               />

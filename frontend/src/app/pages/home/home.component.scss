@@ -227,11 +227,15 @@
 // MOCKUP-PHONE - Scale correctly, no overflow
 // ============================================
 
-.home-hero-phone .mockup-phone,
+.home-hero-visual .mockup-phone,
 #proof .mockup-phone,
 #pillars .mockup-phone,
 .journey-screenshot .mockup-phone {
   // Let phone scale with container; prevent overflow
+  min-width: 0;
+}
+
+.home-hero-visual .mockup-browser {
   min-width: 0;
 }
 
@@ -242,6 +246,12 @@
     height: auto;
     display: block;
   }
+}
+
+.home-hero-visual .mockup-browser img {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
 // ============================================
