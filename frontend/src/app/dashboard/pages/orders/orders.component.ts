@@ -106,11 +106,12 @@ export class OrdersComponent implements OnInit {
     };
   });
 
-  // Computed: filtered orders (server applies date + state; we apply search + customerId client-side)
+  // Computed: filtered orders (server: date, state, code, total; client: search, customerId, productVariantId)
   readonly filteredOrders = computed(() => {
     const query = this.filterService.searchQuery().toLowerCase().trim();
     const stateFilter = this.filterService.stateFilter();
     const customerIdFilter = this.filterService.customerIdFilter();
+    const productVariantId = this.filterService.productVariantId();
     const allOrders = this.orders();
 
     let filtered = allOrders;
@@ -127,6 +128,12 @@ export class OrdersComponent implements OnInit {
       } else {
         filtered = filtered.filter((order) => order.state === stateFilter);
       }
+    }
+
+    if (productVariantId) {
+      filtered = filtered.filter((order) =>
+        order.lines?.some((line: any) => line.productVariant?.id === productVariantId),
+      );
     }
 
     if (query) {
@@ -191,11 +198,14 @@ export class OrdersComponent implements OnInit {
   });
 
   constructor() {
-    // Effect: when list filter (date/state) changes, refetch with new options
+    // Effect: when server-side list filter changes, refetch with new options
     effect(() => {
       this.filterService.dateFrom();
       this.filterService.dateTo();
       this.filterService.stateFilter();
+      this.filterService.orderCode();
+      this.filterService.amountMin();
+      this.filterService.amountMax();
       this.loadOrdersWithFilter();
     });
 
@@ -245,9 +255,14 @@ export class OrdersComponent implements OnInit {
     const dateFrom = this.filterService.dateFrom();
     const dateTo = this.filterService.dateTo();
     const stateFilter = this.filterService.stateFilter();
+    const orderCode = this.filterService.orderCode().trim();
+    const amountMin = this.filterService.amountMin();
+    const amountMax = this.filterService.amountMax();
     const hasDateFilter = dateFrom != null || dateTo != null;
     const hasStateFilter = stateFilter !== '';
-    const hasAnyFilter = hasDateFilter || hasStateFilter;
+    const hasCodeFilter = orderCode !== '';
+    const hasAmountFilter = amountMin != null || amountMax != null;
+    const hasAnyFilter = hasDateFilter || hasStateFilter || hasCodeFilter || hasAmountFilter;
 
     const filter: OrderListOptions['filter'] = {};
     if (dateFrom != null || dateTo != null) {
@@ -257,6 +272,15 @@ export class OrdersComponent implements OnInit {
     }
     if (stateFilter) {
       filter.state = { eq: stateFilter } as any;
+    }
+    if (orderCode) {
+      filter.code = { contains: orderCode } as any;
+    }
+    if (amountMin != null || amountMax != null) {
+      filter.total = {
+        ...(amountMin != null && { gte: amountMin }),
+        ...(amountMax != null && { lte: amountMax }),
+      } as any;
     }
 
     return {

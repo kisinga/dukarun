@@ -4,8 +4,10 @@ import {
   Component,
   ComponentRef,
   DestroyRef,
+  ElementRef,
   inject,
   input,
+  signal,
   ViewChild,
   ViewContainerRef,
 } from '@angular/core';
@@ -27,22 +29,19 @@ const HIDE_DELAY_MS = 200;
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
+      #triggerRef
       class="dropdown dropdown-end relative inline-block"
       (mouseenter)="onTriggerEnter()"
       (mouseleave)="onTriggerLeave()"
     >
-      <div
-        tabindex="0"
-        role="button"
-        class="contents"
-        (focus)="onTriggerEnter()"
-        (blur)="onTriggerLeave()"
-      >
+      <div class="contents">
         <ng-content></ng-content>
       </div>
       @if (isOpen) {
         <div
-          class="dropdown-content left-0 top-full mt-1 z-50 min-w-52 max-w-xs rounded-box bg-base-100 border border-base-300 shadow-lg p-3"
+          class="dropdown-content fixed min-w-52 max-w-xs rounded-box bg-base-100 border border-base-300 shadow-lg p-3 z-[9999]"
+          [style.top.px]="dropdownTop()"
+          [style.left.px]="dropdownLeft()"
           (mouseenter)="onContentEnter()"
           (mouseleave)="onContentLeave()"
         >
@@ -63,6 +62,11 @@ export class HoverPreviewHostComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   @ViewChild('previewSlot', { read: ViewContainerRef }) private previewSlot?: ViewContainerRef;
+  @ViewChild('triggerRef') private triggerRef?: ElementRef<HTMLElement>;
+
+  /** Fixed position for dropdown so it is not clipped by overflow ancestors. */
+  readonly dropdownTop = signal(0);
+  readonly dropdownLeft = signal(0);
 
   constructor() {
     this.destroyRef.onDestroy(() => {
@@ -135,6 +139,7 @@ export class HoverPreviewHostComponent {
     const loader = this.registry.getLoader(key);
     if (!loader || !id) return;
 
+    this.updateDropdownPosition();
     this.isOpen = true;
     this.loading = true;
     this.cdr.markForCheck();
@@ -171,5 +176,13 @@ export class HoverPreviewHostComponent {
     }
     this.isOpen = false;
     this.cdr.markForCheck();
+  }
+
+  private updateDropdownPosition(): void {
+    const el = this.triggerRef?.nativeElement;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    this.dropdownTop.set(rect.bottom + 4);
+    this.dropdownLeft.set(rect.left);
   }
 }

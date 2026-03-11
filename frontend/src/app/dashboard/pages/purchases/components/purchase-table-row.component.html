@@ -33,7 +33,7 @@
 <!-- Actions -->
 <td class="text-right">
   <div class="flex justify-end gap-1">
-    <button (click)="onAction('view')" class="btn btn-ghost btn-xs" title="View Details">
+    <button (click)="onAction('view', $event)" class="btn btn-ghost btn-xs" title="View Details">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         class="h-4 w-4"
@@ -56,15 +56,11 @@
       </svg>
     </button>
     @if (canPay()) {
-      <button
-        (click)="onAction('pay'); $event.preventDefault(); $event.stopPropagation()"
-        class="btn btn-success btn-xs"
-        title="Pay"
-      >
+      <button (click)="onAction('pay', $event)" class="btn btn-success btn-xs" title="Pay">
         Pay
       </button>
     }
-    <button (click)="onAction('edit')" class="btn btn-ghost btn-xs" title="Edit">
+    <button (click)="onAction('edit', $event)" class="btn btn-ghost btn-xs" title="Edit">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         class="h-4 w-4"
@@ -80,7 +76,11 @@
         />
       </svg>
     </button>
-    <button (click)="onAction('delete')" class="btn btn-error btn-ghost btn-xs" title="Delete">
+    <button
+      (click)="onAction('delete', $event)"
+      class="btn btn-error btn-ghost btn-xs"
+      title="Delete"
+    >
       <svg
         xmlns="http://www.w3.org/2000/svg"
         class="h-4 w-4"
