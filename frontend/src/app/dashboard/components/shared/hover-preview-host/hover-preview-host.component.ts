@@ -50,9 +50,8 @@ const HIDE_DELAY_MS = 200;
             <div class="flex items-center justify-center py-6">
               <span class="loading loading-spinner loading-sm text-primary"></span>
             </div>
-          } @else {
-            <ng-container #previewSlot></ng-container>
           }
+          <ng-container #previewSlot></ng-container>
         </div>
       }
     </div>
