@@ -219,6 +219,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'purchases/:id',
+        loadComponent: () =>
+          import('./dashboard/pages/purchases/purchase-detail/purchase-detail.component').then(
+            (m) => m.PurchaseDetailComponent,
+          ),
+      },
+      {
         path: 'purchases/create',
         loadComponent: () =>
           import('./dashboard/pages/purchase-create/purchase-create.component').then(

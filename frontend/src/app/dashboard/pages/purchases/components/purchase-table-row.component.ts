@@ -1,5 +1,6 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { Router } from '@angular/router';
 import { CurrencyService } from '../../../../core/services/currency.service';
 
 export type PurchaseAction = 'view' | 'pay' | 'edit' | 'delete';
@@ -29,13 +30,15 @@ export interface PurchaseCardData {
   selector: '[app-purchase-table-row]',
   imports: [CommonModule, DatePipe],
   host: {
-    class: 'hover',
+    class: 'hover cursor-pointer transition-colors',
+    '(click)': 'navigateToPurchase()',
   },
   templateUrl: './purchase-table-row.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PurchaseTableRowComponent {
   private readonly currencyService = inject(CurrencyService);
+  private readonly router = inject(Router);
 
   readonly purchase = input.required<PurchaseCardData>();
   readonly action = output<{ action: PurchaseAction; purchaseId: string }>();
@@ -65,7 +68,12 @@ export class PurchaseTableRowComponent {
     return p.isCreditPurchase && p.paymentStatus?.toLowerCase() !== 'paid';
   }
 
-  onAction(actionType: PurchaseAction): void {
+  navigateToPurchase(): void {
+    this.router.navigate(['/dashboard/purchases', this.purchase().id]);
+  }
+
+  onAction(actionType: PurchaseAction, event?: Event): void {
+    event?.stopPropagation();
     this.action.emit({ action: actionType, purchaseId: this.purchase().id });
   }
 }

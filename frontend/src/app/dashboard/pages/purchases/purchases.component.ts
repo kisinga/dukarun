@@ -205,7 +205,7 @@ export class PurchasesComponent implements OnInit {
 
     switch (action) {
       case 'view':
-        this.selectedPurchaseId.set(purchaseId);
+        this.router.navigate(['/dashboard/purchases', purchaseId]);
         break;
 
       case 'pay': {
@@ -228,7 +228,7 @@ export class PurchasesComponent implements OnInit {
       }
 
       case 'edit':
-        console.log('Edit purchase:', purchaseId);
+        this.router.navigate(['/dashboard/purchases/edit', purchaseId]);
         break;
 
       case 'delete':

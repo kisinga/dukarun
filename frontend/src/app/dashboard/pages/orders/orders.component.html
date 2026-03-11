@@ -65,7 +65,7 @@
     (searchQueryChange)="filterService.searchQuery.set($event)"
     placeholder="Search by order code, customer name, or email..."
   >
-    @if (filterService.stateFilter() || filterService.dateFrom() || filterService.dateTo()) {
+    @if (filterService.hasActiveFilters()) {
       <div badges class="flex flex-wrap gap-2">
         @if (filterService.stateFilter()) {
           <span [class]="'badge badge-' + filterService.stateFilterColor() + ' gap-1.5'">
@@ -96,6 +96,64 @@
             } @else {
               {{ filterService.dateTo() | date: 'mediumDate' }}
             }
+          </span>
+        }
+        @if (filterService.orderCode()) {
+          <span class="badge badge-ghost gap-1.5">
+            Code: {{ filterService.orderCode() }}
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="filterService.orderCode.set('')"
+              type="button"
+              aria-label="Clear order code filter"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (filterService.amountMin() != null || filterService.amountMax() != null) {
+          <span class="badge badge-ghost gap-1.5">
+            @if (filterService.amountMin() != null && filterService.amountMax() != null) {
+              {{ filterService.amountMin() }} – {{ filterService.amountMax() }}
+            } @else if (filterService.amountMin() != null) {
+              &ge; {{ filterService.amountMin() }}
+            } @else {
+              &le; {{ filterService.amountMax() }}
+            }
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="filterService.amountMin.set(null); filterService.amountMax.set(null)"
+              type="button"
+              aria-label="Clear amount filter"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (filterService.customerIdFilter()) {
+          <span class="badge badge-ghost gap-1.5">
+            Customer
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="filterService.customerIdFilter.set(null)"
+              type="button"
+              aria-label="Clear customer filter"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (filterService.productVariantId()) {
+          <span class="badge badge-ghost gap-1.5">
+            Product
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="filterService.productVariantId.set(null)"
+              type="button"
+              aria-label="Clear product filter"
+            >
+              &times;
+            </button>
           </span>
         }
       </div>

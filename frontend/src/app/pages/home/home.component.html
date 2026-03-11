@@ -210,7 +210,7 @@
               <div
                 class="input input-sm w-full max-w-full bg-base-200 text-base-content/70 border-0"
               >
-                https://app.dukarun.com
+                https://dukarun.com/dashboard
               </div>
             </div>
             <div class="flex items-center justify-center bg-base-200 overflow-hidden min-h-[200px]">
@@ -406,9 +406,10 @@
           id="feature-carousel"
           class="carousel carousel-center w-full overflow-x-auto snap-x snap-mandatory"
         >
-          @for (screenshot of allFeatureScreenshots; track screenshot.src) {
+          @for (screenshot of allFeatureScreenshots; track screenshot.src; let i = $index) {
             <div
-              class="carousel-item w-full min-w-full flex-shrink-0 snap-center flex items-center justify-center"
+              [id]="'featureSlide' + (i + 1)"
+              class="carousel-item relative w-full min-w-full flex-shrink-0 snap-center flex items-center justify-center"
             >
               <div
                 class="mockup-phone w-full max-w-[min(280px,85vw)] sm:max-w-[300px] border-primary/20 transition-transform duration-200 group-hover:-translate-y-0.5"
@@ -424,6 +425,27 @@
                     class="w-full h-auto object-contain object-center"
                   />
                 </div>
+              </div>
+              <div
+                class="absolute left-2 right-2 top-1/2 flex -translate-y-1/2 justify-between pointer-events-none sm:left-5 sm:right-5"
+              >
+                <a
+                  [href]="
+                    '#featureSlide' +
+                    (((i + allFeatureScreenshots.length - 1) % allFeatureScreenshots.length) + 1)
+                  "
+                  class="btn btn-circle btn-sm pointer-events-auto bg-base-100/90 shadow-md hover:bg-base-100 border border-base-300"
+                  aria-label="Previous screenshot"
+                >
+                  &#10094;
+                </a>
+                <a
+                  [href]="'#featureSlide' + (((i + 1) % allFeatureScreenshots.length) + 1)"
+                  class="btn btn-circle btn-sm pointer-events-auto bg-base-100/90 shadow-md hover:bg-base-100 border border-base-300"
+                  aria-label="Next screenshot"
+                >
+                  &#10095;
+                </a>
               </div>
             </div>
           }
