@@ -224,6 +224,27 @@
 }
 
 // ============================================
+// MOCKUP-PHONE - Scale correctly, no overflow
+// ============================================
+
+.home-hero-phone .mockup-phone,
+#proof .mockup-phone,
+#pillars .mockup-phone,
+.journey-screenshot .mockup-phone {
+  // Let phone scale with container; prevent overflow
+  min-width: 0;
+}
+
+.mockup-phone-display {
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+}
+
+// ============================================
 // CAROUSEL - Touch-optimized
 // ============================================
 
