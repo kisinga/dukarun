@@ -12,6 +12,7 @@ import { CurrencyService } from '../../../../core/services/currency.service';
 import { CustomerService } from '../../../../core/services/customer.service';
 import type { CreditCustomerSummary } from '../../../../core/services/customer.service';
 import { CustomerCreditService } from '../../../../core/services/customer/customer-credit.service';
+import { CustomerSearchService } from '../../../../core/services/customer/customer-search.service';
 import type {
   GetOrdersQuery,
   GetOrdersQueryVariables,
@@ -19,6 +20,7 @@ import type {
 } from '../../../../core/graphql/generated/graphql';
 import { GET_ORDERS } from '../../../../core/graphql/operations.graphql';
 import { ApolloService } from '../../../../core/services/apollo.service';
+import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { OrderStateBadgeComponent } from '../../orders/components/order-state-badge.component';
 
 const RECENT_ORDERS_TAKE = 15;
@@ -38,6 +40,7 @@ export class CustomerDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly customerService = inject(CustomerService);
   private readonly creditService = inject(CustomerCreditService);
+  private readonly customerSearchService = inject(CustomerSearchService);
   private readonly apollo = inject(ApolloService);
   readonly currencyService = inject(CurrencyService);
 
@@ -96,6 +99,7 @@ export class CustomerDetailComponent implements OnInit {
       ]);
       this.creditSummary.set(summary);
       this.recentOrders.set(orders);
+      this.customerSearchService.hydrateCustomer(c, summary ?? undefined);
     } catch (err: any) {
       this.error.set(err?.message ?? 'Failed to load customer');
     } finally {

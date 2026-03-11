@@ -4,11 +4,13 @@
     <div class="flex items-start justify-between mb-3">
       <div class="flex-1">
         @if (purchase().supplier?.id) {
-          <a
-            [routerLink]="['/dashboard/suppliers', purchase().supplier!.id]"
-            class="link link-hover text-lg font-bold mb-1"
-            >{{ getSupplierName() }}</a
-          >
+          <app-hover-preview-host previewKey="supplier" [entityId]="purchase().supplier!.id">
+            <a
+              [routerLink]="['/dashboard/suppliers', purchase().supplier!.id]"
+              class="link link-hover text-lg font-bold mb-1"
+              >{{ getSupplierName() }}</a
+            >
+          </app-hover-preview-host>
         } @else {
           <h3 class="text-lg font-bold mb-1">{{ getSupplierName() }}</h3>
         }

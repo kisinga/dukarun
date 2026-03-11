@@ -1,25 +1,29 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { HoverPreviewHostComponent } from '../../../../components/shared/hover-preview-host/hover-preview-host.component';
 import type { OrderCustomerInfoInput } from '../order-detail.types';
 
 /**
  * Order Customer Info Component
  *
- * Displays customer name (link to customer detail when not walk-in), email, and phone
+ * Displays customer name (link to customer detail when not walk-in), email, and phone.
+ * Customer link shows hover preview when available.
  */
 @Component({
   selector: 'app-order-customer-info',
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, HoverPreviewHostComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>
       @if (customer()?.id && !isWalkInCustomer()) {
-        <a
-          [routerLink]="['/dashboard/customers', customer()!.id]"
-          class="link link-hover text-base font-medium text-base-content mb-2 inline-block"
-          >{{ customerName() }}</a
-        >
+        <app-hover-preview-host previewKey="customer" [entityId]="customer()!.id">
+          <a
+            [routerLink]="['/dashboard/customers', customer()!.id]"
+            class="link link-hover text-base font-medium text-base-content mb-2 inline-block"
+            >{{ customerName() }}</a
+          >
+        </app-hover-preview-host>
       } @else {
         <p class="text-base font-medium text-base-content mb-2">{{ customerName() }}</p>
       }

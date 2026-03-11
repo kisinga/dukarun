@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { PaymentsService } from '../../../../core/services/payments.service';
@@ -20,7 +21,7 @@ import { PaymentStateBadgeComponent } from '../components/payment-state-badge.co
  */
 @Component({
   selector: 'app-payment-detail',
-  imports: [CommonModule, RouterLink, PaymentStateBadgeComponent],
+  imports: [CommonModule, RouterLink, HoverPreviewHostComponent, PaymentStateBadgeComponent],
   templateUrl: './payment-detail.component.html',
   styleUrl: './payment-detail.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

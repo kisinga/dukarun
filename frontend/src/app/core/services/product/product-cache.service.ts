@@ -204,6 +204,23 @@ export class ProductCacheService implements CacheSyncEntityHandler {
   }
 
   /**
+   * Insert or update a single product in the in-memory cache (e.g. after detail or preview fetch).
+   * Does not persist to AppCacheService.
+   */
+  hydrateProduct(product: ProductSearchResult): void {
+    if (!product?.id) return;
+    this.productsById.set(product.id, product);
+    const normalizedName = product.name.toLowerCase();
+    const existing = this.productsByName.get(normalizedName) ?? [];
+    const without = existing.filter((p) => p.id !== product.id);
+    this.productsByName.set(normalizedName, [...without, product]);
+    this.statusSignal.update((s) => ({
+      ...s,
+      productCount: this.productsById.size,
+    }));
+  }
+
+  /**
    * Build searchable string for a product (name + manufacturer + SKUs). Normalized for matching.
    */
   private getSearchableString(product: ProductSearchResult): string {

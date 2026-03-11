@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { PaymentWithOrder } from '../../../../core/services/payments.service';
 import { PaymentStateBadgeComponent } from './payment-state-badge.component';
@@ -12,24 +13,28 @@ export type PaymentAction = 'view' | 'viewOrder';
  */
 @Component({
   selector: 'tr[app-payment-table-row]',
-  imports: [CommonModule, RouterLink, PaymentStateBadgeComponent],
+  imports: [CommonModule, RouterLink, HoverPreviewHostComponent, PaymentStateBadgeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <td>
-      <a
-        [routerLink]="['/dashboard/orders', payment().order.id]"
-        class="link link-hover font-medium"
-        >{{ payment().order.code }}</a
-      >
+      <app-hover-preview-host previewKey="order" [entityId]="payment().order.id">
+        <a
+          [routerLink]="['/dashboard/orders', payment().order.id]"
+          class="link link-hover font-medium"
+          >{{ payment().order.code }}</a
+        >
+      </app-hover-preview-host>
       <div class="text-sm text-base-content/60">{{ formatDate(payment().createdAt) }}</div>
     </td>
     <td>
       @if (payment().order.customer?.id) {
-        <a
-          [routerLink]="['/dashboard/customers', payment().order.customer!.id]"
-          class="link link-hover"
-          >{{ getCustomerName() }}</a
-        >
+        <app-hover-preview-host previewKey="customer" [entityId]="payment().order.customer!.id">
+          <a
+            [routerLink]="['/dashboard/customers', payment().order.customer!.id]"
+            class="link link-hover"
+            >{{ getCustomerName() }}</a
+          >
+        </app-hover-preview-host>
       } @else if (payment().order.customer) {
         <div>{{ getCustomerName() }}</div>
       } @else {

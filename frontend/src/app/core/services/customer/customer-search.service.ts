@@ -8,15 +8,26 @@ import { CompanyService } from '../company.service';
 import { ApolloService } from '../apollo.service';
 import { CustomerInput } from '../customer.service';
 import { CustomerApiService } from './customer-api.service';
+import { CustomerCreditService } from './customer-credit.service';
 import { CustomerStateService } from './customer-state.service';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 
 const CUSTOMERS_CACHE_KEY = 'customers_list';
 const CUSTOMERS_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
+/** Threshold (ms) after which cached customer data is considered stale for transaction-related fields (e.g. credit). */
+export const CUSTOMER_CACHE_STALE_MS = 60_000;
+
 interface CustomersCachePayload {
   items: any[];
   lastSync?: number;
+}
+
+/** By-id cache entry for customer (preview/detail). Transaction fields may be stale when updatedAt is old. */
+export interface CustomerCacheEntry {
+  customer: any;
+  creditSummary?: any;
+  updatedAt: number;
 }
 
 /** Fetch policy for customer list/search; default cache-first for resilience; network-only after mutations. */
@@ -42,7 +53,11 @@ export class CustomerSearchService implements CacheSyncEntityHandler {
   private readonly companyService = inject(CompanyService);
   private readonly stateService = inject(CustomerStateService);
   private readonly apiService = inject(CustomerApiService);
+  private readonly creditService = inject(CustomerCreditService);
   private readonly cacheSyncService = inject(CacheSyncService);
+
+  /** By-id cache for preview/detail; hydrated on fetch and on SSE. */
+  private readonly customersById = new Map<string, CustomerCacheEntry>();
 
   constructor() {
     this.cacheSyncService.registerHandler(this);
@@ -233,6 +248,42 @@ export class CustomerSearchService implements CacheSyncEntityHandler {
   }
 
   /**
+   * Get customer by id from by-id cache (for preview/detail). Returns null if not cached.
+   */
+  getCustomerById(id: string): CustomerCacheEntry | null {
+    return this.customersById.get(id) ?? null;
+  }
+
+  /**
+   * Write customer (and optional credit summary) into by-id cache. Call after fetch from detail or preview.
+   */
+  hydrateCustomer(customer: any, creditSummary?: any): void {
+    if (!customer?.id) return;
+    this.customersById.set(customer.id, {
+      customer,
+      creditSummary,
+      updatedAt: Date.now(),
+    });
+  }
+
+  /** CacheSyncEntityHandler: fetch one customer and update by-id cache; also invalidate list. */
+  async hydrateOne(channelId: string, id: string): Promise<void> {
+    try {
+      const customer = await this.apiService.getCustomerById(id);
+      if (!customer) return;
+      let creditSummary: any;
+      try {
+        creditSummary = await this.creditService.getCreditSummary(id);
+      } catch {
+        // optional; cache customer without credit
+      }
+      this.hydrateCustomer(customer, creditSummary);
+    } catch (err) {
+      console.warn('[CustomerSearch] hydrateOne failed', { channelId, id }, err);
+    }
+  }
+
+  /**
    * Invalidate customers cache and clear list state for the given (or current) channel.
    * Called when the backend signals a customer change (e.g. via SSE).
    */
@@ -246,8 +297,9 @@ export class CustomerSearchService implements CacheSyncEntityHandler {
     this.stateService.setTotalItems(0);
   }
 
-  /** CacheSyncEntityHandler: list-only; invalidate so next read refetches. */
-  invalidateOne(channelId: string, _id: string): void {
+  /** CacheSyncEntityHandler: remove from by-id cache and invalidate list. */
+  invalidateOne(channelId: string, id: string): void {
+    this.customersById.delete(id);
     void this.invalidateCache(channelId);
   }
 

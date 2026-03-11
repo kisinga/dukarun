@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { OrderStateBadgeComponent } from './order-state-badge.component';
 
@@ -40,7 +41,7 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
 
 @Component({
   selector: 'app-order-card',
-  imports: [OrderStateBadgeComponent, RouterLink],
+  imports: [OrderStateBadgeComponent, RouterLink, HoverPreviewHostComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -81,12 +82,14 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
               <span>{{ getItemCount() }} items</span>
               <span class="w-1 h-1 rounded-full bg-base-content/30"></span>
               @if (order().customer?.id) {
-                <a
-                  [routerLink]="['/dashboard/customers', order().customer!.id]"
-                  class="link link-hover"
-                  (click)="$event.stopPropagation()"
-                  >{{ getCustomerName() }}</a
-                >
+                <app-hover-preview-host previewKey="customer" [entityId]="order().customer!.id">
+                  <a
+                    [routerLink]="['/dashboard/customers', order().customer!.id]"
+                    class="link link-hover"
+                    (click)="$event.stopPropagation()"
+                    >{{ getCustomerName() }}</a
+                  >
+                </app-hover-preview-host>
               } @else if (order().customer) {
                 <span>{{ getCustomerName() }}</span>
               } @else {

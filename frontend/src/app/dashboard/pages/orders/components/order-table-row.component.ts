@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { OrderStateBadgeComponent } from './order-state-badge.component';
 
@@ -40,7 +41,7 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
 
 @Component({
   selector: 'tr[app-order-table-row]',
-  imports: [OrderStateBadgeComponent, RouterLink],
+  imports: [OrderStateBadgeComponent, RouterLink, HoverPreviewHostComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class: 'cursor-pointer transition-colors',
@@ -55,12 +56,14 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
     </td>
     <td>
       @if (order().customer?.id) {
-        <a
-          [routerLink]="['/dashboard/customers', order().customer!.id]"
-          class="link link-hover"
-          (click)="$event.stopPropagation()"
-          >{{ getCustomerName() }}</a
-        >
+        <app-hover-preview-host previewKey="customer" [entityId]="order().customer!.id">
+          <a
+            [routerLink]="['/dashboard/customers', order().customer!.id]"
+            class="link link-hover"
+            (click)="$event.stopPropagation()"
+            >{{ getCustomerName() }}</a
+          >
+        </app-hover-preview-host>
       } @else if (order().customer) {
         <div>{{ getCustomerName() }}</div>
       } @else {

@@ -252,11 +252,16 @@
                   @for (line of adj.lines; track line.id) {
                     <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
                       @if (line.variant?.product?.id) {
-                        <a
-                          [routerLink]="['/dashboard/products', line.variant.product.id]"
-                          class="link link-hover font-medium"
-                          >{{ getLineVariantDisplay(line) }}</a
+                        <app-hover-preview-host
+                          previewKey="product"
+                          [entityId]="line.variant.product.id"
                         >
+                          <a
+                            [routerLink]="['/dashboard/products', line.variant.product.id]"
+                            class="link link-hover font-medium"
+                            >{{ getLineVariantDisplay(line) }}</a
+                          >
+                        </app-hover-preview-host>
                       } @else {
                         <span class="font-medium">{{ getLineVariantDisplay(line) }}</span>
                       }
@@ -365,14 +370,19 @@
                               <tr>
                                 <td>
                                   @if (line.variant?.product?.id) {
-                                    <a
-                                      [routerLink]="[
-                                        '/dashboard/products',
-                                        line.variant.product.id,
-                                      ]"
-                                      class="link link-hover font-medium"
-                                      >{{ getLineVariantDisplay(line) }}</a
+                                    <app-hover-preview-host
+                                      previewKey="product"
+                                      [entityId]="line.variant.product.id"
                                     >
+                                      <a
+                                        [routerLink]="[
+                                          '/dashboard/products',
+                                          line.variant.product.id,
+                                        ]"
+                                        class="link link-hover font-medium"
+                                        >{{ getLineVariantDisplay(line) }}</a
+                                      >
+                                    </app-hover-preview-host>
                                   } @else {
                                     <div class="font-medium">{{ getLineVariantDisplay(line) }}</div>
                                   }

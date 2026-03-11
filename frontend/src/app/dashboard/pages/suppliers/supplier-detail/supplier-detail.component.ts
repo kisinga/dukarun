@@ -10,6 +10,7 @@ import {
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { SupplierService } from '../../../../core/services/supplier.service';
+import { SupplierSearchService } from '../../../../core/services/supplier/supplier-search.service';
 import { ApolloService } from '../../../../core/services/apollo.service';
 import { GetPurchasesDocument, SortOrder } from '../../../../core/graphql/generated/graphql';
 
@@ -29,6 +30,7 @@ const RECENT_PURCHASES_TAKE = 15;
 export class SupplierDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly supplierService = inject(SupplierService);
+  private readonly supplierSearchService = inject(SupplierSearchService);
   private readonly apollo = inject(ApolloService);
   readonly currencyService = inject(CurrencyService);
 
@@ -65,6 +67,7 @@ export class SupplierDetailComponent implements OnInit {
         this.isLoading.set(false);
         return;
       }
+      this.supplierSearchService.hydrateSupplier(s);
       const purchases = await this.loadRecentPurchases(supplierId);
       this.recentPurchases.set(purchases);
     } catch (err: any) {

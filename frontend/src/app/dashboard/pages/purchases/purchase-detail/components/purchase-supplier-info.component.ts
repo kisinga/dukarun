@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { HoverPreviewHostComponent } from '../../../../components/shared/hover-preview-host/hover-preview-host.component';
 
 /**
  * Purchase Supplier Info Component
@@ -9,17 +10,19 @@ import { RouterLink } from '@angular/router';
  */
 @Component({
   selector: 'app-purchase-supplier-info',
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, HoverPreviewHostComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>
       <h3 class="font-bold text-base mb-3 text-base-content">Supplier</h3>
       @if (supplier()?.id) {
-        <a
-          [routerLink]="['/dashboard/suppliers', supplier()!.id]"
-          class="link link-hover text-base font-medium text-base-content mb-2 inline-block"
-          >{{ supplierName() }}</a
-        >
+        <app-hover-preview-host previewKey="supplier" [entityId]="supplier()!.id">
+          <a
+            [routerLink]="['/dashboard/suppliers', supplier()!.id]"
+            class="link link-hover text-base font-medium text-base-content mb-2 inline-block"
+            >{{ supplierName() }}</a
+          >
+        </app-hover-preview-host>
       } @else {
         <p class="text-base font-medium text-base-content mb-2">{{ supplierName() }}</p>
       }

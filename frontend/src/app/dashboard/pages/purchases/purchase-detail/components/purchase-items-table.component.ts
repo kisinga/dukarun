@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../../core/services/currency.service';
+import { HoverPreviewHostComponent } from '../../../../components/shared/hover-preview-host/hover-preview-host.component';
 
 /**
  * Purchase Items Table Component
@@ -11,7 +12,7 @@ import { CurrencyService } from '../../../../../core/services/currency.service';
  */
 @Component({
   selector: 'app-purchase-items-table',
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, HoverPreviewHostComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>
@@ -34,11 +35,16 @@ import { CurrencyService } from '../../../../../core/services/currency.service';
               <tr>
                 <td>
                   @if (line.variant?.product?.id) {
-                    <a
-                      [routerLink]="['/dashboard/products', line.variant!.product!.id]"
-                      class="link link-hover font-medium"
-                      >{{ getLineItemName(line) }}</a
+                    <app-hover-preview-host
+                      previewKey="product"
+                      [entityId]="line.variant!.product!.id"
                     >
+                      <a
+                        [routerLink]="['/dashboard/products', line.variant!.product!.id]"
+                        class="link link-hover font-medium"
+                        >{{ getLineItemName(line) }}</a
+                      >
+                    </app-hover-preview-host>
                   } @else {
                     <div class="font-medium">{{ getLineItemName(line) }}</div>
                   }
@@ -63,11 +69,16 @@ import { CurrencyService } from '../../../../../core/services/currency.service';
               <div class="flex justify-between items-start mb-2">
                 <div class="flex-1 min-w-0">
                   @if (line.variant?.product?.id) {
-                    <a
-                      [routerLink]="['/dashboard/products', line.variant!.product!.id]"
-                      class="link link-hover font-semibold text-base text-base-content"
-                      >{{ getLineItemName(line) }}</a
+                    <app-hover-preview-host
+                      previewKey="product"
+                      [entityId]="line.variant!.product!.id"
                     >
+                      <a
+                        [routerLink]="['/dashboard/products', line.variant!.product!.id]"
+                        class="link link-hover font-semibold text-base text-base-content"
+                        >{{ getLineItemName(line) }}</a
+                      >
+                    </app-hover-preview-host>
                   } @else {
                     <h4 class="font-semibold text-base text-base-content">
                       {{ getLineItemName(line) }}

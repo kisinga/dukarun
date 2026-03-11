@@ -9,6 +9,7 @@ import type {
 import { GetOrderFullDocument } from '../graphql/generated/graphql';
 import { GET_ORDERS, ORDER_PAYMENT_STATUS } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
+import { OrderCacheService } from './order-cache.service';
 
 export interface OrderPaymentStatusResult {
   totalOwed: number;
@@ -29,6 +30,7 @@ export interface OrderPaymentStatusResult {
 })
 export class OrdersService {
   private readonly apolloService = inject(ApolloService);
+  private readonly orderCacheService = inject(OrderCacheService);
 
   /** Last options used for list fetch; refreshOrders() reuses these so filter state is preserved. */
   private lastListOptions: OrderListOptions | null = null;
@@ -116,6 +118,9 @@ export class OrdersService {
 
       const order = result.data?.order || null;
       this.currentOrderSignal.set(order);
+      if (order) {
+        this.orderCacheService.hydrateOrder(order);
+      }
       return order;
     } catch (error: any) {
       console.error('❌ Failed to fetch order:', error);

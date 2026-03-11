@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { PaymentWithOrder } from '../../../../core/services/payments.service';
 import { OrderDetailComponent } from '../../orders/order-detail/order-detail.component';
@@ -13,7 +14,13 @@ export type PaymentAction = 'view' | 'viewOrder';
  */
 @Component({
   selector: 'app-payment-card',
-  imports: [CommonModule, RouterLink, PaymentStateBadgeComponent, OrderDetailComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    HoverPreviewHostComponent,
+    PaymentStateBadgeComponent,
+    OrderDetailComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <details
@@ -46,13 +53,15 @@ export type PaymentAction = 'view' | 'viewOrder';
           <!-- Payment Summary -->
           <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between gap-2 mb-1">
-              <a
-                [routerLink]="['/dashboard/orders', payment().order.id]"
-                class="link link-hover text-sm line-clamp-1 leading-tight font-medium"
-                (click)="$event.stopPropagation()"
-              >
-                {{ payment().order.code }}
-              </a>
+              <app-hover-preview-host previewKey="order" [entityId]="payment().order.id">
+                <a
+                  [routerLink]="['/dashboard/orders', payment().order.id]"
+                  class="link link-hover text-sm line-clamp-1 leading-tight font-medium"
+                  (click)="$event.stopPropagation()"
+                >
+                  {{ payment().order.code }}
+                </a>
+              </app-hover-preview-host>
               <app-payment-state-badge [state]="payment().state" />
             </div>
 
@@ -95,11 +104,16 @@ export type PaymentAction = 'view' | 'viewOrder';
                 />
               </svg>
               @if (payment().order.customer?.id) {
-                <a
-                  [routerLink]="['/dashboard/customers', payment().order.customer!.id]"
-                  class="link link-hover text-sm font-medium text-base-content"
-                  >{{ getCustomerName() }}</a
+                <app-hover-preview-host
+                  previewKey="customer"
+                  [entityId]="payment().order.customer!.id"
                 >
+                  <a
+                    [routerLink]="['/dashboard/customers', payment().order.customer!.id]"
+                    class="link link-hover text-sm font-medium text-base-content"
+                    >{{ getCustomerName() }}</a
+                  >
+                </app-hover-preview-host>
               } @else {
                 <p class="text-sm font-medium text-base-content">{{ getCustomerName() }}</p>
               }
