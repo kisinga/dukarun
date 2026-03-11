@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import type { OrderListOptions } from '../../../core/graphql/generated/graphql';
 import { CustomerService } from '../../../core/services/customer.service';
 import { OrderService } from '../../../core/services/order.service';
 import { OrdersService } from '../../../core/services/orders.service';
@@ -28,6 +29,8 @@ import {
   type AnalyticsPeriod,
 } from '../../components/shared/charts/period-selector.component';
 import { EchartContainerComponent } from '../../components/shared/charts/echart-container.component';
+import { OrdersAdvancedFiltersModalComponent } from './components/orders-advanced-filters-modal.component';
+import { OrdersListFilterService } from './services/orders-list-filter.service';
 
 /**
  * Orders list page - refactored with composable components
@@ -51,6 +54,7 @@ import { EchartContainerComponent } from '../../components/shared/charts/echart-
     ListSearchBarComponent,
     PeriodSelectorComponent,
     EchartContainerComponent,
+    OrdersAdvancedFiltersModalComponent,
   ],
   templateUrl: './orders.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -64,6 +68,8 @@ export class OrdersComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
+  readonly filterService = inject(OrdersListFilterService);
+
   // State from service
   readonly orders = this.ordersService.orders;
   readonly isLoading = this.ordersService.isLoading;
@@ -75,11 +81,7 @@ export class OrdersComponent implements OnInit {
   // Query parameters
   private readonly queryParams = toSignal(this.route.queryParams, { initialValue: {} });
 
-  // Local UI state
-  readonly searchQuery = signal('');
-  readonly stateFilter = signal('');
-  readonly stateFilterColor = signal<string>('primary');
-  readonly customerIdFilter = signal<string | null>(null);
+  // Local UI state (pagination, modal)
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
@@ -104,23 +106,20 @@ export class OrdersComponent implements OnInit {
     };
   });
 
-  // Computed: filtered orders
+  // Computed: filtered orders (server applies date + state; we apply search + customerId client-side)
   readonly filteredOrders = computed(() => {
-    const query = this.searchQuery().toLowerCase().trim();
-    const stateFilter = this.stateFilter();
-    const customerIdFilter = this.customerIdFilter();
+    const query = this.filterService.searchQuery().toLowerCase().trim();
+    const stateFilter = this.filterService.stateFilter();
+    const customerIdFilter = this.filterService.customerIdFilter();
     const allOrders = this.orders();
 
     let filtered = allOrders;
 
-    // Apply customer ID filter (from query param)
     if (customerIdFilter) {
       filtered = filtered.filter((order) => order.customer?.id === customerIdFilter);
     }
 
-    // Apply state filter
     if (stateFilter) {
-      // Handle "Paid" filter which includes both PaymentSettled and Fulfilled
       if (stateFilter === 'PaymentSettled') {
         filtered = filtered.filter(
           (order) => order.state === 'PaymentSettled' || order.state === 'Fulfilled',
@@ -130,31 +129,20 @@ export class OrdersComponent implements OnInit {
       }
     }
 
-    // Apply search query
     if (query) {
       filtered = filtered.filter((order) => {
-        // Search by order code
         const code = order.code?.toLowerCase().trim() || '';
         if (code.includes(query)) return true;
-
-        // Search by customer information
         const customer = order.customer;
         if (customer) {
-          // Search by full name (first + last)
           const firstName = (customer.firstName || '').toLowerCase().trim();
           const lastName = (customer.lastName || '').toLowerCase().trim();
           const fullName = `${firstName} ${lastName}`.trim();
-
           if (fullName.includes(query)) return true;
-
-          // Search by first name or last name separately
           if (firstName.includes(query) || lastName.includes(query)) return true;
-
-          // Search by email
           const email = (customer.emailAddress || '').toLowerCase().trim();
           if (email.includes(query)) return true;
         }
-
         return false;
       });
     }
@@ -203,30 +191,36 @@ export class OrdersComponent implements OnInit {
   });
 
   constructor() {
+    // Effect: when list filter (date/state) changes, refetch with new options
+    effect(() => {
+      this.filterService.dateFrom();
+      this.filterService.dateTo();
+      this.filterService.stateFilter();
+      this.loadOrdersWithFilter();
+    });
+
     // Effect to handle customerId query parameter
     effect(() => {
       const params = this.queryParams();
       const customerId = 'customerId' in params ? (params['customerId'] as string) : undefined;
-      const orders = this.orders(); // Watch orders to update search query when orders load
+      const orders = this.orders();
 
       if (customerId) {
-        this.customerIdFilter.set(customerId);
-
-        // After orders are loaded, set search query to customer name for visual feedback
+        this.filterService.customerIdFilter.set(customerId);
         if (orders.length > 0) {
           const orderWithCustomer = orders.find((o) => o.customer?.id === customerId);
           if (orderWithCustomer?.customer) {
             const customer = orderWithCustomer.customer;
             const fullName = `${customer.firstName || ''} ${customer.lastName || ''}`.trim();
             if (fullName) {
-              this.searchQuery.set(fullName);
+              this.filterService.searchQuery.set(fullName);
             } else if (customer.emailAddress) {
-              this.searchQuery.set(customer.emailAddress);
+              this.filterService.searchQuery.set(customer.emailAddress);
             }
           }
         }
       } else {
-        this.customerIdFilter.set(null);
+        this.filterService.customerIdFilter.set(null);
       }
     });
 
@@ -235,7 +229,6 @@ export class OrdersComponent implements OnInit {
       const orderData = this.selectedOrderForPayment();
       const modal = this.payOrderModal();
       if (orderData && modal) {
-        // Use setTimeout to ensure modal is ready
         setTimeout(async () => {
           await modal.show();
         }, 0);
@@ -247,29 +240,47 @@ export class OrdersComponent implements OnInit {
     this.loadOrdersAndStats();
   }
 
-  async loadOrders(): Promise<void> {
-    await this.ordersService.fetchOrders({
-      take: 100,
+  /** Build OrderListOptions from filter service (single place that composes filter → options). */
+  private buildOrderListOptions(): OrderListOptions {
+    const dateFrom = this.filterService.dateFrom();
+    const dateTo = this.filterService.dateTo();
+    const stateFilter = this.filterService.stateFilter();
+    const hasDateFilter = dateFrom != null || dateTo != null;
+    const hasStateFilter = stateFilter !== '';
+    const hasAnyFilter = hasDateFilter || hasStateFilter;
+
+    const filter: OrderListOptions['filter'] = {};
+    if (dateFrom != null || dateTo != null) {
+      const after = dateFrom ? `${dateFrom.slice(0, 10)}T00:00:00.000Z` : undefined;
+      const before = dateTo ? `${dateTo.slice(0, 10)}T23:59:59.999Z` : undefined;
+      filter.orderPlacedAt = { ...(after && { after }), ...(before && { before }) } as any;
+    }
+    if (stateFilter) {
+      filter.state = { eq: stateFilter } as any;
+    }
+
+    return {
+      take: hasAnyFilter ? 500 : 100,
       skip: 0,
       sort: { createdAt: 'DESC' as any },
-    });
+      ...(Object.keys(filter).length > 0 && { filter }),
+    };
+  }
+
+  async loadOrdersWithFilter(): Promise<void> {
+    await this.ordersService.fetchOrders(this.buildOrderListOptions());
   }
 
   async loadOrdersForStats(): Promise<void> {
-    // Fetch all orders for accurate stats calculation
-    // This should be called after loadOrders to ensure totalItems is available
     await this.ordersService.fetchAllOrdersForStats();
   }
 
   async loadOrdersAndStats(): Promise<void> {
-    // Load main orders first to get totalItems
-    await this.loadOrders();
-    // Then load all orders for stats calculation
+    await this.loadOrdersWithFilter();
     await this.loadOrdersForStats();
   }
 
   async refreshOrders(): Promise<void> {
-    // Refresh in sequence to ensure totalItems is available for stats
     await this.loadOrdersAndStats();
   }
 
@@ -402,42 +413,46 @@ export class OrdersComponent implements OnInit {
     return order.id;
   }
 
-  /**
-   * Handle filter click from stats component
-   */
   onStatsFilterClick(event: { type: string; value: string; color: string }): void {
     if (event.type === 'state') {
-      // Toggle filter if clicking the same filter
-      if (this.stateFilter() === event.value) {
-        this.stateFilter.set('');
-        this.stateFilterColor.set('primary');
+      if (this.filterService.stateFilter() === event.value) {
+        this.filterService.stateFilter.set('');
+        this.filterService.stateFilterColor.set('primary');
       } else {
-        this.stateFilter.set(event.value);
-        this.stateFilterColor.set(event.color);
+        this.filterService.stateFilter.set(event.value);
+        this.filterService.stateFilterColor.set(event.color);
       }
-      // Reset to first page when filter changes
       this.currentPage.set(1);
     }
   }
 
-  /**
-   * Clear state filter
-   */
   clearStateFilter(): void {
-    this.stateFilter.set('');
-    this.stateFilterColor.set('primary');
+    this.filterService.stateFilter.set('');
+    this.filterService.stateFilterColor.set('primary');
     this.currentPage.set(1);
   }
 
-  /**
-   * Get filter label for display
-   */
   getStateFilterLabel(): string {
-    const filter = this.stateFilter();
+    const filter = this.filterService.stateFilter();
     if (filter === 'Draft') return 'Draft';
     if (filter === 'ArrangingPayment') return 'Unpaid';
     if (filter === 'PaymentSettled') return 'Paid';
     return '';
+  }
+
+  clearAllFilters(): void {
+    this.filterService.clearFilters();
+    this.currentPage.set(1);
+  }
+
+  readonly advancedFiltersOpen = signal(false);
+
+  openAdvancedFilters(): void {
+    this.advancedFiltersOpen.set(true);
+  }
+
+  closeAdvancedFilters(): void {
+    this.advancedFiltersOpen.set(false);
   }
 
   toggleOrderVolumeTrend(): void {
@@ -454,8 +469,23 @@ export class OrdersComponent implements OnInit {
     void this.analyticsService.fetch(period);
   }
 
-  /**
-   * Math utilities for template
-   */
+  /** When user clicks a bar on the order volume trend chart, filter list by that date. */
+  onChartClick(payload: { name?: string; dataIndex: number; value?: unknown }): void {
+    const dateStr = payload?.name;
+    if (dateStr) {
+      const normalized = dateStr.slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+        this.filterService.setSingleDate(normalized);
+        this.currentPage.set(1);
+        return;
+      }
+      const asDate = new Date(dateStr);
+      if (!isNaN(asDate.getTime())) {
+        this.filterService.setSingleDate(asDate.toISOString().slice(0, 10));
+        this.currentPage.set(1);
+      }
+    }
+  }
+
   readonly Math = Math;
 }

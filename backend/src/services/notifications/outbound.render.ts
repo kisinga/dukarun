@@ -29,10 +29,13 @@ const RENDERERS: Record<string, RenderFn> = {
     inAppTitle: 'Order Cancelled',
     inAppMessage: `Order #${p.orderCode} has been cancelled`,
   }),
-  subscription_expiring_soon: p => ({
-    inAppTitle: 'Subscription Expiring Soon',
-    inAppMessage: `Your subscription expires in ${p.daysRemaining ?? 'a few'} days`,
-  }),
+  subscription_expiring_soon: p => {
+    const company = p.company ? `Company: ${String(p.company)}. ` : '';
+    return {
+      inAppTitle: 'Subscription Expiring Soon',
+      inAppMessage: `${company}Your subscription expires in ${p.daysRemaining ?? 'a few'} days`,
+    };
+  },
   subscription_expired: () => ({
     inAppTitle: 'Subscription Expired',
     inAppMessage: 'Your subscription has expired. Please renew to continue.',

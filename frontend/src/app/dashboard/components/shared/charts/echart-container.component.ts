@@ -7,9 +7,16 @@ import {
   inject,
   input,
   OnInit,
+  output,
   signal,
   viewChild,
 } from '@angular/core';
+
+export interface EchartClickPayload {
+  name?: string;
+  dataIndex: number;
+  value?: unknown;
+}
 
 @Component({
   selector: 'app-echart-container',
@@ -30,11 +37,15 @@ export class EchartContainerComponent implements OnInit {
   option = input<Record<string, any>>({});
   height = input('200px');
 
+  /** Emits when user clicks a data point (e.g. bar). Payload includes name (e.g. date), dataIndex, value. */
+  chartClick = output<EchartClickPayload>();
+
   chartEl = viewChild<ElementRef<HTMLDivElement>>('chartEl');
 
   private chart: any;
   private readonly chartReady = signal(false);
   private observer?: ResizeObserver;
+  private clickHandler?: (params: any) => void;
   protected readonly loading = signal(true);
 
   private readonly destroyRef = inject(DestroyRef);
@@ -73,10 +84,24 @@ export class EchartContainerComponent implements OnInit {
     this.loading.set(false);
     this.chartReady.set(true);
 
+    this.clickHandler = (params: { name?: string; dataIndex?: number; value?: unknown }) => {
+      if (params?.dataIndex != null) {
+        this.chartClick.emit({
+          name: params.name,
+          dataIndex: params.dataIndex,
+          value: params.value,
+        });
+      }
+    };
+    this.chart.on('click', this.clickHandler);
+
     this.observer = new ResizeObserver(() => this.chart?.resize());
     this.observer.observe(el);
 
     this.destroyRef.onDestroy(() => {
+      if (this.chart && this.clickHandler) {
+        this.chart.off('click', this.clickHandler);
+      }
       this.observer?.disconnect();
       this.chart?.dispose();
     });

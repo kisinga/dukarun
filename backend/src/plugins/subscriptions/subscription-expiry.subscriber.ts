@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { ChannelService, EventBus, RequestContext } from '@vendure/core';
+import { ChannelService, EventBus, RequestContext, TransactionalConnection } from '@vendure/core';
 import { SubscriptionAlertEvent } from '../../infrastructure/events/custom-events';
+import { getSellerForChannel } from '../../utils/seller-access.util';
 import { NotificationService } from '../../services/notifications/notification.service';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
 import { WorkerBackgroundTaskBase } from '../../infrastructure/utils/worker-background-task.base';
@@ -22,6 +23,7 @@ export class SubscriptionExpirySubscriber extends WorkerBackgroundTaskBase {
   constructor(
     workerContext: WorkerContextService,
     private channelService: ChannelService,
+    private connection: TransactionalConnection,
     private eventBus: EventBus,
     private subscriptionService: SubscriptionService,
     private notificationService: NotificationService
@@ -110,10 +112,14 @@ export class SubscriptionExpirySubscriber extends WorkerBackgroundTaskBase {
           );
           const shouldNotify = lastThreshold === null || daysRemaining < lastThreshold;
           if (!shouldNotify) continue;
+          const seller = await getSellerForChannel(ctx, channelId, this.connection);
+          const company =
+            seller?.name?.replace(/\s+Seller$/, '') || (channel as any).code || 'your company';
           this.eventBus.publish(
             new SubscriptionAlertEvent(ctx, channelId, 'expiring_soon', {
               expiresAt: expiresAt.toISOString(),
               daysRemaining,
+              company,
             })
           );
           notifiedCount++;
