@@ -577,7 +577,19 @@ export class MlModelResolver {
   ): Promise<boolean> {
     this.logger.debug('extractPhotosForTraining called', args);
 
-    await this.mlTrainingService.extractPhotosForChannel(ctx, args.channelId.toString());
+    const channel = await this.channelService.findOne(ctx, args.channelId);
+    if (!channel) {
+      throw new Error(`Channel ${args.channelId} not found`);
+    }
+    const channelCtx = new RequestContext({
+      apiType: ctx.apiType,
+      channel,
+      languageCode: ctx.languageCode,
+      isAuthorized: true,
+      authorizedAsOwnerOnly: false,
+    });
+
+    await this.mlTrainingService.extractPhotosForChannel(channelCtx, args.channelId.toString());
     return true;
   }
 
@@ -842,6 +854,19 @@ export class MlModelResolver {
     @Args() args: { channelId: ID }
   ): Promise<boolean> {
     this.logger.debug('startTraining called', args);
-    return this.mlTrainingService.startTraining(ctx, args.channelId.toString());
+
+    const channel = await this.channelService.findOne(ctx, args.channelId);
+    if (!channel) {
+      throw new Error(`Channel ${args.channelId} not found`);
+    }
+    const channelCtx = new RequestContext({
+      apiType: ctx.apiType,
+      channel,
+      languageCode: ctx.languageCode,
+      isAuthorized: true,
+      authorizedAsOwnerOnly: false,
+    });
+
+    return this.mlTrainingService.startTraining(channelCtx, args.channelId.toString());
   }
 }

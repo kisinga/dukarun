@@ -3,6 +3,7 @@ import {
   Channel,
   ChannelService,
   CurrencyCode,
+  GlobalSettingsService,
   LanguageCode,
   RequestContext,
   Role,
@@ -28,8 +29,9 @@ export class ChannelProvisionerService {
     private readonly connection: TransactionalConnection,
     private readonly auditor: RegistrationAuditorService,
     private readonly errorService: RegistrationErrorService,
-    private readonly validator: RegistrationValidatorService
-  ) { }
+    private readonly validator: RegistrationValidatorService,
+    private readonly globalSettingsService: GlobalSettingsService
+  ) {}
 
   /**
    * Generate a unique company code from company name
@@ -65,13 +67,16 @@ export class ChannelProvisionerService {
   ): Promise<Channel> {
     try {
       // Generate unique company code from company name
-      const companyCode = await this.generateUniqueCompanyCode(
-        ctx,
-        registrationData.companyName
-      );
+      const companyCode = await this.generateUniqueCompanyCode(ctx, registrationData.companyName);
 
-      // Calculate trial period
-      const trialDays = parseInt(process.env.SUBSCRIPTION_TRIAL_DAYS || '30', 10);
+      // Trial period: GlobalSettings.trialDays (DB) → env SUBSCRIPTION_TRIAL_DAYS → 30
+      const settings = await this.globalSettingsService.getSettings(ctx);
+      const cfgTrialDays = (settings as { customFields?: { trialDays?: number } }).customFields
+        ?.trialDays;
+      const trialDays =
+        typeof cfgTrialDays === 'number' && cfgTrialDays >= 0
+          ? cfgTrialDays
+          : parseInt(process.env.SUBSCRIPTION_TRIAL_DAYS || '30', 10);
       const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
       const channelResult = await this.channelService.create(ctx, {

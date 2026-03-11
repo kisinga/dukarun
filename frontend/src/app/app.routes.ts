@@ -42,6 +42,11 @@ export const routes: Routes = [
       import('./pages/support/support.component').then((m) => m.SupportComponent),
   },
   {
+    path: 'onboarding',
+    loadComponent: () =>
+      import('./pages/onboarding/onboarding.component').then((m) => m.OnboardingComponent),
+  },
+  {
     path: 'privacy',
     loadComponent: () =>
       import('./pages/privacy/privacy.component').then((m) => m.PrivacyComponent),

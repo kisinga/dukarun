@@ -8,7 +8,10 @@ import {
 } from '@vendure/core';
 import { SubscriptionAlertEvent } from '../../infrastructure/events/custom-events';
 import { RedisCacheService } from '../../infrastructure/storage/redis-cache.service';
-import { SubscriptionTier } from '../../plugins/subscriptions/subscription.entity';
+import {
+  SubscriptionTier,
+  SubscriptionTierFeatures,
+} from '../../plugins/subscriptions/subscription.entity';
 import { PaystackService } from '../payments/paystack.service';
 import { generatePaystackEmailFromPhone } from '../../utils/email.utils';
 
@@ -757,6 +760,65 @@ export class SubscriptionService {
   }
 
   /**
+   * Get active subscription tiers for public/marketing use (shop API).
+   * Returns only display-safe fields; no id, isActive, smsLimit, or timestamps.
+   */
+  async getActiveSubscriptionTiersForPublic(): Promise<
+    {
+      code: string;
+      name: string;
+      description: string | null;
+      priceMonthly: number;
+      priceYearly: number;
+      features: string[];
+    }[]
+  > {
+    const tierRepo = this.connection.rawConnection.getRepository(SubscriptionTier);
+    const tiers = await tierRepo.find({
+      where: { isActive: true },
+      order: { priceMonthly: 'ASC' },
+    });
+    const MAX_DESCRIPTION_LENGTH = 500;
+    return tiers.map(tier => {
+      const priceMonthly = Math.max(0, tier.priceMonthly);
+      const priceYearly = Math.max(0, tier.priceYearly);
+      let description: string | null = tier.description ?? null;
+      if (description && description.length > MAX_DESCRIPTION_LENGTH) {
+        description = description.slice(0, MAX_DESCRIPTION_LENGTH);
+      }
+      const rawFeatures = tier.features?.features;
+      const features = Array.isArray(rawFeatures)
+        ? rawFeatures.filter((f): f is string => typeof f === 'string')
+        : [];
+      return {
+        code: tier.code,
+        name: tier.name,
+        description,
+        priceMonthly,
+        priceYearly,
+        features,
+      };
+    });
+  }
+
+  /**
+   * Normalize tier features to { features: string[] }.
+   * Accepts: { features: ["a","b"] } or { features: [ { text: "a", included: true }, ... ] }.
+   * Stored and public API use string[] only.
+   */
+  private normalizeTierFeatures(features: any): SubscriptionTierFeatures {
+    if (features == null) return { features: [] };
+    const raw =
+      typeof features === 'object' && Array.isArray(features.features) ? features.features : [];
+    const list = raw
+      .map((f: any) =>
+        typeof f === 'string' ? f : f && typeof f.text === 'string' ? f.text : String(f ?? '')
+      )
+      .filter(Boolean);
+    return { features: list };
+  }
+
+  /**
    * Create a new subscription tier
    */
   async createSubscriptionTier(
@@ -786,7 +848,7 @@ export class SubscriptionService {
       description: input.description ?? undefined,
       priceMonthly: input.priceMonthly,
       priceYearly: input.priceYearly,
-      features: input.features || { features: [] },
+      features: this.normalizeTierFeatures(input.features),
       smsLimit: input.smsLimit ?? 0,
       isActive: input.isActive !== undefined ? input.isActive : true,
     });
@@ -842,7 +904,7 @@ export class SubscriptionService {
       tier.priceYearly = input.priceYearly;
     }
     if (input.features !== undefined) {
-      tier.features = input.features;
+      tier.features = this.normalizeTierFeatures(input.features);
     }
     if (input.smsLimit !== undefined) {
       tier.smsLimit = input.smsLimit;

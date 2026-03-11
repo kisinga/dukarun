@@ -193,9 +193,8 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
         return;
       }
 
-      const locationResult = await this.stockLocationService.findAll(ctx, { take: 1 });
-      const location = locationResult.items?.[0];
-      if (!location) {
+      const location = await this.stockLocationService.defaultStockLocation(ctx);
+      if (!location?.id) {
         this.logger.warn(
           `No stock location for channel ${channelId}; skipping COGS recording for order ${order.code}`
         );
@@ -237,6 +236,7 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
         message.includes('Insufficient quantity in batch') ||
         (message.includes('Batch') && message.includes('not found or not available'));
       if (isInsufficientStock) {
+        // When batch stock is insufficient at payment time (e.g. oversold), COGS is skipped and the order remains paid/fulfilled; consider reporting or alerting on such orders.
         this.logger.warn(
           `Skipping COGS for order ${order.code}: no batch stock (${message}). ` +
             `Add stock via stock adjustment so future sales can record COGS.`

@@ -38,7 +38,7 @@
     <div
       class="font-medium"
       [class.text-warning]="getSupplierOutstandingAmount() < 0"
-      [class.text-success]="getSupplierOutstandingAmount() > 0"
+      [class.text-error]="getSupplierOutstandingAmount() > 0"
     >
       {{ formatCurrency(Math.abs(getSupplierOutstandingAmount())) }}
     </div>

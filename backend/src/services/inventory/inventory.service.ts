@@ -30,6 +30,8 @@ export interface RecordPurchaseInput {
   stockLocationId: ID;
   supplierId: string;
   purchaseReference: string;
+  /** Purchase date used for batchNumber generation when none provided. */
+  purchaseDate?: Date;
   isCreditPurchase: boolean;
   lines: Array<{
     productVariantId: ID;
@@ -125,6 +127,30 @@ export interface WriteOffResult {
 }
 
 /**
+ * Input for applying a stock adjustment to batches (source of truth).
+ * When multiple open batches exist, batchId is required (UI batch selector).
+ */
+export interface ApplyAdjustmentToBatchesInput {
+  channelId: ID;
+  stockLocationId: ID;
+  productVariantId: ID;
+  quantityChange: number; // positive = increase, negative = decrease
+  adjustmentId: string;
+  /** When multiple batches exist, required to select which batch to apply to. */
+  batchId?: ID;
+}
+
+/**
+ * Result of applying adjustment to batches.
+ */
+export interface ApplyAdjustmentToBatchesResult {
+  previousStock: number;
+  newStock: number;
+  /** Batch id used (single batch for increase or primary batch for decrease). */
+  batchId?: string | null;
+}
+
+/**
  * Input for creating opening stock batches (synthetic batches with unitCost 0)
  */
 export interface CreateOpeningStockBatchesInput {
@@ -164,6 +190,53 @@ export class InventoryService {
     private readonly stockValuationService: StockValuationService
   ) {}
 
+  async getBatchStockOnHand(
+    ctx: RequestContext,
+    channelId: ID,
+    productVariantId: ID,
+    stockLocationId: ID
+  ): Promise<number> {
+    const batches = await this.inventoryStore.getOpenBatches(ctx, {
+      channelId,
+      stockLocationId,
+      productVariantId,
+    });
+    return batches.reduce((sum, b) => sum + b.quantity, 0);
+  }
+
+  private formatBatchDateAnchor(date: Date): string {
+    const yyyy = String(date.getFullYear());
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}${mm}${dd}`;
+  }
+
+  private randomSuffix(length = 5): string {
+    const alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    let s = '';
+    for (let i = 0; i < length; i++) {
+      s += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    return s;
+  }
+
+  private async generateUniquePurchaseBatchNumber(
+    ctx: RequestContext,
+    channelId: ID,
+    productVariantId: ID,
+    purchaseDate: Date
+  ): Promise<string> {
+    const dateAnchor = this.formatBatchDateAnchor(purchaseDate);
+    const variantAnchor = String(productVariantId);
+    const base = `${dateAnchor}-${variantAnchor}`;
+    // Collision resistance: 5-char suffix over a 32-char alphabet (~33 million combinations per day+variant).
+    // Final authority is DB unique index on (channelId, batchNumber) where batchNumber is not null.
+    void ctx;
+    void channelId;
+    void productVariantId;
+    return `B-${base}-${this.randomSuffix(5)}`;
+  }
+
   /**
    * Record a purchase and create inventory batches
    */
@@ -175,6 +248,16 @@ export class InventoryService {
 
         // Create batches and movements for each line
         for (const line of input.lines) {
+          const purchaseDate = input.purchaseDate ?? new Date();
+          const resolvedBatchNumber =
+            line.batchNumber ??
+            (await this.generateUniquePurchaseBatchNumber(
+              transactionCtx,
+              input.channelId,
+              line.productVariantId,
+              purchaseDate
+            ));
+
           // Create batch
           const batchInput: CreateBatchInput = {
             channelId: input.channelId,
@@ -185,7 +268,7 @@ export class InventoryService {
             expiryDate: line.expiryDate || null,
             sourceType: 'Purchase',
             sourceId: input.purchaseId,
-            batchNumber: line.batchNumber ?? null,
+            batchNumber: resolvedBatchNumber,
             metadata: {
               purchaseReference: input.purchaseReference,
               supplierId: input.supplierId,
@@ -274,21 +357,21 @@ export class InventoryService {
           let allocationResult: CostAllocationResult;
 
           if (line.batchId) {
-            // Single-batch path: sell from the specified batch only
-            const batches = await this.inventoryStore.getOpenBatches(transactionCtx, {
+            // Single-batch path: sell from the specified batch only (locked read for concurrency safety)
+            const batches = await this.inventoryStore.getOpenBatchesForConsumption(transactionCtx, {
               channelId: input.channelId,
               stockLocationId: input.stockLocationId,
               productVariantId: line.productVariantId,
+              batchId: line.batchId,
+              maxQuantity: line.quantity,
+              orderBy: 'createdAt',
             });
-            const batch = batches.find(b => String(b.id) === String(line.batchId));
-            if (!batch) {
+            const batch = batches[0];
+            if (!batch || batch.quantity < line.quantity) {
               throw new UserInputError(
-                `Batch ${line.batchId} not found or not available for variant ${line.productVariantId}`
-              );
-            }
-            if (batch.quantity < line.quantity) {
-              throw new UserInputError(
-                `Insufficient quantity in batch ${line.batchId}. Available: ${batch.quantity}, requested: ${line.quantity}`
+                !batch
+                  ? `Batch ${line.batchId} not found or not available for variant ${line.productVariantId}`
+                  : `Insufficient quantity in batch ${line.batchId}. Available: ${batch.quantity}, requested: ${line.quantity}`
               );
             }
             const expiryValidation = await this.expiryPolicy.validateBeforeConsume(
@@ -542,6 +625,151 @@ export class InventoryService {
       stockLocationId,
       lines: [{ productVariantId, quantity }],
     });
+  }
+
+  /**
+   * Apply a stock adjustment to batch inventory (source of truth).
+   * If exactly one open batch exists, uses it; if multiple exist, batchId is required (UI selector).
+   * Returns previous and new stock from batch sum; caller should sync Vendure stock_level via setStockLevelFromBatchSum.
+   */
+  async applyAdjustmentToBatches(
+    ctx: RequestContext,
+    input: ApplyAdjustmentToBatchesInput
+  ): Promise<ApplyAdjustmentToBatchesResult> {
+    const channelId = Number(input.channelId);
+    const variantId = input.productVariantId;
+    const locationId = input.stockLocationId;
+    const { quantityChange, adjustmentId, batchId } = input;
+
+    const batches = await this.inventoryStore.getOpenBatchesForConsumption(ctx, {
+      channelId: input.channelId,
+      stockLocationId: input.stockLocationId,
+      productVariantId: input.productVariantId,
+      orderBy: 'createdAt',
+    });
+    const previousStock = batches.reduce((sum, b) => sum + b.quantity, 0);
+    const newStock = previousStock + quantityChange;
+    if (newStock < 0) {
+      throw new UserInputError(
+        `Insufficient batch stock. Current: ${previousStock}, requested change: ${quantityChange}`
+      );
+    }
+
+    let batchIdUsed: string | null = null;
+
+    if (quantityChange > 0) {
+      if (batchId) {
+        const batch = batches.find(b => String(b.id) === String(batchId));
+        if (!batch) {
+          throw new UserInputError(
+            `Batch ${batchId} not found or not open for variant ${variantId} at location ${locationId}`
+          );
+        }
+        await this.inventoryStore.updateBatchQuantity(ctx, batch.id, quantityChange);
+        batchIdUsed = String(batch.id);
+        await this.inventoryStore.createMovement(ctx, {
+          channelId: input.channelId,
+          stockLocationId: input.stockLocationId,
+          productVariantId: input.productVariantId,
+          movementType: MovementType.ADJUSTMENT,
+          quantity: quantityChange,
+          batchId: batch.id,
+          sourceType: 'StockAdjustment',
+          sourceId: adjustmentId,
+          metadata: { reason: 'adjustment' },
+        });
+      } else if (batches.length === 1) {
+        const batch = batches[0];
+        await this.inventoryStore.updateBatchQuantity(ctx, batch.id, quantityChange);
+        batchIdUsed = String(batch.id);
+        await this.inventoryStore.createMovement(ctx, {
+          channelId: input.channelId,
+          stockLocationId: input.stockLocationId,
+          productVariantId: input.productVariantId,
+          movementType: MovementType.ADJUSTMENT,
+          quantity: quantityChange,
+          batchId: batch.id,
+          sourceType: 'StockAdjustment',
+          sourceId: adjustmentId,
+          metadata: { reason: 'adjustment' },
+        });
+      } else if (batches.length > 1) {
+        throw new UserInputError(
+          'Multiple batches exist for this variant at this location; specify batchId to apply adjustment'
+        );
+      } else {
+        const sourceId = `StockAdjustment:${adjustmentId}:${variantId}:${locationId}`;
+        const batch = await this.inventoryStore.createBatch(ctx, {
+          channelId: input.channelId,
+          stockLocationId: input.stockLocationId,
+          productVariantId: input.productVariantId,
+          quantity: quantityChange,
+          unitCost: 0,
+          expiryDate: null,
+          sourceType: 'StockAdjustment',
+          sourceId,
+        });
+        batchIdUsed = String(batch.id);
+        await this.inventoryStore.createMovement(ctx, {
+          channelId: input.channelId,
+          stockLocationId: input.stockLocationId,
+          productVariantId: input.productVariantId,
+          movementType: MovementType.ADJUSTMENT,
+          quantity: quantityChange,
+          batchId: batch.id,
+          sourceType: 'StockAdjustment',
+          sourceId: adjustmentId,
+          metadata: { reason: 'adjustment' },
+        });
+      }
+    } else {
+      const toDeduct = Math.abs(quantityChange);
+      if (batchId) {
+        const batch = batches.find(b => String(b.id) === String(batchId));
+        if (!batch || batch.quantity < toDeduct) {
+          throw new UserInputError(
+            batch
+              ? `Insufficient quantity in batch ${batchId}. Available: ${batch.quantity}, requested: ${toDeduct}`
+              : `Batch ${batchId} not found or not open for variant ${variantId}`
+          );
+        }
+        await this.inventoryStore.updateBatchQuantity(ctx, batch.id, -toDeduct);
+        batchIdUsed = String(batch.id);
+        await this.inventoryStore.createMovement(ctx, {
+          channelId: input.channelId,
+          stockLocationId: input.stockLocationId,
+          productVariantId: input.productVariantId,
+          movementType: MovementType.ADJUSTMENT,
+          quantity: -toDeduct,
+          batchId: batch.id,
+          sourceType: 'StockAdjustment',
+          sourceId: adjustmentId,
+          metadata: { reason: 'adjustment' },
+        });
+      } else {
+        let remaining = toDeduct;
+        for (const batch of batches) {
+          if (remaining <= 0) break;
+          const deduct = Math.min(remaining, batch.quantity);
+          await this.inventoryStore.updateBatchQuantity(ctx, batch.id, -deduct);
+          if (!batchIdUsed) batchIdUsed = String(batch.id);
+          await this.inventoryStore.createMovement(ctx, {
+            channelId: input.channelId,
+            stockLocationId: input.stockLocationId,
+            productVariantId: input.productVariantId,
+            movementType: MovementType.ADJUSTMENT,
+            quantity: -deduct,
+            batchId: batch.id,
+            sourceType: 'StockAdjustment',
+            sourceId: adjustmentId,
+            metadata: { reason: 'adjustment' },
+          });
+          remaining -= deduct;
+        }
+      }
+    }
+
+    return { previousStock, newStock, batchId: batchIdUsed ?? undefined };
   }
 
   /**

@@ -4,6 +4,10 @@
 
 The Dukarun inventory framework provides a composable, extensible system for tracking inventory with FIFO (First-In-First-Out) costing and COGS (Cost of Goods Sold) calculation. The framework is designed with data integrity and composability as core principles.
 
+### Source of truth: batch inventory (ledger)
+
+**We never read Vendure `stock_level` for availability or as source of truth.** All saleable stock and COGS come from `inventory_batch` and `inventory_movement`. Vendure’s `stock_level` table may be written (e.g. from batch sum after adjustments) for compatibility only; it is not read for stock checks or reporting.
+
 ## Architecture
 
 ### Core Components
@@ -41,6 +45,12 @@ const result = await inventoryService.recordPurchase(ctx, {
   ],
 });
 ```
+
+### Order flow & COGS
+
+- **Re-check at recordSale:** Order line quantity is re-validated when `recordSale` runs (via `verifyStockLevel` and `allocateCost` under lock). Stock is consumed from batches only when `recordSale` succeeds.
+- **Quantity changed after add-item:** If an order line's quantity is increased after add-item without a fresh stock check, `recordSale` may throw or skip COGS for that order when batch stock is insufficient.
+- **Fulfillment without COGS:** Fulfillment can occur even when COGS is skipped (e.g. insufficient batch stock at payment time). Batch consumption and COGS are applied only when `recordSale` runs successfully; otherwise the order remains paid/fulfilled but with no COGS recorded.
 
 ### Recording a Sale (with COGS)
 
@@ -188,6 +198,11 @@ const reconciliation = await reconciliationService.reconcileStockLevels(
 - Movements are immutable once created
 - Sum of movements = current stock
 - Source tracking (sourceType, sourceId) provides idempotency
+
+### Fractional quantities
+
+- **Batch and movement:** `inventory_batch.quantity` and `inventory_movement.quantity` use float and support fractional quantities. COGS is computed as `allocationQuantity * batch.unitCost` and stored in cents (integer).
+- **Analytics:** `sale_cogs.quantity` is stored as `decimal(12,0)`; fractional order line quantities are rounded at persistence when writing to `sale_cogs`. `cogsCents` remains exact (integer cents).
 
 ### Concurrency Control
 

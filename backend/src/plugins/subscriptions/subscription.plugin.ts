@@ -1,11 +1,13 @@
 import { APP_GUARD } from '@nestjs/core';
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
-import { AuditDbConnection } from '../../infrastructure/audit/audit-db.connection';
-import { AuditService } from '../../infrastructure/audit/audit.service';
-import { UserContextResolver } from '../../infrastructure/audit/user-context.resolver';
+import { AuditCorePlugin } from '../audit/audit-core.plugin';
 import { RedisCacheService } from '../../infrastructure/storage/redis-cache.service';
 import { SubscriptionResolver, SUBSCRIPTION_SCHEMA } from './subscription.resolver';
+import {
+  SubscriptionPublicResolver,
+  SUBSCRIPTION_PUBLIC_SCHEMA,
+} from './subscription-public.resolver';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
 import { PaystackService } from '../../services/payments/paystack.service';
 import { SubscriptionWebhookController } from './subscription-webhook.controller';
@@ -27,13 +29,12 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
  * - Read-only mode enforcement for expired subscriptions
  */
 @VendurePlugin({
-  imports: [PluginCommonModule, ChannelEventsPlugin, PhoneAuthPlugin],
+  imports: [PluginCommonModule, ChannelEventsPlugin, PhoneAuthPlugin, AuditCorePlugin],
   entities: [SubscriptionTier],
   providers: [
     // Worker context service (required for background tasks)
     WorkerContextService,
-    // Subscription services
-    SubscriptionResolver,
+    // SubscriptionResolver is only in adminApiExtensions.resolvers so it is not discovered for shop API
     SubscriptionService,
     PaystackService,
     RedisCacheService,
@@ -52,6 +53,10 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
   adminApiExtensions: {
     schema: SUBSCRIPTION_SCHEMA,
     resolvers: [SubscriptionResolver],
+  },
+  shopApiExtensions: {
+    schema: SUBSCRIPTION_PUBLIC_SCHEMA,
+    resolvers: [SubscriptionPublicResolver],
   },
   configuration: config => {
     // SubscriptionGuard is applied globally via APP_GUARD provider above

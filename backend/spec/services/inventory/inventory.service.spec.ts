@@ -356,6 +356,389 @@ describe('InventoryService', () => {
 
       await expect(service.recordSale(ctx, input)).rejects.toThrow(UserInputError);
     });
+
+    it('single-batch path: uses getOpenBatchesForConsumption and allocates from specified batch', async () => {
+      const { service, inventoryStore, costingStrategy, expiryPolicy, ledgerPostingService } =
+        buildService();
+
+      const mockBatch = {
+        id: 'batch-1',
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 100,
+        unitCost: 5000,
+        expiryDate: null,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-1',
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockMovement = {
+        id: 'movement-1',
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        movementType: MovementType.SALE,
+        quantity: -30,
+        batchId: 'batch-1',
+        sourceType: 'Order',
+        sourceId: 'order-789',
+        metadata: null,
+        createdAt: new Date(),
+      };
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([mockBatch]);
+      (inventoryStore.getOpenBatches as any).mockResolvedValue([mockBatch]);
+      (expiryPolicy.validateBeforeConsume as any).mockResolvedValue({ allowed: true });
+      (inventoryStore.updateBatchQuantity as any).mockResolvedValue({
+        ...mockBatch,
+        quantity: 70,
+      });
+      (inventoryStore.createMovement as any).mockResolvedValue(mockMovement);
+      (ledgerPostingService.postInventorySaleCogs as any).mockResolvedValue(undefined);
+
+      const input = {
+        orderId: 'order-789',
+        orderCode: 'ORD-001',
+        channelId: 1,
+        stockLocationId: 2,
+        customerId: 'customer-123',
+        lines: [
+          {
+            productVariantId: 3,
+            quantity: 30,
+            batchId: 'batch-1',
+          },
+        ],
+      };
+
+      const result = await service.recordSale(ctx, input);
+
+      expect(result.orderId).toBe('order-789');
+      expect(result.allocations).toHaveLength(1);
+      expect(result.allocations[0].batchId).toBe('batch-1');
+      expect(result.allocations[0].quantity).toBe(30);
+      expect(result.totalCogs).toBe(30 * 5000);
+      expect(inventoryStore.getOpenBatchesForConsumption).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          channelId: 1,
+          stockLocationId: 2,
+          productVariantId: 3,
+          batchId: 'batch-1',
+          maxQuantity: 30,
+          orderBy: 'createdAt',
+        })
+      );
+      expect(costingStrategy.allocateCost).not.toHaveBeenCalled();
+      expect(inventoryStore.verifyStockLevel).not.toHaveBeenCalled();
+      expect(inventoryStore.updateBatchQuantity).toHaveBeenCalledWith(ctx, 'batch-1', -30);
+      expect(ledgerPostingService.postInventorySaleCogs).toHaveBeenCalled();
+    });
+
+    it('single-batch path: throws when batch not found', async () => {
+      const { service, inventoryStore } = buildService();
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([]);
+
+      const input = {
+        orderId: 'order-789',
+        orderCode: 'ORD-001',
+        channelId: 1,
+        stockLocationId: 2,
+        customerId: 'customer-123',
+        lines: [
+          {
+            productVariantId: 3,
+            quantity: 10,
+            batchId: 'batch-missing',
+          },
+        ],
+      };
+
+      await expect(service.recordSale(ctx, input)).rejects.toThrow(UserInputError);
+      await expect(service.recordSale(ctx, input)).rejects.toThrow('not found or not available');
+    });
+
+    it('single-batch path: throws when batch quantity insufficient', async () => {
+      const { service, inventoryStore } = buildService();
+
+      const mockBatch = {
+        id: 'batch-1',
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 5,
+        unitCost: 5000,
+        expiryDate: null,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-1',
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([mockBatch]);
+
+      const input = {
+        orderId: 'order-789',
+        orderCode: 'ORD-001',
+        channelId: 1,
+        stockLocationId: 2,
+        customerId: 'customer-123',
+        lines: [
+          {
+            productVariantId: 3,
+            quantity: 10,
+            batchId: 'batch-1',
+          },
+        ],
+      };
+
+      await expect(service.recordSale(ctx, input)).rejects.toThrow(UserInputError);
+      await expect(service.recordSale(ctx, input)).rejects.toThrow(
+        /Insufficient quantity in batch/
+      );
+    });
+
+    it('single-batch path: throws when expiry validation disallows', async () => {
+      const { service, inventoryStore, expiryPolicy } = buildService();
+
+      const mockBatch = {
+        id: 'batch-1',
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 100,
+        unitCost: 5000,
+        expiryDate: null,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-1',
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([mockBatch]);
+      (expiryPolicy.validateBeforeConsume as any).mockResolvedValue({
+        allowed: false,
+        error: 'Batch expired',
+      });
+
+      const input = {
+        orderId: 'order-789',
+        orderCode: 'ORD-001',
+        channelId: 1,
+        stockLocationId: 2,
+        customerId: 'customer-123',
+        lines: [
+          {
+            productVariantId: 3,
+            quantity: 10,
+            batchId: 'batch-1',
+          },
+        ],
+      };
+
+      await expect(service.recordSale(ctx, input)).rejects.toThrow(UserInputError);
+      await expect(service.recordSale(ctx, input)).rejects.toThrow(/expiry|Batch expired/);
+    });
+
+    it('mixed lines: one with batchId, one strategy path', async () => {
+      const { service, inventoryStore, costingStrategy, expiryPolicy, ledgerPostingService } =
+        buildService();
+
+      const batch1 = {
+        id: 'batch-1',
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 20,
+        unitCost: 5000,
+        expiryDate: null,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-1',
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const batch2 = {
+        id: 'batch-2',
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 4,
+        quantity: 15,
+        unitCost: 6000,
+        expiryDate: null,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-2',
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      (inventoryStore.getOpenBatchesForConsumption as any)
+        .mockResolvedValueOnce([batch1])
+        .mockResolvedValueOnce([batch2]);
+      (inventoryStore.getOpenBatches as any)
+        .mockResolvedValueOnce([batch1])
+        .mockResolvedValueOnce([batch2]);
+      (inventoryStore.verifyStockLevel as any).mockResolvedValue(true);
+      (costingStrategy.allocateCost as any).mockResolvedValue({
+        allocations: [{ batchId: 'batch-2', quantity: 5, unitCost: 6000, totalCost: 30000 }],
+        totalCost: 30000,
+        metadata: {},
+      });
+      (expiryPolicy.validateBeforeConsume as any).mockResolvedValue({ allowed: true });
+      (inventoryStore.updateBatchQuantity as any)
+        .mockResolvedValueOnce({ ...batch1, quantity: 15 })
+        .mockResolvedValueOnce({ ...batch2, quantity: 10 });
+      (inventoryStore.createMovement as any).mockResolvedValue({});
+      (ledgerPostingService.postInventorySaleCogs as any).mockResolvedValue(undefined);
+
+      const input = {
+        orderId: 'order-789',
+        orderCode: 'ORD-001',
+        channelId: 1,
+        stockLocationId: 2,
+        customerId: 'customer-123',
+        lines: [
+          { productVariantId: 3, quantity: 5, batchId: 'batch-1' },
+          { productVariantId: 4, quantity: 5 },
+        ],
+      };
+
+      const result = await service.recordSale(ctx, input);
+
+      expect(result.allocations).toHaveLength(2);
+      expect(result.totalCogs).toBe(5 * 5000 + 30000);
+      expect(inventoryStore.getOpenBatchesForConsumption).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({ batchId: 'batch-1', productVariantId: 3 })
+      );
+      expect(costingStrategy.allocateCost).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({ productVariantId: 4, quantity: 5 })
+      );
+    });
+
+    it('processes line with quantity 0 without breaking (strategy path)', async () => {
+      const { service, inventoryStore, costingStrategy, expiryPolicy, ledgerPostingService } =
+        buildService();
+
+      const batch = {
+        id: 'b1',
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 1,
+        unitCost: 100,
+        expiryDate: null,
+        sourceType: 'Purchase',
+        sourceId: 'p1',
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      (inventoryStore.verifyStockLevel as any).mockResolvedValue(true);
+      (costingStrategy.allocateCost as any)
+        .mockResolvedValueOnce({
+          allocations: [{ batchId: 'b1', quantity: 1, unitCost: 100, totalCost: 100 }],
+          totalCost: 100,
+          metadata: {},
+        })
+        .mockResolvedValueOnce({
+          allocations: [],
+          totalCost: 0,
+          metadata: {},
+        });
+      (inventoryStore.getOpenBatches as any).mockResolvedValue([batch]);
+      (expiryPolicy.validateBeforeConsume as any).mockResolvedValue({ allowed: true });
+      (inventoryStore.updateBatchQuantity as any).mockResolvedValue({});
+      (inventoryStore.createMovement as any).mockResolvedValue({});
+      (ledgerPostingService.postInventorySaleCogs as any).mockResolvedValue(undefined);
+
+      const input = {
+        orderId: 'order-789',
+        orderCode: 'ORD-001',
+        channelId: 1,
+        stockLocationId: 2,
+        customerId: 'customer-123',
+        lines: [
+          { productVariantId: 3, quantity: 1 },
+          { productVariantId: 4, quantity: 0 },
+        ],
+      };
+
+      const result = await service.recordSale(ctx, input);
+
+      expect(result.orderId).toBe('order-789');
+      expect(result.allocations.length).toBe(1);
+      expect(costingStrategy.allocateCost).toHaveBeenCalledTimes(2);
+    });
+
+    it('strategy path: supports fractional quantity', async () => {
+      const { service, inventoryStore, costingStrategy, expiryPolicy, ledgerPostingService } =
+        buildService();
+
+      const mockBatch = {
+        id: 'batch-1',
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 5,
+        unitCost: 100,
+        expiryDate: null,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-1',
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockAllocation = {
+        allocations: [
+          {
+            batchId: 'batch-1',
+            quantity: 1.5,
+            unitCost: 100,
+            totalCost: 150,
+          },
+        ],
+        totalCost: 150,
+        metadata: {},
+      };
+
+      (inventoryStore.verifyStockLevel as any).mockResolvedValue(true);
+      (costingStrategy.allocateCost as any).mockResolvedValue(mockAllocation);
+      (inventoryStore.getOpenBatches as any).mockResolvedValue([mockBatch]);
+      (expiryPolicy.validateBeforeConsume as any).mockResolvedValue({ allowed: true });
+      (inventoryStore.updateBatchQuantity as any).mockResolvedValue({
+        ...mockBatch,
+        quantity: 3.5,
+      });
+      (inventoryStore.createMovement as any).mockResolvedValue({});
+      (ledgerPostingService.postInventorySaleCogs as any).mockResolvedValue(undefined);
+
+      const input = {
+        orderId: 'order-789',
+        orderCode: 'ORD-001',
+        channelId: 1,
+        stockLocationId: 2,
+        customerId: 'customer-123',
+        lines: [{ productVariantId: 3, quantity: 1.5 }],
+      };
+
+      const result = await service.recordSale(ctx, input);
+
+      expect(result.totalCogs).toBe(150);
+      expect(result.allocations[0].quantity).toBe(1.5);
+    });
   });
 
   describe('recordWriteOff', () => {

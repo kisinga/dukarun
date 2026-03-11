@@ -77,4 +77,8 @@ export class InventoryStockAdjustmentLine {
 
   @ManyToOne(() => StockLocation)
   stockLocation: StockLocation;
+
+  /** Batch id used when multiple batches existed and user selected one. UUID; length matches migration. */
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  batchId: string | null;
 }

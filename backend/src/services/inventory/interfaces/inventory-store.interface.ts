@@ -91,6 +91,8 @@ export interface ConsumptionFilters extends BatchFilters {
   excludeExpired?: boolean;
   /** Default 'expiryThenCreatedAt'. Use 'createdAt' for strict FIFO (oldest first by creation only). */
   orderBy?: ConsumptionOrderBy;
+  /** When set, only batches with this id are returned (for single-batch consumption under lock). */
+  batchId?: ID;
 }
 
 /**

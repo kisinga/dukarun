@@ -141,7 +141,7 @@ On top of approval status, each channel also has **subscription fields** (see `S
 
 Key behaviours:
 
-- **Trial (30 days)** – New channels start with a full-feature trial window.
+- **Trial (configurable)** – New channels start with a full-feature trial window (duration is set by the platform).
 - **Active** – Business is fully paid and operates normally.
 - **Expired / Cancelled** – Business can still log in and view data, but is placed in a **subscription read-only mode**.
 
@@ -236,7 +236,7 @@ Common workflows:
 1. **New trial channel**
    - On provisioning, the channel is given:
      - `subscriptionStatus = trial`
-     - `trialEndsAt = now + 30 days` (or configured duration).
+     - `trialEndsAt = now + trialDays` (platform-configured).
 2. **Successful payment / activation**
    - Paystack webhooks or admin actions set:
      - `subscriptionStatus = active`

@@ -18,6 +18,7 @@ export const routes: Routes = [
       { path: 'role-templates', loadComponent: () => import('./pages/role-templates/role-templates-list.component').then(m => m.RoleTemplatesListComponent) },
       { path: 'pending-registrations', loadComponent: () => import('./pages/pending-registrations/pending-registrations.component').then(m => m.PendingRegistrationsComponent) },
       { path: 'subscription-tiers', loadComponent: () => import('./pages/subscription-tiers/subscription-tiers.component').then(m => m.SubscriptionTiersComponent) },
+      { path: 'audit-log', loadComponent: () => import('./pages/audit-log/audit-log.component').then(m => m.AuditLogComponent) },
       { path: 'ml-trainer', loadComponent: () => import('./pages/ml-trainer-management/ml-trainer-management.component').then(m => m.MlTrainerManagementComponent) },
     ],
   },

@@ -10,9 +10,15 @@ This document describes the Paystack subscription and payment flow integration f
 
 - **Subscription data**: Stored on Channel entity via custom fields (each channel = one customer company)
 - **Subscription tiers**: Stored as Vendure custom entity (`SubscriptionTier`)
-- **Trial period**: 30 days from channel creation with full features
+- **Trial period**: Platform-configured from channel creation with full features
 - **Payment flow**: Paystack STK push with phone number pre-filled from Administrator profile
 - **Access control**: Read-only mode when subscription expires (can view but not create/edit)
+
+### Currency convention (tier prices)
+
+- **Storage**: `SubscriptionTier.priceMonthly` and `priceYearly` are stored in **cents** (smallest unit), consistent with the rest of the app (ledger, orders, etc.).
+- **UI**: Super-admin and customer-facing UIs **display and accept prices in KES (Sh)**. Conversion happens at the boundary: input Sh → multiply by 100 before save; display → divide by 100 when reading from API.
+- **Paystack**: `SubscriptionService` converts cents to KES (`amountInKes = amount / 100`) before calling Paystack; `PaystackService` then converts KES to kobo for the API (`amount * 100`). So Paystack receives the correct charge amount.
 
 ### Key Components
 
@@ -21,7 +27,8 @@ This document describes the Paystack subscription and payment flow integration f
 1. **SubscriptionTier Entity** (`backend/src/plugins/subscription.entity.ts`)
 
    - Stores subscription tier definitions
-   - Fields: code, name, description, priceMonthly, priceYearly, features, isActive
+   - Fields: code, name, description, priceMonthly, priceYearly (both in **cents**), features, isActive
+   - **features** (jsonb): shape `{ "features": ["Feature one", "Feature two", ...] }` — array of strings. The backend also accepts `{ "features": [ { "text": "Feature one", "included": true }, ... ] }` and normalizes to string[] when saving. The public API always returns `features` as `[String!]!`.
 
 2. **Channel Custom Fields**
 
@@ -258,9 +265,9 @@ When calling `chargeMobile()` or `initializeTransaction()`, metadata must includ
 
 ### Trial Period
 
-- New channels automatically start with a 30-day trial
+- New channels automatically start with a trial (duration is set by the platform)
 - Trial status is set during channel creation
-- `trialEndsAt` is calculated as `channelCreatedAt + 30 days`
+- `trialEndsAt` is calculated as `channelCreatedAt + trialDays`
 - Full features are available during trial
 
 ### Subscription Purchase Flow

@@ -32,13 +32,13 @@ npm run setup
 
 - 🚀 **[Setup & Deployment](./docs/INFRASTRUCTURE.md)** - Get started, deploy anywhere
 - 🆕 **[Fresh Setup](./docs/INFRASTRUCTURE.md#fresh-setup)** - First-time installation guide
-- 🏗️ **[Architecture](./docs/ARCHITECTURE.md)** - System design and decisions
+- 🏗️ **[Architecture](./ARCHITECTURE.md)** - System design and decisions
 - 🤖 **[ML Guide](./docs/ML_TRAINING_SETUP.md)** - AI model training
 - 🗺️ **[Roadmap](./ROADMAP.md)** - Planned features
 
 - **[Frontend Architecture](./frontend/ARCHITECTURE.md)** - Angular app structure
-- **[Design System](./frontend/DESIGN-SYSTEM.md)** - UI components and patterns
 - **[POS Guide](./frontend/POS_README.md)** - Point-of-sale workflow
+- **[Feature Catalog](./docs/customer-features/FEATURE_CATALOG.md)** - Customer-facing capabilities
 
 ## Current Status
 
@@ -48,12 +48,15 @@ npm run setup
 
 ## Core Features
 
-- 🎯 **AI Product Recognition** - Camera-based product identification
-- 💰 **Fast Point-of-Sale** - Streamlined checkout workflow
-- 📦 **Inventory Management** - Real-time stock tracking
-- 🏪 **Multi-location Support** - Manage multiple shops
-- 📊 **Sales Analytics** - Business insights
-- 📱 **Mobile-first** - Optimized for smartphones
+- 🎯 **AI Product Recognition** - Camera and barcode product lookup
+- 💰 **POS (Sell)** - Checkout, payments, cashier flow
+- 📦 **Products & stock** - Catalog, variants, stock adjustments
+- 📊 **Sales, orders, payments** - Orders, payments, credit
+- 👥 **Customers & suppliers** - Unified people, statements, purchases
+- 📒 **Accounting** - Ledger, expenses, transfers
+- ✅ **Approvals** - User and channel approval flows
+- 🏪 **Multi-location** - Stock locations, channel-scoped data
+- 📱 **Mobile-first** - Responsive dashboard
 
 ## Tech Stack
 

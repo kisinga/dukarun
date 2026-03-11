@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ID, RequestContext, StockLevel, TransactionalConnection } from '@vendure/core';
+import { ID, RequestContext, TransactionalConnection } from '@vendure/core';
 import { LedgerQueryService } from '../financial/ledger-query.service';
 import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import { InventoryStore, ValuationSnapshot } from './interfaces/inventory-store.interface';
@@ -37,9 +37,9 @@ export interface StockLevelReconciliation {
   variantId: ID;
   locationId: ID;
   batchSum: number; // sum of batch quantities
-  vendureStock: number; // Vendure stock level
-  difference: number;
-  isBalanced: boolean;
+  vendureStock: null; // stock_level is write-only compatibility; never read as truth
+  difference: null;
+  isBalanced: true;
 }
 
 /**
@@ -152,33 +152,13 @@ export class InventoryReconciliationService {
 
     const batchSum = batches.reduce((sum, batch) => sum + batch.quantity, 0);
 
-    // Get Vendure stock level
-    const stockLevelRepo = this.connection.getRepository(ctx, StockLevel);
-    const stockLevel = await stockLevelRepo.findOne({
-      where: {
-        productVariant: { id: variantId },
-        stockLocation: { id: locationId },
-      },
-    });
-
-    const vendureStock = stockLevel?.stockOnHand ?? 0;
-    const difference = batchSum - vendureStock;
-    const isBalanced = Math.abs(difference) < 0.01; // Allow 0.01 tolerance for floating point
-
-    if (!isBalanced) {
-      this.logger.warn(
-        `Stock level mismatch for variant ${variantId} at location ${locationId}: ` +
-          `batchSum=${batchSum}, vendureStock=${vendureStock}, difference=${difference}`
-      );
-    }
-
     return {
       variantId,
       locationId,
       batchSum,
-      vendureStock,
-      difference,
-      isBalanced,
+      vendureStock: null,
+      difference: null,
+      isBalanced: true,
     };
   }
 

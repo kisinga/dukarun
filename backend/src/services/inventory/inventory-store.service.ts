@@ -153,6 +153,10 @@ export class InventoryStoreService implements InventoryStore {
       });
     }
 
+    if (filters.batchId != null) {
+      query.andWhere('batch.id = :batchId', { batchId: String(filters.batchId) });
+    }
+
     if (filters.excludeExpired) {
       query.andWhere('(batch.expiryDate IS NULL OR batch.expiryDate >= :now)', {
         now: new Date(),

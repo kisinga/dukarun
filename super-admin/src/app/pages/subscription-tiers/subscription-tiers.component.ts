@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApolloService } from '../../core/services/apollo.service';
@@ -26,7 +27,7 @@ interface Tier {
 @Component({
   selector: 'app-subscription-tiers',
   standalone: true,
-  imports: [FormsModule, PageHeaderComponent],
+  imports: [DecimalPipe, FormsModule, PageHeaderComponent],
   templateUrl: './subscription-tiers.component.html',
   styleUrl: './subscription-tiers.component.scss',
 })
@@ -44,12 +45,26 @@ export class SubscriptionTiersComponent implements OnInit {
     description: '',
     priceMonthly: 0,
     priceYearly: 0,
+    featuresJson: '',
     smsLimit: 0 as number | null,
     isActive: true,
   };
 
   editingTier = signal<Tier | null>(null);
   editSmsLimit = signal<number | ''>('');
+
+  /** Full edit modal: tier being edited (null = modal closed) */
+  editingTierFull = signal<Tier | null>(null);
+  editFormModel = {
+    code: '',
+    name: '',
+    description: '',
+    priceMonthly: 0,
+    priceYearly: 0,
+    featuresJson: '',
+    smsLimit: 0 as number | null,
+    isActive: true,
+  };
 
   async ngOnInit(): Promise<void> {
     await this.loadTiers();
@@ -70,7 +85,30 @@ export class SubscriptionTiersComponent implements OnInit {
     }
   }
 
+  /**
+   * Parse features JSON. Expected shape: { "features": ["Item one", "Item two"] }
+   * or { "features": [ { "text": "Item one", "included": true }, ... ] } (backend normalizes to strings).
+   * Uses double quotes in JSON; single quotes are invalid.
+   */
+  private parseFeaturesJson(json: string): unknown {
+    const t = json?.trim();
+    if (!t) return undefined;
+    try {
+      return JSON.parse(t) as unknown;
+    } catch {
+      throw new Error(
+        'Invalid features JSON. Use double quotes, e.g. {"features": ["Feature one", "Feature two"]}'
+      );
+    }
+  }
+
+  /** Convert Sh (KES) to cents for API. */
+  private shToCents(sh: number): number {
+    return Math.round(Number(sh) * 100);
+  }
+
   async create(): Promise<void> {
+    this.error.set(null);
     const f = this.formModel;
     if (!f.code.trim() || !f.name.trim()) return;
     this.saving.set(true);
@@ -82,14 +120,15 @@ export class SubscriptionTiersComponent implements OnInit {
             code: f.code.trim(),
             name: f.name.trim(),
             description: f.description.trim() || undefined,
-            priceMonthly: f.priceMonthly,
-            priceYearly: f.priceYearly,
+            priceMonthly: this.shToCents(f.priceMonthly),
+            priceYearly: this.shToCents(f.priceYearly),
+            features: this.parseFeaturesJson(f.featuresJson),
             smsLimit: f.smsLimit != null && f.smsLimit > 0 ? f.smsLimit : undefined,
             isActive: f.isActive,
           },
         },
       });
-      this.formModel = { code: '', name: '', description: '', priceMonthly: 0, priceYearly: 0, smsLimit: 0, isActive: true };
+      this.formModel = { code: '', name: '', description: '', priceMonthly: 0, priceYearly: 0, featuresJson: '', smsLimit: 0, isActive: true };
       await this.loadTiers();
     } catch (err: any) {
       this.error.set(err?.message ?? 'Create failed');
@@ -140,6 +179,64 @@ export class SubscriptionTiersComponent implements OnInit {
         },
       });
       this.cancelEdit();
+      await this.loadTiers();
+    } catch (err: any) {
+      this.error.set(err?.message ?? 'Update failed');
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  openEditTier(tier: Tier): void {
+    this.error.set(null);
+    this.editingTierFull.set(tier);
+    // Tier prices from API are in cents; form expects Sh (KES)
+    this.editFormModel = {
+      code: tier.code,
+      name: tier.name,
+      description: tier.description ?? '',
+      priceMonthly: tier.priceMonthly / 100,
+      priceYearly: tier.priceYearly / 100,
+      featuresJson:
+        tier.features != null
+          ? typeof tier.features === 'string'
+            ? tier.features
+            : JSON.stringify(tier.features, null, 2)
+          : '',
+      smsLimit: tier.smsLimit ?? 0,
+      isActive: tier.isActive,
+    };
+  }
+
+  cancelEditTier(): void {
+    this.editingTierFull.set(null);
+  }
+
+  async saveEditTier(): Promise<void> {
+    this.error.set(null);
+    const tier = this.editingTierFull();
+    if (!tier) return;
+    const f = this.editFormModel;
+    if (!f.code.trim() || !f.name.trim()) return;
+    this.saving.set(true);
+    try {
+      await this.apollo.getClient().mutate({
+        mutation: UPDATE_SUBSCRIPTION_TIER,
+        variables: {
+          input: {
+            id: tier.id,
+            code: f.code.trim(),
+            name: f.name.trim(),
+            description: f.description.trim() || undefined,
+            priceMonthly: this.shToCents(f.priceMonthly),
+            priceYearly: this.shToCents(f.priceYearly),
+            features: this.parseFeaturesJson(f.featuresJson),
+            smsLimit: f.smsLimit != null && f.smsLimit > 0 ? f.smsLimit : 0,
+            isActive: f.isActive,
+          },
+        },
+      });
+      this.cancelEditTier();
       await this.loadTiers();
     } catch (err: any) {
       this.error.set(err?.message ?? 'Update failed');

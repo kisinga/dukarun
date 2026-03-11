@@ -28,6 +28,8 @@ So if a **custom entity** uses **UUID** primary keys (e.g. `StockPurchase`, `Cas
 
 - **Credit plugin** (`credit.plugin.ts`): `PaySinglePurchaseInput.purchaseId` → `String!`
 - **Ledger / Period management** (`period-management.schema.ts`): all `sessionId` and UUID-bearing ids (e.g. `reconciliationId`, `countId` where the entity uses UUID) → `String!`
+- **Subscription plugin** (`subscription.resolver.ts`): `SubscriptionTier.id` → `String!`, `UpdateSubscriptionTierInput.id` → `String!`, `deactivateSubscriptionTier(id:)` → `String!` (entity uses `@PrimaryGeneratedColumn('uuid')`).
+- **Stock plugin** (`stock.schema.ts`): `StockAdjustmentLineInput.batchId` → `String` (optional; refers to `InventoryBatch.id`, UUID).
 
 ## References
 

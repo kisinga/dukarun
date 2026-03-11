@@ -8,7 +8,8 @@ import { CurrencyService } from '../../../../core/services/currency.service';
  * Displays order state with appropriate color and icon.
  * When outstandingAmount > 0, overrides to show "Balance due" so the order is not
  * incorrectly shown as "Paid" while a balance remains.
- * When reversedAt is set (order was reversed), shows "Reversed" instead of "Cancelled".
+ * When reversedAt is set (order was voided/reversed), always shows "Voided" with error styling,
+ * regardless of order state, so voided orders are never shown as "Paid".
  */
 @Component({
   selector: 'app-order-state-badge',
@@ -28,7 +29,7 @@ export class OrderStateBadgeComponent {
   readonly state = input.required<string>();
   /** When set and > 0, overrides display to "Balance due" (amount) so UI is not misleading. */
   readonly outstandingAmount = input<number>(0);
-  /** When set, order was reversed (ledger reversal); show "Reversed" instead of "Cancelled". */
+  /** When set, order was voided/reversed; show "Voided" with error styling regardless of state. */
   readonly reversedAt = input<string | null | undefined>(null);
 
   readonly label = computed(() => {
@@ -36,9 +37,9 @@ export class OrderStateBadgeComponent {
     if (outstanding != null && outstanding > 0) {
       return `Balance due ${this.currencyService.format(outstanding, false)}`;
     }
-    const state = this.state();
     const reversed = this.reversedAt() != null;
-    if (state === 'Cancelled' && reversed) return 'Reversed';
+    if (reversed) return 'Voided';
+    const state = this.state();
     const statusMap: Record<string, string> = {
       Draft: 'Draft',
       ArrangingPayment: 'Unpaid',
@@ -52,9 +53,8 @@ export class OrderStateBadgeComponent {
   readonly badgeClass = computed(() => {
     const outstanding = this.outstandingAmount();
     if (outstanding != null && outstanding > 0) return 'badge-warning';
+    if (this.reversedAt() != null) return 'badge-error';
     const state = this.state();
-    const reversed = this.reversedAt() != null;
-    if (state === 'Cancelled' && reversed) return 'badge-error';
     if (state === 'Draft') return 'badge-neutral';
     if (state === 'ArrangingPayment') return 'badge-warning';
     if (state === 'PaymentSettled' || state === 'Fulfilled') return 'badge-success';
@@ -65,9 +65,8 @@ export class OrderStateBadgeComponent {
   readonly icon = computed(() => {
     const outstanding = this.outstandingAmount();
     if (outstanding != null && outstanding > 0) return '⚠';
+    if (this.reversedAt() != null) return '↩';
     const state = this.state();
-    const reversed = this.reversedAt() != null;
-    if (state === 'Cancelled' && reversed) return '↩';
     if (state === 'Fulfilled') return '✓';
     if (state === 'PaymentSettled') return '○';
     if (state === 'ArrangingPayment') return '⚠';
@@ -77,9 +76,8 @@ export class OrderStateBadgeComponent {
   readonly showIcon = computed(() => {
     const outstanding = this.outstandingAmount();
     if (outstanding != null && outstanding > 0) return true;
+    if (this.reversedAt() != null) return true;
     const state = this.state();
-    const reversed = this.reversedAt() != null;
-    if (state === 'Cancelled' && reversed) return true;
     return state === 'Fulfilled' || state === 'PaymentSettled' || state === 'ArrangingPayment';
   });
 }

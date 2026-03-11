@@ -40,7 +40,7 @@
             <div
               class="text-sm font-semibold"
               [class.text-warning]="getOutstandingAmount() < 0"
-              [class.text-success]="getOutstandingAmount() > 0"
+              [class.text-error]="getOutstandingAmount() > 0"
             >
               {{ formatCurrency(getOutstandingAmountAbs()) }}
               <span class="text-xs font-normal text-base-content/60 ml-1">

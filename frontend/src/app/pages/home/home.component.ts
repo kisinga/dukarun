@@ -3,6 +3,7 @@ import {
   AfterViewInit,
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   OnDestroy,
   OnInit,
@@ -11,6 +12,7 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { FooterComponent } from '../../core/layout/footer/footer.component';
 import { NavbarComponent } from '../../core/layout/navbar/navbar.component';
+import { PublicPricingService } from '../../core/services/public-pricing.service';
 import { SEOService } from '../../core/services/seo.service';
 
 interface PricingPlan {
@@ -78,6 +80,13 @@ interface EaseOfUseBenefit {
   description: string;
 }
 
+function formatPrice(amount: number): string {
+  if (amount <= 0) return 'Custom';
+  return new Intl.NumberFormat('en-KE', { style: 'decimal', minimumFractionDigits: 0 }).format(
+    amount,
+  );
+}
+
 @Component({
   selector: 'app-home',
   imports: [RouterLink, NavbarComponent, FooterComponent],
@@ -89,8 +98,23 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly location = inject(Location);
   private readonly seoService = inject(SEOService);
+  private readonly publicPricingService = inject(PublicPricingService);
   private observers: IntersectionObserver[] = [];
   private isUpdatingHash = false;
+
+  /** Pricing from API; empty until loaded. */
+  protected readonly pricingPlans = signal<PricingPlan[]>([]);
+  protected readonly pricingLoading = signal(true);
+  protected readonly pricingError = signal(false);
+
+  /** Trial length (days) from platform config; null when unavailable. */
+  protected readonly trialDays = signal<number | null>(null);
+  protected readonly trialCtaText = computed(() => {
+    const days = this.trialDays();
+    return typeof days === 'number' && days > 0
+      ? `Start free ${days}-day trial`
+      : 'Start free trial';
+  });
 
   // Single source of truth for carousel timing
   private readonly CAROUSEL_CONFIG = {
@@ -121,9 +145,9 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   };
 
   protected readonly heroHighlights: FeatureHighlight[] = [
-    { icon: '📱', text: 'Start on phone' },
+    { icon: '💻', text: 'Desktop & mobile' },
     { icon: '🎓', text: 'No training needed' },
-    { icon: '🖥️', text: 'Grow to any size' },
+    { icon: '🏪', text: 'Retail & services' },
     { icon: '🤝', text: 'Trust in every sale' },
   ];
 
@@ -165,15 +189,26 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     {
       icon: 'camera',
       title: 'Faster selling',
-      description: 'Point your phone at price labels or barcodes and ring up a sale instantly.',
-      bullets: ['Label-photo recognition', 'Barcode scanning', '3-second checkout'],
+      description:
+        'Sell fast on desktop or phone. Use camera label recognition, barcode scanning, or search.',
+      bullets: [
+        'Label-photo recognition',
+        'Barcode scanning',
+        '3-second checkout',
+        'Offline-ready so you never miss a sale; syncs when you reconnect',
+      ],
       screenshot: { src: '', alt: 'Point and sell interface', placeholder: true },
     },
     {
       icon: 'package',
       title: 'Clear inventory',
       description: 'Always know what is in stock across every shelf, stall, or warehouse.',
-      bullets: ['Real-time counts', 'Multi-location tracking', 'Low-stock nudges'],
+      bullets: [
+        'Real-time counts',
+        'Multi-location tracking',
+        'Low-stock nudges',
+        'Movement history and adjustments for full traceability',
+      ],
       screenshot: {
         src: '/assets/screenshots/inventory_mobile.png',
         alt: 'Inventory management dashboard',
@@ -184,7 +219,12 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       icon: 'currency',
       title: 'Healthy cash flow',
       description: 'Stay on top of customer and supplier balances without extra spreadsheets.',
-      bullets: ['Credit limits & approvals', 'Automatic reminders', 'Ledger built in'],
+      bullets: [
+        'Credit limits & approvals',
+        'Automatic reminders',
+        'Ledger built in',
+        'Customer and supplier statements without leaving the app',
+      ],
       screenshot: {
         src: '/assets/screenshots/credit_management_mobile.png',
         alt: 'Cash flow and credit management',
@@ -196,7 +236,12 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       title: 'Decisions with data',
       description:
         'Pro-level business intelligence at your fingertips. Make data-driven decisions to grow.',
-      bullets: ['Dashboards & reports', 'Top product insights', 'Performance alerts'],
+      bullets: [
+        'Dashboards & reports',
+        'Top product insights',
+        'Performance alerts',
+        'Audit log of sales, stock & settings changes',
+      ],
       screenshot: {
         src: '/assets/screenshots/dashboard_mobile.png',
         alt: 'Business intelligence dashboard',
@@ -216,7 +261,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     {
       number: '2',
       title: 'Sell from any device',
-      summary: 'Point, confirm, and accept cash or M-Pesa in seconds.',
+      summary: 'Use desktop or phone to ring up sales and accept cash or M-Pesa in seconds.',
       detail:
         'Accept cash and track M-Pesa payments automatically. No signal? Keep selling. Each sale syncs automatically when you reconnect.',
       screenshot: { src: '', alt: 'Point and sell checkout interface', placeholder: true },
@@ -230,59 +275,62 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     },
   ];
 
-  protected readonly pricingPlans: PricingPlan[] = [
-    {
-      name: 'Pro',
-      monthlyPrice: 'KES 1,500',
-      yearlyPrice: 'KES 14,400',
-      description:
-        'Essential Shop Operations. Everything you need to sell fast, track stock, and stay organized.',
-      features: [
-        { text: 'Sell with camera, barcode, or search', included: true },
-        { text: 'Offline-first POS with auto-sync', included: true },
-        { text: 'Real-time inventory tracking', included: true },
-        { text: 'Customer credit tracking', included: true },
-        { text: 'Basic Sales Reports', included: true },
-        { text: 'Unlimited products', included: true },
-      ],
-      ctaText: 'Start Free 30-Day Trial',
-      ctaLink: '/signup?plan=pro&trial=true',
-    },
-    {
-      name: 'Business',
-      monthlyPrice: 'KES 2,500',
-      yearlyPrice: 'KES 24,000',
-      description:
-        'Financial Control & Growth. For shops that need rigorous accounting, FIFO profit tracking, and deeper insights.',
-      features: [
-        { text: 'Everything in Pro', included: true },
-        { text: 'True Profit Tracking (FIFO)', included: true },
-        { text: 'Daily & Randomized Reconciliation', included: true },
-        { text: 'Full Double-Entry Ledger', included: true },
-        { text: 'Multi-store Management', included: true },
-        { text: 'Advanced Financial Reports', included: true },
-      ],
-      ctaText: 'Start Free Business Trial',
-      ctaLink: '/signup?plan=business&trial=true',
-      popular: true,
-    },
-    {
-      name: 'Enterprise',
-      monthlyPrice: 'Custom',
-      yearlyPrice: 'Custom',
-      description:
-        'Scale & Customization. For larger retail chains needing custom integrations and dedicated support.',
-      features: [
-        { text: 'Everything in Business', included: true },
-        { text: 'Unlimited users & locations', included: true },
-        { text: 'Advanced API integrations', included: true },
-        { text: 'Dedicated success manager', included: true },
-        { text: 'Custom onboarding & training', included: true },
-      ],
-      ctaText: 'Contact Sales',
-      ctaLink: '/contact',
-    },
-  ];
+  /** Default fallback plans when API fails (so section still has content). */
+  private static get fallbackPricingPlans(): PricingPlan[] {
+    return [
+      {
+        name: 'Pro',
+        monthlyPrice: 'KES 1,500',
+        yearlyPrice: 'KES 14,400',
+        description:
+          'Essential Shop Operations. Everything you need to sell fast, track stock, and stay organized.',
+        features: [
+          { text: 'Sell with camera, barcode, or search', included: true },
+          { text: 'Offline-first POS with auto-sync', included: true },
+          { text: 'Real-time inventory tracking', included: true },
+          { text: 'Customer credit tracking', included: true },
+          { text: 'Basic Sales Reports', included: true },
+          { text: 'Unlimited products', included: true },
+        ],
+        ctaText: 'Start free trial',
+        ctaLink: '/signup?plan=pro&trial=true',
+      },
+      {
+        name: 'Business',
+        monthlyPrice: 'KES 2,500',
+        yearlyPrice: 'KES 24,000',
+        description:
+          'Financial Control & Growth. For shops that need rigorous accounting, FIFO profit tracking, and deeper insights.',
+        features: [
+          { text: 'Everything in Pro', included: true },
+          { text: 'True Profit Tracking (FIFO)', included: true },
+          { text: 'Daily & Randomized Reconciliation', included: true },
+          { text: 'Full Double-Entry Ledger', included: true },
+          { text: 'Multi-store Management', included: true },
+          { text: 'Advanced Financial Reports', included: true },
+        ],
+        ctaText: 'Start free trial',
+        ctaLink: '/signup?plan=business&trial=true',
+        popular: true,
+      },
+      {
+        name: 'Enterprise',
+        monthlyPrice: 'Custom',
+        yearlyPrice: 'Custom',
+        description:
+          'Scale & Customization. For larger retail chains needing custom integrations and dedicated support.',
+        features: [
+          { text: 'Everything in Business', included: true },
+          { text: 'Unlimited users & locations', included: true },
+          { text: 'Advanced API integrations', included: true },
+          { text: 'Dedicated success manager', included: true },
+          { text: 'Custom onboarding & training', included: true },
+        ],
+        ctaText: 'Contact Sales',
+        ctaLink: '/contact',
+      },
+    ];
+  }
 
   protected readonly testimonials: Testimonial[] = [
     {
@@ -345,9 +393,9 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected readonly faqItems = signal<FAQItem[]>([
     {
-      question: 'What happens after my 30-day trial ends?',
+      question: 'What happens after my trial ends?',
       answer:
-        'After your free 30-day trial, you can upgrade to Pro (KES 1,500/month) to keep using all features, or pause your account. You can upgrade anytime. No credit card needed to start.',
+        'After your free trial, you can upgrade to a paid plan to keep using all features, or pause your account. You can upgrade anytime. No credit card needed to start.',
       open: false,
     },
     {
@@ -359,7 +407,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     {
       question: 'Does it work without internet?',
       answer:
-        'Yes! You can record up to 30 sales without internet. Everything is stored safely on your device. When you reconnect, it syncs automatically. Perfect for areas with unreliable internet.',
+        'Yes! Products, customers amd suppliers are cached on devicea allowing you to search, view, and you can even record a few sales without internet. When you reconnect, changes sync automatically. Perfect for areas with unreliable internet.',
       open: false,
     },
     {
@@ -395,7 +443,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       icon: 'phone',
       title: 'No complex hardware',
       description:
-        'Works on any smartphone. No barcode scanners, printers, or special equipment needed. Your phone is all you need.',
+        'Works on desktop and smartphone. No barcode scanners, printers, or special equipment required to get started.',
     },
     {
       icon: 'graduation',
@@ -411,9 +459,9 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     },
     {
       icon: 'lightbulb',
-      title: 'Intuitive smartphone interface',
+      title: 'Intuitive interface',
       description:
-        'Designed for touch and simplicity. Everything you need is just a tap away, just like using any modern app.',
+        'Designed for speed and simplicity on both desktop and mobile. Everything you need is a click or tap away.',
     },
     {
       icon: 'chart',
@@ -433,13 +481,61 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     // Set SEO meta tags for homepage
     this.seoService.updateTags({
       title:
-        'Dukarun - Point and Sell POS System for Kenyan Businesses | Fast, Offline, M-Pesa Ready',
+        'Dukarun - POS for Retail & Services in Kenya | Desktop + Mobile, Offline, M-Pesa Ready',
       description:
-        'Point your phone at products and sell in seconds. Join Dukarun the fastest POS system for shops, dukas, and retail. Works offline, accepts M-Pesa, requires no training. Start your free 30-day trial today.',
+        'A modern POS for retail and service businesses in Kenya. Use Dukarun on desktop or phone to sell faster with camera + barcode, track inventory, manage credit, and stay on top of cash flow. Works offline and supports M-Pesa. Start your free trial today.',
       keywords:
         'POS system Kenya, point of sale Kenya, retail software Kenya, duka management system, M-Pesa POS, offline POS Kenya, shop management Kenya, inventory management Kenya, barcode scanner Kenya, retail POS Nairobi, agrovet software Kenya, salon management Kenya, hardware store POS Kenya',
       url: 'https://dukarun.com',
     });
+    this.loadPricingTiers();
+    this.loadPublicPlatformConfig();
+  }
+
+  private async loadPricingTiers(): Promise<void> {
+    try {
+      const tiers = await this.publicPricingService.getPublicTiers();
+      if (tiers.length === 0) {
+        this.pricingError.set(true);
+        this.pricingPlans.set(HomeComponent.fallbackPricingPlans);
+      } else {
+        // API returns prices in cents; display in Sh (KES)
+        const plans: PricingPlan[] = tiers.map((tier, index) => {
+          const isCustom = tier.priceMonthly <= 0;
+          const monthlySh = tier.priceMonthly / 100;
+          const yearlySh = tier.priceYearly / 100;
+          const monthlyStr = isCustom ? 'Custom' : `KES ${formatPrice(monthlySh)}`;
+          const yearlyStr = isCustom ? 'Custom' : `KES ${formatPrice(yearlySh)}`;
+          return {
+            name: tier.name,
+            monthlyPrice: monthlyStr,
+            yearlyPrice: yearlyStr,
+            description: tier.description ?? '',
+            features: tier.features.map((text) => ({ text, included: true })),
+            ctaText: isCustom ? 'Contact Sales' : 'Start free trial',
+            ctaLink: isCustom ? '/contact' : `/signup?plan=${tier.code}&trial=true`,
+            popular: index === 1 && tiers.length >= 2,
+          };
+        });
+        this.pricingPlans.set(plans);
+      }
+    } catch {
+      this.pricingError.set(true);
+      this.pricingPlans.set(HomeComponent.fallbackPricingPlans);
+    } finally {
+      this.pricingLoading.set(false);
+    }
+  }
+
+  private async loadPublicPlatformConfig(): Promise<void> {
+    try {
+      const cfg = await this.publicPricingService.getPublicPlatformConfig();
+      if (cfg?.trialDays !== undefined && typeof cfg.trialDays === 'number') {
+        this.trialDays.set(cfg.trialDays);
+      }
+    } catch {
+      // no-op (fallback to generic wording)
+    }
   }
 
   ngAfterViewInit(): void {

@@ -1,9 +1,11 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import os from 'os';
 import {
   Allow,
   Channel,
   ChannelService,
   Ctx,
+  GlobalSettingsService,
   Permission,
   RequestContext,
   RequestContextService,
@@ -14,11 +16,18 @@ import {
   Zone,
   ZoneService,
 } from '@vendure/core';
+import axios from 'axios';
+import { env } from '../../infrastructure/config/environment.config';
 import { getChannelStatus } from '../../domain/channel-custom-fields';
 import { ChannelAdminService } from '../../services/channels/channel-admin.service';
 import { AdminLoginAttemptService } from '../../infrastructure/audit/admin-login-attempt.service';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { AuditTrailFilters } from '../../infrastructure/audit/audit.types';
+import {
+  PlatformAuditService,
+  PlatformAuditTrailFilters,
+} from '../../infrastructure/audit/platform-audit.service';
+import { PLATFORM_AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
 import { AnalyticsQueryService } from '../../services/analytics/analytics-query.service';
 import { ChannelSettingsService } from '../../services/channels/channel-settings.service';
 import { RoleProvisionerService } from '../../services/auth/provisioning/role-provisioner.service';
@@ -41,6 +50,7 @@ export class SuperAdminResolver {
     private readonly platformAdminService: PlatformAdminService,
     private readonly analyticsQueryService: AnalyticsQueryService,
     private readonly auditService: AuditService,
+    private readonly platformAuditService: PlatformAuditService,
     private readonly adminLoginAttemptService: AdminLoginAttemptService,
     private readonly channelSettingsService: ChannelSettingsService,
     private readonly channelService: ChannelService,
@@ -51,7 +61,8 @@ export class SuperAdminResolver {
     private readonly requestContextService: RequestContextService,
     private readonly connection: TransactionalConnection,
     private readonly zoneService: ZoneService,
-    private readonly taxRateService: TaxRateService
+    private readonly taxRateService: TaxRateService,
+    private readonly globalSettingsService: GlobalSettingsService
   ) {}
 
   @Query()
@@ -167,6 +178,60 @@ export class SuperAdminResolver {
 
   @Query()
   @Allow(Permission.SuperAdmin)
+  async platformMonitoring() {
+    const mem = process.memoryUsage();
+    const heapUsedMB = Math.round((mem.heapUsed / 1024 / 1024) * 100) / 100;
+    const heapTotalMB = Math.round((mem.heapTotal / 1024 / 1024) * 100) / 100;
+    const rssMB = Math.round((mem.rss / 1024 / 1024) * 100) / 100;
+
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const totalMB = Math.round((totalMem / 1024 / 1024) * 100) / 100;
+    const freeMB = Math.round((freeMem / 1024 / 1024) * 100) / 100;
+    const usedMB = Math.round(((totalMem - freeMem) / 1024 / 1024) * 100) / 100;
+
+    const loadAvg = os.loadavg();
+
+    const services: { name: string; status: string; error?: string }[] = [
+      { name: 'backend', status: 'ok' },
+    ];
+
+    const trainerUrl = env.ml?.trainerUrl;
+    if (trainerUrl) {
+      try {
+        const { data } = await axios.get<{ status?: string }>(`${trainerUrl}/health`, {
+          timeout: 5000,
+        });
+        services.push({
+          name: 'ml-trainer',
+          status: data?.status === 'ok' ? 'ok' : 'unavailable',
+        });
+      } catch (err: unknown) {
+        const message =
+          err && typeof err === 'object' && 'message' in err
+            ? String((err as { message?: string }).message)
+            : 'Health check failed';
+        services.push({ name: 'ml-trainer', status: 'unavailable', error: message });
+      }
+    } else {
+      services.push({
+        name: 'ml-trainer',
+        status: 'unavailable',
+        error: 'ML_TRAINER_URL not configured',
+      });
+    }
+
+    return {
+      processMemory: { heapUsedMB, heapTotalMB, rssMB },
+      systemMemory: { totalMB, freeMB, usedMB },
+      uptimeSeconds: process.uptime(),
+      loadAvg: [loadAvg[0], loadAvg[1], loadAvg[2]],
+      services,
+    };
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
   async administratorsForChannel(@Args('channelId') channelId: string) {
     return this.platformAdminService.getAdministratorsForChannel(channelId);
   }
@@ -237,6 +302,15 @@ export class SuperAdminResolver {
       throw new Error('Administrator not found');
     }
     return detail;
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async platformSettings(@Ctx() ctx: RequestContext): Promise<{ trialDays: number }> {
+    const settings = await this.globalSettingsService.getSettings(ctx);
+    const raw = (settings as { customFields?: { trialDays?: number } }).customFields?.trialDays;
+    const trialDays = typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : 30;
+    return { trialDays };
   }
 
   @Query()
@@ -337,6 +411,39 @@ export class SuperAdminResolver {
 
   @Query()
   @Allow(Permission.SuperAdmin)
+  async platformAuditLogs(
+    @Args('options', { nullable: true })
+    options?: {
+      entityType?: string;
+      entityId?: string;
+      userId?: string;
+      eventType?: string;
+      startDate?: Date;
+      endDate?: Date;
+      limit?: number;
+      skip?: number;
+    }
+  ) {
+    const filters: PlatformAuditTrailFilters = {};
+    if (options?.entityType) filters.entityType = options.entityType;
+    if (options?.entityId) filters.entityId = options.entityId;
+    if (options?.userId) filters.userId = options.userId;
+    if (options?.eventType) filters.eventType = options.eventType;
+    if (options?.startDate) {
+      filters.startDate =
+        options.startDate instanceof Date ? options.startDate : new Date(options.startDate);
+    }
+    if (options?.endDate) {
+      filters.endDate =
+        options.endDate instanceof Date ? options.endDate : new Date(options.endDate);
+    }
+    if (options?.limit !== undefined) filters.limit = options.limit;
+    if (options?.skip !== undefined) filters.skip = options.skip;
+    return this.platformAuditService.getTrail(filters);
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
   async adminLoginAttempts(
     @Args('limit', { nullable: true }) limit?: number,
     @Args('skip', { nullable: true }) skip?: number,
@@ -378,6 +485,11 @@ export class SuperAdminResolver {
       id: kenyaRate.id,
       value: percentage,
     });
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.REGISTRATION_TAX_UPDATED, {
+      entityType: 'TaxRate',
+      entityId: String(updated.id),
+      data: { value: percentage },
+    });
     return {
       id: updated.id,
       name: updated.name,
@@ -403,7 +515,16 @@ export class SuperAdminResolver {
     if (input.defaultTaxZoneId != null) {
       updatePayload.defaultTaxZoneId = Number(input.defaultTaxZoneId);
     }
-    return this.channelService.update(ctx, updatePayload as any);
+    const channel = await this.channelService.update(ctx, updatePayload as any);
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.CHANNEL_ZONES_UPDATED, {
+      entityType: 'Channel',
+      entityId: input.channelId,
+      data: {
+        defaultShippingZoneId: input.defaultShippingZoneId,
+        defaultTaxZoneId: input.defaultTaxZoneId,
+      },
+    });
+    return channel;
   }
 
   @Mutation()
@@ -416,38 +537,68 @@ export class SuperAdminResolver {
     if (!VALID_STATUSES.includes(status as any)) {
       throw new Error(`Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`);
     }
-    return this.channelSettingsService.updateChannelStatusForPlatform(
+    const channel = await this.channelSettingsService.updateChannelStatusForPlatform(
       ctx,
       channelId,
       status as 'UNAPPROVED' | 'APPROVED' | 'DISABLED' | 'BANNED'
     );
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.CHANNEL_STATUS_UPDATED, {
+      entityType: 'Channel',
+      entityId: channelId,
+      data: { status },
+    });
+    return channel;
   }
 
   @Mutation()
   @Allow(Permission.SuperAdmin)
   async extendTrialPlatform(
+    @Ctx() ctx: RequestContext,
     @Args('channelId') channelId: string,
     @Args('trialEndsAt') trialEndsAt: Date
   ) {
-    const ctx = RequestContext.empty();
-    const channel = await this.channelService.findOne(ctx, channelId);
+    const emptyCtx = RequestContext.empty();
+    const channel = await this.channelService.findOne(emptyCtx, channelId);
     if (!channel) {
       throw new Error('Channel not found');
     }
     const date =
       trialEndsAt instanceof Date ? trialEndsAt : new Date(trialEndsAt as unknown as string);
-    await this.channelService.update(ctx, {
+    await this.channelService.update(emptyCtx, {
       id: channelId,
       customFields: { trialEndsAt: date },
     });
-    const updated = await this.channelService.findOne(ctx, channelId);
+    const updated = await this.channelService.findOne(emptyCtx, channelId);
     if (!updated) throw new Error('Channel not found after update');
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.CHANNEL_TRIAL_EXTENDED, {
+      entityType: 'Channel',
+      entityId: channelId,
+      data: { trialEndsAt: date.toISOString() },
+    });
     return updated;
   }
 
   @Mutation()
   @Allow(Permission.SuperAdmin)
+  async updatePlatformSettings(
+    @Ctx() ctx: RequestContext,
+    @Args('trialDays') trialDays: number
+  ): Promise<{ trialDays: number }> {
+    const value = Math.max(0, Math.floor(Number(trialDays)));
+    await this.connection.rawConnection.query(
+      `UPDATE global_settings SET "customFieldsTrialdays" = $1`,
+      [value]
+    );
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.PLATFORM_SETTINGS_UPDATED, {
+      data: { trialDays: value },
+    });
+    return { trialDays: value };
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
   async updateChannelFeatureFlagsPlatform(
+    @Ctx() ctx: RequestContext,
     @Args('input')
     input: {
       channelId: string;
@@ -457,8 +608,8 @@ export class SuperAdminResolver {
       enablePrinter?: boolean;
     }
   ) {
-    const ctx = RequestContext.empty();
-    const channel = await this.channelService.findOne(ctx, input.channelId);
+    const emptyCtx = RequestContext.empty();
+    const channel = await this.channelService.findOne(emptyCtx, input.channelId);
     if (!channel) {
       throw new Error('Channel not found');
     }
@@ -473,20 +624,30 @@ export class SuperAdminResolver {
     if (Object.keys(updates).length === 0) {
       return channel;
     }
-    await this.channelService.update(ctx, {
+    await this.channelService.update(emptyCtx, {
       id: input.channelId,
       customFields: { ...cf, ...updates },
     });
-    const updated = await this.channelService.findOne(ctx, input.channelId);
+    const updated = await this.channelService.findOne(emptyCtx, input.channelId);
     if (!updated) throw new Error('Channel not found after update');
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.CHANNEL_FEATURE_FLAGS_UPDATED, {
+      entityType: 'Channel',
+      entityId: input.channelId,
+      data: updates,
+    });
     return updated;
   }
 
   @Mutation()
   @Allow(Permission.SuperAdmin)
-  async approveUser(@Args('userId') userId: string) {
+  async approveUser(@Ctx() ctx: RequestContext, @Args('userId') userId: string) {
     const user = await this.pendingRegistrationsService.approveUser(userId);
     const cf = (user.customFields ?? {}) as Record<string, unknown>;
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.USER_APPROVED, {
+      entityType: 'User',
+      entityId: userId,
+      data: { identifier: user.identifier },
+    });
     return {
       id: user.id.toString(),
       identifier: user.identifier ?? '',
@@ -497,11 +658,17 @@ export class SuperAdminResolver {
   @Mutation()
   @Allow(Permission.SuperAdmin)
   async rejectUser(
+    @Ctx() ctx: RequestContext,
     @Args('userId') userId: string,
     @Args('reason', { nullable: true }) reason?: string
   ) {
     const user = await this.pendingRegistrationsService.rejectUser(userId, reason ?? undefined);
     const cf = (user.customFields ?? {}) as Record<string, unknown>;
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.USER_REJECTED, {
+      entityType: 'User',
+      entityId: userId,
+      data: { identifier: user.identifier, reason: reason ?? null },
+    });
     return {
       id: user.id.toString(),
       identifier: user.identifier ?? '',
@@ -517,6 +684,11 @@ export class SuperAdminResolver {
     input: { code: string; name: string; description?: string; permissions: string[] }
   ) {
     const t = await this.roleTemplateService.create(ctx, input);
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.ROLE_TEMPLATE_CREATED, {
+      entityType: 'RoleTemplate',
+      entityId: t.id,
+      data: { code: t.code, name: t.name },
+    });
     return {
       id: t.id,
       code: t.code,
@@ -534,6 +706,11 @@ export class SuperAdminResolver {
     @Args('input') input: { name?: string; description?: string; permissions?: string[] }
   ) {
     const t = await this.roleTemplateService.update(ctx, id, input);
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.ROLE_TEMPLATE_UPDATED, {
+      entityType: 'RoleTemplate',
+      entityId: id,
+      data: { code: t.code, name: t.name },
+    });
     return {
       id: t.id,
       code: t.code,
@@ -546,7 +723,15 @@ export class SuperAdminResolver {
   @Mutation()
   @Allow(Permission.SuperAdmin)
   async deleteRoleTemplate(@Ctx() ctx: RequestContext, @Args('id') id: string) {
-    return this.roleTemplateService.delete(ctx, id);
+    const result = await this.roleTemplateService.delete(ctx, id);
+    if (result) {
+      await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.ROLE_TEMPLATE_DELETED, {
+        entityType: 'RoleTemplate',
+        entityId: id,
+        data: {},
+      });
+    }
+    return result;
   }
 
   @Mutation()
@@ -586,6 +771,15 @@ export class SuperAdminResolver {
     if (!detail) {
       throw new Error('Failed to load updated administrator');
     }
+    await this.platformAuditService.log(
+      ctx,
+      PLATFORM_AUDIT_EVENTS.ADMINISTRATOR_PERMISSIONS_UPDATED,
+      {
+        entityType: 'Administrator',
+        entityId: administratorId,
+        data: { channelId, permissions },
+      }
+    );
     return detail;
   }
 }
