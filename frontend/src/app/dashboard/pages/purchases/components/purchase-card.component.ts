@@ -1,5 +1,6 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { PurchaseAction, PurchaseCardData } from './purchase-table-row.component';
 
@@ -9,7 +10,7 @@ import { PurchaseAction, PurchaseCardData } from './purchase-table-row.component
  */
 @Component({
   selector: 'app-purchase-card',
-  imports: [CommonModule, DatePipe],
+  imports: [CommonModule, DatePipe, RouterLink],
   templateUrl: './purchase-card.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

@@ -1,19 +1,28 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 /**
  * Purchase Supplier Info Component
  *
- * Displays supplier name, email, and phone
+ * Displays supplier name (link to supplier detail), email, and phone
  */
 @Component({
   selector: 'app-purchase-supplier-info',
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>
       <h3 class="font-bold text-base mb-3 text-base-content">Supplier</h3>
-      <p class="text-base font-medium text-base-content mb-2">{{ supplierName() }}</p>
+      @if (supplier()?.id) {
+        <a
+          [routerLink]="['/dashboard/suppliers', supplier()!.id]"
+          class="link link-hover text-base font-medium text-base-content mb-2 inline-block"
+          >{{ supplierName() }}</a
+        >
+      } @else {
+        <p class="text-base font-medium text-base-content mb-2">{{ supplierName() }}</p>
+      }
       @if (supplier()) {
         <div class="space-y-1">
           @if (supplier()!.emailAddress) {

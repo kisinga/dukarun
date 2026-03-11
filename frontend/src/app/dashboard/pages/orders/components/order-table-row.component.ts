@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { OrderStateBadgeComponent } from './order-state-badge.component';
 
@@ -40,7 +40,7 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
 
 @Component({
   selector: 'tr[app-order-table-row]',
-  imports: [OrderStateBadgeComponent],
+  imports: [OrderStateBadgeComponent, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class: 'cursor-pointer transition-colors',
@@ -54,7 +54,14 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
       </div>
     </td>
     <td>
-      @if (order().customer) {
+      @if (order().customer?.id) {
+        <a
+          [routerLink]="['/dashboard/customers', order().customer!.id]"
+          class="link link-hover"
+          (click)="$event.stopPropagation()"
+          >{{ getCustomerName() }}</a
+        >
+      } @else if (order().customer) {
         <div>{{ getCustomerName() }}</div>
       } @else {
         <span class="text-base-content/60">Walk-in</span>

@@ -1,16 +1,18 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../../core/services/currency.service';
 import type { OrderItemsTableInput } from '../order-detail.types';
 
 /**
  * Order Items Table Component
  *
- * Displays order items in a table format with currency formatting
+ * Displays order items in a table format with currency formatting.
+ * Item names link to product detail when product id is available.
  */
 @Component({
   selector: 'app-order-items-table',
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>
@@ -31,7 +33,15 @@ import type { OrderItemsTableInput } from '../order-detail.types';
             @for (line of lines(); track line.id) {
               <tr>
                 <td>
-                  <div class="font-medium">{{ getLineItemName(line) }}</div>
+                  @if (line.productVariant?.product?.id) {
+                    <a
+                      [routerLink]="['/dashboard/products', line.productVariant.product.id]"
+                      class="link link-hover font-medium"
+                      >{{ getLineItemName(line) }}</a
+                    >
+                  } @else {
+                    <div class="font-medium">{{ getLineItemName(line) }}</div>
+                  }
                 </td>
                 <td class="text-right">{{ line.quantity }}</td>
                 <td class="text-right">
@@ -53,9 +63,17 @@ import type { OrderItemsTableInput } from '../order-detail.types';
             <div class="card-body p-4">
               <div class="flex justify-between items-start mb-2">
                 <div class="flex-1 min-w-0">
-                  <h4 class="font-semibold text-base text-base-content">
-                    {{ getLineItemName(line) }}
-                  </h4>
+                  @if (line.productVariant?.product?.id) {
+                    <a
+                      [routerLink]="['/dashboard/products', line.productVariant.product.id]"
+                      class="link link-hover font-semibold text-base text-base-content"
+                      >{{ getLineItemName(line) }}</a
+                    >
+                  } @else {
+                    <h4 class="font-semibold text-base text-base-content">
+                      {{ getLineItemName(line) }}
+                    </h4>
+                  }
                 </div>
                 <div class="text-right ml-3 shrink-0">
                   <div class="font-bold text-lg text-primary">

@@ -251,7 +251,15 @@
                 <ul class="space-y-2">
                   @for (line of adj.lines; track line.id) {
                     <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-                      <span class="font-medium">{{ getLineVariantDisplay(line) }}</span>
+                      @if (line.variant?.product?.id) {
+                        <a
+                          [routerLink]="['/dashboard/products', line.variant.product.id]"
+                          class="link link-hover font-medium"
+                          >{{ getLineVariantDisplay(line) }}</a
+                        >
+                      } @else {
+                        <span class="font-medium">{{ getLineVariantDisplay(line) }}</span>
+                      }
                       <span
                         class="font-semibold tabular-nums"
                         [class.text-success]="line.quantityChange > 0"
@@ -356,7 +364,18 @@
                             @for (line of adj.lines; track line.id) {
                               <tr>
                                 <td>
-                                  <div class="font-medium">{{ getLineVariantDisplay(line) }}</div>
+                                  @if (line.variant?.product?.id) {
+                                    <a
+                                      [routerLink]="[
+                                        '/dashboard/products',
+                                        line.variant.product.id,
+                                      ]"
+                                      class="link link-hover font-medium"
+                                      >{{ getLineVariantDisplay(line) }}</a
+                                    >
+                                  } @else {
+                                    <div class="font-medium">{{ getLineVariantDisplay(line) }}</div>
+                                  }
                                 </td>
                                 <td class="text-right text-tabular">{{ line.previousStock }}</td>
                                 <td class="text-right text-tabular">{{ line.newStock }}</td>

@@ -1,19 +1,28 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import type { OrderCustomerInfoInput } from '../order-detail.types';
 
 /**
  * Order Customer Info Component
  *
- * Displays customer name, email, and phone with walk-in detection
+ * Displays customer name (link to customer detail when not walk-in), email, and phone
  */
 @Component({
   selector: 'app-order-customer-info',
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>
-      <p class="text-base font-medium text-base-content mb-2">{{ customerName() }}</p>
+      @if (customer()?.id && !isWalkInCustomer()) {
+        <a
+          [routerLink]="['/dashboard/customers', customer()!.id]"
+          class="link link-hover text-base font-medium text-base-content mb-2 inline-block"
+          >{{ customerName() }}</a
+        >
+      } @else {
+        <p class="text-base font-medium text-base-content mb-2">{{ customerName() }}</p>
+      }
       @if (showContactInfo()) {
         <div class="space-y-1">
           @if (customer()?.emailAddress) {

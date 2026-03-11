@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { PaymentWithOrder } from '../../../../core/services/payments.service';
 import { OrderDetailComponent } from '../../orders/order-detail/order-detail.component';
@@ -12,7 +13,7 @@ export type PaymentAction = 'view' | 'viewOrder';
  */
 @Component({
   selector: 'app-payment-card',
-  imports: [CommonModule, PaymentStateBadgeComponent, OrderDetailComponent],
+  imports: [CommonModule, RouterLink, PaymentStateBadgeComponent, OrderDetailComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <details
@@ -45,9 +46,13 @@ export type PaymentAction = 'view' | 'viewOrder';
           <!-- Payment Summary -->
           <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between gap-2 mb-1">
-              <h3 class="text-sm line-clamp-1 leading-tight">
+              <a
+                [routerLink]="['/dashboard/orders', payment().order.id]"
+                class="link link-hover text-sm line-clamp-1 leading-tight font-medium"
+                (click)="$event.stopPropagation()"
+              >
                 {{ payment().order.code }}
-              </h3>
+              </a>
               <app-payment-state-badge [state]="payment().state" />
             </div>
 
@@ -89,7 +94,15 @@ export type PaymentAction = 'view' | 'viewOrder';
                   d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                 />
               </svg>
-              <p class="text-sm font-medium text-base-content">{{ getCustomerName() }}</p>
+              @if (payment().order.customer?.id) {
+                <a
+                  [routerLink]="['/dashboard/customers', payment().order.customer!.id]"
+                  class="link link-hover text-sm font-medium text-base-content"
+                  >{{ getCustomerName() }}</a
+                >
+              } @else {
+                <p class="text-sm font-medium text-base-content">{{ getCustomerName() }}</p>
+              }
             </div>
           </div>
         }

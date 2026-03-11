@@ -2922,6 +2922,7 @@ export const GET_STOCK_ADJUSTMENTS = graphql(`
             name
             sku
             product {
+              id
               name
             }
           }

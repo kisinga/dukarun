@@ -80,7 +80,15 @@
         <!-- Customer Information -->
         <div class="mb-6">
           <h3 class="font-semibold mb-2">Customer</h3>
-          <p class="text-base-content/80">{{ customerName() }}</p>
+          @if (order()!.customer?.id && !isWalkInCustomer()) {
+            <a
+              [routerLink]="['/dashboard/customers', order()!.customer!.id]"
+              class="link link-hover text-base-content/80"
+              >{{ customerName() }}</a
+            >
+          } @else {
+            <p class="text-base-content/80">{{ customerName() }}</p>
+          }
           @if (order()!.customer?.emailAddress && !isWalkInCustomer()) {
             <p class="text-sm text-base-content/60">{{ order()!.customer!.emailAddress }}</p>
           }

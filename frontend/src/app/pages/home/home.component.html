@@ -185,23 +185,36 @@
         </div>
       </div>
       <div class="home-hero-intro-delay flex justify-center w-full min-w-0">
-        <figure
-          class="w-full max-w-full sm:max-w-lg lg:max-w-xl xl:max-w-2xl rounded-2xl border border-base-300 bg-base-200 shadow-md overflow-hidden"
-        >
-          <!-- Mobile: Show mobile dashboard -->
-          <img
-            src="/assets/screenshots/dashboard_mobile2.png"
-            alt="Dukarun mobile dashboard showing business analytics and insights"
-            class="w-full h-auto object-contain lg:hidden"
-            loading="eager"
-          />
-          <!-- Desktop: Show smaller desktop dashboard -->
-          <img
-            src="/assets/screenshots/dashboard_720p.png"
-            alt="Dukarun desktop dashboard showing business analytics and insights"
-            class="hidden lg:block w-full h-auto object-contain"
-            loading="eager"
-          />
+        <figure class="home-hero-phone flex justify-center w-full">
+          <!-- Phone mockup: mobile screenshot (responsive scaling) -->
+          <div
+            class="mockup-phone w-full max-w-[min(280px,85vw)] sm:max-w-[320px] lg:max-w-[340px] xl:max-w-[360px] border-primary/20"
+          >
+            <div class="mockup-phone-camera"></div>
+            <div
+              class="mockup-phone-display flex items-center justify-center bg-neutral-900 overflow-hidden"
+            >
+              <img
+                src="/assets/screenshots/dashboard_mobile2.png"
+                alt="Dukarun mobile dashboard showing business analytics and insights"
+                class="w-full h-auto object-contain object-center"
+                loading="eager"
+              />
+            </div>
+          </div>
+          <!-- Desktop: optional desktop dashboard (no phone frame) -->
+          <div class="hidden lg:block lg:max-w-[480px] xl:max-w-[520px] ml-4 flex-shrink-0">
+            <div
+              class="rounded-2xl border border-base-300 bg-base-200 shadow-md overflow-hidden aspect-video flex items-center justify-center"
+            >
+              <img
+                src="/assets/screenshots/dashboard_720p.png"
+                alt="Dukarun desktop dashboard showing business analytics and insights"
+                class="w-full h-full object-contain"
+                loading="eager"
+              />
+            </div>
+          </div>
           <figcaption class="sr-only">
             Dukarun dashboard with business intelligence and analytics
           </figcaption>

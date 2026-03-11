@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { PaymentWithOrder } from '../../../../core/services/payments.service';
 import { PaymentStateBadgeComponent } from './payment-state-badge.component';
@@ -11,15 +12,25 @@ export type PaymentAction = 'view' | 'viewOrder';
  */
 @Component({
   selector: 'tr[app-payment-table-row]',
-  imports: [CommonModule, PaymentStateBadgeComponent],
+  imports: [CommonModule, RouterLink, PaymentStateBadgeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <td>
-      <div class="font-medium">{{ payment().order.code }}</div>
+      <a
+        [routerLink]="['/dashboard/orders', payment().order.id]"
+        class="link link-hover font-medium"
+        >{{ payment().order.code }}</a
+      >
       <div class="text-sm text-base-content/60">{{ formatDate(payment().createdAt) }}</div>
     </td>
     <td>
-      @if (payment().order.customer) {
+      @if (payment().order.customer?.id) {
+        <a
+          [routerLink]="['/dashboard/customers', payment().order.customer!.id]"
+          class="link link-hover"
+          >{{ getCustomerName() }}</a
+        >
+      } @else if (payment().order.customer) {
         <div>{{ getCustomerName() }}</div>
       } @else {
         <span class="text-base-content/60">Walk-in</span>
