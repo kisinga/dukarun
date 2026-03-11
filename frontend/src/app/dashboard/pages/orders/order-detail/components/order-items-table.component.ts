@@ -34,13 +34,13 @@ import type { OrderItemsTableInput } from '../order-detail.types';
             @for (line of lines(); track line.id) {
               <tr>
                 <td>
-                  @if (line.productVariant?.product?.id) {
+                  @if (line.productVariant.product.id) {
                     <app-hover-preview-host
                       previewKey="product"
-                      [entityId]="line.productVariant.product.id"
+                      [entityId]="line.productVariant!.product!.id"
                     >
                       <a
-                        [routerLink]="['/dashboard/products', line.productVariant.product.id]"
+                        [routerLink]="['/dashboard/products', line.productVariant!.product!.id]"
                         class="link link-hover font-medium"
                         >{{ getLineItemName(line) }}</a
                       >
@@ -69,13 +69,13 @@ import type { OrderItemsTableInput } from '../order-detail.types';
             <div class="card-body p-4">
               <div class="flex justify-between items-start mb-2">
                 <div class="flex-1 min-w-0">
-                  @if (line.productVariant?.product?.id) {
+                  @if (line.productVariant.product.id) {
                     <app-hover-preview-host
                       previewKey="product"
-                      [entityId]="line.productVariant.product.id"
+                      [entityId]="line.productVariant!.product!.id"
                     >
                       <a
-                        [routerLink]="['/dashboard/products', line.productVariant.product.id]"
+                        [routerLink]="['/dashboard/products', line.productVariant!.product!.id]"
                         class="link link-hover font-semibold text-base text-base-content"
                         >{{ getLineItemName(line) }}</a
                       >

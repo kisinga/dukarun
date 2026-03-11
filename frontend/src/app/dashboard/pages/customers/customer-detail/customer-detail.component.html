@@ -104,28 +104,25 @@
                 </div>
               </div>
             }
-            @if ((summary.creditLimit ?? 0) > 0) {
+            @if (summary.creditLimit > 0) {
               <div class="stat bg-base-200/50 rounded-lg p-3">
                 <div class="stat-title text-xs">Limit</div>
                 <div class="stat-value text-sm">{{ formatCurrency(summary.creditLimit) }}</div>
               </div>
             }
-            @if ((summary.outstandingAmount ?? 0) !== 0) {
+            @if (summary.outstandingAmount !== 0) {
               <div class="stat bg-base-200/50 rounded-lg p-3">
                 <div class="stat-title text-xs">Outstanding</div>
-                <div
-                  class="stat-value text-sm"
-                  [class.text-error]="(summary.outstandingAmount ?? 0) > 0"
-                >
+                <div class="stat-value text-sm" [class.text-error]="summary.outstandingAmount > 0">
                   {{ formatCurrency(getOutstandingAbs(summary)) }}
                 </div>
               </div>
             }
-            @if (summary.isCreditApproved && (summary.creditLimit ?? 0) > 0) {
+            @if (summary.isCreditApproved && summary.creditLimit > 0) {
               <div class="stat bg-base-200/50 rounded-lg p-3">
                 <div class="stat-title text-xs">Available</div>
                 <div class="stat-value text-sm">
-                  {{ formatCurrency(summary.availableCredit ?? 0) }}
+                  {{ formatCurrency(summary.availableCredit) }}
                 </div>
               </div>
             }
