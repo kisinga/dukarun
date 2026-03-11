@@ -516,11 +516,7 @@ export class PayOrderModalComponent {
         this.successResult.set(result);
         // Auto-close after 2 seconds and refresh orders
         setTimeout(async () => {
-          await this.ordersService.fetchOrders({
-            take: 100,
-            skip: 0,
-            sort: { createdAt: 'DESC' as any },
-          });
+          await this.ordersService.refreshOrders();
           this.paymentRecorded.emit();
           this.hide();
         }, 2000);

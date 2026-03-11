@@ -30,6 +30,15 @@ export interface OrderPaymentStatusResult {
 export class OrdersService {
   private readonly apolloService = inject(ApolloService);
 
+  /** Last options used for list fetch; refreshOrders() reuses these so filter state is preserved. */
+  private lastListOptions: OrderListOptions | null = null;
+
+  private static readonly DEFAULT_LIST_OPTIONS: OrderListOptions = {
+    take: 50,
+    skip: 0,
+    sort: { createdAt: 'DESC' as any },
+  };
+
   // State signals
   private readonly ordersSignal = signal<any[]>([]);
   private readonly currentOrderSignal = signal<any | null>(null);
@@ -56,16 +65,20 @@ export class OrdersService {
     this.isLoadingSignal.set(true);
     this.errorSignal.set(null);
 
+    const resolved =
+      options != null && Object.keys(options).length > 0
+        ? (options as OrderListOptions)
+        : OrdersService.DEFAULT_LIST_OPTIONS;
+    if (options != null && Object.keys(options).length > 0) {
+      this.lastListOptions = resolved;
+    }
+
     try {
       const client = this.apolloService.getClient();
       const result = await client.query<GetOrdersQuery, GetOrdersQueryVariables>({
         query: GET_ORDERS,
         variables: {
-          options: (options as OrderListOptions) || {
-            take: 50,
-            skip: 0,
-            sort: { createdAt: 'DESC' as any },
-          },
+          options: resolved,
         },
         fetchPolicy: 'network-only',
       });
@@ -115,11 +128,10 @@ export class OrdersService {
   }
 
   /**
-   * Refresh the current orders list
+   * Refresh the current orders list using last options (preserves filter when called from header or pay modal).
    */
   async refreshOrders(): Promise<void> {
-    // Re-fetch with current options (could be enhanced to store last options)
-    await this.fetchOrders();
+    await this.fetchOrders(this.lastListOptions ?? OrdersService.DEFAULT_LIST_OPTIONS);
   }
 
   /**

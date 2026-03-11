@@ -11,7 +11,7 @@
   <!-- Statistics Cards -->
   <app-order-stats
     [stats]="stats()"
-    [activeStateFilter]="stateFilter()"
+    [activeStateFilter]="filterService.stateFilter()"
     (filterClick)="onStatsFilterClick($event)"
   />
 
@@ -48,7 +48,11 @@
               [selected]="trendPeriod()"
               (selectedChange)="onTrendPeriodChange($event)"
             />
-            <app-echart-container [option]="orderVolumeChartOption()" height="220px" />
+            <app-echart-container
+              [option]="orderVolumeChartOption()"
+              height="220px"
+              (chartClick)="onChartClick($event)"
+            />
           </div>
         }
       </div>
@@ -57,35 +61,63 @@
 
   <!-- Search & Filter Bar -->
   <app-list-search-bar
-    [(searchQuery)]="searchQuery"
+    [searchQuery]="filterService.searchQuery()"
+    (searchQueryChange)="filterService.searchQuery.set($event)"
     placeholder="Search by order code, customer name, or email..."
   >
-    @if (stateFilter()) {
+    @if (filterService.stateFilter() || filterService.dateFrom() || filterService.dateTo()) {
       <div badges class="flex flex-wrap gap-2">
-        <span [class]="'badge badge-' + stateFilterColor() + ' gap-1.5'">
-          {{ getStateFilterLabel() }}
-          <button
-            class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
-            (click)="clearStateFilter()"
-            type="button"
-            aria-label="Clear filter"
-          >
-            &times;
-          </button>
-        </span>
+        @if (filterService.stateFilter()) {
+          <span [class]="'badge badge-' + filterService.stateFilterColor() + ' gap-1.5'">
+            {{ getStateFilterLabel() }}
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="clearStateFilter()"
+              type="button"
+              aria-label="Clear state filter"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (filterService.dateFrom() || filterService.dateTo()) {
+          <span class="badge badge-outline gap-1.5">
+            @if (
+              filterService.dateFrom() &&
+              filterService.dateTo() &&
+              filterService.dateFrom() === filterService.dateTo()
+            ) {
+              {{ filterService.dateFrom() | date: 'mediumDate' }}
+            } @else if (filterService.dateFrom() && filterService.dateTo()) {
+              {{ filterService.dateFrom() | date: 'shortDate' }} –
+              {{ filterService.dateTo() | date: 'shortDate' }}
+            } @else if (filterService.dateFrom()) {
+              {{ filterService.dateFrom() | date: 'mediumDate' }}
+            } @else {
+              {{ filterService.dateTo() | date: 'mediumDate' }}
+            }
+          </span>
+        }
       </div>
     }
-    <div filters class="flex gap-2">
+    <div filters class="flex flex-wrap gap-2 items-center">
       <select
         class="select select-bordered select-sm sm:select-md flex-1 sm:flex-none sm:w-auto"
-        [value]="stateFilter()"
-        (change)="stateFilter.set($any($event.target).value)"
+        [value]="filterService.stateFilter()"
+        (change)="filterService.stateFilter.set($any($event.target).value)"
       >
         <option value="">All States</option>
         <option value="Draft">Draft</option>
         <option value="ArrangingPayment">Unpaid</option>
         <option value="PaymentSettled">Paid</option>
       </select>
+      <button
+        type="button"
+        class="btn btn-outline btn-sm btn-ghost"
+        (click)="openAdvancedFilters()"
+      >
+        Advanced filters
+      </button>
     </div>
   </app-list-search-bar>
 
@@ -147,14 +179,11 @@
             </svg>
           </div>
           <h3 class="text-lg font-semibold">No orders found</h3>
-          @if (searchQuery() || stateFilter()) {
+          @if (filterService.hasActiveFilters()) {
             <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
               No orders match your filters. Try adjusting your search criteria.
             </p>
-            <button
-              (click)="searchQuery.set(''); stateFilter.set('')"
-              class="btn btn-outline btn-sm mt-6"
-            >
+            <button (click)="clearAllFilters()" class="btn btn-outline btn-sm mt-6">
               Clear Filters
             </button>
           } @else {
@@ -212,6 +241,12 @@
       (itemsPerPageChange)="changeItemsPerPage($event)"
     />
   }
+
+  <!-- Advanced filters modal -->
+  <app-orders-advanced-filters-modal
+    [isOpen]="advancedFiltersOpen()"
+    (closed)="closeAdvancedFilters()"
+  />
 
   <!-- Payment Modal -->
   <app-pay-order-modal

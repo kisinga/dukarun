@@ -71,16 +71,17 @@ export class NotificationSubscriber implements OnModuleInit {
 
   private async handleSubscription(event: SubscriptionAlertEvent): Promise<void> {
     try {
+      // Disabled: trial/subscription expired notification is inaccurate and triggers wrongly
+      if (event.alertType === 'expired') {
+        return;
+      }
       const triggerKey =
-        event.alertType === 'expiring_soon'
-          ? 'subscription_expiring_soon'
-          : event.alertType === 'expired'
-            ? 'subscription_expired'
-            : 'subscription_renewed';
+        event.alertType === 'expiring_soon' ? 'subscription_expiring_soon' : 'subscription_renewed';
       await this.outboundDelivery.deliver(event.ctx, triggerKey, {
         ...event.data,
         channelId: event.channelId,
         daysRemaining: event.data.daysRemaining,
+        company: event.data.company,
       });
     } catch (error) {
       this.logError('SubscriptionAlertEvent', error);
