@@ -289,26 +289,67 @@
 // PHONE SLIDESHOW - images fade inside fixed frame
 // ============================================
 
-.mockup-phone-display {
-  position: relative;
+// Grid stacking: all images occupy the same cell so the tallest drives height.
+// Opacity transition handles the fade — no absolute positioning needed.
+.phone-slideshow {
+  display: grid;
 }
 
 .phone-screenshot {
-  position: absolute;
-  inset: 0;
+  grid-area: 1 / 1;
   width: 100%;
-  height: 100%;
-  object-fit: contain;
+  height: auto;
+  display: block;
   opacity: 0;
-  transition: opacity 0.7s ease-in-out;
-  pointer-events: none;
+  transition: opacity 0.65s ease-in-out;
 
   &.phone-screenshot--active {
     opacity: 1;
-    pointer-events: auto;
   }
 }
 
+// Prev / next arrow buttons
+.phone-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  border: 1px solid oklch(var(--b3));
+  background-color: oklch(var(--b1));
+  color: oklch(var(--bc) / 0.7);
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease;
+
+  &:hover {
+    background-color: oklch(var(--b2));
+    border-color: oklch(var(--p) / 0.6);
+    color: oklch(var(--p));
+    transform: scale(1.08);
+  }
+
+  &:active {
+    transform: scale(0.94);
+  }
+
+  &:focus-visible {
+    outline: 2px solid oklch(var(--p));
+    outline-offset: 2px;
+  }
+
+  @media (min-width: 768px) {
+    width: 3rem;
+    height: 3rem;
+  }
+}
+
+// Dot indicators
 .phone-dot {
   width: 0.5rem;
   height: 0.5rem;
@@ -318,11 +359,13 @@
   cursor: pointer;
   transition:
     background-color 0.3s ease,
-    transform 0.3s ease;
+    transform 0.3s ease,
+    width 0.3s ease;
 
   &.phone-dot--active {
     background-color: oklch(var(--p));
-    transform: scale(1.4);
+    width: 1.25rem;
+    border-radius: 9999px;
   }
 
   &:focus-visible {
@@ -332,9 +375,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .phone-screenshot {
-    transition: none;
-  }
+  .phone-screenshot,
+  .phone-nav-btn,
   .phone-dot {
     transition: none;
   }

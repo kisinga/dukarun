@@ -580,6 +580,16 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     this.activeScreenshotIndex.set(index);
   }
 
+  protected prevScreenshot(): void {
+    this.activeScreenshotIndex.update(
+      (i) => (i - 1 + this.allFeatureScreenshots.length) % this.allFeatureScreenshots.length,
+    );
+  }
+
+  protected nextScreenshot(): void {
+    this.activeScreenshotIndex.update((i) => (i + 1) % this.allFeatureScreenshots.length);
+  }
+
   private setupFeatureCarousel(): void {
     this.setupPhoneSlideshow();
   }
