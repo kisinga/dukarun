@@ -2043,12 +2043,6 @@ export const SEND_CUSTOMER_STATEMENT_EMAIL = graphql(`
   }
 `);
 
-export const SEND_CUSTOMER_STATEMENT_SMS = graphql(`
-  mutation SendCustomerStatementSms($customerId: ID!) {
-    sendCustomerStatementSms(customerId: $customerId)
-  }
-`);
-
 export const PAY_SINGLE_PURCHASE = graphql(`
   mutation PaySinglePurchase($input: PaySinglePurchaseInput!) {
     paySinglePurchase(input: $input) {

@@ -85,7 +85,8 @@ const RENDERERS: Record<string, RenderFn> = {
     return {
       inAppTitle: '',
       inAppMessage: '',
-      smsBody: `Your account balance has been updated. Outstanding balance: KES ${formatted}.`,
+      emailSubject: 'Your account balance has been updated',
+      emailBody: `Your account balance has been updated.\n\nOutstanding balance: KES ${formatted}.\n\nIf you have questions about this update, please contact your supplier.`,
     };
   },
   repayment_deadline: () => ({
@@ -138,7 +139,6 @@ Please log in to the admin panel to review and approve this registration.
     return {
       inAppTitle: '',
       inAppMessage: '',
-      smsBody: `DukaRun: New company "${details.companyName}" registered. Admin: ${details.adminName} (${details.adminPhone}). Please review and approve.`,
       emailSubject: `New Company Registration: ${details.companyName}`,
       emailBody,
     };
