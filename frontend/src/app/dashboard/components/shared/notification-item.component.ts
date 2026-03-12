@@ -7,6 +7,7 @@ export interface NotificationData {
   message: string;
   read: boolean;
   createdAt: string;
+  data?: Record<string, unknown>;
 }
 
 /**
@@ -44,10 +45,24 @@ export interface NotificationData {
         </p>
       </div>
 
-      <!-- Unread Indicator -->
-      @if (!notification().read) {
-        <div class="w-2.5 h-2.5 bg-primary rounded-full shrink-0 mt-1.5"></div>
-      }
+      <!-- Right side: unread dot or navigate chevron -->
+      <div class="flex flex-col items-center gap-1 shrink-0 mt-1">
+        @if (!notification().read) {
+          <div class="w-2.5 h-2.5 bg-primary rounded-full"></div>
+        }
+        @if (notification().data?.['navigateTo']) {
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-3.5 w-3.5 text-base-content/30"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        }
+      </div>
     </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

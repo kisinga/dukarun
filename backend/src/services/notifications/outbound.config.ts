@@ -39,15 +39,10 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
     channels: { inApp: true, sms: false, email: false },
     inAppType: NotificationType.ORDER,
   },
-  // Subscription (channel admins, in-app)
+  // Subscription (channel admins)
   subscription_expiring_soon: {
     audience: 'channel_admins',
-    channels: { inApp: true, sms: false, email: false },
-    inAppType: NotificationType.PAYMENT,
-  },
-  subscription_expired: {
-    audience: 'channel_admins',
-    channels: { inApp: true, sms: false, email: false },
+    channels: { inApp: true, sms: false, email: true },
     inAppType: NotificationType.PAYMENT,
   },
   subscription_renewed: {

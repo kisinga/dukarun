@@ -63,6 +63,7 @@ export class NotificationSubscriber implements OnModuleInit {
         ...event.data,
         channelId: event.channelId,
         orderCode: event.orderCode,
+        navigateTo: `/dashboard/orders`,
       });
     } catch (error) {
       this.logError('OrderNotificationEvent', error);
@@ -71,10 +72,6 @@ export class NotificationSubscriber implements OnModuleInit {
 
   private async handleSubscription(event: SubscriptionAlertEvent): Promise<void> {
     try {
-      // Disabled: trial/subscription expired notification is inaccurate and triggers wrongly
-      if (event.alertType === 'expired') {
-        return;
-      }
       const triggerKey =
         event.alertType === 'expiring_soon' ? 'subscription_expiring_soon' : 'subscription_renewed';
       await this.outboundDelivery.deliver(event.ctx, triggerKey, {
@@ -82,6 +79,7 @@ export class NotificationSubscriber implements OnModuleInit {
         channelId: event.channelId,
         daysRemaining: event.data.daysRemaining,
         company: event.data.company,
+        navigateTo: '/dashboard/admin/subscription',
       });
     } catch (error) {
       this.logError('SubscriptionAlertEvent', error);
@@ -123,12 +121,18 @@ export class NotificationSubscriber implements OnModuleInit {
         targetUserIds: event.data.targetUserId ? [event.data.targetUserId] : undefined,
       };
 
+      const customerNav = `/dashboard/customers/${event.customerId}`;
+
       if (event.eventType === 'balance_changed') {
-        await this.outboundDelivery.deliver(event.ctx, 'balance_changed_admin', basePayload);
+        await this.outboundDelivery.deliver(event.ctx, 'balance_changed_admin', {
+          ...basePayload,
+          navigateTo: customerNav,
+        });
         await this.outboundDelivery.deliver(event.ctx, 'balance_changed', {
           ...basePayload,
           newBalanceCents: Math.round((event.data.outstandingAmount ?? 0) * 100),
           oldBalanceCents: Math.round((event.data.oldBalance ?? 0) * 100),
+          navigateTo: customerNav,
         });
         return;
       }
@@ -141,7 +145,10 @@ export class NotificationSubscriber implements OnModuleInit {
             : event.eventType === 'repayment_deadline'
               ? 'repayment_deadline'
               : 'balance_changed_admin';
-      await this.outboundDelivery.deliver(event.ctx, triggerKey, basePayload);
+      await this.outboundDelivery.deliver(event.ctx, triggerKey, {
+        ...basePayload,
+        navigateTo: customerNav,
+      });
     } catch (error) {
       this.logError('CustomerNotificationEvent', error);
     }
@@ -168,6 +175,7 @@ export class NotificationSubscriber implements OnModuleInit {
         channelId: event.channelId,
         productId: event.productId,
         message: event.data.message,
+        navigateTo: '/dashboard/products',
       });
     } catch (error) {
       this.logError('StockAlertEvent', error);
@@ -243,6 +251,7 @@ export class NotificationSubscriber implements OnModuleInit {
         ...event.data,
         channelId: event.channelId,
         sessionId: event.sessionId,
+        navigateTo: '/dashboard/accounting',
       });
     } catch (error) {
       this.logError('ShiftSessionEvent', error);

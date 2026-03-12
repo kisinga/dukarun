@@ -80,6 +80,8 @@ export class ChannelCommunicationService {
 
       this.eventBus.publish(
         new CustomerNotificationEvent(ctx, channelId, 'credit_approved', customerId, {
+          customerName:
+            `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim() || undefined,
           creditLimit: finalCreditLimit,
           creditDuration: creditDuration ?? customFields.creditDuration ?? 30,
           targetUserId: customer.user?.id?.toString(),
@@ -120,6 +122,8 @@ export class ChannelCommunicationService {
 
       this.eventBus.publish(
         new CustomerNotificationEvent(ctx, channelId, 'balance_changed', customerId, {
+          customerName:
+            `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim() || undefined,
           outstandingAmount,
           oldBalance: 0,
           isStartingBalance: true,
@@ -156,6 +160,8 @@ export class ChannelCommunicationService {
 
       this.eventBus.publish(
         new CustomerNotificationEvent(ctx, channelId, 'balance_changed', customerId, {
+          customerName:
+            `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim() || undefined,
           outstandingAmount: newBalance,
           oldBalance,
           change: newBalance - oldBalance,
@@ -222,6 +228,8 @@ export class ChannelCommunicationService {
 
         this.eventBus.publish(
           new CustomerNotificationEvent(ctx, channelId, 'repayment_deadline', customerId, {
+            customerName:
+              `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim() || undefined,
             outstandingAmount,
             creditLimit,
             creditDuration,

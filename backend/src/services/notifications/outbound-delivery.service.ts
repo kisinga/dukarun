@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Customer, RequestContext, TransactionalConnection } from '@vendure/core';
+import { Customer, RequestContext, TransactionalConnection, User } from '@vendure/core';
 import { env } from '../../infrastructure/config/environment.config';
 import { CommunicationService } from '../../infrastructure/communication/communication.service';
 import { ChannelUserService } from '../../services/auth/channel-user.service';
@@ -160,6 +160,24 @@ export class OutboundDeliveryService {
       if (!customer?.user?.identifier) return [];
       const id = customer.user.identifier;
       if (typeof id === 'string' && id.includes('@')) return [id];
+      return [];
+    }
+    if (audience === 'channel_admins' && payload.channelId) {
+      // Send to the first channel admin with a valid email (single admin per notification).
+      const adminIds = await this.channelUserService.getChannelAdminUserIds(
+        ctx,
+        String(payload.channelId),
+        { includeSuperAdmins: false }
+      );
+      for (const userId of adminIds) {
+        const user = await this.connection.rawConnection
+          .getRepository(User)
+          .findOne({ where: { id: userId } });
+        const identifier = user?.identifier;
+        if (typeof identifier === 'string' && identifier.includes('@')) {
+          return [identifier];
+        }
+      }
       return [];
     }
     return [];

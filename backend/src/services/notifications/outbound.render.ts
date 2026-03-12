@@ -30,32 +30,44 @@ const RENDERERS: Record<string, RenderFn> = {
     inAppMessage: `Order #${p.orderCode} has been cancelled`,
   }),
   subscription_expiring_soon: p => {
-    const company = p.company ? `Company: ${String(p.company)}. ` : '';
+    const company = String(p.company || 'your company');
+    const days = p.daysRemaining ?? 'a few';
+    const dayWord = days === 1 ? 'day' : 'days';
+    const expiryDate = p.expiresAt
+      ? new Date(String(p.expiresAt)).toLocaleDateString('en-KE', { dateStyle: 'long' })
+      : null;
+    const expiryLine = expiryDate ? `\nExpiry date: ${expiryDate}` : '';
     return {
       inAppTitle: 'Subscription Expiring Soon',
-      inAppMessage: `${company}Your subscription expires in ${p.daysRemaining ?? 'a few'} days`,
+      inAppMessage: `${company}: subscription expires in ${days} ${dayWord}`,
+      emailSubject: `Action required: ${company} subscription expires in ${days} ${dayWord}`,
+      emailBody: `Hi ${company} Team,\n\nThis is a reminder that your DukaRun subscription will expire in ${days} ${dayWord}.${expiryLine}\n\nPlease renew your subscription before it expires to avoid any interruption to your service.\n\nLog in to your dashboard to manage your subscription:\nhttps://dukarun.com/dashboard/settings\n\n– The DukaRun Team`,
     };
   },
-  subscription_expired: () => ({
-    inAppTitle: 'Subscription Expired',
-    inAppMessage: 'Your subscription has expired. Please renew to continue.',
-  }),
-  subscription_renewed: () => ({
+  subscription_renewed: p => ({
     inAppTitle: 'Subscription Renewed',
-    inAppMessage: 'Your subscription has been renewed successfully.',
+    inAppMessage: p.company
+      ? `${p.company}: subscription renewed successfully.`
+      : 'Your subscription has been renewed successfully.',
   }),
   ml_status: p => {
     const op = p.operation === 'training' ? 'Training' : 'Extraction';
-    const statusMap: Record<string, string> = {
-      queued: 'queued',
-      started: 'started',
-      completed: 'completed successfully',
-      failed: 'failed',
-    };
     const status = String(p.status ?? '');
+    const statusMap: Record<string, string> = {
+      queued: 'has been queued',
+      started: 'has started',
+      completed: 'completed successfully',
+      failed: 'failed — check the ML dashboard for details',
+    };
+    const titleSuffix =
+      status === 'completed'
+        ? 'Complete'
+        : status === 'failed'
+          ? 'Failed'
+          : status.charAt(0).toUpperCase() + status.slice(1);
     return {
-      inAppTitle: `ML ${op} ${status === 'completed' ? 'Complete' : status.charAt(0).toUpperCase() + status.slice(1)}`,
-      inAppMessage: `ML ${(op as string).toLowerCase()} has ${statusMap[status] ?? status}`,
+      inAppTitle: `ML ${op} ${titleSuffix}`,
+      inAppMessage: `ML ${op.toLowerCase()} ${statusMap[status] ?? status}.`,
     };
   },
   admin_action: p => {
@@ -67,18 +79,34 @@ const RENDERERS: Record<string, RenderFn> = {
       inAppMessage: `A ${entity} has been ${action}`,
     };
   },
-  customer_created: () => ({
+  customer_created: p => ({
     inAppTitle: 'New Customer',
-    inAppMessage: 'A new customer has been created.',
+    inAppMessage: p.customerName
+      ? `${p.customerName} has been added as a customer.`
+      : 'A new customer has been created.',
   }),
-  credit_approved: () => ({
-    inAppTitle: 'Credit Approved',
-    inAppMessage: 'Customer credit has been approved.',
-  }),
-  balance_changed_admin: () => ({
-    inAppTitle: 'Balance Updated',
-    inAppMessage: 'A customer balance has been updated.',
-  }),
+  credit_approved: p => {
+    const limit =
+      p.creditLimit != null ? ` (KES ${Number(p.creditLimit).toLocaleString('en-KE')})` : '';
+    return {
+      inAppTitle: 'Credit Approved',
+      inAppMessage: p.customerName
+        ? `Credit approved for ${p.customerName}${limit}.`
+        : `Customer credit has been approved${limit}.`,
+    };
+  },
+  balance_changed_admin: p => {
+    const amount =
+      p.outstandingAmount != null
+        ? ` Balance: KES ${Number(p.outstandingAmount).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`
+        : '';
+    return {
+      inAppTitle: 'Balance Updated',
+      inAppMessage: p.customerName
+        ? `${p.customerName}'s balance updated.${amount}`
+        : `A customer balance has been updated.${amount}`,
+    };
+  },
   balance_changed: p => {
     const newBalanceCents = Number(p.newBalanceCents ?? 0);
     const formatted = formatCents(newBalanceCents);
@@ -89,10 +117,19 @@ const RENDERERS: Record<string, RenderFn> = {
       emailBody: `Your account balance has been updated.\n\nOutstanding balance: KES ${formatted}.\n\nIf you have questions about this update, please contact your supplier.`,
     };
   },
-  repayment_deadline: () => ({
-    inAppTitle: 'Repayment Reminder',
-    inAppMessage: 'Customer repayment deadline reminder.',
-  }),
+  repayment_deadline: p => {
+    const amount =
+      p.outstandingAmount != null
+        ? ` Outstanding: KES ${Number(p.outstandingAmount).toLocaleString('en-KE', { minimumFractionDigits: 2 })}.`
+        : '';
+    const reason = p.exceedsThreshold ? 'Credit limit nearly reached.' : 'Repayment due soon.';
+    return {
+      inAppTitle: 'Repayment Reminder',
+      inAppMessage: p.customerName
+        ? `${p.customerName}: ${reason}${amount}`
+        : `Customer repayment deadline.${amount}`,
+    };
+  },
   channel_approved: () => ({
     inAppTitle: 'Channel Approved',
     inAppMessage: 'Your channel status has been updated.',
@@ -103,7 +140,9 @@ const RENDERERS: Record<string, RenderFn> = {
   }),
   stock_low: p => ({
     inAppTitle: 'Low Stock Alert',
-    inAppMessage: (p.message as string) || `Product ${p.productId} is running low on stock`,
+    inAppMessage: (p.productName as string)
+      ? `${p.productName} is running low on stock.`
+      : (p.message as string) || `Product ${p.productId} is running low on stock`,
   }),
   company_registered: p => {
     const details = p as {
@@ -185,14 +224,37 @@ Please log in to the admin panel to review and approve this registration.
       inAppMessage: message,
     };
   },
-  shift_opened: p => ({
-    inAppTitle: 'Shift Opened',
-    inAppMessage: `Cashier session ${p.sessionId ?? 'session'} opened.`,
-  }),
-  shift_closed: p => ({
-    inAppTitle: 'Shift Closed',
-    inAppMessage: `Cashier session ${p.sessionId ?? 'session'} has been closed.`,
-  }),
+  shift_opened: p => {
+    const time = p.openedAt
+      ? new Date(String(p.openedAt)).toLocaleTimeString('en-KE', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : null;
+    return {
+      inAppTitle: 'Shift Opened',
+      inAppMessage: time ? `Shift opened at ${time}.` : 'A new shift has been opened.',
+    };
+  },
+  shift_closed: p => {
+    const time = p.closedAt
+      ? new Date(String(p.closedAt)).toLocaleTimeString('en-KE', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : null;
+    const varianceCents = Number(p.variance ?? 0);
+    const varianceText =
+      varianceCents !== 0
+        ? ` Variance: KES ${(Math.abs(varianceCents) / 100).toFixed(2)}${varianceCents < 0 ? ' short' : ' over'}.`
+        : '';
+    return {
+      inAppTitle: 'Shift Closed',
+      inAppMessage: time
+        ? `Shift closed at ${time}.${varianceText}`
+        : `Shift has been closed.${varianceText}`,
+    };
+  },
 };
 
 /**

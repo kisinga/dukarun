@@ -300,24 +300,22 @@ export class DashboardLayoutComponent implements OnInit {
       return;
     }
 
-    // Check if this is an approval notification and navigate accordingly
-    if (notification?.data?.approvalId) {
+    // Navigate if the notification carries a destination
+    const navigateTo = notification?.data?.navigateTo;
+    if (navigateTo && typeof navigateTo === 'string') {
       await this.notificationService.markAsRead(notificationId);
-      const navigateTo = notification.data.navigateTo;
-      if (navigateTo && typeof navigateTo === 'string') {
-        // Parse route and query params from navigateTo (e.g., "/dashboard/purchases/create?approvalId=xxx")
-        const [path, queryString] = navigateTo.split('?');
-        const queryParams: Record<string, string> = {};
-        if (queryString) {
-          for (const pair of queryString.split('&')) {
-            const [key, value] = pair.split('=');
-            if (key && value) queryParams[key] = decodeURIComponent(value);
-          }
+      const [path, queryString] = navigateTo.split('?');
+      const queryParams: Record<string, string> = {};
+      if (queryString) {
+        for (const pair of queryString.split('&')) {
+          const [key, value] = pair.split('=');
+          if (key && value) queryParams[key] = decodeURIComponent(value);
         }
-        await this.router.navigate([path], { queryParams });
-      } else {
-        await this.router.navigate(['/dashboard/approvals']);
       }
+      await this.router.navigate(
+        [path],
+        Object.keys(queryParams).length ? { queryParams } : undefined,
+      );
       return;
     }
 
