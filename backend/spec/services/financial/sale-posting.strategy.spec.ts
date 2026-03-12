@@ -259,6 +259,86 @@ describe('SalePostingStrategy', () => {
 
     expect(result.success).toBe(true);
     expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
+    // findOne must not be called — early return happens before the DB reload
+    expect(mockOrderService.findOne).not.toHaveBeenCalled();
+  });
+
+  it('always reloads order from DB via orderService.findOne, even when caller passes order with lines', async () => {
+    // Defensive reload must always fire — callers may have stale data
+    await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderWithLines, // already has lines, but reload must still happen
+      isCreditSale: false,
+    });
+
+    expect(mockOrderService.findOne).toHaveBeenCalledWith(
+      ctx,
+      orderWithLines.id,
+      expect.arrayContaining(['lines', 'lines.productVariant', 'customer'])
+    );
+  });
+
+  it('skips COGS gracefully when orderService.findOne returns null (order not found)', async () => {
+    mockOrderService.findOne.mockResolvedValue(null as never);
+
+    const result = await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderWithLines,
+      isCreditSale: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
+  });
+
+  it('sets cogsStatus to "recorded" on the order after successful COGS recording', async () => {
+    await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderWithLines,
+      isCreditSale: false,
+    });
+
+    expect(mockInventoryService.recordSale).toHaveBeenCalled();
+    const repoMock = mockConnection.getRepository();
+    expect(repoMock.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: orderWithLines.id }),
+      expect.objectContaining({
+        customFields: expect.objectContaining({ cogsStatus: 'recorded' }),
+      })
+    );
+  });
+
+  it('sets cogsStatus to "skipped" when COGS is skipped due to insufficient stock', async () => {
+    mockInventoryService.recordSale.mockRejectedValue(
+      new Error('Insufficient stock for variant 16. Requested: 1')
+    );
+
+    const result = await strategy.post({
+      ctx,
+      sourceId: String(settledPayment.id),
+      channelId: ctx.channelId as number,
+      payment: settledPayment,
+      order: orderWithLines,
+      isCreditSale: false,
+    });
+
+    expect(result.success).toBe(true);
+    const repoMock = mockConnection.getRepository();
+    expect(repoMock.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: orderWithLines.id }),
+      expect.objectContaining({
+        customFields: expect.objectContaining({ cogsStatus: 'skipped' }),
+      })
+    );
   });
 
   it('calls recordSale even when order.lines is undefined (TypeORM unloaded relation)', async () => {

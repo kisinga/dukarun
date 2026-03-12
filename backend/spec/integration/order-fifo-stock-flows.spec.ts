@@ -23,6 +23,7 @@ describe('Order FIFO / stock integration flows', () => {
   let mockQueryService: any;
   let mockChartService: any;
   let mockInventoryService: any;
+  let mockOrderService: any;
   let salePostingStrategy: SalePostingStrategy;
 
   beforeEach(() => {
@@ -73,12 +74,33 @@ describe('Order FIFO / stock integration flows', () => {
       recordSale: (jest.fn() as any).mockResolvedValue(undefined),
     };
 
+    // findOne returns whichever order the strategy requests — tests override per-case
+    mockOrderService = {
+      findOne: jest.fn().mockImplementation((_ctx: any, _id: any) =>
+        Promise.resolve({
+          id: _id,
+          code: `ORD-${_id}`,
+          lines: [{ productVariantId: 100, quantity: 2, productVariant: { id: 100 } }],
+          customer: { id: 'cust-1' },
+          orderPlacedAt: new Date(),
+        })
+      ),
+    };
+    const mockConnection = {
+      getRepository: jest.fn().mockReturnValue({
+        findOne: jest.fn().mockResolvedValue({ id: 'order-1', customFields: {} } as never),
+        update: jest.fn().mockResolvedValue(undefined as never),
+      }),
+    };
+
     salePostingStrategy = new SalePostingStrategy(
       mockPostingService as any,
       mockQueryService as any,
       mockChartService as any,
       mockInventoryService as any,
-      stockLocationService
+      stockLocationService,
+      mockOrderService as any,
+      mockConnection as any
     );
   });
 
@@ -187,6 +209,7 @@ describe('Order FIFO / stock integration flows', () => {
         customer: { id: 'cust-1' },
         orderPlacedAt: new Date(),
       } as any;
+      mockOrderService.findOne.mockResolvedValue(order);
 
       const result = await salePostingStrategy.post({
         ctx,
