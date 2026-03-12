@@ -3,7 +3,6 @@ import { ChannelService, EventBus, RequestContext, TransactionalConnection } fro
 import { SubscriptionAlertEvent } from '../../infrastructure/events/custom-events';
 import { getSellerForChannel } from '../../utils/seller-access.util';
 import { NotificationService } from '../../services/notifications/notification.service';
-import { SubscriptionService } from '../../services/subscriptions/subscription.service';
 import { WorkerBackgroundTaskBase } from '../../infrastructure/utils/worker-background-task.base';
 import { WorkerContextService } from '../../infrastructure/utils/worker-context.service';
 
@@ -25,7 +24,6 @@ export class SubscriptionExpirySubscriber extends WorkerBackgroundTaskBase {
     private channelService: ChannelService,
     private connection: TransactionalConnection,
     private eventBus: EventBus,
-    private subscriptionService: SubscriptionService,
     private notificationService: NotificationService
   ) {
     super(workerContext, SubscriptionExpirySubscriber.name);
@@ -77,22 +75,8 @@ export class SubscriptionExpirySubscriber extends WorkerBackgroundTaskBase {
 
         const channelId = channel.id.toString();
 
-        // Check if expired
+        // Skip already-expired subscriptions
         if (expiresAt <= now) {
-          // Send exactly one "expired" notification, then never again.
-          // Mark before publish so a crash after emit does not cause duplicate on next run.
-          const alreadySent = await this.subscriptionService.hasEverSentExpiredReminder(
-            ctx,
-            channelId
-          );
-          if (alreadySent) continue;
-          await this.subscriptionService.markExpiredReminderSent(ctx, channelId);
-          this.eventBus.publish(
-            new SubscriptionAlertEvent(ctx, channelId, 'expired', {
-              expiresAt: expiresAt.toISOString(),
-            })
-          );
-          notifiedCount++;
           continue;
         }
 

@@ -16,6 +16,7 @@ import { CompanyService } from '../../../core/services/company.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { DashboardService, PeriodStats } from '../../../core/services/dashboard.service';
 import { AnalyticsService } from '../../../core/services/analytics.service';
+import { AuthPermissionsService } from '../../../core/services/auth/auth-permissions.service';
 import { OrderTableRowComponent } from '../orders/components/order-table-row.component';
 import { OrderCardComponent } from '../orders/components/order-card.component';
 import { EchartContainerComponent } from '../../components/shared/charts/echart-container.component';
@@ -207,6 +208,19 @@ export class OverviewComponent implements OnInit {
   protected readonly stockValueStats = this.dashboardService.stockValueStats;
   protected readonly stockValueLoading = this.dashboardService.stockValueLoading;
 
+  private readonly authPermissions = inject(AuthPermissionsService);
+
+  /**
+   * Admin-only stats gate.
+   * Minimum permission: UpdateSettings
+   * Hides: Gross profit, Profit margin %, Stock value (Retail/Wholesale/Cost)
+   * Everyone else sees: Revenue, Orders, Sales/Purchases/Expenses, Sales graph,
+   *   Product count, Variant count, Low stock, Recent orders.
+   */
+  protected readonly hasAdminStats = computed(() =>
+    this.authPermissions.hasUpdateSettingsPermission(),
+  );
+
   constructor() {
     effect(
       () => {
@@ -214,7 +228,10 @@ export class OverviewComponent implements OnInit {
         if (companyId) {
           this.dashboardService.fetchDashboardData();
           void this.analyticsService.fetch('30d'); // 30d for profit margin + sales chart
-          void this.dashboardService.loadStockValueStats();
+          // Stock value is admin-only — skip the query for non-admins
+          if (this.hasAdminStats()) {
+            void this.dashboardService.loadStockValueStats();
+          }
         }
       },
       { allowSignalWrites: true },
@@ -230,7 +247,9 @@ export class OverviewComponent implements OnInit {
   }
 
   refreshStockValue(): void {
-    void this.dashboardService.loadStockValueStats(true);
+    if (this.hasAdminStats()) {
+      void this.dashboardService.loadStockValueStats(true);
+    }
   }
 
   private createCategoryData(

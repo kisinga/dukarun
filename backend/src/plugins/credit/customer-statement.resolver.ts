@@ -14,13 +14,4 @@ export class CustomerStatementResolver {
   ): Promise<boolean> {
     return this.statementService.sendStatementEmail(ctx, customerId);
   }
-
-  @Mutation()
-  @Allow(Permission.ReadCustomer)
-  async sendCustomerStatementSms(
-    @Ctx() ctx: RequestContext,
-    @Args('customerId') customerId: string
-  ): Promise<boolean> {
-    return this.statementService.sendMiniStatementSms(ctx, customerId);
-  }
 }

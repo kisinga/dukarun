@@ -5,11 +5,7 @@ import type {
   GetOrdersQueryVariables,
   OrderListOptions,
 } from '../../graphql/generated/graphql';
-import {
-  GET_ORDERS,
-  SEND_CUSTOMER_STATEMENT_EMAIL,
-  SEND_CUSTOMER_STATEMENT_SMS,
-} from '../../graphql/operations.graphql';
+import { GET_ORDERS, SEND_CUSTOMER_STATEMENT_EMAIL } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { CustomerService } from '../customer.service';
 
@@ -77,19 +73,6 @@ export class CustomerStatementService {
         variables: { customerId },
       });
       return result.data?.sendCustomerStatementEmail ?? false;
-    } catch {
-      return false;
-    }
-  }
-
-  async sendMiniStatementSms(customerId: string): Promise<boolean> {
-    try {
-      const client = this.apollo.getClient();
-      const result = await client.mutate<{ sendCustomerStatementSms: boolean }>({
-        mutation: SEND_CUSTOMER_STATEMENT_SMS as DocumentNode,
-        variables: { customerId },
-      });
-      return result.data?.sendCustomerStatementSms ?? false;
     } catch {
       return false;
     }

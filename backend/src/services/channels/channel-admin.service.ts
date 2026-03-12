@@ -1,10 +1,10 @@
-import crypto from 'crypto';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   Administrator,
   AdministratorEvent,
   AdministratorService,
   Channel,
+  ChannelService,
   EventBus,
   NativeAuthenticationMethod,
   PasswordCipher,
@@ -15,14 +15,14 @@ import {
   RoleService,
   TransactionalConnection,
   User,
-  ChannelService,
 } from '@vendure/core';
+import crypto from 'crypto';
+import { RoleTemplateAssignment } from '../../domain/role-template/role-template-assignment.entity';
+import { RoleTemplate } from '../../domain/role-template/role-template.entity';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { CommunicationService } from '../../infrastructure/communication/communication.service';
-import { RoleTemplate } from '../../domain/role-template/role-template.entity';
-import { RoleTemplateAssignment } from '../../domain/role-template/role-template-assignment.entity';
-import { RoleTemplateService } from './role-template.service';
 import { formatPhoneNumber } from '../../utils/phone.utils';
+import { RoleTemplateService } from './role-template.service';
 
 export interface InviteAdministratorInput {
   emailAddress?: string;
@@ -708,7 +708,7 @@ export class ChannelAdminService {
 
       const message = isExistingUser
         ? `Welcome! You've been added as an administrator to ${companyName}. You can now access the dashboard. Go to https://dukarun.com/login to get started.`
-        : `Welcome to ${companyName}! You've been added as an administrator. You can now access the dashboard. Go to https://dukarun.com/login to get started.`;
+        : `Welcome to Dukarun! You've been added as an administrator to ${companyName}. You can now access the dashboard. Go to https://dukarun.com/login to get started.`;
 
       const result = await this.communicationService.send({
         channel: 'sms',

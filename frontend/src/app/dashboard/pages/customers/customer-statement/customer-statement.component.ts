@@ -18,7 +18,6 @@ import { CustomerStatementService } from '../../../../core/services/customer/cus
  * Shows statement (orders/payments) for a customer with options to:
  * - Download as PDF (print)
  * - Email statement (if customer has email)
- * - Send mini statement via SMS (if customer has phone, &lt; 160 chars)
  */
 @Component({
   selector: 'app-customer-statement',
@@ -51,15 +50,12 @@ export class CustomerStatementComponent implements OnInit {
     return !!e && e.toLowerCase() !== 'walkin@pos.local';
   });
 
-  readonly hasPhone = computed(() => !!this.customer()?.phoneNumber?.trim());
-
   readonly totalOrders = computed(() => this.orders().length);
   readonly totalAmount = computed(() =>
     this.orders().reduce((sum, o) => sum + (o.totalWithTax ?? o.total ?? 0), 0),
   );
 
   readonly emailSending = signal(false);
-  readonly smsSending = signal(false);
   readonly toastMessage = signal<{ type: 'success' | 'error'; text: string } | null>(null);
 
   ngOnInit(): void {
@@ -91,23 +87,6 @@ export class CustomerStatementComponent implements OnInit {
       );
     } finally {
       this.emailSending.set(false);
-    }
-  }
-
-  async sendMiniStatementSms(): Promise<void> {
-    const id = this.customer()?.id;
-    if (!id || !this.hasPhone()) return;
-    this.smsSending.set(true);
-    this.toastMessage.set(null);
-    try {
-      const ok = await this.statementService.sendMiniStatementSms(id);
-      this.toastMessage.set(
-        ok
-          ? { type: 'success', text: 'Mini statement sent via SMS.' }
-          : { type: 'error', text: 'Failed to send SMS.' },
-      );
-    } finally {
-      this.smsSending.set(false);
     }
   }
 

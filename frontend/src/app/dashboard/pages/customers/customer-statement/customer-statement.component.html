@@ -178,19 +178,6 @@
           Email statement
         </button>
       }
-      @if (hasPhone()) {
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          [disabled]="smsSending()"
-          (click)="sendMiniStatementSms()"
-        >
-          @if (smsSending()) {
-            <span class="loading loading-spinner loading-xs"></span>
-          }
-          Send mini statement (SMS)
-        </button>
-      }
     </div>
 
     @if (toastMessage()) {

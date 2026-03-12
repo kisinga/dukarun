@@ -1,11 +1,11 @@
-import crypto from 'crypto';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { RequestContext } from '@vendure/core';
+import crypto from 'crypto';
 import Redis from 'ioredis';
 import { BRAND_CONFIG } from '../../constants/brand.constants';
-import { env } from '../../infrastructure/config/environment.config';
 import { AdminLoginAttemptService } from '../../infrastructure/audit/admin-login-attempt.service';
 import { CommunicationService } from '../../infrastructure/communication/communication.service';
+import { env } from '../../infrastructure/config/environment.config';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 
 /**
@@ -226,7 +226,7 @@ export class OtpService implements OnModuleInit, OnModuleDestroy {
 
     // Send SMS (Primary Channel) - Only if it's a phone number
     if (!isEmailIdentifier) {
-      const message = `Your ${BRAND_CONFIG.name} verification code is: ${otpCode} Valid for 5 minutes.`;
+      const message = `Welcome to ${BRAND_CONFIG.name}! Your verification code is: ${otpCode} Valid for 5 minutes. Do not share this code with anyone.`;
       await this.communicationService.send({
         channel: 'sms',
         recipient: storageKey,

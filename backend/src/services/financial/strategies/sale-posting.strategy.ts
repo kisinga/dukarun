@@ -1,5 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { Order, Payment, RequestContext, StockLocationService } from '@vendure/core';
+import {
+  Order,
+  OrderService,
+  Payment,
+  RequestContext,
+  StockLocationService,
+  TransactionalConnection,
+} from '@vendure/core';
 import { ACCOUNT_CODES } from '../../../ledger/account-codes.constants';
 import { BaseTransactionStrategy } from '../base-transaction-strategy';
 import { ChartOfAccountsService } from '../chart-of-accounts.service';
@@ -52,7 +59,9 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
     queryService: LedgerQueryService,
     private readonly chartOfAccountsService: ChartOfAccountsService,
     private readonly inventoryService: InventoryService,
-    private readonly stockLocationService: StockLocationService
+    private readonly stockLocationService: StockLocationService,
+    private readonly orderService: OrderService,
+    private readonly connection: TransactionalConnection
   ) {
     super(postingService, queryService, 'SalePostingStrategy');
   }
@@ -193,15 +202,26 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
         return;
       }
 
+      // Always reload with lines — callers do not guarantee this relation is hydrated
+      const fullOrder = await this.orderService.findOne(ctx, order.id, [
+        'lines',
+        'lines.productVariant',
+        'customer',
+      ]);
+      if (!fullOrder) {
+        this.logger.warn(`Order ${orderId} not found when recording COGS — skipping`);
+        return;
+      }
+
       const location = await this.stockLocationService.defaultStockLocation(ctx);
       if (!location?.id) {
         this.logger.warn(
-          `No stock location for channel ${channelId}; skipping COGS recording for order ${order.code}`
+          `No stock location for channel ${channelId}; skipping COGS recording for order ${fullOrder.code}`
         );
         return;
       }
 
-      const lines = (order.lines ?? [])
+      const lines = (fullOrder.lines ?? [])
         .filter(line => line.quantity > 0)
         .map(line => ({
           productVariantId: String(line.productVariantId ?? (line as any).productVariant?.id),
@@ -213,22 +233,23 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
       }
 
       const saleDate =
-        order.orderPlacedAt != null
-          ? new Date(order.orderPlacedAt).toISOString().slice(0, 10)
+        fullOrder.orderPlacedAt != null
+          ? new Date(fullOrder.orderPlacedAt).toISOString().slice(0, 10)
           : undefined;
 
       const input: RecordSaleInput = {
         orderId,
-        orderCode: order.code,
+        orderCode: fullOrder.code,
         channelId: ctx.channelId as any,
         stockLocationId: location.id as any,
-        customerId: order.customer?.id?.toString() ?? '',
+        customerId: fullOrder.customer?.id?.toString() ?? '',
         saleDate,
         lines,
       };
 
       await this.inventoryService.recordSale(ctx, input);
-      this.logger.log(`Recorded COGS for order ${order.code}`);
+      await this.setCogsStatus(ctx, order.id, 'recorded');
+      this.logger.log(`Recorded COGS for order ${fullOrder.code}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const isInsufficientStock =
@@ -236,7 +257,9 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
         message.includes('Insufficient quantity in batch') ||
         (message.includes('Batch') && message.includes('not found or not available'));
       if (isInsufficientStock) {
-        // When batch stock is insufficient at payment time (e.g. oversold), COGS is skipped and the order remains paid/fulfilled; consider reporting or alerting on such orders.
+        // Batch stock exhausted at sale time (e.g. oversold). Mark the order so operators can
+        // query all skipped-COGS orders and reconcile after restocking.
+        await this.setCogsStatus(ctx, order.id, 'skipped').catch(() => {});
         this.logger.warn(
           `Skipping COGS for order ${order.code}: no batch stock (${message}). ` +
             `Add stock via stock adjustment so future sales can record COGS.`
@@ -245,6 +268,27 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
       }
       this.logger.error(`Failed to record COGS for order ${order.code}: ${message}`);
       throw err;
+    }
+  }
+
+  private async setCogsStatus(
+    ctx: RequestContext,
+    orderId: string | number,
+    status: 'recorded' | 'skipped'
+  ): Promise<void> {
+    try {
+      const orderRepo = this.connection.getRepository(ctx, Order);
+      const existing = await orderRepo.findOne({ where: { id: orderId } });
+      if (!existing) return;
+      const customFields = (existing.customFields as Record<string, unknown>) || {};
+      await orderRepo.update(
+        { id: orderId },
+        { customFields: { ...customFields, cogsStatus: status } as Record<string, unknown> }
+      );
+    } catch (e) {
+      this.logger.warn(
+        `Failed to set cogsStatus="${status}" on order ${orderId}: ${e instanceof Error ? e.message : String(e)}`
+      );
     }
   }
 

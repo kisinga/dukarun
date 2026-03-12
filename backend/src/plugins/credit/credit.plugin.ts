@@ -202,7 +202,6 @@ const COMBINED_SCHEMA = gql`
     reverseOrder(orderId: ID!): OrderReversalResult!
     voidOrder(orderId: ID!): OrderReversalResult!
     sendCustomerStatementEmail(customerId: ID!): Boolean!
-    sendCustomerStatementSms(customerId: ID!): Boolean!
   }
 
   """

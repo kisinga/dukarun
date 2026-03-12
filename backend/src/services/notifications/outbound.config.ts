@@ -39,15 +39,10 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
     channels: { inApp: true, sms: false, email: false },
     inAppType: NotificationType.ORDER,
   },
-  // Subscription (channel admins, in-app)
+  // Subscription (channel admins)
   subscription_expiring_soon: {
     audience: 'channel_admins',
-    channels: { inApp: true, sms: false, email: false },
-    inAppType: NotificationType.PAYMENT,
-  },
-  subscription_expired: {
-    audience: 'channel_admins',
-    channels: { inApp: true, sms: false, email: false },
+    channels: { inApp: true, sms: false, email: true },
     inAppType: NotificationType.PAYMENT,
   },
   subscription_renewed: {
@@ -88,12 +83,11 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
     channels: { inApp: true, sms: false, email: false },
     inAppType: NotificationType.PAYMENT,
   },
-  // Balance change: SMS to customer only (in-app to admins is balance_changed_admin)
+  // Balance change: email to customer only (in-app to admins is balance_changed_admin)
   balance_changed: {
     audience: 'customer',
-    channels: { inApp: false, sms: true, email: false },
+    channels: { inApp: false, sms: false, email: true },
     inAppType: NotificationType.PAYMENT,
-    smsCategory: 'ACCOUNT_NOTIFICATION' as SmsCategory,
   },
   // Channel status (channel admins, in-app)
   channel_approved: {
@@ -112,12 +106,11 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
     channels: { inApp: true, sms: false, email: false },
     inAppType: NotificationType.STOCK,
   },
-  // Company registered (platform admin, SMS + email)
+  // Company registered (platform admin, email only)
   company_registered: {
     audience: 'platform_admin',
-    channels: { inApp: false, sms: true, email: true },
+    channels: { inApp: false, sms: false, email: true },
     inAppType: NotificationType.ORDER,
-    smsCategory: 'ADMIN' as SmsCategory,
   },
   // Approval (channel admins or requester, in-app)
   approval_created: {
