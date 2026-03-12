@@ -698,6 +698,14 @@ export class InventoryService {
           'Multiple batches exist for this variant at this location; specify batchId to apply adjustment'
         );
       } else {
+        // No open batches exist — creating a zero-cost batch. COGS for future sales
+        // from this batch will be $0, which distorts gross margin reporting.
+        // Operators should receive stock via a purchase instead to capture cost.
+        this.logger.warn(
+          `No open batches for variant ${variantId} at location ${locationId}. ` +
+            `Creating zero-cost batch for adjustment ${adjustmentId}. ` +
+            `COGS for sales from this batch will be $0. Prefer recording a purchase to capture unit cost.`
+        );
         const sourceId = `StockAdjustment:${adjustmentId}:${variantId}:${locationId}`;
         const batch = await this.inventoryStore.createBatch(ctx, {
           channelId: input.channelId,

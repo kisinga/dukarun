@@ -81,21 +81,35 @@
       </div>
     </div>
 
-    <!-- Period-driven summary: Revenue, Gross profit, Orders, Profit margin (COGS-based when available) -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 px-4 py-3 border-b border-base-300/40">
+    <!--
+      Period-driven KPI summary.
+      ReadOrder (everyone): Revenue, Orders
+      UpdateSettings (admin only): Gross profit, Profit margin
+    -->
+    <div
+      [class]="
+        'grid gap-3 px-4 py-3 border-b border-base-300/40 ' +
+        (hasAdminStats() ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2')
+      "
+    >
+      <!-- ReadOrder: visible to everyone -->
       <div class="kpi-card kpi-card--revenue rounded-lg p-3">
         <span class="kpi-label">Revenue</span>
         <p class="text-xl font-bold tabular-nums text-primary leading-tight mt-1">
           {{ periodRevenueFormatted() }}
         </p>
       </div>
-      <div class="kpi-card kpi-card--margin rounded-lg p-3">
-        <span class="kpi-label">Gross profit</span>
-        <p class="text-xl font-bold tabular-nums text-success leading-tight mt-1">
-          {{ periodGrossProfitFormatted() }}
-        </p>
-        <span class="text-[10px] text-base-content/40 mt-0.5 block">based on COGS</span>
-      </div>
+      <!-- UpdateSettings: admin only -->
+      @if (hasAdminStats()) {
+        <div class="kpi-card kpi-card--margin rounded-lg p-3">
+          <span class="kpi-label">Gross profit</span>
+          <p class="text-xl font-bold tabular-nums text-success leading-tight mt-1">
+            {{ periodGrossProfitFormatted() }}
+          </p>
+          <span class="text-[10px] text-base-content/40 mt-0.5 block">based on COGS</span>
+        </div>
+      }
+      <!-- ReadOrder: visible to everyone -->
       <div class="kpi-card rounded-lg p-3">
         <span class="kpi-label">Orders</span>
         @if (periodOrderCount() !== null) {
@@ -104,18 +118,21 @@
           <p class="text-xl font-bold tabular-nums text-base-content/50 leading-tight mt-1">—</p>
         }
       </div>
-      <div class="kpi-card kpi-card--margin rounded-lg p-3">
-        <span class="kpi-label">Profit margin</span>
-        @if (analyticsLoading()) {
-          <div class="skeleton h-7 w-14 rounded mt-1"></div>
-        } @else if (profitMarginPercent() !== null) {
-          <p class="text-xl font-bold tabular-nums text-success leading-tight mt-1">
-            {{ profitMarginPercent() }}%
-          </p>
-        } @else {
-          <p class="text-xl font-bold tabular-nums text-base-content/50 leading-tight mt-1">—</p>
-        }
-      </div>
+      <!-- UpdateSettings: admin only -->
+      @if (hasAdminStats()) {
+        <div class="kpi-card kpi-card--margin rounded-lg p-3">
+          <span class="kpi-label">Profit margin</span>
+          @if (analyticsLoading()) {
+            <div class="skeleton h-7 w-14 rounded mt-1"></div>
+          } @else if (profitMarginPercent() !== null) {
+            <p class="text-xl font-bold tabular-nums text-success leading-tight mt-1">
+              {{ profitMarginPercent() }}%
+            </p>
+          } @else {
+            <p class="text-xl font-bold tabular-nums text-base-content/50 leading-tight mt-1">—</p>
+          }
+        </div>
+      }
     </div>
 
     <!-- Category cards — Sales, Purchases, Expenses for selected period -->
@@ -285,34 +302,48 @@
           </svg>
           <span class="hidden sm:inline text-xs font-medium">Analytics</span>
         </a>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm btn-square touch-manipulation"
-          (click)="refreshStockValue()"
-          [disabled]="stockValueLoading()"
-          title="Refresh stock value"
-        >
-          @if (stockValueLoading()) {
-            <span class="loading loading-spinner loading-xs"></span>
-          } @else {
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-          }
-        </button>
+        <!-- UpdateSettings: refresh only relevant when stock values are visible -->
+        @if (hasAdminStats()) {
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm btn-square touch-manipulation"
+            (click)="refreshStockValue()"
+            [disabled]="stockValueLoading()"
+            title="Refresh stock value"
+          >
+            @if (stockValueLoading()) {
+              <span class="loading loading-spinner loading-xs"></span>
+            } @else {
+              <svg
+                class="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            }
+          </button>
+        }
       </div>
     </div>
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 px-4 py-4">
+    <!--
+      Inventory grid.
+      ReadOrder (everyone): Products, Variants, Low stock
+      UpdateSettings (admin only): Stock value · Retail / Wholesale / Cost
+      Layout: 6 items (admin) → grid-cols-2 sm:grid-cols-3; 3 items (non-admin) → grid-cols-3
+    -->
+    <div
+      [class]="
+        'grid gap-3 px-4 py-4 ' + (hasAdminStats() ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-3')
+      "
+    >
+      <!-- ReadOrder: visible to everyone -->
       <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
         <span class="inventory-stat__label">Products</span>
         <p class="inventory-stat__value text-accent">{{ productCount() }}</p>
@@ -335,36 +366,41 @@
           <p class="inventory-stat__value text-success">0</p>
         }
       </div>
-      <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
-        <span class="inventory-stat__label">Stock value · Retail</span>
-        @if (stockValueLoading() && !stockValueStats()) {
-          <div class="skeleton h-7 w-20 rounded mt-0.5"></div>
-        } @else if (stockValueStats(); as sv) {
-          <p class="inventory-stat__value text-primary">{{ currencyService.format(sv.retail) }}</p>
-        } @else {
-          <p class="inventory-stat__value text-base-content/50">—</p>
-        }
-      </div>
-      <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
-        <span class="inventory-stat__label">Stock value · Wholesale</span>
-        @if (stockValueLoading() && !stockValueStats()) {
-          <div class="skeleton h-7 w-20 rounded mt-0.5"></div>
-        } @else if (stockValueStats(); as sv) {
-          <p class="inventory-stat__value">{{ currencyService.format(sv.wholesale) }}</p>
-        } @else {
-          <p class="inventory-stat__value text-base-content/50">—</p>
-        }
-      </div>
-      <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
-        <span class="inventory-stat__label">Stock value · Cost</span>
-        @if (stockValueLoading() && !stockValueStats()) {
-          <div class="skeleton h-7 w-20 rounded mt-0.5"></div>
-        } @else if (stockValueStats(); as sv) {
-          <p class="inventory-stat__value text-success">{{ currencyService.format(sv.cost) }}</p>
-        } @else {
-          <p class="inventory-stat__value text-base-content/50">—</p>
-        }
-      </div>
+      <!-- UpdateSettings: admin only — stock values are financially sensitive -->
+      @if (hasAdminStats()) {
+        <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
+          <span class="inventory-stat__label">Stock value · Retail</span>
+          @if (stockValueLoading() && !stockValueStats()) {
+            <div class="skeleton h-7 w-20 rounded mt-0.5"></div>
+          } @else if (stockValueStats(); as sv) {
+            <p class="inventory-stat__value text-primary">
+              {{ currencyService.format(sv.retail) }}
+            </p>
+          } @else {
+            <p class="inventory-stat__value text-base-content/50">—</p>
+          }
+        </div>
+        <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
+          <span class="inventory-stat__label">Stock value · Wholesale</span>
+          @if (stockValueLoading() && !stockValueStats()) {
+            <div class="skeleton h-7 w-20 rounded mt-0.5"></div>
+          } @else if (stockValueStats(); as sv) {
+            <p class="inventory-stat__value">{{ currencyService.format(sv.wholesale) }}</p>
+          } @else {
+            <p class="inventory-stat__value text-base-content/50">—</p>
+          }
+        </div>
+        <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
+          <span class="inventory-stat__label">Stock value · Cost</span>
+          @if (stockValueLoading() && !stockValueStats()) {
+            <div class="skeleton h-7 w-20 rounded mt-0.5"></div>
+          } @else if (stockValueStats(); as sv) {
+            <p class="inventory-stat__value text-success">{{ currencyService.format(sv.cost) }}</p>
+          } @else {
+            <p class="inventory-stat__value text-base-content/50">—</p>
+          }
+        </div>
+      }
     </div>
   </div>
 

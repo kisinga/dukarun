@@ -1122,6 +1122,21 @@ export const config: VendureConfig = {
         public: false,
         nullable: true,
       },
+      {
+        name: 'cogsStatus',
+        type: 'string',
+        label: [{ languageCode: LanguageCode.en, value: 'COGS Status' }],
+        description: [
+          {
+            languageCode: LanguageCode.en,
+            value:
+              'Tracks whether cost-of-goods-sold was recorded for this order. Values: recorded | skipped. Null means not yet processed.',
+          },
+        ],
+        public: false,
+        nullable: true,
+        ui: { tab: 'Inventory' },
+      },
     ],
     Payment: [
       {
