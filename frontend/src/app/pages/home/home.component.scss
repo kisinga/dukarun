@@ -276,13 +276,67 @@
 }
 
 // Hide scrollbar for carousels
-#barcode-carousel,
-#feature-carousel {
+#barcode-carousel {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
 
   &::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Opera */
+  }
+}
+
+// ============================================
+// PHONE SLIDESHOW - images fade inside fixed frame
+// ============================================
+
+.mockup-phone-display {
+  position: relative;
+}
+
+.phone-screenshot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.7s ease-in-out;
+  pointer-events: none;
+
+  &.phone-screenshot--active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.phone-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: oklch(var(--b3));
+  border: none;
+  cursor: pointer;
+  transition:
+    background-color 0.3s ease,
+    transform 0.3s ease;
+
+  &.phone-dot--active {
+    background-color: oklch(var(--p));
+    transform: scale(1.4);
+  }
+
+  &:focus-visible {
+    outline: 2px solid oklch(var(--p));
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone-screenshot {
+    transition: none;
+  }
+  .phone-dot {
+    transition: none;
   }
 }
 

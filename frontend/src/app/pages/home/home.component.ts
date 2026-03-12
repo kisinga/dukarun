@@ -109,6 +109,10 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Trial length (days) from platform config; null when unavailable. */
   protected readonly trialDays = signal<number | null>(null);
+  protected readonly activeScreenshotIndex = signal(0);
+
+  private phoneSlideshowInterval?: number;
+  private phoneSlideshowObserver?: IntersectionObserver;
   protected readonly trialCtaText = computed(() => {
     const days = this.trialDays();
     return typeof days === 'number' && days > 0
@@ -549,6 +553,13 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     this.observers.forEach((observer) => observer.disconnect());
     this.observers = [];
 
+    if (this.phoneSlideshowInterval) {
+      clearInterval(this.phoneSlideshowInterval);
+    }
+    if (this.phoneSlideshowObserver) {
+      this.phoneSlideshowObserver.disconnect();
+    }
+
     // Clean up all carousels
     this.carousels.forEach((carousel, id) => {
       if (carousel.interval) {
@@ -565,8 +576,53 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     this.setupCarousel('barcode-carousel');
   }
 
+  protected setActiveScreenshot(index: number): void {
+    this.activeScreenshotIndex.set(index);
+  }
+
   private setupFeatureCarousel(): void {
-    this.setupCarousel('feature-carousel');
+    this.setupPhoneSlideshow();
+  }
+
+  private setupPhoneSlideshow(): void {
+    setTimeout(() => {
+      const phoneElement = document.getElementById('feature-phone');
+      if (!phoneElement) return;
+
+      const startSlideshow = () => {
+        if (this.phoneSlideshowInterval) return;
+        this.phoneSlideshowInterval = window.setInterval(() => {
+          this.activeScreenshotIndex.update((i) => (i + 1) % this.allFeatureScreenshots.length);
+        }, this.CAROUSEL_CONFIG.scrollInterval);
+      };
+
+      const stopSlideshow = () => {
+        if (this.phoneSlideshowInterval) {
+          clearInterval(this.phoneSlideshowInterval);
+          this.phoneSlideshowInterval = undefined;
+        }
+      };
+
+      this.phoneSlideshowObserver = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            startSlideshow();
+          } else {
+            stopSlideshow();
+          }
+        },
+        { threshold: 0.1 },
+      );
+      this.phoneSlideshowObserver.observe(phoneElement);
+
+      phoneElement.addEventListener('mouseenter', stopSlideshow);
+      phoneElement.addEventListener('mouseleave', () => {
+        const rect = phoneElement.getBoundingClientRect();
+        if (rect.top < window.innerHeight && rect.bottom > 0) {
+          startSlideshow();
+        }
+      });
+    }, this.CAROUSEL_CONFIG.initDelay);
   }
 
   // Unified carousel setup - single source of truth
