@@ -93,6 +93,8 @@ describe('Order FIFO / stock integration flows', () => {
       }),
     };
 
+    const mockEventBus = { publish: jest.fn() };
+
     salePostingStrategy = new SalePostingStrategy(
       mockPostingService as any,
       mockQueryService as any,
@@ -100,7 +102,8 @@ describe('Order FIFO / stock integration flows', () => {
       mockInventoryService as any,
       stockLocationService,
       mockOrderService as any,
-      mockConnection as any
+      mockConnection as any,
+      mockEventBus as any
     );
   });
 

@@ -163,7 +163,9 @@ export class CacheSyncService {
 
     // created / updated
     if (handler.hydrateOne) {
-      if (handler.has?.(msg.channelId, id)) return;
+      // For 'created': skip if already cached (catch-up dedup).
+      // For 'updated': always re-hydrate so stock/price changes propagate.
+      if (msg.action === 'created' && handler.has?.(msg.channelId, id)) return;
       void handler.hydrateOne(msg.channelId, id);
     } else if (handler.invalidateOne) {
       void Promise.resolve(handler.invalidateOne(msg.channelId, id));

@@ -37,7 +37,7 @@ export class ProductMapperService {
    */
   toProductVariant(graphqlVariant: any, product: any): ProductVariant {
     const productAsset = product?.featuredAsset;
-    const stock = graphqlVariant.stockLevels?.[0]?.stockOnHand ?? graphqlVariant.stockOnHand ?? 0;
+    const stock = graphqlVariant.stockOnHand ?? graphqlVariant.stockLevels?.[0]?.stockOnHand ?? 0;
     return {
       id: graphqlVariant.id,
       name: graphqlVariant.name,

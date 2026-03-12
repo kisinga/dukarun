@@ -9,6 +9,7 @@ import {
 } from '@vendure/core';
 import { Observable, Subject } from 'rxjs';
 import { PaymentMethodChangedEvent } from '../../infrastructure/events/cache-invalidation.events';
+import { ProductStockChangedEvent } from '../../infrastructure/events/custom-events';
 import { CacheSyncRecentBufferService } from './cache-sync-recent-buffer.service';
 import type { CacheSyncMessage } from './cache-sync.types';
 
@@ -109,6 +110,24 @@ export class CacheSyncStreamService implements OnModuleInit {
       const supplierMsg: CacheSyncMessage = { entityType: 'supplier', action, channelId, id };
       this.message$.next(supplierMsg);
       this.recentBuffer.push(supplierMsg).catch(() => {});
+    });
+
+    this.eventBus.ofType(ProductStockChangedEvent).subscribe((event: ProductStockChangedEvent) => {
+      const channelId = event.channelId;
+      if (!channelId) return;
+      for (const productId of event.productIds) {
+        this.logger.log(
+          `CacheSync: event received entityType=product (stock changed) action=updated channelId=${channelId} productId=${productId}`
+        );
+        const msg: CacheSyncMessage = {
+          entityType: 'product',
+          action: 'updated',
+          channelId,
+          id: productId,
+        };
+        this.message$.next(msg);
+        this.recentBuffer.push(msg).catch(() => {});
+      }
     });
 
     this.eventBus.ofType(OrderEvent).subscribe((event: OrderEvent) => {
