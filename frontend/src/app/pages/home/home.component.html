@@ -400,42 +400,77 @@
         </div>
       }
     </div>
-    <div class="container-app mt-12 flex justify-center">
-      <figure id="feature-phone" class="group flex flex-col items-center gap-5">
-        <div
-          class="mockup-phone max-w-[min(280px,85vw)] sm:max-w-[300px] border-primary/20 transition-transform duration-300 group-hover:-translate-y-1"
-        >
-          <div class="mockup-phone-camera"></div>
-          <div class="mockup-phone-display bg-neutral-900 overflow-hidden relative">
-            @for (screenshot of allFeatureScreenshots; track screenshot.src; let i = $index) {
-              <img
-                [src]="screenshot.src"
-                [alt]="screenshot.alt"
-                loading="lazy"
-                class="phone-screenshot"
-                [class.phone-screenshot--active]="i === activeScreenshotIndex()"
-              />
-            }
+    <div class="container-app mt-16 flex flex-col items-center gap-6">
+      <!-- Phone + arrow controls row -->
+      <div class="flex items-center gap-4 sm:gap-8 md:gap-12">
+        <button class="phone-nav-btn" aria-label="Previous screenshot" (click)="prevScreenshot()">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="w-5 h-5"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+
+        <figure id="feature-phone" class="group">
+          <div
+            class="mockup-phone w-[260px] sm:w-[310px] md:w-[370px] lg:w-[410px] border-primary/20 transition-transform duration-300 group-hover:-translate-y-1"
+          >
+            <div class="mockup-phone-camera"></div>
+            <div class="mockup-phone-display bg-neutral-900 overflow-hidden">
+              <div class="phone-slideshow">
+                @for (screenshot of allFeatureScreenshots; track screenshot.src; let i = $index) {
+                  <img
+                    [src]="screenshot.src"
+                    [alt]="screenshot.alt"
+                    loading="lazy"
+                    class="phone-screenshot"
+                    [class.phone-screenshot--active]="i === activeScreenshotIndex()"
+                  />
+                }
+              </div>
+            </div>
           </div>
-        </div>
+          <figcaption class="sr-only">
+            Dukarun feature screenshots showing all key functionality
+          </figcaption>
+        </figure>
 
-        <div class="flex gap-2" role="tablist" aria-label="Feature screenshots">
-          @for (screenshot of allFeatureScreenshots; track screenshot.src; let i = $index) {
-            <button
-              role="tab"
-              [attr.aria-selected]="i === activeScreenshotIndex()"
-              [attr.aria-label]="screenshot.alt"
-              class="phone-dot"
-              [class.phone-dot--active]="i === activeScreenshotIndex()"
-              (click)="setActiveScreenshot(i)"
-            ></button>
-          }
-        </div>
+        <button class="phone-nav-btn" aria-label="Next screenshot" (click)="nextScreenshot()">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="w-5 h-5"
+          >
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+      </div>
 
-        <figcaption class="sr-only">
-          Dukarun feature screenshots showing all key functionality
-        </figcaption>
-      </figure>
+      <!-- Dot indicators -->
+      <div class="flex gap-3" role="tablist" aria-label="Feature screenshots">
+        @for (screenshot of allFeatureScreenshots; track screenshot.src; let i = $index) {
+          <button
+            role="tab"
+            [attr.aria-selected]="i === activeScreenshotIndex()"
+            [attr.aria-label]="screenshot.alt"
+            class="phone-dot"
+            [class.phone-dot--active]="i === activeScreenshotIndex()"
+            (click)="setActiveScreenshot(i)"
+          ></button>
+        }
+      </div>
     </div>
   </section>
 
