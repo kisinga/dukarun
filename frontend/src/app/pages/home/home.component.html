@@ -400,56 +400,38 @@
         </div>
       }
     </div>
-    <div class="container-app mt-12 flex justify-center overflow-x-hidden">
-      <figure class="group relative w-full max-w-lg mx-auto">
+    <div class="container-app mt-12 flex justify-center">
+      <figure id="feature-phone" class="group flex flex-col items-center gap-5">
         <div
-          id="feature-carousel"
-          class="carousel carousel-center w-full overflow-x-auto snap-x snap-mandatory"
+          class="mockup-phone max-w-[min(280px,85vw)] sm:max-w-[300px] border-primary/20 transition-transform duration-300 group-hover:-translate-y-1"
         >
+          <div class="mockup-phone-camera"></div>
+          <div class="mockup-phone-display bg-neutral-900 overflow-hidden relative">
+            @for (screenshot of allFeatureScreenshots; track screenshot.src; let i = $index) {
+              <img
+                [src]="screenshot.src"
+                [alt]="screenshot.alt"
+                loading="lazy"
+                class="phone-screenshot"
+                [class.phone-screenshot--active]="i === activeScreenshotIndex()"
+              />
+            }
+          </div>
+        </div>
+
+        <div class="flex gap-2" role="tablist" aria-label="Feature screenshots">
           @for (screenshot of allFeatureScreenshots; track screenshot.src; let i = $index) {
-            <div
-              [id]="'featureSlide' + (i + 1)"
-              class="carousel-item relative w-full min-w-full flex-shrink-0 snap-center flex items-center justify-center"
-            >
-              <div
-                class="mockup-phone w-full max-w-[min(280px,85vw)] sm:max-w-[300px] border-primary/20 transition-transform duration-200 group-hover:-translate-y-0.5"
-              >
-                <div class="mockup-phone-camera"></div>
-                <div
-                  class="mockup-phone-display flex items-center justify-center bg-neutral-900 overflow-hidden"
-                >
-                  <img
-                    [src]="screenshot.src"
-                    [alt]="screenshot.alt"
-                    loading="lazy"
-                    class="w-full h-auto object-contain object-center"
-                  />
-                </div>
-              </div>
-              <div
-                class="absolute left-2 right-2 top-1/2 flex -translate-y-1/2 justify-between pointer-events-none sm:left-5 sm:right-5"
-              >
-                <a
-                  [href]="
-                    '#featureSlide' +
-                    (((i + allFeatureScreenshots.length - 1) % allFeatureScreenshots.length) + 1)
-                  "
-                  class="btn btn-circle btn-sm pointer-events-auto bg-base-100/90 shadow-md hover:bg-base-100 border border-base-300"
-                  aria-label="Previous screenshot"
-                >
-                  &#10094;
-                </a>
-                <a
-                  [href]="'#featureSlide' + (((i + 1) % allFeatureScreenshots.length) + 1)"
-                  class="btn btn-circle btn-sm pointer-events-auto bg-base-100/90 shadow-md hover:bg-base-100 border border-base-300"
-                  aria-label="Next screenshot"
-                >
-                  &#10095;
-                </a>
-              </div>
-            </div>
+            <button
+              role="tab"
+              [attr.aria-selected]="i === activeScreenshotIndex()"
+              [attr.aria-label]="screenshot.alt"
+              class="phone-dot"
+              [class.phone-dot--active]="i === activeScreenshotIndex()"
+              (click)="setActiveScreenshot(i)"
+            ></button>
           }
         </div>
+
         <figcaption class="sr-only">
           Dukarun feature screenshots showing all key functionality
         </figcaption>
