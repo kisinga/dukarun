@@ -72,6 +72,10 @@ export class NotificationSubscriber implements OnModuleInit {
 
   private async handleSubscription(event: SubscriptionAlertEvent): Promise<void> {
     try {
+      // Only deliver for expiring_soon and renewed; expired has no outbound trigger
+      if (event.alertType === 'expired') {
+        return;
+      }
       const triggerKey =
         event.alertType === 'expiring_soon' ? 'subscription_expiring_soon' : 'subscription_renewed';
       await this.outboundDelivery.deliver(event.ctx, triggerKey, {

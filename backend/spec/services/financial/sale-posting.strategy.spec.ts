@@ -17,6 +17,7 @@ describe('SalePostingStrategy', () => {
   let mockStockLocationService: any;
   let mockOrderService: any;
   let mockConnection: any;
+  let mockEventBus: any;
 
   const settledPayment = {
     id: 21,
@@ -69,6 +70,9 @@ describe('SalePostingStrategy', () => {
         update: jest.fn().mockResolvedValue(undefined as never),
       }),
     };
+    mockEventBus = {
+      publish: jest.fn(),
+    };
 
     strategy = new SalePostingStrategy(
       mockPostingService as any,
@@ -77,7 +81,8 @@ describe('SalePostingStrategy', () => {
       mockInventoryService as any,
       mockStockLocationService as any,
       mockOrderService as any,
-      mockConnection as any
+      mockConnection as any,
+      mockEventBus as any
     );
   });
 

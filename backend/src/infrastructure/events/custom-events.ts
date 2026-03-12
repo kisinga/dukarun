@@ -134,6 +134,20 @@ export class StockLevelChangedEvent extends VendureEvent {
 }
 
 /**
+ * Emitted after a sale (or reversal) changes batch stock for one or more products.
+ * Carries productIds so cache-sync can push targeted updates to frontends.
+ */
+export class ProductStockChangedEvent extends VendureEvent {
+  constructor(
+    public readonly ctx: RequestContext,
+    public readonly channelId: string,
+    public readonly productIds: string[]
+  ) {
+    super();
+  }
+}
+
+/**
  * Stock-related alerts
  */
 export class StockAlertEvent extends DukaHubEvent {

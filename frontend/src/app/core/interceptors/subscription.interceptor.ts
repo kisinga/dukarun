@@ -18,11 +18,8 @@ export const subscriptionInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
-      // Check if error is subscription-related
-      if (
-        error.error?.message?.includes('Subscription expired') ||
-        error.error?.message?.includes('subscription')
-      ) {
+      // Check if error is specifically a subscription expiry block from the backend guard
+      if (error.error?.message?.includes('Subscription expired. Please renew')) {
         // Show toast notification
         toastService.show(
           'Subscription',

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  EventBus,
   Order,
   OrderService,
   Payment,
@@ -7,6 +8,7 @@ import {
   StockLocationService,
   TransactionalConnection,
 } from '@vendure/core';
+import { ProductStockChangedEvent } from '../../../infrastructure/events/custom-events';
 import { ACCOUNT_CODES } from '../../../ledger/account-codes.constants';
 import { BaseTransactionStrategy } from '../base-transaction-strategy';
 import { ChartOfAccountsService } from '../chart-of-accounts.service';
@@ -61,7 +63,8 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
     private readonly inventoryService: InventoryService,
     private readonly stockLocationService: StockLocationService,
     private readonly orderService: OrderService,
-    private readonly connection: TransactionalConnection
+    private readonly connection: TransactionalConnection,
+    private readonly eventBus: EventBus
   ) {
     super(postingService, queryService, 'SalePostingStrategy');
   }
@@ -250,6 +253,18 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
       await this.inventoryService.recordSale(ctx, input);
       await this.setCogsStatus(ctx, order.id, 'recorded');
       this.logger.log(`Recorded COGS for order ${fullOrder.code}`);
+
+      // Notify frontends so product cache updates stock
+      const productIds = [
+        ...new Set(
+          (fullOrder.lines ?? [])
+            .map(line => (line as any).productVariant?.productId?.toString())
+            .filter(Boolean) as string[]
+        ),
+      ];
+      if (productIds.length > 0) {
+        this.eventBus.publish(new ProductStockChangedEvent(ctx, String(channelId), productIds));
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const isInsufficientStock =
