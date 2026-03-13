@@ -100,7 +100,7 @@ export interface ConsumptionFilters extends BatchFilters {
  */
 export interface CreateMovementInput {
   channelId: ID;
-  stockLocationId: ID;
+  stockLocationId?: ID;
   productVariantId: ID;
   movementType: MovementType;
   quantity: number; // positive for increases, negative for decreases

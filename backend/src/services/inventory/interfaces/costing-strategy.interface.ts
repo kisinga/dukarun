@@ -5,7 +5,7 @@ import { ID, RequestContext } from '@vendure/core';
  */
 export interface CostAllocationRequest {
   channelId: ID;
-  stockLocationId: ID;
+  stockLocationId?: ID;
   productVariantId: ID;
   quantity: number;
   sourceType: string;
