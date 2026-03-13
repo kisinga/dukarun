@@ -122,7 +122,6 @@ const COMBINED_SCHEMA = gql`
     LedgerTransactionService,
     FinancialService,
     OpenSessionService,
-    BatchStockVariantResolver,
   ],
   exports: [
     PostingService,
@@ -160,7 +159,6 @@ const COMBINED_SCHEMA = gql`
       ReconciliationResolver,
       PeriodManagementResolver,
       StockValueStatsResolver,
-      BatchStockVariantResolver,
     ],
   },
   compatibility: VENDURE_COMPATIBILITY_VERSION,
