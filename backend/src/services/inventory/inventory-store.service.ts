@@ -252,10 +252,19 @@ export class InventoryStoreService implements InventoryStore {
       return existingMovement;
     }
 
+    // Resolve stockLocationId from the associated batch when not provided
+    let resolvedLocationId = input.stockLocationId;
+    if (!resolvedLocationId && input.batchId) {
+      const batch = await this.connection
+        .getRepository(ctx, InventoryBatch)
+        .findOne({ where: { id: String(input.batchId) } });
+      resolvedLocationId = batch?.stockLocationId;
+    }
+
     const movementRepo = this.connection.getRepository(ctx, InventoryMovement);
     const movement = movementRepo.create({
       channelId: Number(input.channelId),
-      stockLocationId: Number(input.stockLocationId),
+      stockLocationId: resolvedLocationId ? Number(resolvedLocationId) : 0,
       productVariantId: Number(input.productVariantId),
       movementType: input.movementType,
       quantity: input.quantity,
