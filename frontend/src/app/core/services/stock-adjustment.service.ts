@@ -209,13 +209,9 @@ export class StockAdjustmentService {
         return null;
       }
 
-      // Find stock level for the specific location
-      const stockLevel = variant.stockLevels?.find(
-        (sl: { stockOnHand: number; stockLocation?: { id: string; name: string } }) =>
-          sl.stockLocation?.id === locationId || sl.stockLocation?.id === String(locationId),
-      );
-
-      return stockLevel?.stockOnHand ?? variant.stockOnHand ?? 0;
+      // stockOnHand is resolved by BatchAwareStockLevelService from batch inventory
+      // (the source of truth). Vendure's stockLevels table is stale and must not be used.
+      return variant.stockOnHand ?? 0;
     } catch (error) {
       console.error('Failed to fetch stock level:', error);
       return null;
