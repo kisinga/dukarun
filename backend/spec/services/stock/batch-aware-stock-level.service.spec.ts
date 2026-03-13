@@ -1,8 +1,11 @@
 /**
  * BatchAwareStockLevelService tests.
  *
- * Ensures getAvailableStock returns batch-based stock when InventoryStore is
- * available, and falls back to default Vendure behavior when it is not.
+ * NOTE: This service is module-scoped to LedgerPlugin. The global stock resolution
+ * for GraphQL queries (stockOnHand) goes through BatchStockLocationStrategy, which
+ * has its own tests in spec/plugins/ledger/batch-stock-location.strategy.spec.ts.
+ * These tests verify the secondary path within LedgerPlugin's module scope
+ * (used by getSaleableStockLevel, getFulfillableStockLevel for add-item/fulfillment).
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

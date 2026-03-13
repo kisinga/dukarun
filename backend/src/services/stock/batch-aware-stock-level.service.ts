@@ -13,9 +13,14 @@ import { InventoryStore } from '../inventory/interfaces/inventory-store.interfac
  * StockLevelService override that resolves available stock from FIFO batch inventory
  * instead of Vendure's stock_level table.
  *
- * Source of truth for stock is batch inventory; Vendure stock_level is never read
- * for availability. Used by ProductVariantService.getSaleableStockLevel and
- * getFulfillableStockLevel (add-item, adjust-line, fulfillment).
+ * IMPORTANT: This service is MODULE-SCOPED to LedgerPlugin via NestJS DI.
+ * It does NOT affect the global GraphQL `stockOnHand` resolution because
+ * Vendure's ProductVariantAdminEntityResolver lives in a different NestJS module
+ * (ApiModule). For the global stock resolution path, see:
+ * @see BatchStockLocationStrategy — configured via catalogOptions.stockLocationStrategy
+ *
+ * This override provides batch-aware stock for services WITHIN LedgerPlugin
+ * (e.g. getSaleableStockLevel, getFulfillableStockLevel for add-item/fulfillment).
  *
  * When InventoryStore is not available (e.g. tests or plugin order), falls back
  * to default Vendure behavior (stock_level).
