@@ -441,14 +441,6 @@ export const GET_PRODUCT_DETAIL = graphql(`
           price
           currencyCode
         }
-        stockLevels {
-          id
-          stockOnHand
-          stockLocation {
-            id
-            name
-          }
-        }
       }
     }
   }
@@ -634,14 +626,11 @@ export const GET_PRODUCT = graphql(`
         sku
         price
         priceWithTax
+        stockOnHand
         trackInventory
         prices {
           price
           currencyCode
-        }
-        stockLevels {
-          stockLocationId
-          stockOnHand
         }
         customFields {
           wholesalePrice
@@ -659,14 +648,6 @@ export const GET_VARIANT_STOCK_LEVEL = graphql(`
       name
       sku
       stockOnHand
-      stockLevels {
-        id
-        stockOnHand
-        stockLocation {
-          id
-          name
-        }
-      }
     }
   }
 `);

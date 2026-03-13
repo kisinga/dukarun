@@ -1417,6 +1417,7 @@ export type CreateInventoryReconciliationInput = {
 
 export type CreateOrderCustomFieldsInput = {
   auditCreatedAt?: InputMaybe<Scalars['DateTime']['input']>;
+  cogsStatus?: InputMaybe<Scalars['String']['input']>;
   createdByUserIdId?: InputMaybe<Scalars['ID']['input']>;
   lastModifiedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
   reversedAt?: InputMaybe<Scalars['DateTime']['input']>;
@@ -4044,7 +4045,6 @@ export type Mutation = {
   runPendingSearchIndexUpdates: Success;
   runScheduledTask: Success;
   sendCustomerStatementEmail: Scalars['Boolean']['output'];
-  sendCustomerStatementSms: Scalars['Boolean']['output'];
   setCustomerForDraftOrder: SetCustomerForDraftOrderResult;
   /** Sets the billing address for a draft Order */
   setDraftOrderBillingAddress: Order;
@@ -5072,11 +5072,6 @@ export type MutationSendCustomerStatementEmailArgs = {
 };
 
 
-export type MutationSendCustomerStatementSmsArgs = {
-  customerId: Scalars['ID']['input'];
-};
-
-
 export type MutationSetCustomerForDraftOrderArgs = {
   customerId?: InputMaybe<Scalars['ID']['input']>;
   input?: InputMaybe<CreateCustomerInput>;
@@ -5735,6 +5730,7 @@ export type OrderAddress = {
 export type OrderCustomFields = {
   __typename?: 'OrderCustomFields';
   auditCreatedAt?: Maybe<Scalars['DateTime']['output']>;
+  cogsStatus?: Maybe<Scalars['String']['output']>;
   createdByUserId?: Maybe<User>;
   lastModifiedByUserId?: Maybe<User>;
   reversedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -5748,6 +5744,7 @@ export type OrderFilterParameter = {
   aggregateOrderId?: InputMaybe<IdOperators>;
   auditCreatedAt?: InputMaybe<DateOperators>;
   code?: InputMaybe<StringOperators>;
+  cogsStatus?: InputMaybe<StringOperators>;
   createdAt?: InputMaybe<DateOperators>;
   currencyCode?: InputMaybe<StringOperators>;
   customerLastName?: InputMaybe<StringOperators>;
@@ -5952,6 +5949,7 @@ export type OrderSortParameter = {
   aggregateOrderId?: InputMaybe<SortOrder>;
   auditCreatedAt?: InputMaybe<SortOrder>;
   code?: InputMaybe<SortOrder>;
+  cogsStatus?: InputMaybe<SortOrder>;
   createdAt?: InputMaybe<SortOrder>;
   createdByUserId?: InputMaybe<SortOrder>;
   customerLastName?: InputMaybe<SortOrder>;
@@ -9693,6 +9691,7 @@ export type UpdateOrderAddressInput = {
 
 export type UpdateOrderCustomFieldsInput = {
   auditCreatedAt?: InputMaybe<Scalars['DateTime']['input']>;
+  cogsStatus?: InputMaybe<Scalars['String']['input']>;
   createdByUserIdId?: InputMaybe<Scalars['ID']['input']>;
   lastModifiedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
   reversedAt?: InputMaybe<Scalars['DateTime']['input']>;
