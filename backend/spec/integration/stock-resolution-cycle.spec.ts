@@ -4,7 +4,8 @@
  * Verifies the full cycle through BatchStockLocationStrategy:
  *   batch exists → strategy returns correct stock
  *   sale decrements batch → strategy returns decreased stock
- *   location/channel isolation → batches from other scopes excluded
+ *   channel isolation → batches from other channels excluded
+ *   all locations summed within a channel
  *
  * Uses an in-memory batch array behind a mock connection so we exercise
  * the real strategy logic (query construction, SUM, filters) without a DB.
@@ -24,7 +25,7 @@ interface MockBatch {
 /**
  * Creates a mock connection whose getRepository().createQueryBuilder() chain
  * filters the in-memory batch array using the WHERE parameters the strategy passes.
- * This lets us verify the strategy's filtering logic end-to-end.
+ * Strategy no longer filters by stockLocationId, so mock only filters by channel + variant.
  */
 function createMockConnection(batches: MockBatch[]) {
   return {
@@ -50,11 +51,6 @@ function createMockConnection(batches: MockBatch[]) {
           const filtered = batches.filter(b => {
             if (filters.channelId !== undefined && b.channelId !== filters.channelId) return false;
             if (
-              filters.stockLocationId !== undefined &&
-              b.stockLocationId !== filters.stockLocationId
-            )
-              return false;
-            if (
               filters.productVariantId !== undefined &&
               b.productVariantId !== filters.productVariantId
             )
@@ -73,7 +69,6 @@ function createMockConnection(batches: MockBatch[]) {
 
 describe('Stock Resolution Cycle (BatchStockLocationStrategy)', () => {
   const CHANNEL = 1;
-  const LOCATION = 5;
   const VARIANT = 100;
   const ctx = { channelId: CHANNEL } as RequestContext;
 
@@ -85,15 +80,12 @@ describe('Stock Resolution Cycle (BatchStockLocationStrategy)', () => {
 
     strategy = new BatchStockLocationStrategy();
     (strategy as any).connection = createMockConnection(batches);
-    (strategy as any).stockLocationService = {
-      defaultStockLocation: jest.fn().mockImplementation(() => Promise.resolve({ id: LOCATION })),
-    };
   });
 
   it('batch exists → strategy returns correct stock sum', async () => {
     batches.push(
-      { channelId: CHANNEL, stockLocationId: LOCATION, productVariantId: VARIANT, quantity: 5 },
-      { channelId: CHANNEL, stockLocationId: LOCATION, productVariantId: VARIANT, quantity: 3 }
+      { channelId: CHANNEL, stockLocationId: 2, productVariantId: VARIANT, quantity: 5 },
+      { channelId: CHANNEL, stockLocationId: 2, productVariantId: VARIANT, quantity: 3 }
     );
 
     const result = await strategy.getAvailableStock(ctx, VARIANT, []);
@@ -104,7 +96,7 @@ describe('Stock Resolution Cycle (BatchStockLocationStrategy)', () => {
   it('sale decrements batch → strategy returns decreased stock', async () => {
     batches.push({
       channelId: CHANNEL,
-      stockLocationId: LOCATION,
+      stockLocationId: 2,
       productVariantId: VARIANT,
       quantity: 10,
     });
@@ -122,21 +114,21 @@ describe('Stock Resolution Cycle (BatchStockLocationStrategy)', () => {
     expect(after.stockOnHand).toBe(6);
   });
 
-  it('batches at different locations are excluded', async () => {
+  it('batches across multiple locations are ALL summed for the channel', async () => {
     batches.push(
-      { channelId: CHANNEL, stockLocationId: LOCATION, productVariantId: VARIANT, quantity: 5 },
-      { channelId: CHANNEL, stockLocationId: 999, productVariantId: VARIANT, quantity: 100 }
+      { channelId: CHANNEL, stockLocationId: 1, productVariantId: VARIANT, quantity: 5 },
+      { channelId: CHANNEL, stockLocationId: 2, productVariantId: VARIANT, quantity: 100 }
     );
 
     const result = await strategy.getAvailableStock(ctx, VARIANT, []);
 
-    expect(result.stockOnHand).toBe(5); // not 105
+    expect(result.stockOnHand).toBe(105); // both locations summed
   });
 
   it('batches in different channels are excluded', async () => {
     batches.push(
-      { channelId: CHANNEL, stockLocationId: LOCATION, productVariantId: VARIANT, quantity: 7 },
-      { channelId: 999, stockLocationId: LOCATION, productVariantId: VARIANT, quantity: 50 }
+      { channelId: CHANNEL, stockLocationId: 2, productVariantId: VARIANT, quantity: 7 },
+      { channelId: 999, stockLocationId: 2, productVariantId: VARIANT, quantity: 50 }
     );
 
     const result = await strategy.getAvailableStock(ctx, VARIANT, []);
@@ -146,8 +138,8 @@ describe('Stock Resolution Cycle (BatchStockLocationStrategy)', () => {
 
   it('batches for different variants are excluded', async () => {
     batches.push(
-      { channelId: CHANNEL, stockLocationId: LOCATION, productVariantId: VARIANT, quantity: 3 },
-      { channelId: CHANNEL, stockLocationId: LOCATION, productVariantId: 999, quantity: 20 }
+      { channelId: CHANNEL, stockLocationId: 2, productVariantId: VARIANT, quantity: 3 },
+      { channelId: CHANNEL, stockLocationId: 2, productVariantId: 999, quantity: 20 }
     );
 
     const result = await strategy.getAvailableStock(ctx, VARIANT, []);
@@ -156,7 +148,6 @@ describe('Stock Resolution Cycle (BatchStockLocationStrategy)', () => {
   });
 
   it('returns 0 when no batches match', async () => {
-    // No batches at all
     const result = await strategy.getAvailableStock(ctx, VARIANT, []);
 
     expect(result.stockOnHand).toBe(0);
@@ -164,12 +155,12 @@ describe('Stock Resolution Cycle (BatchStockLocationStrategy)', () => {
 
   it('zero-quantity batches are excluded', async () => {
     batches.push(
-      { channelId: CHANNEL, stockLocationId: LOCATION, productVariantId: VARIANT, quantity: 0 },
-      { channelId: CHANNEL, stockLocationId: LOCATION, productVariantId: VARIANT, quantity: 4 }
+      { channelId: CHANNEL, stockLocationId: 2, productVariantId: VARIANT, quantity: 0 },
+      { channelId: CHANNEL, stockLocationId: 2, productVariantId: VARIANT, quantity: 4 }
     );
 
     const result = await strategy.getAvailableStock(ctx, VARIANT, []);
 
-    expect(result.stockOnHand).toBe(4); // not 4
+    expect(result.stockOnHand).toBe(4);
   });
 });

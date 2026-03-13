@@ -400,13 +400,18 @@ describe('Order FIFO / stock integration flows', () => {
   describe('BatchStockLocationStrategy (global stock resolution)', () => {
     let strategy: BatchStockLocationStrategy;
     let andWhereCalls: Array<[string, unknown]>;
+    let whereCalls: Array<[string, unknown]>;
 
     beforeEach(() => {
       andWhereCalls = [];
+      whereCalls = [];
 
       const mockQb: Record<string, jest.Mock> = {};
       mockQb.select = jest.fn().mockReturnValue(mockQb);
-      mockQb.where = jest.fn().mockReturnValue(mockQb);
+      mockQb.where = jest.fn().mockImplementation((...args: unknown[]) => {
+        whereCalls.push([args[0] as string, args[1]]);
+        return mockQb;
+      });
       mockQb.andWhere = jest.fn().mockImplementation((...args: unknown[]) => {
         andWhereCalls.push([args[0] as string, args[1]]);
         return mockQb;
@@ -421,29 +426,25 @@ describe('Order FIFO / stock integration flows', () => {
 
       strategy = new BatchStockLocationStrategy();
       (strategy as any).connection = strategyConnection;
-      (strategy as any).stockLocationService = stockLocationService;
     });
 
-    it('uses same defaultStockLocation as BatchAwareStockLevelService and SalePostingStrategy', async () => {
-      await strategy.getAvailableStock(ctx, 'variant_100', []);
-
-      expect(stockLocationService.defaultStockLocation).toHaveBeenCalledWith(ctx);
-
-      const locationClause = andWhereCalls.find(([clause]) =>
-        (clause as string).includes('stockLocationId')
-      );
-      expect(locationClause).toBeDefined();
-      expect(locationClause![1]).toEqual({ stockLocationId: DEFAULT_LOCATION_ID });
-    });
-
-    it('filters by channel, location, and variant', async () => {
+    it('filters by channel and variant, not by stockLocationId', async () => {
       await strategy.getAvailableStock(ctx, 200, []);
+
+      const channelClause = whereCalls.find(([clause]) => (clause as string).includes('channelId'));
+      expect(channelClause).toBeDefined();
+      expect(channelClause![1]).toEqual({ channelId: channelId });
 
       const variantClause = andWhereCalls.find(([clause]) =>
         (clause as string).includes('productVariantId')
       );
       expect(variantClause).toBeDefined();
       expect(variantClause![1]).toEqual({ productVariantId: 200 });
+
+      const locationClause = andWhereCalls.find(([clause]) =>
+        (clause as string).includes('stockLocationId')
+      );
+      expect(locationClause).toBeUndefined();
     });
   });
 });

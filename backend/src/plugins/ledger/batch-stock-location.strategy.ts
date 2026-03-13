@@ -5,7 +5,6 @@ import {
   MultiChannelStockLocationStrategy,
   RequestContext,
   StockLevel,
-  StockLocationService,
 } from '@vendure/core';
 import { InventoryBatch } from '../../services/inventory/entities/inventory-batch.entity';
 
@@ -18,20 +17,17 @@ import { InventoryBatch } from '../../services/inventory/entities/inventory-batc
  * applies to ALL stock queries: GraphQL stockOnHand, saleable/fulfillable checks,
  * add-to-cart validation, etc. — without NestJS module-scoping issues.
  *
- * NOTE: BatchAwareStockLevelService is a separate, module-scoped override of
- * StockLevelService within LedgerPlugin. It does NOT affect GraphQL queries
- * because Vendure's ProductVariantAdminEntityResolver lives in a different module.
- * This strategy is the only code path that matters for stock display.
+ * Sums batch quantities across ALL stock locations for the channel.
+ * channelId already isolates tenant data; stockLocationId is not filtered
+ * because defaultStockLocation() may not match the location where batches
+ * were actually created (e.g. "Main" vs "Default Stock Location").
  *
  * Falls back to the default MultiChannelStockLocationStrategy when batch
  * inventory is unavailable (e.g. during initial bootstrap before tables exist).
  */
 export class BatchStockLocationStrategy extends MultiChannelStockLocationStrategy {
-  private stockLocationService!: StockLocationService;
-
   async init(injector: Injector): Promise<void> {
     await super.init(injector);
-    this.stockLocationService = injector.get(StockLocationService);
     Logger.info('BatchStockLocationStrategy initialized', 'BatchStockLocationStrategy');
   }
 
@@ -45,23 +41,11 @@ export class BatchStockLocationStrategy extends MultiChannelStockLocationStrateg
     }
 
     try {
-      const location = await this.stockLocationService.defaultStockLocation(ctx);
-      if (!location?.id) {
-        Logger.warn(
-          `No default stock location for channel ${ctx.channelId} — falling back to super`,
-          'BatchStockLocationStrategy'
-        );
-        return super.getAvailableStock(ctx, productVariantId, stockLevels);
-      }
-
       const result = await this.connection
         .getRepository(ctx, InventoryBatch)
         .createQueryBuilder('batch')
         .select('SUM(batch.quantity)', 'total')
         .where('batch."channelId" = :channelId', { channelId: Number(ctx.channelId) })
-        .andWhere('batch."stockLocationId" = :stockLocationId', {
-          stockLocationId: Number(location.id),
-        })
         .andWhere('batch."productVariantId" = :productVariantId', {
           productVariantId: Number(productVariantId),
         })
@@ -69,11 +53,6 @@ export class BatchStockLocationStrategy extends MultiChannelStockLocationStrateg
         .getRawOne<{ total: string | null }>();
 
       const stockOnHand = Number(result?.total ?? 0);
-
-      Logger.debug(
-        `Stock for variant ${productVariantId} @ location ${location.id}: ${stockOnHand}`,
-        'BatchStockLocationStrategy'
-      );
 
       return {
         stockOnHand,
