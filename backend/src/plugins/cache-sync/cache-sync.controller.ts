@@ -1,6 +1,6 @@
 import { Controller, ForbiddenException, Get, Logger, Query, Sse } from '@nestjs/common';
 import { Allow, Permission, RequestContext } from '@vendure/core';
-import { Observable } from 'rxjs';
+import { Observable, interval, merge } from 'rxjs';
 import { concat, defer, from } from 'rxjs';
 import { filter, map, switchMap, tap } from 'rxjs/operators';
 import { CtxFromReq } from './ctx-from-req.decorator';
@@ -40,6 +40,13 @@ export class CacheSyncController {
     }
     this.logger.log(`CacheSync: client subscribed channelId=${channelId}`);
 
+    // Heartbeat every 30s keeps nginx proxy + intermediate proxies from closing the connection
+    const heartbeat$ = interval(30_000).pipe(
+      map(() => ({
+        data: { entityType: 'heartbeat' as const, action: 'updated' as const, channelId },
+      }))
+    );
+
     const liveStream = this.streamService.getMessageStream().pipe(
       filter(msg => msg.channelId === channelId),
       tap(msg => {
@@ -53,7 +60,7 @@ export class CacheSyncController {
     return defer(() => from(this.recentBuffer.getRecent(channelId))).pipe(
       switchMap(catchUp => {
         const catchUpEmissions = from(catchUp).pipe(map(msg => ({ data: msg })));
-        return concat(catchUpEmissions, liveStream);
+        return concat(catchUpEmissions, merge(liveStream, heartbeat$));
       })
     );
   }

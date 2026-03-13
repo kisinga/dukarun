@@ -1,5 +1,11 @@
 /** Entity types emitted by the cache-sync SSE stream. Frontend must align. */
-export type CacheSyncEntityType = 'product' | 'payment_method' | 'customer' | 'supplier' | 'order';
+export type CacheSyncEntityType =
+  | 'product'
+  | 'payment_method'
+  | 'customer'
+  | 'supplier'
+  | 'order'
+  | 'heartbeat';
 
 export type CacheSyncAction = 'created' | 'updated' | 'deleted';
 

@@ -33,8 +33,8 @@ export class CacheSyncService {
 
   private eventSource: EventSource | null = null;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-  private backoffMs = 1000;
-  private readonly maxBackoffMs = 30000;
+  private backoffMs = 2000;
+  private readonly maxBackoffMs = 60000;
 
   /** Catch-up phase: buffer messages after connect, then deduplicate and apply once. */
   private catchingUp = false;
@@ -71,7 +71,7 @@ export class CacheSyncService {
     }
     this.catchingUp = false;
     this.catchUpBuffer = [];
-    this.backoffMs = 1000;
+    this.backoffMs = 2000;
   }
 
   private connect(channelId: string): void {
@@ -86,7 +86,7 @@ export class CacheSyncService {
     this.eventSource = new EventSource(url, { withCredentials: true });
 
     this.eventSource.onopen = () => {
-      this.backoffMs = 1000;
+      this.backoffMs = 2000;
       this.catchingUp = true;
       this.catchUpBuffer = [];
     };
@@ -95,6 +95,8 @@ export class CacheSyncService {
       setTimeout(() => {
         try {
           const msg = JSON.parse(e.data) as CacheSyncMessage;
+          // Ignore heartbeat keep-alive messages
+          if ((msg.entityType as string) === 'heartbeat') return;
           console.log('[CacheSync] SSE event received', {
             entityType: msg.entityType,
             action: msg.action,
@@ -173,7 +175,8 @@ export class CacheSyncService {
   }
 
   private check401AndReconnect(streamUrl: string, channelId: string): void {
-    fetch(streamUrl, { method: 'GET', credentials: 'include' })
+    // Use HEAD to avoid opening a full SSE stream just for an auth check
+    fetch(streamUrl, { method: 'HEAD', credentials: 'include' })
       .then((r) => {
         if (r.status === 401) {
           return;
@@ -186,12 +189,15 @@ export class CacheSyncService {
   }
 
   private scheduleReconnect(channelId: string): void {
+    // Add jitter (0–25%) so multiple tabs don't reconnect in lockstep
+    const jitter = this.backoffMs * Math.random() * 0.25;
+    const delay = this.backoffMs + jitter;
     this.reconnectTimeout = setTimeout(() => {
       this.reconnectTimeout = null;
       if (this.companyService.activeCompanyId() === channelId) {
         this.connect(channelId);
       }
-    }, this.backoffMs);
+    }, delay);
     this.backoffMs = Math.min(this.maxBackoffMs, this.backoffMs * 2);
   }
 }
