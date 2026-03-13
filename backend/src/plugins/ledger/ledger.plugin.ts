@@ -53,6 +53,7 @@ import { ReconciliationResolver } from './reconciliation.resolver';
 import { PeriodManagementResolver } from './period-management.resolver';
 import { PERIOD_MANAGEMENT_SCHEMA } from './period-management.schema';
 import { BatchAwareStockLevelService } from '../../services/stock/batch-aware-stock-level.service';
+import { BatchStockVariantResolver } from './batch-stock-variant.resolver';
 import { CustomVendureStockMovementService } from '../../services/stock/custom-vendure-stock-movement.service';
 import { StockMovementService as LocalStockMovementServiceClass } from '../../services/stock/stock-movement.service';
 import { StockValueCacheSubscriber } from './stock-value-cache.subscriber';
@@ -121,6 +122,7 @@ const COMBINED_SCHEMA = gql`
     LedgerTransactionService,
     FinancialService,
     OpenSessionService,
+    BatchStockVariantResolver,
   ],
   exports: [
     PostingService,
@@ -147,6 +149,7 @@ const COMBINED_SCHEMA = gql`
       ReconciliationResolver,
       PeriodManagementResolver,
       StockValueStatsResolver,
+      BatchStockVariantResolver,
     ],
   },
   shopApiExtensions: {
@@ -157,6 +160,7 @@ const COMBINED_SCHEMA = gql`
       ReconciliationResolver,
       PeriodManagementResolver,
       StockValueStatsResolver,
+      BatchStockVariantResolver,
     ],
   },
   compatibility: VENDURE_COMPATIBILITY_VERSION,
