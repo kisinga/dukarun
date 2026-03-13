@@ -79,7 +79,6 @@ describe('SalePostingStrategy', () => {
       mockQueryService as any,
       mockChartService as any,
       mockInventoryService as any,
-      mockStockLocationService as any,
       mockOrderService as any,
       mockConnection as any,
       mockEventBus as any
@@ -158,9 +157,7 @@ describe('SalePostingStrategy', () => {
     expect(context.openSessionId).toBeUndefined();
   });
 
-  it('does not call recordSale when defaultStockLocation returns no id (skip COGS)', async () => {
-    mockStockLocationService.defaultStockLocation.mockResolvedValue(null);
-
+  it('calls recordSale even without stockLocationId — finds batches by channel', async () => {
     const result = await strategy.post({
       ctx,
       sourceId: String(settledPayment.id),
@@ -172,23 +169,9 @@ describe('SalePostingStrategy', () => {
 
     expect(result.success).toBe(true);
     expect(mockPostingService.postPayment).toHaveBeenCalled();
-    expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
-  });
-
-  it('does not call recordSale when defaultStockLocation returns object without id', async () => {
-    mockStockLocationService.defaultStockLocation.mockResolvedValue({ name: 'Loc' });
-
-    const result = await strategy.post({
-      ctx,
-      sourceId: String(settledPayment.id),
-      channelId: ctx.channelId as number,
-      payment: settledPayment,
-      order: orderWithLines,
-      isCreditSale: false,
-    });
-
-    expect(result.success).toBe(true);
-    expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
+    expect(mockInventoryService.recordSale).toHaveBeenCalled();
+    const input = mockInventoryService.recordSale.mock.calls[0][1];
+    expect(input.stockLocationId).toBeUndefined();
   });
 
   it('treats "Insufficient quantity in batch" as non-fatal (skip COGS)', async () => {
@@ -227,10 +210,7 @@ describe('SalePostingStrategy', () => {
     expect(mockInventoryService.recordSale).toHaveBeenCalled();
   });
 
-  it('calls recordSale with stockLocationId from defaultStockLocation (location consistency)', async () => {
-    const locationId = 99;
-    mockStockLocationService.defaultStockLocation.mockResolvedValue({ id: locationId });
-
+  it('recordSale input contains channelId and orderId but no stockLocationId', async () => {
     await strategy.post({
       ctx,
       sourceId: String(settledPayment.id),
@@ -243,11 +223,13 @@ describe('SalePostingStrategy', () => {
     expect(mockInventoryService.recordSale).toHaveBeenCalledWith(
       ctx,
       expect.objectContaining({
-        stockLocationId: locationId,
         orderId: String(orderWithLines.id),
+        channelId: ctx.channelId,
         lines: expect.any(Array),
       })
     );
+    const input = mockInventoryService.recordSale.mock.calls[0][1];
+    expect(input.stockLocationId).toBeUndefined();
   });
 
   it('does not call recordSale when COGS already posted (idempotency)', async () => {
@@ -408,7 +390,7 @@ describe('SalePostingStrategy', () => {
     expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
   });
 
-  it('credit sale calls recordSale when location present', async () => {
+  it('credit sale calls recordSale with channelId', async () => {
     const orderCredit = {
       ...orderWithLines,
       totalWithTax: 10000,
@@ -429,7 +411,7 @@ describe('SalePostingStrategy', () => {
       ctx,
       expect.objectContaining({
         orderId: String(orderCredit.id),
-        stockLocationId: 1,
+        channelId: ctx.channelId,
       })
     );
   });

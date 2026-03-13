@@ -58,7 +58,7 @@ export interface RecordSaleInput {
   orderId: string;
   orderCode: string;
   channelId: ID;
-  stockLocationId: ID;
+  stockLocationId?: ID;
   customerId: string;
   /** Sale date (YYYY-MM-DD) for analytics; defaults to today */
   saleDate?: string;

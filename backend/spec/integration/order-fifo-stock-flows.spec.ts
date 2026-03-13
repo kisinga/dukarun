@@ -101,15 +101,14 @@ describe('Order FIFO / stock integration flows', () => {
       mockQueryService as any,
       mockChartService as any,
       mockInventoryService as any,
-      stockLocationService,
       mockOrderService as any,
       mockConnection as any,
       mockEventBus as any
     );
   });
 
-  describe('location consistency', () => {
-    it('BatchAwareStockLevelService and SalePostingStrategy use same defaultStockLocation for stock and COGS', async () => {
+  describe('channel-scoped stock and COGS', () => {
+    it('BatchAwareStockLevelService uses defaultStockLocation, SalePostingStrategy records COGS by channel', async () => {
       const variantId = 'variant_100';
 
       const stockResult = await batchAwareStock.getAvailableStock(ctx, variantId);
@@ -153,56 +152,21 @@ describe('Order FIFO / stock integration flows', () => {
       expect(mockInventoryService.recordSale).toHaveBeenCalledWith(
         ctx,
         expect.objectContaining({
-          stockLocationId: DEFAULT_LOCATION_ID,
           orderId: 'order-1',
+          channelId,
           lines: expect.arrayContaining([
             expect.objectContaining({ productVariantId: '100', quantity: 2 }),
           ]),
         })
       );
-    });
-
-    it('when defaultStockLocation returns different id, both stock check and recordSale receive that id', async () => {
-      const customLocationId = 42;
-      stockLocationService.defaultStockLocation.mockResolvedValue({ id: customLocationId });
-
-      await batchAwareStock.getAvailableStock(ctx, 'v1');
-      expect(inventoryStore.getOpenBatches).toHaveBeenLastCalledWith(
-        ctx,
-        expect.objectContaining({ stockLocationId: customLocationId })
-      );
-
-      const order = {
-        id: 'o2',
-        code: 'ORD-002',
-        lines: [{ productVariantId: 1, quantity: 1, productVariant: { id: 1 } }],
-        customer: { id: 'c1' },
-        orderPlacedAt: new Date(),
-      } as any;
-      await salePostingStrategy.post({
-        ctx,
-        sourceId: 'pay-2',
-        channelId,
-        payment: {
-          id: 'pay-2',
-          state: 'Settled',
-          method: 'cash',
-          amount: 100,
-          metadata: {},
-        } as any,
-        order,
-        isCreditSale: false,
-      });
-
-      expect(mockInventoryService.recordSale).toHaveBeenCalledWith(
-        ctx,
-        expect.objectContaining({ stockLocationId: customLocationId })
-      );
+      // stockLocationId should NOT be passed — batches are found by channel + variant
+      const recordSaleInput = mockInventoryService.recordSale.mock.calls[0][1];
+      expect(recordSaleInput.stockLocationId).toBeUndefined();
     });
   });
 
   describe('cash sale flow', () => {
-    it('posting cash sale calls recordSale with order lines and default location', async () => {
+    it('posting cash sale calls recordSale with order lines', async () => {
       const order = {
         id: 'order-3',
         code: 'ORD-003',
@@ -235,7 +199,7 @@ describe('Order FIFO / stock integration flows', () => {
       expect(mockInventoryService.recordSale).toHaveBeenCalledTimes(1);
       const recordSaleInput = mockInventoryService.recordSale.mock.calls[0][1];
       expect(recordSaleInput.orderId).toBe('order-3');
-      expect(recordSaleInput.stockLocationId).toBe(DEFAULT_LOCATION_ID);
+      expect(recordSaleInput.stockLocationId).toBeUndefined();
       expect(recordSaleInput.lines).toHaveLength(2);
       expect(recordSaleInput.lines.map((l: any) => l.quantity)).toEqual([3, 1]);
     });
@@ -305,7 +269,7 @@ describe('Order FIFO / stock integration flows', () => {
   });
 
   describe('credit sale flow', () => {
-    it('posting credit sale calls recordSale with order and default location', async () => {
+    it('posting credit sale calls recordSale with order', async () => {
       const order = {
         id: 'order-6',
         code: 'ORD-006',
@@ -330,7 +294,7 @@ describe('Order FIFO / stock integration flows', () => {
         ctx,
         expect.objectContaining({
           orderId: 'order-6',
-          stockLocationId: DEFAULT_LOCATION_ID,
+          channelId,
           lines: expect.any(Array),
         })
       );
@@ -367,7 +331,7 @@ describe('Order FIFO / stock integration flows', () => {
       expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
     });
 
-    it('when defaultStockLocation returns null, recordSale is not called', async () => {
+    it('recordSale is called even without defaultStockLocation — finds batches by channel', async () => {
       stockLocationService.defaultStockLocation.mockResolvedValue(null);
 
       const order = {
@@ -393,7 +357,7 @@ describe('Order FIFO / stock integration flows', () => {
         isCreditSale: false,
       });
 
-      expect(mockInventoryService.recordSale).not.toHaveBeenCalled();
+      expect(mockInventoryService.recordSale).toHaveBeenCalled();
     });
   });
 

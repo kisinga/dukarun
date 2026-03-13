@@ -335,7 +335,7 @@ export class InventoryStoreService implements InventoryStore {
   async verifyStockLevel(
     ctx: RequestContext,
     variantId: ID,
-    locationId: ID,
+    locationId: ID | undefined,
     expectedMin: number
   ): Promise<boolean> {
     const batches = await this.getOpenBatches(ctx, {

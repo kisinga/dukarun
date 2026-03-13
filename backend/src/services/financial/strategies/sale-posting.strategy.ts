@@ -5,7 +5,6 @@ import {
   OrderService,
   Payment,
   RequestContext,
-  StockLocationService,
   TransactionalConnection,
 } from '@vendure/core';
 import { ProductStockChangedEvent } from '../../../infrastructure/events/custom-events';
@@ -61,7 +60,6 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
     queryService: LedgerQueryService,
     private readonly chartOfAccountsService: ChartOfAccountsService,
     private readonly inventoryService: InventoryService,
-    private readonly stockLocationService: StockLocationService,
     private readonly orderService: OrderService,
     private readonly connection: TransactionalConnection,
     private readonly eventBus: EventBus
@@ -216,14 +214,6 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
         return;
       }
 
-      const location = await this.stockLocationService.defaultStockLocation(ctx);
-      if (!location?.id) {
-        this.logger.warn(
-          `No stock location for channel ${channelId}; skipping COGS recording for order ${fullOrder.code}`
-        );
-        return;
-      }
-
       const lines = (fullOrder.lines ?? [])
         .filter(line => line.quantity > 0)
         .map(line => ({
@@ -244,7 +234,6 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
         orderId,
         orderCode: fullOrder.code,
         channelId: ctx.channelId as any,
-        stockLocationId: location.id as any,
         customerId: fullOrder.customer?.id?.toString() ?? '',
         saleDate,
         lines,
