@@ -1,6 +1,7 @@
 import {
   ID,
   Injector,
+  Logger,
   MultiChannelStockLocationStrategy,
   RequestContext,
   StockLevel,
@@ -31,6 +32,7 @@ export class BatchStockLocationStrategy extends MultiChannelStockLocationStrateg
   async init(injector: Injector): Promise<void> {
     await super.init(injector);
     this.stockLocationService = injector.get(StockLocationService);
+    Logger.info('BatchStockLocationStrategy initialized', 'BatchStockLocationStrategy');
   }
 
   async getAvailableStock(
@@ -45,6 +47,10 @@ export class BatchStockLocationStrategy extends MultiChannelStockLocationStrateg
     try {
       const location = await this.stockLocationService.defaultStockLocation(ctx);
       if (!location?.id) {
+        Logger.warn(
+          `No default stock location for channel ${ctx.channelId} — falling back to super`,
+          'BatchStockLocationStrategy'
+        );
         return super.getAvailableStock(ctx, productVariantId, stockLevels);
       }
 
@@ -64,12 +70,21 @@ export class BatchStockLocationStrategy extends MultiChannelStockLocationStrateg
 
       const stockOnHand = Number(result?.total ?? 0);
 
+      Logger.debug(
+        `Stock for variant ${productVariantId} @ location ${location.id}: ${stockOnHand}`,
+        'BatchStockLocationStrategy'
+      );
+
       return {
         stockOnHand,
         stockAllocated: 0,
       };
-    } catch {
-      // Table may not exist yet during migrations/bootstrap
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      Logger.error(
+        `Error querying batch stock for variant ${productVariantId}: ${msg}`,
+        'BatchStockLocationStrategy'
+      );
       return super.getAvailableStock(ctx, productVariantId, stockLevels);
     }
   }
