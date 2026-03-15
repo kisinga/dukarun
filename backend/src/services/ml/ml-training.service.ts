@@ -56,26 +56,42 @@ export class MlTrainingService {
    * No channel updates, no webhooks, no status changes. Single source of truth for manifest data.
    */
   async buildManifestForChannel(ctx: RequestContext, channelId: string): Promise<TrainingManifest> {
-    const products = await this.productService.findAll(ctx, {
-      take: 1000,
-    });
+    const products = await this.productService.findAll(ctx, { take: 1000 }, [
+      'featuredAsset',
+      'assets',
+      'assets.asset',
+    ]);
 
     const manifestProducts: ProductManifestEntry[] = [];
 
     for (const product of products.items) {
-      const productWithAssets = await this.productService.findOne(ctx, product.id, ['assets']);
-      if (!productWithAssets?.assets || productWithAssets.assets.length === 0) {
-        continue;
+      const images: ImageManifestEntry[] = [];
+      const seenAssetIds = new Set<string>();
+
+      // Use featuredAsset as primary image (always available when product has any image)
+      if (product.featuredAsset) {
+        const id = product.featuredAsset.id.toString();
+        seenAssetIds.add(id);
+        images.push({
+          assetId: id,
+          url: this.generateAssetUrl(product.featuredAsset.source),
+          filename: product.featuredAsset.name,
+        });
       }
 
-      const images: ImageManifestEntry[] = [];
-      for (const asset of productWithAssets.assets) {
-        const publicUrl = this.generateAssetUrl(asset.asset.source);
-        images.push({
-          assetId: asset.asset.id.toString(),
-          url: publicUrl,
-          filename: asset.asset.name,
-        });
+      // Add additional images from the ProductAsset join table, deduplicating
+      if (product.assets?.length) {
+        for (const productAsset of product.assets) {
+          if (!productAsset.asset) continue;
+          const id = productAsset.asset.id.toString();
+          if (seenAssetIds.has(id)) continue;
+          seenAssetIds.add(id);
+          images.push({
+            assetId: id,
+            url: this.generateAssetUrl(productAsset.asset.source),
+            filename: productAsset.asset.name,
+          });
+        }
       }
 
       if (images.length > 0) {
@@ -134,15 +150,8 @@ export class MlTrainingService {
   }
 
   /**
-   * Get training manifest for a channel
-   *
-   * Note: This method extracts photos to generate the manifest.
-   * The extraction is idempotent - it updates channel custom fields with counts
-   * but doesn't change the underlying product/asset data.
-   *
-   * If mlProductCount > 0, extraction was done recently, but we still need to
-   * extract again to get the actual manifest data (product IDs, image URLs).
-   * This is expected behavior since we don't store the full manifest.
+   * Get training manifest for a channel (read-only).
+   * Builds the manifest without triggering status updates or webhooks.
    */
   async getTrainingManifest(ctx: RequestContext, channelId: string): Promise<TrainingManifest> {
     const channel = await this.channelService.findOne(ctx, channelId);
@@ -150,7 +159,6 @@ export class MlTrainingService {
       throw new Error('Channel not found');
     }
 
-    // Use a context scoped to the target channel so product queries return that channel's products
     const channelCtx = new RequestContext({
       apiType: ctx.apiType,
       channel,
@@ -159,9 +167,7 @@ export class MlTrainingService {
       authorizedAsOwnerOnly: false,
     });
 
-    // Always extract to get fresh manifest data
-    // This is necessary since we don't store the full manifest, only counts
-    return this.extractPhotosForChannel(channelCtx, channelId);
+    return this.buildManifestForChannel(channelCtx, channelId);
   }
 
   /**
@@ -187,7 +193,6 @@ export class MlTrainingService {
       updateData.mlTrainingError = error;
     }
 
-    // Update channel custom fields
     // Update channel custom fields
     await this.channelService.update(ctx, {
       id: channelId,
@@ -245,14 +250,9 @@ export class MlTrainingService {
     }
   }
 
-  /**
-   * Generate public URL for an asset
-   */
   private generateAssetUrl(source: string): string {
-    // In production, this would use the actual asset server URL
-    // For now, return a placeholder that would work with AssetServerPlugin
-    const baseUrl = process.env.ASSET_URL_PREFIX || 'http://localhost:3000/assets';
-    return `${baseUrl}/${source}`;
+    const baseUrl = env.ml.backendInternalUrl || 'http://backend:3000';
+    return `${baseUrl}/assets/${source}`;
   }
 
   /**

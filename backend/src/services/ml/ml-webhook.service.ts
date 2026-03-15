@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ChannelService, RequestContext } from '@vendure/core';
+import { env } from '../../infrastructure/config/environment.config';
 
 export interface TrainingWebhookPayload {
   channelId: string;
@@ -75,7 +76,7 @@ export class MlWebhookService {
    * Generate manifest download URL for external service
    */
   private generateManifestUrl(channelId: string): string {
-    const baseUrl = process.env.ASSET_URL_PREFIX || 'http://localhost:3000';
+    const baseUrl = env.ml.backendInternalUrl || 'http://backend:3000';
     return `${baseUrl}/admin-api?query=query{mlTrainingManifest(channelId:"${channelId}"){channelId,version,extractedAt,products{productId,productName,images{assetId,url,filename}}}}`;
   }
 
