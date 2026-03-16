@@ -642,9 +642,6 @@ export class SubscriptionService {
       customFields: { subscriptionStatus: 'expired' },
     });
 
-    // Publish subscription expired event
-    this.eventBus.publish(new SubscriptionAlertEvent(ctx, channelId, 'expired', {}));
-
     this.logger.log(`Subscription expired for channel ${channelId}`);
   }
 
