@@ -6,6 +6,7 @@ import {
   EventBus,
   ProductService,
   RequestContext,
+  RequestContextService,
   TransactionalConnection,
 } from '@vendure/core';
 import { findChannelById } from '../../utils/channel-access.util';
@@ -36,7 +37,8 @@ export interface TrainingManifest {
  * ML Training Service
  *
  * Handles photo extraction and training manifest generation for ML models.
- * Provides methods for extracting product photos and generating training manifests.
+ * All public methods accept channelId and create their own channel-scoped
+ * RequestContext internally via RequestContextService.
  */
 @Injectable()
 export class MlTrainingService {
@@ -48,19 +50,51 @@ export class MlTrainingService {
     private assetService: AssetService,
     private connection: TransactionalConnection,
     private webhookService: MlWebhookService,
-    private eventBus: EventBus
+    private eventBus: EventBus,
+    private requestContextService: RequestContextService
   ) {}
 
   /**
-   * Build training manifest for a channel (read-only).
-   * No channel updates, no webhooks, no status changes. Single source of truth for manifest data.
+   * Create a properly channel-scoped RequestContext for ML operations.
+   * This is the ONLY way ML code should obtain a context for product queries.
    */
-  async buildManifestForChannel(ctx: RequestContext, channelId: string): Promise<TrainingManifest> {
+  private async createChannelContext(channelId: string): Promise<RequestContext> {
+    const defaultCtx = await this.requestContextService.create({
+      apiType: 'admin',
+    });
+
+    const channel = await this.channelService.findOne(defaultCtx, channelId);
+    if (!channel) {
+      throw new Error(`Channel ${channelId} not found`);
+    }
+
+    return this.requestContextService.create({
+      apiType: 'admin',
+      channelOrToken: channel,
+    });
+  }
+
+  /**
+   * Build training manifest for a channel (read-only, internal).
+   * No channel updates, no webhooks, no status changes.
+   */
+  private async buildManifestForChannel(
+    ctx: RequestContext,
+    channelId: string
+  ): Promise<TrainingManifest> {
+    this.logger.log(
+      `Building manifest for channel ${channelId} (context channel: ${ctx.channel?.id})`
+    );
+
     const products = await this.productService.findAll(ctx, { take: 1000 }, [
       'featuredAsset',
       'assets',
       'assets.asset',
     ]);
+
+    this.logger.log(
+      `productService.findAll returned ${products.items.length} products for channel ${channelId}`
+    );
 
     const manifestProducts: ProductManifestEntry[] = [];
 
@@ -68,7 +102,6 @@ export class MlTrainingService {
       const images: ImageManifestEntry[] = [];
       const seenAssetIds = new Set<string>();
 
-      // Use featuredAsset as primary image (always available when product has any image)
       if (product.featuredAsset) {
         const id = product.featuredAsset.id.toString();
         seenAssetIds.add(id);
@@ -79,7 +112,6 @@ export class MlTrainingService {
         });
       }
 
-      // Add additional images from the ProductAsset join table, deduplicating
       if (product.assets?.length) {
         for (const productAsset of product.assets) {
           if (!productAsset.asset) continue;
@@ -103,6 +135,20 @@ export class MlTrainingService {
       }
     }
 
+    const totalImages = manifestProducts.reduce((sum, p) => sum + p.images.length, 0);
+    const productsWithoutImages = products.items.length - manifestProducts.length;
+
+    this.logger.log(
+      `Manifest built: ${manifestProducts.length} products with images ` +
+        `(${totalImages} total images), ${productsWithoutImages} products without images`
+    );
+
+    if (productsWithoutImages > 0) {
+      this.logger.warn(
+        `${productsWithoutImages} products have no images (no featuredAsset and no loaded assets)`
+      );
+    }
+
     return {
       channelId,
       version: new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-'),
@@ -113,12 +159,13 @@ export class MlTrainingService {
 
   /**
    * Extract photos for a channel and generate training manifest.
-   * Updates channel, status, and webhooks. Uses buildManifestForChannel for the manifest data.
+   * Updates channel, status, and webhooks.
    */
-  async extractPhotosForChannel(ctx: RequestContext, channelId: string): Promise<TrainingManifest> {
+  async extractPhotosForChannel(channelId: string): Promise<TrainingManifest> {
     this.logger.log(`Extracting photos for channel ${channelId}`);
+    const ctx = await this.createChannelContext(channelId);
 
-    await this.updateTrainingStatus(ctx, channelId, 'extracting', 0);
+    await this.updateTrainingStatus(channelId, 'extracting', 0);
     await this.webhookService.notifyTrainingStarted(ctx, channelId);
 
     try {
@@ -133,7 +180,7 @@ export class MlTrainingService {
         },
       });
 
-      await this.updateTrainingStatus(ctx, channelId, 'ready', 100);
+      await this.updateTrainingStatus(channelId, 'ready', 100);
       await this.webhookService.notifyTrainingReady(ctx, channelId);
 
       this.logger.log(
@@ -143,7 +190,7 @@ export class MlTrainingService {
     } catch (error) {
       this.logger.error(`Error extracting photos for channel ${channelId}:`, error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      await this.updateTrainingStatus(ctx, channelId, 'failed', 0, errorMessage);
+      await this.updateTrainingStatus(channelId, 'failed', 0, errorMessage);
       await this.webhookService.notifyTrainingFailed(ctx, channelId, errorMessage);
       throw error;
     }
@@ -153,33 +200,22 @@ export class MlTrainingService {
    * Get training manifest for a channel (read-only).
    * Builds the manifest without triggering status updates or webhooks.
    */
-  async getTrainingManifest(ctx: RequestContext, channelId: string): Promise<TrainingManifest> {
-    const channel = await this.channelService.findOne(ctx, channelId);
-    if (!channel) {
-      throw new Error('Channel not found');
-    }
-
-    const channelCtx = new RequestContext({
-      apiType: ctx.apiType,
-      channel,
-      languageCode: ctx.languageCode,
-      isAuthorized: true,
-      authorizedAsOwnerOnly: false,
-    });
-
-    return this.buildManifestForChannel(channelCtx, channelId);
+  async getTrainingManifest(channelId: string): Promise<TrainingManifest> {
+    const ctx = await this.createChannelContext(channelId);
+    return this.buildManifestForChannel(ctx, channelId);
   }
 
   /**
    * Update training status for a channel
    */
   async updateTrainingStatus(
-    ctx: RequestContext,
     channelId: string,
     status: string,
     progress: number = 0,
     error?: string
   ): Promise<void> {
+    const ctx = await this.createChannelContext(channelId);
+
     const updateData: any = {
       mlTrainingStatus: status,
       mlTrainingProgress: progress,
@@ -193,13 +229,11 @@ export class MlTrainingService {
       updateData.mlTrainingError = error;
     }
 
-    // Update channel custom fields
     await this.channelService.update(ctx, {
       id: channelId,
       customFields: updateData,
     });
 
-    // Publish appropriate ML status event
     if (status === 'training' && progress === 0) {
       this.eventBus.publish(new MLStatusEvent(ctx, channelId, 'training', 'started', { progress }));
     } else if (status === 'training' && progress > 0 && progress < 100) {
@@ -219,9 +253,9 @@ export class MlTrainingService {
 
   /**
    * Check if a channel has ML enabled
-   * Shared utility method to avoid duplication across services
    */
-  async isMlEnabled(ctx: RequestContext, channelId: string): Promise<boolean> {
+  async isMlEnabled(channelId: string): Promise<boolean> {
+    const ctx = await this.createChannelContext(channelId);
     const channel = await this.channelService.findOne(ctx, channelId);
     if (!channel) return false;
 
@@ -235,18 +269,14 @@ export class MlTrainingService {
   }
 
   /**
-   * Schedule auto-extraction for a channel (debounced)
+   * Schedule auto-extraction for a channel
    */
-  async scheduleAutoExtraction(ctx: RequestContext, channelId: string): Promise<void> {
-    // In a real implementation, you would use Vendure's job queue
-    // For now, we'll just trigger extraction immediately
+  async scheduleAutoExtraction(channelId: string): Promise<void> {
     this.logger.log(`Scheduling auto-extraction for channel ${channelId}`);
 
-    // Check if channel has ML enabled
-    const hasMlEnabled = await this.isMlEnabled(ctx, channelId);
+    const hasMlEnabled = await this.isMlEnabled(channelId);
     if (hasMlEnabled) {
-      // Trigger extraction
-      await this.extractPhotosForChannel(ctx, channelId);
+      await this.extractPhotosForChannel(channelId);
     }
   }
 
@@ -260,7 +290,8 @@ export class MlTrainingService {
    * Loads channel by ID with seller filter bypass so we always get the requested channel's
    * counts (mlProductCount, mlImageCount) regardless of the request's active channel.
    */
-  async getTrainingInfo(ctx: RequestContext, channelId: string): Promise<any> {
+  async getTrainingInfo(channelId: string): Promise<any> {
+    const ctx = await this.createChannelContext(channelId);
     const channel = await findChannelById(
       ctx,
       channelId,
@@ -274,7 +305,6 @@ export class MlTrainingService {
 
     const customFields = channel.customFields as any;
 
-    // Handle both loaded Asset objects and raw IDs
     const getAssetId = (field: any) => {
       if (!field) return null;
       return typeof field === 'object' ? field.id : field;
@@ -291,41 +321,55 @@ export class MlTrainingService {
       productCount: customFields.mlProductCount || 0,
       imageCount: customFields.mlImageCount || 0,
       hasActiveModel: !!(modelJsonId && metadataId),
-      lastTrainedAt: customFields.mlTrainingStartedAt, // Could be improved with separate field
+      lastTrainedAt: customFields.mlTrainingStartedAt,
       queuedAt: customFields.mlTrainingQueuedAt ?? null,
     };
   }
 
   /**
-   * Start training for a channel
-   * Invokes the ml-trainer microservice
+   * Start training for a channel.
+   * Invokes the ml-trainer microservice.
    */
-  async startTraining(ctx: RequestContext, channelId: string): Promise<boolean> {
+  async startTraining(channelId: string): Promise<boolean> {
     this.logger.log(`Starting training for channel ${channelId}`);
+    const ctx = await this.createChannelContext(channelId);
 
-    // Check if channel has training data
-    const manifest = await this.getTrainingManifest(ctx, channelId);
+    // Check stored counts from last extraction for diagnostics
+    const channel = await this.channelService.findOne(ctx, channelId);
+    const storedProductCount = (channel?.customFields as any)?.mlProductCount || 0;
+    const storedImageCount = (channel?.customFields as any)?.mlImageCount || 0;
+    this.logger.log(
+      `Channel ${channelId} stored counts: ${storedProductCount} products, ${storedImageCount} images`
+    );
+
+    // Build live manifest for validation
+    const manifest = await this.buildManifestForChannel(ctx, channelId);
+    const liveImageCount = manifest.products.reduce((sum, p) => sum + p.images.length, 0);
+    this.logger.log(
+      `Channel ${channelId} live manifest: ${manifest.products.length} products, ${liveImageCount} images`
+    );
+
     if (!manifest.products || manifest.products.length < 2) {
-      throw new Error('Insufficient training data. Need at least 2 products with images.');
+      const errorMsg =
+        `Insufficient training data for channel ${channelId}. ` +
+        `Found ${manifest.products?.length ?? 0} products with images (need >= 2). ` +
+        `Stored count was ${storedProductCount}. ` +
+        `Context channel: ${ctx.channel?.id}`;
+      this.logger.error(errorMsg);
+      throw new Error(errorMsg);
     }
 
-    // Update status to training (starting)
-    // We don't set progress to 0 yet, as that's done by the webhook when it actually starts
-    await this.updateTrainingStatus(ctx, channelId, 'training', 0);
+    await this.updateTrainingStatus(channelId, 'training', 0);
 
     try {
-      // Get service token from environment config
       const authToken = env.ml.serviceToken;
       if (!authToken) {
         throw new Error('ML_SERVICE_TOKEN not configured. Cannot start training.');
       }
 
-      // Use URLs from environment config (defaults to Docker service names)
       const trainerUrl = env.ml.trainerUrl;
       const backendUrl = env.ml.backendInternalUrl;
 
-      // The manifest URL needs to be accessible by ml-trainer
-      // We use the admin-api with a query to get it
       const manifestUrl = `${backendUrl}/admin-api?query=query{mlTrainingManifest(channelId:"${channelId}"){channelId,version,extractedAt,products{productId,productName,images{assetId,url,filename}}}}`;
 
       this.logger.log(`Invoking ML trainer at ${trainerUrl}/v1/train`);
@@ -335,7 +379,7 @@ export class MlTrainingService {
         {
           channelId,
           manifestUrl,
-          webhookUrl: `${backendUrl}/admin-api`, // The GraphQL endpoint for callbacks
+          webhookUrl: `${backendUrl}/admin-api`,
           authToken,
         },
         {
@@ -350,7 +394,6 @@ export class MlTrainingService {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to start training: ${errorMessage}`);
       await this.updateTrainingStatus(
-        ctx,
         channelId,
         'failed',
         0,

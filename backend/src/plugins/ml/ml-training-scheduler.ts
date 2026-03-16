@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ChannelService, RequestContext, TransactionalConnection } from '@vendure/core';
+import { ChannelService, RequestContextService, TransactionalConnection } from '@vendure/core';
 import { env } from '../../infrastructure/config/environment.config';
 import { MlTrainingService } from '../../services/ml/ml-training.service';
 import { WorkerBackgroundTaskBase } from '../../infrastructure/utils/worker-background-task.base';
@@ -20,7 +20,8 @@ export class MlTrainingScheduler extends WorkerBackgroundTaskBase {
     workerContext: WorkerContextService,
     private channelService: ChannelService,
     private mlTrainingService: MlTrainingService,
-    private connection: TransactionalConnection
+    private connection: TransactionalConnection,
+    private requestContextService: RequestContextService
   ) {
     super(workerContext, MlTrainingScheduler.name);
   }
@@ -109,7 +110,7 @@ export class MlTrainingScheduler extends WorkerBackgroundTaskBase {
 
           // Eligible for training - start it
           this.logger.log(`Starting training for channel ${channel.id}`);
-          await this.mlTrainingService.startTraining(RequestContext.empty(), channel.id.toString());
+          await this.mlTrainingService.startTraining(channel.id.toString());
 
           // Clear the queue marker (training has been initiated)
           await this.clearTrainingQueuedAt(channel.id.toString());
@@ -134,8 +135,8 @@ export class MlTrainingScheduler extends WorkerBackgroundTaskBase {
    */
   private async findChannelsNeedingTraining(): Promise<any[]> {
     try {
-      // Query channels where mlTrainingQueuedAt is not null
-      const channels = await this.channelService.findAll(RequestContext.empty());
+      const ctx = await this.requestContextService.create({ apiType: 'admin' });
+      const channels = await this.channelService.findAll(ctx);
       return channels.items.filter((channel: any) => {
         const customFields = channel.customFields as any;
         return !!customFields.mlTrainingQueuedAt;
@@ -151,7 +152,8 @@ export class MlTrainingScheduler extends WorkerBackgroundTaskBase {
    */
   private async clearTrainingQueuedAt(channelId: string): Promise<void> {
     try {
-      await this.channelService.update(RequestContext.empty(), {
+      const ctx = await this.requestContextService.create({ apiType: 'admin' });
+      await this.channelService.update(ctx, {
         id: channelId,
         customFields: {
           mlTrainingQueuedAt: null,

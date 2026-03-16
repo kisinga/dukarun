@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ChannelService, RequestContext } from '@vendure/core';
+import { ChannelService, RequestContextService } from '@vendure/core';
 import pLimit from 'p-limit';
 import { MlExtractionQueueService } from '../../services/ml/ml-extraction-queue.service';
 import { MlTrainingService } from '../../services/ml/ml-training.service';
@@ -24,7 +24,8 @@ export class MlExtractionQueueSubscriber extends WorkerBackgroundTaskBase {
     workerContext: WorkerContextService,
     private extractionQueueService: MlExtractionQueueService,
     private mlTrainingService: MlTrainingService,
-    private channelService: ChannelService
+    private channelService: ChannelService,
+    private requestContextService: RequestContextService
   ) {
     super(workerContext, MlExtractionQueueSubscriber.name);
   }
@@ -65,9 +66,8 @@ export class MlExtractionQueueSubscriber extends WorkerBackgroundTaskBase {
   private async processQueue(): Promise<void> {
     try {
       this.logger.debug('Checking for due extractions...');
-      const dueExtractions = await this.extractionQueueService.getDueExtractions(
-        RequestContext.empty()
-      );
+      const adminCtx = await this.requestContextService.create({ apiType: 'admin' });
+      const dueExtractions = await this.extractionQueueService.getDueExtractions(adminCtx);
 
       if (dueExtractions.length === 0) {
         this.logger.debug(
@@ -101,22 +101,13 @@ export class MlExtractionQueueSubscriber extends WorkerBackgroundTaskBase {
             );
 
             // Mark as processing (this will emit ML_EXTRACTION_STARTED event)
-            await this.extractionQueueService.markAsProcessing(
-              RequestContext.empty(),
-              extraction.id
-            );
+            await this.extractionQueueService.markAsProcessing(adminCtx, extraction.id);
 
             // Perform the extraction
-            await this.mlTrainingService.scheduleAutoExtraction(
-              RequestContext.empty(),
-              extraction.channelId
-            );
+            await this.mlTrainingService.scheduleAutoExtraction(extraction.channelId);
 
             // Mark as completed (this will emit ML_EXTRACTION_COMPLETED event)
-            await this.extractionQueueService.markAsCompleted(
-              RequestContext.empty(),
-              extraction.id
-            );
+            await this.extractionQueueService.markAsCompleted(adminCtx, extraction.id);
 
             // Queue training instead of starting immediately
             // The MlTrainingScheduler will process the queue on its interval
@@ -135,11 +126,7 @@ export class MlExtractionQueueSubscriber extends WorkerBackgroundTaskBase {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.logger.error(`Error processing extraction ${extraction.id}:`, error);
             // Mark as failed (this will emit ML_EXTRACTION_FAILED event)
-            await this.extractionQueueService.markAsFailed(
-              RequestContext.empty(),
-              extraction.id,
-              errorMessage
-            );
+            await this.extractionQueueService.markAsFailed(adminCtx, extraction.id, errorMessage);
           }
         }
       };
@@ -162,7 +149,8 @@ export class MlExtractionQueueSubscriber extends WorkerBackgroundTaskBase {
    */
   private async queueTrainingForChannel(channelId: string): Promise<void> {
     try {
-      await this.channelService.update(RequestContext.empty(), {
+      const ctx = await this.requestContextService.create({ apiType: 'admin' });
+      await this.channelService.update(ctx, {
         id: channelId,
         customFields: {
           mlTrainingQueuedAt: new Date(),
@@ -181,9 +169,8 @@ export class MlExtractionQueueSubscriber extends WorkerBackgroundTaskBase {
    */
   private async cleanupOldExtractions(): Promise<void> {
     try {
-      const cleanedCount = await this.extractionQueueService.cleanupOldExtractions(
-        RequestContext.empty()
-      );
+      const ctx = await this.requestContextService.create({ apiType: 'admin' });
+      const cleanedCount = await this.extractionQueueService.cleanupOldExtractions(ctx);
       if (cleanedCount > 0) {
         this.logger.log(`Cleaned up ${cleanedCount} old extractions on startup`);
       }

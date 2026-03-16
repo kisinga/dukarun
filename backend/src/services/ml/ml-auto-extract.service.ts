@@ -6,6 +6,7 @@ import {
   ProductEvent,
   ProductService,
   RequestContext,
+  RequestContextService,
   TransactionalConnection,
 } from '@vendure/core';
 import { ProductAsset } from '@vendure/core/dist/entity/product/product-asset.entity';
@@ -28,7 +29,8 @@ export class MlAutoExtractService implements OnModuleInit {
     private productService: ProductService,
     private connection: TransactionalConnection,
     private extractionQueueService: MlExtractionQueueService,
-    private mlTrainingService: MlTrainingService
+    private mlTrainingService: MlTrainingService,
+    private requestContextService: RequestContextService
   ) {}
 
   onModuleInit() {
@@ -94,7 +96,7 @@ export class MlAutoExtractService implements OnModuleInit {
   ): Promise<void> {
     try {
       // Check if channel has ML enabled using shared utility
-      const hasMlEnabled = await this.mlTrainingService.isMlEnabled(ctx, channelId);
+      const hasMlEnabled = await this.mlTrainingService.isMlEnabled(channelId.toString());
       if (!hasMlEnabled) {
         this.logger.log(`Channel ${channelId} does not have ML enabled, skipping`);
         return;
@@ -147,13 +149,10 @@ export class MlAutoExtractService implements OnModuleInit {
    */
   async clearAllPending(): Promise<void> {
     try {
-      // Cancel all pending extractions in the database
-      const channels = await this.channelService.findAll(RequestContext.empty());
+      const ctx = await this.requestContextService.create({ apiType: 'admin' });
+      const channels = await this.channelService.findAll(ctx);
       for (const channel of channels.items) {
-        await this.extractionQueueService.cancelPendingExtractions(
-          RequestContext.empty(),
-          channel.id.toString()
-        );
+        await this.extractionQueueService.cancelPendingExtractions(ctx, channel.id.toString());
       }
       this.logger.log('Cleared all pending extractions from database');
     } catch (error) {
