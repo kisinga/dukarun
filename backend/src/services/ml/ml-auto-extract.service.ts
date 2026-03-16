@@ -1,5 +1,14 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { AssetEvent, ChannelService, EventBus, ProductEvent, RequestContext } from '@vendure/core';
+import {
+  AssetEvent,
+  ChannelService,
+  EventBus,
+  ProductEvent,
+  ProductService,
+  RequestContext,
+  TransactionalConnection,
+} from '@vendure/core';
+import { ProductAsset } from '@vendure/core/dist/entity/product/product-asset.entity';
 import { MlExtractionQueueService } from './ml-extraction-queue.service';
 import { MlTrainingService } from './ml-training.service';
 
@@ -16,6 +25,8 @@ export class MlAutoExtractService implements OnModuleInit {
   constructor(
     private eventBus: EventBus,
     private channelService: ChannelService,
+    private productService: ProductService,
+    private connection: TransactionalConnection,
     private extractionQueueService: MlExtractionQueueService,
     private mlTrainingService: MlTrainingService
   ) {}
@@ -109,23 +120,16 @@ export class MlAutoExtractService implements OnModuleInit {
     }
   }
 
-  /**
-   * Get all channels a product belongs to
-   */
   private async getProductChannels(ctx: RequestContext, productId: string): Promise<any[]> {
-    // This is a simplified implementation
-    // In a real scenario, you'd query the product's channels through Vendure's relations
-    const channels = await this.channelService.findAll(ctx);
-    return channels.items;
+    return this.productService.getProductChannels(ctx, productId as any);
   }
 
-  /**
-   * Get all products an asset is assigned to
-   */
   private async getAssetProducts(ctx: RequestContext, assetId: string): Promise<any[]> {
-    // This is a simplified implementation
-    // In a real scenario, you'd query the asset's products through Vendure's relations
-    return [];
+    const productAssets = await this.connection.getRepository(ctx, ProductAsset).find({
+      where: { assetId: assetId as any },
+      relations: ['product'],
+    });
+    return productAssets.map(pa => pa.product).filter(Boolean);
   }
 
   /**

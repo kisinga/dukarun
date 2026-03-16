@@ -27,12 +27,6 @@ export async function startTraining(config: TrainingConfig): Promise<void> {
     const manifest = await fetchManifest(manifestUrl, authToken);
     const classes = manifest.products.map((p) => p.productId);
 
-    if (manifest.products.length < 2) {
-      throw new Error(
-        `Insufficient training data: Need at least 2 products, got ${manifest.products.length}`
-      );
-    }
-
     if (!fs.existsSync(jobDir)) {
       fs.mkdirSync(jobDir, { recursive: true });
     }

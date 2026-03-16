@@ -45,12 +45,6 @@ export async function fetchManifest(
     );
   }
 
-  if (!manifest.products || manifest.products.length < 2) {
-    throw new Error(
-      `Insufficient training data: Need at least 2 products, got ${manifest.products?.length || 0}`
-    );
-  }
-
   return manifest;
 }
 
