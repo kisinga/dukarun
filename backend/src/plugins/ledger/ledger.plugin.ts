@@ -56,6 +56,7 @@ import { BatchAwareStockLevelService } from '../../services/stock/batch-aware-st
 import { BatchStockLocationStrategy } from './batch-stock-location.strategy';
 import { CustomVendureStockMovementService } from '../../services/stock/custom-vendure-stock-movement.service';
 import { StockMovementService as LocalStockMovementServiceClass } from '../../services/stock/stock-movement.service';
+import { OpeningStockBatchSubscriber } from './opening-stock-batch.subscriber';
 import { StockValueCacheSubscriber } from './stock-value-cache.subscriber';
 import { StockValueStatsResolver } from './stock-value-stats.resolver';
 import {
@@ -115,6 +116,7 @@ const COMBINED_SCHEMA = gql`
     InventoryReconciliationService,
     StockValuationService,
     StockValueCacheSubscriber,
+    OpeningStockBatchSubscriber,
     PeriodEndClosingService,
     LedgerPostingService,
     PurchasePostingStrategy,
