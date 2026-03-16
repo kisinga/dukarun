@@ -379,7 +379,7 @@ export class MlModelResolver {
   @Query()
   @Allow(Permission.ReadCatalog)
   async mlTrainingInfo(@Ctx() ctx: RequestContext, @Args() args: { channelId: ID }): Promise<any> {
-    return this.mlTrainingService.getTrainingInfo(ctx, args.channelId.toString());
+    return this.mlTrainingService.getTrainingInfo(args.channelId.toString());
   }
 
   @Query()
@@ -393,21 +393,7 @@ export class MlModelResolver {
     imageCount: number;
     products: Array<{ productName: string; imageCount: number }>;
   }> {
-    const channel = await this.channelService.findOne(ctx, args.channelId);
-    if (!channel) {
-      throw new Error('Channel not found');
-    }
-    const channelCtx = new RequestContext({
-      apiType: ctx.apiType,
-      channel,
-      languageCode: ctx.languageCode,
-      isAuthorized: true,
-      authorizedAsOwnerOnly: false,
-    });
-    const manifest = await this.mlTrainingService.buildManifestForChannel(
-      channelCtx,
-      args.channelId.toString()
-    );
+    const manifest = await this.mlTrainingService.getTrainingManifest(args.channelId.toString());
     const productCount = manifest.products?.length ?? 0;
     let imageCount = 0;
     const products = (manifest.products ?? []).map(p => {
@@ -439,20 +425,14 @@ export class MlModelResolver {
       );
     }
 
-    const channel = await this.channelService.findOne(ctx, args.channelId);
-    if (!channel) {
-      throw new Error('Channel not found');
-    }
-    const channelCtx = new RequestContext({
-      apiType: ctx.apiType,
-      channel,
-      languageCode: ctx.languageCode,
-      isAuthorized: true,
-      authorizedAsOwnerOnly: false,
-    });
-    const manifest = await this.mlTrainingService.buildManifestForChannel(channelCtx, channelId);
+    const manifest = await this.mlTrainingService.getTrainingManifest(channelId);
     const products = manifest.products ?? [];
     const imageCount = products.reduce((sum, p) => sum + (p.images?.length ?? 0), 0);
+
+    const channelCtx = await this.requestContextService.create({
+      apiType: 'admin',
+      channelOrToken: (await this.channelService.findOne(ctx, args.channelId))!,
+    });
     await this.channelService.update(channelCtx, {
       id: channelId,
       customFields: {
@@ -550,22 +530,7 @@ export class MlModelResolver {
       throw new Error('Invalid service token');
     }
 
-    // Create a RequestContext for the specific channel
-    // This ensures product queries use the correct channel filter
-    const channel = await this.channelService.findOne(ctx, args.channelId);
-    if (!channel) {
-      throw new Error(`Channel ${args.channelId} not found`);
-    }
-
-    const channelCtx = new RequestContext({
-      apiType: ctx.apiType,
-      channel,
-      languageCode: ctx.languageCode,
-      isAuthorized: true,
-      authorizedAsOwnerOnly: false,
-    });
-
-    return this.mlTrainingService.getTrainingManifest(channelCtx, args.channelId.toString());
+    return this.mlTrainingService.getTrainingManifest(args.channelId.toString());
   }
 
   @Transaction()
@@ -576,20 +541,7 @@ export class MlModelResolver {
     @Args() args: { channelId: ID }
   ): Promise<boolean> {
     this.logger.debug('extractPhotosForTraining called', args);
-
-    const channel = await this.channelService.findOne(ctx, args.channelId);
-    if (!channel) {
-      throw new Error(`Channel ${args.channelId} not found`);
-    }
-    const channelCtx = new RequestContext({
-      apiType: ctx.apiType,
-      channel,
-      languageCode: ctx.languageCode,
-      isAuthorized: true,
-      authorizedAsOwnerOnly: false,
-    });
-
-    await this.mlTrainingService.extractPhotosForChannel(channelCtx, args.channelId.toString());
+    await this.mlTrainingService.extractPhotosForChannel(args.channelId.toString());
     return true;
   }
 
@@ -604,7 +556,6 @@ export class MlModelResolver {
     this.logger.debug('updateTrainingStatus called', args);
 
     await this.mlTrainingService.updateTrainingStatus(
-      ctx,
       args.channelId.toString(),
       args.status,
       args.progress || 0,
@@ -695,7 +646,6 @@ export class MlModelResolver {
       this.logger.error('Error completing training:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       await this.mlTrainingService.updateTrainingStatus(
-        internalCtx,
         args.channelId.toString(),
         'failed',
         0,
@@ -782,12 +732,9 @@ export class MlModelResolver {
     if (!channel) {
       throw new Error('Channel not found');
     }
-    const channelCtx = new RequestContext({
-      apiType: ctx.apiType,
-      channel,
-      languageCode: ctx.languageCode,
-      isAuthorized: true,
-      authorizedAsOwnerOnly: false,
+    const channelCtx = await this.requestContextService.create({
+      apiType: 'admin',
+      channelOrToken: channel,
     });
     await this.applyUploadedModelToChannel(channelCtx, args.channelId.toString(), {
       modelJson: args.modelJson,
@@ -803,21 +750,7 @@ export class MlModelResolver {
     @Ctx() ctx: RequestContext,
     @Args() args: { channelId: ID }
   ): Promise<{ manifestJson: string }> {
-    const channel = await this.channelService.findOne(ctx, args.channelId);
-    if (!channel) {
-      throw new Error('Channel not found');
-    }
-    const channelCtx = new RequestContext({
-      apiType: ctx.apiType,
-      channel,
-      languageCode: ctx.languageCode,
-      isAuthorized: true,
-      authorizedAsOwnerOnly: false,
-    });
-    const manifest = await this.mlTrainingService.buildManifestForChannel(
-      channelCtx,
-      args.channelId.toString()
-    );
+    const manifest = await this.mlTrainingService.getTrainingManifest(args.channelId.toString());
     return {
       manifestJson: JSON.stringify({
         channelId: manifest.channelId,
@@ -854,19 +787,6 @@ export class MlModelResolver {
     @Args() args: { channelId: ID }
   ): Promise<boolean> {
     this.logger.debug('startTraining called', args);
-
-    const channel = await this.channelService.findOne(ctx, args.channelId);
-    if (!channel) {
-      throw new Error(`Channel ${args.channelId} not found`);
-    }
-    const channelCtx = new RequestContext({
-      apiType: ctx.apiType,
-      channel,
-      languageCode: ctx.languageCode,
-      isAuthorized: true,
-      authorizedAsOwnerOnly: false,
-    });
-
-    return this.mlTrainingService.startTraining(channelCtx, args.channelId.toString());
+    return this.mlTrainingService.startTraining(args.channelId.toString());
   }
 }
