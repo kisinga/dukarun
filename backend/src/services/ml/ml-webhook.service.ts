@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ChannelService, RequestContext } from '@vendure/core';
+import { Injectable } from '@nestjs/common';
+import { ChannelService, Logger, RequestContext } from '@vendure/core';
 import { env } from '../../infrastructure/config/environment.config';
 
 export interface TrainingWebhookPayload {
@@ -14,8 +14,6 @@ export interface TrainingWebhookPayload {
 
 @Injectable()
 export class MlWebhookService {
-  private readonly logger = new Logger(MlWebhookService.name);
-
   constructor(private channelService: ChannelService) {}
 
   /**
@@ -32,7 +30,7 @@ export class MlWebhookService {
     try {
       const channel = await this.channelService.findOne(ctx, channelId);
       if (!channel) {
-        this.logger.warn(`Channel ${channelId} not found for webhook`);
+        Logger.warn(`Channel ${channelId} not found for webhook`, 'MlWebhookService');
         return;
       }
 
@@ -48,27 +46,27 @@ export class MlWebhookService {
         error,
       };
 
-      // For now, just console.log the webhook data
+      // For now, just log the webhook data
       // In production, this would POST to external service URL
-      this.logger.log('=== ML TRAINING WEBHOOK ===');
-      this.logger.log(`Channel: ${channelId}`);
-      this.logger.log(`Status: ${status}`);
-      this.logger.log(`Progress: ${payload.progress}%`);
-      this.logger.log(`Products: ${payload.productCount}`);
-      this.logger.log(`Images: ${payload.imageCount}`);
+      Logger.info('=== ML TRAINING WEBHOOK ===', 'MlWebhookService');
+      Logger.info(`Channel: ${channelId}`, 'MlWebhookService');
+      Logger.info(`Status: ${status}`, 'MlWebhookService');
+      Logger.info(`Progress: ${payload.progress}%`, 'MlWebhookService');
+      Logger.info(`Products: ${payload.productCount}`, 'MlWebhookService');
+      Logger.info(`Images: ${payload.imageCount}`, 'MlWebhookService');
       if (payload.manifestUrl) {
-        this.logger.log(`Manifest URL: ${payload.manifestUrl}`);
+        Logger.info(`Manifest URL: ${payload.manifestUrl}`, 'MlWebhookService');
       }
       if (error) {
-        this.logger.log(`Error: ${error}`);
+        Logger.info(`Error: ${error}`, 'MlWebhookService');
       }
-      this.logger.log('=== END WEBHOOK ===');
+      Logger.info('=== END WEBHOOK ===', 'MlWebhookService');
 
       // TODO: In production, replace console.log with actual HTTP POST
       // await this.httpService.post(webhookUrl, payload).toPromise();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to send training webhook: ${errorMessage}`);
+      Logger.error(`Failed to send training webhook: ${errorMessage}`, 'MlWebhookService');
     }
   }
 

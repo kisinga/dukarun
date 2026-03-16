@@ -5,6 +5,7 @@ import {
   CurrencyCode,
   GlobalSettingsService,
   LanguageCode,
+  Logger,
   RequestContext,
   Role,
   TransactionalConnection,
@@ -151,8 +152,9 @@ export class ChannelProvisionerService {
     } catch (error: any) {
       // Log error but don't fail channel creation if SuperAdmin role update fails
       // This is a non-critical operation - channel will still be created
-      console.error(
-        `Failed to add channel ${channel.id} to SuperAdmin role: ${error instanceof Error ? error.message : String(error)}`
+      Logger.error(
+        `Failed to add channel ${channel.id} to SuperAdmin role: ${error instanceof Error ? error.message : String(error)}`,
+        'ChannelProvisionerService'
       );
     }
   }
