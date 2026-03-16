@@ -694,9 +694,25 @@ export class InventoryService {
           metadata: { reason: 'adjustment' },
         });
       } else if (batches.length > 1) {
-        throw new UserInputError(
-          'Multiple batches exist for this variant at this location; specify batchId to apply adjustment'
+        // Auto-select the most recent batch for increases (batches ordered by createdAt ASC)
+        const mostRecent = batches[batches.length - 1];
+        this.logger.warn(
+          `Auto-selected most recent batch ${mostRecent.id} for adjustment increase on variant ${variantId} ` +
+            `at location ${locationId} (${batches.length} open batches exist)`
         );
+        await this.inventoryStore.updateBatchQuantity(ctx, mostRecent.id, quantityChange);
+        batchIdUsed = String(mostRecent.id);
+        await this.inventoryStore.createMovement(ctx, {
+          channelId: input.channelId,
+          stockLocationId: input.stockLocationId,
+          productVariantId: input.productVariantId,
+          movementType: MovementType.ADJUSTMENT,
+          quantity: quantityChange,
+          batchId: mostRecent.id,
+          sourceType: 'StockAdjustment',
+          sourceId: adjustmentId,
+          metadata: { reason: 'adjustment', autoSelectedBatch: true },
+        });
       } else {
         // No open batches exist — creating a zero-cost batch. COGS for future sales
         // from this batch will be $0, which distorts gross margin reporting.

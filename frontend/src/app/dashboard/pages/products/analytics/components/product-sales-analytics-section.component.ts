@@ -104,6 +104,7 @@ export class ProductSalesAnalyticsSectionComponent {
   readonly topSellingRows = computed<AnalyticsTableRow[]>(() =>
     (this.stats()?.topSelling ?? []).map((p, i) => ({
       rank: i + 1,
+      productId: p.productId,
       productName: p.productName,
       variantName: p.variantName ?? null,
       displayValue: p.totalQuantity.toLocaleString() + ' units',
@@ -121,6 +122,7 @@ export class ProductSalesAnalyticsSectionComponent {
   readonly highestRevenueRows = computed<AnalyticsTableRow[]>(() =>
     (this.stats()?.highestRevenue ?? []).map((p, i) => ({
       rank: i + 1,
+      productId: p.productId,
       productName: p.productName,
       variantName: p.variantName ?? null,
       displayValue: this.currencyService.format(p.totalRevenue),
@@ -138,6 +140,7 @@ export class ProductSalesAnalyticsSectionComponent {
   readonly highestMarginRows = computed<AnalyticsTableRow[]>(() =>
     (this.stats()?.highestMargin ?? []).map((p, i) => ({
       rank: i + 1,
+      productId: p.productId,
       productName: p.productName,
       variantName: p.variantName ?? null,
       displayValue: (p.marginPercent ?? 0).toFixed(1) + '%',
@@ -160,6 +163,7 @@ export class ProductSalesAnalyticsSectionComponent {
       const change = p.quantityChangePercent ?? 0;
       return {
         rank: i + 1,
+        productId: p.productId,
         productName: p.productName,
         variantName: p.variantName ?? null,
         displayValue: (change >= 0 ? '+' : '') + change.toFixed(1) + '%',

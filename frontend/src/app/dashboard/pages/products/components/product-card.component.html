@@ -55,12 +55,17 @@
       <!-- Product Summary -->
       <div class="flex-1 min-w-0">
         <div class="flex items-start justify-between gap-2 mb-1">
-          <app-product-label
-            [productName]="product().name"
-            [facetValues]="product().facetValues ?? []"
-            [lineClampName]="true"
-            class="flex-1 min-w-0"
-          />
+          <a
+            [routerLink]="'/dashboard/products/' + product().id"
+            (click)="$event.stopPropagation()"
+            class="flex-1 min-w-0 hover:underline"
+          >
+            <app-product-label
+              [productName]="product().name"
+              [facetValues]="product().facetValues ?? []"
+              [lineClampName]="true"
+            />
+          </a>
           @if (product().enabled) {
             <span class="badge badge-success badge-xs gap-1 shrink-0">
               <span class="w-1 h-1 bg-success-content rounded-full"></span>

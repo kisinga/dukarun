@@ -1,4 +1,4 @@
-import { Inject } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import {
   Cancellation,
   EventBus,
@@ -35,6 +35,7 @@ import { StockMovementService as LocalStockMovementService } from './stock-movem
 const REASON_PRODUCT_CREATE_UPDATE = 'Product create/update';
 
 export class CustomVendureStockMovementService extends StockMovementService {
+  private readonly logger = new Logger('CustomVendureStockMovementService');
   private readonly conn: TransactionalConnection;
   private readonly bus: EventBus;
   private readonly stockLoc: StockLocationService;
@@ -204,9 +205,19 @@ export class CustomVendureStockMovementService extends StockMovementService {
       }));
     }
 
+    this.logger.log(
+      `adjustProductVariantStock called: variantId=${variantId}, ` +
+        `stockOnHandInput=${JSON.stringify(stockOnHandNumberOrInput)}, ` +
+        `resolvedInputs=${JSON.stringify(stockOnHandInputs)}`
+    );
+
     for (const input of stockOnHandInputs) {
       const current = await this.localStock.getCurrentStock(ctx, variantId, input.stockLocationId);
       const delta = input.stockOnHand - current;
+      this.logger.log(
+        `Opening stock check: variantId=${variantId}, locationId=${input.stockLocationId}, ` +
+          `targetStockOnHand=${input.stockOnHand}, currentBatchSum=${current}, delta=${delta}`
+      );
       if (delta === 0) continue;
       await this.localStock.adjustStockLevel(
         ctx,

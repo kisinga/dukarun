@@ -1,10 +1,12 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 export interface AnalyticsTableRow {
   rank: number;
   productName: string;
   variantName: string | null;
   displayValue: string;
+  productId?: string;
 }
 
 /**
@@ -32,9 +34,20 @@ export interface AnalyticsTableRow {
           </thead>
           <tbody>
             @for (row of rows(); track row.rank) {
-              <tr class="hover">
+              <tr class="hover" [class.cursor-pointer]="row.productId">
                 <td class="text-right tabular-nums text-base-content/60">{{ row.rank }}</td>
-                <td class="font-medium">{{ row.productName }}</td>
+                <td>
+                  @if (row.productId) {
+                    <a
+                      [routerLink]="'/dashboard/products/' + row.productId"
+                      class="font-medium link link-hover text-primary"
+                    >
+                      {{ row.productName }}
+                    </a>
+                  } @else {
+                    <span class="font-medium">{{ row.productName }}</span>
+                  }
+                </td>
                 <td class="text-base-content/70">{{ row.variantName ?? '—' }}</td>
                 <td class="text-right tabular-nums font-medium">{{ row.displayValue }}</td>
               </tr>
@@ -44,6 +57,7 @@ export interface AnalyticsTableRow {
       </div>
     </div>
   `,
+  imports: [RouterLink],
 })
 export class AnalyticsResultsTableComponent {
   readonly title = input.required<string>();

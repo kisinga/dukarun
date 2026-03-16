@@ -135,6 +135,7 @@ export class ProductAnalyticsPageComponent {
       const result = await this.dashboardService.loadStockValueRanking(type, 20);
       const rows: AnalyticsTableRow[] = result.items.map((item, i) => ({
         rank: i + 1,
+        productId: item.productId,
         productName: item.productName,
         variantName: item.variantName,
         displayValue: this.currencyService.format(item.value),
