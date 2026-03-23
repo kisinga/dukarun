@@ -7,6 +7,7 @@ import {
   CustomerService,
   Permission,
   RequestContext,
+  TransactionalConnection,
   UserInputError,
 } from '@vendure/core';
 import { formatPhoneNumber } from '../../utils/phone.utils';
@@ -37,7 +38,8 @@ export class CustomerResolver {
 
   constructor(
     private readonly customerService: CustomerService,
-    private readonly customerLookupService: CustomerLookupService
+    private readonly customerLookupService: CustomerLookupService,
+    private readonly connection: TransactionalConnection
   ) {}
 
   /**
@@ -76,19 +78,44 @@ export class CustomerResolver {
       input.emailAddress = generateSentinelEmailFromPhone(normalizedPhone, 'customer');
     }
 
-    // Check for existing customer by phone number
+    // Check for existing customer by phone number (including soft-deleted)
     if (normalizedPhone) {
-      const existingCustomer = await this.customerLookupService.findCustomerByPhone(
+      const existingCustomer = await this.customerLookupService.findCustomerByPhoneIncludingDeleted(
         ctx,
         normalizedPhone
       );
 
       if (existingCustomer) {
         this.logger.log(
-          `Customer with phone ${normalizedPhone} already exists: ${existingCustomer.id}`
+          `Customer with phone ${normalizedPhone} already exists: ${existingCustomer.id} (deletedAt: ${existingCustomer.deletedAt ?? 'none'})`
         );
 
-        // Return existing customer
+        const customerRepo = this.connection.getRepository(ctx, Customer);
+
+        // Reactivate if soft-deleted
+        if (existingCustomer.deletedAt) {
+          this.logger.log(`Reactivating soft-deleted customer ${existingCustomer.id}`);
+          existingCustomer.deletedAt = null as any;
+        }
+
+        // Update core fields from input
+        if (input.firstName) existingCustomer.firstName = input.firstName;
+        if (input.lastName) existingCustomer.lastName = input.lastName;
+        if (input.emailAddress && input.emailAddress.trim() !== '') {
+          existingCustomer.emailAddress = input.emailAddress;
+        }
+        if (input.title) existingCustomer.title = input.title;
+
+        // Merge customFields: preserve existing, overlay new
+        if (input.customFields) {
+          existingCustomer.customFields = {
+            ...(existingCustomer.customFields || {}),
+            ...input.customFields,
+          };
+        }
+
+        await customerRepo.save(existingCustomer);
+        this.logger.log(`Updated and returned existing customer ${existingCustomer.id}`);
         return existingCustomer;
       }
     }

@@ -124,10 +124,12 @@ export function mergeCustomerFields(
     lastName?: string;
     emailAddress?: string;
     phoneNumber?: string;
+    isCreditApproved?: boolean;
+    creditLimit?: number;
+    creditDuration?: number;
   },
 ): any {
   const existingCustomFields = existing.customFields || {};
-  const isSupplier = existingCustomFields.isSupplier === true;
 
   // Merge customer fields (update if provided, preserve existing otherwise)
   const mergedCustomerFields = {
@@ -137,9 +139,19 @@ export function mergeCustomerFields(
     phoneNumber: customerData.phoneNumber || existing.phoneNumber,
   };
 
-  // Preserve all custom fields (supplier fields, credit fields, etc.)
-  // Strip GraphQL metadata (__typename) before returning
+  // Preserve all existing custom fields, then overlay new credit fields
   const preservedCustomFields = stripGraphQLMetadata({ ...existingCustomFields });
+
+  // Merge customer credit fields: use new values if provided, otherwise keep existing
+  if (customerData.isCreditApproved !== undefined) {
+    preservedCustomFields.isCreditApproved = customerData.isCreditApproved;
+  }
+  if (customerData.creditLimit !== undefined && customerData.creditLimit > 0) {
+    preservedCustomFields.creditLimit = customerData.creditLimit;
+  }
+  if (customerData.creditDuration !== undefined && customerData.creditDuration > 0) {
+    preservedCustomFields.creditDuration = customerData.creditDuration;
+  }
 
   return {
     id: existing.id,
