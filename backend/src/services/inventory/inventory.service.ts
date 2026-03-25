@@ -241,104 +241,104 @@ export class InventoryService {
    * Record a purchase and create inventory batches
    */
   async recordPurchase(ctx: RequestContext, input: RecordPurchaseInput): Promise<PurchaseResult> {
-    return this.connection.withTransaction(ctx, async transactionCtx => {
-      try {
-        const batches: InventoryBatch[] = [];
-        const movements: InventoryMovement[] = [];
+    // No nested withTransaction — caller provides the transaction context.
+    // This ensures batches are immediately visible within the caller's transaction.
+    try {
+      const batches: InventoryBatch[] = [];
+      const movements: InventoryMovement[] = [];
 
-        // Create batches and movements for each line
-        for (const line of input.lines) {
-          const purchaseDate = input.purchaseDate ?? new Date();
-          const resolvedBatchNumber =
-            line.batchNumber ??
-            (await this.generateUniquePurchaseBatchNumber(
-              transactionCtx,
-              input.channelId,
-              line.productVariantId,
-              purchaseDate
-            ));
+      // Create batches and movements for each line
+      for (const line of input.lines) {
+        const purchaseDate = input.purchaseDate ?? new Date();
+        const resolvedBatchNumber =
+          line.batchNumber ??
+          (await this.generateUniquePurchaseBatchNumber(
+            ctx,
+            input.channelId,
+            line.productVariantId,
+            purchaseDate
+          ));
 
-          // Create batch
-          const batchInput: CreateBatchInput = {
-            channelId: input.channelId,
-            stockLocationId: input.stockLocationId,
-            productVariantId: line.productVariantId,
-            quantity: line.quantity,
-            unitCost: line.unitCost,
-            expiryDate: line.expiryDate || null,
-            sourceType: 'Purchase',
-            sourceId: input.purchaseId,
-            batchNumber: resolvedBatchNumber,
-            metadata: {
-              purchaseReference: input.purchaseReference,
-              supplierId: input.supplierId,
-            },
-          };
+        // Create batch
+        const batchInput: CreateBatchInput = {
+          channelId: input.channelId,
+          stockLocationId: input.stockLocationId,
+          productVariantId: line.productVariantId,
+          quantity: line.quantity,
+          unitCost: line.unitCost,
+          expiryDate: line.expiryDate || null,
+          sourceType: 'Purchase',
+          sourceId: input.purchaseId,
+          batchNumber: resolvedBatchNumber,
+          metadata: {
+            purchaseReference: input.purchaseReference,
+            supplierId: input.supplierId,
+          },
+        };
 
-          const batch = await this.inventoryStore.createBatch(transactionCtx, batchInput);
-          batches.push(batch);
+        const batch = await this.inventoryStore.createBatch(ctx, batchInput);
+        batches.push(batch);
 
-          // Verify batch was created
-          const batchExists = await this.inventoryStore.verifyBatchExists(transactionCtx, batch.id);
-          if (!batchExists) {
-            throw new Error(`Failed to create batch for purchase ${input.purchaseId}`);
-          }
-
-          // Create movement
-          const movementInput: CreateMovementInput = {
-            channelId: input.channelId,
-            stockLocationId: input.stockLocationId,
-            productVariantId: line.productVariantId,
-            movementType: MovementType.PURCHASE,
-            quantity: line.quantity,
-            batchId: batch.id,
-            sourceType: 'Purchase',
-            sourceId: input.purchaseId,
-            metadata: {
-              purchaseReference: input.purchaseReference,
-              supplierId: input.supplierId,
-            },
-          };
-
-          const movement = await this.inventoryStore.createMovement(transactionCtx, movementInput);
-          movements.push(movement);
-
-          // Call expiry policy hook
-          await this.expiryPolicy.onBatchCreated(transactionCtx, batch);
+        // Verify batch was created
+        const batchExists = await this.inventoryStore.verifyBatchExists(ctx, batch.id);
+        if (!batchExists) {
+          throw new Error(`Failed to create batch for purchase ${input.purchaseId}`);
         }
 
-        // Post to ledger
-        const totalCost = input.lines.reduce((sum, line) => sum + line.quantity * line.unitCost, 0);
-
-        await this.ledgerPostingService.postInventoryPurchase(transactionCtx, input.purchaseId, {
-          purchaseId: input.purchaseId,
-          purchaseReference: input.purchaseReference,
-          supplierId: input.supplierId,
-          totalCost,
-          isCreditPurchase: input.isCreditPurchase,
-          batchAllocations: batches.map(b => ({
-            batchId: String(b.id),
-            quantity: b.quantity,
-            unitCost: b.unitCost,
-          })),
-        });
-
-        this.logger.log(
-          `Recorded purchase ${input.purchaseId}: ${batches.length} batches, total cost: ${totalCost}`
-        );
-
-        return {
-          purchaseId: input.purchaseId,
-          batches,
-          movements,
+        // Create movement
+        const movementInput: CreateMovementInput = {
+          channelId: input.channelId,
+          stockLocationId: input.stockLocationId,
+          productVariantId: line.productVariantId,
+          movementType: MovementType.PURCHASE,
+          quantity: line.quantity,
+          batchId: batch.id,
+          sourceType: 'Purchase',
+          sourceId: input.purchaseId,
+          metadata: {
+            purchaseReference: input.purchaseReference,
+            supplierId: input.supplierId,
+          },
         };
-      } catch (error) {
-        this.logger.error(
-          `Failed to record purchase ${input.purchaseId}: ${error instanceof Error ? error.message : String(error)}`
-        );
-        throw error;
+
+        const movement = await this.inventoryStore.createMovement(ctx, movementInput);
+        movements.push(movement);
+
+        // Call expiry policy hook
+        await this.expiryPolicy.onBatchCreated(ctx, batch);
       }
-    });
+
+      // Post to ledger
+      const totalCost = input.lines.reduce((sum, line) => sum + line.quantity * line.unitCost, 0);
+
+      await this.ledgerPostingService.postInventoryPurchase(ctx, input.purchaseId, {
+        purchaseId: input.purchaseId,
+        purchaseReference: input.purchaseReference,
+        supplierId: input.supplierId,
+        totalCost,
+        isCreditPurchase: input.isCreditPurchase,
+        batchAllocations: batches.map(b => ({
+          batchId: String(b.id),
+          quantity: b.quantity,
+          unitCost: b.unitCost,
+        })),
+      });
+
+      this.logger.log(
+        `Recorded purchase ${input.purchaseId}: ${batches.length} batches, total cost: ${totalCost}`
+      );
+
+      return {
+        purchaseId: input.purchaseId,
+        batches,
+        movements,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to record purchase ${input.purchaseId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      throw error;
+    }
   }
 
   /**

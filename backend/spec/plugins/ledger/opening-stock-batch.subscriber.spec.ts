@@ -4,20 +4,14 @@
  * Covers:
  * - Reacts to ProductVariantEvent('created') and creates opening stock batches
  * - Uses stockOnHand from event input
- * - Falls back to reading StockLevel when input has no stockOnHand
  * - Ignores events that are not 'created'
  * - Ignores variants with zero stock
  * - Handles stockLevels (multi-location) input
+ * - Does NOT fall back to stock_level table (batch inventory is single source of truth)
  */
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import {
-  EventBus,
-  ProductVariantEvent,
-  StockLocationService,
-  TransactionalConnection,
-  StockLevel,
-} from '@vendure/core';
+import { EventBus, ProductVariantEvent, StockLocationService } from '@vendure/core';
 import { Subject } from 'rxjs';
 import { OpeningStockBatchSubscriber } from '../../../src/plugins/ledger/opening-stock-batch.subscriber';
 import { InventoryService } from '../../../src/services/inventory/inventory.service';
@@ -27,7 +21,6 @@ describe('OpeningStockBatchSubscriber', () => {
   let eventBus: jest.Mocked<EventBus>;
   let inventoryService: jest.Mocked<InventoryService>;
   let stockLocationService: jest.Mocked<StockLocationService>;
-  let connection: jest.Mocked<TransactionalConnection>;
   let subscriber: OpeningStockBatchSubscriber;
 
   const ctx = { channelId: 1 } as any;
@@ -49,24 +42,7 @@ describe('OpeningStockBatchSubscriber', () => {
       defaultStockLocation: jest.fn<any>().mockResolvedValue(defaultLocation),
     } as any;
 
-    const mockQb = {
-      innerJoin: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      getOne: jest.fn<any>().mockResolvedValue(null),
-    };
-    connection = {
-      getRepository: jest.fn().mockReturnValue({
-        createQueryBuilder: jest.fn().mockReturnValue(mockQb),
-      }),
-    } as any;
-
-    subscriber = new OpeningStockBatchSubscriber(
-      eventBus,
-      inventoryService,
-      stockLocationService,
-      connection
-    );
+    subscriber = new OpeningStockBatchSubscriber(eventBus, inventoryService, stockLocationService);
     subscriber.onModuleInit();
   });
 
@@ -115,30 +91,15 @@ describe('OpeningStockBatchSubscriber', () => {
     expect(inventoryService.ensureOpeningStockBatchIfNeeded).not.toHaveBeenCalled();
   });
 
-  it('falls back to StockLevel when input has no stockOnHand', async () => {
-    // Set up the StockLevel fallback to return a stock level
-    const mockQb = {
-      innerJoin: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      getOne: jest.fn<any>().mockResolvedValue({ stockOnHand: 25 }),
-    };
-    connection.getRepository = jest.fn().mockReturnValue({
-      createQueryBuilder: jest.fn().mockReturnValue(mockQb),
-    }) as any;
-
+  it('does not create batch when input has no stockOnHand (no stock_level fallback)', async () => {
     await emitEvent(
       'created',
       [{ id: 'v1' }],
       [{}] // No stockOnHand in input
     );
 
-    expect(inventoryService.ensureOpeningStockBatchIfNeeded).toHaveBeenCalledWith(
-      ctx,
-      'v1',
-      'loc-1',
-      25
-    );
+    // No fallback to stock_level table — batch inventory is the single source of truth
+    expect(inventoryService.ensureOpeningStockBatchIfNeeded).not.toHaveBeenCalled();
   });
 
   it('handles stockLevels input (multi-location)', async () => {

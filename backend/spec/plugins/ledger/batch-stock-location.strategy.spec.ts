@@ -93,23 +93,23 @@ describe('BatchStockLocationStrategy', () => {
       expect(result).toEqual({ stockOnHand: 0, stockAllocated: 0 });
     });
 
-    it('falls back to super when ctx.channelId is falsy', async () => {
+    it('returns zero stock when ctx.channelId is falsy (no fallback)', async () => {
       const noChannelCtx = {} as RequestContext;
 
       const result = await strategy.getAvailableStock(noChannelCtx, VARIANT_ID, []);
 
       expect(mockConnection.getRepository).not.toHaveBeenCalled();
-      expect(result.stockOnHand).toBe(0);
+      expect(result).toEqual({ stockOnHand: 0, stockAllocated: 0 });
     });
 
-    it('falls back to super on query error (bootstrap/migration)', async () => {
+    it('propagates query errors instead of falling back silently', async () => {
       mockQueryBuilder.getRawOne.mockImplementation(() =>
         Promise.reject(new Error('relation "inventory_batch" does not exist'))
       );
 
-      const result = await strategy.getAvailableStock(ctx, VARIANT_ID, []);
-
-      expect(result.stockOnHand).toBe(0);
+      await expect(strategy.getAvailableStock(ctx, VARIANT_ID, [])).rejects.toThrow(
+        'relation "inventory_batch" does not exist'
+      );
     });
 
     it('always reports stockAllocated as 0', async () => {

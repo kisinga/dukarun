@@ -83,11 +83,8 @@ describe('BatchAwareStockLevelService', () => {
       expect(result).toEqual({ stockOnHand: 0, stockAllocated: 0 });
     });
 
-    it('falls back to super when defaultStockLocation returns no id', async () => {
+    it('returns zero when defaultStockLocation returns no id', async () => {
       stockLocationService.defaultStockLocation.mockImplementation(() => Promise.resolve(null));
-      connection.getRepository = jest.fn().mockReturnValue({
-        find: jest.fn().mockImplementation(() => Promise.resolve([])),
-      });
       const service = new BatchAwareStockLevelService(
         connection,
         stockLocationService,
@@ -101,13 +98,10 @@ describe('BatchAwareStockLevelService', () => {
       expect(result).toEqual({ stockOnHand: 0, stockAllocated: 0 });
     });
 
-    it('falls back to super when defaultStockLocation returns object without id', async () => {
+    it('returns zero when defaultStockLocation returns object without id', async () => {
       stockLocationService.defaultStockLocation.mockImplementation(() =>
         Promise.resolve({ name: 'Loc' })
       );
-      connection.getRepository = jest.fn().mockReturnValue({
-        find: jest.fn().mockImplementation(() => Promise.resolve([])),
-      });
       const service = new BatchAwareStockLevelService(
         connection,
         stockLocationService,
@@ -155,11 +149,8 @@ describe('BatchAwareStockLevelService', () => {
     });
   });
 
-  describe('getAvailableStock without InventoryStore (fallback)', () => {
-    it('calls parent getAvailableStock when InventoryStore is undefined', async () => {
-      connection.getRepository = jest.fn().mockReturnValue({
-        find: jest.fn().mockImplementation(() => Promise.resolve([])),
-      });
+  describe('getAvailableStock without InventoryStore', () => {
+    it('returns zero when InventoryStore is undefined (no fallback)', async () => {
       const service = new BatchAwareStockLevelService(
         connection,
         stockLocationService,
@@ -173,11 +164,8 @@ describe('BatchAwareStockLevelService', () => {
       expect(result).toEqual({ stockOnHand: 0, stockAllocated: 0 });
     });
 
-    it('falls back when ctx.channelId is missing', async () => {
+    it('returns zero when ctx.channelId is missing (no fallback)', async () => {
       const noChannelCtx = {} as RequestContext;
-      connection.getRepository = jest.fn().mockReturnValue({
-        find: jest.fn().mockImplementation(() => Promise.resolve([])),
-      });
       const service = new BatchAwareStockLevelService(
         connection,
         stockLocationService,
