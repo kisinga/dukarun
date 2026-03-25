@@ -43,10 +43,10 @@ export class StockManagementService {
     private readonly stockMovementService: StockMovementService,
     private readonly validationService: StockValidationService,
     private readonly financialService: FinancialService,
+    private readonly inventoryService: InventoryService,
     @Optional() private readonly creditValidator?: CreditValidatorService,
     @Optional() private readonly approvalService?: ApprovalService,
     @Optional() private readonly auditService?: AuditService,
-    private readonly inventoryService: InventoryService,
     @Optional() private readonly inventoryConfig?: InventoryConfigurationService,
     @Optional() private readonly reconciliationService?: InventoryReconciliationService
   ) {}
