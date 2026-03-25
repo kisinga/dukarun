@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls /Users/mac/Documents/code/Dukahub/jest.config.*)"
+      "Bash(lsof -ti:4200,3000,3005)",
+      "Bash(xargs kill:*)"
     ]
   }
 }
