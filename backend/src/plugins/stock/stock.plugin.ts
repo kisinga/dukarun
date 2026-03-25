@@ -17,9 +17,10 @@ import {
 } from '../../services/stock/entities/stock-adjustment.entity';
 import { CreditPlugin } from '../credit/credit.plugin';
 import { AuditPlugin } from '../audit/audit.plugin';
+import { LedgerPlugin } from '../ledger/ledger.plugin';
 
 @VendurePlugin({
-  imports: [PluginCommonModule, CreditPlugin, AuditPlugin],
+  imports: [PluginCommonModule, CreditPlugin, AuditPlugin, LedgerPlugin],
   providers: [
     StockValidationService,
     StockMovementService,
