@@ -131,6 +131,7 @@ const COMBINED_SCHEMA = gql`
     OpenSessionService,
     ChannelPaymentMethodService,
     FinancialService,
+    InventoryService,
   ],
   configuration: config => {
     // Register custom permissions
