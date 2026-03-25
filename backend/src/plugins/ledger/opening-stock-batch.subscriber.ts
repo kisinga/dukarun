@@ -1,11 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import {
-  EventBus,
-  ProductVariantEvent,
-  StockLocationService,
-  TransactionalConnection,
-  StockLevel,
-} from '@vendure/core';
+import { EventBus, ProductVariantEvent, StockLocationService } from '@vendure/core';
 import type { CreateProductVariantInput } from '@vendure/common/lib/generated-types';
 import { InventoryService } from '../../services/inventory/inventory.service';
 
@@ -29,8 +23,7 @@ export class OpeningStockBatchSubscriber implements OnModuleInit {
   constructor(
     private readonly eventBus: EventBus,
     private readonly inventoryService: InventoryService,
-    private readonly stockLocationService: StockLocationService,
-    private readonly connection: TransactionalConnection
+    private readonly stockLocationService: StockLocationService
   ) {}
 
   onModuleInit(): void {
@@ -82,23 +75,6 @@ export class OpeningStockBatchSubscriber implements OnModuleInit {
           }
         }
         continue; // Already handled per-location
-      }
-
-      if (stockOnHand <= 0) {
-        // No opening stock set — check if Vendure wrote to stock_level directly
-        // (fallback: read from stock_level table in case the input didn't have it
-        //  but Vendure set it via a different path)
-        const stockLevel = await this.connection
-          .getRepository(ctx, StockLevel)
-          .createQueryBuilder('sl')
-          .innerJoin('sl.productVariant', 'v')
-          .innerJoin('sl.stockLocation', 'loc')
-          .where('v.id = :variantId', { variantId: variant.id })
-          .andWhere('loc.id = :locationId', { locationId })
-          .getOne();
-        if (stockLevel && stockLevel.stockOnHand > 0) {
-          stockOnHand = stockLevel.stockOnHand;
-        }
       }
 
       if (stockOnHand <= 0) continue;

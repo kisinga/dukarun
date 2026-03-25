@@ -97,6 +97,9 @@ export class CustomerApiService {
             lastName: input.lastName,
             emailAddress: emailAddress || fullCustomer.emailAddress,
             phoneNumber: normalizedPhone,
+            isCreditApproved: input.isCreditApproved,
+            creditLimit: input.creditLimit,
+            creditDuration: input.creditDuration,
           });
 
           // Use UPDATE_CUSTOMER to update customer fields (preserving supplier fields)

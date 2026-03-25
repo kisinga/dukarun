@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Customer, RequestContext, TransactionalConnection } from '@vendure/core';
+import { IsNull } from 'typeorm';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 
 /**
@@ -36,7 +37,7 @@ export class CustomerLookupService {
       const customerRepo = this.connection.getRepository(ctx, Customer);
 
       const customer = await customerRepo.findOne({
-        where: { phoneNumber: normalizedPhone },
+        where: { phoneNumber: normalizedPhone, deletedAt: IsNull() },
       });
 
       if (customer) {
@@ -46,6 +47,36 @@ export class CustomerLookupService {
       return customer || null;
     } catch (error) {
       // If phone number format is invalid, log and return null
+      this.logger.warn(
+        `Invalid phone number format for lookup: ${phoneNumber}`,
+        error instanceof Error ? error.stack : undefined
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Find a customer by phone number, including soft-deleted records.
+   * Used for reactivation flows where we need to find and restore deleted customers.
+   */
+  async findCustomerByPhoneIncludingDeleted(
+    ctx: RequestContext,
+    phoneNumber: string
+  ): Promise<Customer | null> {
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
+      return null;
+    }
+
+    try {
+      const normalizedPhone = formatPhoneNumber(phoneNumber);
+      const customerRepo = this.connection.getRepository(ctx, Customer);
+
+      const customer = await customerRepo.findOne({
+        where: { phoneNumber: normalizedPhone },
+      });
+
+      return customer || null;
+    } catch (error) {
       this.logger.warn(
         `Invalid phone number format for lookup: ${phoneNumber}`,
         error instanceof Error ? error.stack : undefined

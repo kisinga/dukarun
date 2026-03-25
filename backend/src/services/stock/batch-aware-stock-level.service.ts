@@ -41,20 +41,20 @@ export class BatchAwareStockLevelService extends StockLevelService {
 
   /**
    * Returns available stock from batch inventory (sum of open batch quantities)
-   * at the channel's default stock location. Falls back to super when
-   * InventoryStore is not available.
+   * at the channel's default stock location. No fallback to stock_level —
+   * batch inventory is the single source of truth.
    */
   override async getAvailableStock(
     ctx: RequestContext,
     productVariantId: ID
   ): Promise<{ stockOnHand: number; stockAllocated: number }> {
     if (!this.inventoryStore || !ctx.channelId) {
-      return super.getAvailableStock(ctx, productVariantId);
+      return { stockOnHand: 0, stockAllocated: 0 };
     }
 
     const location = await this.stockLocationServiceRef.defaultStockLocation(ctx);
     if (!location?.id) {
-      return super.getAvailableStock(ctx, productVariantId);
+      return { stockOnHand: 0, stockAllocated: 0 };
     }
 
     const batches = await this.inventoryStore.getOpenBatches(ctx, {

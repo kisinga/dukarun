@@ -43,10 +43,10 @@ export class StockManagementService {
     private readonly stockMovementService: StockMovementService,
     private readonly validationService: StockValidationService,
     private readonly financialService: FinancialService,
+    private readonly inventoryService: InventoryService,
     @Optional() private readonly creditValidator?: CreditValidatorService,
     @Optional() private readonly approvalService?: ApprovalService,
     @Optional() private readonly auditService?: AuditService,
-    @Optional() private readonly inventoryService?: InventoryService,
     @Optional() private readonly inventoryConfig?: InventoryConfigurationService,
     @Optional() private readonly reconciliationService?: InventoryReconciliationService
   ) {}
@@ -158,17 +158,87 @@ export class StockManagementService {
         // 5. Create purchase record
         const purchase = await this.purchaseService.createPurchaseRecord(transactionCtx, input);
 
-        // 6. Update stock levels for each line
-        const stockMovements = [];
+        // 6. Record purchase in InventoryService (creates batches — single source of truth)
+        // Get previous batch stock per line for audit trail
+        const previousStocks = new Map<string, number>();
         for (const line of input.lines) {
-          const movement = await this.stockMovementService.adjustStockLevel(
+          const prev = await this.inventoryService.getBatchStockOnHand(
+            transactionCtx,
+            ctx.channelId!,
+            line.variantId,
+            line.stockLocationId
+          );
+          previousStocks.set(`${line.variantId}:${line.stockLocationId}`, prev);
+        }
+
+        await this.inventoryService.recordPurchase(transactionCtx, {
+          purchaseId: purchase.id,
+          channelId: ctx.channelId!,
+          stockLocationId: input.lines[0]?.stockLocationId || 0,
+          supplierId: String(input.supplierId),
+          purchaseReference: purchase.referenceNumber || purchase.id,
+          purchaseDate: input.purchaseDate,
+          isCreditPurchase: input.isCreditPurchase ?? false,
+          lines: input.lines.map(line => ({
+            productVariantId: line.variantId,
+            quantity: line.quantity,
+            unitCost: line.unitCost,
+            expiryDate:
+              line.expiryDate == null
+                ? null
+                : line.expiryDate instanceof Date
+                  ? line.expiryDate
+                  : new Date(line.expiryDate as string),
+            batchNumber: line.batchNumber ?? null,
+          })),
+        });
+
+        // Sync stock_level from batch sums (Vendure compatibility) and build audit trail
+        const stockMovements: Array<{
+          variantId: ID;
+          locationId: ID;
+          previousStock: number;
+          newStock: number;
+        }> = [];
+        for (const line of input.lines) {
+          const key = `${line.variantId}:${line.stockLocationId}`;
+          const previousStock = previousStocks.get(key) ?? 0;
+          const newStock = await this.inventoryService.getBatchStockOnHand(
+            transactionCtx,
+            ctx.channelId!,
+            line.variantId,
+            line.stockLocationId
+          );
+          await this.stockMovementService.setStockLevelFromBatchSum(
             transactionCtx,
             line.variantId,
             line.stockLocationId,
-            line.quantity, // Positive quantity for purchase
-            `Purchase ${purchase.id}`
+            newStock
           );
-          stockMovements.push(movement);
+          stockMovements.push({
+            variantId: line.variantId,
+            locationId: line.stockLocationId,
+            previousStock,
+            newStock,
+          });
+        }
+
+        this.logger.log(`Purchase ${purchase.id} recorded in InventoryService`);
+
+        if (this.reconciliationService) {
+          try {
+            const reconciliation =
+              await this.reconciliationService.getInventoryValuationVsLedger(transactionCtx);
+            if (!reconciliation.isBalanced) {
+              this.logger.warn(
+                `Inventory valuation mismatch detected: difference=${reconciliation.difference}`
+              );
+            }
+          } catch (reconError) {
+            this.logger.warn(
+              `Reconciliation check failed: ${reconError instanceof Error ? reconError.message : String(reconError)}`
+            );
+          }
         }
 
         // 7. Log audit event
@@ -219,55 +289,6 @@ export class StockManagementService {
           );
         }
 
-        // 8. Record purchase in InventoryService when available (creates batches for COGS/FIFO)
-        if (this.inventoryService) {
-          try {
-            await this.inventoryService.recordPurchase(transactionCtx, {
-              purchaseId: purchase.id,
-              channelId: ctx.channelId!,
-              stockLocationId: input.lines[0]?.stockLocationId || 0,
-              supplierId: String(input.supplierId),
-              purchaseReference: purchase.referenceNumber || purchase.id,
-              purchaseDate: input.purchaseDate,
-              isCreditPurchase: input.isCreditPurchase ?? false,
-              lines: input.lines.map(line => ({
-                productVariantId: line.variantId,
-                quantity: line.quantity,
-                unitCost: line.unitCost,
-                expiryDate:
-                  line.expiryDate == null
-                    ? null
-                    : line.expiryDate instanceof Date
-                      ? line.expiryDate
-                      : new Date(line.expiryDate as string),
-                batchNumber: line.batchNumber ?? null,
-              })),
-            });
-            this.logger.log(`Purchase ${purchase.id} recorded in InventoryService`);
-
-            if (this.reconciliationService) {
-              try {
-                const reconciliation =
-                  await this.reconciliationService.getInventoryValuationVsLedger(transactionCtx);
-                if (!reconciliation.isBalanced) {
-                  this.logger.warn(
-                    `Inventory valuation mismatch detected: difference=${reconciliation.difference}`
-                  );
-                }
-              } catch (reconError) {
-                this.logger.warn(
-                  `Reconciliation check failed: ${reconError instanceof Error ? reconError.message : String(reconError)}`
-                );
-              }
-            }
-          } catch (inventoryError) {
-            this.logger.error(
-              `Failed to record purchase in InventoryService: ${inventoryError instanceof Error ? inventoryError.message : String(inventoryError)}`
-            );
-            throw inventoryError;
-          }
-        }
-
         this.logger.log(`Purchase recorded successfully: ${purchase.id}`);
         return purchase;
       } catch (error) {
@@ -298,16 +319,63 @@ export class StockManagementService {
         throw new UserInputError(`Purchase ${purchaseId} has no lines`);
       }
 
-      const stockMovements = [];
+      // Record in InventoryService (creates batches — single source of truth)
+      const previousStocks = new Map<string, number>();
       for (const line of purchaseWithLines.lines) {
-        const movement = await this.stockMovementService.adjustStockLevel(
+        const prev = await this.inventoryService.getBatchStockOnHand(
+          transactionCtx,
+          ctx.channelId!,
+          line.variantId,
+          line.stockLocationId
+        );
+        previousStocks.set(`${line.variantId}:${line.stockLocationId}`, prev);
+      }
+
+      await this.inventoryService.recordPurchase(transactionCtx, {
+        purchaseId,
+        channelId: ctx.channelId!,
+        stockLocationId: purchaseWithLines.lines[0]?.stockLocationId || 0,
+        supplierId: String(purchase.supplierId),
+        purchaseReference: purchase.referenceNumber || purchaseId,
+        purchaseDate: purchase.purchaseDate,
+        isCreditPurchase: true,
+        lines: purchaseWithLines.lines.map(line => ({
+          productVariantId: line.variantId,
+          quantity: line.quantity,
+          unitCost: line.unitCost,
+          expiryDate: null,
+          batchNumber: null,
+        })),
+      });
+
+      // Sync stock_level from batch sums (Vendure compat) and build audit trail
+      const stockMovements: Array<{
+        variantId: ID;
+        locationId: ID;
+        previousStock: number;
+        newStock: number;
+      }> = [];
+      for (const line of purchaseWithLines.lines) {
+        const key = `${line.variantId}:${line.stockLocationId}`;
+        const previousStock = previousStocks.get(key) ?? 0;
+        const newStock = await this.inventoryService.getBatchStockOnHand(
+          transactionCtx,
+          ctx.channelId!,
+          line.variantId,
+          line.stockLocationId
+        );
+        await this.stockMovementService.setStockLevelFromBatchSum(
           transactionCtx,
           line.variantId,
           line.stockLocationId,
-          line.quantity,
-          `Purchase ${purchaseId} (confirmed)`
+          newStock
         );
-        stockMovements.push(movement);
+        stockMovements.push({
+          variantId: line.variantId,
+          locationId: line.stockLocationId,
+          previousStock,
+          newStock,
+        });
       }
 
       if (this.auditService) {

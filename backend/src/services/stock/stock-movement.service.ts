@@ -66,21 +66,6 @@ export class StockMovementService {
         `change=${quantityChange}, previous=${previousStock}, new=${newStock}, reason=${reason}`
     );
 
-    if (newStock > 0 && this.inventoryService) {
-      try {
-        await this.inventoryService.ensureOpeningStockBatchIfNeeded(
-          ctx,
-          variantId,
-          locationId,
-          newStock
-        );
-      } catch (err) {
-        this.logger.warn(
-          `Opening stock batch creation failed for variant ${variantId}: ${err instanceof Error ? err.message : String(err)}`
-        );
-      }
-    }
-
     const channelId = ctx.channelId?.toString();
     if (channelId) {
       this.eventBus.publish(new StockLevelChangedEvent(ctx, channelId));

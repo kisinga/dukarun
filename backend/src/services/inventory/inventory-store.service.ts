@@ -41,10 +41,13 @@ export class InventoryStoreService implements InventoryStore {
       throw new UserInputError('Batch quantity cannot be negative');
     }
 
-    // Check for idempotency - if movement with same source exists, return existing batch
+    // Check for idempotency - if movement with same source + variant exists, return existing batch.
+    // productVariantId is included because a single purchase (sourceId) can have multiple lines
+    // for different variants, each needing its own batch.
     const existingMovement = await this.connection.getRepository(ctx, InventoryMovement).findOne({
       where: {
         channelId: Number(input.channelId),
+        productVariantId: Number(input.productVariantId),
         sourceType: input.sourceType,
         sourceId: String(input.sourceId),
       },

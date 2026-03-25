@@ -22,8 +22,7 @@ import { InventoryBatch } from '../../services/inventory/entities/inventory-batc
  * because defaultStockLocation() may not match the location where batches
  * were actually created (e.g. "Main" vs "Default Stock Location").
  *
- * Falls back to the default MultiChannelStockLocationStrategy when batch
- * inventory is unavailable (e.g. during initial bootstrap before tables exist).
+ * No fallback to stock_level — batch inventory is the single source of truth.
  */
 export class BatchStockLocationStrategy extends MultiChannelStockLocationStrategy {
   async init(injector: Injector): Promise<void> {
@@ -37,34 +36,23 @@ export class BatchStockLocationStrategy extends MultiChannelStockLocationStrateg
     stockLevels: StockLevel[]
   ): Promise<{ stockOnHand: number; stockAllocated: number }> {
     if (!ctx.channelId) {
-      return super.getAvailableStock(ctx, productVariantId, stockLevels);
+      return { stockOnHand: 0, stockAllocated: 0 };
     }
 
-    try {
-      const result = await this.connection
-        .getRepository(ctx, InventoryBatch)
-        .createQueryBuilder('batch')
-        .select('SUM(batch.quantity)', 'total')
-        .where('batch."channelId" = :channelId', { channelId: Number(ctx.channelId) })
-        .andWhere('batch."productVariantId" = :productVariantId', {
-          productVariantId: Number(productVariantId),
-        })
-        .andWhere('batch.quantity > 0')
-        .getRawOne<{ total: string | null }>();
+    const result = await this.connection
+      .getRepository(ctx, InventoryBatch)
+      .createQueryBuilder('batch')
+      .select('SUM(batch.quantity)', 'total')
+      .where('batch."channelId" = :channelId', { channelId: Number(ctx.channelId) })
+      .andWhere('batch."productVariantId" = :productVariantId', {
+        productVariantId: Number(productVariantId),
+      })
+      .andWhere('batch.quantity > 0')
+      .getRawOne<{ total: string | null }>();
 
-      const stockOnHand = Number(result?.total ?? 0);
-
-      return {
-        stockOnHand,
-        stockAllocated: 0,
-      };
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      Logger.error(
-        `Error querying batch stock for variant ${productVariantId}: ${msg}`,
-        'BatchStockLocationStrategy'
-      );
-      return super.getAvailableStock(ctx, productVariantId, stockLevels);
-    }
+    return {
+      stockOnHand: Number(result?.total ?? 0),
+      stockAllocated: 0,
+    };
   }
 }
