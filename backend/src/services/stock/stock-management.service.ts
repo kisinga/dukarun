@@ -43,13 +43,22 @@ export class StockManagementService {
     private readonly stockMovementService: StockMovementService,
     private readonly validationService: StockValidationService,
     private readonly financialService: FinancialService,
-    private readonly inventoryService: InventoryService,
     @Optional() private readonly creditValidator?: CreditValidatorService,
     @Optional() private readonly approvalService?: ApprovalService,
     @Optional() private readonly auditService?: AuditService,
+    @Optional() private readonly inventoryService?: InventoryService,
     @Optional() private readonly inventoryConfig?: InventoryConfigurationService,
     @Optional() private readonly reconciliationService?: InventoryReconciliationService
   ) {}
+
+  private requireInventoryService(): InventoryService {
+    if (!this.inventoryService) {
+      throw new Error(
+        'InventoryService is required but not available. Ensure LedgerPlugin is loaded.'
+      );
+    }
+    return this.inventoryService;
+  }
 
   /**
    * Record a purchase and update stock levels
@@ -57,6 +66,7 @@ export class StockManagementService {
    * When saveAsDraft is true, creates draft purchase only (no ledger, no stock, no payment)
    */
   async recordPurchase(ctx: RequestContext, input: RecordPurchaseInput): Promise<StockPurchase> {
+    const inventory = this.requireInventoryService();
     return this.connection.withTransaction(ctx, async transactionCtx => {
       try {
         // 1. Validate input
@@ -162,7 +172,7 @@ export class StockManagementService {
         // Get previous batch stock per line for audit trail
         const previousStocks = new Map<string, number>();
         for (const line of input.lines) {
-          const prev = await this.inventoryService.getBatchStockOnHand(
+          const prev = await inventory.getBatchStockOnHand(
             transactionCtx,
             ctx.channelId!,
             line.variantId,
@@ -171,7 +181,7 @@ export class StockManagementService {
           previousStocks.set(`${line.variantId}:${line.stockLocationId}`, prev);
         }
 
-        await this.inventoryService.recordPurchase(transactionCtx, {
+        await inventory.recordPurchase(transactionCtx, {
           purchaseId: purchase.id,
           channelId: ctx.channelId!,
           stockLocationId: input.lines[0]?.stockLocationId || 0,
@@ -203,7 +213,7 @@ export class StockManagementService {
         for (const line of input.lines) {
           const key = `${line.variantId}:${line.stockLocationId}`;
           const previousStock = previousStocks.get(key) ?? 0;
-          const newStock = await this.inventoryService.getBatchStockOnHand(
+          const newStock = await inventory.getBatchStockOnHand(
             transactionCtx,
             ctx.channelId!,
             line.variantId,
@@ -304,6 +314,7 @@ export class StockManagementService {
    * Confirm a draft purchase: post to ledger and update stock levels
    */
   async confirmPurchase(ctx: RequestContext, purchaseId: string): Promise<StockPurchase> {
+    const inventory = this.requireInventoryService();
     return this.connection.withTransaction(ctx, async transactionCtx => {
       const purchase = await this.purchaseService.confirmPurchase(transactionCtx, purchaseId);
 
@@ -322,7 +333,7 @@ export class StockManagementService {
       // Record in InventoryService (creates batches — single source of truth)
       const previousStocks = new Map<string, number>();
       for (const line of purchaseWithLines.lines) {
-        const prev = await this.inventoryService.getBatchStockOnHand(
+        const prev = await inventory.getBatchStockOnHand(
           transactionCtx,
           ctx.channelId!,
           line.variantId,
@@ -331,7 +342,7 @@ export class StockManagementService {
         previousStocks.set(`${line.variantId}:${line.stockLocationId}`, prev);
       }
 
-      await this.inventoryService.recordPurchase(transactionCtx, {
+      await inventory.recordPurchase(transactionCtx, {
         purchaseId,
         channelId: ctx.channelId!,
         stockLocationId: purchaseWithLines.lines[0]?.stockLocationId || 0,
@@ -358,7 +369,7 @@ export class StockManagementService {
       for (const line of purchaseWithLines.lines) {
         const key = `${line.variantId}:${line.stockLocationId}`;
         const previousStock = previousStocks.get(key) ?? 0;
-        const newStock = await this.inventoryService.getBatchStockOnHand(
+        const newStock = await inventory.getBatchStockOnHand(
           transactionCtx,
           ctx.channelId!,
           line.variantId,
