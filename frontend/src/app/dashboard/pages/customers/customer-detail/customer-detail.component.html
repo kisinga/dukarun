@@ -94,7 +94,14 @@
     @if (showCredit() && creditSummary(); as summary) {
       <div class="card bg-base-100 shadow-sm border border-base-300/60">
         <div class="card-body p-4">
-          <h3 class="font-bold text-base mb-3 text-base-content">Credit</h3>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-base text-base-content">Credit</h3>
+            @if (canOverrideBalance() && summary.outstandingAmount !== 0) {
+              <button class="btn btn-outline btn-xs" (click)="handleOverrideBalance()">
+                Override Balance
+              </button>
+            }
+          </div>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
             @if (summary.isCreditApproved) {
               <div class="stat bg-base-200/50 rounded-lg p-3">
@@ -202,3 +209,10 @@
     </div>
   }
 </div>
+
+<!-- Balance Override Modal -->
+<app-balance-override-modal
+  [data]="balanceOverrideData()"
+  (balanceOverridden)="onBalanceOverridden()"
+  (cancelled)="onBalanceOverrideCancelled()"
+/>

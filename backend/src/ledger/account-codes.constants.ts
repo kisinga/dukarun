@@ -53,6 +53,13 @@ export const EXPENSE_ACCOUNTS = {
 } as const;
 
 /**
+ * Equity Account Codes
+ */
+export const EQUITY_ACCOUNTS = {
+  BALANCE_ADJUSTMENT: 'BALANCE_ADJUSTMENT',
+} as const;
+
+/**
  * All account codes as a single object for easy access
  */
 export const ACCOUNT_CODES = {
@@ -60,6 +67,7 @@ export const ACCOUNT_CODES = {
   ...LIABILITY_ACCOUNTS,
   ...INCOME_ACCOUNTS,
   ...EXPENSE_ACCOUNTS,
+  ...EQUITY_ACCOUNTS,
 } as const;
 
 /**

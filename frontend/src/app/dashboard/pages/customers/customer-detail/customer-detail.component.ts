@@ -3,9 +3,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   OnInit,
   signal,
+  viewChild,
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../core/services/currency.service';
@@ -13,6 +15,7 @@ import { CustomerService } from '../../../../core/services/customer.service';
 import type { CreditCustomerSummary } from '../../../../core/services/customer.service';
 import { CustomerCreditService } from '../../../../core/services/customer/customer-credit.service';
 import { CustomerSearchService } from '../../../../core/services/customer/customer-search.service';
+import { AuthPermissionsService } from '../../../../core/services/auth/auth-permissions.service';
 import type {
   GetOrdersQuery,
   GetOrdersQueryVariables,
@@ -20,8 +23,11 @@ import type {
 } from '../../../../core/graphql/generated/graphql';
 import { GET_ORDERS } from '../../../../core/graphql/operations.graphql';
 import { ApolloService } from '../../../../core/services/apollo.service';
-import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { OrderStateBadgeComponent } from '../../orders/components/order-state-badge.component';
+import {
+  BalanceOverrideModalComponent,
+  BalanceOverrideModalData,
+} from '../components/balance-override-modal.component';
 
 const RECENT_ORDERS_TAKE = 15;
 
@@ -32,7 +38,7 @@ const RECENT_ORDERS_TAKE = 15;
 @Component({
   selector: 'app-customer-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, OrderStateBadgeComponent],
+  imports: [CommonModule, RouterLink, OrderStateBadgeComponent, BalanceOverrideModalComponent],
   templateUrl: './customer-detail.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -41,6 +47,7 @@ export class CustomerDetailComponent implements OnInit {
   private readonly customerService = inject(CustomerService);
   private readonly creditService = inject(CustomerCreditService);
   private readonly customerSearchService = inject(CustomerSearchService);
+  private readonly authPermissions = inject(AuthPermissionsService);
   private readonly apollo = inject(ApolloService);
   readonly currencyService = inject(CurrencyService);
 
@@ -71,6 +78,45 @@ export class CustomerDetailComponent implements OnInit {
     if (!s) return false;
     return s.isCreditApproved || (s.outstandingAmount ?? 0) !== 0 || (s.creditLimit ?? 0) > 0;
   });
+
+  readonly canOverrideBalance = computed(() =>
+    this.authPermissions.hasOverrideCustomerBalancePermission(),
+  );
+  readonly balanceOverrideData = signal<BalanceOverrideModalData | null>(null);
+  private readonly balanceOverrideModal = viewChild(BalanceOverrideModalComponent);
+
+  constructor() {
+    effect(() => {
+      const data = this.balanceOverrideData();
+      const modal = this.balanceOverrideModal();
+      if (data && modal) {
+        setTimeout(() => void modal.show(), 0);
+      }
+    });
+  }
+
+  handleOverrideBalance(): void {
+    const summary = this.creditSummary();
+    if (!summary) return;
+    this.balanceOverrideData.set({
+      customerId: this.customerId(),
+      customerName: this.customerName(),
+      currentBalance: summary.outstandingAmount ?? 0,
+    });
+  }
+
+  async onBalanceOverridden(): Promise<void> {
+    this.balanceOverrideData.set(null);
+    // Reload customer data to reflect the new balance
+    const id = this.customerId();
+    if (id) {
+      await this.load(id);
+    }
+  }
+
+  onBalanceOverrideCancelled(): void {
+    this.balanceOverrideData.set(null);
+  }
 
   ngOnInit(): void {
     const id = this.customerId();

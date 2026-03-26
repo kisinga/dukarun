@@ -255,7 +255,8 @@ export class PaymentAllocationService {
             resolvedMethodCode,
             amountToAllocate,
             input.debitAccountCode?.trim(),
-            session.id
+            session.id,
+            input.customerId
           );
 
           await this.updateOrderCustomFields(transactionCtx, order.id, {
@@ -421,7 +422,8 @@ export class PaymentAllocationService {
         actualPaymentMethodCode,
         paymentAmountInCents,
         debitAccountCode?.trim(),
-        session.id
+        session.id,
+        customerId
       );
 
       // Update order custom fields for user tracking

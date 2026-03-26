@@ -36,10 +36,13 @@ import { PaymentAllocationResolver } from './payment-allocation.resolver';
 import {
   ApproveCustomerCreditPermission,
   ManageCustomerCreditLimitPermission,
+  OverrideCustomerBalancePermission,
   ReverseOrderPermission,
 } from './permissions';
 import { OrderReversalApprovalSubscriber } from './order-reversal-approval.subscriber';
 import { OrderReversalResolver } from './order-reversal.resolver';
+import { PaymentReversalResolver } from './payment-reversal.resolver';
+import { PaymentReversalService } from '../../services/payments/payment-reversal.service';
 import { ManageSupplierCreditPurchasesPermission } from './supplier-credit.permissions';
 import { SupplierCreditResolver } from './supplier-credit.resolver';
 import { SupplierPaymentAllocationResolver } from './supplier-payment-allocation.resolver';
@@ -191,6 +194,40 @@ const COMBINED_SCHEMA = gql`
     hadPayments: Boolean!
   }
 
+  type PaymentReversalResult {
+    paymentId: ID!
+    """
+    The amount that was reversed, in smallest currency unit (cents).
+    """
+    reversedAmount: Float!
+    """
+    True if the order now has an outstanding balance after the payment reversal.
+    """
+    orderNowUnderpaid: Boolean!
+  }
+
+  """
+  All monetary amounts in BalanceOverrideResult are in smallest currency unit (cents).
+  """
+  type BalanceOverrideResult {
+    customerId: ID!
+    previousBalance: Float!
+    newBalance: Float!
+    adjustmentAmount: Float!
+  }
+
+  input OverrideCustomerBalanceInput {
+    customerId: ID!
+    """
+    Target balance in smallest currency unit (cents). Must be >= 0.
+    """
+    targetBalance: Float!
+    """
+    Reason for the override (required for audit trail).
+    """
+    reason: String!
+  }
+
   extend type Mutation {
     approveCustomerCredit(input: ApproveCustomerCreditInput!): CreditSummary!
     updateCustomerCreditLimit(input: UpdateCustomerCreditLimitInput!): CreditSummary!
@@ -201,6 +238,8 @@ const COMBINED_SCHEMA = gql`
     paySingleOrder(input: PaySingleOrderInput!): PaymentAllocationResult!
     reverseOrder(orderId: ID!): OrderReversalResult!
     voidOrder(orderId: ID!): OrderReversalResult!
+    reversePayment(paymentId: ID!): PaymentReversalResult!
+    overrideCustomerBalance(input: OverrideCustomerBalanceInput!): BalanceOverrideResult!
     sendCustomerStatementEmail(customerId: ID!): Boolean!
   }
 
@@ -311,6 +350,7 @@ const COMBINED_SCHEMA = gql`
     OrderStateService,
     // Payment services
     PaymentAllocationService,
+    PaymentReversalService,
     SupplierPaymentAllocationService,
     // Resolvers and subscribers
     CreditResolver,
@@ -337,6 +377,7 @@ const COMBINED_SCHEMA = gql`
       ApproveCustomerCreditPermission,
       ManageCustomerCreditLimitPermission,
       ManageSupplierCreditPurchasesPermission,
+      OverrideCustomerBalancePermission,
       ReverseOrderPermission,
     ];
 
@@ -357,6 +398,7 @@ const COMBINED_SCHEMA = gql`
       CreditResolver,
       CustomerFieldResolver,
       OrderReversalResolver,
+      PaymentReversalResolver,
       PaymentAllocationResolver,
       CustomerStatementResolver,
       SupplierCreditResolver,

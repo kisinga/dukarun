@@ -214,6 +214,52 @@ export class CreditService {
     }
   }
 
+  /**
+   * Override a customer's balance by posting a BalanceAdjustment ledger entry.
+   * The ledger remains the single source of truth.
+   */
+  async overrideBalance(
+    ctx: RequestContext,
+    entityId: ID,
+    partyType: CreditPartyType,
+    targetBalance: number,
+    reason: string
+  ): Promise<{ previousBalance: number; newBalance: number; adjustmentAmount: number }> {
+    if (!reason?.trim()) {
+      throw new UserInputError('A reason is required for balance override.');
+    }
+
+    // Verify entity exists
+    await this.getEntityOrThrow(ctx, entityId, partyType);
+
+    const result = await this.financialService.adjustCustomerBalance(
+      ctx,
+      entityId.toString(),
+      targetBalance,
+      reason.trim()
+    );
+
+    if (this.auditService) {
+      await this.auditService.log(ctx, `${partyType}.balance.override`, {
+        entityType: 'Customer',
+        entityId: entityId.toString(),
+        data: {
+          previousBalance: result.previousBalance,
+          newBalance: result.newBalance,
+          adjustmentAmount: result.adjustmentAmount,
+          reason: reason.trim(),
+          performedBy: ctx.activeUserId,
+        },
+      });
+    }
+
+    this.logger.log(
+      `Balance override for ${partyType} ${entityId}: ${result.previousBalance} → ${result.newBalance} (reason: ${reason})`
+    );
+
+    return result;
+  }
+
   // ── Private helpers ──────────────────────────────────────────────
 
   private async getEntityOrThrow(

@@ -491,3 +491,47 @@ export function createInventoryWriteOffEntry(
     memo: `Inventory write-off: ${context.reason}`,
   };
 }
+
+/**
+ * Context for posting a balance adjustment entry.
+ * Used to manually override a customer's AR balance via a ledger entry.
+ */
+export interface BalanceAdjustmentPostingContext {
+  amount: number; // absolute value of delta, in cents
+  direction: 'increase' | 'decrease'; // increase = customer owes more, decrease = forgive debt
+  customerId: string;
+  reason: string;
+}
+
+/**
+ * Generate journal entry template for a customer balance adjustment.
+ *
+ * Increase (customer owes more): Debit AR, Credit BALANCE_ADJUSTMENT
+ * Decrease (forgive debt):       Debit BALANCE_ADJUSTMENT, Credit AR
+ */
+export function createBalanceAdjustmentEntry(
+  context: BalanceAdjustmentPostingContext
+): JournalEntryTemplate {
+  const meta = {
+    customerId: context.customerId,
+    reason: context.reason,
+  };
+
+  if (context.direction === 'increase') {
+    return {
+      lines: [
+        { accountCode: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE, debit: context.amount, meta },
+        { accountCode: ACCOUNT_CODES.BALANCE_ADJUSTMENT, credit: context.amount, meta },
+      ],
+      memo: `Balance adjustment (increase) for customer ${context.customerId}: ${context.reason}`,
+    };
+  } else {
+    return {
+      lines: [
+        { accountCode: ACCOUNT_CODES.BALANCE_ADJUSTMENT, debit: context.amount, meta },
+        { accountCode: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE, credit: context.amount, meta },
+      ],
+      memo: `Balance adjustment (decrease) for customer ${context.customerId}: ${context.reason}`,
+    };
+  }
+}

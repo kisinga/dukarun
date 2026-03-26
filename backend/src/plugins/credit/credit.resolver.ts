@@ -13,6 +13,7 @@ import {
 import {
   ApproveCustomerCreditPermission,
   ManageCustomerCreditLimitPermission,
+  OverrideCustomerBalancePermission,
 } from './permissions';
 
 interface ApproveCustomerCreditInput {
@@ -190,6 +191,25 @@ export class CreditResolver {
       input.creditDuration
     );
     return toCustomerGraphQL(result);
+  }
+
+  @Mutation()
+  @Allow(OverrideCustomerBalancePermission.Permission)
+  async overrideCustomerBalance(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { customerId: string; targetBalance: number; reason: string }
+  ) {
+    const result = await this.creditService.overrideBalance(
+      ctx,
+      input.customerId,
+      'customer',
+      input.targetBalance,
+      input.reason
+    );
+    return {
+      customerId: input.customerId,
+      ...result,
+    };
   }
 
   @Mutation()

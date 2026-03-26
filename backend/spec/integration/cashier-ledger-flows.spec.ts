@@ -183,7 +183,8 @@ describe('Cashier-ledger flows', () => {
         'credit-1',
         5000,
         ACCOUNT_CODES.CASH_ON_HAND,
-        FLOW_A_SESSION_ID
+        FLOW_A_SESSION_ID,
+        'cust-1'
       );
     });
   });

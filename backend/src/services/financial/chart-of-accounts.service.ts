@@ -183,6 +183,12 @@ export class ChartOfAccountsService {
         type: 'expense' as const,
       },
       { code: ACCOUNT_CODES.EXPIRY_LOSS, name: 'Expiry Loss', type: 'expense' as const },
+      // Equity Accounts - Manual adjustments
+      {
+        code: ACCOUNT_CODES.BALANCE_ADJUSTMENT,
+        name: 'Balance Adjustment',
+        type: 'equity' as const,
+      },
     ];
 
     let createdCount = 0;

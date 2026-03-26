@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Order, Payment, RequestContext } from '@vendure/core';
+import { Order, Payment, RequestContext, UserInputError } from '@vendure/core';
 import { randomUUID } from 'crypto';
 import { ACCOUNT_CODES, type AccountCode } from '../../ledger/account-codes.constants';
 import { ChartOfAccountsService } from './chart-of-accounts.service';
@@ -202,7 +202,9 @@ export class FinancialService {
     paymentMethod: string,
     amount: number,
     debitAccountCode?: string,
-    openSessionId?: string
+    openSessionId?: string,
+    /** Explicit customerId — preferred over order.customer?.id which may not be hydrated. */
+    customerId?: string
   ): Promise<void> {
     if (amount <= 0) {
       throw new Error(
@@ -215,7 +217,7 @@ export class FinancialService {
       method: paymentMethod,
       orderId: order.id.toString(),
       orderCode: order.code,
-      customerId: order.customer?.id?.toString(),
+      customerId: customerId || order.customer?.id?.toString(),
       resolvedAccountCode: debitAccountCode?.trim() || undefined,
       openSessionId,
     };
@@ -383,6 +385,52 @@ export class FinancialService {
     this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.EXPENSES);
     this.queryService.invalidateCache(ctx.channelId as number, code);
     return { sourceId };
+  }
+
+  /**
+   * Reverse a specific payment.
+   * Reads everything from the ledger (accounts, amounts, meta) — no reliance on ORM entities.
+   * Returns the reversed amount in cents.
+   */
+  async reversePayment(ctx: RequestContext, paymentId: string): Promise<number> {
+    return this.postingService.postPaymentReversal(ctx, paymentId);
+  }
+
+  /**
+   * Adjust a customer's AR balance to a target amount by posting a BalanceAdjustment entry.
+   * The ledger remains the single source of truth.
+   * Returns the previous balance, new balance, and adjustment amount (all in cents).
+   */
+  async adjustCustomerBalance(
+    ctx: RequestContext,
+    customerId: string,
+    targetBalance: number,
+    reason: string
+  ): Promise<{ previousBalance: number; newBalance: number; adjustmentAmount: number }> {
+    if (targetBalance < 0) {
+      throw new UserInputError('Target balance cannot be negative. AR balance must be >= 0.');
+    }
+
+    const previousBalance = await this.getCustomerBalance(ctx, customerId);
+    const delta = targetBalance - previousBalance;
+
+    if (delta === 0) {
+      return { previousBalance, newBalance: previousBalance, adjustmentAmount: 0 };
+    }
+
+    const sourceId = `balance-adj-${randomUUID()}`;
+    await this.postingService.postBalanceAdjustment(ctx, sourceId, {
+      amount: Math.abs(delta),
+      direction: delta > 0 ? 'increase' : 'decrease',
+      customerId,
+      reason,
+    });
+
+    return {
+      previousBalance,
+      newBalance: targetBalance,
+      adjustmentAmount: Math.abs(delta),
+    };
   }
 
   /**

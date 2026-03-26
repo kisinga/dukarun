@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../../core/services/currency.service';
 import type { OrderPaymentInfoInput } from '../order-detail.types';
@@ -8,7 +16,7 @@ import type { OrderPaymentInfoInput } from '../order-detail.types';
  * Order Payment Info Component
  *
  * Displays all payments for the order in a table-like layout with method, amount, date,
- * and a total row. Links to payment detail.
+ * and a total row. Links to payment detail. Supports reversing settled payments.
  */
 @Component({
   selector: 'app-order-payment-info',
@@ -36,10 +44,26 @@ import type { OrderPaymentInfoInput } from '../order-detail.types';
                   <td class="font-medium">{{ p.method }}</td>
                   <td class="text-right">{{ formatAmount(p.amount) }}</td>
                   <td class="text-sm text-base-content/70">{{ formatDate(p.createdAt) }}</td>
-                  <td>
+                  <td class="flex gap-1">
                     <a [routerLink]="['/dashboard/payments', p.id]" class="btn btn-ghost btn-xs">
                       View
                     </a>
+                    @if (canReverse() && p.state === 'Settled') {
+                      <button
+                        class="btn btn-ghost btn-xs text-error"
+                        [disabled]="reversingPaymentId() === p.id"
+                        (click)="onReverse(p.id)"
+                      >
+                        @if (reversingPaymentId() === p.id) {
+                          <span class="loading loading-spinner loading-xs"></span>
+                        } @else {
+                          Reverse
+                        }
+                      </button>
+                    }
+                    @if (p.state === 'Cancelled') {
+                      <span class="badge badge-ghost badge-xs">Cancelled</span>
+                    }
                   </td>
                 </tr>
               }
@@ -62,6 +86,17 @@ import type { OrderPaymentInfoInput } from '../order-detail.types';
 export class OrderPaymentInfoComponent {
   private readonly currencyService = inject(CurrencyService);
   readonly payments = input<OrderPaymentInfoInput['payments']>(null);
+  readonly canReverse = input<boolean>(false);
+  readonly reversingPaymentId = signal<string | null>(null);
+  readonly reversePayment = output<string>();
+
+  onReverse(paymentId: string): void {
+    this.reversePayment.emit(paymentId);
+  }
+
+  setReversing(paymentId: string | null): void {
+    this.reversingPaymentId.set(paymentId);
+  }
 
   readonly paymentList = computed(() => {
     const p = this.payments();
