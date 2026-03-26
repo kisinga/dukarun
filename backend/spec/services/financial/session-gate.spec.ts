@@ -138,7 +138,8 @@ describe('Session gate (requireOpenSession)', () => {
         expect.any(String),
         5000,
         undefined,
-        'session-123'
+        'session-123',
+        'cust-1'
       );
     });
   });
