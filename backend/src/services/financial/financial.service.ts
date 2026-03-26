@@ -202,7 +202,9 @@ export class FinancialService {
     paymentMethod: string,
     amount: number,
     debitAccountCode?: string,
-    openSessionId?: string
+    openSessionId?: string,
+    /** Explicit customerId — preferred over order.customer?.id which may not be hydrated. */
+    customerId?: string
   ): Promise<void> {
     if (amount <= 0) {
       throw new Error(
@@ -215,7 +217,7 @@ export class FinancialService {
       method: paymentMethod,
       orderId: order.id.toString(),
       orderCode: order.code,
-      customerId: order.customer?.id?.toString(),
+      customerId: customerId || order.customer?.id?.toString(),
       resolvedAccountCode: debitAccountCode?.trim() || undefined,
       openSessionId,
     };

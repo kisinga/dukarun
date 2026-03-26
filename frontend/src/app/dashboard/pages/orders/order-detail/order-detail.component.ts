@@ -22,6 +22,9 @@ import { ToastService } from '../../../../core/services/toast.service';
 import { CustomerPaymentService } from '../../../../core/services/customer/customer-payment.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { PaymentMethodService } from '../../../../core/services/payment-method.service';
+import { AuthPermissionsService } from '../../../../core/services/auth/auth-permissions.service';
+import { ApolloService } from '../../../../core/services/apollo.service';
+import { REVERSE_PAYMENT } from '../../../../core/graphql/operations.graphql';
 import { OrderDetailHeaderComponent } from './components/order-detail-header.component';
 import { OrderCustomerInfoComponent } from './components/order-customer-info.component';
 import { OrderAddressComponent } from './components/order-address.component';
@@ -73,6 +76,8 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
   private readonly router = inject(Router);
   private readonly paymentService = inject(CustomerPaymentService);
   private readonly paymentMethodService = inject(PaymentMethodService);
+  private readonly authPermissions = inject(AuthPermissionsService);
+  private readonly apollo = inject(ApolloService);
   readonly currencyService = inject(CurrencyService);
 
   // Inputs for composable usage
@@ -303,6 +308,11 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
   readonly isDeletingDraft = signal(false);
   readonly isVoiding = signal(false);
 
+  readonly canReversePayments = computed(() => {
+    if (!this.canVoid()) return false;
+    return this.authPermissions.hasReverseOrderPermission();
+  });
+
   private async loadPaymentMethodsForDraft(): Promise<void> {
     try {
       const methods = await this.paymentMethodService.getPaymentMethods();
@@ -391,6 +401,35 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
   onPayOrderModalCancelled(): void {
     this.payOrderModalData.set(null);
     this.isProcessingPayment.set(false);
+  }
+
+  async handleReversePayment(paymentId: string): Promise<void> {
+    if (
+      !confirm('Reverse this payment? The ledger entry will be inverted and the payment cancelled.')
+    ) {
+      return;
+    }
+    try {
+      const client = this.apollo.getClient();
+      const result = await client.mutate({
+        mutation: REVERSE_PAYMENT as import('graphql').DocumentNode,
+        variables: { paymentId },
+      });
+      const data = (result.data as any)?.reversePayment;
+      if (data) {
+        const msg = data.orderNowUnderpaid
+          ? 'Payment reversed. Order now has an outstanding balance.'
+          : 'Payment reversed successfully.';
+        this.toastService.show('Payment reversed', msg, 'success');
+      }
+      const order = this.order();
+      if (order) {
+        await this.ordersService.fetchOrderById(order.id);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to reverse payment';
+      this.toastService.show('Reverse failed', message, 'error');
+    }
   }
 
   async handleVoidOrder(): Promise<void> {

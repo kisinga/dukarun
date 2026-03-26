@@ -223,7 +223,11 @@
 
         <div class="card bg-base-100 shadow-sm border border-base-300/60">
           <div class="card-body p-3 sm:p-4">
-            <app-order-payment-info [payments]="order()!.payments" />
+            <app-order-payment-info
+              [payments]="order()!.payments"
+              [canReverse]="canReversePayments()"
+              (reversePayment)="handleReversePayment($event)"
+            />
             <a
               [routerLink]="['/dashboard/payments']"
               [queryParams]="{ orderId: order()!.id }"

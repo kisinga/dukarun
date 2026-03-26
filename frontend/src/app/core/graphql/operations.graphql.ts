@@ -1229,6 +1229,27 @@ export const VOID_ORDER = graphql(`
   }
 `);
 
+export const REVERSE_PAYMENT = graphql(`
+  mutation ReversePayment($paymentId: ID!) {
+    reversePayment(paymentId: $paymentId) {
+      paymentId
+      reversedAmount
+      orderNowUnderpaid
+    }
+  }
+`);
+
+export const OVERRIDE_CUSTOMER_BALANCE = graphql(`
+  mutation OverrideCustomerBalance($input: OverrideCustomerBalanceInput!) {
+    overrideCustomerBalance(input: $input) {
+      customerId
+      previousBalance
+      newBalance
+      adjustmentAmount
+    }
+  }
+`);
+
 export const ADD_FULFILLMENT_TO_ORDER = graphql(`
   mutation AddFulfillmentToOrder($input: FulfillOrderInput!) {
     addFulfillmentToOrder(input: $input) {
