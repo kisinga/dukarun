@@ -33,9 +33,14 @@ export class CreditPaymentSubscriber implements OnModuleInit {
       return;
     }
 
-    // Handle payment cancellation/decline/error
+    // Payment cancellation/decline/error is NOT a repayment.
+    // The ledger reversal (OrderReversal or PaymentReversal) handles AR adjustments.
     if (toState === 'Cancelled' || toState === 'Declined' || toState === 'Error') {
-      await this.creditService.recordRepayment(ctx, customerId, 'customer', payment.amount);
+      this.logger.debug(
+        `Credit payment ${payment.id} for order ${order?.code} transitioned to ${toState}. ` +
+          `No repayment recorded (cancellation is not a repayment; ledger reversal handles AR).`
+      );
+      return;
     }
 
     // Prevent auto-settlement of credit payments during order creation

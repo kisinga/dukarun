@@ -681,12 +681,16 @@ export class LedgerQueryService {
   async getOrderLedgerFootprint(
     channelId: number,
     orderId: string
-  ): Promise<Array<{ accountCode: string; debit: number; credit: number }>> {
+  ): Promise<{
+    lines: Array<{ accountCode: string; debit: number; credit: number }>;
+    /** customerId extracted from original entry meta (authoritative). */
+    customerId?: string;
+  }> {
     const lineRepo = this.dataSource.getRepository(JournalLine);
     const reversalSourceId = `${orderId}-reversal`;
     const orderFilter = JSON.stringify({ orderId });
 
-    const rows = await lineRepo
+    const baseQuery = lineRepo
       .createQueryBuilder('line')
       .innerJoin('line.entry', 'entry')
       .innerJoin('line.account', 'account')
@@ -695,18 +699,39 @@ export class LedgerQueryService {
       .andWhere('NOT (entry.sourceType = :reversalType AND entry.sourceId = :reversalSourceId)', {
         reversalType: 'OrderReversal',
         reversalSourceId,
-      })
+      });
+
+    const rows = await baseQuery
+      .clone()
       .groupBy('account.code')
       .select('account.code', 'accountCode')
       .addSelect('SUM(CAST(line.debit AS BIGINT))', 'debitTotal')
       .addSelect('SUM(CAST(line.credit AS BIGINT))', 'creditTotal')
       .getRawMany<{ accountCode: string; debitTotal: string; creditTotal: string }>();
 
-    return rows.map(r => ({
-      accountCode: r.accountCode,
-      debit: parseInt(r.debitTotal || '0', 10),
-      credit: parseInt(r.creditTotal || '0', 10),
-    }));
+    // Extract customerId from the original entries' meta (authoritative source).
+    // This avoids relying on ORM relation hydration for financial correctness.
+    const metaRow = await baseQuery
+      .clone()
+      .select("DISTINCT line.meta->>'customerId'", 'customerId')
+      .where('line.channelId = :channelId', { channelId })
+      .andWhere('line.meta @> :orderFilter', { orderFilter })
+      .andWhere('NOT (entry.sourceType = :reversalType AND entry.sourceId = :reversalSourceId)', {
+        reversalType: 'OrderReversal',
+        reversalSourceId,
+      })
+      .andWhere("line.meta->>'customerId' IS NOT NULL")
+      .limit(1)
+      .getRawOne<{ customerId: string | null }>();
+
+    return {
+      lines: rows.map(r => ({
+        accountCode: r.accountCode,
+        debit: parseInt(r.debitTotal || '0', 10),
+        credit: parseInt(r.creditTotal || '0', 10),
+      })),
+      customerId: metaRow?.customerId ?? undefined,
+    };
   }
 
   private getCacheKey(query: BalanceQuery): string {

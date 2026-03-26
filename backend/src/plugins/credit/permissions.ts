@@ -14,3 +14,8 @@ export const ReverseOrderPermission = new PermissionDefinition({
   name: 'ReverseOrder',
   description: 'Allows reversing an order (ledger reversal and mark order reversed).',
 });
+
+export const OverrideCustomerBalancePermission = new PermissionDefinition({
+  name: 'OverrideCustomerBalance',
+  description: 'Allows overriding a customer balance via ledger adjustment entry.',
+});

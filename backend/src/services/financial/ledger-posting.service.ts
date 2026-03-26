@@ -4,10 +4,12 @@ import { MetricsService } from '../../infrastructure/observability/metrics.servi
 import { TracingService } from '../../infrastructure/observability/tracing.service';
 import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import { Account } from '../../ledger/account.entity';
+import { JournalEntry } from '../../ledger/journal-entry.entity';
 import { JournalLine } from '../../ledger/journal-line.entity';
 import { PostingPayload, PostingService } from '../../ledger/posting.service';
 import { LedgerQueryService } from './ledger-query.service';
 import {
+  BalanceAdjustmentPostingContext,
   ExpensePostingContext,
   InventoryPurchasePostingContext,
   InventorySalePostingContext,
@@ -17,6 +19,7 @@ import {
   RefundPostingContext,
   SalePostingContext,
   SupplierPaymentPostingContext,
+  createBalanceAdjustmentEntry,
   createCreditSaleEntry,
   createExpenseEntry,
   createInventoryPurchaseEntry,
@@ -184,22 +187,26 @@ export class LedgerPostingService {
   ): Promise<void> {
     const channelId = ctx.channelId as number;
     const footprint = await this.ledgerQueryService.getOrderLedgerFootprint(channelId, orderId);
-    if (footprint.length === 0) {
+    if (footprint.lines.length === 0) {
       throw new Error(
         `Order ${context.orderCode} has no ledger entries to reverse. Ensure the order has been posted (credit sale or payments).`
       );
     }
+
+    // Use customerId from the original ledger entries (authoritative).
+    // Falls back to context.customerId only if the original entries lack it.
+    const customerId = footprint.customerId ?? context.customerId;
 
     const reversalDate = context.reversalDate ?? new Date().toISOString().slice(0, 10);
     const baseMeta: Record<string, string> = {
       orderId: context.orderId,
       orderCode: context.orderCode,
     };
-    if (context.customerId) {
-      baseMeta.customerId = context.customerId;
+    if (customerId) {
+      baseMeta.customerId = customerId;
     }
 
-    const lines = footprint
+    const lines = footprint.lines
       .map(({ accountCode, debit, credit }) => ({
         accountCode,
         debit: credit,
@@ -533,6 +540,120 @@ export class LedgerPostingService {
     await this.postingService.post(ctx, 'variance-adjustment', sourceId, payload);
     this.logger.log(
       `Posted variance adjustment for session ${sessionId}, account ${accountCode}, amount ${varianceCents}`
+    );
+  }
+
+  /**
+   * Reverse a specific payment by reading the original journal entry from the ledger
+   * and posting the inverse. All data (accounts, amounts, meta) comes from the ledger —
+   * no reliance on ORM entity relations for financial correctness.
+   *
+   * Idempotent: sourceId = `${paymentId}-reversal`.
+   * Returns the reversed amount, or 0 if the reversal already existed (idempotent no-op).
+   */
+  async postPaymentReversal(ctx: RequestContext, paymentId: string): Promise<number> {
+    const channelId = ctx.channelId as number;
+
+    // Find the original journal entry by sourceId = paymentId.
+    // It could be sourceType 'Payment' or 'PaymentAllocation'.
+    const entryRepo = this.connection.getRepository(ctx, JournalEntry);
+    const originalEntry = await entryRepo.findOne({
+      where: [
+        { channelId, sourceType: 'Payment', sourceId: paymentId },
+        { channelId, sourceType: 'PaymentAllocation', sourceId: paymentId },
+      ],
+      relations: ['lines', 'lines.account'],
+    });
+
+    if (!originalEntry) {
+      throw new Error(
+        `No ledger entry found for payment ${paymentId} in channel ${channelId}. ` +
+          `Cannot reverse a payment that was never posted.`
+      );
+    }
+
+    // Check if reversal already exists (idempotent)
+    const reversalSourceId = `${paymentId}-reversal`;
+    const existingReversal = await entryRepo.findOne({
+      where: { channelId, sourceType: 'PaymentReversal', sourceId: reversalSourceId },
+    });
+    if (existingReversal) {
+      this.logger.log(`Payment reversal for ${paymentId} already exists, skipping.`);
+      return 0;
+    }
+
+    // Build reversal lines by inverting the original: swap debits and credits, copy meta.
+    const reversalLines = originalEntry.lines
+      .map(line => ({
+        accountCode: line.account.code,
+        debit: parseInt(String(line.credit), 10) || 0,
+        credit: parseInt(String(line.debit), 10) || 0,
+        meta: line.meta ?? undefined,
+      }))
+      .filter(l => l.debit > 0 || l.credit > 0);
+
+    if (reversalLines.length === 0) {
+      throw new Error(`Original entry for payment ${paymentId} has no amounts to reverse.`);
+    }
+
+    const accountCodes = reversalLines.map(l => l.accountCode);
+    await this.ensureAccountsExist(ctx, accountCodes);
+
+    const payload: PostingPayload = {
+      channelId,
+      entryDate: new Date().toISOString().slice(0, 10),
+      memo: `Payment reversal for ${originalEntry.sourceType} ${paymentId}`,
+      reversalOf: originalEntry.id,
+      lines: reversalLines,
+    };
+
+    await this.postingService.post(ctx, 'PaymentReversal', reversalSourceId, payload);
+
+    for (const code of accountCodes) {
+      this.ledgerQueryService.invalidateCache(channelId, code);
+    }
+
+    // Calculate reversed amount (sum of original debits = the payment amount)
+    const reversedAmount = originalEntry.lines.reduce(
+      (sum, line) => sum + (parseInt(String(line.debit), 10) || 0),
+      0
+    );
+
+    this.logger.log(
+      `Posted payment reversal for ${originalEntry.sourceType} ${paymentId}, amount: ${reversedAmount}`
+    );
+    return reversedAmount;
+  }
+
+  /**
+   * Post a balance adjustment entry (manual override of customer AR balance).
+   * Uses BALANCE_ADJUSTMENT equity account as contra-entry.
+   */
+  async postBalanceAdjustment(
+    ctx: RequestContext,
+    sourceId: string,
+    context: BalanceAdjustmentPostingContext
+  ): Promise<void> {
+    const template = createBalanceAdjustmentEntry(context);
+    const accountCodes = template.lines.map(l => l.accountCode);
+
+    await this.ensureAccountsExist(ctx, accountCodes);
+
+    const payload: PostingPayload = {
+      channelId: ctx.channelId as number,
+      entryDate: new Date().toISOString().slice(0, 10),
+      memo: template.memo,
+      lines: template.lines,
+    };
+
+    await this.postingService.post(ctx, 'BalanceAdjustment', sourceId, payload);
+
+    for (const code of accountCodes) {
+      this.ledgerQueryService.invalidateCache(ctx.channelId as number, code);
+    }
+    this.logger.log(
+      `Posted balance adjustment ${sourceId} for customer ${context.customerId}, ` +
+        `${context.direction} ${context.amount}, reason: ${context.reason}`
     );
   }
 
