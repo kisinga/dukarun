@@ -466,6 +466,15 @@ export type AuthorizationStatus = {
   status: Scalars['String']['output'];
 };
 
+/** All monetary amounts in BalanceOverrideResult are in smallest currency unit (cents). */
+export type BalanceOverrideResult = {
+  __typename?: 'BalanceOverrideResult';
+  adjustmentAmount: Scalars['Float']['output'];
+  customerId: Scalars['ID']['output'];
+  newBalance: Scalars['Float']['output'];
+  previousBalance: Scalars['Float']['output'];
+};
+
 export type BooleanCustomFieldConfig = CustomField & {
   __typename?: 'BooleanCustomFieldConfig';
   deprecated?: Maybe<Scalars['Boolean']['output']>;
@@ -3891,6 +3900,7 @@ export type Mutation = {
   moveCollection: Collection;
   openAccountingPeriod: AccountingPeriod;
   openCashierSession: CashierSession;
+  overrideCustomerBalance: BalanceOverrideResult;
   paySingleOrder: PaymentAllocationResult;
   paySinglePurchase: SupplierPaymentAllocationResult;
   /** Queue a channel for training on the next scheduler run. */
@@ -3944,6 +3954,7 @@ export type Mutation = {
   requestRegistrationOTP: OtpResponse;
   requestUpdateOTP: OtpResponse;
   reverseOrder: OrderReversalResult;
+  reversePayment: PaymentReversalResult;
   reviewApprovalRequest: ApprovalRequest;
   reviewCashCount: CashDrawerCount;
   runPendingSearchIndexUpdates: Success;
@@ -4795,6 +4806,11 @@ export type MutationOpenCashierSessionArgs = {
 };
 
 
+export type MutationOverrideCustomerBalanceArgs = {
+  input: OverrideCustomerBalanceInput;
+};
+
+
 export type MutationPaySingleOrderArgs = {
   input: PaySingleOrderInput;
 };
@@ -4952,6 +4968,11 @@ export type MutationRequestUpdateOtpArgs = {
 
 export type MutationReverseOrderArgs = {
   orderId: Scalars['ID']['input'];
+};
+
+
+export type MutationReversePaymentArgs = {
+  paymentId: Scalars['ID']['input'];
 };
 
 
@@ -5906,6 +5927,14 @@ export enum OrderType {
   Seller = 'Seller'
 }
 
+export type OverrideCustomerBalanceInput = {
+  customerId: Scalars['ID']['input'];
+  /** Reason for the override (required for audit trail). */
+  reason: Scalars['String']['input'];
+  /** Target balance in smallest currency unit (cents). Must be >= 0. */
+  targetBalance: Scalars['Float']['input'];
+};
+
 export type PaginatedList = {
   items: Array<Node>;
   totalItems: Scalars['Int']['output'];
@@ -6099,6 +6128,15 @@ export type PaymentOrderMismatchError = ErrorResult & {
   message: Scalars['String']['output'];
 };
 
+export type PaymentReversalResult = {
+  __typename?: 'PaymentReversalResult';
+  /** True if the order now has an outstanding balance after the payment reversal. */
+  orderNowUnderpaid: Scalars['Boolean']['output'];
+  paymentId: Scalars['ID']['output'];
+  /** The amount that was reversed, in smallest currency unit (cents). */
+  reversedAmount: Scalars['Float']['output'];
+};
+
 /** Returned when there is an error in transitioning the Payment state */
 export type PaymentStateTransitionError = ErrorResult & {
   __typename?: 'PaymentStateTransitionError';
@@ -6288,6 +6326,8 @@ export enum Permission {
   ManageStockAdjustments = 'ManageStockAdjustments',
   /** Allows managing supplier credit purchases, including approval, limit management, and bulk payments. */
   ManageSupplierCreditPurchases = 'ManageSupplierCreditPurchases',
+  /** Allows overriding a customer balance via ledger adjustment entry. */
+  OverrideCustomerBalance = 'OverrideCustomerBalance',
   /** Allows overriding order line prices during order creation */
   OverridePrice = 'OverridePrice',
   /** Owner means the user owns this entity, e.g. a Customer's own Order */
@@ -6499,6 +6539,12 @@ export type PlatformChannelDetail = {
   defaultTaxZone?: Maybe<PlatformZone>;
   id: Scalars['ID']['output'];
   token: Scalars['String']['output'];
+};
+
+export type PlatformMetrics = {
+  __typename?: 'PlatformMetrics';
+  mau: Scalars['Int']['output'];
+  onlineUsers: Scalars['Int']['output'];
 };
 
 /** Platform monitoring: process/host metrics and service health. */
@@ -7227,6 +7273,7 @@ export type Query = {
   platformAdministrators: PlatformAdministratorList;
   platformAuditLogs: Array<PlatformAuditLog>;
   platformChannels: Array<PlatformChannel>;
+  platformMetrics: PlatformMetrics;
   platformMonitoring: PlatformMonitoring;
   platformRoleTemplates: Array<PlatformRoleTemplate>;
   platformSettings: PlatformSettings;
