@@ -2,6 +2,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { gql } from '@apollo/client/core';
 import {
   GET_DASHBOARD_STATS,
+  GET_PLATFORM_METRICS,
   GET_PRODUCT_STATS,
   GET_PRODUCTS,
   GET_RECENT_ORDERS,
@@ -111,6 +112,12 @@ export interface StockValueRankingResult {
 
 export type StockValuationType = 'RETAIL' | 'WHOLESALE' | 'COST';
 
+/** Platform-wide user activity metrics */
+export interface PlatformMetrics {
+  onlineUsers: number;
+  mau: number;
+}
+
 /**
  * Recent activity item for the dashboard feed
  */
@@ -184,6 +191,7 @@ export class DashboardService {
   private readonly lowStockCountSignal = signal<number>(0);
   private readonly stockValueStatsSignal = signal<StockValueStats | null>(null);
   private readonly stockValueLoadingSignal = signal(false);
+  private readonly platformMetricsSignal = signal<PlatformMetrics | null>(null);
   private readonly isLoadingSignal = signal(false);
   private readonly errorSignal = signal<string | null>(null);
 
@@ -194,6 +202,7 @@ export class DashboardService {
   readonly lowStockCount = this.lowStockCountSignal.asReadonly();
   readonly stockValueStats = this.stockValueStatsSignal.asReadonly();
   readonly stockValueLoading = this.stockValueLoadingSignal.asReadonly();
+  readonly platformMetrics = this.platformMetricsSignal.asReadonly();
   readonly isLoading = this.isLoadingSignal.asReadonly();
   readonly error = this.errorSignal.asReadonly();
 
@@ -360,6 +369,23 @@ export class DashboardService {
       fetchPolicy: 'network-only',
     });
     return result.data?.stockValueRanking ?? { items: [], total: 0 };
+  }
+
+  /**
+   * Fetch platform-wide metrics (online users, MAU).
+   */
+  async loadPlatformMetrics(): Promise<void> {
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.query<{ platformMetrics: PlatformMetrics }>({
+        query: GET_PLATFORM_METRICS as import('graphql').DocumentNode,
+        fetchPolicy: 'network-only',
+      });
+      this.platformMetricsSignal.set(result.data?.platformMetrics ?? null);
+    } catch (error) {
+      console.error('Failed to fetch platform metrics:', error);
+      this.platformMetricsSignal.set(null);
+    }
   }
 
   /**
