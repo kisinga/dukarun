@@ -207,6 +207,7 @@ export class OverviewComponent implements OnInit {
 
   protected readonly stockValueStats = this.dashboardService.stockValueStats;
   protected readonly stockValueLoading = this.dashboardService.stockValueLoading;
+  protected readonly platformMetrics = this.dashboardService.platformMetrics;
 
   private readonly authPermissions = inject(AuthPermissionsService);
 
@@ -228,6 +229,7 @@ export class OverviewComponent implements OnInit {
         if (companyId) {
           this.dashboardService.fetchDashboardData();
           void this.analyticsService.fetch('30d'); // 30d for profit margin + sales chart
+          void this.dashboardService.loadPlatformMetrics();
           // Stock value is admin-only — skip the query for non-admins
           if (this.hasAdminStats()) {
             void this.dashboardService.loadStockValueStats();
@@ -325,6 +327,7 @@ export class OverviewComponent implements OnInit {
   async refresh(): Promise<void> {
     await this.dashboardService.refresh();
     void this.analyticsService.fetch('30d');
+    void this.dashboardService.loadPlatformMetrics();
     const companyId = this.companyService.activeCompanyId();
     if (companyId) {
       const channelId = parseInt(companyId, 10);

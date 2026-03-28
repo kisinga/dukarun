@@ -320,6 +320,33 @@ export class AnalyticsQueryService {
     };
   }
 
+  /**
+   * Platform metrics: online users (session updated in last 15 min) and MAU
+   * (distinct users with session activity in last 30 days).
+   * Uses Vendure's authenticated_session table in the main DB.
+   */
+  async getPlatformMetrics(): Promise<{ onlineUsers: number; mau: number }> {
+    const [onlineRows, mauRows] = await Promise.all([
+      this.dataSource.query(
+        `SELECT COUNT(DISTINCT "userId") AS count
+         FROM session
+         WHERE type = 'authenticated'
+           AND "invalidated" = false
+           AND "updatedAt" > NOW() - INTERVAL '15 minutes'`
+      ),
+      this.dataSource.query(
+        `SELECT COUNT(DISTINCT "userId") AS count
+         FROM session
+         WHERE type = 'authenticated'
+           AND "updatedAt" > NOW() - INTERVAL '30 days'`
+      ),
+    ]);
+    return {
+      onlineUsers: Number(onlineRows[0]?.count ?? 0),
+      mau: Number(mauRows[0]?.count ?? 0),
+    };
+  }
+
   async refreshAll(): Promise<void> {
     const views = [
       'mv_daily_product_sales',

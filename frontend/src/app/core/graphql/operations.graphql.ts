@@ -858,6 +858,15 @@ export const GET_DASHBOARD_STATS = graphql(`
   }
 `);
 
+export const GET_PLATFORM_METRICS = graphql(`
+  query GetPlatformMetrics {
+    platformMetrics {
+      onlineUsers
+      mau
+    }
+  }
+`);
+
 export const GET_STOCK_VALUE_STATS = graphql(`
   query GetStockValueStats($stockLocationId: ID, $forceRefresh: Boolean) {
     stockValueStats(stockLocationId: $stockLocationId, forceRefresh: $forceRefresh) {

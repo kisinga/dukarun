@@ -70,6 +70,12 @@ export class AnalyticsStatsResolver {
     };
   }
 
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async platformMetrics() {
+    return this.analyticsQueryService.getPlatformMetrics();
+  }
+
   @Mutation()
   @Allow(Permission.UpdateSettings)
   async refreshAnalytics(): Promise<boolean> {

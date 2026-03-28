@@ -39,8 +39,14 @@ export const ANALYTICS_STATS_SCHEMA = gql`
     previousEndDate: String
   }
 
+  type PlatformMetrics {
+    onlineUsers: Int!
+    mau: Int!
+  }
+
   extend type Query {
     analyticsStats(timeRange: AnalyticsTimeRange!, limit: Int): AnalyticsStats!
+    platformMetrics: PlatformMetrics!
   }
 
   extend type Mutation {
