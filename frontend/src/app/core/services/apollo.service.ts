@@ -177,6 +177,8 @@ export class ApolloService {
     return new ApolloClient({
       link: from([errorLink, authLink, httpLink]),
       cache: new InMemoryCache(),
+      // `errorPolicy: 'all'` defaults are registered in src/apollo.d.ts
+      // (Apollo Client 4.2+ requires declaring default options for type safety).
       defaultOptions: {
         watchQuery: {
           fetchPolicy: 'cache-and-network',

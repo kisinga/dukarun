@@ -144,10 +144,10 @@
 
 <main class="bg-base-100 text-base-content overflow-x-hidden w-full">
   <section id="hero" class="section scroll-mt-28 bg-base-100 pb-16 overflow-x-hidden">
-    <div
-      class="container-app grid gap-6 sm:gap-8 md:gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:items-center w-full"
-    >
-      <div class="home-hero-intro flex flex-col gap-4 sm:gap-6 md:gap-7 w-full min-w-0">
+    <div class="container-app flex w-full flex-col items-center text-center">
+      <div
+        class="home-hero-intro flex w-full max-w-3xl flex-col items-center gap-4 sm:gap-6 md:gap-7"
+      >
         <h1 class="w-full text-3xl font-bold leading-tight sm:text-4xl md:text-5xl lg:text-6xl">
           Dukarun POS for Retail & Services
         </h1>
@@ -184,48 +184,10 @@
           }
         </div>
       </div>
-      <div class="home-hero-intro-delay flex justify-center w-full min-w-0">
-        <figure class="home-hero-visual flex justify-center w-full">
-          <!-- Mobile: phone mockup with mobile screenshot -->
-          <div
-            class="mockup-phone w-full max-w-[min(280px,85vw)] sm:max-w-[300px] md:max-w-[320px] border-primary/20 lg:hidden"
-          >
-            <div class="mockup-phone-camera"></div>
-            <div
-              class="mockup-phone-display flex items-center justify-center bg-neutral-900 overflow-hidden"
-            >
-              <img
-                src="/assets/screenshots/dashboard_mobile2.png"
-                alt="Dukarun mobile dashboard showing business analytics and insights"
-                class="w-full h-auto object-contain object-center"
-                loading="eager"
-              />
-            </div>
-          </div>
-          <!-- Desktop: browser mockup with desktop screenshot -->
-          <div
-            class="mockup-browser border border-base-300 w-full max-w-full hidden lg:block lg:max-w-xl xl:max-w-2xl"
-          >
-            <div class="mockup-browser-toolbar">
-              <div
-                class="input input-sm w-full max-w-full bg-base-200 text-base-content/70 border-0"
-              >
-                https://dukarun.com/dashboard
-              </div>
-            </div>
-            <div class="flex items-center justify-center bg-base-200 overflow-hidden min-h-[200px]">
-              <img
-                src="/assets/screenshots/dashboard_720p.png"
-                alt="Dukarun desktop dashboard showing business analytics and insights"
-                class="w-full h-auto object-contain object-center"
-                loading="eager"
-              />
-            </div>
-          </div>
-          <figcaption class="sr-only">
-            Dukarun dashboard with business intelligence and analytics
-          </figcaption>
-        </figure>
+      <!-- Animated product render — the live stand-in for the app. Replaces the
+           static hero screenshots; those now move to a "See it in action" section. -->
+      <div class="home-hero-intro-delay mt-10 w-full max-w-4xl sm:mt-12">
+        <app-pos-demo />
       </div>
     </div>
   </section>
@@ -233,16 +195,12 @@
   <div class="divider divider-primary opacity-20 my-0"></div>
 
   <section class="section scroll-mt-28 bg-base-200" id="proof">
-    <div class="container-app space-y-4 text-center">
-      <span
-        class="inline-flex items-center gap-2 text-sm md:text-xs font-semibold uppercase tracking-[0.18em] text-primary/80"
-      >
-        Proof in the aisle
-      </span>
-      <h2 class="text-3xl font-bold sm:text-4xl md:text-5xl lg:text-6xl lg:text-7xl">
-        Shopkeepers across Kenya already run calmer days with Dukarun
-      </h2>
-      <div class="mx-auto max-w-2xl space-y-4">
+    <div class="container-app">
+      <div class="mkt-section-head">
+        <span class="mkt-eyebrow">Proof in the aisle</span>
+        <h2 class="mkt-h2">Shopkeepers across Kenya already run calmer days with Dukarun</h2>
+      </div>
+      <div class="mx-auto mt-6 max-w-2xl space-y-4 text-center">
         <div class="flex flex-wrap items-center justify-center gap-2">
           @for (business of businessExamples; track business.name) {
             <span
@@ -312,23 +270,19 @@
     class="section scroll-mt-28 bg-gradient-to-b from-base-100 to-base-200/50 py-16"
     id="pillars"
   >
-    <div class="container-app space-y-4 text-center">
-      <span
-        class="badge badge-primary badge-outline badge-sm font-semibold uppercase tracking-wider"
-      >
-        Why Dukarun works
-      </span>
-      <h2 class="text-3xl font-bold sm:text-4xl md:text-5xl lg:text-6xl">
-        Everything your team needs in one calm workspace
-      </h2>
-      <p class="mx-auto max-w-2xl text-base text-base-content/70">
-        Dukarun makes the things that should be simple actually simple. From recording up a sale to
-        knowing who owes what on desktop or phone.
-      </p>
-      <p class="mx-auto max-w-2xl text-sm text-base-content/60">
-        An audit log keeps a record of who made a change where and when. sales, stock adjustments,
-        payments, settings, reconcilliations, so you can review and stay accountable.
-      </p>
+    <div class="container-app">
+      <div class="mkt-section-head">
+        <span class="mkt-eyebrow">Why Dukarun works</span>
+        <h2 class="mkt-h2">Everything your team needs in one calm workspace</h2>
+        <p class="mkt-subhead">
+          Dukarun makes the things that should be simple actually simple. From recording up a sale
+          to knowing who owes what on desktop or phone.
+        </p>
+        <p class="mkt-subhead text-sm text-base-content/60">
+          An audit log keeps a record of who made a change where and when. sales, stock adjustments,
+          payments, settings, reconcilliations, so you can review and stay accountable.
+        </p>
+      </div>
     </div>
     <div class="container-app mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
       @for (pillar of corePillars; track pillar.title) {

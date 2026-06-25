@@ -1,0 +1,58 @@
+// ============================================
+// MARKETING DESIGN-SYSTEM LAYER
+// ============================================
+// Recipe classes for the PUBLIC pages (home, features, about, contact, support,
+// legal). Built on the same daisyUI theme + Tailwind utilities as the rest of the
+// app, so the marketing surface can't drift from the brand. Collapses the
+// eyebrow → heading → subhead header, the light card, and the warm-dark focal
+// "stage" that were copy-pasted (and slowly diverging) across the public pages
+// into single names a designer can retune here.
+//
+// Used in templates: class="mkt-section-head", "mkt-eyebrow", "mkt-h2", etc.
+// Structure stays in the templates; these only standardize the paint.
+// ============================================
+
+@layer components {
+  // ── Focal stage ────────────────────────────────────────────────────────────
+  // A deep, warm stone panel that makes a bright render or screenshot pop on the
+  // otherwise light, sunlit-legible page. Contrast as hierarchy on ONE element —
+  // deliberately NOT a site-wide dark theme (duka owners read these in daylight).
+  .mkt-stage {
+    @apply relative overflow-hidden rounded-3xl bg-stone-950 text-white ring-1 ring-white/10 shadow-2xl shadow-stone-950/30;
+  }
+
+  // ── Section header rhythm ────────────────────────────────────────────────────
+  // The centered block that heads each marketing section. Sits inside .container-app.
+  .mkt-section-head {
+    @apply mx-auto max-w-3xl text-center;
+  }
+  .mkt-section-head > * + * {
+    @apply mt-4;
+  }
+
+  // The uppercase primary kicker above a heading — one look site-wide.
+  .mkt-eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary;
+  }
+
+  // ── Headings (Outfit body face, sized up for marketing) ─────────────────────
+  .mkt-h1 {
+    @apply text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-6xl;
+  }
+  .mkt-h2 {
+    @apply text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl;
+  }
+
+  // ── Supporting copy ──────────────────────────────────────────────────────────
+  .mkt-lead {
+    @apply text-base leading-relaxed text-base-content/70 sm:text-lg;
+  }
+  .mkt-subhead {
+    @apply mx-auto max-w-2xl text-base leading-relaxed text-base-content/70;
+  }
+
+  // ── Light marketing card (pillars, feature grids, etc.) ──────────────────────
+  .mkt-card {
+    @apply rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-lg transition-all duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl;
+  }
+}

@@ -4,11 +4,14 @@ import {
   Component,
   inject,
   OnDestroy,
+  OnInit,
+  PLATFORM_ID,
 } from '@angular/core';
-import { Location } from '@angular/common';
+import { isPlatformBrowser, Location } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FooterComponent } from '../../core/layout/footer/footer.component';
 import { NavbarComponent } from '../../core/layout/navbar/navbar.component';
+import { SEOService } from '../../core/services/seo.service';
 
 type IconType =
   | 'phone'
@@ -70,9 +73,11 @@ interface ComingSoonFeature {
   styleUrl: './features.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class FeaturesComponent implements AfterViewInit, OnDestroy {
+export class FeaturesComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly location = inject(Location);
+  private readonly seo = inject(SEOService);
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private observers: IntersectionObserver[] = [];
   private isUpdatingHash = false;
 
@@ -486,7 +491,17 @@ export class FeaturesComponent implements AfterViewInit, OnDestroy {
     return iconMap[icon] || iconMap.phone;
   }
 
+  ngOnInit(): void {
+    this.seo.updateTags({
+      title: 'Features — Point-and-Sell, Offline, M-Pesa POS | Dukarun',
+      description:
+        'Everything Dukarun does: sell with camera or barcode, work offline, accept cash and M-Pesa, track inventory and credit, and run built-in accounting — for Kenyan shops and service businesses.',
+      url: 'https://dukarun.com/features',
+    });
+  }
+
   ngAfterViewInit(): void {
+    if (!this.isBrowser) return;
     this.setupScrollSpy();
     this.handleInitialHash();
   }

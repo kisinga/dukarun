@@ -1,4 +1,5 @@
-import { computed, effect, inject, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, PLATFORM_ID, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { BackgroundStateService } from './background-state.service';
 import { ToastService } from './toast.service';
 
@@ -12,9 +13,11 @@ import { ToastService } from './toast.service';
 export class NetworkService {
   private readonly toastService = inject(ToastService);
   private readonly backgroundStateService = inject(BackgroundStateService);
-  private readonly onlineStatusSignal = signal<boolean>(navigator.onLine);
+  // SSR/prerender has no `navigator`/`window`; default to online on the server.
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+  private readonly onlineStatusSignal = signal<boolean>(this.isBrowser ? navigator.onLine : true);
   private readonly wasOfflineSignal = signal<boolean>(false);
-  private previousStatus = navigator.onLine;
+  private previousStatus = this.isBrowser ? navigator.onLine : true;
   private statusBeforeBackground: boolean | null = null;
 
   /**
@@ -100,6 +103,7 @@ export class NetworkService {
    * Check if currently online
    */
   checkOnlineStatus(): boolean {
+    if (!this.isBrowser) return true;
     const online = navigator.onLine;
     this.updateStatus(online);
     return online;
@@ -109,6 +113,7 @@ export class NetworkService {
    * Setup event listeners for online/offline events
    */
   private setupEventListeners(): void {
+    if (!this.isBrowser) return;
     // Handle online event
     window.addEventListener('online', () => {
       this.updateStatus(true);
