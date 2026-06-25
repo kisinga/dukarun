@@ -12,6 +12,9 @@
 // Dashboard layout + page styles (scoped under app-dashboard-layout and .dashboard-main)
 @use 'styles/dashboard';
 
+// Marketing design-system layer — recipe classes for the public pages
+@use 'styles/marketing';
+
 // Import Tailwind & daisyUI
 @use 'tailwindcss';
 

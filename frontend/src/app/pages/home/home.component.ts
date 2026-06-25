@@ -1,4 +1,4 @@
-import { Location } from '@angular/common';
+import { isPlatformBrowser, Location } from '@angular/common';
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
@@ -7,11 +7,13 @@ import {
   inject,
   OnDestroy,
   OnInit,
+  PLATFORM_ID,
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FooterComponent } from '../../core/layout/footer/footer.component';
 import { NavbarComponent } from '../../core/layout/navbar/navbar.component';
+import { PosDemoComponent } from '../../shared/marketing/pos-demo.component';
 import { PublicPricingService } from '../../core/services/public-pricing.service';
 import { SEOService } from '../../core/services/seo.service';
 
@@ -49,7 +51,6 @@ interface CorePillar {
   title: string;
   description: string;
   bullets: string[];
-  screenshot?: { src: string; alt: string; placeholder: boolean };
 }
 
 interface JourneyStage {
@@ -89,7 +90,7 @@ function formatPrice(amount: number): string {
 
 @Component({
   selector: 'app-home',
-  imports: [RouterLink, NavbarComponent, FooterComponent],
+  imports: [RouterLink, NavbarComponent, FooterComponent, PosDemoComponent],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -99,6 +100,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly location = inject(Location);
   private readonly seoService = inject(SEOService);
   private readonly publicPricingService = inject(PublicPricingService);
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private observers: IntersectionObserver[] = [];
   private isUpdatingHash = false;
 
@@ -120,25 +122,11 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       : 'Start free trial';
   });
 
-  // Single source of truth for carousel timing
+  // Timing for the feature-phone slideshow.
   private readonly CAROUSEL_CONFIG = {
-    scrollInterval: 3500, // 3.5 seconds between scrolls
-    scrollDuration: 800, // Smooth scroll duration in ms
-    initDelay: 300, // Delay before initializing carousels
-    visibilityThreshold: 0.1, // IntersectionObserver threshold
+    scrollInterval: 3500, // ms between screenshots
+    initDelay: 300, // ms before initializing the slideshow
   };
-
-  // Carousel state management
-  private carousels = new Map<
-    string,
-    {
-      interval?: number;
-      currentIndex: number;
-      observer: IntersectionObserver | undefined;
-      isVisible: boolean;
-      isPaused: boolean;
-    }
-  >();
 
   protected readonly isYearly = signal(false);
 
@@ -155,36 +143,25 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     { icon: '🤝', text: 'Trust in every sale' },
   ];
 
-  protected readonly barcodeImages = [
-    {
-      src: '/assets/screenshots/barcode_scanning_mobile.png',
-      alt: 'Barcode scanning interface showing product recognition',
-    },
-    {
-      src: '/assets/screenshots/barcode_found_mobile.png',
-      alt: 'Product found after barcode scan with details and add to cart',
-    },
-  ];
-
   protected readonly allFeatureScreenshots = [
     {
-      src: '/assets/screenshots/barcode_scanning_mobile.png',
+      src: '/assets/screenshots/barcode_scanning_mobile.webp',
       alt: 'Barcode scanning interface showing product recognition',
     },
     {
-      src: '/assets/screenshots/barcode_found_mobile.png',
+      src: '/assets/screenshots/barcode_found_mobile.webp',
       alt: 'Product found after barcode scan with details and add to cart',
     },
     {
-      src: '/assets/screenshots/inventory_mobile.png',
+      src: '/assets/screenshots/inventory_mobile.webp',
       alt: 'Inventory management dashboard',
     },
     {
-      src: '/assets/screenshots/credit_management_mobile.png',
+      src: '/assets/screenshots/credit_management_mobile.webp',
       alt: 'Cash flow and credit management',
     },
     {
-      src: '/assets/screenshots/dashboard_mobile.png',
+      src: '/assets/screenshots/dashboard_mobile.webp',
       alt: 'Business intelligence dashboard',
     },
   ];
@@ -201,7 +178,6 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
         '3-second checkout',
         'Offline-ready so you never miss a sale; syncs when you reconnect',
       ],
-      screenshot: { src: '', alt: 'Point and sell interface', placeholder: true },
     },
     {
       icon: 'package',
@@ -213,11 +189,6 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
         'Low-stock nudges',
         'Movement history and adjustments for full traceability',
       ],
-      screenshot: {
-        src: '/assets/screenshots/inventory_mobile.png',
-        alt: 'Inventory management dashboard',
-        placeholder: false,
-      },
     },
     {
       icon: 'currency',
@@ -229,11 +200,6 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
         'Ledger built in',
         'Customer and supplier statements without leaving the app',
       ],
-      screenshot: {
-        src: '/assets/screenshots/credit_management_mobile.png',
-        alt: 'Cash flow and credit management',
-        placeholder: false,
-      },
     },
     {
       icon: 'chart',
@@ -246,11 +212,6 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
         'Performance alerts',
         'Audit log of sales, stock & settings changes',
       ],
-      screenshot: {
-        src: '/assets/screenshots/dashboard_mobile.png',
-        alt: 'Business intelligence dashboard',
-        placeholder: false,
-      },
     },
   ];
 
@@ -492,8 +453,12 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
         'POS system Kenya, point of sale Kenya, retail software Kenya, duka management system, M-Pesa POS, offline POS Kenya, shop management Kenya, inventory management Kenya, barcode scanner Kenya, retail POS Nairobi, agrovet software Kenya, salon management Kenya, hardware store POS Kenya',
       url: 'https://dukarun.com',
     });
-    this.loadPricingTiers();
-    this.loadPublicPlatformConfig();
+    // Data fetches run in the browser only — prerender ships the loading/fallback
+    // state, then the client hydrates and loads live pricing.
+    if (this.isBrowser) {
+      this.loadPricingTiers();
+      this.loadPublicPlatformConfig();
+    }
   }
 
   private async loadPricingTiers(): Promise<void> {
@@ -543,9 +508,9 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
+    if (!this.isBrowser) return;
     this.setupScrollSpy();
     this.handleInitialHash();
-    this.setupBarcodeCarousel();
     this.setupFeatureCarousel();
   }
 
@@ -559,21 +524,6 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.phoneSlideshowObserver) {
       this.phoneSlideshowObserver.disconnect();
     }
-
-    // Clean up all carousels
-    this.carousels.forEach((carousel, id) => {
-      if (carousel.interval) {
-        clearInterval(carousel.interval);
-      }
-      if (carousel.observer) {
-        carousel.observer.disconnect();
-      }
-    });
-    this.carousels.clear();
-  }
-
-  private setupBarcodeCarousel(): void {
-    this.setupCarousel('barcode-carousel');
   }
 
   protected setActiveScreenshot(index: number): void {
@@ -633,171 +583,6 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       });
     }, this.CAROUSEL_CONFIG.initDelay);
-  }
-
-  // Unified carousel setup - single source of truth
-  private setupCarousel(carouselId: string): void {
-    setTimeout(() => {
-      const carouselElement = document.getElementById(carouselId);
-      if (!carouselElement) {
-        console.warn(`Carousel element not found: ${carouselId}`);
-        return;
-      }
-
-      const items = carouselElement.querySelectorAll('.carousel-item');
-      if (items.length <= 1) {
-        console.warn(`Carousel ${carouselId} has ${items.length} items, need at least 2`);
-        return;
-      }
-
-      // Clean up existing state if any
-      const existingState = this.carousels.get(carouselId);
-      if (existingState?.interval) {
-        clearInterval(existingState.interval);
-      }
-      if (existingState?.observer) {
-        existingState.observer.disconnect();
-      }
-
-      // Initialize carousel state
-      const carouselState: {
-        interval?: number;
-        currentIndex: number;
-        observer: IntersectionObserver | undefined;
-        isVisible: boolean;
-        isPaused: boolean;
-      } = {
-        interval: undefined,
-        currentIndex: 0,
-        observer: undefined,
-        isVisible: false,
-        isPaused: false,
-      };
-      this.carousels.set(carouselId, carouselState);
-
-      // Check if carousel is already visible
-      const checkInitialVisibility = (): boolean => {
-        const rect = carouselElement.getBoundingClientRect();
-        const isVisible =
-          rect.top < window.innerHeight &&
-          rect.bottom > 0 &&
-          rect.left < window.innerWidth &&
-          rect.right > 0;
-        return isVisible;
-      };
-
-      // IntersectionObserver for visibility detection
-      const observer = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            const state = this.carousels.get(carouselId);
-            if (!state) return;
-
-            state.isVisible = entry.isIntersecting;
-            if (state.isVisible && !state.isPaused) {
-              if (!state.interval) {
-                this.startCarouselAutoscroll(carouselId, carouselElement, items);
-              }
-            } else {
-              if (state.interval) {
-                clearInterval(state.interval);
-                state.interval = undefined;
-              }
-            }
-          });
-        },
-        {
-          root: null,
-          rootMargin: '0px',
-          threshold: [0, 0.1, 0.5],
-        },
-      );
-
-      carouselState.observer = observer;
-      observer.observe(carouselElement);
-
-      // Start immediately if already visible
-      if (checkInitialVisibility()) {
-        setTimeout(() => {
-          const state = this.carousels.get(carouselId);
-          if (state && !state.interval && !state.isPaused) {
-            this.startCarouselAutoscroll(carouselId, carouselElement, items);
-          }
-        }, this.CAROUSEL_CONFIG.initDelay + 100);
-      }
-
-      // Pause on hover
-      const pauseOnHover = () => {
-        const state = this.carousels.get(carouselId);
-        if (!state) return;
-        state.isPaused = true;
-        if (state.interval) {
-          clearInterval(state.interval);
-          state.interval = undefined;
-        }
-      };
-
-      const resumeOnLeave = () => {
-        const state = this.carousels.get(carouselId);
-        if (!state) return;
-        state.isPaused = false;
-        if (state.isVisible && !state.interval) {
-          this.startCarouselAutoscroll(carouselId, carouselElement, items);
-        }
-      };
-
-      carouselElement.addEventListener('mouseenter', pauseOnHover);
-      carouselElement.addEventListener('mouseleave', resumeOnLeave);
-    }, this.CAROUSEL_CONFIG.initDelay);
-  }
-
-  // Unified autoscroll function - single source of truth for timing
-  private startCarouselAutoscroll(
-    carouselId: string,
-    carouselElement: HTMLElement,
-    items: NodeListOf<Element>,
-  ): void {
-    const state = this.carousels.get(carouselId);
-    if (!state) {
-      console.warn(`State not found for carousel: ${carouselId}`);
-      return;
-    }
-
-    // Clear any existing interval
-    if (state.interval) {
-      clearInterval(state.interval);
-      state.interval = undefined;
-    }
-
-    // Use CSS for smooth scrolling
-    carouselElement.style.scrollBehavior = 'smooth';
-
-    // Start autoscroll with consistent timing
-    state.interval = window.setInterval(() => {
-      const currentState = this.carousels.get(carouselId);
-      if (!currentState || currentState.isPaused || !currentState.isVisible) {
-        return;
-      }
-
-      // Move to next item
-      currentState.currentIndex = (currentState.currentIndex + 1) % items.length;
-      const targetItem = items[currentState.currentIndex] as HTMLElement;
-
-      if (targetItem && carouselElement) {
-        // Calculate precise scroll position - each item is full width
-        const carouselWidth = carouselElement.clientWidth;
-        const scrollPosition = currentState.currentIndex * carouselWidth;
-
-        // Smooth scroll
-        carouselElement.scrollTo({
-          left: scrollPosition,
-          behavior: 'smooth',
-        });
-      }
-    }, this.CAROUSEL_CONFIG.scrollInterval);
-
-    // Update state in map
-    this.carousels.set(carouselId, state);
   }
 
   private setupScrollSpy(): void {

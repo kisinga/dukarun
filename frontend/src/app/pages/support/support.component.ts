@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FooterComponent } from '../../core/layout/footer/footer.component';
 import { NavbarComponent } from '../../core/layout/navbar/navbar.component';
+import { SEOService } from '../../core/services/seo.service';
 
 interface FAQItem {
   question: string;
@@ -16,7 +17,18 @@ interface FAQItem {
   styleUrl: './support.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SupportComponent {
+export class SupportComponent implements OnInit {
+  private readonly seo = inject(SEOService);
+
+  ngOnInit(): void {
+    this.seo.updateTags({
+      title: 'Support & FAQ — Dukarun POS Help',
+      description:
+        'Answers to common Dukarun questions: getting started, offline selling, adding products, M-Pesa, customer credit, team access and more. Help for Kenyan shops and service businesses.',
+      url: 'https://dukarun.com/support',
+    });
+  }
+
   protected readonly faqItems = signal<FAQItem[]>([
     {
       question: 'How do I get started with dukarun?',

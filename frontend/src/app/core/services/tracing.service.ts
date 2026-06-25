@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { Span, SpanStatusCode, trace } from '@opentelemetry/api';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { registerInstrumentations } from '@opentelemetry/instrumentation';
@@ -32,6 +33,7 @@ import { environment } from '../../../environments/environment';
   providedIn: 'root',
 })
 export class TracingService {
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private tracer = trace.getTracer(environment.serviceName || 'dukarun-frontend');
   private initialized = false;
 
@@ -41,6 +43,11 @@ export class TracingService {
    */
   initialize(): void {
     if (this.initialized) {
+      return;
+    }
+
+    // Browser-only: OpenTelemetry web SDK touches window/location; skip on the server.
+    if (!this.isBrowser) {
       return;
     }
 
@@ -117,16 +124,16 @@ export class TracingService {
       // Return a no-op span if not initialized
       return {
         spanContext: () => ({ traceId: '', spanId: '', traceFlags: 0 }),
-        setAttribute: () => { },
-        setAttributes: () => { },
-        addEvent: () => { },
-        addLink: () => { },
-        addLinks: () => { },
-        setStatus: () => { },
-        updateName: () => { },
-        end: () => { },
+        setAttribute: () => {},
+        setAttributes: () => {},
+        addEvent: () => {},
+        addLink: () => {},
+        addLinks: () => {},
+        setStatus: () => {},
+        updateName: () => {},
+        end: () => {},
         isRecording: () => false,
-        recordException: () => { },
+        recordException: () => {},
       } as unknown as Span;
     }
 

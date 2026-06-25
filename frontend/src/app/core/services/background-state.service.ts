@@ -1,4 +1,5 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { inject, Injectable, PLATFORM_ID, computed, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 
 /**
  * Background State Service
@@ -12,7 +13,9 @@ import { Injectable, computed, signal } from '@angular/core';
   providedIn: 'root',
 })
 export class BackgroundStateService {
-  private readonly isBackgroundSignal = signal<boolean>(document.hidden);
+  // SSR/prerender has no `document`; treat the app as foreground on the server.
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+  private readonly isBackgroundSignal = signal<boolean>(this.isBrowser ? document.hidden : false);
   private readonly isReturningFromBackgroundSignal = signal<boolean>(false);
   private lastBackgroundTime: number | null = null;
   private returnFromBackgroundTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -42,6 +45,7 @@ export class BackgroundStateService {
    * Setup Page Visibility API listener
    */
   private setupVisibilityListener(): void {
+    if (!this.isBrowser) return;
     // Initial state
     this.updateVisibilityState();
 

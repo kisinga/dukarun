@@ -9,7 +9,7 @@
     "super-admin"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.22.1"
   },
   "scripts": {
     "setup": "ts-node scripts/setup.ts",
@@ -30,11 +30,11 @@
     "prepare": "node -e \"if (process.env.CI === 'true' || process.env.HUSKY === '0') process.exit(0); require('child_process').execSync('npx husky install', {stdio:'inherit'})\""
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "concurrently": "^9.1.0",
+    "@types/node": "^26.0.1",
+    "concurrently": "^10.0.3",
     "husky": "^9.1.7",
-    "lint-staged": "^15.5.2",
+    "lint-staged": "^17.0.8",
     "ts-node": "^10.9.2",
-    "typescript": "^5.7.0"
+    "typescript": "^6.0.3"
   }
 }

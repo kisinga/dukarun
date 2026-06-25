@@ -2,14 +2,14 @@
 
 <main class="bg-base-100 text-base-content">
   <section class="section scroll-mt-28 bg-base-100 py-16">
-    <div class="container-app space-y-4 text-center">
-      <span class="badge badge-primary badge-soft badge-sm font-semibold uppercase tracking-wider">
-        Help & Support
-      </span>
-      <h1 class="text-3xl font-bold sm:text-4xl md:text-5xl lg:text-6xl">We're here to help</h1>
-      <p class="mx-auto max-w-2xl text-base text-base-content/70">
-        Find answers to common questions or get in touch with our support team.
-      </p>
+    <div class="container-app text-center">
+      <div class="mkt-section-head">
+        <span class="mkt-eyebrow"> Help & Support </span>
+        <h1 class="mkt-h1">We're here to help</h1>
+        <p class="mkt-lead">
+          Find answers to common questions or get in touch with our support team.
+        </p>
+      </div>
     </div>
 
     <div class="container-app mt-10 grid gap-6 md:grid-cols-3">
@@ -86,9 +86,7 @@
     </div>
 
     <div class="container-app mt-10 space-y-4">
-      <h2 class="text-2xl font-bold text-center sm:text-3xl md:text-4xl">
-        Frequently asked questions
-      </h2>
+      <h2 class="mkt-h2 text-center">Frequently asked questions</h2>
       <div class="grid gap-3">
         @for (faq of faqItems(); track $index) {
           <div class="collapse collapse-arrow border border-base-300 bg-base-200/60 text-left">
@@ -108,8 +106,8 @@
       class="container-app mt-10 grid gap-6 rounded-3xl border border-base-300 bg-base-100 p-8 shadow-xl md:grid-cols-[2fr,1fr] md:items-center"
     >
       <div class="space-y-4">
-        <h2 class="text-2xl font-bold sm:text-3xl md:text-4xl lg:text-5xl">Still need help?</h2>
-        <p class="text-base-content/70">
+        <h2 class="mkt-h2">Still need help?</h2>
+        <p class="mkt-subhead">
           Our support team is ready to assist you. Reach out and we'll get back to you within 24
           hours.
         </p>
