@@ -1,7 +1,7 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { ReplaySubject, firstValueFrom } from 'rxjs';
 import { GET_ACTIVE_ADMIN } from '../../graphql/operations.graphql';
-import type { ActiveAdministrator, GetActiveAdministratorQuery } from '../../models/user.model';
+import type { ActiveAdministrator } from '../../models/user.model';
 import { ApolloService } from '../apollo.service';
 import { CompanyService } from '../company.service';
 
@@ -58,7 +58,7 @@ export class AuthSessionService {
         setTimeout(() => reject(new Error('Query timeout')), 5000); // 5 second timeout (reduced for faster failure)
       });
 
-      const queryPromise = client.query<GetActiveAdministratorQuery>({
+      const queryPromise = client.query({
         query: GET_ACTIVE_ADMIN,
         fetchPolicy: 'network-only',
         context: { skipChannelToken: true },

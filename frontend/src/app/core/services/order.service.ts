@@ -256,8 +256,8 @@ export class OrderService {
    */
   async voidOrder(orderId: string): Promise<{ order: Order; hadPayments: boolean }> {
     const client = this.apolloService.getClient();
-    const result = await client.mutate<{ voidOrder: { order: Order; hadPayments: boolean } }>({
-      mutation: VOID_ORDER as import('graphql').DocumentNode,
+    const result = await client.mutate({
+      mutation: VOID_ORDER,
       variables: { orderId },
     });
     if (result.error) {
@@ -380,7 +380,7 @@ export class OrderService {
       }
 
       const result = await client.mutate({
-        mutation: SET_ORDER_LINE_CUSTOM_PRICE as any,
+        mutation: SET_ORDER_LINE_CUSTOM_PRICE,
         variables: {
           input: {
             orderLineId,
@@ -396,7 +396,7 @@ export class OrderService {
         throw new Error(`GraphQL error setting custom line price: ${result.error.message}`);
       }
 
-      const data = (result.data as any)?.setOrderLineCustomPrice;
+      const data = result.data?.setOrderLineCustomPrice;
       if (!data) {
         throw new Error('No data returned from setOrderLineCustomPrice');
       }
@@ -421,11 +421,11 @@ export class OrderService {
   async removeDraftOrderLine(orderId: string, orderLineId: string): Promise<Order> {
     const client = this.apolloService.getClient();
     const result = await client.mutate({
-      mutation: REMOVE_DRAFT_ORDER_LINE as any,
+      mutation: REMOVE_DRAFT_ORDER_LINE,
       variables: { orderId, orderLineId },
     });
     if (result.error) throw new Error(result.error.message);
-    const order = (result.data as any)?.removeDraftOrderLine;
+    const order = result.data?.removeDraftOrderLine;
     if (
       !order ||
       order.__typename === 'OrderModificationError' ||
@@ -446,11 +446,11 @@ export class OrderService {
   ): Promise<Order> {
     const client = this.apolloService.getClient();
     const result = await client.mutate({
-      mutation: ADJUST_DRAFT_ORDER_LINE as any,
+      mutation: ADJUST_DRAFT_ORDER_LINE,
       variables: { orderId, input: { orderLineId, quantity } },
     });
     if (result.error) throw new Error(result.error.message);
-    const order = (result.data as any)?.adjustDraftOrderLine;
+    const order = result.data?.adjustDraftOrderLine;
     if (
       !order ||
       order.__typename === 'OrderModificationError' ||
@@ -470,7 +470,7 @@ export class OrderService {
   ): Promise<Order> {
     const client = this.apolloService.getClient();
     const result = await client.mutate({
-      mutation: ADD_ITEM_TO_DRAFT_ORDER as any,
+      mutation: ADD_ITEM_TO_DRAFT_ORDER,
       variables: {
         orderId,
         input: {
@@ -481,7 +481,7 @@ export class OrderService {
       },
     });
     if (result.error) throw new Error(result.error.message);
-    const data = (result.data as any)?.addItemToDraftOrder;
+    const data = result.data?.addItemToDraftOrder;
     if (!data || data.__typename !== 'Order') {
       throw new Error('Failed to add item to draft order');
     }
@@ -494,11 +494,11 @@ export class OrderService {
   async deleteDraftOrder(orderId: string): Promise<{ result: string; message?: string | null }> {
     const client = this.apolloService.getClient();
     const result = await client.mutate({
-      mutation: DELETE_DRAFT_ORDER as any,
+      mutation: DELETE_DRAFT_ORDER,
       variables: { orderId },
     });
     if (result.error) throw new Error(result.error.message);
-    const data = (result.data as any)?.deleteDraftOrder;
+    const data = result.data?.deleteDraftOrder;
     if (!data) throw new Error('Failed to delete draft order');
     return { result: data.result, message: data.message };
   }

@@ -1,8 +1,5 @@
 import { inject, Injectable, signal } from '@angular/core';
-import type {
-  GetAnalyticsStatsQuery,
-  GetAnalyticsStatsQueryVariables,
-} from '../graphql/generated/graphql';
+import type { GetAnalyticsStatsQuery } from '../graphql/generated/graphql';
 import { GET_ANALYTICS_STATS } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
 import type { AnalyticsPeriod } from '../../dashboard/components/shared/charts';
@@ -102,7 +99,7 @@ export class AnalyticsService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<GetAnalyticsStatsQuery, GetAnalyticsStatsQueryVariables>({
+      const result = await client.query({
         query: GET_ANALYTICS_STATS,
         variables: { timeRange: periodToDateRange(period), limit },
         fetchPolicy: 'network-only',

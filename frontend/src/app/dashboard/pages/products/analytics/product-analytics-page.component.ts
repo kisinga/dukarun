@@ -137,7 +137,7 @@ export class ProductAnalyticsPageComponent {
         rank: i + 1,
         productId: item.productId,
         productName: item.productName,
-        variantName: item.variantName,
+        variantName: item.variantName ?? null,
         displayValue: this.currencyService.format(item.value),
       }));
       this.tableRows.set(rows);

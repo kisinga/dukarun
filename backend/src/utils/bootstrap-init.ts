@@ -89,6 +89,10 @@ export async function initializeVendureBootstrap(config: VendureConfig): Promise
     'tax_category',
     'tax_rate',
     'asset',
+    // Vendure 3.6+ made Asset translatable. ChannelService.initChannels eager-loads
+    // asset custom-field relations, which JOIN asset_translation during bootstrap —
+    // so a missing 3.6 migration must fail loudly here, not crash later at query time.
+    'asset_translation',
     'payment_method',
   ];
 

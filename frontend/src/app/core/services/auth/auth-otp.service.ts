@@ -1,14 +1,4 @@
 import { inject, Injectable } from '@angular/core';
-import type {
-  RequestLoginOtpMutation,
-  RequestLoginOtpMutationVariables,
-  RequestRegistrationOtpMutation,
-  RequestRegistrationOtpMutationVariables,
-  VerifyLoginOtpMutation,
-  VerifyLoginOtpMutationVariables,
-  VerifyRegistrationOtpMutation,
-  VerifyRegistrationOtpMutationVariables,
-} from '../../graphql/generated/graphql';
 import {
   REQUEST_LOGIN_OTP,
   REQUEST_REGISTRATION_OTP,
@@ -38,13 +28,11 @@ export class AuthOtpService {
   ): Promise<{ success: boolean; message: string; expiresAt?: number }> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.mutate<RequestLoginOtpMutation, RequestLoginOtpMutationVariables>(
-        {
-          mutation: REQUEST_LOGIN_OTP,
-          variables: { phoneNumber },
-          context: { skipChannelToken: true },
-        },
-      );
+      const result = await client.mutate({
+        mutation: REQUEST_LOGIN_OTP,
+        variables: { phoneNumber },
+        context: { skipChannelToken: true },
+      });
 
       const data = result.data?.requestLoginOTP;
       if (!data || !data.success) {
@@ -72,7 +60,7 @@ export class AuthOtpService {
   ): Promise<{ success: boolean; token?: string; message: string }> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.mutate<VerifyLoginOtpMutation, VerifyLoginOtpMutationVariables>({
+      const result = await client.mutate({
         mutation: VERIFY_LOGIN_OTP,
         variables: { phoneNumber, otp: otp.trim() },
         context: { skipChannelToken: true },
@@ -112,10 +100,7 @@ export class AuthOtpService {
   ): Promise<{ success: boolean; message: string; sessionId?: string; expiresAt?: number }> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.mutate<
-        RequestRegistrationOtpMutation,
-        RequestRegistrationOtpMutationVariables
-      >({
+      const result = await client.mutate({
         mutation: REQUEST_REGISTRATION_OTP,
         variables: { phoneNumber, registrationData },
         context: { skipChannelToken: true },
@@ -161,10 +146,7 @@ export class AuthOtpService {
         throw new Error('Session expired. Please start registration again.');
       }
 
-      const result = await client.mutate<
-        VerifyRegistrationOtpMutation,
-        VerifyRegistrationOtpMutationVariables
-      >({
+      const result = await client.mutate({
         mutation: VERIFY_REGISTRATION_OTP,
         variables: {
           phoneNumber: normalizedPhone,

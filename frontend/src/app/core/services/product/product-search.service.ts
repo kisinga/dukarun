@@ -129,9 +129,7 @@ export class ProductSearchService {
 
       const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
       const client = this.apolloService.getClient();
-      const result = await client.query<{
-        products: { items: any[] };
-      }>({
+      const result = await client.query({
         query: GET_PRODUCTS,
         variables: {
           options: { filter: { _or: searchOr }, take: 20 },
@@ -169,9 +167,7 @@ export class ProductSearchService {
     try {
       const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
       const client = this.apolloService.getClient();
-      const result = await client.query<{
-        product: any | null;
-      }>({
+      const result = await client.query({
         query: GET_PRODUCT,
         variables: { id: productId },
         fetchPolicy,
@@ -195,11 +191,7 @@ export class ProductSearchService {
     if (isBarcodeIgnored(barcode)) return null;
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<{
-        products: {
-          items: any[];
-        };
-      }>({
+      const result = await client.query({
         query: SEARCH_BY_BARCODE,
         variables: { barcode: barcode },
       });
@@ -234,9 +226,7 @@ export class ProductSearchService {
     try {
       const fetchPolicy = 'cache-first' as FetchPolicy;
       const client = this.apolloService.getClient();
-      const result = await client.query<{
-        products: { items: any[] };
-      }>({
+      const result = await client.query({
         query: GET_PRODUCTS,
         variables: {
           options: { take: limit, skip: 0 },
@@ -280,11 +270,7 @@ export class ProductSearchService {
       // This is a workaround - ideally we'd have a direct variant lookup query
       const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
       const client = this.apolloService.getClient();
-      const result = await client.query<{
-        products: {
-          items: any[];
-        };
-      }>({
+      const result = await client.query({
         query: SEARCH_PRODUCTS,
         variables: { term: '' }, // Empty search to get all products (may need pagination)
         fetchPolicy,

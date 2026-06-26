@@ -1,37 +1,14 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { gql } from '@apollo/client/core';
 import {
   GET_DASHBOARD_STATS,
   GET_PLATFORM_METRICS,
   GET_PRODUCT_STATS,
   GET_PRODUCTS,
   GET_RECENT_ORDERS,
+  GET_STOCK_VALUE_RANKING,
   GET_STOCK_VALUE_STATS,
 } from '../graphql/operations.graphql';
-
-/** Used until codegen includes GetStockValueRanking. Same as operations.graphql.ts GetStockValueRanking. */
-const GET_STOCK_VALUE_RANKING_DOC = gql`
-  query GetStockValueRanking(
-    $valuationType: StockValuationType!
-    $limit: Int
-    $stockLocationId: ID
-  ) {
-    stockValueRanking(
-      valuationType: $valuationType
-      limit: $limit
-      stockLocationId: $stockLocationId
-    ) {
-      items {
-        productVariantId
-        productId
-        productName
-        variantName
-        value
-      }
-      total
-    }
-  }
-`;
+import { StockValuationType as GqlStockValuationType } from '../graphql/generated/graphql';
 import { OrderCacheService } from './order-cache.service';
 import { ApolloService } from './apollo.service';
 import { CompanyService } from './company.service';
@@ -100,7 +77,7 @@ export interface StockValueRankingItem {
   productVariantId: string;
   productId: string;
   productName: string;
-  variantName: string | null;
+  variantName?: string | null;
   value: number;
 }
 
@@ -278,8 +255,8 @@ export class DashboardService {
   private async fetchDashboardStats(): Promise<DashboardStatsResponse | null> {
     const client = this.apolloService.getClient();
     try {
-      const result = await client.query<{ dashboardStats: DashboardStatsResponse }>({
-        query: GET_DASHBOARD_STATS as import('graphql').DocumentNode,
+      const result = await client.query({
+        query: GET_DASHBOARD_STATS,
         fetchPolicy: 'network-only',
       });
       return result.data?.dashboardStats ?? null;
@@ -315,10 +292,7 @@ export class DashboardService {
     const client = this.apolloService.getClient();
 
     try {
-      const result = await client.query<{
-        products: { totalItems: number };
-        productVariants: { totalItems: number };
-      }>({
+      const result = await client.query({
         query: GET_PRODUCT_STATS,
       });
 
@@ -340,8 +314,8 @@ export class DashboardService {
     this.stockValueLoadingSignal.set(true);
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<{ stockValueStats: StockValueStats }>({
-        query: GET_STOCK_VALUE_STATS as import('graphql').DocumentNode,
+      const result = await client.query({
+        query: GET_STOCK_VALUE_STATS,
         variables: { forceRefresh },
         fetchPolicy: 'network-only',
       });
@@ -363,9 +337,13 @@ export class DashboardService {
     stockLocationId?: string,
   ): Promise<StockValueRankingResult> {
     const client = this.apolloService.getClient();
-    const result = await client.query<{ stockValueRanking: StockValueRankingResult }>({
-      query: GET_STOCK_VALUE_RANKING_DOC,
-      variables: { valuationType, limit, stockLocationId: stockLocationId ?? null },
+    const result = await client.query({
+      query: GET_STOCK_VALUE_RANKING,
+      variables: {
+        valuationType: GqlStockValuationType[valuationType],
+        limit,
+        stockLocationId: stockLocationId ?? null,
+      },
       fetchPolicy: 'network-only',
     });
     return result.data?.stockValueRanking ?? { items: [], total: 0 };
@@ -377,8 +355,8 @@ export class DashboardService {
   async loadPlatformMetrics(): Promise<void> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<{ platformMetrics: PlatformMetrics }>({
-        query: GET_PLATFORM_METRICS as import('graphql').DocumentNode,
+      const result = await client.query({
+        query: GET_PLATFORM_METRICS,
         fetchPolicy: 'network-only',
       });
       this.platformMetricsSignal.set(result.data?.platformMetrics ?? null);
@@ -419,36 +397,7 @@ export class DashboardService {
     const client = this.apolloService.getClient();
 
     try {
-      const result = await client.query<{
-        orders: {
-          items: Array<{
-            id: string;
-            code: string;
-            total: number;
-            totalWithTax: number;
-            state: string;
-            createdAt: string;
-            currencyCode: string;
-            customer?: {
-              firstName?: string;
-              lastName?: string;
-            };
-            lines: Array<{
-              id: string;
-              quantity: number;
-              productVariant: {
-                id: string;
-                name: string;
-                sku: string;
-                product: {
-                  id: string;
-                  name: string;
-                };
-              };
-            }>;
-          }>;
-        };
-      }>({
+      const result = await client.query({
         query: GET_RECENT_ORDERS,
       });
 
@@ -469,16 +418,7 @@ export class DashboardService {
 
     try {
       // Fetch all products with their variants and stock levels
-      const result = await client.query<{
-        products: {
-          items: Array<{
-            id: string;
-            variants: Array<{
-              stockOnHand: number;
-            }>;
-          }>;
-        };
-      }>({
+      const result = await client.query({
         query: GET_PRODUCTS,
         variables: {
           options: {

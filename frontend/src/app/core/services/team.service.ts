@@ -6,13 +6,6 @@ import {
   UPDATE_CHANNEL_ADMIN,
   DISABLE_CHANNEL_ADMIN,
 } from '../graphql/operations.graphql';
-import type {
-  GetAdministratorsQuery,
-  GetRoleTemplatesQuery,
-  CreateChannelAdminMutation,
-  UpdateChannelAdminMutation,
-  DisableChannelAdminMutation,
-} from '../graphql/generated/graphql';
 import { ApolloService } from './apollo.service';
 import { CompanyService } from './company.service';
 
@@ -78,7 +71,7 @@ export class TeamService {
       const channelId = company.id;
 
       const client = this.apolloService.getClient();
-      const result = await client.query<GetAdministratorsQuery>({
+      const result = await client.query({
         query: GET_ADMINISTRATORS,
         variables: {
           options: {
@@ -149,7 +142,7 @@ export class TeamService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<GetRoleTemplatesQuery>({
+      const result = await client.query({
         query: GET_ROLE_TEMPLATES,
         fetchPolicy: 'network-only',
       });
@@ -180,7 +173,7 @@ export class TeamService {
         throw new Error(errorMessage);
       }
       const client = this.apolloService.getClient();
-      const result = await client.mutate<CreateChannelAdminMutation>({
+      const result = await client.mutate({
         mutation: CREATE_CHANNEL_ADMIN,
         variables: { input },
       });
@@ -254,7 +247,7 @@ export class TeamService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.mutate<UpdateChannelAdminMutation>({
+      const result = await client.mutate({
         mutation: UPDATE_CHANNEL_ADMIN,
         variables: { id, permissions },
       });
@@ -304,7 +297,7 @@ export class TeamService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.mutate<DisableChannelAdminMutation>({
+      const result = await client.mutate({
         mutation: DISABLE_CHANNEL_ADMIN,
         variables: { id },
       });

@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import type { GetActiveChannelQuery, GetUserChannelsQuery } from '../graphql/generated/graphql';
+import type { GetActiveChannelQuery } from '../graphql/generated/graphql';
 import { GET_ACTIVE_CHANNEL, GET_USER_CHANNELS } from '../graphql/operations.graphql';
 import type { Company } from '../models/company.model';
 import { AppCacheService } from './cache/app-cache.service';
@@ -186,7 +186,7 @@ export class CompanyService {
    */
   async fetchActiveChannel(): Promise<void> {
     try {
-      const result = await this.apolloService.getClient().query<GetActiveChannelQuery>({
+      const result = await this.apolloService.getClient().query({
         query: GET_ACTIVE_CHANNEL,
         fetchPolicy: 'network-only',
       });
@@ -204,7 +204,7 @@ export class CompanyService {
   async fetchUserChannels(): Promise<void> {
     this.isLoadingSignal.set(true);
     try {
-      const result = await this.apolloService.getClient().query<GetUserChannelsQuery>({
+      const result = await this.apolloService.getClient().query({
         query: GET_USER_CHANNELS,
         fetchPolicy: 'network-only',
         context: { skipChannelToken: true },

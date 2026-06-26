@@ -6,11 +6,6 @@ import {
   GetMyApprovalRequestsDocument,
   CreateApprovalRequestDocument,
   ReviewApprovalRequestDocument,
-  type GetApprovalRequestsQuery,
-  type GetApprovalRequestQuery,
-  type GetMyApprovalRequestsQuery,
-  type CreateApprovalRequestMutation,
-  type ReviewApprovalRequestMutation,
 } from '../graphql/generated/graphql';
 
 export interface ApprovalRequest {
@@ -50,7 +45,7 @@ export class ApprovalService {
     type?: string;
   }): Promise<ApprovalRequestList> {
     const client = this.apolloService.getClient();
-    const result = await client.query<GetApprovalRequestsQuery>({
+    const result = await client.query({
       query: GetApprovalRequestsDocument,
       variables: { options: options ?? {} },
       fetchPolicy: 'network-only',
@@ -63,7 +58,7 @@ export class ApprovalService {
 
   async getApproval(id: string): Promise<ApprovalRequest | null> {
     const client = this.apolloService.getClient();
-    const result = await client.query<GetApprovalRequestQuery>({
+    const result = await client.query({
       query: GetApprovalRequestDocument,
       variables: { id },
       fetchPolicy: 'network-only',
@@ -79,7 +74,7 @@ export class ApprovalService {
     type?: string;
   }): Promise<ApprovalRequestList> {
     const client = this.apolloService.getClient();
-    const result = await client.query<GetMyApprovalRequestsQuery>({
+    const result = await client.query({
       query: GetMyApprovalRequestsDocument,
       variables: { options: options ?? {} },
       fetchPolicy: 'network-only',
@@ -98,7 +93,7 @@ export class ApprovalService {
     dueAt?: string;
   }): Promise<ApprovalRequest> {
     const client = this.apolloService.getClient();
-    const result = await client.mutate<CreateApprovalRequestMutation>({
+    const result = await client.mutate({
       mutation: CreateApprovalRequestDocument,
       variables: { input },
     });
@@ -117,7 +112,7 @@ export class ApprovalService {
     rejectionReasonCode?: string;
   }): Promise<ApprovalRequest> {
     const client = this.apolloService.getClient();
-    const result = await client.mutate<ReviewApprovalRequestMutation>({
+    const result = await client.mutate({
       mutation: ReviewApprovalRequestDocument,
       variables: { input },
     });

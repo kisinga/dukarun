@@ -227,28 +227,4 @@ export class ApolloService {
   async resetStore(): Promise<void> {
     await this.apolloClient.resetStore();
   }
-
-  /**
-   * Execute a GraphQL query
-   */
-  async query<T = any>(query: any, variables?: any, context?: any): Promise<{ data: T }> {
-    const result = await this.apolloClient.query<T>({
-      query,
-      variables,
-      context,
-    });
-    return { data: result.data as T };
-  }
-
-  /**
-   * Execute a GraphQL mutation
-   */
-  async mutate<T = any>(mutation: any, variables?: any, context?: any): Promise<{ data: T }> {
-    const result = await this.apolloClient.mutate<T>({
-      mutation,
-      variables,
-      context,
-    });
-    return { data: result.data as T };
-  }
 }

@@ -71,8 +71,7 @@ describe('Service Behavior Tests', () => {
 
     it('should provide data access services', () => {
       // Test: Apollo service should provide core functionality
-      expect(typeof apolloService.query).toBe('function');
-      expect(typeof apolloService.mutate).toBe('function');
+      expect(typeof apolloService.getClient).toBe('function');
     });
   });
 

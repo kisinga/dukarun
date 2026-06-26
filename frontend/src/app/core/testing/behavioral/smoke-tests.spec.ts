@@ -77,8 +77,7 @@ describe('Behavioral Smoke Tests', () => {
       // Smoke test: Can user access data?
       // This catches data access failures early
 
-      expect(typeof apolloService.query).toBe('function');
-      expect(typeof apolloService.mutate).toBe('function');
+      expect(typeof apolloService.getClient).toBe('function');
     });
   });
 

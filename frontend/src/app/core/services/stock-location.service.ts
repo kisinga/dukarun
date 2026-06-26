@@ -1,5 +1,4 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import type { GetStockLocationsQuery } from '../graphql/generated/graphql';
 import { GET_STOCK_LOCATIONS } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
 import { CashierSessionService } from './cashier-session/cashier-session.service';
@@ -99,7 +98,7 @@ export class StockLocationService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<GetStockLocationsQuery>({
+      const result = await client.query({
         query: GET_STOCK_LOCATIONS,
         fetchPolicy: 'network-only',
       });

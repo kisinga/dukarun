@@ -32,8 +32,8 @@ export class ExpenseService {
   ): Promise<RecordExpenseResult | null> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.mutate<{ recordExpense: RecordExpenseResult }>({
-        mutation: RECORD_EXPENSE as any,
+      const result = await client.mutate({
+        mutation: RECORD_EXPENSE,
         variables: {
           input: {
             amount: amountCents,

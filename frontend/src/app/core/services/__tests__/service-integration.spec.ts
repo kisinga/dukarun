@@ -94,8 +94,7 @@ describe('Service Integration', () => {
     });
 
     it('should provide data access services', () => {
-      expect(typeof apolloService.query).toBe('function');
-      expect(typeof apolloService.mutate).toBe('function');
+      expect(typeof apolloService.getClient).toBe('function');
     });
   });
 

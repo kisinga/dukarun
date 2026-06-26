@@ -352,7 +352,7 @@ export class ProfileComponent {
 
       const client = this.apolloService.getClient();
       await client.mutate({
-        mutation: UPDATE_ADMIN_PROFILE as any,
+        mutation: UPDATE_ADMIN_PROFILE,
         variables: { input },
       });
 

@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { SortOrder } from '../../graphql/generated/graphql';
 import {
   APPROVE_CUSTOMER_CREDIT,
   GET_CREDIT_SUMMARY,
@@ -8,7 +9,7 @@ import {
   VALIDATE_CREDIT,
 } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
-import { CreditCustomerSummary, CustomerRecord } from '../customer.service';
+import { CreditCustomerSummary } from '../customer.service';
 import { CustomerMapperService } from './customer-mapper.service';
 
 /**
@@ -40,7 +41,7 @@ export class CustomerCreditService {
     }
 
     const client = this.apolloService.getClient();
-    const result = await client.query<{ customers: { items: CustomerRecord[] } }>({
+    const result = await client.query({
       query: GET_CUSTOMERS,
       variables: {
         options: {
@@ -79,18 +80,7 @@ export class CustomerCreditService {
     const client = this.apolloService.getClient();
 
     try {
-      const result = await client.query<{
-        creditSummary: {
-          customerId: string;
-          isCreditApproved: boolean;
-          creditLimit: number;
-          outstandingAmount: number;
-          availableCredit: number;
-          lastRepaymentDate?: string | null;
-          lastRepaymentAmount: number;
-          creditDuration: number;
-        };
-      }>({
+      const result = await client.query({
         query: GET_CREDIT_SUMMARY,
         variables: { customerId },
         fetchPolicy: 'network-only',
@@ -140,15 +130,7 @@ export class CustomerCreditService {
 
     try {
       // Call backend validation (single source of truth)
-      const validationResult = await client.query<{
-        validateCredit: {
-          isValid: boolean;
-          error?: string | null;
-          availableCredit: number;
-          estimatedOrderTotal: number;
-          wouldExceedLimit: boolean;
-        };
-      }>({
+      const validationResult = await client.query({
         query: VALIDATE_CREDIT,
         variables: {
           input: {
@@ -188,14 +170,14 @@ export class CustomerCreditService {
 
   async listCreditCustomers(take = 200): Promise<CreditCustomerSummary[]> {
     const client = this.apolloService.getClient();
-    const result = await client.query<{ customers: { items: CustomerRecord[] } }>({
+    const result = await client.query({
       query: GET_CUSTOMERS,
       variables: {
         options: {
           take,
           skip: 0,
           sort: {
-            createdAt: 'DESC',
+            createdAt: SortOrder.DESC,
           },
         },
       },
@@ -217,18 +199,7 @@ export class CustomerCreditService {
   ): Promise<CreditCustomerSummary> {
     const client = this.apolloService.getClient();
     try {
-      const result = await client.mutate<{
-        approveCustomerCredit: {
-          customerId: string;
-          isCreditApproved: boolean;
-          creditLimit: number;
-          outstandingAmount: number;
-          availableCredit: number;
-          lastRepaymentDate?: string | null;
-          lastRepaymentAmount: number;
-          creditDuration: number;
-        };
-      }>({
+      const result = await client.mutate({
         mutation: APPROVE_CUSTOMER_CREDIT,
         variables: {
           input: {
@@ -282,18 +253,7 @@ export class CustomerCreditService {
     creditDuration?: number,
   ): Promise<CreditCustomerSummary> {
     const client = this.apolloService.getClient();
-    const result = await client.mutate<{
-      updateCustomerCreditLimit: {
-        customerId: string;
-        isCreditApproved: boolean;
-        creditLimit: number;
-        outstandingAmount: number;
-        availableCredit: number;
-        lastRepaymentDate?: string | null;
-        lastRepaymentAmount: number;
-        creditDuration: number;
-      };
-    }>({
+    const result = await client.mutate({
       mutation: UPDATE_CUSTOMER_CREDIT_LIMIT,
       variables: {
         input: {
@@ -336,18 +296,7 @@ export class CustomerCreditService {
     base?: Partial<CreditCustomerSummary>,
   ): Promise<CreditCustomerSummary> {
     const client = this.apolloService.getClient();
-    const result = await client.mutate<{
-      updateCreditDuration: {
-        customerId: string;
-        isCreditApproved: boolean;
-        creditLimit: number;
-        outstandingAmount: number;
-        availableCredit: number;
-        lastRepaymentDate?: string | null;
-        lastRepaymentAmount: number;
-        creditDuration: number;
-      };
-    }>({
+    const result = await client.mutate({
       mutation: UPDATE_CREDIT_DURATION,
       variables: {
         input: {

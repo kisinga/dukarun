@@ -1,10 +1,5 @@
 import { inject, Injectable, signal } from '@angular/core';
-import type { DocumentNode } from 'graphql';
-import type {
-  GetOrdersQuery,
-  GetOrdersQueryVariables,
-  OrderListOptions,
-} from '../../graphql/generated/graphql';
+import type { OrderListOptions } from '../../graphql/generated/graphql';
 import { GET_ORDERS, SEND_CUSTOMER_STATEMENT_EMAIL } from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { CustomerService } from '../customer.service';
@@ -43,7 +38,7 @@ export class CustomerStatementService {
         return;
       }
       const client = this.apollo.getClient();
-      const result = await client.query<GetOrdersQuery, GetOrdersQueryVariables>({
+      const result = await client.query({
         query: GET_ORDERS,
         variables: {
           options: {
@@ -68,8 +63,8 @@ export class CustomerStatementService {
   async sendStatementEmail(customerId: string): Promise<boolean> {
     try {
       const client = this.apollo.getClient();
-      const result = await client.mutate<{ sendCustomerStatementEmail: boolean }>({
-        mutation: SEND_CUSTOMER_STATEMENT_EMAIL as DocumentNode,
+      const result = await client.mutate({
+        mutation: SEND_CUSTOMER_STATEMENT_EMAIL,
         variables: { customerId },
       });
       return result.data?.sendCustomerStatementEmail ?? false;

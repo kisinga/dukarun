@@ -1,14 +1,18 @@
-// Apollo Client 4.2+ requires application-wide `defaultOptions` values to be
-// registered here for type safety — otherwise it brands any undeclared value
-// (e.g. `errorPolicy: 'all'`) and the config in core/services/apollo.service.ts
-// fails to compile.
+// Apollo Client 4.2+ type configuration for this app.
 //
-// The declarations are intentionally OPTIONAL (`errorPolicy?`). Declaring them
-// as required would make `defaultOptions` mandatory on every `new ApolloClient`
-// call (breaking constructions that omit it, e.g. the test mock) and would flip
-// all methods/hooks to the "modern" signature, which forbids the manually-passed
-// generics this codebase uses at ~140 call sites. Optional declarations remove
-// the brand while preserving the classic, pre-4.2 typing the codebase relies on.
+// 1) defaultOptions registration: ApolloService sets `errorPolicy: 'all'` as the
+//    default for watchQuery/query/mutate. AC 4.2 brands undeclared default-option
+//    values, so they must be registered in `DeclareDefaultOptions` for the config
+//    in core/services/apollo.service.ts to type-check. They are declared OPTIONAL
+//    so `defaultOptions` stays optional on `new ApolloClient` (the test mock omits
+//    it) while still removing the brand.
+//
+// 2) signatureStyle: 'modern' — query/mutate/watchQuery infer Data/Variables from
+//    the TypedDocumentNode and FORBID manually-passed generics. Every call site was
+//    migrated to inference, so this ENFORCES it: a manual generic (e.g.
+//    `client.query<X>(...)`) or a document cast that strips typing is now a compile
+//    error, preventing regressions. Under modern signatures `result.data` is
+//    accurately typed `TData | undefined` (because the default errorPolicy is 'all').
 import '@apollo/client';
 
 declare module '@apollo/client' {
@@ -24,5 +28,9 @@ declare module '@apollo/client' {
         errorPolicy?: 'all';
       }
     }
+  }
+
+  interface TypeOverrides {
+    signatureStyle: 'modern';
   }
 }

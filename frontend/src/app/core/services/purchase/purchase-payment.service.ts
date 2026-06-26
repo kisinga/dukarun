@@ -7,6 +7,12 @@ import {
   UPDATE_SUPPLIER_CREDIT_LIMIT,
   UPDATE_SUPPLIER_CREDIT_DURATION,
 } from '../../graphql/operations.graphql';
+import type {
+  ApproveSupplierCreditInput,
+  PaySinglePurchaseInput,
+  SupplierPaymentAllocationInput,
+  UpdateSupplierCreditLimitInput,
+} from '../../graphql/generated/graphql';
 import { ApolloService } from '../apollo.service';
 
 export interface PaySinglePurchaseResult {
@@ -60,12 +66,12 @@ export class PurchasePaymentService {
   ): Promise<PaySinglePurchaseResult | null> {
     try {
       const client = this.apolloService.getClient();
-      const input: Record<string, unknown> = { purchaseId };
-      if (paymentAmount !== undefined) input['paymentAmount'] = paymentAmount;
-      if (debitAccountCode) input['debitAccountCode'] = debitAccountCode;
+      const input: PaySinglePurchaseInput = { purchaseId };
+      if (paymentAmount !== undefined) input.paymentAmount = paymentAmount;
+      if (debitAccountCode) input.debitAccountCode = debitAccountCode;
 
-      const result = await client.mutate<{ paySinglePurchase: PaySinglePurchaseResult }>({
-        mutation: PAY_SINGLE_PURCHASE as any,
+      const result = await client.mutate({
+        mutation: PAY_SINGLE_PURCHASE,
         variables: { input },
       });
 
@@ -89,8 +95,8 @@ export class PurchasePaymentService {
   async getSupplierCreditSummary(supplierId: string): Promise<SupplierCreditSummary | null> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<{ supplierCreditSummary: SupplierCreditSummary }>({
-        query: GET_SUPPLIER_CREDIT_SUMMARY as any,
+      const result = await client.query({
+        query: GET_SUPPLIER_CREDIT_SUMMARY,
         variables: { supplierId },
       });
 
@@ -123,14 +129,12 @@ export class PurchasePaymentService {
   ): Promise<AllocateBulkSupplierPaymentResult | null> {
     try {
       const client = this.apolloService.getClient();
-      const input: Record<string, unknown> = { supplierId, paymentAmount };
-      if (purchaseIds?.length) input['purchaseIds'] = purchaseIds;
-      if (debitAccountCode) input['debitAccountCode'] = debitAccountCode;
+      const input: SupplierPaymentAllocationInput = { supplierId, paymentAmount };
+      if (purchaseIds?.length) input.purchaseIds = purchaseIds;
+      if (debitAccountCode) input.debitAccountCode = debitAccountCode;
 
-      const result = await client.mutate<{
-        allocateBulkSupplierPayment: AllocateBulkSupplierPaymentResult;
-      }>({
-        mutation: ALLOCATE_BULK_SUPPLIER_PAYMENT as any,
+      const result = await client.mutate({
+        mutation: ALLOCATE_BULK_SUPPLIER_PAYMENT,
         variables: { input },
       });
 
@@ -159,13 +163,13 @@ export class PurchasePaymentService {
   ): Promise<SupplierCreditSummary | null> {
     try {
       const client = this.apolloService.getClient();
-      const input: Record<string, unknown> = { supplierId, approved };
-      if (supplierCreditLimit !== undefined) input['supplierCreditLimit'] = supplierCreditLimit;
+      const input: ApproveSupplierCreditInput = { supplierId, approved };
+      if (supplierCreditLimit !== undefined) input.supplierCreditLimit = supplierCreditLimit;
       if (supplierCreditDuration !== undefined)
-        input['supplierCreditDuration'] = supplierCreditDuration;
+        input.supplierCreditDuration = supplierCreditDuration;
 
-      const result = await client.mutate<{ approveSupplierCredit: SupplierCreditSummary }>({
-        mutation: APPROVE_SUPPLIER_CREDIT as any,
+      const result = await client.mutate({
+        mutation: APPROVE_SUPPLIER_CREDIT,
         variables: { input },
       });
 
@@ -190,12 +194,12 @@ export class PurchasePaymentService {
   ): Promise<SupplierCreditSummary | null> {
     try {
       const client = this.apolloService.getClient();
-      const input: Record<string, unknown> = { supplierId, supplierCreditLimit };
+      const input: UpdateSupplierCreditLimitInput = { supplierId, supplierCreditLimit };
       if (supplierCreditDuration !== undefined)
-        input['supplierCreditDuration'] = supplierCreditDuration;
+        input.supplierCreditDuration = supplierCreditDuration;
 
-      const result = await client.mutate<{ updateSupplierCreditLimit: SupplierCreditSummary }>({
-        mutation: UPDATE_SUPPLIER_CREDIT_LIMIT as any,
+      const result = await client.mutate({
+        mutation: UPDATE_SUPPLIER_CREDIT_LIMIT,
         variables: { input },
       });
 
@@ -219,10 +223,8 @@ export class PurchasePaymentService {
   ): Promise<SupplierCreditSummary | null> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.mutate<{
-        updateSupplierCreditDuration: SupplierCreditSummary;
-      }>({
-        mutation: UPDATE_SUPPLIER_CREDIT_DURATION as any,
+      const result = await client.mutate({
+        mutation: UPDATE_SUPPLIER_CREDIT_DURATION,
         variables: { input: { supplierId, supplierCreditDuration } },
       });
 

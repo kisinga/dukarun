@@ -53,8 +53,8 @@ export class ProductOptionService {
       });
 
       // Create option group WITH options (required by Vendure)
-      const result = await client.mutate<any>({
-        mutation: CREATE_PRODUCT_OPTION_GROUP as any,
+      const result = await client.mutate({
+        mutation: CREATE_PRODUCT_OPTION_GROUP,
         variables: {
           input: {
             code: optionGroupCode,
@@ -97,7 +97,7 @@ export class ProductOptionService {
 
       // Add the option group to the product
       const addResult = await client.mutate({
-        mutation: ADD_OPTION_GROUP_TO_PRODUCT as any,
+        mutation: ADD_OPTION_GROUP_TO_PRODUCT,
         variables: {
           productId,
           optionGroupId: optionGroup.id,

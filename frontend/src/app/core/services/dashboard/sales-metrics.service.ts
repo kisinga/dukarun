@@ -29,21 +29,8 @@ export class SalesMetricsService {
 
     try {
       // Fetch dashboard stats from ledger (all periods calculated server-side)
-      const result = await client.query<{
-        dashboardStats: {
-          sales: {
-            today: number;
-            week: number;
-            month: number;
-            accounts: Array<{
-              label: string;
-              value: number;
-              icon: string;
-            }>;
-          };
-        };
-      }>({
-        query: GET_DASHBOARD_STATS as import('graphql').DocumentNode,
+      const result = await client.query({
+        query: GET_DASHBOARD_STATS,
         fetchPolicy: 'network-only', // Always fetch fresh data from ledger
       });
 

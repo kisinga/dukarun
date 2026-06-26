@@ -105,7 +105,7 @@ export class CustomerSearchService implements CacheSyncEntityHandler {
     const fetchPolicy = 'network-only' as FetchPolicy;
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<any>({
+      const result = await client.query({
         query: GET_CUSTOMERS,
         variables: {
           options: options || {
@@ -154,7 +154,7 @@ export class CustomerSearchService implements CacheSyncEntityHandler {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<any>({
+      const result = await client.query({
         query: GET_CUSTOMERS,
         variables: {
           options: {
@@ -192,7 +192,7 @@ export class CustomerSearchService implements CacheSyncEntityHandler {
       const normalizedPhone = formatPhoneNumber(phone);
 
       const client = this.apolloService.getClient();
-      const result = await client.query<any>({
+      const result = await client.query({
         query: GET_CUSTOMERS,
         variables: {
           options: {

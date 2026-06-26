@@ -1,11 +1,5 @@
 import { inject, Injectable, signal } from '@angular/core';
-import type {
-  GetOrdersQuery,
-  GetOrdersQueryVariables,
-  GetOrderFullQuery,
-  GetOrderFullQueryVariables,
-  OrderListOptions,
-} from '../graphql/generated/graphql';
+import type { OrderListOptions } from '../graphql/generated/graphql';
 import { GetOrderFullDocument } from '../graphql/generated/graphql';
 import { GET_ORDERS, ORDER_PAYMENT_STATUS } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
@@ -77,7 +71,7 @@ export class OrdersService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<GetOrdersQuery, GetOrdersQueryVariables>({
+      const result = await client.query({
         query: GET_ORDERS,
         variables: {
           options: resolved,
@@ -110,7 +104,7 @@ export class OrdersService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<GetOrderFullQuery, GetOrderFullQueryVariables>({
+      const result = await client.query({
         query: GetOrderFullDocument,
         variables: { id },
         fetchPolicy: 'network-only',
@@ -145,10 +139,8 @@ export class OrdersService {
   async getOrderPaymentStatus(orderId: string): Promise<OrderPaymentStatusResult | null> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<{
-        orderPaymentStatus: OrderPaymentStatusResult;
-      }>({
-        query: ORDER_PAYMENT_STATUS as any,
+      const result = await client.query({
+        query: ORDER_PAYMENT_STATUS,
         variables: { orderId },
         fetchPolicy: 'network-only',
       });
@@ -189,7 +181,7 @@ export class OrdersService {
       // if there are fewer than 10000, or at least the first 10000 if there are more
       const take = totalItems > 0 ? Math.min(totalItems, 10000) : 10000;
 
-      const result = await client.query<GetOrdersQuery, GetOrdersQueryVariables>({
+      const result = await client.query({
         query: GET_ORDERS,
         variables: {
           options: {

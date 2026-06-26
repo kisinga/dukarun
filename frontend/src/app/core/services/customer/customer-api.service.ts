@@ -42,7 +42,7 @@ export class CustomerApiService {
 
       // Check for existing customer by phone number to prevent duplicates
       if (normalizedPhone) {
-        const existingResult = await client.query<any>({
+        const existingResult = await client.query({
           query: GET_CUSTOMERS,
           variables: {
             options: {
@@ -62,7 +62,7 @@ export class CustomerApiService {
           console.log('✅ Found existing customer by phone:', existing.id);
 
           // Fetch full customer data including all custom fields
-          const fullCustomerResult = await client.query<any>({
+          const fullCustomerResult = await client.query({
             query: GET_CUSTOMER,
             variables: { id: existing.id },
             fetchPolicy: 'network-only',
@@ -103,17 +103,17 @@ export class CustomerApiService {
           });
 
           // Use UPDATE_CUSTOMER to update customer fields (preserving supplier fields)
-          const updateResult = await client.mutate<any>({
+          const updateResult = await client.mutate({
             mutation: UPDATE_CUSTOMER,
             variables: { input: updateInput },
           });
 
           const updated = updateResult.data?.updateCustomer;
-          if (updated?.id) {
+          if (updated?.__typename === 'Customer') {
             console.log('✅ Customer fields updated:', updated.id);
             this.stateService.setIsCreating(false);
             return updated.id;
-          } else if (updated?.errorCode) {
+          } else if (updated?.__typename === 'EmailAddressConflictError') {
             this.stateService.setError(updated.message || 'Failed to update customer');
             return null;
           } else {
@@ -159,18 +159,15 @@ export class CustomerApiService {
         normalizedInput.customFields = customFields;
       }
 
-      const result = await client.mutate<any>({
+      const result = await client.mutate({
         mutation: CREATE_CUSTOMER,
         variables: { input: normalizedInput },
       });
 
       const customer = result.data?.createCustomerSafe;
-      if (customer?.id) {
+      if (customer?.__typename === 'Customer') {
         console.log('✅ Customer created:', customer.id);
         return customer.id;
-      } else if (customer?.errorCode) {
-        this.stateService.setError(customer.message || 'Failed to create customer');
-        return null;
       } else {
         this.stateService.setError('Failed to create customer');
         return null;
@@ -207,7 +204,7 @@ export class CustomerApiService {
         return { exists: false, isSupplier: false };
       }
 
-      const result = await client.query<any>({
+      const result = await client.query({
         query: GET_CUSTOMERS,
         variables: {
           options: {
@@ -248,7 +245,7 @@ export class CustomerApiService {
   async getCustomerById(id: string): Promise<any | null> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<any>({
+      const result = await client.query({
         query: GET_CUSTOMER,
         variables: { id },
         fetchPolicy: 'network-only',
@@ -291,16 +288,16 @@ export class CustomerApiService {
             : undefined,
       };
 
-      const result = await client.mutate<any>({
+      const result = await client.mutate({
         mutation: UPDATE_CUSTOMER,
         variables: { input: mutationInput },
       });
 
       const customer = result.data?.updateCustomer;
-      if (customer?.id) {
+      if (customer?.__typename === 'Customer') {
         console.log('✅ Customer updated:', customer.id);
         return true;
-      } else if (customer?.errorCode) {
+      } else if (customer?.__typename === 'EmailAddressConflictError') {
         this.stateService.setError(customer.message || 'Failed to update customer');
         return false;
       } else {
@@ -324,7 +321,7 @@ export class CustomerApiService {
       console.log('🗑️ Deleting customer:', customerId);
       const client = this.apolloService.getClient();
 
-      const result = await client.mutate<any>({
+      const result = await client.mutate({
         mutation: DELETE_CUSTOMER,
         variables: { id: customerId },
       });

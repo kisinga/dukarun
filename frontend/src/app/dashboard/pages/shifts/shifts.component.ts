@@ -236,7 +236,7 @@ export class ShiftsComponent implements OnInit {
   }
 
   /** Format amount in cents for display (e.g. "12345" → "123.45"). */
-  formatCents(cents: string | null): string {
+  formatCents(cents: string | null | undefined): string {
     if (cents == null) return '–';
     const n = parseInt(cents, 10);
     if (Number.isNaN(n)) return cents;

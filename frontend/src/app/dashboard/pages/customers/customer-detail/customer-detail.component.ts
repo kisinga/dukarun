@@ -16,11 +16,7 @@ import type { CreditCustomerSummary } from '../../../../core/services/customer.s
 import { CustomerCreditService } from '../../../../core/services/customer/customer-credit.service';
 import { CustomerSearchService } from '../../../../core/services/customer/customer-search.service';
 import { AuthPermissionsService } from '../../../../core/services/auth/auth-permissions.service';
-import type {
-  GetOrdersQuery,
-  GetOrdersQueryVariables,
-  OrderListOptions,
-} from '../../../../core/graphql/generated/graphql';
+import type { OrderListOptions } from '../../../../core/graphql/generated/graphql';
 import { GET_ORDERS } from '../../../../core/graphql/operations.graphql';
 import { ApolloService } from '../../../../core/services/apollo.service';
 import { OrderStateBadgeComponent } from '../../orders/components/order-state-badge.component';
@@ -172,7 +168,7 @@ export class CustomerDetailComponent implements OnInit {
   private async loadRecentOrders(customerId: string): Promise<any[]> {
     try {
       const client = this.apollo.getClient();
-      const result = await client.query<GetOrdersQuery, GetOrdersQueryVariables>({
+      const result = await client.query({
         query: GET_ORDERS,
         variables: {
           options: {

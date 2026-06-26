@@ -412,10 +412,10 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
     try {
       const client = this.apollo.getClient();
       const result = await client.mutate({
-        mutation: REVERSE_PAYMENT as import('graphql').DocumentNode,
+        mutation: REVERSE_PAYMENT,
         variables: { paymentId },
       });
-      const data = (result.data as any)?.reversePayment;
+      const data = result.data?.reversePayment;
       if (data) {
         const msg = data.orderNowUnderpaid
           ? 'Payment reversed. Order now has an outstanding balance.'

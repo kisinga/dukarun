@@ -23,7 +23,7 @@ export class ProductValidationService {
   async checkSKUExists(sku: string): Promise<boolean> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<any>({
+      const result = await client.query({
         query: CHECK_SKU_EXISTS,
         variables: { sku },
         fetchPolicy: 'network-only',
@@ -52,8 +52,8 @@ export class ProductValidationService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<any>({
-        query: CHECK_BARCODE_EXISTS as any,
+      const result = await client.query({
+        query: CHECK_BARCODE_EXISTS,
         variables: { barcode: barcode.trim() },
         fetchPolicy: 'network-only',
       });

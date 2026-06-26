@@ -187,7 +187,7 @@ export class BalanceOverrideModalComponent {
     try {
       const client = this.apollo.getClient();
       const result = await client.mutate({
-        mutation: OVERRIDE_CUSTOMER_BALANCE as import('graphql').DocumentNode,
+        mutation: OVERRIDE_CUSTOMER_BALANCE,
         variables: {
           input: {
             customerId: d.customerId,
@@ -197,7 +197,7 @@ export class BalanceOverrideModalComponent {
         },
       });
 
-      const data = (result.data as any)?.overrideCustomerBalance;
+      const data = result.data?.overrideCustomerBalance;
       if (data) {
         this.successResult.set({
           previousBalance: data.previousBalance,

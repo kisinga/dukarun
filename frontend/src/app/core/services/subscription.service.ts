@@ -1,12 +1,4 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import type {
-  GetSubscriptionTiersQuery,
-  GetChannelSubscriptionQuery,
-  CheckSubscriptionStatusQuery,
-  InitiateSubscriptionPurchaseMutation,
-  VerifySubscriptionPaymentMutation,
-  CancelSubscriptionMutation,
-} from '../graphql/generated/graphql';
 import {
   GET_SUBSCRIPTION_TIERS,
   GET_CHANNEL_SUBSCRIPTION,
@@ -112,7 +104,7 @@ export class SubscriptionService {
       this.errorSignal.set(null);
 
       const client = this.apolloService.getClient();
-      const result = await client.query<GetSubscriptionTiersQuery>({
+      const result = await client.query({
         query: GET_SUBSCRIPTION_TIERS,
         fetchPolicy: 'network-only',
       });
@@ -145,7 +137,7 @@ export class SubscriptionService {
       }
 
       const client = this.apolloService.getClient();
-      const result = await client.query<GetChannelSubscriptionQuery>({
+      const result = await client.query({
         query: GET_CHANNEL_SUBSCRIPTION,
         variables: { channelId: targetChannelId },
         fetchPolicy: 'network-only',
@@ -187,7 +179,7 @@ export class SubscriptionService {
       this.errorSignal.set(null);
 
       const client = this.apolloService.getClient();
-      const result = await client.query<CheckSubscriptionStatusQuery>({
+      const result = await client.query({
         query: CHECK_SUBSCRIPTION_STATUS,
         variables: { channelId: targetChannelId },
         fetchPolicy: 'network-only',
@@ -304,7 +296,7 @@ export class SubscriptionService {
 
       console.log('[SubscriptionService] Calling GraphQL with valid tierId:', tierIdStr);
       const client = this.apolloService.getClient();
-      const result = await client.mutate<InitiateSubscriptionPurchaseMutation>({
+      const result = await client.mutate({
         mutation: INITIATE_SUBSCRIPTION_PURCHASE,
         variables: {
           channelId,
@@ -351,7 +343,7 @@ export class SubscriptionService {
       }
 
       const client = this.apolloService.getClient();
-      const result = await client.mutate<VerifySubscriptionPaymentMutation>({
+      const result = await client.mutate({
         mutation: VERIFY_SUBSCRIPTION_PAYMENT,
         variables: {
           channelId,
@@ -395,7 +387,7 @@ export class SubscriptionService {
       }
 
       const client = this.apolloService.getClient();
-      const result = await client.mutate<CancelSubscriptionMutation>({
+      const result = await client.mutate({
         mutation: CANCEL_SUBSCRIPTION,
         variables: {
           channelId: targetChannelId,

@@ -1,6 +1,5 @@
 import { inject, Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
-import type { GetOrderFullQuery, GetOrderFullQueryVariables } from '../graphql/generated/graphql';
 import { GetOrderFullDocument } from '../graphql/generated/graphql';
 import { CacheSyncService } from './cache/cache-sync.service';
 import type { CacheSyncEntityHandler } from './cache/cache-sync-handler.interface';
@@ -51,7 +50,7 @@ export class OrderCacheService implements CacheSyncEntityHandler {
     if (this.companyService.activeCompanyId() !== channelId) return;
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<GetOrderFullQuery, GetOrderFullQueryVariables>({
+      const result = await client.query({
         query: GetOrderFullDocument,
         variables: { id },
         fetchPolicy: 'network-only',

@@ -101,7 +101,7 @@ export class AssetUploadService {
 
     const client = this.apolloService.getClient();
     await client.mutate({
-      mutation: ASSIGN_ASSETS_TO_CHANNEL as any,
+      mutation: ASSIGN_ASSETS_TO_CHANNEL,
       variables: {
         assetIds: assets.map((a) => a.id),
         channelId: channel.id,
