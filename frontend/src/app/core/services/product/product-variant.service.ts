@@ -1,10 +1,4 @@
 import { inject, Injectable } from '@angular/core';
-import type {
-  CreateProductVariantsMutation,
-  CreateProductVariantsMutationVariables,
-  UpdateProductVariantMutation,
-  UpdateProductVariantMutationVariables,
-} from '../../graphql/generated/graphql';
 import {
   CREATE_PRODUCT_VARIANTS,
   DELETE_PRODUCT_VARIANTS,
@@ -105,10 +99,7 @@ export class ProductVariantService {
         console.log(`🔧 Creating variant ${i + 1}/${variants.length}:`, v.sku);
         console.log(`🔧 Variant input data:`, JSON.stringify(input, null, 2));
 
-        const result = await client.mutate<
-          CreateProductVariantsMutation,
-          CreateProductVariantsMutationVariables
-        >({
+        const result = await client.mutate({
           mutation: CREATE_PRODUCT_VARIANTS,
           variables: { input: [input] }, // Send as single-item array
         });
@@ -160,10 +151,8 @@ export class ProductVariantService {
     if (variantIds.length === 0) return true;
     try {
       const client = this.apolloService.getClient();
-      const result = await client.mutate<{
-        deleteProductVariants: Array<{ result: string; message?: string | null }>;
-      }>({
-        mutation: DELETE_PRODUCT_VARIANTS as any,
+      const result = await client.mutate({
+        mutation: DELETE_PRODUCT_VARIANTS,
         variables: { ids: variantIds },
       });
       if (result.error) {
@@ -201,10 +190,7 @@ export class ProductVariantService {
       const client = this.apolloService.getClient();
 
       for (const variant of variants) {
-        const result = await client.mutate<
-          UpdateProductVariantMutation,
-          UpdateProductVariantMutationVariables
-        >({
+        const result = await client.mutate({
           mutation: UPDATE_PRODUCT_VARIANT,
           variables: {
             input: {
@@ -266,10 +252,7 @@ export class ProductVariantService {
           };
         }
 
-        const result = await client.mutate<
-          UpdateProductVariantMutation,
-          UpdateProductVariantMutationVariables
-        >({
+        const result = await client.mutate({
           mutation: UPDATE_PRODUCT_VARIANT,
           variables: {
             input,

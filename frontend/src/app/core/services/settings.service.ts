@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, from } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import type { GetAuditLogsQuery, GetAuditLogsQueryVariables } from '../graphql/generated/graphql';
+import type { GetAuditLogsQueryVariables } from '../graphql/generated/graphql';
 import { LanguageCode } from '../graphql/generated/graphql';
 import {
   CREATE_CHANNEL_PAYMENT_METHOD,
@@ -154,11 +154,11 @@ export class SettingsService {
     try {
       const client = this.apolloService.getClient();
       const result = await client.mutate({
-        mutation: UPDATE_CHANNEL_LOGO as any,
+        mutation: UPDATE_CHANNEL_LOGO,
         variables: { logoAssetId },
       });
 
-      if ((result.data as any)?.updateChannelLogo) {
+      if (result.data?.updateChannelLogo) {
         await this.companyService.fetchActiveChannel();
       }
     } catch (err) {
@@ -179,11 +179,11 @@ export class SettingsService {
     try {
       const client = this.apolloService.getClient();
       const result = await client.mutate({
-        mutation: UPDATE_CASHIER_SETTINGS as any,
+        mutation: UPDATE_CASHIER_SETTINGS,
         variables: { cashierFlowEnabled },
       });
 
-      if ((result.data as any)?.updateCashierSettings) {
+      if (result.data?.updateCashierSettings) {
         await this.companyService.fetchActiveChannel();
       }
     } catch (err) {
@@ -204,11 +204,11 @@ export class SettingsService {
     try {
       const client = this.apolloService.getClient();
       const result = await client.mutate({
-        mutation: UPDATE_PRINTER_SETTINGS as any,
+        mutation: UPDATE_PRINTER_SETTINGS,
         variables: { enablePrinter },
       });
 
-      if ((result.data as any)?.updatePrinterSettings) {
+      if (result.data?.updatePrinterSettings) {
         await this.companyService.fetchActiveChannel();
       }
     } catch (err) {
@@ -356,7 +356,7 @@ export class SettingsService {
       },
     };
 
-    const queryPromise = client.query<GetAuditLogsQuery>({
+    const queryPromise = client.query({
       query: GET_AUDIT_LOGS,
       variables,
       fetchPolicy: 'network-only',

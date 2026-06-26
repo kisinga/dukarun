@@ -1,30 +1,13 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { ApolloService } from '../apollo.service';
 import { map, catchError, of, from } from 'rxjs';
-import { gql } from '@apollo/client/core';
 import {
   GetLedgerAccountsDocument,
   GetJournalEntriesDocument,
   GetJournalEntryDocument,
   CreateInterAccountTransferDocument,
+  GetEligibleDebitAccountsDocument,
 } from '../../graphql/generated/graphql';
-
-const GetEligibleDebitAccountsDocument = gql`
-  query GetEligibleDebitAccounts {
-    eligibleDebitAccounts {
-      items {
-        id
-        code
-        name
-        type
-        isActive
-        balance
-        parentAccountId
-        isParent
-      }
-    }
-  }
-`;
 
 export interface LedgerAccount {
   id: string;
@@ -94,7 +77,7 @@ export class LedgerService {
   loadEligibleDebitAccounts() {
     this.error.set(null);
     const client = this.apolloService.getClient();
-    const queryPromise = client.query<{ eligibleDebitAccounts: { items: LedgerAccount[] } }>({
+    const queryPromise = client.query({
       query: GetEligibleDebitAccountsDocument,
       fetchPolicy: 'network-only',
     });
@@ -119,7 +102,7 @@ export class LedgerService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const queryPromise = client.query<{ ledgerAccounts: { items: LedgerAccount[] } }>({
+    const queryPromise = client.query({
       query: GetLedgerAccountsDocument,
       fetchPolicy: 'network-only',
     });
@@ -145,9 +128,7 @@ export class LedgerService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const queryPromise = client.query<{
-      journalEntries: { items: JournalEntry[]; totalItems: number };
-    }>({
+    const queryPromise = client.query({
       query: GetJournalEntriesDocument,
       variables: { options },
       fetchPolicy: 'network-only',
@@ -175,7 +156,7 @@ export class LedgerService {
 
   getJournalEntry(id: string) {
     const client = this.apolloService.getClient();
-    const queryPromise = client.query<{ journalEntry: JournalEntry | null }>({
+    const queryPromise = client.query({
       query: GetJournalEntryDocument,
       variables: { id },
       fetchPolicy: 'network-only',

@@ -4,6 +4,11 @@ import {
   PAY_SINGLE_ORDER,
   RECORD_PAYMENT,
 } from '../../graphql/operations.graphql';
+import type {
+  PaymentAllocationInput,
+  PaySingleOrderInput,
+  RecordPaymentInput,
+} from '../../graphql/generated/graphql';
 import { ApolloService } from '../apollo.service';
 import { CustomerStateService } from './customer-state.service';
 
@@ -39,22 +44,16 @@ export class CustomerPaymentService {
     this.stateService.setError(null);
     try {
       const client = this.apolloService.getClient();
-      const input: Record<string, unknown> = {
+      const input: RecordPaymentInput = {
         customerId: params.customerId,
         paymentAmount: params.paymentAmount,
         paymentMethodCode: params.paymentMethodCode,
       };
-      if (params.referenceNumber != null) input['referenceNumber'] = params.referenceNumber;
-      if (params.orderId != null) input['orderId'] = params.orderId;
+      if (params.referenceNumber != null) input.referenceNumber = params.referenceNumber;
+      if (params.orderId != null) input.orderId = params.orderId;
 
-      const result = await client.mutate<{
-        recordPayment: {
-          ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
-          remainingBalance: number;
-          totalAllocated: number;
-        };
-      }>({
-        mutation: RECORD_PAYMENT as any,
+      const result = await client.mutate({
+        mutation: RECORD_PAYMENT,
         variables: { input },
       });
 
@@ -98,7 +97,7 @@ export class CustomerPaymentService {
     try {
       const client = this.apolloService.getClient();
 
-      const input: any = {
+      const input: PaymentAllocationInput = {
         customerId,
         paymentAmount,
       };
@@ -107,13 +106,7 @@ export class CustomerPaymentService {
         input.orderIds = orderIds;
       }
 
-      const result = await client.mutate<{
-        allocateBulkPayment: {
-          ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
-          remainingBalance: number;
-          totalAllocated: number;
-        };
-      }>({
+      const result = await client.mutate({
         mutation: ALLOCATE_BULK_PAYMENT,
         variables: { input },
       });
@@ -176,34 +169,28 @@ export class CustomerPaymentService {
     try {
       const client = this.apolloService.getClient();
 
-      const input: Record<string, unknown> = {
+      const input: PaySingleOrderInput = {
         orderId,
       };
 
       if (paymentAmount !== undefined) {
-        input['paymentAmount'] = paymentAmount;
+        input.paymentAmount = paymentAmount;
       }
 
       if (paymentMethodCode) {
-        input['paymentMethodCode'] = paymentMethodCode;
+        input.paymentMethodCode = paymentMethodCode;
       }
 
       if (referenceNumber) {
-        input['referenceNumber'] = referenceNumber;
+        input.referenceNumber = referenceNumber;
       }
 
       if (debitAccountCode) {
-        input['debitAccountCode'] = debitAccountCode;
+        input.debitAccountCode = debitAccountCode;
       }
 
-      const result = await client.mutate<{
-        paySingleOrder: {
-          ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
-          remainingBalance: number;
-          totalAllocated: number;
-        };
-      }>({
-        mutation: PAY_SINGLE_ORDER as any,
+      const result = await client.mutate({
+        mutation: PAY_SINGLE_ORDER,
         variables: { input },
       });
 

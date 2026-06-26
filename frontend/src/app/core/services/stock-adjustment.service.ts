@@ -198,7 +198,7 @@ export class StockAdjustmentService {
   async getStockLevelForLocation(variantId: string, locationId: string): Promise<number | null> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<any>({
+      const result = await client.query({
         query: GetVariantStockLevelDocument,
         variables: { variantId },
         fetchPolicy: 'network-only',

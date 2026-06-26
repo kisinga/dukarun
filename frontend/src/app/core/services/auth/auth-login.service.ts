@@ -1,10 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { LOGIN, LOGOUT } from '../../graphql/operations.graphql';
-import type {
-  LoginMutation,
-  LoginMutationVariables,
-  LogoutMutation,
-} from '../../models/user.model';
+import type { LoginMutation, LoginMutationVariables } from '../../models/user.model';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 import { ApolloService } from '../apollo.service';
 import { AppInitService } from '../app-init.service';
@@ -70,7 +66,7 @@ export class AuthLoginService {
       // Ensure phone number is normalized for login (must match format used during OTP verification)
       const normalizedPhone = formatPhoneNumber(phoneNumber);
 
-      const loginResult = await client.mutate<LoginMutation, LoginMutationVariables>({
+      const loginResult = await client.mutate({
         mutation: LOGIN,
         variables: {
           username: normalizedPhone,
@@ -115,7 +111,7 @@ export class AuthLoginService {
   async login(credentials: LoginMutationVariables): Promise<LoginMutation['login']> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.mutate<LoginMutation, LoginMutationVariables>({
+      const result = await client.mutate({
         mutation: LOGIN,
         variables: credentials,
         context: { skipChannelToken: true },
@@ -151,7 +147,7 @@ export class AuthLoginService {
   async logout(): Promise<void> {
     try {
       const client = this.apolloService.getClient();
-      await client.mutate<LogoutMutation>({
+      await client.mutate({
         mutation: LOGOUT,
         context: { skipChannelToken: true },
       });

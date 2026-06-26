@@ -15,9 +15,9 @@ export type CashCountType = 'opening' | 'interim' | 'closing';
 
 export interface CashDrawerCount {
   id: string;
-  channelId: number;
+  channelId?: number;
   sessionId: string;
-  countType: CashCountType;
+  countType: string; // wire scalar is String; CashCountType is the enum for the recordCashCount input
   takenAt: string;
   declaredCash: string;
   expectedCash?: string | null; // Hidden from cashiers
@@ -37,14 +37,14 @@ export interface CashCountResult {
 
 export interface MpesaVerification {
   id: string;
-  channelId: number;
+  channelId?: number;
   sessionId: string;
   verifiedAt: string;
   transactionCount: number;
   allConfirmed: boolean;
   flaggedTransactionIds?: string[] | null;
   notes?: string | null;
-  verifiedByUserId: number;
+  verifiedByUserId?: number;
 }
 
 /**
@@ -91,8 +91,8 @@ export class CashControlService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const queryPromise = client.query<{ sessionCashCounts: CashDrawerCount[] }>({
-      query: GET_SESSION_CASH_COUNTS as any,
+    const queryPromise = client.query({
+      query: GET_SESSION_CASH_COUNTS,
       variables: { sessionId },
       fetchPolicy: 'network-only',
     });
@@ -120,8 +120,8 @@ export class CashControlService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const queryPromise = client.query<{ pendingVarianceReviews: CashDrawerCount[] }>({
-      query: GET_PENDING_VARIANCE_REVIEWS as any,
+    const queryPromise = client.query({
+      query: GET_PENDING_VARIANCE_REVIEWS,
       variables: { channelId },
       fetchPolicy: 'network-only',
     });
@@ -149,8 +149,8 @@ export class CashControlService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const queryPromise = client.query<{ sessionMpesaVerifications: MpesaVerification[] }>({
-      query: GET_SESSION_MPESA_VERIFICATIONS as any,
+    const queryPromise = client.query({
+      query: GET_SESSION_MPESA_VERIFICATIONS,
       variables: { sessionId },
       fetchPolicy: 'network-only',
     });
@@ -179,8 +179,8 @@ export class CashControlService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const mutationPromise = client.mutate<{ recordCashCount: CashCountResult }>({
-      mutation: RECORD_CASH_COUNT as any,
+    const mutationPromise = client.mutate({
+      mutation: RECORD_CASH_COUNT,
       variables: {
         input: {
           sessionId,
@@ -217,8 +217,8 @@ export class CashControlService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const mutationPromise = client.mutate<{ explainVariance: CashDrawerCount }>({
-      mutation: EXPLAIN_VARIANCE as any,
+    const mutationPromise = client.mutate({
+      mutation: EXPLAIN_VARIANCE,
       variables: { countId, reason },
     });
 
@@ -258,8 +258,8 @@ export class CashControlService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const mutationPromise = client.mutate<{ reviewCashCount: CashDrawerCount }>({
-      mutation: REVIEW_CASH_COUNT as any,
+    const mutationPromise = client.mutate({
+      mutation: REVIEW_CASH_COUNT,
       variables: { countId, notes },
     });
 
@@ -268,9 +268,7 @@ export class CashControlService {
         const reviewedCount = result.data?.reviewCashCount ?? null;
         if (reviewedCount) {
           // Remove from pending reviews
-          this.pendingReviews.update((reviews) =>
-            reviews.filter((r) => r.id !== reviewedCount.id),
-          );
+          this.pendingReviews.update((reviews) => reviews.filter((r) => r.id !== reviewedCount.id));
         }
         this.isLoading.set(false);
         return reviewedCount;
@@ -296,8 +294,8 @@ export class CashControlService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const mutationPromise = client.mutate<{ verifyMpesaTransactions: MpesaVerification }>({
-      mutation: VERIFY_MPESA_TRANSACTIONS as any,
+    const mutationPromise = client.mutate({
+      mutation: VERIFY_MPESA_TRANSACTIONS,
       variables: {
         input: {
           sessionId,
@@ -351,4 +349,3 @@ export class CashControlService {
     this.error.set(null);
   }
 }
-

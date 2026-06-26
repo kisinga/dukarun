@@ -39,8 +39,8 @@ export class ProductAssetService {
 
       // Step 2: Assign assets to product
       const client = this.apolloService.getClient();
-      const result = await client.mutate<any>({
-        mutation: ASSIGN_ASSETS_TO_PRODUCT as any,
+      const result = await client.mutate({
+        mutation: ASSIGN_ASSETS_TO_PRODUCT,
         variables: {
           productId,
           assetIds,
@@ -75,8 +75,8 @@ export class ProductAssetService {
       for (const assetId of removedAssetIds) {
         try {
           await client.mutate({
-            mutation: DELETE_ASSET as any,
-            variables: { input: { id: assetId } },
+            mutation: DELETE_ASSET,
+            variables: { input: { assetId } },
           });
         } catch (error) {
           console.warn(`Failed to delete asset ${assetId}:`, error);
@@ -105,7 +105,7 @@ export class ProductAssetService {
       // Step 4: Update product with full asset list
       const allAssetIds = [...currentAssetIds, ...newAssetIds];
       const result = await client.mutate({
-        mutation: UPDATE_PRODUCT_ASSETS as any,
+        mutation: UPDATE_PRODUCT_ASSETS,
         variables: {
           productId,
           assetIds: allAssetIds,
@@ -113,7 +113,7 @@ export class ProductAssetService {
         },
       });
 
-      return !!(result.data as any)?.updateProduct;
+      return !!result.data?.updateProduct;
     } catch (error: any) {
       console.error('Update product assets failed:', error);
       this.stateService.setError(error.message || 'Failed to update product assets');
@@ -128,11 +128,11 @@ export class ProductAssetService {
     try {
       const client = this.apolloService.getClient();
       const result = await client.mutate({
-        mutation: DELETE_ASSET as any,
-        variables: { input: { id: assetId } },
+        mutation: DELETE_ASSET,
+        variables: { input: { assetId } },
       });
 
-      const deleteResult = (result.data as any)?.deleteAsset;
+      const deleteResult = result.data?.deleteAsset;
       if (deleteResult?.result === 'DELETED') return true;
 
       this.stateService.setError(deleteResult?.message || 'Failed to delete asset');

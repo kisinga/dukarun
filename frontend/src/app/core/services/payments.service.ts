@@ -1,11 +1,5 @@
 import { inject, Injectable, signal } from '@angular/core';
-import type {
-  GetPaymentsQuery,
-  GetPaymentsQueryVariables,
-  GetPaymentFullQuery,
-  GetPaymentFullQueryVariables,
-  OrderListOptions,
-} from '../graphql/generated/graphql';
+import type { OrderListOptions } from '../graphql/generated/graphql';
 import { GET_PAYMENTS, GET_PAYMENT_FULL } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
 
@@ -77,7 +71,7 @@ export class PaymentsService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<GetPaymentsQuery, GetPaymentsQueryVariables>({
+      const result = await client.query({
         query: GET_PAYMENTS,
         variables: {
           options: (options as OrderListOptions) || {
@@ -149,7 +143,7 @@ export class PaymentsService {
       if (cachedPayment) {
         // Fetch full order details
         const client = this.apolloService.getClient();
-        const result = await client.query<GetPaymentFullQuery, GetPaymentFullQueryVariables>({
+        const result = await client.query({
           query: GET_PAYMENT_FULL,
           variables: { orderId: cachedPayment.order.id },
           fetchPolicy: 'network-only',

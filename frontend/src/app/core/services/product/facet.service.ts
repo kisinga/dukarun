@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { GetFacetValuesDocument } from '../../graphql/generated/graphql';
+import { GetFacetValuesDocument, LanguageCode } from '../../graphql/generated/graphql';
 import {
   CREATE_FACET,
   CREATE_FACET_VALUE,
@@ -39,11 +39,9 @@ export class FacetService {
     if (cached) return cached;
 
     const client = this.apollo.getClient();
-    const result = await client.query<{
-      facets: { items: Array<{ id: string; code: string; name: string }> };
-    }>({
+    const result = await client.query({
       query: GET_FACETS_BY_CODES,
-      variables: { codes: FACET_CODES },
+      variables: { codes: [...FACET_CODES] },
     });
 
     const facet = result.data?.facets?.items?.find((f) => f.code === code);
@@ -53,15 +51,13 @@ export class FacetService {
     }
 
     const displayName = FACET_DISPLAY_NAMES[code];
-    const createResult = await client.mutate<{
-      createFacet: { id: string; code: string; name: string };
-    }>({
+    const createResult = await client.mutate({
       mutation: CREATE_FACET,
       variables: {
         input: {
           code,
           isPrivate: true,
-          translations: [{ languageCode: 'en' as const, name: displayName }],
+          translations: [{ languageCode: LanguageCode.en, name: displayName }],
         },
       },
     });
@@ -108,15 +104,13 @@ export class FacetService {
   async createFacetValue(facetId: string, name: string): Promise<FacetValueSummary> {
     const code = this.slug(name);
     const client = this.apollo.getClient();
-    const result = await client.mutate<{
-      createFacetValue: { id: string; name: string; code: string };
-    }>({
+    const result = await client.mutate({
       mutation: CREATE_FACET_VALUE,
       variables: {
         input: {
           facetId,
           code,
-          translations: [{ languageCode: 'en' as const, name: name.trim() }],
+          translations: [{ languageCode: LanguageCode.en, name: name.trim() }],
         },
       },
     });

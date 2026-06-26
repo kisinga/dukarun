@@ -45,7 +45,7 @@ export class SupplierApiService {
       // Check for existing customer by phone number to prevent duplicates
       // Note: We check for any customer (supplier or not) since a customer can become a supplier
       if (normalizedPhone) {
-        const existingResult = await client.query<any>({
+        const existingResult = await client.query({
           query: GET_CUSTOMERS,
           variables: {
             options: {
@@ -65,7 +65,7 @@ export class SupplierApiService {
           console.log('✅ Found existing customer by phone:', existing.id);
 
           // Fetch full customer data including all custom fields
-          const fullCustomerResult = await client.query<any>({
+          const fullCustomerResult = await client.query({
             query: GET_CUSTOMER,
             variables: { id: existing.id },
             fetchPolicy: 'network-only',
@@ -110,20 +110,20 @@ export class SupplierApiService {
           });
 
           // Use UPDATE_CUSTOMER to add supplier capability
-          const updateResult = await client.mutate<any>({
+          const updateResult = await client.mutate({
             mutation: UPDATE_CUSTOMER,
             variables: { input: updateInput },
           });
 
           const updated = updateResult.data?.updateCustomer;
-          if (updated?.id) {
+          if (updated?.__typename === 'Customer') {
             console.log(
               `✅ ${isAlreadySupplier ? 'Supplier fields updated' : 'Supplier capability added'}:`,
               updated.id,
             );
             this.stateService.setIsCreating(false);
             return updated.id;
-          } else if (updated?.errorCode) {
+          } else if (updated?.__typename === 'EmailAddressConflictError') {
             this.stateService.setError(updated.message || 'Failed to add supplier capability');
             return null;
           } else {
@@ -180,18 +180,15 @@ export class SupplierApiService {
         customFields,
       };
 
-      const result = await client.mutate<any>({
+      const result = await client.mutate({
         mutation: CREATE_SUPPLIER,
         variables: { input: supplierInput },
       });
 
       const supplier = result.data?.createCustomerSafe;
-      if (supplier?.id) {
+      if (supplier?.__typename === 'Customer') {
         console.log('✅ Supplier created:', supplier.id);
         return supplier.id;
-      } else if (supplier?.errorCode) {
-        this.stateService.setError(supplier.message || 'Failed to create supplier');
-        return null;
       } else {
         this.stateService.setError('Failed to create supplier');
         return null;
@@ -228,7 +225,7 @@ export class SupplierApiService {
         return { exists: false, isSupplier: false };
       }
 
-      const result = await client.query<any>({
+      const result = await client.query({
         query: GET_CUSTOMERS,
         variables: {
           options: {
@@ -269,7 +266,7 @@ export class SupplierApiService {
   async getSupplierById(id: string): Promise<any | null> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<any>({
+      const result = await client.query({
         query: GET_SUPPLIER,
         variables: { id },
         fetchPolicy: 'network-only',
@@ -297,7 +294,7 @@ export class SupplierApiService {
       const client = this.apolloService.getClient();
 
       // Fetch current supplier to preserve existing custom fields
-      const currentResult = await client.query<any>({
+      const currentResult = await client.query({
         query: GET_CUSTOMER,
         variables: { id },
         fetchPolicy: 'network-only',
@@ -324,16 +321,16 @@ export class SupplierApiService {
         creditDuration: input.creditDuration,
       });
 
-      const result = await client.mutate<any>({
+      const result = await client.mutate({
         mutation: UPDATE_SUPPLIER,
         variables: { input: updateInput },
       });
 
       const supplier = result.data?.updateCustomer;
-      if (supplier?.id) {
+      if (supplier?.__typename === 'Customer') {
         console.log('✅ Supplier updated:', supplier.id);
         return true;
-      } else if (supplier?.errorCode) {
+      } else if (supplier?.__typename === 'EmailAddressConflictError') {
         this.stateService.setError(supplier.message || 'Failed to update supplier');
         return false;
       } else {
@@ -357,7 +354,7 @@ export class SupplierApiService {
       console.log('🗑️ Deleting supplier:', supplierId);
       const client = this.apolloService.getClient();
 
-      const result = await client.mutate<any>({
+      const result = await client.mutate({
         mutation: DELETE_SUPPLIER,
         variables: { id: supplierId },
       });

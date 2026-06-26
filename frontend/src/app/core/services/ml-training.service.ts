@@ -12,8 +12,8 @@ import { ApolloService } from './apollo.service';
 export interface MlTrainingInfo {
   status: string;
   progress: number;
-  startedAt?: string;
-  error?: string;
+  startedAt?: string | null;
+  error?: string | null;
   productCount: number;
   imageCount: number;
   hasActiveModel: boolean;
@@ -99,12 +99,14 @@ export class MlTrainingService {
     this.errorSignal.set(null);
 
     return from(
-      this.apolloService.query<{ mlTrainingInfo: MlTrainingInfo }>(GET_ML_TRAINING_INFO, {
-        channelId,
+      this.apolloService.getClient().query({
+        query: GET_ML_TRAINING_INFO,
+        variables: { channelId },
       }),
     ).pipe(
       tap((result) => console.log('[MlTrainingService] Raw query result:', result)),
       map((result) => {
+        if (!result.data) throw new Error('mlTrainingInfo query returned no data');
         return result.data.mlTrainingInfo;
       }),
       tap((info) => {
@@ -142,12 +144,13 @@ export class MlTrainingService {
    */
   getTrainingManifest(channelId: string): Observable<MlTrainingManifest> {
     return from(
-      this.apolloService.query<{ mlTrainingManifest: MlTrainingManifest }>(
-        GET_ML_TRAINING_MANIFEST,
-        { channelId },
-      ),
+      this.apolloService.getClient().query({
+        query: GET_ML_TRAINING_MANIFEST,
+        variables: { channelId },
+      }),
     ).pipe(
       map((result) => {
+        if (!result.data) throw new Error('mlTrainingManifest query returned no data');
         return result.data.mlTrainingManifest;
       }),
       catchError((error) => {
@@ -196,12 +199,10 @@ export class MlTrainingService {
     this.errorSignal.set(null);
 
     return from(
-      this.apolloService.mutate<{ extractPhotosForTraining: boolean }>(
-        EXTRACT_PHOTOS_FOR_TRAINING,
-        {
-          channelId,
-        },
-      ),
+      this.apolloService.getClient().mutate({
+        mutation: EXTRACT_PHOTOS_FOR_TRAINING,
+        variables: { channelId },
+      }),
     ).pipe(
       map((result) => {
         return result.data?.extractPhotosForTraining ?? false;
@@ -238,11 +239,9 @@ export class MlTrainingService {
     error?: string,
   ): Observable<boolean> {
     return from(
-      this.apolloService.mutate<{ updateTrainingStatus: boolean }>(UPDATE_TRAINING_STATUS, {
-        channelId,
-        status,
-        progress,
-        error,
+      this.apolloService.getClient().mutate({
+        mutation: UPDATE_TRAINING_STATUS,
+        variables: { channelId, status, progress, error },
       }),
     ).pipe(
       map((result) => result.data?.updateTrainingStatus ?? false),
@@ -266,11 +265,9 @@ export class MlTrainingService {
     this.errorSignal.set(null);
 
     return from(
-      this.apolloService.mutate<{ completeTraining: boolean }>(COMPLETE_TRAINING, {
-        channelId,
-        modelJson,
-        weightsFile,
-        metadata,
+      this.apolloService.getClient().mutate({
+        mutation: COMPLETE_TRAINING,
+        variables: { channelId, modelJson, weightsFile, metadata },
       }),
     ).pipe(
       map((result) => result.data?.completeTraining ?? false),

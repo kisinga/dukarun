@@ -3,7 +3,6 @@ import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@ang
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { LanguageCode } from '../../../../../core/graphql/generated/graphql';
 import { GET_PAYMENT_METHODS } from '../../../../../core/graphql/operations.graphql';
-import type { GetPaymentMethodsQuery } from '../../../../../core/graphql/generated/graphql';
 import { ApolloService } from '../../../../../core/services/apollo.service';
 import { CompanyService } from '../../../../../core/services/company.service';
 import {
@@ -146,7 +145,7 @@ export class PaymentMethodsComponent {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<GetPaymentMethodsQuery>({
+      const result = await client.query({
         query: GET_PAYMENT_METHODS,
         fetchPolicy: 'network-only',
       });

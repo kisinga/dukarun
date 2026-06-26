@@ -97,7 +97,7 @@ export class SupplierSearchService implements CacheSyncEntityHandler {
     const fetchPolicy = 'network-only' as FetchPolicy;
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<any>({
+      const result = await client.query({
         query: GET_SUPPLIERS,
         variables: {
           options: options || {
@@ -151,7 +151,7 @@ export class SupplierSearchService implements CacheSyncEntityHandler {
       const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
 
       const client = this.apolloService.getClient();
-      const result = await client.query<any>({
+      const result = await client.query({
         query: GET_CUSTOMERS,
         variables: {
           options: {

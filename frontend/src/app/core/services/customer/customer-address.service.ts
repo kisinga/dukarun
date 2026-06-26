@@ -29,7 +29,7 @@ export class CustomerAddressService {
     try {
       const client = this.apolloService.getClient();
 
-      const result = await client.mutate<any>({
+      const result = await client.mutate({
         mutation: CREATE_CUSTOMER_ADDRESS,
         variables: { customerId, input },
       });
@@ -58,7 +58,7 @@ export class CustomerAddressService {
     try {
       const client = this.apolloService.getClient();
 
-      const result = await client.mutate<any>({
+      const result = await client.mutate({
         mutation: UPDATE_CUSTOMER_ADDRESS,
         variables: { input: { id: addressId, ...input } },
       });
@@ -86,7 +86,7 @@ export class CustomerAddressService {
     try {
       const client = this.apolloService.getClient();
 
-      const result = await client.mutate<any>({
+      const result = await client.mutate({
         mutation: DELETE_CUSTOMER_ADDRESS,
         variables: { id: addressId },
       });

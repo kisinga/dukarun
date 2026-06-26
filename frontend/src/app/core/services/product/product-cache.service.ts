@@ -141,9 +141,7 @@ export class ProductCacheService implements CacheSyncEntityHandler {
         const take = Math.min(MAX_PRODUCTS_CACHE - allItems.length, VENDURE_MAX_TAKE);
         if (take <= 0) break;
 
-        const result = await client.query<{
-          products: { totalItems: number; items: any[] };
-        }>({
+        const result = await client.query({
           query: PREFETCH_PRODUCTS,
           variables: { take, skip: skip ?? 0 },
           fetchPolicy: 'network-only',
@@ -381,7 +379,7 @@ export class ProductCacheService implements CacheSyncEntityHandler {
   async hydrateOne(channelId: string, productId: string): Promise<void> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<{ product: unknown }>({
+      const result = await client.query({
         query: GET_PRODUCT,
         variables: { id: productId },
         fetchPolicy: 'network-only',

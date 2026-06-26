@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { gql } from '@apollo/client/core';
+import type { TypedDocumentNode } from '@apollo/client';
 import {
   CREATE_PRODUCT,
   DELETE_PRODUCT,
@@ -49,7 +50,7 @@ export class ProductApiService {
           input.facetValueIds && input.facetValueIds.length > 0 ? input.facetValueIds : undefined,
       };
 
-      const result = await client.mutate<any>({
+      const result = await client.mutate({
         mutation: CREATE_PRODUCT,
         variables: { input: createInput },
       });
@@ -80,7 +81,12 @@ export class ProductApiService {
     const slug = this.generateSlug(payload.name);
     const hasFacets = payload.facetValueIds !== undefined;
 
-    const UPDATE_PRODUCT_BASIC = gql`
+    // TODO(apollo-migration): move these inline mutations into operations.graphql.ts + codegen
+    // once the backend schema is reachable; typed here so result access stays checked.
+    const UPDATE_PRODUCT_BASIC: TypedDocumentNode<
+      { updateProduct?: { id: string } | null },
+      Record<string, unknown>
+    > = gql`
       mutation UpdateProductBasic($id: ID!, $name: String!, $slug: String!, $barcode: String) {
         updateProduct(
           input: {
@@ -99,7 +105,10 @@ export class ProductApiService {
       }
     `;
 
-    const UPDATE_PRODUCT_WITH_FACETS = gql`
+    const UPDATE_PRODUCT_WITH_FACETS: TypedDocumentNode<
+      { updateProduct?: { id: string } | null },
+      Record<string, unknown>
+    > = gql`
       mutation UpdateProductWithFacets(
         $id: ID!
         $name: String!
@@ -134,11 +143,11 @@ export class ProductApiService {
         barcode: normalizeBarcodeForApi(payload.barcode) ?? null,
       };
       const result = hasFacets
-        ? await client.mutate<any>({
+        ? await client.mutate({
             mutation: UPDATE_PRODUCT_WITH_FACETS,
             variables: { ...baseVariables, facetValueIds: payload.facetValueIds ?? [] },
           })
-        : await client.mutate<any>({
+        : await client.mutate({
             mutation: UPDATE_PRODUCT_BASIC,
             variables: baseVariables,
           });
@@ -156,7 +165,7 @@ export class ProductApiService {
   async getProductById(id: string): Promise<any | null> {
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<any>({
+      const result = await client.query({
         query: GET_PRODUCT_DETAIL,
         variables: { id },
         fetchPolicy: 'network-only',
@@ -178,7 +187,7 @@ export class ProductApiService {
       console.log('🗑️ Deleting product:', productId);
       const client = this.apolloService.getClient();
 
-      const result = await client.mutate<any>({
+      const result = await client.mutate({
         mutation: DELETE_PRODUCT,
         variables: { id: productId },
       });

@@ -27,8 +27,8 @@ export interface CashierSession {
   cashierUserId: number;
   openedAt: string;
   closedAt?: string | null;
-  closingDeclared: string;
-  status: 'open' | 'closed';
+  closingDeclared?: string;
+  status: string;
 }
 
 export interface PaymentMethodReconciliationConfig {
@@ -107,9 +107,9 @@ export interface ReconciliationAccountDetail {
   accountId: string;
   accountCode: string;
   accountName: string;
-  declaredAmountCents: string | null;
-  expectedBalanceCents: string | null;
-  varianceCents: string | null;
+  declaredAmountCents?: string | null;
+  expectedBalanceCents?: string | null;
+  varianceCents?: string | null;
 }
 
 export interface LastClosingBalance {
@@ -233,8 +233,8 @@ export class CashierSessionService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const queryPromise = client.query<{ currentCashierSession: CashierSession | null }>({
-      query: GET_CURRENT_CASHIER_SESSION as any,
+    const queryPromise = client.query({
+      query: GET_CURRENT_CASHIER_SESSION,
       variables: { channelId },
       fetchPolicy: 'network-only',
     });
@@ -266,8 +266,8 @@ export class CashierSessionService {
   loadLastClosedAt(channelId: number) {
     const client = this.apolloService.getClient();
     return from(
-      client.query<{ cashierSessions: { items: CashierSession[] } }>({
-        query: GET_CASHIER_SESSIONS as any,
+      client.query({
+        query: GET_CASHIER_SESSIONS,
         variables: { channelId, options: { status: 'closed', take: 1 } },
         fetchPolicy: 'network-only',
       }),
@@ -295,8 +295,8 @@ export class CashierSessionService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const queryPromise = client.query<{ cashierSession: CashierSessionSummary }>({
-      query: GET_CASHIER_SESSION as any,
+    const queryPromise = client.query({
+      query: GET_CASHIER_SESSION,
       variables: { sessionId },
       fetchPolicy: 'network-only',
     });
@@ -324,10 +324,8 @@ export class CashierSessionService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const queryPromise = client.query<{
-      cashierSessions: { items: CashierSession[]; totalItems: number };
-    }>({
-      query: GET_CASHIER_SESSIONS as any,
+    const queryPromise = client.query({
+      query: GET_CASHIER_SESSIONS,
       variables: { channelId, options },
       fetchPolicy: 'network-only',
     });
@@ -357,8 +355,8 @@ export class CashierSessionService {
   getChannelReconciliationConfig(channelId: number) {
     const client = this.apolloService.getClient();
     return from(
-      client.query<{ channelReconciliationConfig: PaymentMethodReconciliationConfig[] }>({
-        query: GET_CHANNEL_RECONCILIATION_CONFIG as any,
+      client.query({
+        query: GET_CHANNEL_RECONCILIATION_CONFIG,
         variables: { channelId },
         fetchPolicy: 'network-only',
       }),
@@ -375,8 +373,8 @@ export class CashierSessionService {
   getShiftModalPrefillData(channelId: number) {
     const client = this.apolloService.getClient();
     return from(
-      client.query<{ shiftModalPrefillData: ShiftModalPrefillData }>({
-        query: GET_SHIFT_MODAL_PREFILL_DATA as any,
+      client.query({
+        query: GET_SHIFT_MODAL_PREFILL_DATA,
         variables: { channelId },
         fetchPolicy: 'network-only',
       }),
@@ -394,8 +392,8 @@ export class CashierSessionService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const mutationPromise = client.mutate<{ openCashierSession: CashierSession }>({
-      mutation: OPEN_CASHIER_SESSION as any,
+    const mutationPromise = client.mutate({
+      mutation: OPEN_CASHIER_SESSION,
       variables: {
         input: {
           channelId,
@@ -430,15 +428,8 @@ export class CashierSessionService {
   getAccountBalancesAsOf(channelId: number, asOfDate: string) {
     const client = this.apolloService.getClient();
     return from(
-      client.query<{
-        accountBalancesAsOf: Array<{
-          accountId: string;
-          accountCode: string;
-          accountName: string;
-          balanceCents: string;
-        }>;
-      }>({
-        query: GET_ACCOUNT_BALANCES_AS_OF as any,
+      client.query({
+        query: GET_ACCOUNT_BALANCES_AS_OF,
         variables: { channelId, asOfDate },
         fetchPolicy: 'network-only',
       }),
@@ -457,8 +448,8 @@ export class CashierSessionService {
   getReconciliations(channelId: number, options?: ReconciliationListOptions) {
     const client = this.apolloService.getClient();
     return from(
-      client.query<{ reconciliations: { items: Reconciliation[]; totalItems: number } }>({
-        query: GET_RECONCILIATIONS as any,
+      client.query({
+        query: GET_RECONCILIATIONS,
         variables: { channelId, options: options ?? {} },
         fetchPolicy: 'network-only',
       }),
@@ -479,10 +470,8 @@ export class CashierSessionService {
     }
     const client = this.apolloService.getClient();
     return from(
-      client.query<{
-        reconciliationDetails: ReconciliationAccountDetail[];
-      }>({
-        query: GET_RECONCILIATION_DETAILS as any,
+      client.query({
+        query: GET_RECONCILIATION_DETAILS,
         variables: { reconciliationId: id },
         fetchPolicy: 'network-only',
       }),
@@ -524,9 +513,7 @@ export class CashierSessionService {
       variables.channelId = channelId;
     }
     return from(
-      client.query<{
-        sessionReconciliationDetails: ReconciliationAccountDetail[];
-      }>({
+      client.query({
         query: GET_SESSION_RECONCILIATION_DETAILS,
         variables,
         fetchPolicy: 'network-only',
@@ -601,10 +588,8 @@ export class CashierSessionService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const mutationPromise = client.mutate<{
-      createCashierSessionReconciliation: Reconciliation;
-    }>({
-      mutation: CREATE_CASHIER_SESSION_RECONCILIATION as any,
+    const mutationPromise = client.mutate({
+      mutation: CREATE_CASHIER_SESSION_RECONCILIATION,
       variables: { sessionId, notes },
     });
 
@@ -630,8 +615,8 @@ export class CashierSessionService {
     this.error.set(null);
 
     const client = this.apolloService.getClient();
-    const mutationPromise = client.mutate<{ createReconciliation: Reconciliation }>({
-      mutation: CREATE_RECONCILIATION as any,
+    const mutationPromise = client.mutate({
+      mutation: CREATE_RECONCILIATION,
       variables: { input },
     });
 
@@ -655,8 +640,8 @@ export class CashierSessionService {
   getLastClosingBalances(channelId: number) {
     const client = this.apolloService.getClient();
     return from(
-      client.query<{ lastClosedSessionClosingBalances: LastClosingBalance[] }>({
-        query: GET_LAST_CLOSED_SESSION_CLOSING_BALANCES as any,
+      client.query({
+        query: GET_LAST_CLOSED_SESSION_CLOSING_BALANCES,
         variables: { channelId },
         fetchPolicy: 'network-only',
       }),
@@ -679,8 +664,8 @@ export class CashierSessionService {
     }
     const client = this.apolloService.getClient();
     return from(
-      client.query<{ expectedSessionClosingBalances: ExpectedClosingBalance[] }>({
-        query: GET_EXPECTED_SESSION_CLOSING_BALANCES as any,
+      client.query({
+        query: GET_EXPECTED_SESSION_CLOSING_BALANCES,
         variables: { sessionId },
         fetchPolicy: 'network-only',
       }),

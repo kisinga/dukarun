@@ -1,10 +1,4 @@
 import { inject, Injectable, signal } from '@angular/core';
-import type {
-  GetAdministratorByIdQuery,
-  GetAdministratorByIdQueryVariables,
-  GetAdministratorByUserIdQuery,
-  GetAdministratorByUserIdQueryVariables,
-} from '../graphql/generated/graphql';
 import {
   GET_ADMINISTRATOR_BY_ID,
   GET_ADMINISTRATOR_BY_USER_ID,
@@ -69,10 +63,7 @@ export class UsersService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<
-        GetAdministratorByIdQuery,
-        GetAdministratorByIdQueryVariables
-      >({
+      const result = await client.query({
         query: GET_ADMINISTRATOR_BY_ID,
         variables: { id },
         fetchPolicy: 'network-only',
@@ -133,10 +124,7 @@ export class UsersService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<
-        GetAdministratorByUserIdQuery,
-        GetAdministratorByUserIdQueryVariables
-      >({
+      const result = await client.query({
         query: GET_ADMINISTRATOR_BY_USER_ID,
         variables: { userId },
         fetchPolicy: 'network-only',

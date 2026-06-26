@@ -46,7 +46,7 @@ export class ProductListingService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query<{ products: { items: any[]; totalItems: number } }>({
+      const result = await client.query({
         query: GET_PRODUCTS,
         variables: {
           options: options ?? DEFAULT_OPTIONS,
