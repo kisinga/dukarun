@@ -45,6 +45,8 @@
     "@angular/ssr": "^21.2.17",
     "@apollo/client": "^4.0.12",
     "@huggingface/transformers": "3.8.1",
+    "@ng-icons/core": "^33.3.0",
+    "@ng-icons/heroicons": "^33.3.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
     "@opentelemetry/instrumentation": "^0.219.0",
