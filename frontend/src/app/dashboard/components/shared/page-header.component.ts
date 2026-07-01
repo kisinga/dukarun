@@ -21,27 +21,36 @@ import { RefreshButtonComponent } from './refresh-button.component';
   imports: [RefreshButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-      <div class="min-w-0">
+    <!--
+      Responsive header. Mobile: [title … refresh] on row 1, stats wrap to row 2
+      (so the refresh never orphans below the pills). Desktop: [title … stats refresh]
+      on one row. Driven by flex order + margin-auto so no content is projected twice.
+    -->
+    <div class="flex flex-wrap items-start gap-x-4 gap-y-3">
+      <div class="order-1 min-w-0">
         <h1 class="text-xl lg:text-2xl font-bold tracking-tight truncate">{{ title() }}</h1>
         @if (subtitle()) {
           <p class="text-sm text-base-content/60 mt-0.5 truncate">{{ subtitle() }}</p>
         }
       </div>
 
-      <div class="flex flex-wrap items-center gap-x-6 gap-y-2 sm:justify-end">
+      <!-- Actions + refresh: top-right on mobile, trailing on desktop -->
+      <div class="order-2 ml-auto flex items-center gap-2 shrink-0 sm:order-3 sm:ml-0">
+        <ng-content select="[actions]"></ng-content>
+        @if (showRefresh()) {
+          <app-refresh-button
+            [isLoading]="isLoading()"
+            [title]="refreshTitle()"
+            (refresh)="refresh.emit()"
+          />
+        }
+      </div>
+
+      <!-- Stats: own full-width row on mobile, inline-right on desktop; hidden when empty -->
+      <div
+        class="order-3 w-full flex flex-wrap items-center gap-x-4 gap-y-2 empty:hidden sm:order-2 sm:ml-auto sm:w-auto"
+      >
         <ng-content select="[header-stats]"></ng-content>
-        <!-- Actions + refresh: one grouped cluster, kept apart from the stats -->
-        <div class="flex items-center gap-2">
-          <ng-content select="[actions]"></ng-content>
-          @if (showRefresh()) {
-            <app-refresh-button
-              [isLoading]="isLoading()"
-              [title]="refreshTitle()"
-              (refresh)="refresh.emit()"
-            />
-          }
-        </div>
       </div>
     </div>
   `,

@@ -17,20 +17,16 @@
     } @else {
       <span class="w-7 h-7 shrink-0 block" aria-hidden="true"></span>
     }
-    <div class="avatar">
-      <div class="w-12 h-12 rounded bg-base-200 flex items-center justify-center">
-        @if (getThumbnail()) {
-          <img
-            [src]="getThumbnail()!"
-            [alt]="product().name"
-            class="object-cover w-full h-full rounded"
-          />
-        } @else if (isService()) {
-          <ng-icon name="heroCog6Tooth" size="1.5rem" class="text-accent" />
-        } @else {
-          <ng-icon name="heroCube" size="1.5rem" class="text-primary" />
-        }
-      </div>
+    <div
+      class="w-12 h-12 shrink-0 rounded bg-base-200 flex items-center justify-center overflow-hidden"
+    >
+      @if (getThumbnail()) {
+        <img [src]="getThumbnail()!" [alt]="product().name" class="object-cover w-full h-full" />
+      } @else if (isService()) {
+        <ng-icon name="heroCog6Tooth" size="1.5rem" class="text-accent" />
+      } @else {
+        <ng-icon name="heroCube" size="1.5rem" class="text-primary" />
+      }
     </div>
   </div>
 </td>
@@ -65,20 +61,21 @@
 
 <!-- Price Range -->
 <td>
-  <span class="font-mono text-sm">{{ priceRange() }}</span>
+  <span class="text-sm tabular-nums whitespace-nowrap">
+    @if (!price().empty) {
+      @if (!price().single) {
+        <span class="text-base-content/50">from </span>
+      }
+      <app-money [value]="price().minCents" />
+    } @else {
+      <span class="text-base-content/40">—</span>
+    }
+  </span>
 </td>
 
 <!-- Total Stock -->
 <td class="text-center">
-  <span
-    class="badge badge-sm"
-    [class.badge-info]="isService()"
-    [class.badge-success]="!isService() && totalStock() > 20"
-    [class.badge-warning]="!isService() && totalStock() > 0 && totalStock() <= 20"
-    [class.badge-error]="!isService() && totalStock() === 0"
-  >
-    {{ getStockDisplay() }}
-  </span>
+  <span class="badge badge-sm" [class]="stockBadge()">{{ stockLabel() }}</span>
 </td>
 
 <!-- Status -->

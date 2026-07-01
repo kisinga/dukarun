@@ -19,8 +19,7 @@ import {
 import { FacetService } from '../../../core/services/product/facet.service';
 import { FACET_CODES, type FacetCode } from '../../../core/services/product/facet.types';
 import { ProductService } from '../../../core/services/product.service';
-import { CurrencyService } from '../../../core/services/currency.service';
-import { calculateProductStats } from '../../../core/services/stats/product-stats.util';
+import { calculateProductStats, isLowStock } from '../../../core/services/stats/product-stats.util';
 import {
   DeleteConfirmationData,
   DeleteConfirmationModalComponent,
@@ -32,10 +31,8 @@ import { ProductStats, ProductStatsComponent } from './components/product-stats.
 import { ProductTableRowComponent } from './components/product-table-row.component';
 import { PageHeaderComponent } from '../../components/shared/page-header.component';
 import { ListSearchBarComponent } from '../../components/shared/list-search-bar.component';
-import {
-  VariantListComponent,
-  type VariantListItem,
-} from '../shared/components/variant-list.component';
+import { MoneyComponent } from '../../../core/components/money.component';
+import { stockBadgeClass, stockDisplay } from './utils/product-presentation';
 
 /**
  * Products list page - refactored with composable components
@@ -60,7 +57,7 @@ import {
     PaginationComponent,
     DeleteConfirmationModalComponent,
     PageHeaderComponent,
-    VariantListComponent,
+    MoneyComponent,
   ],
   templateUrl: './products.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -71,7 +68,6 @@ export class ProductsComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  readonly currencyService = inject(CurrencyService);
 
   readonly canEditProduct = this.authService.hasUpdateProductPermission;
 
@@ -122,7 +118,7 @@ export class ProductsComponent implements OnInit {
     const list = this.products();
     if (!this.showLowStockOnly()) return list;
     return list.filter((product) =>
-      product.variants?.some((v: { stockOnHand?: number }) => (v.stockOnHand ?? 0) < 10),
+      product.variants?.some((v: { stockOnHand?: number }) => isLowStock(v.stockOnHand ?? 0)),
     );
   });
 
@@ -182,23 +178,14 @@ export class ProductsComponent implements OnInit {
     });
   }
 
-  /** Map product variants to VariantListItem for shared variant-list panel. */
-  variantListItems(product: {
-    variants?: Array<{
-      name: string;
-      sku: string;
-      priceWithTax: number;
-      stockOnHand?: number;
-      trackInventory?: boolean;
-    }>;
-  }): VariantListItem[] {
-    return (product.variants ?? []).map((v) => ({
-      name: v.name,
-      sku: v.sku,
-      priceWithTax: v.priceWithTax,
-      stockOnHand: v.stockOnHand,
-      trackInventory: v.trackInventory,
-    }));
+  /** Stock badge tone for a single expanded variant row (shared with the card/row). */
+  variantBadgeClass(v: { stockOnHand?: number; trackInventory?: boolean }): string {
+    return stockBadgeClass(v.stockOnHand ?? 0, v.trackInventory === false);
+  }
+
+  /** Stock label for a single expanded variant row. */
+  variantStock(v: { stockOnHand?: number; trackInventory?: boolean }): string {
+    return stockDisplay(v.stockOnHand ?? 0, v.trackInventory === false);
   }
 
   ngOnInit(): void {

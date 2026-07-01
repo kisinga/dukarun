@@ -71,7 +71,26 @@ export class ProductAssetService {
     try {
       const client = this.apolloService.getClient();
 
-      // Step 1: Delete removed assets
+      // Read the CURRENT asset list + featured BEFORE mutating anything, so we merge rather than
+      // replace. (The old flow uploaded via the replacing uploadProductPhotos first, then re-read
+      // the already-clobbered list — dropping existing photos and duplicating the new ones.)
+      const product = await this.apiService.getProductById(productId);
+      if (!product) return false;
+      const keptAssetIds: string[] = (product.assets || [])
+        .map((asset: any) => asset.id)
+        .filter((id: string) => !removedAssetIds.includes(id));
+      const currentFeaturedId: string | null = product.featuredAsset?.id ?? null;
+
+      // Upload new files → asset ids (channel-assign only; do NOT assign to the product here, since
+      // that path replaces the product's whole asset list).
+      let newAssetIds: string[] = [];
+      if (newPhotos.length > 0) {
+        const uploaded = await this.assetUploadService.uploadAndAssignToChannel(newPhotos);
+        newAssetIds = uploaded.map((a) => a.id);
+        if (newAssetIds.length === 0) return false;
+      }
+
+      // Delete removed assets.
       for (const assetId of removedAssetIds) {
         try {
           await client.mutate({
@@ -83,33 +102,19 @@ export class ProductAssetService {
         }
       }
 
-      // Step 2: Upload new photos if any
-      let newAssetIds: string[] = [];
-      if (newPhotos.length > 0) {
-        const uploadedIds = await this.uploadProductPhotos(productId, newPhotos);
-        if (uploadedIds) {
-          newAssetIds = uploadedIds;
-        } else {
-          return false;
-        }
-      }
-
-      // Step 3: Get current product assets (excluding removed ones)
-      const product = await this.apiService.getProductById(productId);
-      if (!product) return false;
-
-      const currentAssetIds = (product.assets || [])
-        .map((asset: any) => asset.id)
-        .filter((id: string) => !removedAssetIds.includes(id));
-
-      // Step 4: Update product with full asset list
-      const allAssetIds = [...currentAssetIds, ...newAssetIds];
+      // Write the merged list. Preserve the existing featured asset if it survived; else default to
+      // the first asset.
+      const allAssetIds = [...keptAssetIds, ...newAssetIds];
+      const featuredAssetId =
+        currentFeaturedId && allAssetIds.includes(currentFeaturedId)
+          ? currentFeaturedId
+          : (allAssetIds[0] ?? null);
       const result = await client.mutate({
         mutation: UPDATE_PRODUCT_ASSETS,
         variables: {
           productId,
           assetIds: allAssetIds,
-          featuredAssetId: allAssetIds[0] || null,
+          featuredAssetId,
         },
       });
 

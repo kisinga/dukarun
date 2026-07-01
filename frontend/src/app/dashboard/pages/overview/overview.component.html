@@ -1,65 +1,17 @@
 <div class="space-y-4 sm:space-y-5 anim-stagger">
-  <!-- ===== HEADER: Greeting + Shift + Refresh ===== -->
-  <div class="overview-header rounded-xl border border-base-300 bg-base-100 overflow-hidden">
-    <div class="px-4 py-3 sm:px-5 sm:py-4">
-      <div class="flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <h1 class="text-lg sm:text-xl font-bold tracking-tight leading-tight">
-            {{ getGreeting() }}
-          </h1>
-          <p class="text-xs text-base-content/40 mt-0.5">{{ getCurrentDate() }}</p>
-        </div>
-        <!-- Platform metrics: online users & MAU -->
-        @if (platformMetrics(); as pm) {
-          <div class="hidden sm:flex items-center gap-3 text-xs">
-            <div class="flex items-center gap-1.5" title="Users online now">
-              <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
-              <span class="font-semibold tabular-nums">{{ pm.onlineUsers }}</span>
-              <span class="text-base-content/40">online</span>
-            </div>
-            <div class="w-px h-4 bg-base-300"></div>
-            <div class="flex items-center gap-1.5" title="Monthly active users (30 days)">
-              <svg
-                class="h-3.5 w-3.5 text-base-content/40"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              <span class="font-semibold tabular-nums">{{ pm.mau }}</span>
-              <span class="text-base-content/40">MAU</span>
-            </div>
-          </div>
-        }
-        <div class="flex items-center gap-2 shrink-0">
-          <app-refresh-button [isLoading]="isLoading()" (refresh)="refresh()" />
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- ===== HEADER ===== -->
+  <app-page-header
+    [title]="getGreeting()"
+    [subtitle]="getCurrentDate()"
+    [isLoading]="isLoading()"
+    refreshTitle="Refresh dashboard"
+    (refresh)="refresh()"
+  />
 
   <!-- ===== ERROR ===== -->
   @if (error()) {
     <div role="alert" class="alert alert-error alert-sm rounded-xl">
-      <svg
-        class="h-4 w-4 shrink-0"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        stroke-width="2"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
+      <ng-icon name="heroExclamationCircle" size="1rem" class="shrink-0" />
       <span class="text-xs font-medium flex-1">{{ error() }}</span>
       <button class="btn btn-error btn-xs" (click)="refresh()">Retry</button>
     </div>
@@ -87,102 +39,50 @@
     </div>
 
     <!--
-      Period-driven KPI summary.
-      ReadOrder (everyone): Revenue, Orders
-      UpdateSettings (admin only): Gross profit, Profit margin
+      Money band — in/out for the selected period on one aligned grid:
+      Sales (hero = money in), Purchases + Expenses (money out), Orders (activity).
+      Sales/Purchases/Expenses expand an account breakdown below.
     -->
-    <div
-      [class]="
-        'grid gap-3 px-4 py-3 border-b border-base-300/40 ' +
-        (hasAdminStats() ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2')
-      "
-    >
-      <!-- ReadOrder: visible to everyone -->
-      <div class="kpi-card kpi-card--revenue rounded-lg p-3">
-        <span class="kpi-label">Revenue</span>
-        <p class="text-xl font-bold tabular-nums text-primary leading-tight mt-1">
-          {{ periodRevenueFormatted() }}
-        </p>
-      </div>
-      <!-- UpdateSettings: admin only -->
-      @if (hasAdminStats()) {
-        <div class="kpi-card kpi-card--margin rounded-lg p-3">
-          <span class="kpi-label">Gross profit</span>
-          <p class="text-xl font-bold tabular-nums text-success leading-tight mt-1">
-            {{ periodGrossProfitFormatted() }}
-          </p>
-          <span class="text-[10px] text-base-content/40 mt-0.5 block">based on COGS</span>
-        </div>
-      }
-      <!-- ReadOrder: visible to everyone -->
-      <div class="kpi-card rounded-lg p-3">
-        <span class="kpi-label">Orders</span>
-        @if (periodOrderCount() !== null) {
-          <p class="text-xl font-bold tabular-nums leading-tight mt-1">{{ periodOrderCount() }}</p>
-        } @else {
-          <p class="text-xl font-bold tabular-nums text-base-content/50 leading-tight mt-1">—</p>
-        }
-      </div>
-      <!-- UpdateSettings: admin only -->
-      @if (hasAdminStats()) {
-        <div class="kpi-card kpi-card--margin rounded-lg p-3">
-          <span class="kpi-label">Profit margin</span>
-          @if (analyticsLoading()) {
-            <div class="skeleton h-7 w-14 rounded mt-1"></div>
-          } @else if (profitMarginPercent() !== null) {
-            <p class="text-xl font-bold tabular-nums text-success leading-tight mt-1">
-              {{ profitMarginPercent() }}%
-            </p>
-          } @else {
-            <p class="text-xl font-bold tabular-nums text-base-content/50 leading-tight mt-1">—</p>
-          }
-        </div>
-      }
-    </div>
-
-    <!-- Category cards — Sales, Purchases, Expenses for selected period -->
-    <div
-      class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-base-300/40"
-    >
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-5 px-4 py-4">
       @for (category of categories(); track category.type) {
-        <button
-          type="button"
-          class="finance-card text-left px-4 py-4 transition-colors hover:bg-base-200/30"
-          [class.finance-card--expanded]="expandedCategory() === category.type"
-          (click)="toggleCategory(category.type)"
-        >
-          <div class="flex items-center gap-2 mb-1.5">
+        <button type="button" class="text-left min-w-0" (click)="toggleCategory(category.type)">
+          <span class="flex items-center gap-1.5">
             <span
-              class="w-2 h-2 rounded-full shrink-0"
+              class="w-1.5 h-1.5 rounded-full shrink-0"
               [class.bg-success]="category.type === 'sales'"
               [class.bg-info]="category.type === 'purchases'"
               [class.bg-error]="category.type === 'expenses'"
             ></span>
-            <span class="text-xs font-semibold uppercase tracking-wide text-base-content/50">
-              {{ category.name }}
-            </span>
-            <span class="text-[10px] text-base-content/30 ml-auto">{{
-              getActivePeriodLabel()
-            }}</span>
-          </div>
+            <span class="stat-label">{{ category.name }}</span>
+            @if (category.accounts.length > 0) {
+              <ng-icon
+                name="heroChevronDown"
+                size="0.75rem"
+                class="text-base-content/30 transition-transform"
+                [class.rotate-180]="expandedCategory() === category.type"
+              />
+            }
+          </span>
           <p
-            class="text-xl sm:text-2xl font-bold tabular-nums leading-tight"
+            class="stat-value truncate"
+            [class.!text-2xl]="category.type === 'sales'"
             [class.text-success]="category.type === 'sales'"
-            [class.text-info]="category.type === 'purchases'"
             [class.text-error]="category.type === 'expenses'"
           >
             {{ getAmountForPeriod(category) }}
           </p>
-          <!-- Secondary periods -->
-          <div class="flex gap-3 mt-1.5">
+          <p class="mt-0.5 text-[0.625rem] text-base-content/40 tabular-nums truncate">
             @for (stat of getSecondaryStats(category); track stat.period) {
-              <span class="text-[10px] text-base-content/35 tabular-nums">
-                {{ stat.label }}: {{ stat.amount }}
-              </span>
+              <span class="mr-2">{{ stat.label }} {{ stat.amount }}</span>
             }
-          </div>
+          </p>
         </button>
       }
+      <!-- Orders (activity) -->
+      <div class="min-w-0">
+        <span class="stat-label">Orders</span>
+        <p class="stat-value">{{ periodOrderCount() ?? '—' }}</p>
+      </div>
     </div>
 
     <!-- Account breakdown (expands below the whole grid) -->
@@ -198,16 +98,9 @@
                 <button
                   class="btn btn-ghost btn-xs btn-square"
                   (click)="toggleCategory(category.type); $event.stopPropagation()"
+                  aria-label="Close breakdown"
                 >
-                  <svg
-                    class="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <ng-icon name="heroXMark" size="0.875rem" />
                 </button>
               </div>
               <div class="divide-y divide-base-300/30">
@@ -286,103 +179,56 @@
   <div class="rounded-xl border border-base-300 bg-base-100 overflow-hidden">
     <div class="flex items-center justify-between px-4 py-3 border-b border-base-300/60">
       <h2 class="text-sm font-bold text-base-content/70">Product & Inventory</h2>
-      <div class="flex items-center gap-1">
-        <a
-          routerLink="/dashboard/products/analytics"
-          class="btn btn-ghost btn-sm gap-1 touch-manipulation"
-          aria-label="Product analytics"
-        >
-          <svg
-            class="h-4 w-4 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-            />
-          </svg>
-          <span class="hidden sm:inline text-xs font-medium">Analytics</span>
-        </a>
-        <!-- UpdateSettings: refresh only relevant when stock values are visible -->
-        @if (hasAdminStats()) {
-          <app-refresh-button
-            [isLoading]="stockValueLoading()"
-            title="Refresh stock value"
-            (refresh)="refreshStockValue()"
-          />
-        }
-      </div>
+      <a
+        routerLink="/dashboard/products/analytics"
+        class="btn btn-ghost btn-sm gap-1.5"
+        aria-label="Product analytics"
+      >
+        <ng-icon name="heroChartBar" size="1rem" />
+        <span class="hidden sm:inline text-xs font-medium">Analytics</span>
+      </a>
     </div>
     <!--
-      Inventory grid.
-      ReadOrder (everyone): Products, Variants, Low stock
-      UpdateSettings (admin only): Stock value · Retail / Wholesale / Cost
-      Layout: 6 items (admin) → grid-cols-2 sm:grid-cols-3; 3 items (non-admin) → grid-cols-3
+      Inventory band — same aligned grid as the money band above.
+      Everyone: Products, Variants, Low stock. Admin: Stock value (retail hero,
+      wholesale/cost as a subline).
     -->
-    <div
-      [class]="
-        'grid gap-3 px-4 py-4 ' + (hasAdminStats() ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-3')
-      "
-    >
-      <!-- ReadOrder: visible to everyone -->
-      <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
-        <span class="inventory-stat__label">Products</span>
-        <p class="inventory-stat__value text-accent">{{ productCount() }}</p>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-5 px-4 py-4">
+      <div class="min-w-0">
+        <span class="stat-label">Products</span>
+        <p class="stat-value">{{ productCount() }}</p>
       </div>
-      <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
-        <span class="inventory-stat__label">Variants</span>
-        <p class="inventory-stat__value">{{ variantCount() }}</p>
+      <div class="min-w-0">
+        <span class="stat-label">Variants</span>
+        <p class="stat-value">{{ variantCount() }}</p>
       </div>
-      <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
-        <span class="inventory-stat__label">Low stock</span>
+      <div class="min-w-0">
+        <span class="stat-label">Low stock</span>
         @if (lowStockCount() > 0) {
           <button
             type="button"
-            class="inventory-stat__value text-left text-warning hover:opacity-80"
+            class="stat-value text-left text-warning hover:opacity-80"
             (click)="navigateToInventory()"
           >
-            {{ lowStockCount() }} <span class="text-xs font-normal text-base-content/50">→</span>
+            {{ lowStockCount() }} <span class="text-sm font-normal text-base-content/40">→</span>
           </button>
         } @else {
-          <p class="inventory-stat__value text-success">0</p>
+          <p class="stat-value text-success">0</p>
         }
       </div>
-      <!-- UpdateSettings: admin only — stock values are financially sensitive -->
       @if (hasAdminStats()) {
-        <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
-          <span class="inventory-stat__label">Stock value · Retail</span>
+        <div class="min-w-0">
+          <span class="stat-label">Stock value</span>
           @if (stockValueLoading() && !stockValueStats()) {
-            <div class="skeleton h-7 w-20 rounded mt-0.5"></div>
+            <div class="skeleton h-7 w-24 rounded mt-1"></div>
           } @else if (stockValueStats(); as sv) {
-            <p class="inventory-stat__value text-primary">
-              {{ currencyService.format(sv.retail) }}
+            <p class="stat-value truncate">{{ currencyService.format(sv.retail) }}</p>
+            <p class="mt-0.5 text-[0.625rem] text-base-content/40 tabular-nums truncate">
+              whl {{ currencyService.format(sv.wholesale) }} · cost
+              {{ currencyService.format(sv.cost) }}
             </p>
           } @else {
-            <p class="inventory-stat__value text-base-content/50">—</p>
-          }
-        </div>
-        <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
-          <span class="inventory-stat__label">Stock value · Wholesale</span>
-          @if (stockValueLoading() && !stockValueStats()) {
-            <div class="skeleton h-7 w-20 rounded mt-0.5"></div>
-          } @else if (stockValueStats(); as sv) {
-            <p class="inventory-stat__value">{{ currencyService.format(sv.wholesale) }}</p>
-          } @else {
-            <p class="inventory-stat__value text-base-content/50">—</p>
-          }
-        </div>
-        <div class="inventory-stat rounded-lg p-3 bg-base-200/30">
-          <span class="inventory-stat__label">Stock value · Cost</span>
-          @if (stockValueLoading() && !stockValueStats()) {
-            <div class="skeleton h-7 w-20 rounded mt-0.5"></div>
-          } @else if (stockValueStats(); as sv) {
-            <p class="inventory-stat__value text-success">{{ currencyService.format(sv.cost) }}</p>
-          } @else {
-            <p class="inventory-stat__value text-base-content/50">—</p>
+            <p class="stat-value text-base-content/50">—</p>
           }
         </div>
       }
@@ -394,19 +240,7 @@
     <div class="rounded-xl border border-base-300 overflow-hidden bg-base-100">
       <div class="flex items-center justify-between px-4 py-3 border-b border-base-300/60">
         <h3 class="text-sm font-bold text-base-content/70 flex items-center gap-2">
-          <svg
-            class="h-4 w-4 text-base-content/40"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
+          <ng-icon name="heroClock" size="1rem" class="text-base-content/40" />
           Recent Sales
         </h3>
         <a
