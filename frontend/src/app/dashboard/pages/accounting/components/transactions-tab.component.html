@@ -62,11 +62,9 @@
               <tr>
                 <th class="w-12"></th>
                 <th>Date</th>
-                <th>Source Type</th>
-                <th>Source ID</th>
-                <th>Memo</th>
-                <th class="text-right">Total Debit</th>
-                <th class="text-right">Total Credit</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th class="text-right">Amount</th>
                 <th class="text-right">Actions</th>
               </tr>
             </thead>
@@ -112,17 +110,9 @@
                   <td>
                     <div class="badge badge-outline">{{ sourceTypeLabel(entry.sourceType) }}</div>
                   </td>
-                  <td class="font-mono text-sm">{{ entry.sourceId }}</td>
-                  <td>{{ entry.memo || '-' }}</td>
-                  <td class="text-right">
-                    <span class="text-success font-semibold">
-                      {{ context().formatCurrency(context().getEntryTotalDebit(entry)) }}
-                    </span>
-                  </td>
-                  <td class="text-right">
-                    <span class="text-error font-semibold">
-                      {{ context().formatCurrency(context().getEntryTotalCredit(entry)) }}
-                    </span>
+                  <td>{{ entry.memo || entry.sourceId }}</td>
+                  <td class="text-right font-semibold">
+                    <app-money [value]="context().getEntryTotalDebit(entry)" />
                   </td>
                   <td class="text-right">
                     <button class="btn btn-sm btn-ghost" (click)="onViewEntry(entry)">
@@ -133,9 +123,9 @@
                 <!-- Expanded Row: Journal Lines -->
                 @if (context().expandedEntries.has(entry.id)) {
                   <tr>
-                    <td colspan="8" class="bg-base-200 p-0">
+                    <td colspan="6" class="bg-base-200 p-0">
                       <div class="p-4">
-                        <h4 class="font-semibold mb-2">Journal Lines</h4>
+                        <h4 class="font-semibold mb-2">Accounting detail</h4>
                         <div class="overflow-x-auto">
                           <table class="table table-xs table-zebra">
                             <thead>
