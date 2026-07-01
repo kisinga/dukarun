@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { PurchaseLineItem } from '../../../../core/services/purchase.service.types';
+import { CurrencyService } from '../../../../core/services/currency.service';
 
 /**
  * Purchase Line Items Table Component
@@ -235,12 +236,10 @@ export class PurchaseLineItemsTableComponent {
     return `${sign}${margin.toFixed(1)}%`;
   }
 
+  private readonly currencyService = inject(CurrencyService);
+
   formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      minimumFractionDigits: 2,
-    }).format(amount);
+    return this.currencyService.formatMajor(amount);
   }
 
   parseFloat(value: string | number): number {

@@ -15,6 +15,7 @@ import {
   type ReconciliationAccountDetail,
 } from '../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../core/services/company.service';
+import { toDisplayDate } from '../../../core/utils/date.util';
 
 /** Cached reconciliation details for a shift (opening and/or closing). */
 export interface ShiftReconciliationDetails {
@@ -226,13 +227,7 @@ export class ShiftsComponent implements OnInit {
   }
 
   formatDateTime(dateStr: string): string {
-    return new Date(dateStr).toLocaleString('en-KE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return toDisplayDate(dateStr, 'datetime');
   }
 
   /** Format amount in cents for display (e.g. "12345" → "123.45"). */

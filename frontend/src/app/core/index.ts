@@ -9,6 +9,12 @@ export * from './services/network.service';
 export * from './services/product.service';
 export * from './services/stock-location.service';
 
+// Pipes
+export * from './pipes/money.pipe';
+
+// Utils
+export * from './utils/date.util';
+
 // Guards
 export * from './guards/auth.guard';
 

@@ -129,7 +129,7 @@
                     <td class="align-top">
                       <a
                         [routerLink]="['/dashboard/payments']"
-                        [queryParams]="{ orderId: order.id }"
+                        [queryParams]="{ customerId: customer()?.id, orderId: order.id }"
                         class="link link-hover text-sm"
                       >
                         View payments

@@ -190,9 +190,9 @@ export class UpgradeVendureCore360Schema9600000000000 implements MigrationInterf
     // "IDX_order_customFields_cogsStatus" (migration 9500000000003) and
     // "IDX_customer_customFields_isSupplier" (migration 9500000000002). These are
     // intentional perf indexes TypeORM's metadata doesn't track and are NOT part of
-    // the 3.6 schema change — they are NOT dropped here. Vendure will log a harmless
-    // "schema does not match" for only those two on boot; silence later via the
-    // custom-field `index: true` config.
+    // the 3.6 schema change — they are NOT dropped here. They are dropped in
+    // migration 9900000000000 to silence the boot-time "schema does not match" log
+    // (this Vendure version has no custom-field `index` config option to track them).
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

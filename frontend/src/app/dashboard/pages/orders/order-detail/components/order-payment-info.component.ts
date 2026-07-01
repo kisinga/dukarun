@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../../core/services/currency.service';
+import { toDisplayDate } from '../../../../../core/utils/date.util';
 import type { OrderPaymentInfoInput } from '../order-detail.types';
 
 /**
@@ -109,13 +110,7 @@ export class OrderPaymentInfoComponent {
 
   formatDate(dateString: string | null | undefined): string {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-KE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return toDisplayDate(dateString, 'medium');
   }
 
   formatAmount(cents: number): string {

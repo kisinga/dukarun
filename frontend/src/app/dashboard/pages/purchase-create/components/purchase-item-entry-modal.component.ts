@@ -16,6 +16,7 @@ import {
   ProductVariant,
 } from '../../../../core/services/product/product-search.service';
 import { ProductLabelComponent } from '../../shared/components/product-label.component';
+import { CurrencyService } from '../../../../core/services/currency.service';
 
 /** Modal: variant selection + qty/cost entry for adding a purchase line. */
 @Component({
@@ -313,6 +314,7 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
 export class PurchaseItemEntryModalComponent {
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly currencyService = inject(CurrencyService);
 
   readonly isOpen = input.required<boolean>();
   readonly product = input.required<ProductSearchResult | null>();
@@ -444,10 +446,6 @@ export class PurchaseItemEntryModalComponent {
   }
 
   formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      minimumFractionDigits: 2,
-    }).format(amount);
+    return this.currencyService.formatMajor(amount);
   }
 }

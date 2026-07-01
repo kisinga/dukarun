@@ -1,3 +1,5 @@
+import { toDisplayDate } from '../../../../core/utils/date.util';
+
 /**
  * Pure formatting helpers for the accounting page. No DI; safe to use in components and tests.
  */
@@ -11,22 +13,12 @@ export function formatCurrency(amountInCents: number, locale: string = DEFAULT_L
   }).format(amountInCents / 100);
 }
 
-export function formatDate(dateStr: string, locale: string = DEFAULT_LOCALE): string {
-  return new Date(dateStr).toLocaleDateString(locale, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+export function formatDate(dateStr: string): string {
+  return toDisplayDate(dateStr, 'medium');
 }
 
-export function formatDateTime(dateStr: string, locale: string = DEFAULT_LOCALE): string {
-  return new Date(dateStr).toLocaleString(locale, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+export function formatDateTime(dateStr: string): string {
+  return toDisplayDate(dateStr, 'datetime');
 }
 
 const ACCOUNT_TYPE_LABELS: Record<string, string> = {

@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
+import { toDisplayDate } from '../../../../core/utils/date.util';
 
 /**
  * Customer View Modal Component
@@ -201,12 +202,7 @@ export class CustomerViewModalComponent {
    */
   formatDate(dateString: string | null | undefined): string {
     if (!dateString) return '—';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-    } catch {
-      return '—';
-    }
+    return toDisplayDate(dateString, 'medium');
   }
 
   /**

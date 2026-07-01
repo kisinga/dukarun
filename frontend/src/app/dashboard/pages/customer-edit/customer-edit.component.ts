@@ -12,6 +12,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { CreditCustomerSummary, CustomerService } from '../../../core/services/customer.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { toDisplayDate } from '../../../core/utils/date.util';
 import { PageHeaderComponent } from '../shared/components/page-header.component';
 import { PersonEditFormComponent } from '../shared/components/person-edit-form.component';
 
@@ -641,11 +642,6 @@ export class CustomerEditComponent {
 
   formatDate(dateString: string | null | undefined): string {
     if (!dateString) return '—';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-    } catch {
-      return '—';
-    }
+    return toDisplayDate(dateString, 'medium');
   }
 }

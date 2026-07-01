@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { PurchaseDraft } from '../../../../core/services/purchase.service.types';
+import { CurrencyService } from '../../../../core/services/currency.service';
 
 @Component({
   selector: 'app-purchase-payment-section',
@@ -125,11 +126,9 @@ export class PurchasePaymentSectionComponent {
     return Number.isNaN(parsed) ? null : parsed;
   }
 
+  private readonly currencyService = inject(CurrencyService);
+
   formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      minimumFractionDigits: 2,
-    }).format(amount);
+    return this.currencyService.formatMajor(amount);
   }
 }

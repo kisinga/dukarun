@@ -3,6 +3,8 @@ import { Router, RouterLink } from '@angular/router';
 import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { OrderStateBadgeComponent } from './order-state-badge.component';
+import { getOrderAmountOwing } from '../utils/order-payment.util';
+import { toDisplayDate } from '../../../../core/utils/date.util';
 
 export interface OrderTableRowData {
   id: string;
@@ -72,6 +74,13 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
     </td>
     <td class="text-center">{{ getItemCount() }}</td>
     <td class="text-right font-medium">{{ formatCurrency(order().totalWithTax) }}</td>
+    <td class="text-right">
+      @if (amountOwing() > 0) {
+        <span class="font-medium text-warning">{{ formatCurrency(amountOwing()) }}</span>
+      } @else {
+        <span class="text-base-content/40">-</span>
+      }
+    </td>
     <td>
       <app-order-state-badge
         [state]="order().state"
@@ -137,14 +146,7 @@ export class OrderTableRowComponent {
   }
 
   formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-KE', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return toDisplayDate(dateString, 'medium');
   }
 
   formatCurrency(amount: number): string {
@@ -164,18 +166,14 @@ export class OrderTableRowComponent {
     );
   }
 
+  readonly amountOwing = computed(() => getOrderAmountOwing(this.order()));
+
   readonly canPay = computed(() => {
     const order = this.order();
     if (order.state !== 'ArrangingPayment') return false;
     if (!order.customer) return false;
 
-    const payments = order.payments || [];
-    const settledPayments = payments
-      .filter((p: any) => p.state === 'Settled')
-      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-
-    const orderTotal = order.totalWithTax || order.total || 0;
-    return orderTotal - settledPayments > 0;
+    return this.amountOwing() > 0;
   });
 
   navigateToOrder(): void {

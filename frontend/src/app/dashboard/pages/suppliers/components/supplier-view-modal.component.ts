@@ -9,6 +9,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { toDisplayDate } from '../../../../core/utils/date.util';
 
 /**
  * Supplier View Modal Component
@@ -160,12 +161,7 @@ export class SupplierViewModalComponent {
    */
   formatDate(dateString: string | null | undefined): string {
     if (!dateString) return '—';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-    } catch {
-      return '—';
-    }
+    return toDisplayDate(dateString, 'medium');
   }
 
   /**

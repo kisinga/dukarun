@@ -11,13 +11,14 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../core/services/currency.service';
+import { toDisplayDate } from '../../../../core/utils/date.util';
 import { CustomerService } from '../../../../core/services/customer.service';
 import type { CreditCustomerSummary } from '../../../../core/services/customer.service';
 import { CustomerCreditService } from '../../../../core/services/customer/customer-credit.service';
 import { CustomerSearchService } from '../../../../core/services/customer/customer-search.service';
 import { AuthPermissionsService } from '../../../../core/services/auth/auth-permissions.service';
 import type { OrderListOptions } from '../../../../core/graphql/generated/graphql';
-import { GET_ORDERS } from '../../../../core/graphql/operations.graphql';
+import { GET_CUSTOMER_ORDERS } from '../../../../core/graphql/operations.graphql';
 import { ApolloService } from '../../../../core/services/apollo.service';
 import { OrderStateBadgeComponent } from '../../orders/components/order-state-badge.component';
 import {
@@ -25,7 +26,7 @@ import {
   BalanceOverrideModalData,
 } from '../components/balance-override-modal.component';
 
-const RECENT_ORDERS_TAKE = 15;
+const RECENT_ORDERS_TAKE = 25;
 
 /**
  * Read-only customer detail page.
@@ -50,6 +51,7 @@ export class CustomerDetailComponent implements OnInit {
   readonly customer = signal<any | null>(null);
   readonly creditSummary = signal<CreditCustomerSummary | null>(null);
   readonly recentOrders = signal<any[]>([]);
+  readonly recentPayments = signal<any[]>([]);
   readonly isLoading = signal(true);
   readonly error = signal<string | null>(null);
 
@@ -135,12 +137,13 @@ export class CustomerDetailComponent implements OnInit {
         return;
       }
 
-      const [summary, orders] = await Promise.all([
+      const [summary, activity] = await Promise.all([
         this.loadCreditSummary(customerId, c),
-        this.loadRecentOrders(customerId),
+        this.loadCustomerActivity(customerId),
       ]);
       this.creditSummary.set(summary);
-      this.recentOrders.set(orders);
+      this.recentOrders.set(activity.orders);
+      this.recentPayments.set(activity.payments);
       this.customerSearchService.hydrateCustomer(c, summary ?? undefined);
     } catch (err: any) {
       this.error.set(err?.message ?? 'Failed to load customer');
@@ -165,12 +168,20 @@ export class CustomerDetailComponent implements OnInit {
     }
   }
 
-  private async loadRecentOrders(customerId: string): Promise<any[]> {
+  /**
+   * Load this customer's recent orders AND payments from the paginated
+   * customer.orders relation (complete + scoped — not a global window that a
+   * customer's rows can fall outside of).
+   */
+  private async loadCustomerActivity(
+    customerId: string,
+  ): Promise<{ orders: any[]; payments: any[] }> {
     try {
       const client = this.apollo.getClient();
       const result = await client.query({
-        query: GET_ORDERS,
+        query: GET_CUSTOMER_ORDERS,
         variables: {
+          id: customerId,
           options: {
             take: RECENT_ORDERS_TAKE,
             skip: 0,
@@ -179,26 +190,23 @@ export class CustomerDetailComponent implements OnInit {
         },
         fetchPolicy: 'network-only',
       });
-      const items = result.data?.orders?.items ?? [];
-      return items.filter((o: any) => o.customer?.id === customerId);
+      const orders = result.data?.customer?.orders?.items ?? [];
+      const payments = orders
+        .flatMap((o: any) =>
+          (o.payments ?? []).map((p: any) => ({ ...p, orderId: o.id, orderCode: o.code })),
+        )
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 8); // summary card — full history is behind "View all payments"
+      return { orders, payments };
     } catch {
-      return [];
+      return { orders: [], payments: [] };
     }
   }
 
   formatDate(value: string | null | undefined): string {
     if (!value) return '—';
-    try {
-      return new Date(value).toLocaleDateString('en-KE', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return '—';
-    }
+    // datetime: orders/payments on the same day must stay distinguishable
+    return toDisplayDate(value, 'datetime');
   }
 
   formatCurrency(cents: number): string {
