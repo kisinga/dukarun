@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  OnDestroy,
   output,
   signal,
   viewChild,
@@ -90,7 +91,7 @@ import {
             <span class="badge badge-xs badge-ghost">?</span>
           </div>
         </div>
-        <span class="text-xs opacity-60">Camera or gallery</span>
+        <span class="text-xs opacity-60">Enables camera recognition at checkout</span>
       </button>
     } @else {
       <!-- Photo Grid -->
@@ -149,7 +150,7 @@ import {
     }
   `,
 })
-export class PhotoManagerComponent {
+export class PhotoManagerComponent implements OnDestroy {
   // State
   readonly photos = signal<File[]>([]);
   readonly photoPreviews = signal<string[]>([]);
@@ -175,15 +176,10 @@ export class PhotoManagerComponent {
     const allPhotos = [...currentPhotos, ...newFiles];
     this.photos.set(allPhotos);
 
-    // Generate previews for new photos
-    newFiles.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const preview = e.target?.result as string;
-        this.photoPreviews.set([...this.photoPreviews(), preview]);
-      };
-      reader.readAsDataURL(file);
-    });
+    // Previews via object URLs (cheap, releasable) — base64 data URLs bloat memory on low-end
+    // phones and can't be freed. Revoked on remove/clear/destroy below.
+    const newPreviews = newFiles.map((file) => URL.createObjectURL(file));
+    this.photoPreviews.set([...this.photoPreviews(), ...newPreviews]);
 
     // Emit changes
     this.photosChanged.emit(allPhotos);
@@ -200,6 +196,7 @@ export class PhotoManagerComponent {
     const photos = this.photos();
     const previews = this.photoPreviews();
 
+    this.revokePreview(previews[index]);
     photos.splice(index, 1);
     previews.splice(index, 1);
 
@@ -222,9 +219,20 @@ export class PhotoManagerComponent {
    * Clear all photos (for reset)
    */
   clearPhotos(): void {
+    this.photoPreviews().forEach((preview) => this.revokePreview(preview));
     this.photos.set([]);
     this.photoPreviews.set([]);
     this.photosChanged.emit([]);
     this.photoCountChange.emit(0);
+  }
+
+  ngOnDestroy(): void {
+    this.photoPreviews().forEach((preview) => this.revokePreview(preview));
+  }
+
+  private revokePreview(preview: string | undefined): void {
+    if (preview?.startsWith('blob:')) {
+      URL.revokeObjectURL(preview);
+    }
   }
 }

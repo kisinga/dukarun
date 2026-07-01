@@ -3,7 +3,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
-  Injector,
   OnDestroy,
   OnInit,
   computed,
@@ -20,6 +19,7 @@ import { CameraService } from '../../../../core/services/camera.service';
 import { ProductSearchResult } from '../../../../core/services/product/product-search.service';
 import { ProductSearchService } from '../../../../core/services/product/product-search.service';
 import { ScannerBeepService } from '../../../../core/services/scanner-beep.service';
+import { EmbedderService } from '../../../../core/services/ml-model/embedder.service';
 import { BarcodeDetector } from './detection/barcode-detector';
 import { DetectionCoordinator } from './detection/detection-coordinator';
 import { DetectionResult } from './detection/detection.types';
@@ -45,17 +45,15 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
       <div class="card bg-base-100 shadow-xl border-2 border-primary anim-fade-in">
         <div class="card-body p-3">
           <!-- Scanner Header -->
-          <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center justify-between mb-2" role="status" aria-live="polite">
             <div class="flex items-center gap-2">
               <div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
               <span class="font-semibold text-sm">Scanning...</span>
-              @if (activeDetectors().length > 0) {
-                <span class="text-xs text-base-content/70"
-                  >({{ activeDetectors().join(', ') }})</span
-                >
+              @if (detectorLabels()) {
+                <span class="text-xs text-base-content/70">({{ detectorLabels() }})</span>
               }
             </div>
-            <button class="btn btn-sm btn-error" (click)="stopScanner()">Stop</button>
+            <button class="btn btn-error min-h-11 px-5" (click)="stopScanner()">Stop</button>
           </div>
 
           <!-- Camera View -->
@@ -68,15 +66,59 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
               muted
             ></video>
 
-            <!-- Scan Frame -->
-            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div class="scan-frame"></div>
+            <!-- Aim box: centered SQUARE matching the center-crop ROI the recognizer reads -->
+            <div class="absolute inset-0 grid place-items-center pointer-events-none">
+              <div class="relative aspect-square h-[88%] max-h-full">
+                <div
+                  class="absolute inset-0 rounded-2xl ring-2 ring-primary/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
+                ></div>
+                <span
+                  class="absolute -top-px -left-px w-6 h-6 border-t-4 border-l-4 border-primary rounded-tl-2xl"
+                ></span>
+                <span
+                  class="absolute -top-px -right-px w-6 h-6 border-t-4 border-r-4 border-primary rounded-tr-2xl"
+                ></span>
+                <span
+                  class="absolute -bottom-px -left-px w-6 h-6 border-b-4 border-l-4 border-primary rounded-bl-2xl"
+                ></span>
+                <span
+                  class="absolute -bottom-px -right-px w-6 h-6 border-b-4 border-r-4 border-primary rounded-br-2xl"
+                ></span>
+                <span
+                  class="absolute -bottom-7 inset-x-0 text-center text-[11px] text-white/90 drop-shadow"
+                >
+                  Frame the item here
+                </span>
+              </div>
             </div>
+
+            <!-- Recognition model status (non-blocking; barcode keeps working throughout) -->
+            @if (embedderStatus().state === 'loading') {
+              <div
+                class="absolute top-0 inset-x-0 bg-base-100/90 backdrop-blur-sm px-3 py-2 flex items-center gap-2 text-xs"
+              >
+                <span class="loading loading-spinner loading-xs text-primary"></span>
+                <span class="flex-1 truncate">Preparing camera recognition…</span>
+                @if (embedderStatus().progress != null) {
+                  <span class="tabular-nums">{{ embedderStatus().progress }}%</span>
+                }
+              </div>
+            } @else if (embedderStatus().state === 'error') {
+              <div
+                class="absolute top-0 inset-x-0 bg-warning/90 text-warning-content px-3 py-2 text-xs text-center"
+              >
+                Camera recognition unavailable — barcode still works
+              </div>
+            }
           </div>
 
           <!-- Status Footer -->
-          <div class="text-center text-xs text-base-content/70 mt-2">
-            Point camera at product or barcode
+          <div class="text-center text-xs text-base-content/70 mt-2" aria-live="polite">
+            @if (mlActive()) {
+              Point the camera at a product or barcode
+            } @else {
+              Scan a barcode
+            }
           </div>
 
           <!-- Barcode Not Found Feedback -->
@@ -106,17 +148,29 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
           }
         </div>
       </div>
-    }
-  `,
-  styles: `
-    .scan-frame {
-      width: 80%;
-      height: 60%;
-      max-width: 300px;
-      max-height: 300px;
-      border: 3px solid oklch(var(--p));
-      border-radius: 1rem;
-      box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.5);
+    } @else {
+      <!-- Non-scanning states: never leave the camera area blank (error / permission / idle) -->
+      <div class="card bg-base-100 shadow-md border border-base-300">
+        <div class="card-body items-center text-center gap-3 p-6">
+          @if (scannerStatus() === 'error') {
+            <span class="material-symbols-outlined text-4xl text-error">no_photography</span>
+            <p class="font-semibold">Camera unavailable</p>
+            <p class="text-sm text-base-content/70">
+              Allow camera access, or search the product by name below.
+            </p>
+            <button class="btn btn-primary min-h-12 px-6" (click)="toggleScanner()">
+              Try again
+            </button>
+          } @else if (scannerStatus() === 'initializing') {
+            <span class="loading loading-spinner loading-lg text-primary"></span>
+            <p class="text-sm text-base-content/70">Starting camera…</p>
+          } @else {
+            <button class="btn btn-primary min-h-12 px-6 gap-2" (click)="toggleScanner()">
+              <span class="material-symbols-outlined">photo_camera</span> Tap to scan
+            </button>
+          }
+        </div>
+      </div>
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -124,7 +178,6 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
 export class ProductScannerComponent implements OnInit, OnDestroy {
   // Inputs
   readonly channelId = input.required<string>();
-  readonly confidenceThreshold = input<number>(0.9);
   readonly enableMLDetection = input<boolean>(true);
   readonly enableBarcodeScanning = input<boolean>(true);
   readonly autoStartOnMobile = input<boolean>(true);
@@ -137,7 +190,7 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
   readonly scanningStateChange = output<boolean>();
 
   // Services
-  private readonly injector = inject(Injector);
+  private readonly embedderService = inject(EmbedderService);
   private readonly backgroundStateService = inject(BackgroundStateService);
   private readonly cameraService = inject(CameraService);
   private readonly barcodeService = inject(BarcodeScannerService);
@@ -152,6 +205,17 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
   readonly isScanning = signal<boolean>(false);
   readonly activeDetectors = signal<string[]>([]);
   readonly barcodeNotFoundMessage = signal<string | null>(null);
+
+  /** Embedder load/download status, surfaced as a non-blocking banner (45MB one-time download). */
+  readonly embedderStatus = this.embedderService.status;
+  /** True once ML recognition is armed and active (≥3 enrolled products + model ready). */
+  readonly mlActive = computed(() => this.activeDetectors().includes('ml'));
+  /** Human-readable active-detector labels for the header (e.g. "Camera · Barcode"). */
+  readonly detectorLabels = computed(() =>
+    this.activeDetectors()
+      .map((n) => (n === 'ml' ? 'Camera' : n === 'barcode' ? 'Barcode' : n))
+      .join(' · '),
+  );
 
   // Detection coordinator
   private coordinator: DetectionCoordinator | null = null;
@@ -227,11 +291,9 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
       // Register ML detector
       if (this.enableMLDetection()) {
         const mlDetector = new MLDetector(
-          this.injector,
+          this.embedderService,
           this.productSearchService,
           this.beepService,
-          this.channelId(),
-          this.confidenceThreshold(),
         );
         this.coordinator.registerDetector(mlDetector);
       }

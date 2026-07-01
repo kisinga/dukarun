@@ -24,6 +24,14 @@
       "resources": {
         "files": ["/assets/logo/**", "/*.(eot|svg|cur|jpg|gif|otf|ttf|woff|woff2|ani)"]
       }
+    },
+    {
+      "name": "ml-recognition",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": ["/assets/ml/**"]
+      }
     }
   ],
   "dataGroups": [

@@ -59,18 +59,22 @@ registration. (Detector interface confirmed in
 `frontend/src/app/dashboard/pages/sell/components/detection/detection.types.ts`.)
 
 1. **`EmbedderService`** — `providedIn: 'root'` singleton, near `core/services/ml-model/`.
-   - `embed(source: HTMLVideoElement | HTMLCanvasElement): Promise<number[]>` (L2-normalized).
-   - Owns: model load, the model-file IndexedDB cache (keyed `embedder/<name>-<EMBEDDER_VERSION>`,
-     **one file shared across all channels**, not per-channel), and the shared preprocess
-     (resize + center-ROI crop + normalize).
+   - `embed(source: HTMLCanvasElement): Promise<number[]>` (L2-normalized). Wraps MobileCLIP-S0
+     via Transformers.js / ONNX Runtime Web; returns the CLIP **projection** output.
+   - Owns: model load with the **WebGPU/fp32 → WASM/fp32 fallback** (Section 7; int8 is broken), the model-file
+     cache (keyed `embedder/<name>-<EMBEDDER_VERSION>`, **one file shared across all channels**),
+     and the shared preprocess (the model's own `AutoProcessor` — do not hand-roll resize/normalize).
    - **Enrollment and inference inject the same instance** — that is how they "share one
      embedder": a DI singleton, not two constructions.
 
 2. **`embedding-match.ts`** — a **pure** module (no Angular, no I/O), beside the service.
-   - `cosineSim(a, b)`, `bestMatch(query, candidates) → { productId, score, margin }`
-     (max-over-set per product), `calibrateTau(fingerprints) → { tau, margin }`.
+   - `cosineSim(a, b)`, `bestMatch(query, candidates) → { productId, score, margin }`,
+     `calibrateTau(fingerprints) → { tau, margin }`. **Default match mode = centroid** (the
+     spike: centroid 94.3% vs max-over-set 85.7% raw top-1). `calibrateTau` sets the threshold
+     from the enrolment set's own genuine-vs-impostor similarity distributions (no label peeking).
    - **This is where matching lives** — not inside `MLDetector`, not on `ProductSearchService`
      (which stays a catalog lookup and must never learn what cosine similarity is).
+   - The spike's `match.js` is the working prototype — port it directly.
    - Independently unit-testable; reused by enrollment's "too close to an existing product?" check.
 
 3. **`MLDetector`** (rewritten body, **same constructor/Detector seam**) —
@@ -135,21 +139,37 @@ threaded end to end or the feature silently recognizes nothing:
 4. Persist it in the `ProductCachePayload` (`product-cache.service.ts`).
 5. `MLDetector.initialize()` reads fingerprints off the already-cached products — no extra fetch.
 
-## 7. Model choice
+## 7. Model choice — DECIDED: MobileCLIP-S0
 
-Ship behind the `Embedder` interface so the model is swappable, but **ship exactly one**
-(building two runtime paths re-creates the `combined/legacy` branching we are deleting).
+The spike settled it. On 16 real items (same-session split), nearest-match top-1 separability:
+MobileNet **88.6%** vs **MobileCLIP-S0 94.3%**; achievable recall at 0% false-accept (oracle
+ceiling) **77.1%** vs **91.4%**. MobileNet plateaus below the bar; MobileCLIP clears it with
+room. Latency on WebGPU was **31 ms** — well inside budget. So:
 
-- **Default: the MobileNet / TF.js you already ship** (`@tensorflow/tfjs` is already a
-  dependency; ~2–3 MB model, no new runtime).
-- **Upgrade to MobileCLIP-S0 int8 (~12 MB model + ~4 MB ONNX runtime) only if the spike
-  proves MobileNet's separability is insufficient.** MobileCLIP is contrastively trained, so
-  it is more robust to lighting/clutter and better at look-alike SKUs — but it costs a new
-  runtime and per-scan compute, so we don't pay for it until measurement says we must.
+- **Embedder = MobileCLIP-S0**, via Transformers.js / ONNX Runtime Web, using the CLIP **vision
+  tower + projection head** (`image_embeds`) — NOT a feature-extraction pipeline's pooled tokens.
+- Ship behind the `Embedder` interface, but **ship exactly one** model.
 
-Verified sizes (one-time, cached): MobileCLIP-S0 vision encoder — int8 **11.8 MB**, fp16
-22.9 MB, fp32 45.5 MB (Xenova ONNX). MobileNet feature extractor in our stack ≈ 2–3 MB.
-Fingerprint dim: MobileNet ~1280, MobileCLIP 512.
+**For MobileCLIP-S0 the only universally-correct weight is fp32** (all learned the hard way in
+the spike — each was a real, measured failure):
+- **int8 (q8, 11.8 MB) → BROKEN: near-constant garbage on BOTH WebGPU and WASM** (~9–27% top-1,
+  i.e. chance). The Xenova int8 export collapses this model's embedding space. Do not use.
+- **fp16 (22.9 MB) → needs the `shader-f16` GPU feature**, often missing → load fails. Not
+  universal; using it would force an fp32 fallback too = a two-model split. Avoid.
+- **fp32 (45.5 MB) → correct everywhere**: WebGPU (fast, ~67 ms) and WASM/CPU (correct, slower).
+
+So we ship **ONE model: fp32 (45 MB).** `EmbedderService` tries **WebGPU/fp32, falls back to
+WASM/fp32**, and pulls the CLIP **projection** output. One file, every device — no multi-model
+split (that split is the cost of trying to shrink). The spike's `embedders.js` implements this;
+port it. The 45 MB is the price of "one model that works everywhere." Fingerprint dim: **512**.
+
+> Low-end, no-GPU phones run fp32 on WASM/CPU — correct but slow (the int8 WASM run was ~243 ms
+> even while broken; real fp32/CPU will be higher). Measure on a real device; if it's too slow
+> there, that subset falls back to barcode-only, consistent with the assistive design.
+
+> Caveat: these numbers are from a **same-session** split (enrol/test from the same shoot),
+> which flatters absolute accuracy. The *relative* MobileCLIP ≫ MobileNet result is robust; the
+> absolute ~90% must be re-confirmed with a separate-session test before launch (Section 9).
 
 ## 8. Kill list
 
@@ -166,12 +186,26 @@ Fingerprint dim: MobileNet ~1280, MobileCLIP 512.
 **Before deleting**, per `CLAUDE.md`, run `gitnexus_impact` on the high-fan-in symbols:
 `MlModelService.predict`, `getProductIdFromLabel`, `ModelLoaderService.loadModel`.
 
-## 9. Task 0 — the spike (the gate; do this first)
+## 9. Task 0 — the spike — PASSED (same-session); separate-session confirm pending
 
-**Riskiest assumption:** the enrollment↔scan distribution gap (staged enroll photos vs
-handheld, off-angle, blurred, cluttered, fluorescent scan frames) is small enough that cosine
-separates genuine SKUs from look-alikes. Nothing else in the design measures this. **No app
-code** — a standalone harness.
+**Result (16 real items, same-session split, harness in `spikes/recognition/`):**
+MobileCLIP-S0 centroid — raw top-1 **94.3%**, **auto-calibrated (realistic) 88.6% genuine @
+0% false-accept**, oracle ceiling 91.4%, latency 31–67 ms (WebGPU/fp32). **VERDICT: PASS**
+(≥85% @ ≤2% FA). MobileNet centroid could not: at a tau giving 80% recall its false-accept hit
+**8.6%** — its genuine/impostor distributions overlap, so it can't be both high-recall and
+safe. The one genuinely confusable pair is the two **Fanta sizes** (1.5 L vs 330 ml) —
+barcode-only / margin-confirm. `calibrateTau` (genuine-vs-impostor from enrolment) was what
+lifted realistic from 74% → 88.6%; it ships in the app.
+
+**Still open (do before launch, not before building):** re-run with a **separate-session**
+test set (enrol one day, scan another under bad conditions) to confirm the absolute number
+survives the real enrolment↔scan gap. Same-session flatters it.
+
+---
+
+**Riskiest assumption (why the spike existed):** the enrollment↔scan distribution gap (staged
+enroll photos vs handheld, off-angle, blurred, cluttered, fluorescent scan frames) is small
+enough that cosine separates genuine SKUs from look-alikes. **No app code** — a standalone harness.
 
 **Setup:**
 - 15–20 real SKUs, including 2–3 deliberate look-alike pairs (e.g. 500 ml vs 1 L of the same brand).

@@ -44,3 +44,8 @@ Thumbs.db
 # GraphQL Code Generator
 # Uncomment the line below if you don't want to commit generated types
 # /src/app/core/graphql/generated/
+
+# On-device recognition runtime + model (copied/downloaded by scripts, not committed)
+# ORT runtime: scripts/copy-ml-runtime.mjs (runs via prebuild/prestart)
+# Model (offline): npm run ml:fetch-model (scripts/fetch-recognition-model.mjs)
+/public/assets/ml/

@@ -110,6 +110,12 @@ function loadImage(file) {
 }
 
 function log(line = '') { els.out.textContent += line + '\n'; }
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)),
+  ]);
+}
 function pct(x) { return (100 * x).toFixed(1) + '%'; }
 function median(a) { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)] || 0; }
 function p90(a) { const s = [...a].sort((x, y) => x - y); return s[Math.floor(0.9 * (s.length - 1))] || 0; }
@@ -143,11 +149,19 @@ async function runEmbedder(key, split) {
   log(`========================================`);
   els.status.textContent = `loading ${def.label}…`;
 
+  // Progress goes to the status line always, and milestones (non-% lines) also go to the
+  // output box so they're captured in what you copy/paste.
+  const onProgress = (msg) => {
+    els.status.textContent = msg;
+    if (!msg.includes('%')) log(`  · ${msg}`);
+  };
+
   let embedder;
   try {
-    embedder = await def.create();
+    log(`  loading model… (first run downloads weights; MobileCLIP can take 30–90s)`);
+    embedder = await withTimeout(def.create(onProgress), 120000, 'model load');
   } catch (err) {
-    log(`!! failed to load: ${err.message}`);
+    log(`!! failed to load: ${err?.message || String(err)}`);
     log(`   (network? for MobileCLIP try device 'wasm' or dtype 'fp16' in embedders.js)`);
     return;
   }

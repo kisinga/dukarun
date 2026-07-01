@@ -80,24 +80,35 @@ export function bestMatch(query, candidates, mode = 'max') {
  * This is the candidate the spike validates against real scan photos.
  */
 export function calibrateTau(candidates) {
+  // Set tau from the enrolment set's OWN genuine vs impostor similarity distributions —
+  // no test-label peeking. Within-product photo pairs are genuine; cross-product pairs are
+  // impostor. tau should sit above the impostors (safety) and below most genuines (recall).
+  // (The earlier impostor-only formula over-abstained on models whose genuine scores sit
+  //  close to their impostors — e.g. MobileCLIP — throwing away real recall.)
+  const genuine = [];
   const impostor = [];
   for (let i = 0; i < candidates.length; i++) {
-    for (const v of candidates[i].vectors) {
-      let worst = -1;
+    const vi = candidates[i].vectors;
+    for (let a = 0; a < vi.length; a++) {
+      for (let b = a + 1; b < vi.length; b++) genuine.push(cosineSim(vi[a], vi[b]));
       for (let j = 0; j < candidates.length; j++) {
         if (i === j) continue;
-        for (const w of candidates[j].vectors) {
-          const s = cosineSim(v, w);
-          if (s > worst) worst = s;
-        }
+        for (const w of candidates[j].vectors) impostor.push(cosineSim(vi[a], w));
       }
-      if (worst > -1) impostor.push(worst);
     }
   }
-  if (!impostor.length) return { tau: 0.5, margin: 0.05 };
+  if (!impostor.length) return { tau: 0.5, margin: 0.04 };
   impostor.sort((a, b) => a - b);
-  const p95 = impostor[Math.floor(0.95 * (impostor.length - 1))];
-  return { tau: Math.min(0.95, p95 + 0.02), margin: 0.05 };
+  const impHi = impostor[Math.floor(0.98 * (impostor.length - 1))]; // above ~all impostors
+  let tau = impHi + 0.02;
+  if (genuine.length) {
+    genuine.sort((a, b) => a - b);
+    const genLo = genuine[Math.floor(0.1 * (genuine.length - 1))]; // below most genuines
+    // Clean separation -> midpoint. Overlap -> lean on the impostor ceiling and let the
+    // top1/top2 margin gate handle the contested region.
+    tau = impHi < genLo ? (impHi + genLo) / 2 : impHi + 0.01;
+  }
+  return { tau: Math.max(0.2, Math.min(0.95, tau)), margin: 0.04 };
 }
 
 /**

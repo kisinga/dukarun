@@ -610,6 +610,11 @@ export const GET_PRODUCT = graphql(`
     product(id: $id) {
       id
       name
+      customFields {
+        barcode
+        mlEmbedding
+        mlEmbeddingVersion
+      }
       featuredAsset {
         preview
       }
@@ -696,6 +701,11 @@ export const PREFETCH_PRODUCTS = graphql(`
         id
         name
         enabled
+        customFields {
+          barcode
+          mlEmbedding
+          mlEmbeddingVersion
+        }
         featuredAsset {
           preview
         }

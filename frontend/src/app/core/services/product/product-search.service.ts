@@ -49,12 +49,21 @@ export interface ProductSearchResult {
   id: string;
   name: string;
   enabled?: boolean;
+  /** Product-level barcode (shared across variants). Cached so barcode scanning works offline. */
+  barcode?: string;
   variants: ProductVariant[];
   featuredAsset?: {
     preview: string;
   };
   /** For manufacturer/category pills (facet.code = manufacturer | category) */
   facetValues?: ProductFacetValue[];
+  /**
+   * On-device image-recognition fingerprints (per-image CLIP embeddings, each 512-dim).
+   * Parsed once from the `mlEmbedding` product custom field; undefined when not enrolled.
+   */
+  mlFingerprint?: number[][];
+  /** Embedder version the fingerprints were produced with (gates cross-version matching). */
+  mlEmbeddingVersion?: string;
 }
 
 /**
@@ -185,10 +194,30 @@ export class ProductSearchService {
   }
 
   /**
+   * Enrolled image-recognition candidates (productId → per-image fingerprints) from the offline
+   * cache, for the given embedder version. Thin facade over the cache so the scanner depends only
+   * on ProductSearchService.
+   */
+  getRecognitionCandidates(embedderVersion: string): Map<string, number[][]> {
+    return this.cacheService.getRecognitionCandidates(embedderVersion);
+  }
+
+  /**
    * Search by barcode
    */
   async searchByBarcode(barcode: string): Promise<ProductVariant | null> {
     if (isBarcodeIgnored(barcode)) return null;
+
+    // Offline-first: resolve from the product cache when available, so barcode scanning works
+    // offline at the counter — parity with ML recognition, which already runs from the cache.
+    // Falls through to the network when the cache is cold or the barcode isn't cached (online).
+    if (this.cacheService.isCacheReady()) {
+      const cachedVariant = this.cacheService.getProductByBarcode(barcode)?.variants?.[0];
+      if (cachedVariant) {
+        return cachedVariant;
+      }
+    }
+
     try {
       const client = this.apolloService.getClient();
       const result = await client.query({

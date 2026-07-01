@@ -4,7 +4,10 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
+    "prestart": "node scripts/copy-ml-runtime.mjs",
     "build": "ng build",
+    "prebuild": "node scripts/copy-ml-runtime.mjs",
+    "ml:fetch-model": "node scripts/fetch-recognition-model.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "test:headless": "USE_HEADLESS=true ng test --watch=false",
@@ -41,6 +44,7 @@
     "@angular/service-worker": "^21.0.8",
     "@angular/ssr": "^21.2.17",
     "@apollo/client": "^4.0.12",
+    "@huggingface/transformers": "3.8.1",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
     "@opentelemetry/instrumentation": "^0.219.0",
