@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { ApprovalRequest, ApprovalService } from '../../../core/services/approval.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { CurrencyService } from '../../../core/services/currency.service';
@@ -8,7 +9,7 @@ import { PageHeaderComponent } from '../shared/components/page-header.component'
 
 @Component({
   selector: 'app-approvals',
-  imports: [CommonModule, PageHeaderComponent],
+  imports: [CommonModule, NgIcon, PageHeaderComponent],
   template: `
     <div class="min-h-screen bg-base-100">
       <app-page-header title="Approvals" (backClick)="goBack()" />
@@ -52,13 +53,13 @@ import { PageHeaderComponent } from '../shared/components/page-header.component'
         <!-- Empty state -->
         @if (!isLoading() && approvals().length === 0) {
           <div class="text-center py-12 text-base-content/50">
-            <p class="text-4xl mb-2">
+            <div class="mb-2 flex justify-center">
               @if (activeTab() === 'pending') {
-                &#x2714;
+                <ng-icon name="heroCheckCircle" size="2.25rem" />
               } @else {
-                &#x1F4CB;
+                <ng-icon name="heroClipboardDocumentList" size="2.25rem" />
               }
-            </p>
+            </div>
             <p>
               @if (activeTab() === 'pending') {
                 No pending approvals

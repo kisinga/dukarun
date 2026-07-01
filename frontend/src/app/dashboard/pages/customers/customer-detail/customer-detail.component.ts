@@ -133,6 +133,9 @@ export class CustomerDetailComponent implements OnInit {
       const c = await this.customerService.getCustomerById(customerId);
       this.customer.set(c);
       if (!c) {
+        // Never blank the page: getCustomerById() swallows errors and returns
+        // null, so surface it as an error instead of rendering nothing.
+        this.error.set('Customer not found or could not be loaded.');
         this.isLoading.set(false);
         return;
       }

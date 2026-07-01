@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { NgIcon } from '@ng-icons/core';
 import type { OrderListOptions } from '../../../core/graphql/generated/graphql';
 import { CustomerService } from '../../../core/services/customer.service';
 import { OrderService } from '../../../core/services/order.service';
@@ -45,6 +46,7 @@ import { OrdersListFilterService } from './services/orders-list-filter.service';
   selector: 'app-orders',
   imports: [
     CommonModule,
+    NgIcon,
     OrderCardComponent,
     OrderStatsComponent,
     OrderTableRowComponent,

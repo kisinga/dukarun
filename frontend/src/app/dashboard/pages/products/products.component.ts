@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { AuthService } from '../../../core/services/auth.service';
 import {
   buildProductListOptions,
@@ -50,6 +51,7 @@ import {
   imports: [
     CommonModule,
     RouterLink,
+    NgIcon,
     ProductCardComponent,
     ProductListFacetSelectorComponent,
     ProductStatsComponent,

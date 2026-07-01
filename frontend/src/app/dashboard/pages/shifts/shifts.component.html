@@ -1,34 +1,10 @@
 <div class="space-y-6 anim-stagger">
-  <div class="flex items-start justify-between gap-4">
-    <div class="flex-1 min-w-0">
-      <h2 class="text-lg font-semibold">Shifts</h2>
-      <p class="text-sm text-base-content/60 mt-0.5">Monitor cashier sessions</p>
-    </div>
-    <button
-      type="button"
-      class="btn btn-ghost btn-sm btn-square"
-      (click)="load()"
-      [class.loading]="sessionsLoading()"
-      title="Refresh"
-    >
-      @if (!sessionsLoading()) {
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-          />
-        </svg>
-      }
-    </button>
-  </div>
+  <app-page-header
+    title="Shifts"
+    subtitle="Monitor cashier sessions"
+    [isLoading]="sessionsLoading()"
+    (refresh)="load()"
+  />
 
   @if (error(); as err) {
     <div role="alert" class="alert alert-error">
@@ -145,9 +121,9 @@
                       [title]="isSessionExpanded(session) ? 'Collapse details' : 'Expand details'"
                     >
                       @if (isSessionExpanded(session)) {
-                        <span aria-hidden="true">▼</span>
+                        <ng-icon name="heroChevronDown" size="1rem" aria-hidden="true" />
                       } @else {
-                        <span aria-hidden="true">▶</span>
+                        <ng-icon name="heroChevronRight" size="1rem" aria-hidden="true" />
                       }
                     </button>
                   </td>

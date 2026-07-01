@@ -13,41 +13,9 @@
               class="object-cover w-full h-full rounded-lg"
             />
           } @else if (isService()) {
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-8 w-8 text-accent"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
+            <ng-icon name="heroCog6Tooth" size="2rem" class="text-accent" />
           } @else {
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-8 w-8 text-primary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-              />
-            </svg>
+            <ng-icon name="heroCube" size="2rem" class="text-primary" />
           }
         </div>
       </div>
@@ -116,20 +84,7 @@
       <div class="bg-base-200 rounded-lg p-2.5">
         <div class="text-xs text-base-content/60 mb-0.5">Variants</div>
         <div class="flex items-center gap-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4 text-secondary"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-            />
-          </svg>
+          <ng-icon name="heroTag" size="1rem" class="text-secondary" />
           <span class="text-base font-bold">{{ variantCount() }}</span>
         </div>
       </div>
@@ -137,24 +92,14 @@
       <div class="bg-base-200 rounded-lg p-2.5">
         <div class="text-xs text-base-content/60 mb-0.5">Stock Level</div>
         <div class="flex items-center gap-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
+          <ng-icon
+            name="heroArchiveBox"
+            size="1rem"
             [class.text-info]="isService()"
             [class.text-success]="!isService() && totalStock() > 20"
             [class.text-warning]="!isService() && totalStock() > 0 && totalStock() <= 20"
             [class.text-error]="!isService() && totalStock() === 0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-            />
-          </svg>
+          />
           <span class="text-base font-bold">{{ getStockDisplay() }}</span>
         </div>
       </div>
@@ -163,56 +108,17 @@
     <!-- Action Buttons -->
     <div class="flex gap-2">
       <button (click)="onAction('purchase')" class="btn btn-primary btn-sm flex-1 gap-1.5">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-          />
-        </svg>
+        <ng-icon name="heroShoppingCart" size="1rem" />
         Purchase
       </button>
       @if (canEdit()) {
         <button (click)="onAction('edit')" class="btn btn-ghost btn-sm flex-1 gap-1.5">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-            />
-          </svg>
+          <ng-icon name="heroPencilSquare" size="1rem" />
           Edit
         </button>
       }
       <button (click)="onAction('delete')" class="btn btn-error btn-outline btn-sm gap-1.5">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-          />
-        </svg>
+        <ng-icon name="heroTrash" size="1rem" />
         Delete
       </button>
     </div>

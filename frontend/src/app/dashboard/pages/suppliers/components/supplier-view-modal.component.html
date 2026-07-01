@@ -68,7 +68,13 @@
                 {{ formatCurrency(getOutstandingAmountAbs()) }}
               </div>
               <div class="text-xs text-base-content/60">
-                {{ getOutstandingAmount() < 0 ? 'Owed' : 'Credit' }}
+                {{
+                  getOutstandingAmount() === 0
+                    ? 'Settled'
+                    : getOutstandingAmount() < 0
+                      ? 'Owed'
+                      : 'Credit'
+                }}
               </div>
             </div>
             @if (isSupplierCreditApproved()) {
@@ -184,26 +190,26 @@
       }
     </div>
 
-    <!-- Footer Actions -->
+    <!-- Footer: one primary CTA, subtle secondaries, destructive separated -->
     <div
-      class="sticky bottom-0 bg-base-100 border-t border-base-300 px-4 py-3 flex flex-col sm:flex-row gap-2 flex-wrap"
+      class="sticky bottom-0 bg-base-100 border-t border-base-300 px-4 py-3 flex flex-wrap items-center gap-2"
     >
-      <button class="btn btn-primary flex-1 min-w-[120px]" (click)="onViewPurchases()">
-        <ng-icon name="heroShoppingBag" />
-        View Purchases
-      </button>
       @if (isSupplierCreditApproved()) {
-        <button class="btn btn-secondary flex-1 min-w-[120px]" (click)="onRecordPayment()">
-          <ng-icon name="heroBanknotes" />
+        <button class="btn btn-primary btn-sm gap-1.5" (click)="onRecordPayment()">
+          <ng-icon name="heroBanknotes" size="1rem" />
           Record Payment
         </button>
       }
-      <button class="btn btn-outline flex-1 min-w-[120px]" (click)="onEdit()">
-        <ng-icon name="heroPencilSquare" />
+      <button class="btn btn-ghost btn-sm gap-1.5" (click)="onViewPurchases()">
+        <ng-icon name="heroShoppingBag" size="1rem" />
+        Purchases
+      </button>
+      <button class="btn btn-ghost btn-sm gap-1.5" (click)="onEdit()">
+        <ng-icon name="heroPencilSquare" size="1rem" />
         Edit
       </button>
-      <button class="btn btn-error btn-outline flex-1 min-w-[120px]" (click)="onDelete()">
-        <ng-icon name="heroTrash" />
+      <button class="btn btn-ghost btn-sm gap-1.5 text-error ml-auto" (click)="onDelete()">
+        <ng-icon name="heroTrash" size="1rem" />
         Delete
       </button>
     </div>

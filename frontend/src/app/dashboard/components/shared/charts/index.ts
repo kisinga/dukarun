@@ -5,4 +5,3 @@ export { PeriodSelectorComponent, type AnalyticsPeriod } from './period-selector
 export { RankedListComponent, type RankedItem } from './ranked-list.component';
 export { RankedCardComponent } from './ranked-card.component';
 export { EchartContainerComponent } from './echart-container.component';
-export { StatCardStripComponent } from './stat-card-strip.component';

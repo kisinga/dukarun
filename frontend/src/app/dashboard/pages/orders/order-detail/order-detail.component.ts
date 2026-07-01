@@ -15,6 +15,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { NgIcon } from '@ng-icons/core';
 import { CustomerService } from '../../../../core/services/customer.service';
 import { OrderService } from '../../../../core/services/order.service';
 import { OrdersService } from '../../../../core/services/orders.service';
@@ -53,6 +54,7 @@ import { PayOrderModalComponent, PayOrderModalData } from '../components/pay-ord
   imports: [
     CommonModule,
     RouterModule,
+    NgIcon,
     OrderDetailHeaderComponent,
     OrderCustomerInfoComponent,
     OrderAddressComponent,

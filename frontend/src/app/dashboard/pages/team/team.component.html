@@ -5,54 +5,26 @@
     class="btn btn-lg btn-circle btn-primary shadow-xl"
     aria-label="Add team member"
   >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      class="h-6 w-6"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-      />
-    </svg>
+    <ng-icon name="heroPlus" size="1.5rem" />
   </button>
 </div>
 
 <div class="space-y-5 lg:space-y-6 anim-stagger">
   <!-- Header -->
-  <div class="flex items-start justify-between gap-4">
-    <div class="flex-1 min-w-0">
-      <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Team</h1>
-      <p class="text-sm text-base-content/60 mt-1">Manage channel administrators and permissions</p>
-    </div>
-
-    <div class="flex gap-2 shrink-0">
-      <button
-        class="btn btn-primary btn-sm lg:btn-md gap-2 hidden lg:flex"
-        (click)="onCreateClick()"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-          />
-        </svg>
-        Add Team Member
-      </button>
-    </div>
-  </div>
+  <app-page-header
+    title="Team"
+    subtitle="Manage channel administrators and permissions"
+    [showRefresh]="false"
+  >
+    <button
+      actions
+      class="btn btn-primary btn-sm lg:btn-md gap-2 hidden lg:flex"
+      (click)="onCreateClick()"
+    >
+      <ng-icon name="heroPlus" size="1rem" />
+      Add Team Member
+    </button>
+  </app-page-header>
 
   <!-- Statistics Cards -->
   @if (stats(); as statsData) {
@@ -66,20 +38,7 @@
             <div
               class="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 text-secondary"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
+              <ng-icon name="heroUsers" size="1.25rem" class="text-secondary" />
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-xs text-base-content/60 truncate">Total Members</p>
@@ -96,20 +55,7 @@
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 text-success"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+              <ng-icon name="heroCheckCircle" size="1.25rem" class="text-success" />
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-xs text-base-content/60 truncate">Verified</p>
@@ -128,20 +74,7 @@
         <div class="card-body p-3 lg:p-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 text-info"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                />
-              </svg>
+              <ng-icon name="heroCheckBadge" size="1.25rem" class="text-info" />
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-xs text-base-content/60 truncate">Roles</p>
@@ -169,20 +102,7 @@
   <!-- Error Alert -->
   @if (error(); as errorMsg) {
     <div role="alert" class="alert alert-error">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-5 w-5 shrink-0"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
+      <ng-icon name="heroExclamationTriangle" size="1.25rem" class="shrink-0" />
       <span class="flex-1">{{ errorMsg }}</span>
     </div>
   }
@@ -207,20 +127,7 @@
           <div
             class="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-8 w-8 lg:h-10 lg:w-10 text-base-content/30"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
+            <ng-icon name="heroUsers" size="2rem" class="lg:text-[2.5rem] text-base-content/30" />
           </div>
           <h3 class="text-lg font-semibold">No team members found</h3>
           @if (searchQuery()) {
@@ -235,20 +142,7 @@
               Get started by adding your first team member.
             </p>
             <button class="btn btn-primary btn-sm mt-6 gap-2" (click)="onCreateClick()">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
+              <ng-icon name="heroPlus" size="1rem" />
               Add Team Member
             </button>
           }
@@ -322,28 +216,14 @@
             </div>
             <div class="flex gap-2">
               <button class="btn btn-ghost btn-sm flex-1 gap-1.5" (click)="onEditClick(member)">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                  />
-                </svg>
+                <ng-icon name="heroPencilSquare" size="1rem" />
                 Edit
               </button>
               <button
                 class="btn btn-error btn-outline btn-sm flex-1 gap-1.5"
                 (click)="onDeleteClick(member)"
               >
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
+                <ng-icon name="heroTrash" size="1rem" />
                 Remove
               </button>
             </div>

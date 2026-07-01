@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { OrderStateBadgeComponent } from './order-state-badge.component';
@@ -43,7 +44,7 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
 
 @Component({
   selector: 'tr[app-order-table-row]',
-  imports: [OrderStateBadgeComponent, RouterLink, HoverPreviewHostComponent],
+  imports: [OrderStateBadgeComponent, RouterLink, HoverPreviewHostComponent, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class: 'cursor-pointer transition-colors',
@@ -102,19 +103,7 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
             class="btn btn-xs btn-ghost"
             (click)="onAction('print'); $event.stopPropagation()"
           >
-            <svg
-              class="h-3.5 w-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-              />
-            </svg>
+            <ng-icon name="heroPrinter" size="1rem" />
           </button>
         }
         @if (canVoid()) {

@@ -10,6 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 
 export interface QuantityInputData {
@@ -23,7 +24,7 @@ export interface QuantityInputData {
 @Component({
   selector: 'app-quantity-input-sheet',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, NgIcon],
   template: `
     <!-- Backdrop -->
     <div
@@ -53,20 +54,7 @@ export interface QuantityInputData {
         <div class="flex items-center justify-between">
           <h3 class="font-semibold text-lg">Update Quantity</h3>
           <button class="btn btn-ghost btn-sm btn-circle" (click)="close()" aria-label="Close">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <ng-icon name="heroXMark" size="1.25rem" />
           </button>
         </div>
       </div>

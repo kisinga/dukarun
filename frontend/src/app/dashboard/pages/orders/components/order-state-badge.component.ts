@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 
 /**
@@ -13,12 +14,12 @@ import { CurrencyService } from '../../../../core/services/currency.service';
  */
 @Component({
   selector: 'app-order-state-badge',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <span class="badge badge-sm" [class]="badgeClass()">
       @if (showIcon()) {
-        <span class="mr-1">{{ icon() }}</span>
+        <ng-icon [name]="icon()" size="1rem" class="mr-1" />
       }
       {{ label() }}
     </span>
@@ -64,12 +65,12 @@ export class OrderStateBadgeComponent {
 
   readonly icon = computed(() => {
     const outstanding = this.outstandingAmount();
-    if (outstanding != null && outstanding > 0) return '⚠';
-    if (this.reversedAt() != null) return '↩';
+    if (outstanding != null && outstanding > 0) return 'heroExclamationTriangle';
+    if (this.reversedAt() != null) return 'heroArrowUturnLeft';
     const state = this.state();
-    if (state === 'Fulfilled') return '✓';
-    if (state === 'PaymentSettled') return '○';
-    if (state === 'ArrangingPayment') return '⚠';
+    if (state === 'Fulfilled') return 'heroCheckCircle';
+    if (state === 'PaymentSettled') return 'heroCheck';
+    if (state === 'ArrangingPayment') return 'heroExclamationTriangle';
     return '';
   });
 

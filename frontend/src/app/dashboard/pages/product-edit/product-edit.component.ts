@@ -17,6 +17,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { ProductService } from '../../../core/services/product.service';
 import { ProductNameInputComponent } from '../product-create/components/product-name-input.component';
 import { ValidationIssuesPanelComponent } from '../product-create/components/validation-issues-panel.component';
@@ -35,6 +36,7 @@ import { PhotoEditorComponent, ProductAsset } from './components/photo-editor.co
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    NgIcon,
     PhotoEditUnlockModalComponent,
     PhotoEditorComponent,
     ProductNameInputComponent,

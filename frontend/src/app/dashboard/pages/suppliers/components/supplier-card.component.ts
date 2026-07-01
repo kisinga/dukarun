@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { EntityAvatarComponent } from '../../../components/shared/entity-avatar.component';
 import { StatusBadgeComponent } from '../../../components/shared/status-badge.component';
 import { toDisplayDate } from '../../../../core/utils/date.util';
@@ -8,7 +9,7 @@ export type SupplierAction = 'view' | 'edit' | 'delete' | 'recordPayment';
 
 @Component({
   selector: 'app-supplier-card',
-  imports: [CommonModule, EntityAvatarComponent, StatusBadgeComponent],
+  imports: [CommonModule, NgIcon, EntityAvatarComponent, StatusBadgeComponent],
   templateUrl: './supplier-card.component.html',
   styleUrl: './supplier-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

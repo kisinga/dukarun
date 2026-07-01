@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { CustomerService } from '../../../../core/services/customer.service';
 
@@ -21,7 +22,7 @@ import { CustomerService } from '../../../../core/services/customer.service';
 @Component({
   selector: 'app-bulk-payment-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NgIcon],
   templateUrl: './bulk-payment-modal.component.html',
   styleUrl: './bulk-payment-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

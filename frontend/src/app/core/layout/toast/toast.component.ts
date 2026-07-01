@@ -1,8 +1,10 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-toast',
+  imports: [NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="toast toast-top toast-end z-50">
@@ -10,7 +12,7 @@ import { ToastService } from '../../services/toast.service';
         <div class="alert anim-slide-in-right" [class]="getAlertClass(toast.type)">
           <div class="flex items-start gap-3">
             <div class="flex-shrink-0">
-              <span class="text-lg">{{ getIcon(toast.type) }}</span>
+              <ng-icon [name]="getIcon(toast.type)" size="1.25rem" />
             </div>
             <div class="flex-1 min-w-0">
               <h4 class="font-semibold text-sm">{{ toast.title }}</h4>
@@ -21,14 +23,7 @@ import { ToastService } from '../../services/toast.service';
               (click)="onDismiss(toast.id)"
               aria-label="Close notification"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                ></path>
-              </svg>
+              <ng-icon name="heroXMark" size="1rem" />
             </button>
           </div>
         </div>
@@ -70,13 +65,13 @@ export class ToastComponent {
   getIcon(type: string): string {
     switch (type) {
       case 'success':
-        return '✅';
+        return 'heroCheckCircle';
       case 'warning':
-        return '⚠️';
+        return 'heroExclamationTriangle';
       case 'error':
-        return '❌';
+        return 'heroXCircle';
       default:
-        return 'ℹ️';
+        return 'heroInformationCircle';
     }
   }
 }

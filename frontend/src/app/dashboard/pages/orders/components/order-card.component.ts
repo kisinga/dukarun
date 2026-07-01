@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { OrderStateBadgeComponent } from './order-state-badge.component';
@@ -43,7 +44,7 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
 
 @Component({
   selector: 'app-order-card',
-  imports: [OrderStateBadgeComponent, RouterLink, HoverPreviewHostComponent],
+  imports: [OrderStateBadgeComponent, RouterLink, HoverPreviewHostComponent, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -57,19 +58,7 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
             <div
               class="w-14 h-14 rounded-lg ring-2 ring-base-300 ring-offset-1 bg-base-200 flex items-center justify-center"
             >
-              <svg
-                class="h-7 w-7 text-primary"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
+              <ng-icon name="heroDocumentText" size="1.75rem" class="text-primary" />
             </div>
           </div>
           <div class="flex-1 min-w-0">
@@ -134,19 +123,7 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
               (click)="onAction('print'); $event.stopPropagation()"
               class="btn btn-ghost btn-xs gap-1"
             >
-              <svg
-                class="h-3.5 w-3.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                />
-              </svg>
+              <ng-icon name="heroPrinter" size="1rem" />
               Print
             </button>
           }

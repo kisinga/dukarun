@@ -9,6 +9,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { getExpenseCategoryLabel } from '../../../core/constants/expense-categories';
 import { CashierSessionService } from '../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../core/services/company.service';
@@ -16,7 +17,7 @@ import { CurrencyService } from '../../../core/services/currency.service';
 import { DashboardService } from '../../../core/services/dashboard.service';
 import { JournalEntry, LedgerService } from '../../../core/services/ledger/ledger.service';
 import { toDisplayDate } from '../../../core/utils/date.util';
-import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
+import { PageHeaderComponent } from '../../components/shared/page-header.component';
 import { RecordExpenseModalComponent } from '../shifts/record-expense-modal.component';
 
 const EXPENSE_SOURCE_TYPE = 'Expense';
@@ -27,7 +28,7 @@ const EXPENSE_SOURCE_TYPE = 'Expense';
  */
 @Component({
   selector: 'app-expenses',
-  imports: [CommonModule, PageHeaderComponent, RecordExpenseModalComponent],
+  imports: [CommonModule, NgIcon, PageHeaderComponent, RecordExpenseModalComponent],
   templateUrl: './expenses.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

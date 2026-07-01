@@ -1,29 +1,17 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { CheckoutSummaryComponent } from './checkout-summary.component';
 
 @Component({
   selector: 'app-checkout-cashier',
   standalone: true,
-  imports: [CommonModule, CheckoutSummaryComponent],
+  imports: [CommonModule, NgIcon, CheckoutSummaryComponent],
   template: `
     <div class="space-y-4 anim-stagger">
       <div class="text-center">
         <div class="inline-flex items-center justify-center w-8 h-8 bg-info/10 rounded-full mb-3">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 text-info"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            />
-          </svg>
+          <ng-icon name="heroClipboardDocument" size="1.25rem" class="text-info" />
         </div>
         <h4 class="font-bold text-lg sm:text-xl mb-1">Send to Cashier</h4>
       </div>
@@ -43,20 +31,7 @@ import { CheckoutSummaryComponent } from './checkout-summary.component';
         @if (isProcessing()) {
           <span class="loading loading-spinner"></span>
         } @else {
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-            />
-          </svg>
+          <ng-icon name="heroClipboardDocumentCheck" size="1.25rem" />
         }
         Submit to Cashier
       </button>

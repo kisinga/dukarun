@@ -68,7 +68,13 @@
                 {{ formatCurrency(getOutstandingAmountAbs()) }}
               </div>
               <div class="text-xs text-base-content/60">
-                {{ getOutstandingAmount() < 0 ? 'Owed' : 'Credit' }}
+                {{
+                  getOutstandingAmount() === 0
+                    ? 'Settled'
+                    : getOutstandingAmount() < 0
+                      ? 'Owed'
+                      : 'Credit'
+                }}
               </div>
             </div>
             @if (isCreditApproved()) {
@@ -160,36 +166,34 @@
       }
     </div>
 
-    <!-- Footer Actions -->
-    <div class="sticky bottom-0 bg-base-100 border-t border-base-300 px-4 py-3 flex flex-col gap-2">
-      <div class="flex flex-col sm:flex-row gap-2">
-        <button class="btn btn-primary flex-1" (click)="onViewOrders()">
-          <ng-icon name="heroClipboardDocumentList" />
-          View Orders
+    <!-- Footer: one primary CTA, subtle secondaries -->
+    <div
+      class="sticky bottom-0 bg-base-100 border-t border-base-300 px-4 py-3 flex flex-wrap items-center gap-2"
+    >
+      @if (isCreditApproved() || isCreditFrozen()) {
+        <button class="btn btn-primary btn-sm gap-1.5" (click)="onRecordPayment()">
+          <ng-icon name="heroBanknotes" size="1rem" />
+          Record Payment
         </button>
-        @if (isCreditApproved() || isCreditFrozen()) {
-          <button class="btn btn-success flex-1" (click)="onRecordPayment()">
-            <ng-icon name="heroBanknotes" />
-            Record Payment
-          </button>
-        }
-        @if (!isWalkInCustomer()) {
-          <button class="btn btn-outline flex-1" (click)="onEdit()">
-            <ng-icon name="heroPencilSquare" />
-            Edit
-          </button>
-        }
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <button type="button" class="btn btn-ghost btn-sm" (click)="onViewPayments()">
-          <ng-icon name="heroCreditCard" />
-          View payments
+      }
+      <button class="btn btn-ghost btn-sm gap-1.5" (click)="onViewOrders()">
+        <ng-icon name="heroClipboardDocumentList" size="1rem" />
+        Orders
+      </button>
+      <button type="button" class="btn btn-ghost btn-sm gap-1.5" (click)="onViewPayments()">
+        <ng-icon name="heroCreditCard" size="1rem" />
+        Payments
+      </button>
+      <button type="button" class="btn btn-ghost btn-sm gap-1.5" (click)="onStatement()">
+        <ng-icon name="heroDocumentText" size="1rem" />
+        Statement
+      </button>
+      @if (!isWalkInCustomer()) {
+        <button class="btn btn-ghost btn-sm gap-1.5 ml-auto" (click)="onEdit()">
+          <ng-icon name="heroPencilSquare" size="1rem" />
+          Edit
         </button>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="onStatement()">
-          <ng-icon name="heroDocumentText" />
-          Statement
-        </button>
-      </div>
+      }
     </div>
   </div>
 

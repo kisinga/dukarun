@@ -10,6 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { AuthService } from '../../../core/services/auth.service';
 import { CartService } from '../../../core/services/cart.service';
 import { CashierSessionService } from '../../../core/services/cashier-session/cashier-session.service';
@@ -60,6 +61,7 @@ type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
   imports: [
     CommonModule,
     RouterModule,
+    NgIcon,
     ProductScannerComponent,
     ProductSearchViewComponent,
     ProductConfirmModalComponent,

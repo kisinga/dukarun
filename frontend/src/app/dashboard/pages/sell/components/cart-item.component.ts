@@ -8,6 +8,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import {
   PriceModificationService,
@@ -54,7 +55,7 @@ export interface CartItemData {
 @Component({
   selector: 'app-cart-item',
   standalone: true,
-  imports: [CommonModule, QuantityInputSheetComponent, PriceEditSheetComponent],
+  imports: [CommonModule, NgIcon, QuantityInputSheetComponent, PriceEditSheetComponent],
   template: `
     <div class="px-3 py-1.5 pr-4 md:py-2.5 md:px-4">
       <!-- Mobile: Row 1 = remove + product, Row 2 = qty (left) + price (right) -->
@@ -66,16 +67,7 @@ export interface CartItemData {
             (click)="removeItem.emit(item().variant.id)"
             aria-label="Remove item"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="size-[1.2em]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2.5"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <ng-icon name="heroXMark" size="1.2em" />
           </button>
           <div class="flex-1 min-w-0">
             <div class="flex items-baseline gap-1.5 min-w-0">
@@ -113,16 +105,7 @@ export interface CartItemData {
           (click)="removeItem.emit(item().variant.id)"
           aria-label="Remove item"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2.5"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <ng-icon name="heroXMark" size="1rem" />
         </button>
         <div class="flex-1 min-w-0 py-0.5">
           <div class="flex items-baseline gap-2 min-w-0">
@@ -160,20 +143,7 @@ export interface CartItemData {
           (click)="openQuantitySheet()"
           aria-label="Edit quantity"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4 md:h-3.5 md:w-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-            />
-          </svg>
+          <ng-icon name="heroPencilSquare" size="1rem" />
           {{ item().quantity }}
         </button>
       } @else {
@@ -184,16 +154,7 @@ export interface CartItemData {
             [disabled]="item().quantity <= 1"
             aria-label="Decrease quantity"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5 md:h-4 md:w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2.5"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
-            </svg>
+            <ng-icon name="heroMinus" size="1.25rem" class="md:text-base" />
           </button>
           <span
             class="w-8 text-center font-bold text-base tabular-nums select-none md:w-6 md:text-sm"
@@ -204,16 +165,7 @@ export interface CartItemData {
             (click)="increaseQuantity()"
             aria-label="Increase quantity"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5 md:h-4 md:w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2.5"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
+            <ng-icon name="heroPlus" size="1.25rem" class="md:text-base" />
           </button>
         </div>
       }
@@ -228,16 +180,7 @@ export interface CartItemData {
             (click)="decreasePrice()"
             aria-label="Decrease price"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5 md:h-4 md:w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2.5"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
+            <ng-icon name="heroChevronDown" size="1.25rem" class="md:text-base" />
           </button>
         }
 
@@ -278,16 +221,7 @@ export interface CartItemData {
             (click)="increasePrice()"
             aria-label="Increase price"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5 md:h-4 md:w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2.5"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
-            </svg>
+            <ng-icon name="heroChevronUp" size="1.25rem" class="md:text-base" />
           </button>
         }
       </div>

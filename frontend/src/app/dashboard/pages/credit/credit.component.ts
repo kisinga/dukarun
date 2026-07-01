@@ -1,457 +1,261 @@
-import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   OnInit,
   computed,
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { filter, skip } from 'rxjs';
-import { NavigationEnd, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { AuthService } from '../../../core/services/auth.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { CustomerService, CreditCustomerSummary } from '../../../core/services/customer.service';
+import { SupplierService } from '../../../core/services/supplier.service';
+import { PageHeaderComponent } from '../../components/shared/page-header.component';
+import { StatBarComponent, type StatItem } from '../../components/shared/stat-bar.component';
 
+type CreditMode = 'receivables' | 'payables';
+
+/** A customer (receivable) or supplier (payable) reduced to one credit row. */
+interface CreditParty {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  approved: boolean;
+  outstanding: number; // cents, absolute
+  limit: number;
+  available: number;
+  duration: number;
+  manageLink: string[];
+}
+
+/**
+ * Credit & Payables — one page, two roles.
+ *
+ * Receivables = customers who owe the shop (AR). Payables = suppliers the shop
+ * owes (AP). Both sides share one layout (stats strip → list) and one data
+ * shape (CreditParty); a segmented toggle is the signifier for switching.
+ */
 @Component({
   selector: 'app-credit',
-  imports: [CommonModule, RouterLink],
+  standalone: true,
+  imports: [RouterLink, NgIcon, PageHeaderComponent, StatBarComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-5 lg:space-y-6">
       <!-- Header -->
-      <div class="flex items-start justify-between gap-4">
-        <div class="flex-1 min-w-0">
-          <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Credit Management</h1>
-          <p class="text-sm text-base-content/60 mt-1">
-            Approve customers for credit, adjust limits, and manage balances
-          </p>
-        </div>
-
-        <div class="flex gap-2 shrink-0">
-          <button
-            (click)="reloadCustomers()"
-            class="btn btn-ghost btn-square btn-sm lg:btn-md"
-            [disabled]="isLoading()"
-            title="Refresh credit data"
-          >
-            @if (!isLoading()) {
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-            } @else {
-              <span class="loading loading-spinner loading-sm"></span>
-            }
-          </button>
-        </div>
-      </div>
+      <app-page-header
+        [title]="'Credit & Payables'"
+        [subtitle]="subtitle()"
+        [isLoading]="isLoading()"
+        (refresh)="reload()"
+      />
 
       @if (!hasPermission()) {
         <div role="alert" class="alert alert-warning">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
+          <ng-icon name="heroExclamationTriangle" size="1.25rem" />
           <span>You need credit management permissions to access this page.</span>
         </div>
       } @else {
-        <!-- Statistics Cards -->
-        @if (stats(); as statsData) {
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-            <!-- Total Customers -->
-            <div
-              class="card bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20"
+        <!-- Toggle (left) + summary stats fill the space to the right -->
+        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <div class="join">
+            <button
+              type="button"
+              class="join-item btn btn-sm sm:btn-md"
+              [class.btn-active]="mode() === 'receivables'"
+              [class.btn-primary]="mode() === 'receivables'"
+              (click)="setMode('receivables')"
             >
-              <div class="card-body p-3 lg:p-4">
-                <div class="flex items-center gap-3">
-                  <div
-                    class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5 text-warning"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                      />
-                    </svg>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-xs text-base-content/60 truncate">Total Customers</p>
-                    <p class="text-xl lg:text-2xl font-bold text-warning tracking-tight">
-                      {{ statsData.total }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Approved -->
-            <div
-              class="card bg-gradient-to-br from-success/10 to-success/5 border border-success/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
-              [class.ring-2]="approvedFilter()"
-              [class.ring-primary]="approvedFilter()"
-              [class.bg-primary/20]="approvedFilter()"
-              (click)="onApprovedStatsClick()"
+              <ng-icon name="heroUsers" size="1rem" />
+              Receivables · Customers
+            </button>
+            <button
+              type="button"
+              class="join-item btn btn-sm sm:btn-md"
+              [class.btn-active]="mode() === 'payables'"
+              [class.btn-primary]="mode() === 'payables'"
+              (click)="setMode('payables')"
             >
-              <div class="card-body p-3 lg:p-4">
-                <div class="flex items-center gap-3">
-                  <div
-                    class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5 text-success"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-xs text-base-content/60 truncate">Approved</p>
-                    <p class="text-xl lg:text-2xl font-bold text-success tracking-tight">
-                      {{ statsData.approved }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Total Outstanding -->
-            <div
-              class="card bg-gradient-to-br from-error/10 to-error/5 border border-error/20 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
-              [class.ring-2]="outstandingFilter()"
-              [class.ring-primary]="outstandingFilter()"
-              [class.bg-primary/20]="outstandingFilter()"
-              (click)="onOutstandingStatsClick()"
-            >
-              <div class="card-body p-3 lg:p-4">
-                <div class="flex items-center gap-3">
-                  <div
-                    class="w-9 h-9 rounded-lg bg-error/10 flex items-center justify-center shrink-0"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5 text-error"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-xs text-base-content/60 truncate">Outstanding</p>
-                    <p class="text-lg lg:text-xl font-bold text-error tracking-tight">
-                      {{ currencyService.format(statsData.totalOutstanding) }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Total Limit -->
-            <div
-              class="card bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20"
-            >
-              <div class="card-body p-3 lg:p-4">
-                <div class="flex items-center gap-3">
-                  <div
-                    class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5 text-primary"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                      />
-                    </svg>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-xs text-base-content/60 truncate">Total Limit</p>
-                    <p class="text-lg lg:text-xl font-bold text-primary tracking-tight">
-                      {{ currencyService.format(statsData.totalLimit) }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+              <ng-icon name="heroTruck" size="1rem" />
+              Payables · Suppliers
+            </button>
           </div>
-        }
+          <app-stat-bar [stats]="statItems()" (select)="onStatSelect($event)" />
+        </div>
 
-        <!-- Search Bar -->
+        <!-- Filters + search -->
         <div class="flex flex-col gap-2 sm:gap-3">
-          <!-- Active Filter Badges -->
           @if (approvedFilter() || outstandingFilter()) {
             <div class="flex flex-wrap gap-2">
               @if (approvedFilter()) {
-                <span
-                  [class]="'badge badge-' + (activeFilterColors().approved || 'success') + ' gap-2'"
-                >
-                  Approved
+                <span class="badge badge-success gap-1">
+                  On credit
                   <button
                     class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
-                    (click)="clearFilter('approved')"
+                    (click)="toggleApproved()"
                     type="button"
                     aria-label="Clear filter"
                   >
-                    ×
+                    <ng-icon name="heroXMark" size="0.75rem" />
                   </button>
                 </span>
               }
               @if (outstandingFilter()) {
-                <span
-                  [class]="
-                    'badge badge-' + (activeFilterColors().outstanding || 'error') + ' gap-2'
-                  "
-                >
-                  Outstanding
+                <span class="badge badge-error gap-1">
+                  {{ outstandingLabel() }}
                   <button
                     class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
-                    (click)="clearFilter('outstanding')"
+                    (click)="toggleOutstanding()"
                     type="button"
                     aria-label="Clear filter"
                   >
-                    ×
+                    <ng-icon name="heroXMark" size="0.75rem" />
                   </button>
                 </span>
               }
             </div>
           }
 
-          <div class="form-control">
-            <input
-              type="text"
-              class="input input-bordered w-full"
-              placeholder="Search by customer name or phone..."
-              [value]="searchTerm()"
-              (input)="searchTerm.set($any($event.target).value)"
-            />
-          </div>
+          <input
+            type="text"
+            class="input input-bordered w-full"
+            [placeholder]="'Search by ' + partyNoun() + ' name or phone…'"
+            [value]="searchTerm()"
+            (input)="searchTerm.set($any($event.target).value)"
+          />
         </div>
 
-        <!-- Loading State -->
+        <!-- Loading -->
         @if (isLoading()) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <div class="flex flex-col items-center justify-center py-12">
-                <span class="loading loading-spinner loading-lg text-warning"></span>
-                <p class="text-sm text-base-content/60 mt-4">Loading credit data...</p>
-              </div>
+          <div class="card bg-base-100 shadow-sm border border-base-300/60">
+            <div class="card-body items-center py-12">
+              <span class="loading loading-spinner loading-lg text-primary"></span>
+              <p class="text-sm text-base-content/60 mt-2">Loading…</p>
             </div>
           </div>
-        }
-
-        <!-- Empty State -->
-        @else if (filteredCustomers().length === 0) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <div class="text-center py-12 lg:py-16 px-4">
-                <div
-                  class="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-8 w-8 lg:h-10 lg:w-10 text-base-content/30"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                    />
-                  </svg>
-                </div>
-                <h3 class="text-lg font-semibold">No credit customers found</h3>
-                <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
-                  {{
-                    searchTerm()
-                      ? 'Try adjusting your search terms.'
-                      : 'No customers with credit data available.'
-                  }}
-                </p>
-                @if (searchTerm()) {
-                  <button (click)="searchTerm.set('')" class="btn btn-outline btn-sm mt-6">
-                    Clear Search
-                  </button>
-                }
+        } @else if (filteredParties().length === 0) {
+          <!-- Empty -->
+          <div class="card bg-base-100 shadow-sm border border-base-300/60">
+            <div class="card-body items-center text-center py-12 lg:py-16">
+              <div class="w-16 h-16 rounded-full bg-base-200 flex items-center justify-center">
+                <ng-icon name="heroCreditCard" size="2rem" class="text-base-content/30" />
               </div>
+              <h3 class="text-base font-semibold mt-4">No {{ partyNoun() }}s found</h3>
+              <p class="text-sm text-base-content/60 mt-1 max-w-md">
+                {{
+                  searchTerm()
+                    ? 'Try adjusting your search.'
+                    : 'No ' + partyNoun() + 's with credit data yet.'
+                }}
+              </p>
+              @if (searchTerm()) {
+                <button (click)="searchTerm.set('')" class="btn btn-outline btn-sm mt-4">
+                  Clear search
+                </button>
+              }
             </div>
           </div>
-        }
-
-        <!-- Credit List -->
-        @else {
-          <!-- Mobile: Card View -->
+        } @else {
+          <!-- Mobile cards -->
           <div class="lg:hidden space-y-3">
-            @for (customer of filteredCustomers(); track customer.id) {
-              <div class="card bg-base-100 shadow-sm border border-base-300 rounded-xl">
-                <div class="card-body p-4">
+            @for (party of filteredParties(); track party.id) {
+              <div class="card bg-base-100 shadow-sm border border-base-300/60 rounded-2xl">
+                <div class="card-body p-4 gap-0">
                   <div class="flex items-start justify-between gap-3">
-                    <div class="flex-1 min-w-0">
-                      <h3 class="font-semibold text-base truncate">
-                        {{ customer.name || 'Unnamed Customer' }}
-                      </h3>
+                    <div class="min-w-0">
+                      <h3 class="font-semibold truncate">{{ party.name }}</h3>
                       <p class="text-xs text-base-content/60 truncate">
-                        {{ customer.phone || customer.email || '—' }}
+                        {{ party.phone || party.email || '—' }}
                       </p>
                     </div>
                     <span
-                      class="badge badge-sm"
-                      [class.badge-success]="customer.isCreditApproved"
-                      [class.badge-warning]="!customer.isCreditApproved"
+                      class="badge badge-sm shrink-0"
+                      [class.badge-success]="party.approved"
+                      [class.badge-warning]="!party.approved"
                     >
-                      {{ customer.isCreditApproved ? 'Approved' : 'Pending' }}
+                      {{ party.approved ? 'On credit' : 'Pending' }}
                     </span>
                   </div>
-
                   <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-base-300">
                     <div>
-                      <p class="text-xs text-base-content/60">Outstanding</p>
+                      <p class="text-xs text-base-content/60">{{ outstandingLabel() }}</p>
                       <p class="text-sm font-semibold text-error">
-                        {{ currencyService.format(customer.outstandingAmount) }}
+                        {{ currencyService.format(party.outstanding) }}
                       </p>
                     </div>
                     <div>
                       <p class="text-xs text-base-content/60">Limit</p>
                       <p class="text-sm font-semibold">
-                        {{ currencyService.format(customer.creditLimit) }}
+                        {{ currencyService.format(party.limit) }}
                       </p>
                     </div>
                     <div>
                       <p class="text-xs text-base-content/60">Available</p>
                       <p class="text-sm font-semibold text-success">
-                        {{ currencyService.format(customer.availableCredit) }}
+                        {{ currencyService.format(party.available) }}
                       </p>
                     </div>
                   </div>
-
-                  <div class="mt-3 pt-3 border-t border-base-300">
-                    <a
-                      [routerLink]="['/dashboard/customers/edit', customer.id]"
-                      queryParamsHandling="merge"
-                      [queryParams]="{ expandCredit: 'true' }"
-                      class="btn btn-sm btn-primary w-full"
-                    >
-                      Manage
-                    </a>
-                  </div>
+                  <a [routerLink]="party.manageLink" class="btn btn-sm btn-primary w-full mt-3">
+                    Manage
+                  </a>
                 </div>
               </div>
             }
           </div>
 
-          <!-- Desktop: Table View -->
-          <div class="card bg-base-100 shadow hidden lg:block">
+          <!-- Desktop table -->
+          <div class="card bg-base-100 shadow-sm border border-base-300/60 hidden lg:block">
             <div class="overflow-x-auto">
               <table class="table table-zebra">
                 <thead>
                   <tr>
-                    <th>Name</th>
+                    <th>{{ partyNoun() === 'customer' ? 'Customer' : 'Supplier' }}</th>
                     <th>Contact</th>
-                    <th class="text-right">Outstanding</th>
+                    <th class="text-right">{{ outstandingLabel() }}</th>
                     <th class="text-right">Limit</th>
                     <th class="text-right">Available</th>
-                    <th>Duration</th>
+                    <th>Terms</th>
                     <th>Status</th>
                     <th class="text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @for (customer of filteredCustomers(); track customer.id) {
+                  @for (party of filteredParties(); track party.id) {
                     <tr>
                       <td>
-                        <div class="font-semibold">{{ customer.name || 'Unnamed Customer' }}</div>
-                        <div class="text-xs text-base-content/60">
-                          ID: {{ customer.id.slice(0, 8) }}...
-                        </div>
+                        <div class="font-semibold">{{ party.name }}</div>
                       </td>
                       <td>
-                        <div class="text-sm">{{ customer.phone || '—' }}</div>
-                        <div class="text-xs text-base-content/60">{{ customer.email || '—' }}</div>
+                        <div class="text-sm">{{ party.phone || '—' }}</div>
+                        <div class="text-xs text-base-content/60">{{ party.email || '—' }}</div>
                       </td>
                       <td class="text-right">
                         <span class="text-error font-medium">{{
-                          currencyService.format(customer.outstandingAmount)
+                          currencyService.format(party.outstanding)
                         }}</span>
                       </td>
-                      <td class="text-right">
-                        {{ currencyService.format(customer.creditLimit) }}
-                      </td>
+                      <td class="text-right">{{ currencyService.format(party.limit) }}</td>
                       <td class="text-right">
                         <span class="text-success font-medium">{{
-                          currencyService.format(customer.availableCredit)
+                          currencyService.format(party.available)
                         }}</span>
                       </td>
-                      <td>{{ customer.creditDuration }} days</td>
+                      <td>{{ party.duration }} days</td>
                       <td>
                         <span
                           class="badge badge-sm"
-                          [class.badge-success]="customer.isCreditApproved"
-                          [class.badge-warning]="!customer.isCreditApproved"
+                          [class.badge-success]="party.approved"
+                          [class.badge-warning]="!party.approved"
                         >
-                          {{ customer.isCreditApproved ? 'Approved' : 'Pending' }}
+                          {{ party.approved ? 'On credit' : 'Pending' }}
                         </span>
                       </td>
                       <td class="text-right">
-                        <a
-                          [routerLink]="['/dashboard/customers/edit', customer.id]"
-                          queryParamsHandling="merge"
-                          [queryParams]="{ expandCredit: 'true' }"
-                          class="btn btn-xs btn-primary"
-                        >
-                          Manage
-                        </a>
+                        <a [routerLink]="party.manageLink" class="btn btn-xs btn-primary">Manage</a>
                       </td>
                     </tr>
                   }
@@ -463,127 +267,194 @@ import { CustomerService, CreditCustomerSummary } from '../../../core/services/c
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CreditComponent implements OnInit {
   private readonly customerService = inject(CustomerService);
+  private readonly supplierService = inject(SupplierService);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
-  private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
   readonly currencyService = inject(CurrencyService);
-
-  readonly isLoading = signal(false);
-
-  constructor() {
-    this.router.events
-      .pipe(
-        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-        filter((e) => e.urlAfterRedirects.includes('credit')),
-        skip(1),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe(() => {
-        if (this.hasPermission()) {
-          void this.reloadCustomers();
-        }
-      });
-  }
-  readonly customers = signal<CreditCustomerSummary[]>([]);
-  readonly searchTerm = signal('');
-  readonly approvedFilter = signal(false);
-  readonly outstandingFilter = signal(false);
-  readonly activeFilterColors = signal<{ approved?: string; outstanding?: string }>({});
 
   readonly hasPermission = this.authService.hasCreditManagementPermission;
 
-  readonly filteredCustomers = computed(() => {
+  readonly mode = signal<CreditMode>('receivables');
+  readonly searchTerm = signal('');
+  readonly approvedFilter = signal(false);
+  readonly outstandingFilter = signal(false);
+
+  // Receivables (customers)
+  private readonly customers = signal<CreditCustomerSummary[]>([]);
+  private readonly loadingReceivables = signal(false);
+  private receivablesLoaded = false;
+  // Payables (suppliers) — sourced from the shared SupplierService signals
+  private readonly suppliers = this.supplierService.suppliers;
+  private payablesLoaded = false;
+
+  readonly isLoading = computed(() =>
+    this.mode() === 'receivables' ? this.loadingReceivables() : this.supplierService.isLoading(),
+  );
+
+  readonly partyNoun = computed(() => (this.mode() === 'receivables' ? 'customer' : 'supplier'));
+  readonly partyPlural = computed(() =>
+    this.mode() === 'receivables' ? 'Customers' : 'Suppliers',
+  );
+  readonly outstandingLabel = computed(() =>
+    this.mode() === 'receivables' ? 'Owed to you' : 'You owe',
+  );
+  readonly subtitle = computed(() =>
+    this.mode() === 'receivables'
+      ? 'Approve customers for credit, set limits, and track what they owe you.'
+      : 'Manage supplier credit, set limits, and track what you owe them.',
+  );
+
+  readonly parties = computed<CreditParty[]>(() =>
+    this.mode() === 'receivables'
+      ? this.customers().map((c) => this.mapCustomer(c))
+      : this.suppliers().map((s) => this.mapSupplier(s)),
+  );
+
+  readonly filteredParties = computed(() => {
     const term = this.searchTerm().trim().toLowerCase();
     const approved = this.approvedFilter();
     const outstanding = this.outstandingFilter();
-    let filtered = this.customers();
-
-    // Apply approved filter
-    if (approved) {
-      filtered = filtered.filter((c) => c.isCreditApproved);
-    }
-
-    // Apply outstanding filter (customers with outstanding amount > 0)
-    if (outstanding) {
-      filtered = filtered.filter((c) => c.outstandingAmount > 0);
-    }
-
-    // Apply search query
-    if (!term) {
-      return filtered;
-    }
-    return filtered.filter((customer) => {
-      return (
-        customer.name.toLowerCase().includes(term) ||
-        (customer.phone ?? '').toLowerCase().includes(term) ||
-        customer.id.toLowerCase().includes(term)
-      );
-    });
+    let list = this.parties();
+    if (approved) list = list.filter((p) => p.approved);
+    if (outstanding) list = list.filter((p) => p.outstanding > 0);
+    if (!term) return list;
+    return list.filter(
+      (p) =>
+        p.name.toLowerCase().includes(term) ||
+        (p.phone ?? '').toLowerCase().includes(term) ||
+        p.id.toLowerCase().includes(term),
+    );
   });
 
   readonly stats = computed(() => {
-    const allCustomers = this.customers();
+    const list = this.parties();
     return {
-      total: allCustomers.length,
-      approved: allCustomers.filter((c) => c.isCreditApproved).length,
-      totalOutstanding: allCustomers.reduce((sum, c) => sum + c.outstandingAmount, 0),
-      totalLimit: allCustomers.reduce((sum, c) => sum + c.creditLimit, 0),
+      total: list.length,
+      approved: list.filter((p) => p.approved).length,
+      totalOutstanding: list.reduce((sum, p) => sum + p.outstanding, 0),
+      totalLimit: list.reduce((sum, p) => sum + p.limit, 0),
     };
   });
 
+  readonly statItems = computed<StatItem[]>(() => {
+    const s = this.stats();
+    return [
+      { label: this.partyPlural().toLowerCase(), value: s.total },
+      { label: 'on credit', value: s.approved, filter: 'approved', active: this.approvedFilter() },
+      {
+        label: this.outstandingLabel().toLowerCase(),
+        value: this.currencyService.format(s.totalOutstanding),
+        tone: 'error',
+        filter: 'outstanding',
+        active: this.outstandingFilter(),
+      },
+      { label: 'total limit', value: this.currencyService.format(s.totalLimit) },
+    ];
+  });
+
+  onStatSelect(key: string): void {
+    if (key === 'approved') this.toggleApproved();
+    else if (key === 'outstanding') this.toggleOutstanding();
+  }
+
   ngOnInit(): void {
-    if (this.hasPermission()) {
-      void this.reloadCustomers();
+    const tab = this.route.snapshot.queryParamMap.get('tab');
+    if (tab === 'payables') this.mode.set('payables');
+    if (this.hasPermission()) void this.ensureLoaded(this.mode());
+  }
+
+  setMode(mode: CreditMode): void {
+    if (this.mode() === mode) return;
+    this.mode.set(mode);
+    this.approvedFilter.set(false);
+    this.outstandingFilter.set(false);
+    this.searchTerm.set('');
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: mode === 'payables' ? 'payables' : null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+    void this.ensureLoaded(mode);
+  }
+
+  toggleApproved(): void {
+    this.approvedFilter.update((v) => !v);
+  }
+
+  toggleOutstanding(): void {
+    this.outstandingFilter.update((v) => !v);
+  }
+
+  async reload(): Promise<void> {
+    if (this.mode() === 'receivables') {
+      this.receivablesLoaded = false;
+      await this.loadReceivables();
+    } else {
+      this.payablesLoaded = false;
+      await this.loadPayables();
     }
   }
 
-  async reloadCustomers(): Promise<void> {
-    this.isLoading.set(true);
+  private async ensureLoaded(mode: CreditMode): Promise<void> {
+    if (mode === 'receivables' && !this.receivablesLoaded) await this.loadReceivables();
+    if (mode === 'payables' && !this.payablesLoaded) await this.loadPayables();
+  }
+
+  private async loadReceivables(): Promise<void> {
+    this.loadingReceivables.set(true);
     try {
-      const customers = await this.customerService.listCreditCustomers();
-      this.customers.set(customers);
+      this.customers.set(await this.customerService.listCreditCustomers());
+      this.receivablesLoaded = true;
     } catch (error) {
       console.error('Failed to load credit customers', error);
     } finally {
-      this.isLoading.set(false);
+      this.loadingReceivables.set(false);
     }
   }
 
-  /**
-   * Handle approved filter click from stats
-   */
-  onApprovedStatsClick(): void {
-    const newValue = !this.approvedFilter();
-    this.approvedFilter.set(newValue);
-    const colors = this.activeFilterColors();
-    this.activeFilterColors.set({ ...colors, approved: newValue ? 'success' : undefined });
-  }
-
-  /**
-   * Handle outstanding filter click from stats
-   */
-  onOutstandingStatsClick(): void {
-    const newValue = !this.outstandingFilter();
-    this.outstandingFilter.set(newValue);
-    const colors = this.activeFilterColors();
-    this.activeFilterColors.set({ ...colors, outstanding: newValue ? 'error' : undefined });
-  }
-
-  /**
-   * Clear a specific filter
-   */
-  clearFilter(type: string): void {
-    const colors = this.activeFilterColors();
-    if (type === 'approved') {
-      this.approvedFilter.set(false);
-      this.activeFilterColors.set({ ...colors, approved: undefined });
-    } else if (type === 'outstanding') {
-      this.outstandingFilter.set(false);
-      this.activeFilterColors.set({ ...colors, outstanding: undefined });
+  private async loadPayables(): Promise<void> {
+    try {
+      await this.supplierService.fetchSuppliers({ take: 200, skip: 0 });
+      this.payablesLoaded = true;
+    } catch (error) {
+      console.error('Failed to load suppliers', error);
     }
+  }
+
+  private mapCustomer(c: CreditCustomerSummary): CreditParty {
+    return {
+      id: c.id,
+      name: c.name || 'Unnamed customer',
+      phone: c.phone,
+      email: c.email,
+      approved: c.isCreditApproved,
+      outstanding: Math.abs(c.outstandingAmount ?? 0),
+      limit: c.creditLimit ?? 0,
+      available: c.availableCredit ?? 0,
+      duration: c.creditDuration ?? 0,
+      manageLink: ['/dashboard/customers/edit', c.id],
+    };
+  }
+
+  private mapSupplier(s: any): CreditParty {
+    const outstanding = Math.abs(Number(s.supplierOutstandingAmount ?? 0));
+    const limit = Number(s.customFields?.supplierCreditLimit ?? 0);
+    return {
+      id: s.id,
+      name: `${s.firstName ?? ''} ${s.lastName ?? ''}`.trim() || 'Unnamed supplier',
+      phone: s.phoneNumber,
+      email: s.emailAddress,
+      approved: Boolean(s.customFields?.isSupplierCreditApproved),
+      outstanding,
+      limit,
+      available: Math.max(limit - outstanding, 0),
+      duration: Number(s.customFields?.supplierCreditDuration ?? 0),
+      manageLink: ['/dashboard/suppliers/edit', s.id],
+    };
   }
 }

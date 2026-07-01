@@ -1,20 +1,13 @@
 <div class="space-y-4 lg:space-y-6">
-  <!-- Header (matches order detail pattern) -->
+  <!-- Header -->
   <div class="no-print">
-    <button type="button" (click)="goBack()" class="btn btn-ghost btn-sm mb-3">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-4 w-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        stroke-width="2"
-      >
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-      </svg>
+    <button type="button" (click)="goBack()" class="btn btn-ghost btn-sm gap-1 mb-2">
+      <ng-icon name="heroArrowLeft" size="1rem" />
       Back to Customers
     </button>
-    <h1 class="text-xl sm:text-2xl font-bold text-base-content">Customer Statement</h1>
+    <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-base-content">
+      Customer Statement
+    </h1>
   </div>
 
   @if (error()) {
@@ -33,15 +26,28 @@
     <!-- Statement content (printable) -->
     <div class="statement-content">
       <div class="card bg-base-100 shadow-sm border border-base-300/60">
-        <div class="card-body p-3 sm:p-4">
-          <h2 class="card-title text-lg">{{ customerName() }}</h2>
-          @if (customer()?.emailAddress && hasEmail()) {
-            <p class="text-sm text-base-content/70">{{ customer()!.emailAddress }}</p>
-          }
-          @if (customer()?.phoneNumber) {
-            <p class="text-sm text-base-content/70">{{ customer()!.phoneNumber }}</p>
-          }
-          <p class="text-sm text-base-content/60 mt-2">Statement · {{ totalOrders() }} order(s)</p>
+        <div class="card-body p-4">
+          <h2 class="text-lg font-bold text-base-content">{{ customerName() }}</h2>
+          <div
+            class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-base-content/70"
+          >
+            @if (customer()?.emailAddress && hasEmail()) {
+              <span class="inline-flex items-center gap-1.5">
+                <ng-icon name="heroEnvelope" size="1rem" class="text-base-content/50" />
+                {{ customer()!.emailAddress }}
+              </span>
+            }
+            @if (customer()?.phoneNumber) {
+              <span class="inline-flex items-center gap-1.5">
+                <ng-icon name="heroPhone" size="1rem" class="text-base-content/50" />
+                {{ customer()!.phoneNumber }}
+              </span>
+            }
+            <span class="inline-flex items-center gap-1.5 text-base-content/60">
+              <ng-icon name="heroDocumentText" size="1rem" class="text-base-content/50" />
+              Statement · {{ totalOrders() }} order(s)
+            </span>
+          </div>
         </div>
       </div>
 

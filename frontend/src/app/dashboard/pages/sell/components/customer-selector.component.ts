@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { CompanySearchSelectComponent } from '../../shared/components/company-search-select.component';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { validatePhoneNumber } from '../../../../core/utils/phone.utils';
@@ -20,7 +21,7 @@ export interface Customer {
  */
 @Component({
   selector: 'app-customer-selector',
-  imports: [CommonModule, CompanySearchSelectComponent],
+  imports: [CommonModule, NgIcon, CompanySearchSelectComponent],
   template: `
     <div class="space-y-6">
       @if (!selectedCustomer() && !showForm()) {
@@ -51,20 +52,7 @@ export interface Customer {
             class="btn btn-outline btn-primary w-full interactive-press"
             (click)="showForm.set(true)"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-              />
-            </svg>
+            <ng-icon name="heroUserPlus" size="1.25rem" />
             Create New Customer
           </button>
         </div>
@@ -74,20 +62,7 @@ export interface Customer {
       @if (showForm()) {
         <div class="space-y-6 anim-stagger">
           <div class="alert alert-info">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5 flex-shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <ng-icon name="heroInformationCircle" size="1.25rem" class="flex-shrink-0" />
             <span class="text-sm">Only basic details required for quick customer creation</span>
           </div>
 
@@ -192,20 +167,7 @@ export interface Customer {
                 </div>
                 @if (!selectedCustomer()!.isCreditApproved) {
                   <div class="alert alert-warning mt-3">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5 flex-shrink-0"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
+                    <ng-icon name="heroExclamationCircle" size="1.25rem" class="flex-shrink-0" />
                     <span class="text-sm">Customer pending credit approval</span>
                   </div>
                 }
@@ -215,20 +177,7 @@ export interface Customer {
                 (click)="customerSelect.emit(null)"
                 aria-label="Remove customer"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <ng-icon name="heroXMark" size="1rem" />
               </button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { Router } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 
 export type PurchaseAction = 'view' | 'pay' | 'edit' | 'delete';
@@ -28,7 +29,7 @@ export interface PurchaseCardData {
  */
 @Component({
   selector: '[app-purchase-table-row]',
-  imports: [CommonModule, DatePipe],
+  imports: [CommonModule, DatePipe, NgIcon],
   host: {
     class: 'hover cursor-pointer transition-colors',
     '(click)': 'navigateToPurchase()',

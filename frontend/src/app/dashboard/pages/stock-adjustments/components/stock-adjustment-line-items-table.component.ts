@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { ProductVariant } from '../../../../core/services/product/product-search.service';
 import { StockAdjustmentLineItem } from '../../../../core/services/stock-adjustment.service.types';
 
@@ -21,7 +22,7 @@ export interface StockAdjustmentLineItemDisplay extends StockAdjustmentLineItem 
  */
 @Component({
   selector: 'app-stock-adjustment-line-items-table',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   template: `
     @if (lineItems().length > 0) {
       <div class="card bg-base-100 shadow">
@@ -52,35 +53,9 @@ export interface StockAdjustmentLineItemDisplay extends StockAdjustmentLineItem 
                         aria-label="Toggle details"
                       >
                         @if (isExpanded($index)) {
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-4 w-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M5 15l7-7 7 7"
-                            />
-                          </svg>
+                          <ng-icon name="heroChevronUp" size="1rem" />
                         } @else {
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-4 w-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
+                          <ng-icon name="heroChevronDown" size="1rem" />
                         }
                       </button>
                     </td>
@@ -104,20 +79,7 @@ export interface StockAdjustmentLineItemDisplay extends StockAdjustmentLineItem 
                         (click)="onLineItemRemove($index)"
                         aria-label="Remove item"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-3.5 w-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
+                        <ng-icon name="heroTrash" size="0.875rem" />
                       </button>
                     </td>
                   </tr>
@@ -190,20 +152,7 @@ export interface StockAdjustmentLineItemDisplay extends StockAdjustmentLineItem 
             <div
               class="w-14 h-14 mx-auto mb-3 rounded-full bg-base-200 flex items-center justify-center"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-7 w-7 text-base-content/40"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M20 7l-8 8-8-8m0 0l8-8 8 8m-8 8V3"
-                />
-              </svg>
+              <ng-icon name="heroArrowsUpDown" size="1.75rem" class="text-base-content/40" />
             </div>
             <p class="font-semibold">No items added yet</p>
             <p class="text-sm mt-2">Add items above to get started</p>

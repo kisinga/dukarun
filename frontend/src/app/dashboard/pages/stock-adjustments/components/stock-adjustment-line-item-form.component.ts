@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { ProductVariant } from '../../../../core/services/product/product-search.service';
 
 /**
@@ -11,7 +12,7 @@ import { ProductVariant } from '../../../../core/services/product/product-search
  */
 @Component({
   selector: 'app-stock-adjustment-line-item-form',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   template: `
     <div class="card bg-base-200 shadow">
       <div class="card-body p-4">
@@ -59,20 +60,7 @@ import { ProductVariant } from '../../../../core/services/product/product-search
             [disabled]="!canAddItem()"
             (click)="onAddItem()"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              />
-            </svg>
+            <ng-icon name="heroPlus" size="1rem" />
             Add
           </button>
         </div>

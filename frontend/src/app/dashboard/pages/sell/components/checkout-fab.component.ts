@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 
 /**
@@ -7,7 +8,7 @@ import { CurrencyService } from '../../../../core/services/currency.service';
  */
 @Component({
   selector: 'app-checkout-fab',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   template: `
     <button
       class="fixed bottom-20 right-4 btn btn-primary btn-lg shadow-xl z-40 flex items-center gap-3 rounded-full px-5 sm:bottom-24 sm:right-6 anim-scale-in"
@@ -22,16 +23,7 @@ import { CurrencyService } from '../../../../core/services/currency.service';
       </span>
 
       <!-- Checkout Arrow Icon -->
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-6 w-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        stroke-width="2.5"
-      >
-        <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-      </svg>
+      <ng-icon name="heroArrowLongRight" size="1.5rem" />
     </button>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { CustomerService } from '../../../../core/services/customer.service';
 import { CustomerStatementService } from '../../../../core/services/customer/customer-statement.service';
@@ -23,7 +24,7 @@ import { toDisplayDate } from '../../../../core/utils/date.util';
 @Component({
   selector: 'app-customer-statement',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, NgIcon],
   templateUrl: './customer-statement.component.html',
   styleUrl: './customer-statement.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

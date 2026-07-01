@@ -9,8 +9,9 @@
         type="button"
         (click)="cancel()"
         class="btn btn-sm btn-circle bg-base-200 hover:bg-base-300 text-base-content border-0"
+        aria-label="Close"
       >
-        ✕
+        <ng-icon name="heroXMark" size="1.25rem" />
       </button>
     </div>
 
@@ -43,7 +44,8 @@
   <!-- Alerts -->
   @if (submitSuccess()) {
     <div role="alert" class="alert alert-success mb-3">
-      <span>✓ Product updated!</span>
+      <ng-icon name="heroCheck" size="1.25rem" />
+      <span>Product updated!</span>
     </div>
   }
   @if (submitError()) {
@@ -72,7 +74,7 @@
                   (click)="showPhotoEditUnlock()"
                   class="btn btn-xs btn-warning gap-1"
                 >
-                  <span>📸</span>
+                  <ng-icon name="heroCamera" size="1rem" />
                   <span>Edit Photos</span>
                 </button>
               }
@@ -81,7 +83,7 @@
             <!-- Photo Display -->
             @if (productAssets().length === 0) {
               <div class="text-center py-6 bg-base-200 rounded">
-                <div class="text-2xl mb-2">📷</div>
+                <ng-icon name="heroCamera" size="1.5rem" class="opacity-70 mb-2 inline-block" />
                 <p class="text-sm opacity-70">No photos yet</p>
                 <p class="text-xs opacity-50">Add photos for better AI recognition</p>
               </div>
@@ -95,8 +97,9 @@
                       class="w-full h-full object-cover rounded border"
                     />
                     @if ($index === 0) {
-                      <div class="badge badge-xs badge-primary absolute bottom-1 left-1">
-                        ⭐ Main
+                      <div class="badge badge-xs badge-primary absolute bottom-1 left-1 gap-0.5">
+                        <ng-icon name="heroStar" size="0.75rem" />
+                        Main
                       </div>
                     }
                   </div>
@@ -109,11 +112,16 @@
               <div class="mt-4 p-3 bg-warning/10 rounded border border-warning/20">
                 <div class="flex items-center justify-between mb-3">
                   <div class="flex items-center gap-2">
-                    <span class="text-warning">⚠️</span>
+                    <ng-icon name="heroExclamationTriangle" size="1.25rem" class="text-warning" />
                     <span class="text-sm font-semibold">Photo Editor Active</span>
                   </div>
-                  <button type="button" (click)="closePhotoEditor()" class="btn btn-xs btn-ghost">
-                    ✕ Close
+                  <button
+                    type="button"
+                    (click)="closePhotoEditor()"
+                    class="btn btn-xs btn-ghost gap-1"
+                  >
+                    <ng-icon name="heroXMark" size="1rem" />
+                    Close
                   </button>
                 </div>
 
@@ -155,8 +163,9 @@
                         type="button"
                         (click)="removeSku($index)"
                         class="btn btn-xs btn-ghost btn-circle text-error"
+                        aria-label="Remove SKU"
                       >
-                        ✕
+                        <ng-icon name="heroXMark" size="1rem" />
                       </button>
                     }
                   </div>
@@ -255,12 +264,13 @@
             >
               Cancel
             </button>
-            <button type="submit" class="btn btn-primary flex-1" [disabled]="!canSubmit()">
+            <button type="submit" class="btn btn-primary flex-1 gap-1" [disabled]="!canSubmit()">
               @if (isSubmitting()) {
                 <span class="loading loading-spinner loading-sm"></span>
                 Saving...
               } @else {
-                💾 Save Changes
+                <ng-icon name="heroArrowDownTray" size="1.25rem" />
+                Save Changes
               }
             </button>
           </div>

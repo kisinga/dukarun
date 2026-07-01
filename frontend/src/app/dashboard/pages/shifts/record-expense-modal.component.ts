@@ -9,6 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { firstValueFrom } from 'rxjs';
 import { CashierSessionService } from '../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../core/services/company.service';
@@ -29,7 +30,7 @@ import { LedgerService } from '../../../core/services/ledger/ledger.service';
 @Component({
   selector: 'app-record-expense-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <dialog #modal class="modal modal-bottom sm:modal-middle" (click)="onBackdropClick($event)">
@@ -46,14 +47,7 @@ import { LedgerService } from '../../../core/services/ledger/ledger.service';
               [disabled]="isProcessing()"
               aria-label="Close"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              <ng-icon name="heroXMark" size="1.25rem" />
             </button>
           </form>
         </div>

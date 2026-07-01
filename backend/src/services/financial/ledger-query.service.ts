@@ -117,7 +117,17 @@ export class LedgerQueryService {
     });
 
     if (!account) {
-      throw new Error(`Account ${query.accountCode} not found for channel ${query.channelId}`);
+      // Missing account for this channel = no postings = zero balance (mirrors
+      // AccountBalanceService.getAccountBalance). Don't throw — a thrown error
+      // here nulls the whole customer/supplier GraphQL response, which surfaced
+      // as a blank customer-detail page when opened from the payments list.
+      return {
+        accountCode: query.accountCode,
+        accountName: query.accountCode,
+        balance: 0,
+        debitTotal: 0,
+        creditTotal: 0,
+      };
     }
 
     let queryBuilder = this.dataSource

@@ -8,6 +8,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import {
   ProductSearchResult,
@@ -23,7 +24,7 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
  */
 @Component({
   selector: 'app-product-confirm-modal',
-  imports: [CommonModule, ProductLabelComponent],
+  imports: [CommonModule, NgIcon, ProductLabelComponent],
   template: `
     @if (isOpen() && product()) {
       <div class="modal modal-open modal-bottom sm:modal-middle modal-backdrop-anim">
@@ -33,20 +34,17 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <div class="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-5 w-5 text-success"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
+                  <ng-icon name="heroCheck" size="1.25rem" class="text-success" />
                 </div>
-                <h3 class="font-bold">✓ Product Found</h3>
+                <h3 class="font-bold">Product Found</h3>
               </div>
-              <button class="btn btn-ghost btn-sm btn-circle" (click)="closeModal.emit()">✕</button>
+              <button
+                class="btn btn-ghost btn-sm btn-circle"
+                (click)="closeModal.emit()"
+                aria-label="Close"
+              >
+                <ng-icon name="heroXMark" size="1.25rem" />
+              </button>
             </div>
           </div>
 
@@ -61,7 +59,7 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
                 />
               } @else {
                 <div class="w-16 h-16 rounded-lg bg-base-300 flex items-center justify-center">
-                  <span class="text-2xl">📦</span>
+                  <ng-icon name="heroCube" size="1.5rem" class="text-base-content/60" />
                 </div>
               }
               <div class="flex-1 min-w-0">
@@ -112,36 +110,10 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
                         [class.badge-error]="variant.stockLevel === 'OUT_OF_STOCK'"
                       >
                         @if (variant.stockLevel === 'IN_STOCK') {
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-3 w-3 mr-1"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
+                          <ng-icon name="heroCheck" size="0.75rem" class="mr-1" />
                           Available
                         } @else {
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-3 w-3 mr-1"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
+                          <ng-icon name="heroXMark" size="0.75rem" class="mr-1" />
                           Unavailable
                         }
                       </div>
@@ -176,36 +148,10 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
                       [class.badge-error]="product()!.variants[0].stockLevel === 'OUT_OF_STOCK'"
                     >
                       @if (product()!.variants[0].stockLevel === 'IN_STOCK') {
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-3 w-3 mr-1"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
+                        <ng-icon name="heroCheck" size="0.75rem" class="mr-1" />
                         Available
                       } @else {
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-3 w-3 mr-1"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
+                        <ng-icon name="heroXMark" size="0.75rem" class="mr-1" />
                         Unavailable
                       }
                     </div>
@@ -224,16 +170,7 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
                         class="btn btn-sm btn-circle btn-ghost"
                         (click)="decrementQuantity()"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          stroke-width="2.5"
-                        >
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
-                        </svg>
+                        <ng-icon name="heroMinus" size="1rem" />
                       </button>
                       <input
                         type="number"
@@ -247,16 +184,7 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
                         class="btn btn-sm btn-circle btn-ghost"
                         (click)="incrementQuantity()"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          stroke-width="2.5"
-                        >
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                        </svg>
+                        <ng-icon name="heroPlus" size="1rem" />
                       </button>
                     </div>
                   </div>
@@ -268,35 +196,13 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
                   class="btn btn-primary btn-block min-h-[3rem] interactive-press"
                   (click)="handleSingleVariantAdd()"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
+                  <ng-icon name="heroShoppingCart" size="1.25rem" />
                   Add to Cart
                 </button>
               } @else {
                 <!-- Out of Stock Message -->
                 <div class="alert alert-error">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <ng-icon name="heroXMark" size="1.25rem" />
                   <div>
                     <div class="font-semibold">Product Unavailable</div>
                     <div class="text-sm">
@@ -308,20 +214,7 @@ import { ProductLabelComponent } from '../../shared/components/product-label.com
             } @else {
               <!-- No Variants -->
               <div class="alert alert-error">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+                <ng-icon name="heroExclamationCircle" size="1.25rem" />
                 <span class="text-sm">No variants available</span>
               </div>
             }

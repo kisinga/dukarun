@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { PaymentMethod } from '../../../../../core/services/payment-method.service';
 import { Customer, CustomerSelectorComponent } from '../customer-selector.component';
 import { CheckoutSummaryComponent } from './checkout-summary.component';
@@ -12,7 +13,7 @@ export interface SelectedPaymentMethod {
 @Component({
   selector: 'app-checkout-cash',
   standalone: true,
-  imports: [CommonModule, CustomerSelectorComponent, CheckoutSummaryComponent],
+  imports: [CommonModule, NgIcon, CustomerSelectorComponent, CheckoutSummaryComponent],
   template: `
     <div class="space-y-3 anim-stagger">
       <!-- Step 1: Order Summary (Read-Only) -->
@@ -31,20 +32,7 @@ export interface SelectedPaymentMethod {
           class="btn btn-ghost btn-lg w-full flex items-center justify-center gap-3 interactive-press min-h-[52px] border-2 border-dashed border-base-300"
           (click)="saveAsProforma.emit()"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
+          <ng-icon name="heroDocumentText" size="1.5rem" />
           <span class="font-bold text-base sm:text-lg">Save as Proforma</span>
         </button>
 
@@ -53,40 +41,14 @@ export interface SelectedPaymentMethod {
           class="btn btn-warning btn-lg w-full flex items-center justify-center gap-3 interactive-press min-h-[52px]"
           (click)="selectCredit.emit()"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
+          <ng-icon name="heroCreditCard" size="1.5rem" />
           <span class="font-bold text-base sm:text-lg">Credit Sale</span>
         </button>
 
         <!-- Cash Payment Methods Grid -->
         @if (paymentMethodsError()) {
           <div class="alert alert-error anim-fade-in-down">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4 flex-shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <ng-icon name="heroExclamationCircle" size="1rem" class="flex-shrink-0" />
             <div class="text-sm">
               <p class="font-semibold">Payment Methods Not Available</p>
               <p class="mt-1">{{ paymentMethodsError() }}</p>
@@ -119,22 +81,13 @@ export interface SelectedPaymentMethod {
                         class="w-6 h-6 object-contain"
                       />
                     } @else {
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-5 w-5 transition-colors duration-300"
+                      <ng-icon
+                        name="heroBanknotes"
+                        size="1.25rem"
+                        class="transition-colors duration-300"
                         [class.text-success]="selectedPaymentMethod()?.code === method.code"
                         [class.text-base-content/60]="selectedPaymentMethod()?.code !== method.code"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                        />
-                      </svg>
+                      />
                     }
                   </div>
                   <span class="font-semibold text-xs sm:text-sm text-center leading-tight">{{
@@ -169,20 +122,7 @@ export interface SelectedPaymentMethod {
               } @else {
                 <div class="flex items-center justify-between bg-success/10 rounded-lg p-2 px-3">
                   <div class="flex items-center gap-2">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-4 w-4 text-success"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
+                    <ng-icon name="heroCheckCircle" size="1rem" class="text-success" />
                     <span class="text-xs sm:text-sm text-success"
                       >Linked to {{ selectedCustomerForCash()!.name }}</span
                     >
@@ -192,20 +132,7 @@ export interface SelectedPaymentMethod {
                     (click)="customerSelectForCash.emit(null)"
                     aria-label="Remove customer"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-3 w-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
+                    <ng-icon name="heroXMark" size="0.75rem" />
                   </button>
                 </div>
               }
@@ -226,20 +153,7 @@ export interface SelectedPaymentMethod {
                   @if (isProcessing()) {
                     <span class="loading loading-spinner"></span>
                   } @else {
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
+                    <ng-icon name="heroCheck" size="1.25rem" />
                   }
                   Complete
                 </button>
@@ -253,20 +167,7 @@ export interface SelectedPaymentMethod {
                     @if (isProcessing()) {
                       <span class="loading loading-spinner"></span>
                     } @else {
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                        />
-                      </svg>
+                      <ng-icon name="heroPrinter" size="1.25rem" />
                     }
                     Complete & Print
                   </button>
