@@ -1,6 +1,7 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { PurchaseAction, PurchaseCardData } from './purchase-table-row.component';
@@ -11,7 +12,7 @@ import { PurchaseAction, PurchaseCardData } from './purchase-table-row.component
  */
 @Component({
   selector: 'app-purchase-card',
-  imports: [CommonModule, DatePipe, RouterLink, HoverPreviewHostComponent],
+  imports: [CommonModule, DatePipe, RouterLink, NgIcon, HoverPreviewHostComponent],
   templateUrl: './purchase-card.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

@@ -9,20 +9,7 @@
 
   @if (error()) {
     <div role="alert" class="alert alert-error">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-5 w-5 shrink-0"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
+      <ng-icon name="heroXCircle" size="1.25rem" class="shrink-0" />
       <span class="flex-1">{{ error() }}</span>
       <button (click)="clearError()" class="btn btn-sm">Dismiss</button>
     </div>
@@ -65,20 +52,7 @@
           @if (isLoading()) {
             <span class="loading loading-spinner loading-sm"></span>
           } @else {
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-              />
-            </svg>
+            <ng-icon name="heroArrowDownTray" size="1rem" />
             Record adjustment
           }
         </button>

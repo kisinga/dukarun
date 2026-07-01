@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { CustomerService } from '../../../core/services/customer.service';
 import { AnalyticsService } from '../../../core/services/analytics.service';
 import {
@@ -51,6 +52,7 @@ import { EchartContainerComponent } from '../../components/shared/charts/echart-
   selector: 'app-customers',
   imports: [
     CommonModule,
+    NgIcon,
     CustomerCardComponent,
     CustomerStatsComponent,
     PageHeaderComponent,

@@ -5,20 +5,7 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">Purchase Details</h3>
         <button class="btn btn-ghost btn-sm btn-circle" (click)="close()" aria-label="Close">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
+          <ng-icon name="heroXMark" size="1.25rem" />
         </button>
       </div>
       <!-- Purchase Content -->
@@ -37,7 +24,10 @@
     <!-- Header -->
     @if (showHeader()) {
       <div>
-        <button (click)="goBack()" class="btn btn-ghost btn-sm mb-2">← Back to Purchases</button>
+        <button (click)="goBack()" class="btn btn-ghost btn-sm mb-2 gap-1">
+          <ng-icon name="heroArrowLeft" size="1rem" />
+          Back to Purchases
+        </button>
         <h1 class="text-3xl font-bold">Purchase Details</h1>
       </div>
     }
@@ -46,7 +36,13 @@
     @if (error() && !isLoading()) {
       <div class="alert alert-error">
         <span>{{ error() }}</span>
-        <button class="btn btn-ghost btn-sm" (click)="error.set(null)">✕</button>
+        <button
+          class="btn btn-ghost btn-sm btn-circle"
+          (click)="error.set(null)"
+          aria-label="Dismiss"
+        >
+          <ng-icon name="heroXMark" size="1.25rem" />
+        </button>
       </div>
     }
 
@@ -183,7 +179,13 @@
         @if (confirmError()) {
           <div class="alert alert-error text-sm">
             <span>{{ confirmError() }}</span>
-            <button class="btn btn-ghost btn-xs" (click)="confirmError.set(null)">✕</button>
+            <button
+              class="btn btn-ghost btn-xs btn-circle"
+              (click)="confirmError.set(null)"
+              aria-label="Dismiss"
+            >
+              <ng-icon name="heroXMark" size="1rem" />
+            </button>
           </div>
         }
         <div class="flex flex-wrap gap-2">

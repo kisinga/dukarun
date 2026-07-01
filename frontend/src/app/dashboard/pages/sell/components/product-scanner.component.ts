@@ -13,6 +13,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { BackgroundStateService } from '../../../../core/services/background-state.service';
 import { BarcodeScannerService } from '../../../../core/services/barcode-scanner.service';
 import { CameraService } from '../../../../core/services/camera.service';
@@ -39,7 +40,7 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
  */
 @Component({
   selector: 'app-product-scanner',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   template: `
     @if (isScanning()) {
       <div class="card bg-base-100 shadow-xl border-2 border-primary anim-fade-in">
@@ -124,20 +125,7 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
           <!-- Barcode Not Found Feedback -->
           @if (barcodeNotFoundMessage()) {
             <div class="alert alert-warning mt-2 anim-fade-in-down">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
+              <ng-icon name="heroExclamationTriangle" size="1.25rem" />
               <div>
                 <div class="font-semibold">Barcode Not Found</div>
                 <div class="text-sm">
@@ -153,7 +141,7 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
       <div class="card bg-base-100 shadow-md border border-base-300">
         <div class="card-body items-center text-center gap-3 p-6">
           @if (scannerStatus() === 'error') {
-            <span class="material-symbols-outlined text-4xl text-error">no_photography</span>
+            <ng-icon name="heroNoSymbol" size="2.25rem" class="text-error" />
             <p class="font-semibold">Camera unavailable</p>
             <p class="text-sm text-base-content/70">
               Allow camera access, or search the product by name below.
@@ -166,7 +154,7 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
             <p class="text-sm text-base-content/70">Starting camera…</p>
           } @else {
             <button class="btn btn-primary min-h-12 px-6 gap-2" (click)="toggleScanner()">
-              <span class="material-symbols-outlined">photo_camera</span> Tap to scan
+              <ng-icon name="heroCamera" size="1.25rem" /> Tap to scan
             </button>
           }
         </div>

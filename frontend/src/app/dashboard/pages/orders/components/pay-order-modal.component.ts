@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { firstValueFrom } from 'rxjs';
 import { CashierSessionService } from '../../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../../core/services/company.service';
@@ -45,7 +46,7 @@ export interface PayOrderModalData {
  */
 @Component({
   selector: 'app-pay-order-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <dialog #modal class="modal modal-bottom sm:modal-middle" (click)="onBackdropClick($event)">
@@ -65,14 +66,7 @@ export interface PayOrderModalData {
               [disabled]="isProcessing()"
               aria-label="Close"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                ></path>
-              </svg>
+              <ng-icon name="heroXMark" size="1.25rem" />
             </button>
           </form>
         </div>
@@ -93,13 +87,7 @@ export interface PayOrderModalData {
         <!-- Success Message -->
         @if (successResult()) {
           <div class="alert alert-success mb-4">
-            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clip-rule="evenodd"
-              ></path>
-            </svg>
+            <ng-icon name="heroCheckCircle" size="1.25rem" />
             <div class="flex-1">
               <div class="font-semibold">Payment recorded successfully!</div>
               <div class="text-xs mt-1">
@@ -115,13 +103,7 @@ export interface PayOrderModalData {
         <!-- Error Message -->
         @if (error()) {
           <div class="alert alert-error mb-4">
-            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clip-rule="evenodd"
-              ></path>
-            </svg>
+            <ng-icon name="heroXCircle" size="1.25rem" />
             <span class="text-sm">{{ error() }}</span>
           </div>
         }
@@ -129,18 +111,7 @@ export interface PayOrderModalData {
         <!-- No session message -->
         @if (!successResult() && !cashierSessionService.hasActiveSession()) {
           <div class="alert alert-warning mb-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clip-rule="evenodd"
-              />
-            </svg>
+            <ng-icon name="heroExclamationTriangle" size="1.25rem" />
             <span
               >Open a session to record payments. Go to the Dashboard and click "Open shift"
               first.</span
@@ -192,24 +163,12 @@ export interface PayOrderModalData {
                 </div>
               } @else if (paymentMethodsError()) {
                 <div class="alert alert-error">
-                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fill-rule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clip-rule="evenodd"
-                    ></path>
-                  </svg>
+                  <ng-icon name="heroXCircle" size="1.25rem" />
                   <span class="text-sm">{{ paymentMethodsError() }}</span>
                 </div>
               } @else if (paymentMethods().length === 0) {
                 <div class="alert alert-warning">
-                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fill-rule="evenodd"
-                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                      clip-rule="evenodd"
-                    ></path>
-                  </svg>
+                  <ng-icon name="heroExclamationTriangle" size="1.25rem" />
                   <span class="text-sm">No payment methods available</span>
                 </div>
               } @else {
@@ -238,22 +197,12 @@ export interface PayOrderModalData {
                               class="w-8 h-8 object-contain"
                             />
                           } @else {
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              class="h-6 w-6"
+                            <ng-icon
+                              name="heroCreditCard"
+                              size="1.5rem"
                               [class.text-primary]="selectedPaymentMethod() === method.code"
                               [class.text-base-content/60]="selectedPaymentMethod() !== method.code"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                              />
-                            </svg>
+                            />
                           }
                         </div>
                         <span class="font-semibold text-xs text-center">{{ method.name }}</span>

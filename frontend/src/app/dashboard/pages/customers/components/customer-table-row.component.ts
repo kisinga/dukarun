@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { EntityAvatarComponent } from '../../../components/shared/entity-avatar.component';
 import { StatusBadgeComponent } from '../../../components/shared/status-badge.component';
@@ -6,7 +7,7 @@ import { CustomerAction } from './customer-card.component';
 
 @Component({
   selector: 'tr[app-customer-table-row]',
-  imports: [EntityAvatarComponent, StatusBadgeComponent],
+  imports: [NgIcon, EntityAvatarComponent, StatusBadgeComponent],
   templateUrl: './customer-table-row.component.html',
   styleUrl: './customer-table-row.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

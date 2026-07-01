@@ -1,53 +1,47 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { RefreshButtonComponent } from './refresh-button.component';
 
 /**
- * Dashboard page header component
+ * Standardized dashboard page header.
  *
- * Provides a consistent header layout across all dashboard pages.
- * Bold title ensures users always know where they are.
+ * One layout everywhere: the title (≤24px, tight) sits left; a summary
+ * `[stats]` slot (typically <app-stat-bar>), any `[actions]`, and an optional
+ * refresh button fill the space to the right — so page-level stats never eat a
+ * dedicated vertical band. Wraps below the title on narrow screens.
+ *
+ * ```html
+ * <app-page-header title="Payments" subtitle="…" [isLoading]="loading()" (refresh)="reload()">
+ *   <app-x-stats stats … />
+ *   <button actions …>New</button>
+ * </app-page-header>
+ * ```
  */
 @Component({
   selector: 'app-page-header',
+  imports: [RefreshButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex items-start justify-between gap-4">
-      <div class="flex-1 min-w-0">
-        <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">{{ title() }}</h1>
+    <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+      <div class="min-w-0">
+        <h1 class="text-xl lg:text-2xl font-bold tracking-tight truncate">{{ title() }}</h1>
         @if (subtitle()) {
-          <p class="text-sm text-base-content/60 mt-1">{{ subtitle() }}</p>
+          <p class="text-sm text-base-content/60 mt-0.5 truncate">{{ subtitle() }}</p>
         }
       </div>
 
-      <div class="flex gap-2 shrink-0">
-        <!-- Refresh button -->
-        @if (showRefresh()) {
-          <button
-            (click)="refresh.emit()"
-            class="btn btn-ghost btn-square btn-sm lg:btn-md"
-            [class.loading]="isLoading()"
-            [title]="refreshTitle()"
-          >
-            @if (!isLoading()) {
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-            }
-          </button>
-        }
-
-        <!-- Custom actions slot -->
-        <ng-content select="[actions]"></ng-content>
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-2 sm:justify-end">
+        <ng-content select="[header-stats]"></ng-content>
+        <!-- Actions + refresh: one grouped cluster, kept apart from the stats -->
+        <div class="flex items-center gap-2">
+          <ng-content select="[actions]"></ng-content>
+          @if (showRefresh()) {
+            <app-refresh-button
+              [isLoading]="isLoading()"
+              [title]="refreshTitle()"
+              (refresh)="refresh.emit()"
+            />
+          }
+        </div>
       </div>
     </div>
   `,
@@ -61,4 +55,3 @@ export class PageHeaderComponent {
 
   readonly refresh = output<void>();
 }
-

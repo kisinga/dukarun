@@ -1,6 +1,5 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { StatCardComponent } from '../../../components/shared/stat-card.component';
-import { StatStripComponent } from '../../../components/shared/stat-strip.component';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { StatBarComponent, type StatItem } from '../../../components/shared/stat-bar.component';
 
 export interface CustomerStats {
   totalCustomers: number;
@@ -11,50 +10,16 @@ export interface CustomerStats {
 }
 
 /**
- * Customer KPI strip.
- *
- * Routes through the shared <app-stat-card>/<app-stat-strip> (design-spec
- * hierarchy: value is the hero, semantic colour only where it means something —
- * verified=success, frozen=error; a plain total stays neutral). The three
- * meaningful states are interactive filters with an active-ring signifier.
+ * Customer summary — a compact inline stat line. The three meaningful states are
+ * independent toggle filters (multi-select); only "frozen" (a problem state) is
+ * coloured.
  */
 @Component({
   selector: 'app-customer-stats',
   standalone: true,
-  imports: [StatCardComponent, StatStripComponent],
+  imports: [StatBarComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <app-stat-strip [cols]="4">
-      <app-stat-card label="Customers" [value]="stats().totalCustomers" icon="heroUsers" />
-      <app-stat-card
-        label="Verified"
-        [value]="stats().verifiedCustomers"
-        tone="success"
-        icon="heroCheckBadge"
-        [interactive]="true"
-        [active]="!!activeFilters().verified"
-        (select)="onFilterClick('verified')"
-      />
-      <app-stat-card
-        label="Credit"
-        [value]="stats().creditApprovedCustomers"
-        tone="primary"
-        icon="heroCreditCard"
-        [interactive]="true"
-        [active]="!!activeFilters().creditApproved"
-        (select)="onFilterClick('creditApproved')"
-      />
-      <app-stat-card
-        label="Frozen"
-        [value]="stats().frozenCustomers"
-        tone="error"
-        icon="heroLockClosed"
-        [interactive]="true"
-        [active]="!!activeFilters().frozen"
-        (select)="onFilterClick('frozen')"
-      />
-    </app-stat-strip>
-  `,
+  template: `<app-stat-bar [stats]="items()" (select)="onFilterClick($event)" />`,
 })
 export class CustomerStatsComponent {
   readonly stats = input.required<CustomerStats>();
@@ -65,6 +30,28 @@ export class CustomerStatsComponent {
     recent?: boolean;
   }>({});
   readonly filterClick = output<{ type: string; color: string }>();
+
+  readonly items = computed<StatItem[]>(() => {
+    const s = this.stats();
+    const f = this.activeFilters();
+    return [
+      { label: 'customers', value: s.totalCustomers },
+      { label: 'verified', value: s.verifiedCustomers, filter: 'verified', active: !!f.verified },
+      {
+        label: 'on credit',
+        value: s.creditApprovedCustomers,
+        filter: 'creditApproved',
+        active: !!f.creditApproved,
+      },
+      {
+        label: 'frozen',
+        value: s.frozenCustomers,
+        tone: s.frozenCustomers > 0 ? 'error' : 'neutral',
+        filter: 'frozen',
+        active: !!f.frozen,
+      },
+    ];
+  });
 
   onFilterClick(type: string): void {
     const colorMap: Record<string, string> = {

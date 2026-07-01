@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { NgIcon } from '@ng-icons/core';
 import { PurchaseService } from '../../../core/services/purchase.service';
 import { calculatePurchaseStats } from '../../../core/services/stats/purchase-stats.util';
 import { PaginationComponent } from '../../components/shared/pagination.component';
@@ -41,6 +42,7 @@ import { PurchaseDetailComponent } from './purchase-detail/purchase-detail.compo
   selector: 'app-purchases',
   imports: [
     CommonModule,
+    NgIcon,
     PurchaseStatsComponent,
     PurchaseCardComponent,
     PageHeaderComponent,

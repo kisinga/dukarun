@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, EventEmitter, input, Output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { SupplierCreateComponent } from '../../supplier-create/supplier-create.component';
 
 /**
@@ -10,7 +11,7 @@ import { SupplierCreateComponent } from '../../supplier-create/supplier-create.c
  */
 @Component({
   selector: 'app-supplier-create-modal',
-  imports: [CommonModule, SupplierCreateComponent],
+  imports: [CommonModule, NgIcon, SupplierCreateComponent],
   template: `
     <dialog class="modal" [class.modal-open]="isOpen()" id="supplier-create-modal">
       <div class="modal-box max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -22,7 +23,7 @@ import { SupplierCreateComponent } from '../../supplier-create/supplier-create.c
             (click)="close()"
             aria-label="Close modal"
           >
-            ✕
+            <ng-icon name="heroXMark" size="1.25rem" />
           </button>
         </div>
 

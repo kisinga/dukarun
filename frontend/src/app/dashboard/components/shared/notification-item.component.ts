@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 
 export interface NotificationData {
   id: string;
@@ -16,6 +17,7 @@ export interface NotificationData {
  */
 @Component({
   selector: 'app-notification-item',
+  imports: [NgIcon],
   template: `
     <div
       class="flex items-start gap-3 p-4 hover:bg-base-200 active:bg-base-300 cursor-pointer transition-colors"
@@ -24,12 +26,12 @@ export interface NotificationData {
     >
       <!-- Type Icon -->
       <div
-        class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg"
+        class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
         [class.bg-warning/20]="typeClass() === 'warning'"
         [class.bg-success/20]="typeClass() === 'success'"
         [class.bg-info/20]="typeClass() === 'info'"
       >
-        {{ icon() }}
+        <ng-icon [name]="icon()" size="1.25rem" />
       </div>
 
       <!-- Content -->
@@ -51,16 +53,7 @@ export interface NotificationData {
           <div class="w-2.5 h-2.5 bg-primary rounded-full"></div>
         }
         @if (notification().data?.['navigateTo']) {
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-3.5 w-3.5 text-base-content/30"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
+          <ng-icon name="heroChevronRight" size="1rem" class="text-base-content/30" />
         }
       </div>
     </div>
@@ -78,17 +71,17 @@ export class NotificationItemComponent {
   icon = () => {
     switch (this.notification().type) {
       case 'ORDER':
-        return '💰';
+        return 'heroCurrencyDollar';
       case 'STOCK':
-        return '⚠️';
+        return 'heroExclamationTriangle';
       case 'ML_TRAINING':
-        return '🤖';
+        return 'heroCpuChip';
       case 'PAYMENT':
-        return '💳';
+        return 'heroCreditCard';
       case 'APPROVAL':
-        return '📋';
+        return 'heroClipboardDocumentCheck';
       default:
-        return 'ℹ️';
+        return 'heroInformationCircle';
     }
   };
 

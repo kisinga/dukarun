@@ -13,6 +13,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { AppInitService } from '../../core/services/app-init.service';
 import { AuthService } from '../../core/services/auth.service';
 import { RegisterLinkPreviewsService } from '../../core/services/link-preview/register-link-previews.service';
@@ -50,6 +51,7 @@ import { environment } from '../../../environments/environment';
     NavIconComponent,
     NotificationDropdownComponent,
     UserAvatarButtonComponent,
+    NgIcon,
   ],
   templateUrl: './dashboard-layout.component.html',
   styleUrl: './dashboard-layout.component.scss',
@@ -659,20 +661,21 @@ export class DashboardLayoutComponent implements OnInit {
     }
   }
 
+  /** Returns a registered ng-icon name for a notification type (rendered via <ng-icon [name]>). */
   getNotificationIcon(type: string): string {
     switch (type) {
       case 'ORDER':
-        return '💰';
+        return 'heroBanknotes';
       case 'STOCK':
-        return '⚠️';
+        return 'heroExclamationTriangle';
       case 'ML_TRAINING':
-        return '🤖';
+        return 'heroCpuChip';
       case 'PAYMENT':
-        return '💳';
+        return 'heroCreditCard';
       case 'APPROVAL':
-        return '📋';
+        return 'heroClipboardDocumentList';
       default:
-        return 'ℹ️';
+        return 'heroInformationCircle';
     }
   }
 

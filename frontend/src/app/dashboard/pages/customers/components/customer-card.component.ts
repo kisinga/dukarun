@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { EntityAvatarComponent } from '../../../components/shared/entity-avatar.component';
 import { StatusBadgeComponent } from '../../../components/shared/status-badge.component';
@@ -7,7 +8,7 @@ export type CustomerAction = 'edit' | 'delete' | 'viewOrders' | 'recordPayment' 
 
 @Component({
   selector: 'app-customer-card',
-  imports: [EntityAvatarComponent, StatusBadgeComponent],
+  imports: [NgIcon, EntityAvatarComponent, StatusBadgeComponent],
   templateUrl: './customer-card.component.html',
   styleUrl: './customer-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

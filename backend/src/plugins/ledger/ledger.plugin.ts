@@ -63,6 +63,7 @@ import {
   CloseAccountingPeriodPermission,
   CreateInterAccountTransferPermission,
   ManageReconciliationPermission,
+  ViewFinancialsPermission,
 } from './permissions';
 
 // Merge schemas
@@ -137,6 +138,7 @@ const COMBINED_SCHEMA = gql`
     // Register custom permissions
     config.authOptions.customPermissions = [
       ...(config.authOptions.customPermissions || []),
+      ViewFinancialsPermission,
       ManageReconciliationPermission,
       CloseAccountingPeriodPermission,
       CreateInterAccountTransferPermission,

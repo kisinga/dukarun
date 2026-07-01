@@ -38,7 +38,11 @@ export class AccountBalanceService {
     });
 
     if (!account) {
-      throw new Error(`Account ${accountCode} not found for channel ${channelId}`);
+      // A channel whose chart of accounts doesn't (yet) include this account
+      // simply has no postings for it → a zero balance, not an error. Throwing
+      // here nulled the entire customer/supplier GraphQL response (blank detail
+      // page) because the outstandingAmount field resolver reads this balance.
+      return { accountCode, accountName: accountCode, balance: 0, debitTotal: 0, creditTotal: 0 };
     }
 
     // If account is a parent, roll up balances from sub-accounts

@@ -9,6 +9,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { getExpenseCategoryLabel } from '../../../core/constants/expense-categories';
 import { CashierSessionService } from '../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../core/services/company.service';
@@ -16,7 +17,7 @@ import { CurrencyService } from '../../../core/services/currency.service';
 import { DashboardService } from '../../../core/services/dashboard.service';
 import { JournalEntry, LedgerService } from '../../../core/services/ledger/ledger.service';
 import { toDisplayDate } from '../../../core/utils/date.util';
-import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
+import type { StatItem } from '../../components/shared/stat-bar.component';
 import { RecordExpenseModalComponent } from '../shifts/record-expense-modal.component';
 
 const EXPENSE_SOURCE_TYPE = 'Expense';
@@ -27,7 +28,7 @@ const EXPENSE_SOURCE_TYPE = 'Expense';
  */
 @Component({
   selector: 'app-expenses',
-  imports: [CommonModule, PageHeaderComponent, RecordExpenseModalComponent],
+  imports: [CommonModule, NgIcon, RecordExpenseModalComponent],
   templateUrl: './expenses.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -48,6 +49,16 @@ export class ExpensesComponent implements OnInit {
   readonly expenseStats = computed(() => {
     const stats = this.dashboardService.stats();
     return stats?.expenses ?? { today: 0, week: 0, month: 0, accounts: [] };
+  });
+
+  /** The spend-over-time summary as the same pill row every other page uses. */
+  readonly headerStats = computed<StatItem[]>(() => {
+    const s = this.expenseStats();
+    return [
+      { label: 'today', value: this.formatCurrency(s.today) },
+      { label: 'this week', value: this.formatCurrency(s.week) },
+      { label: 'this month', value: this.formatCurrency(s.month) },
+    ];
   });
 
   readonly sessionOpen = this.cashierSessionService.hasActiveSession;

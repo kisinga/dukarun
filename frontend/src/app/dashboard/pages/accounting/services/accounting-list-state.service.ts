@@ -4,7 +4,7 @@ import {
   LedgerAccount,
   LedgerService,
 } from '../../../../core/services/ledger/ledger.service';
-import type { AccountingStats } from '../components/accounting-stats.component';
+import type { AccountingStats } from '../accounting-context';
 import { formatDate as formatDateUtil } from '../utils/accounting-formatting';
 
 @Injectable({

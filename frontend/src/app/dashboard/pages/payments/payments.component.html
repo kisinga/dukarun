@@ -1,37 +1,18 @@
 <div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
-  <!-- Header -->
-  <div class="flex items-start justify-between gap-3 sm:gap-4">
-    <div class="flex-1 min-w-0">
-      <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">Payments</h1>
-      <p class="text-xs sm:text-sm text-base-content/60 mt-1">View and manage all payments</p>
-    </div>
-
-    <div class="flex gap-2 shrink-0">
-      <button
-        (click)="refreshPayments()"
-        class="btn btn-ghost btn-square btn-sm lg:btn-md touch-manipulation"
-        [class.loading]="isLoading()"
-        title="Refresh payments"
-      >
-        @if (!isLoading()) {
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-        }
-      </button>
-    </div>
-  </div>
+  <!-- Header: title left, summary stats fill the space to the right -->
+  <app-page-header
+    title="Payments"
+    subtitle="View and manage all payments"
+    [isLoading]="isLoading()"
+    (refresh)="refreshPayments()"
+  >
+    <app-payment-stats
+      header-stats
+      [stats]="stats()"
+      [activeStateFilter]="stateFilter()"
+      (filterClick)="onStatsFilterClick($event)"
+    />
+  </app-page-header>
 
   <!-- Context banner: payments for a specific customer or order -->
   @if (hasContextFilter()) {
@@ -61,13 +42,6 @@
       </button>
     </div>
   }
-
-  <!-- Statistics Cards -->
-  <app-payment-stats
-    [stats]="stats()"
-    [activeStateFilter]="stateFilter()"
-    (filterClick)="onStatsFilterClick($event)"
-  />
 
   <!-- Search & Filter Bar -->
   <app-payment-search-bar
@@ -158,27 +132,6 @@
 
   <!-- Payments List -->
   @else {
-    <!-- List Controls -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1">
-      <div class="text-sm text-base-content/60">
-        Showing {{ (currentPage() - 1) * itemsPerPage() + 1 }} to {{ endItem() }} of
-        {{ filteredPayments().length }} payments
-      </div>
-
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-base-content/60">Per page:</span>
-        <select
-          class="select select-sm select-bordered"
-          [value]="itemsPerPage()"
-          (change)="changeItemsPerPage(+$any($event.target).value)"
-        >
-          @for (option of pageOptions; track option) {
-            <option [value]="option">{{ option }}</option>
-          }
-        </select>
-      </div>
-    </div>
-
     <!-- Mobile: Card View -->
     <div class="lg:hidden space-y-4">
       @for (payment of paginatedPayments(); track trackByPaymentId($index, payment)) {

@@ -1,73 +1,71 @@
-<div class="card bg-base-100 shadow">
-  <div class="card-body">
-    <div class="flex flex-col lg:flex-row gap-4">
-      <!-- Search -->
-      <div class="flex-1">
-        <input
-          type="text"
-          placeholder="Search transactions, accounts, memos..."
-          class="input input-bordered w-full"
-          [value]="filters().searchTerm"
-          (input)="onSearchChange($event)"
-        />
-      </div>
-
-      <!-- Account Filter -->
-      <div class="w-full lg:w-64">
-        <select
-          class="select select-bordered w-full"
-          [value]="filters().selectedAccount?.id || ''"
-          (change)="onAccountChange($event)"
-        >
-          <option value="">All Accounts</option>
-          @for (account of filters().accounts; track account.id) {
-            <option [value]="account.id">{{ account.code }} - {{ account.name }}</option>
-          }
-        </select>
-      </div>
-
-      <!-- Source Type Filter -->
-      <div class="w-full lg:w-48">
-        <select
-          class="select select-bordered w-full"
-          [value]="filters().sourceTypeFilter"
-          (change)="onSourceTypeChange($event)"
-        >
-          <option value="">All Source Types</option>
-          @for (sourceType of filters().sourceTypes; track sourceType) {
-            <option [value]="sourceType">{{ sourceTypeLabel(sourceType) }}</option>
-          }
-        </select>
-      </div>
-
-      <!-- Date Range -->
-      <div class="flex gap-2">
-        <input
-          type="date"
-          class="input input-bordered"
-          [value]="filters().dateFilter.start || ''"
-          (change)="onStartDateChange($event)"
-        />
-        <input
-          type="date"
-          class="input input-bordered"
-          [value]="filters().dateFilter.end || ''"
-          (change)="onEndDateChange($event)"
-        />
-      </div>
-
-      <!-- Clear Filters -->
-      <button class="btn btn-outline" (click)="clearFilters.emit()">Clear</button>
+<div class="rounded-box border border-base-300/60 bg-base-100 p-4">
+  <div class="flex flex-col lg:flex-row lg:items-center gap-3">
+    <!-- Search -->
+    <div class="flex-1">
+      <input
+        type="text"
+        placeholder="Search transactions, accounts, memos..."
+        class="input input-bordered input-sm w-full"
+        [value]="filters().searchTerm"
+        (input)="onSearchChange($event)"
+      />
     </div>
 
-    <!-- Quick Filters -->
-    @if (filters().showQuickFilters) {
-      <div class="flex flex-wrap gap-2 mt-2">
-        <button class="btn btn-sm btn-ghost" (click)="onQuickFilter('today')">Today</button>
-        <button class="btn btn-sm btn-ghost" (click)="onQuickFilter('week')">This Week</button>
-        <button class="btn btn-sm btn-ghost" (click)="onQuickFilter('month')">This Month</button>
-        <button class="btn btn-sm btn-ghost" (click)="onQuickFilter('all')">All Time</button>
-      </div>
-    }
+    <!-- Account Filter -->
+    <div class="w-full lg:w-56">
+      <select
+        class="select select-bordered select-sm w-full"
+        [value]="filters().selectedAccount?.id || ''"
+        (change)="onAccountChange($event)"
+      >
+        <option value="">All Accounts</option>
+        @for (account of filters().accounts; track account.id) {
+          <option [value]="account.id">{{ account.code }} - {{ account.name }}</option>
+        }
+      </select>
+    </div>
+
+    <!-- Source Type Filter -->
+    <div class="w-full lg:w-44">
+      <select
+        class="select select-bordered select-sm w-full"
+        [value]="filters().sourceTypeFilter"
+        (change)="onSourceTypeChange($event)"
+      >
+        <option value="">All Source Types</option>
+        @for (sourceType of filters().sourceTypes; track sourceType) {
+          <option [value]="sourceType">{{ sourceTypeLabel(sourceType) }}</option>
+        }
+      </select>
+    </div>
+
+    <!-- Date Range -->
+    <div class="flex gap-2">
+      <input
+        type="date"
+        class="input input-bordered input-sm"
+        [value]="filters().dateFilter.start || ''"
+        (change)="onStartDateChange($event)"
+      />
+      <input
+        type="date"
+        class="input input-bordered input-sm"
+        [value]="filters().dateFilter.end || ''"
+        (change)="onEndDateChange($event)"
+      />
+    </div>
+
+    <!-- Clear -->
+    <button class="btn btn-outline btn-sm lg:ml-auto" (click)="clearFilters.emit()">Clear</button>
   </div>
+
+  <!-- Quick Filters -->
+  @if (filters().showQuickFilters) {
+    <div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-base-300/60">
+      <button class="btn btn-xs btn-ghost" (click)="onQuickFilter('today')">Today</button>
+      <button class="btn btn-xs btn-ghost" (click)="onQuickFilter('week')">This Week</button>
+      <button class="btn btn-xs btn-ghost" (click)="onQuickFilter('month')">This Month</button>
+      <button class="btn btn-xs btn-ghost" (click)="onQuickFilter('all')">All Time</button>
+    </div>
+  }
 </div>

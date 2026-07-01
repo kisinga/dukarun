@@ -1,68 +1,125 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { RouterLink } from '@angular/router';
 
 /**
- * Mobile floating action button component
+ * Floating action button component
  *
- * Fixed position FAB for primary actions on mobile.
- * Hidden on desktop where inline buttons are used.
+ * Fixed bottom-right FAB for primary page actions.
  */
 @Component({
   selector: 'app-mobile-fab',
-  imports: [RouterLink],
+  imports: [NgIcon, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="fixed bottom-24 right-4 z-40 lg:hidden">
-      @if (routerLink()) {
-        <a
-          [routerLink]="routerLink()"
-          class="btn btn-lg btn-circle btn-primary shadow-xl"
-          [attr.aria-label]="ariaLabel()"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-            />
-          </svg>
-        </a>
-      } @else {
-        <button
-          (click)="fabClick.emit()"
-          class="btn btn-lg btn-circle btn-primary shadow-xl"
-          [attr.aria-label]="ariaLabel()"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-            />
-          </svg>
-        </button>
+    @if (routerLink()) {
+      <a
+        [routerLink]="routerLink()"
+        class="btn mobile-fab-action"
+        [class.btn-primary]="variant() === 'primary'"
+        [class.btn-ghost]="variant() === 'secondary'"
+        [class.mobile-fab-action-secondary]="variant() === 'secondary'"
+        [attr.aria-label]="ariaLabel()"
+        [attr.title]="title()"
+        [attr.aria-disabled]="disabled() || null"
+      >
+        <ng-icon [name]="icon()" size="1.55rem" />
+        @if (label()) {
+          <span>{{ label() }}</span>
+        }
+      </a>
+    } @else {
+      <button
+        (click)="fabClick.emit()"
+        class="btn mobile-fab-action"
+        [class.btn-primary]="variant() === 'primary'"
+        [class.btn-ghost]="variant() === 'secondary'"
+        [class.mobile-fab-action-secondary]="variant() === 'secondary'"
+        [attr.aria-label]="ariaLabel()"
+        [attr.title]="title()"
+        [disabled]="disabled()"
+        type="button"
+      >
+        <ng-icon [name]="icon()" size="1.55rem" />
+        @if (label()) {
+          <span>{{ label() }}</span>
+        }
+      </button>
+    }
+  `,
+  host: {
+    class: 'dashboard-fab-host',
+    '[class.stack-1]': 'stack() === 1',
+  },
+  styles: `
+    :host {
+      position: fixed;
+      right: 1rem;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 6rem);
+      z-index: 1000;
+      pointer-events: none;
+      display: block;
+    }
+
+    :host(.stack-1) {
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 11rem);
+    }
+
+    .mobile-fab-action {
+      pointer-events: auto;
+      height: 4rem;
+      min-width: 4rem;
+      padding: 0 1.25rem;
+      border-radius: 999px;
+      gap: 0.7rem;
+      font-size: 1rem;
+      font-weight: 800;
+      box-shadow:
+        0 18px 42px color-mix(in oklch, var(--color-primary) 34%, transparent),
+        0 0 0 8px color-mix(in oklch, var(--color-primary) 12%, transparent),
+        inset 0 1px 0 rgb(255 255 255 / 0.28);
+    }
+
+    .mobile-fab-action:not(:has(span)) {
+      width: 4rem;
+      padding: 0;
+    }
+
+    .mobile-fab-action-secondary {
+      border-color: color-mix(in oklch, var(--color-base-content) 18%, transparent);
+      background: var(--color-base-100);
+      color: var(--color-base-content);
+      box-shadow:
+        0 14px 32px rgb(0 0 0 / 0.16),
+        0 0 0 8px color-mix(in oklch, var(--color-base-content) 8%, transparent),
+        inset 0 1px 0 rgb(255 255 255 / 0.14);
+    }
+
+    .mobile-fab-action-secondary ng-icon {
+      color: var(--color-primary);
+    }
+
+    @media (min-width: 1024px) {
+      :host {
+        right: 2rem;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
       }
-    </div>
+
+      :host(.stack-1) {
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 7rem);
+      }
+    }
   `,
 })
 export class MobileFabComponent {
   readonly routerLink = input<string | string[]>();
   readonly ariaLabel = input('Create new');
+  readonly label = input('');
+  readonly title = input<string | null>(null);
+  readonly disabled = input(false);
+  readonly icon = input('heroPlus');
+  readonly stack = input(0);
+  readonly variant = input<'primary' | 'secondary'>('primary');
 
   readonly fabClick = output<void>();
 }
-

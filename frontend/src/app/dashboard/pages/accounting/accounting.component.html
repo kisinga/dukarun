@@ -1,83 +1,32 @@
-<div class="space-y-5 lg:space-y-6 anim-stagger">
-  <!-- Header -->
-  <div class="flex items-start justify-between gap-4">
-    <div class="flex-1 min-w-0">
-      <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Ledger</h1>
-      <p class="text-sm text-base-content/60 mt-1">
-        View chart of accounts, transactions, and financial history
-      </p>
-    </div>
-
-    <div class="flex gap-2 shrink-0">
-      <button
-        (click)="loadData()"
-        class="btn btn-ghost btn-square btn-sm lg:btn-md"
-        [class.loading]="isLoading()"
-        title="Refresh accounting"
-      >
-        @if (!isLoading()) {
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-        }
-      </button>
-    </div>
-  </div>
-
+<div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
   <!-- Error Alert -->
   @if (error(); as err) {
     <div role="alert" class="alert alert-error">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-5 w-5 shrink-0"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
+      <ng-icon name="heroExclamationTriangle" size="1.25rem" class="shrink-0" />
       <span class="flex-1">{{ err }}</span>
       <button (click)="error.set(null)" class="btn btn-sm">Dismiss</button>
     </div>
   }
 
-  <!-- Summary Statistics Cards (visible in Overview and Transactions tabs) -->
-  @if (activeTab() === 'overview' || activeTab() === 'transactions') {
-    <app-accounting-stats [stats]="stats()" [formatCurrency]="formatCurrency" />
+  <!-- Owner-first money summary (Overview only) -->
+  @if (headerStats().length > 0) {
+    <app-stat-bar [stats]="headerStats()" />
   }
 
-  <!-- Filters Bar -->
-  <app-accounting-filters
-    [filters]="filters()"
-    (searchTermChange)="onSearchTermChange($event)"
-    (accountChange)="onAccountFilterChange($event)"
-    (sourceTypeChange)="onSourceTypeFilterChange($event)"
-    (dateFilterChange)="onDateFilterChange($event)"
-    (quickFilterChange)="onQuickFilterChange($event)"
-    (clearFilters)="clearFilters()"
-  />
+  @if (activeTab() === 'transactions') {
+    <app-accounting-filters
+      [filters]="filters()"
+      (searchTermChange)="onSearchTermChange($event)"
+      (accountChange)="onAccountFilterChange($event)"
+      (sourceTypeChange)="onSourceTypeFilterChange($event)"
+      (dateFilterChange)="onDateFilterChange($event)"
+      (quickFilterChange)="onQuickFilterChange($event)"
+      (clearFilters)="clearFilters()"
+    />
+  }
 
-  <!-- Tabs -->
-  <app-accounting-tabs />
-
-  <!-- Tab Content -->
-  <div class="mt-3">
+  <!-- Tab Content (navigation lives in the parent Finances layout) -->
+  <div>
     <!-- Overview Tab -->
     @if (activeTab() === 'overview') {
       <app-overview-tab

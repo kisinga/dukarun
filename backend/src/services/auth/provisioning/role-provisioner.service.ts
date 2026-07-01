@@ -28,6 +28,7 @@ import {
   ManageReconciliationPermission,
   CloseAccountingPeriodPermission,
   CreateInterAccountTransferPermission,
+  ViewFinancialsPermission,
 } from '../../../plugins/ledger/permissions';
 import { ManageSupplierCreditPurchasesPermission } from '../../../plugins/credit/supplier-credit.permissions';
 import { ManageApprovalsPermission } from '../../../plugins/approval/approval.plugin';
@@ -95,6 +96,7 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
       ManageCustomerCreditLimitPermission.Permission as Permission,
       ManageStockAdjustmentsPermission.Permission as Permission,
       ManageReconciliationPermission.Permission as Permission,
+      ViewFinancialsPermission.Permission as Permission,
       CloseAccountingPeriodPermission.Permission as Permission,
       CreateInterAccountTransferPermission.Permission as Permission,
       ManageSupplierCreditPurchasesPermission.Permission as Permission,
@@ -129,6 +131,7 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
       Permission.ReadCustomer,
       Permission.ReadProduct,
       ManageReconciliationPermission.Permission as Permission,
+      ViewFinancialsPermission.Permission as Permission,
       CloseAccountingPeriodPermission.Permission as Permission,
       ManageCustomerCreditLimitPermission.Permission as Permission,
       ManageSupplierCreditPurchasesPermission.Permission as Permission,
@@ -236,6 +239,7 @@ export class RoleProvisionerService {
     ManageCustomerCreditLimitPermission.Permission as Permission,
     ManageStockAdjustmentsPermission.Permission as Permission,
     ManageReconciliationPermission.Permission as Permission,
+    ViewFinancialsPermission.Permission as Permission,
     CloseAccountingPeriodPermission.Permission as Permission,
     CreateInterAccountTransferPermission.Permission as Permission,
     ManageSupplierCreditPurchasesPermission.Permission as Permission,

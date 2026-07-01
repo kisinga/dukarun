@@ -8,11 +8,13 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import {
   TeamService,
   type Administrator,
   type RoleTemplate,
 } from '../../../core/services/team.service';
+import { PageHeaderComponent } from '../../components/shared/page-header.component';
 import { CreateAdminModalComponent } from './components/create-admin-modal.component';
 import { PermissionEditorComponent } from './components/permission-editor.component';
 import { TeamMemberRowComponent } from './components/team-member-row.component';
@@ -30,6 +32,8 @@ import { TeamMemberRowComponent } from './components/team-member-row.component';
   selector: 'app-team',
   imports: [
     CommonModule,
+    NgIcon,
+    PageHeaderComponent,
     TeamMemberRowComponent,
     CreateAdminModalComponent,
     PermissionEditorComponent,

@@ -154,12 +154,21 @@ describe('AccountBalanceService', () => {
       expect(result.creditTotal).toBe(300);
     });
 
-    it('should throw error if account not found', async () => {
+    it('should return a zero balance if account not found', async () => {
+      // A channel whose chart of accounts doesn't (yet) include this account
+      // has no postings for it → a zero balance, not an error. Throwing here
+      // would null the entire customer/supplier GraphQL response.
       mockAccountRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.getAccountBalance(ctx, 'INVALID', 1)).rejects.toThrow(
-        'Account INVALID not found for channel 1'
-      );
+      const result = await service.getAccountBalance(ctx, 'INVALID', 1);
+
+      expect(result).toEqual({
+        accountCode: 'INVALID',
+        accountName: 'INVALID',
+        balance: 0,
+        debitTotal: 0,
+        creditTotal: 0,
+      });
     });
   });
 

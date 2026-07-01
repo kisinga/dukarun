@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { NgIcon } from '@ng-icons/core';
 import { StockAdjustmentService } from '../../../core/services/stock-adjustment.service';
 import { toDisplayDate } from '../../../core/utils/date.util';
 import { HoverPreviewHostComponent } from '../../components/shared/hover-preview-host/hover-preview-host.component';
@@ -22,6 +23,7 @@ import { ADJUSTMENT_REASONS } from './components/stock-adjustment-form-fields.co
   imports: [
     CommonModule,
     RouterLink,
+    NgIcon,
     HoverPreviewHostComponent,
     PageHeaderComponent,
     ListSearchBarComponent,

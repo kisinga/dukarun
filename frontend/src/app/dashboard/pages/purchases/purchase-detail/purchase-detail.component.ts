@@ -15,6 +15,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { NgIcon } from '@ng-icons/core';
 import { PurchaseService } from '../../../../core/services/purchase.service';
 import { PrintService } from '../../../../core/services/print.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
@@ -42,6 +43,7 @@ import { PurchasePaymentInfoComponent } from './components/purchase-payment-info
   imports: [
     CommonModule,
     RouterModule,
+    NgIcon,
     PurchaseDetailHeaderComponent,
     PurchaseSupplierInfoComponent,
     PurchaseItemsTableComponent,

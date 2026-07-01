@@ -10,6 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import {
   ProductSearchService,
   ProductSearchResult,
@@ -31,6 +32,7 @@ import { ProductSearchViewComponent } from '../../shared/components/product-sear
   selector: 'app-stock-adjustment-create',
   imports: [
     CommonModule,
+    NgIcon,
     PageHeaderComponent,
     ProductSearchViewComponent,
     StockAdjustmentFormFieldsComponent,

@@ -1,12 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { JournalEntry } from '../../../../core/services/ledger/ledger.service';
+import { MoneyComponent } from '../../../../core/components/money.component';
 import type { TransactionsTabContext } from '../accounting-context';
 import { sourceTypeLabel } from '../utils/accounting-formatting';
 
 @Component({
   selector: 'app-transactions-tab',
-  imports: [CommonModule],
+  imports: [CommonModule, MoneyComponent],
   templateUrl: './transactions-tab.component.html',
   styleUrl: './transactions-tab.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

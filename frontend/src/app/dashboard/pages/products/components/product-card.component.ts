@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import {
   ProductLabelComponent,
@@ -32,7 +33,7 @@ export type ProductAction = 'view' | 'edit' | 'purchase' | 'delete';
  */
 @Component({
   selector: 'app-product-card',
-  imports: [CommonModule, RouterLink, ProductLabelComponent],
+  imports: [CommonModule, RouterLink, NgIcon, ProductLabelComponent],
   templateUrl: './product-card.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

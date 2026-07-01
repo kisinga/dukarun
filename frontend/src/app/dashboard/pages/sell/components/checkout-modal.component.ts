@@ -10,6 +10,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import {
   PaymentMethod,
@@ -30,6 +31,7 @@ type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
   selector: 'app-checkout-modal',
   imports: [
     CommonModule,
+    NgIcon,
     CheckoutSuccessComponent,
     CheckoutCashierComponent,
     CheckoutCreditComponent,
@@ -55,20 +57,7 @@ type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
             >
               <div class="flex items-center gap-2">
                 <div class="indicator">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-3 w-3 sm:h-4 sm:w-4 text-primary"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+                  <ng-icon name="heroCheckCircle" size="1rem" class="text-primary" />
                   <span class="indicator-item badge badge-primary badge-xs sm:badge-sm">{{
                     itemCount()
                   }}</span>
@@ -80,20 +69,7 @@ type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
                 (click)="closeModal.emit()"
                 aria-label="Close checkout"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <ng-icon name="heroXMark" size="1rem" />
               </button>
             </div>
 
@@ -101,20 +77,7 @@ type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
               <!-- Error Alert -->
               @if (error()) {
                 <div role="alert" class="alert alert-error mb-3 anim-fade-in-down">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-4 w-4 flex-shrink-0"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+                  <ng-icon name="heroExclamationCircle" size="1rem" class="flex-shrink-0" />
                   <span class="text-sm">{{ error() }}</span>
                 </div>
               }

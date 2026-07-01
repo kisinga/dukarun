@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { filter } from 'rxjs';
 import { SupplierService } from '../../../core/services/supplier.service';
 import { calculateSupplierStats } from '../../../core/services/stats/supplier-stats.util';
@@ -39,6 +40,7 @@ import { SupplierPaymentModalComponent } from './components/supplier-payment-mod
   selector: 'app-suppliers',
   imports: [
     CommonModule,
+    NgIcon,
     SupplierCardComponent,
     SupplierStatsComponent,
     PageHeaderComponent,

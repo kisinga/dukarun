@@ -1,43 +1,37 @@
-<div class="card bg-base-100 border border-base-300">
-  <div class="card-body p-4 lg:p-5">
-    <div class="flex flex-col gap-4">
-      <!-- Items per page selector (if enabled) -->
+<div class="border-t border-base-300/70 pt-3">
+  <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 lg:justify-start">
+      <span class="text-sm text-base-content/60">
+        <span class="font-semibold text-base-content">{{ startItem() }}-{{ endItem() }}</span>
+        of
+        <span class="font-semibold text-base-content">{{ totalItems() }}</span>
+        {{ itemLabel() }}
+      </span>
+
       @if (showItemsPerPage()) {
-        <div class="flex items-center justify-center gap-2">
-          <span class="text-sm text-base-content/70">Show</span>
+        <span class="hidden h-4 w-px bg-base-300 sm:inline-block"></span>
+        <label class="flex items-center gap-2 text-sm text-base-content/60">
+          <span>Show</span>
           <select
             [value]="itemsPerPage()"
             (change)="onItemsPerPageSelect($event)"
-            class="select select-bordered select-sm w-20"
+            class="select select-bordered select-xs h-8 min-h-8 w-20"
           >
             @for (option of pageOptions(); track option) {
               <option [value]="option">{{ option }}</option>
             }
           </select>
-          <span class="text-sm text-base-content/70">per page</span>
-        </div>
+        </label>
       }
+    </div>
 
-      <!-- Page Info -->
-      <div class="text-center">
-        <div class="text-sm text-base-content/60">
-          Showing
-          <span class="font-semibold text-base-content"> {{ startItem() }}-{{ endItem() }} </span>
-          of
-          <span class="font-semibold text-base-content">{{ totalItems() }}</span>
-          {{ itemLabel() }}
-        </div>
-        <div class="text-xs text-base-content/50 mt-1">
-          Page {{ currentPage() }} of {{ totalPages() }}
-        </div>
-      </div>
-
-      <!-- Pagination Controls -->
+    <div
+      class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-center lg:justify-end"
+    >
       <div class="flex items-center justify-center gap-2">
-        <!-- First & Previous -->
         <div class="join">
           <button
-            class="join-item btn btn-sm lg:btn-md"
+            class="join-item btn btn-sm btn-square"
             [disabled]="currentPage() === 1"
             (click)="onPageChange(1)"
             aria-label="First page"
@@ -45,7 +39,7 @@
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
+              class="h-4 w-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -59,7 +53,7 @@
             </svg>
           </button>
           <button
-            class="join-item btn btn-sm lg:btn-md"
+            class="join-item btn btn-sm btn-square"
             [disabled]="currentPage() === 1"
             (click)="onPageChange(currentPage() - 1)"
             aria-label="Previous page"
@@ -67,7 +61,7 @@
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
+              class="h-4 w-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -82,11 +76,10 @@
           </button>
         </div>
 
-        <!-- Page Numbers (Desktop only) -->
         <div class="join hidden sm:flex">
           @for (page of pageNumbers(); track page) {
             <button
-              class="join-item btn btn-sm lg:btn-md min-w-[2.5rem]"
+              class="join-item btn btn-sm min-w-9"
               [class.btn-active]="page === currentPage()"
               (click)="onPageChange(page)"
               [attr.aria-current]="page === currentPage() ? 'page' : null"
@@ -96,15 +89,13 @@
           }
         </div>
 
-        <!-- Mobile: Current Page Display -->
         <div class="badge badge-lg badge-primary sm:hidden font-bold px-4">
           {{ currentPage() }}
         </div>
 
-        <!-- Next & Last -->
         <div class="join">
           <button
-            class="join-item btn btn-sm lg:btn-md"
+            class="join-item btn btn-sm btn-square"
             [disabled]="currentPage() === totalPages()"
             (click)="onPageChange(currentPage() + 1)"
             aria-label="Next page"
@@ -112,7 +103,7 @@
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
+              class="h-4 w-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -126,7 +117,7 @@
             </svg>
           </button>
           <button
-            class="join-item btn btn-sm lg:btn-md"
+            class="join-item btn btn-sm btn-square"
             [disabled]="currentPage() === totalPages()"
             (click)="onPageChange(totalPages())"
             aria-label="Last page"
@@ -134,7 +125,7 @@
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
+              class="h-4 w-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -149,7 +140,10 @@
           </button>
         </div>
       </div>
+
+      <div class="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
+        <ng-content select="[pagination-actions]"></ng-content>
+      </div>
     </div>
   </div>
 </div>
-

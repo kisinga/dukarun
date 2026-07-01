@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import {
   CashierSessionService,
   type CashierSession,
@@ -16,6 +17,7 @@ import {
 } from '../../../core/services/cashier-session/cashier-session.service';
 import { CompanyService } from '../../../core/services/company.service';
 import { toDisplayDate } from '../../../core/utils/date.util';
+import { PageHeaderComponent } from '../../components/shared/page-header.component';
 
 /** Cached reconciliation details for a shift (opening and/or closing). */
 export interface ShiftReconciliationDetails {
@@ -26,7 +28,7 @@ export interface ShiftReconciliationDetails {
 @Component({
   selector: 'app-shifts',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, NgIcon, PageHeaderComponent],
   templateUrl: './shifts.component.html',
   styleUrl: './shifts.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

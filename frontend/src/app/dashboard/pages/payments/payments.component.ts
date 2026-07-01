@@ -11,6 +11,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { PaymentsService, PaymentWithOrder } from '../../../core/services/payments.service';
 import { calculatePaymentStats } from '../../../core/services/stats/payment-stats.util';
+import { PageHeaderComponent } from '../../components/shared/page-header.component';
 import { PaginationComponent } from '../../components/shared/pagination.component';
 import { OrderDetailComponent } from '../orders/order-detail/order-detail.component';
 import { PaymentAction, PaymentCardComponent } from './components/payment-card.component';
@@ -30,6 +31,7 @@ import { PaymentTableRowComponent } from './components/payment-table-row.compone
   selector: 'app-payments',
   imports: [
     CommonModule,
+    PageHeaderComponent,
     PaymentCardComponent,
     PaymentStatsComponent,
     PaymentSearchBarComponent,

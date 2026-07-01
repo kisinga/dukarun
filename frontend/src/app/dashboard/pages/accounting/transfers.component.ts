@@ -7,12 +7,12 @@ import {
   viewChild,
   signal,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { JournalEntry, LedgerService } from '../../../core/services/ledger/ledger.service';
 import { toDisplayDate } from '../../../core/utils/date.util';
-import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { TransactionDetailModalComponent } from './components/transaction-detail-modal.component';
 import { CreateTransferModalComponent } from './create-transfer-modal.component';
 import { sourceTypeLabel } from './utils/accounting-formatting';
@@ -27,12 +27,7 @@ export interface TransferFromTo {
 @Component({
   selector: 'app-transfers',
   standalone: true,
-  imports: [
-    CommonModule,
-    PageHeaderComponent,
-    CreateTransferModalComponent,
-    TransactionDetailModalComponent,
-  ],
+  imports: [CommonModule, NgIcon, CreateTransferModalComponent, TransactionDetailModalComponent],
   templateUrl: './transfers.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 
 /**
  * Payment State Badge Component
@@ -8,12 +9,12 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
  */
 @Component({
   selector: 'app-payment-state-badge',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <span class="badge badge-sm" [class]="badgeClass()">
       @if (showIcon()) {
-        <span class="mr-1">{{ icon() }}</span>
+        <ng-icon [name]="icon()" size="1rem" class="mr-1" />
       }
       {{ label() }}
     </span>
@@ -45,9 +46,9 @@ export class PaymentStateBadgeComponent {
 
   readonly icon = computed(() => {
     const state = this.state();
-    if (state === 'Settled') return '✓';
-    if (state === 'Authorized') return '○';
-    if (state === 'Declined' || state === 'Cancelled') return '✕';
+    if (state === 'Settled') return 'heroCheckCircle';
+    if (state === 'Authorized') return 'heroCheck';
+    if (state === 'Declined' || state === 'Cancelled') return 'heroXCircle';
     return '';
   });
 

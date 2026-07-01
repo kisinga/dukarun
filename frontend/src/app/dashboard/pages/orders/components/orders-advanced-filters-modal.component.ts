@@ -11,6 +11,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { CompanySearchSelectComponent } from '../../shared/components/company-search-select.component';
 import { CustomerSearchService } from '../../../../core/services/customer/customer-search.service';
 import { ProductSearchService } from '../../../../core/services/product/product-search.service';
@@ -32,7 +33,7 @@ interface CustomerItem {
 @Component({
   selector: 'app-orders-advanced-filters-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, CompanySearchSelectComponent],
+  imports: [CommonModule, FormsModule, NgIcon, CompanySearchSelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './orders-advanced-filters-modal.component.html',
 })

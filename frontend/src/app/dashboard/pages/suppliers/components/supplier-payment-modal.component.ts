@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import {
   PurchasePaymentService,
@@ -25,7 +26,7 @@ import {
 @Component({
   selector: 'app-supplier-payment-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NgIcon],
   templateUrl: './supplier-payment-modal.component.html',
   styleUrl: './supplier-payment-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

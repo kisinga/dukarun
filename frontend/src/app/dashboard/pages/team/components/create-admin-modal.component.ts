@@ -14,6 +14,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { Subscription } from 'rxjs';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TeamService, type RoleTemplate } from '../../../../core/services/team.service';
@@ -32,7 +33,7 @@ import {
  */
 @Component({
   selector: 'app-create-admin-modal',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, NgIcon],
   templateUrl: './create-admin-modal.component.html',
   styleUrl: './create-admin-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
