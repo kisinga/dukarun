@@ -33,6 +33,7 @@ import {
   CloseAccountingPeriodPermission,
   CreateInterAccountTransferPermission,
   ManageReconciliationPermission,
+  ViewFinancialsPermission,
 } from './permissions';
 
 /** GraphQL-shaped type for CashDrawerCount (matches schema; expectedCash/variance nullable when hidden). */
@@ -89,13 +90,13 @@ export class PeriodManagementResolver {
   ) {}
 
   @Query()
-  @Allow(Permission.ReadOrder) // TODO: Use custom permission
+  @Allow(ViewFinancialsPermission.Permission)
   async currentPeriodStatus(@Ctx() ctx: RequestContext, @Args('channelId') channelId: number) {
     return this.periodEndClosingService.getCurrentPeriodStatus(ctx, channelId);
   }
 
   @Query()
-  @Allow(Permission.ReadOrder) // TODO: Use custom permission
+  @Allow(ViewFinancialsPermission.Permission)
   async periodReconciliationStatus(
     @Ctx() ctx: RequestContext,
     @Args('channelId') channelId: number,
@@ -105,7 +106,7 @@ export class PeriodManagementResolver {
   }
 
   @Query()
-  @Allow(Permission.ReadOrder) // TODO: Use custom permission
+  @Allow(ViewFinancialsPermission.Permission)
   async closedPeriods(
     @Ctx() ctx: RequestContext,
     @Args('channelId') channelId: number,
@@ -127,7 +128,7 @@ export class PeriodManagementResolver {
   }
 
   @Query()
-  @Allow(Permission.ReadOrder) // TODO: Use custom permission
+  @Allow(ViewFinancialsPermission.Permission)
   async inventoryValuation(
     @Ctx() ctx: RequestContext,
     @Args('channelId') channelId: number,
@@ -539,7 +540,7 @@ export class PeriodManagementResolver {
   }
 
   @Query()
-  @Allow(Permission.ReadOrder)
+  @Allow(ManageReconciliationPermission.Permission)
   async shiftModalPrefillData(
     @Ctx() ctx: RequestContext,
     @Args('channelId') channelId: number
@@ -569,7 +570,7 @@ export class PeriodManagementResolver {
   }
 
   @Query()
-  @Allow(Permission.ReadOrder)
+  @Allow(ManageReconciliationPermission.Permission)
   async reconciliations(
     @Ctx() ctx: RequestContext,
     @Args('channelId') channelId: number,
@@ -587,7 +588,7 @@ export class PeriodManagementResolver {
   }
 
   @Query()
-  @Allow(Permission.ReadOrder)
+  @Allow(ManageReconciliationPermission.Permission)
   async reconciliationDetails(
     @Ctx() ctx: RequestContext,
     @Args('reconciliationId') reconciliationId: string
@@ -596,7 +597,7 @@ export class PeriodManagementResolver {
   }
 
   @Query()
-  @Allow(Permission.ReadOrder)
+  @Allow(ManageReconciliationPermission.Permission)
   async accountBalancesAsOf(
     @Ctx() ctx: RequestContext,
     @Args('channelId') channelId: number,
@@ -606,7 +607,7 @@ export class PeriodManagementResolver {
   }
 
   @Query()
-  @Allow(Permission.ReadOrder)
+  @Allow(ManageReconciliationPermission.Permission)
   async sessionReconciliationDetails(
     @Ctx() ctx: RequestContext,
     @Args('sessionId') sessionId: string,
@@ -631,7 +632,7 @@ export class PeriodManagementResolver {
   }
 
   @Query()
-  @Allow(Permission.ReadOrder)
+  @Allow(ManageReconciliationPermission.Permission)
   async lastClosedSessionClosingBalances(
     @Ctx() ctx: RequestContext,
     @Args('channelId') channelId: number
@@ -640,7 +641,7 @@ export class PeriodManagementResolver {
   }
 
   @Query()
-  @Allow(Permission.ReadOrder)
+  @Allow(ManageReconciliationPermission.Permission)
   async expectedSessionClosingBalances(
     @Ctx() ctx: RequestContext,
     @Args('sessionId') sessionId: string

@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard, noAuthGuard } from './core/guards/auth.guard';
 import { creditGuard } from './core/guards/credit.guard';
+import { financialsGuard } from './core/guards/financials.guard';
 import { productGuard } from './core/guards/product.guard';
 import { settingsGuard } from './core/guards/settings.guard';
 import { stockAdjustmentGuard } from './core/guards/stock-adjustment.guard';
@@ -253,7 +254,7 @@ export const routes: Routes = [
       },
       {
         path: 'accounting',
-        canActivate: [settingsGuard],
+        canActivate: [financialsGuard],
         loadComponent: () =>
           import('./dashboard/pages/accounting/accounting-layout.component').then(
             (m) => m.AccountingLayoutComponent,
@@ -262,7 +263,7 @@ export const routes: Routes = [
           { path: '', pathMatch: 'full', redirectTo: 'ledger' },
           {
             path: 'ledger',
-            canActivate: [settingsGuard],
+            canActivate: [financialsGuard],
             loadComponent: () =>
               import('./dashboard/pages/accounting/accounting.component').then(
                 (m) => m.AccountingComponent,
@@ -270,7 +271,7 @@ export const routes: Routes = [
           },
           {
             path: 'expenses',
-            canActivate: [settingsGuard],
+            canActivate: [financialsGuard],
             loadComponent: () =>
               import('./dashboard/pages/expenses/expenses.component').then(
                 (m) => m.ExpensesComponent,
@@ -278,7 +279,7 @@ export const routes: Routes = [
           },
           {
             path: 'transfers',
-            canActivate: [settingsGuard],
+            canActivate: [financialsGuard],
             loadComponent: () =>
               import('./dashboard/pages/accounting/transfers.component').then(
                 (m) => m.TransfersComponent,

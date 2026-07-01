@@ -55,6 +55,7 @@ export class AuthService {
   readonly hasManageApprovalsPermission = this.permissionsService.hasManageApprovalsPermission;
   readonly hasUpdateProductPermission = this.permissionsService.hasUpdateProductPermission;
   readonly hasSuperAdminPermission = this.permissionsService.hasSuperAdminPermission;
+  readonly canViewFinancials = this.permissionsService.canViewFinancials;
 
   constructor() {
     // Register session expiration handler with Apollo service

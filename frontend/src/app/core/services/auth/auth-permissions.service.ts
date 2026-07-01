@@ -117,6 +117,22 @@ export class AuthPermissionsService {
   });
 
   /**
+   * Can view business financial figures — the Finances section, balances, P&L,
+   * receivables/payables, ledger. Backed by the `ViewFinancials` permission
+   * (granted to admin/accountant/cashier) or SuperAdmin. Operational figures
+   * (cart/order totals, own shift count) are not gated by this.
+   */
+  readonly canViewFinancials = computed(() => {
+    const user = this.sessionService.user();
+    if (!user?.user?.roles) return false;
+    return user.user.roles.some(
+      (role) =>
+        role.permissions.includes('ViewFinancials' as Permission) ||
+        role.permissions.includes(Permission.SuperAdmin),
+    );
+  });
+
+  /**
    * Check if user has a specific role (extend as needed)
    */
   hasRole(role: string): boolean {
