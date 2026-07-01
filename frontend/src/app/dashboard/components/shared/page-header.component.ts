@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { NgIcon } from '@ng-icons/core';
+import { RefreshButtonComponent } from './refresh-button.component';
 
 /**
  * Standardized dashboard page header.
@@ -18,7 +18,7 @@ import { NgIcon } from '@ng-icons/core';
  */
 @Component({
   selector: 'app-page-header',
-  imports: [NgIcon],
+  imports: [RefreshButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
@@ -35,16 +35,11 @@ import { NgIcon } from '@ng-icons/core';
         <div class="flex items-center gap-2">
           <ng-content select="[actions]"></ng-content>
           @if (showRefresh()) {
-            <button
-              (click)="refresh.emit()"
-              [disabled]="isLoading()"
-              class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-base-300 bg-base-100 text-base-content/70 transition-colors hover:bg-base-200 hover:text-base-content disabled:opacity-60"
-              [attr.title]="refreshTitle()"
-              [attr.aria-label]="refreshTitle()"
-            >
-              <!-- Spin the icon itself while loading — same element, same size, no jump -->
-              <ng-icon name="heroArrowPath" size="1.125rem" [class.animate-spin]="isLoading()" />
-            </button>
+            <app-refresh-button
+              [isLoading]="isLoading()"
+              [title]="refreshTitle()"
+              (refresh)="refresh.emit()"
+            />
           }
         </div>
       </div>

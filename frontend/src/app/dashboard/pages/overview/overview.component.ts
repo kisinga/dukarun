@@ -20,6 +20,7 @@ import { AuthPermissionsService } from '../../../core/services/auth/auth-permiss
 import { OrderTableRowComponent } from '../orders/components/order-table-row.component';
 import { OrderCardComponent } from '../orders/components/order-card.component';
 import { EchartContainerComponent } from '../../components/shared/charts/echart-container.component';
+import { RefreshButtonComponent } from '../../components/shared/refresh-button.component';
 
 type Period = 'today' | 'week' | 'month';
 
@@ -43,7 +44,13 @@ interface CategoryData {
 
 @Component({
   selector: 'app-overview',
-  imports: [RouterModule, OrderTableRowComponent, OrderCardComponent, EchartContainerComponent],
+  imports: [
+    RouterModule,
+    OrderTableRowComponent,
+    OrderCardComponent,
+    EchartContainerComponent,
+    RefreshButtonComponent,
+  ],
   templateUrl: './overview.component.html',
   styleUrl: './overview.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

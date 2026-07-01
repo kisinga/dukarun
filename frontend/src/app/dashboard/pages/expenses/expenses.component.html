@@ -1,71 +1,12 @@
-<!-- FAB for Record Expense - Mobile Only -->
-@if (sessionOpen()) {
-  <div class="fixed bottom-24 right-4 z-40 lg:hidden">
-    <button
-      type="button"
-      class="btn btn-lg btn-circle btn-primary shadow-xl"
-      (click)="openRecordExpense()"
-      aria-label="Record expense"
-    >
-      <ng-icon name="heroPlus" size="1.5rem" />
-    </button>
-  </div>
-}
-
 <div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
-  <!-- Header -->
-  <app-page-header
-    title="Expenses"
-    subtitle="Track operating costs"
-    [isLoading]="isLoading()"
-    (refresh)="refresh()"
-  >
-    @if (sessionOpen()) {
-      <button
-        actions
-        type="button"
-        class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
-        (click)="openRecordExpense()"
-      >
+  @if (sessionOpen()) {
+    <div class="flex justify-end">
+      <button type="button" class="btn btn-primary btn-sm gap-2" (click)="openRecordExpense()">
         <ng-icon name="heroPlus" size="1rem" />
-        Record expense
+        Record Expense
       </button>
-    }
-  </app-page-header>
-
-  <!-- Stats Cards -->
-  <div class="grid grid-cols-3 gap-2 sm:gap-3">
-    <div class="rounded-lg border border-base-300 bg-base-100 p-3 sm:p-4">
-      <span
-        class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-base-content/50 block mb-1"
-      >
-        Today
-      </span>
-      <p class="text-lg sm:text-xl font-bold tabular-nums text-error">
-        {{ formatCurrency(expenseStats().today) }}
-      </p>
     </div>
-    <div class="rounded-lg border border-base-300 bg-base-100 p-3 sm:p-4">
-      <span
-        class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-base-content/50 block mb-1"
-      >
-        This week
-      </span>
-      <p class="text-lg sm:text-xl font-bold tabular-nums text-error">
-        {{ formatCurrency(expenseStats().week) }}
-      </p>
-    </div>
-    <div class="rounded-lg border border-base-300 bg-base-100 p-3 sm:p-4">
-      <span
-        class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-base-content/50 block mb-1"
-      >
-        This month
-      </span>
-      <p class="text-lg sm:text-xl font-bold tabular-nums text-error">
-        {{ formatCurrency(expenseStats().month) }}
-      </p>
-    </div>
-  </div>
+  }
 
   <!-- Error Alert -->
   @if (error()) {

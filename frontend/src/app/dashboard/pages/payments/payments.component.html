@@ -132,27 +132,6 @@
 
   <!-- Payments List -->
   @else {
-    <!-- List Controls -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1">
-      <div class="text-sm text-base-content/60">
-        Showing {{ (currentPage() - 1) * itemsPerPage() + 1 }} to {{ endItem() }} of
-        {{ filteredPayments().length }} payments
-      </div>
-
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-base-content/60">Per page:</span>
-        <select
-          class="select select-sm select-bordered"
-          [value]="itemsPerPage()"
-          (change)="changeItemsPerPage(+$any($event.target).value)"
-        >
-          @for (option of pageOptions; track option) {
-            <option [value]="option">{{ option }}</option>
-          }
-        </select>
-      </div>
-    </div>
-
     <!-- Mobile: Card View -->
     <div class="lg:hidden space-y-4">
       @for (payment of paginatedPayments(); track trackByPaymentId($index, payment)) {

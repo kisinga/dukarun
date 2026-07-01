@@ -1,14 +1,3 @@
-<!-- FAB for Add Supplier - Mobile Only -->
-<div class="fixed bottom-24 right-4 z-40 lg:hidden">
-  <button
-    (click)="router.navigate(['/dashboard/suppliers/create'])"
-    class="btn btn-lg btn-circle btn-primary shadow-xl"
-    aria-label="Add new supplier"
-  >
-    <ng-icon name="heroPlus" size="1.5rem" />
-  </button>
-</div>
-
 <div class="space-y-5 lg:space-y-6 anim-stagger">
   <!-- Header -->
   <app-page-header
@@ -28,14 +17,6 @@
       }"
       (filterClick)="onStatsFilterClick($event)"
     />
-    <button
-      actions
-      (click)="router.navigate(['/dashboard/suppliers/create'])"
-      class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
-    >
-      <ng-icon name="heroPlus" size="1rem" />
-      Add Supplier
-    </button>
   </app-page-header>
 
   <!-- Search Bar -->
@@ -189,7 +170,17 @@
       itemLabel="suppliers"
       (pageChange)="goToPage($event)"
       (itemsPerPageChange)="changeItemsPerPage($event)"
-    />
+    >
+      <button
+        pagination-actions
+        type="button"
+        class="btn btn-primary btn-sm gap-2"
+        (click)="router.navigate(['/dashboard/suppliers/create'])"
+      >
+        <ng-icon name="heroPlus" size="1rem" />
+        Add Supplier
+      </button>
+    </app-pagination>
   }
 </div>
 

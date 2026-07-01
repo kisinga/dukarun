@@ -9,19 +9,6 @@
   (cancel)="onDeleteCancelled()"
 />
 
-<!-- FAB for Create Product - Mobile Only -->
-@if (canEditProduct()) {
-  <div class="fixed bottom-24 right-4 z-40 lg:hidden">
-    <a
-      routerLink="/dashboard/products/create"
-      class="btn btn-lg btn-circle btn-primary shadow-xl"
-      aria-label="Create new product"
-    >
-      <ng-icon name="heroPlus" size="1.5rem" />
-    </a>
-  </div>
-}
-
 <div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
   <!-- Header -->
   <app-page-header
@@ -37,16 +24,6 @@
       [lowStockActive]="showLowStockOnly()"
       (lowStockClick)="onLowStockStatsClick()"
     />
-    @if (canEditProduct()) {
-      <a
-        actions
-        routerLink="/dashboard/products/create"
-        class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
-      >
-        <ng-icon name="heroPlus" size="1rem" />
-        Add Product
-      </a>
-    }
   </app-page-header>
 
   <!-- Search & Filter Bar -->
@@ -314,6 +291,17 @@
       itemLabel="products"
       (pageChange)="goToPage($event)"
       (itemsPerPageChange)="changeItemsPerPage($event)"
-    />
+    >
+      @if (canEditProduct()) {
+        <a
+          pagination-actions
+          routerLink="/dashboard/products/create"
+          class="btn btn-primary btn-sm gap-2"
+        >
+          <ng-icon name="heroPlus" size="1rem" />
+          Add Product
+        </a>
+      }
+    </app-pagination>
   }
 </div>

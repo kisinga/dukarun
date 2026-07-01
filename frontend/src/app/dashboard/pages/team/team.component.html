@@ -1,14 +1,3 @@
-<!-- FAB for Add Team Member - Mobile Only -->
-<div class="fixed bottom-24 right-4 z-40 lg:hidden">
-  <button
-    (click)="onCreateClick()"
-    class="btn btn-lg btn-circle btn-primary shadow-xl"
-    aria-label="Add team member"
-  >
-    <ng-icon name="heroPlus" size="1.5rem" />
-  </button>
-</div>
-
 <div class="space-y-5 lg:space-y-6 anim-stagger">
   <!-- Header -->
   <app-page-header
@@ -16,11 +5,7 @@
     subtitle="Manage channel administrators and permissions"
     [showRefresh]="false"
   >
-    <button
-      actions
-      class="btn btn-primary btn-sm lg:btn-md gap-2 hidden lg:flex"
-      (click)="onCreateClick()"
-    >
+    <button actions class="btn btn-primary btn-sm gap-2" (click)="onCreateClick()">
       <ng-icon name="heroPlus" size="1rem" />
       Add Team Member
     </button>

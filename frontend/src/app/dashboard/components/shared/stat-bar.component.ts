@@ -43,26 +43,26 @@ const VALUE_TONE: Record<string, string> = {
             type="button"
             (click)="select.emit(s.filter!)"
             [attr.aria-pressed]="!!s.active"
-            class="inline-flex items-baseline gap-1.5 rounded-full border px-3 py-1 transition-colors cursor-pointer"
+            class="inline-flex items-center gap-2 rounded-full border px-4 py-2 transition-colors cursor-pointer"
             [class]="
               s.active
                 ? 'border-base-content/25 bg-base-200'
                 : 'border-base-300 bg-base-100 hover:bg-base-200/60'
             "
           >
-            <span class="text-sm font-semibold tabular-nums" [class]="toneClass(s)">{{
+            <span class="text-base font-bold tabular-nums leading-none" [class]="toneClass(s)">{{
               s.value
             }}</span>
-            <span class="text-xs text-base-content/60">{{ s.label }}</span>
+            <span class="text-sm text-base-content/60 leading-none">{{ s.label }}</span>
           </button>
         } @else {
           <span
-            class="inline-flex items-baseline gap-1.5 rounded-full border border-base-300 bg-base-100 px-3 py-1"
+            class="inline-flex items-center gap-2 rounded-full border border-base-300 bg-base-100 px-4 py-2"
           >
-            <span class="text-sm font-semibold tabular-nums" [class]="toneClass(s)">{{
+            <span class="text-base font-bold tabular-nums leading-none" [class]="toneClass(s)">{{
               s.value
             }}</span>
-            <span class="text-xs text-base-content/60">{{ s.label }}</span>
+            <span class="text-sm text-base-content/60 leading-none">{{ s.label }}</span>
           </span>
         }
       }
@@ -74,6 +74,10 @@ export class StatBarComponent {
   readonly select = output<string>();
 
   toneClass(s: StatItem): string {
-    return VALUE_TONE[s.tone ?? 'neutral'];
+    // A zero count carries no urgency — never paint a 0 as an alert (e.g. a red
+    // "0 failed" or amber "0 pending"). Colour is reserved for a value that
+    // actually means something.
+    const tone = Number(s.value) === 0 ? 'neutral' : (s.tone ?? 'neutral');
+    return VALUE_TONE[tone];
   }
 }

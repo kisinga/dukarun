@@ -9,6 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { forkJoin, startWith } from 'rxjs';
 import {
   CashierSessionService,
@@ -41,6 +42,7 @@ import {
   AccountingFilters,
   AccountingFiltersComponent,
 } from './components/accounting-filters.component';
+import type { StatItem } from '../../components/shared/stat-bar.component';
 import type { TabType } from './components/accounting-tabs.component';
 import { AccountsTabComponent } from './components/accounts-tab.component';
 import { OverviewTabComponent } from './components/overview-tab.component';
@@ -52,6 +54,7 @@ import { TransactionsTabComponent } from './components/transactions-tab.componen
   selector: 'app-accounting',
   imports: [
     CommonModule,
+    NgIcon,
     TransactionDetailModalComponent,
     AccountingFiltersComponent,
     OverviewTabComponent,
@@ -105,6 +108,26 @@ export class AccountingComponent implements OnInit {
   readonly hierarchicalAccounts = computed(() => buildHierarchicalAccounts(this.accounts()));
   readonly keyAccounts = computed(() => getKeyAccounts(this.accounts(), 10));
 
+  readonly headerStats = computed<StatItem[]>(() => {
+    if (this.activeTab() !== 'overview') return [];
+    const accounts = this.accounts();
+    const balanceOf = (code: string) => accounts.find((a) => a.code === code)?.balance ?? 0;
+    return [
+      { label: 'cash', value: this.formatCurrency(balanceOf('CASH_ON_HAND')) },
+      { label: 'bank', value: this.formatCurrency(balanceOf('BANK_MAIN')) },
+      {
+        label: 'owed to me',
+        value: this.formatCurrency(balanceOf('ACCOUNTS_RECEIVABLE')),
+        tone: 'success',
+      },
+      {
+        label: 'I owe',
+        value: this.formatCurrency(balanceOf('ACCOUNTS_PAYABLE')),
+        tone: 'error',
+      },
+    ];
+  });
+
   readonly filters = computed<AccountingFilters>(() => ({
     searchTerm: this.listState.searchTerm(),
     selectedAccount: this.listState.selectedAccount(),
@@ -112,7 +135,7 @@ export class AccountingComponent implements OnInit {
     dateFilter: this.listState.dateFilter(),
     accounts: this.accounts(),
     sourceTypes: this.listState.sourceTypes(),
-    showQuickFilters: this.activeTab() === 'overview',
+    showQuickFilters: false,
   }));
 
   readonly accountingContext = computed<AccountingContext>(() => ({

@@ -1,14 +1,3 @@
-<!-- FAB for Create Purchase - Mobile Only -->
-<div class="fixed bottom-24 right-4 z-40 lg:hidden">
-  <button
-    (click)="router.navigate(['/dashboard/purchases/create'])"
-    class="btn btn-lg btn-circle btn-primary shadow-xl"
-    aria-label="Create new purchase"
-  >
-    <ng-icon name="heroPlus" size="1.5rem" />
-  </button>
-</div>
-
 <div class="space-y-5 lg:space-y-6 anim-stagger">
   <!-- Header -->
   <app-page-header
@@ -24,22 +13,6 @@
       [pendingPaymentsActive]="pendingPaymentsFilter()"
       (pendingPaymentsClick)="onPendingPaymentsStatsClick()"
     />
-    <div actions class="flex gap-2">
-      <button
-        (click)="router.navigate(['/dashboard/purchases/create'])"
-        class="btn btn-ghost btn-sm gap-1.5 hidden lg:flex touch-manipulation border-2 border-dashed border-base-300"
-      >
-        <ng-icon name="heroDocumentText" size="1rem" />
-        Create PO
-      </button>
-      <button
-        (click)="router.navigate(['/dashboard/purchases/create'])"
-        class="btn btn-primary btn-sm gap-1.5 hidden lg:flex touch-manipulation"
-      >
-        <ng-icon name="heroPlus" size="1rem" />
-        Create Purchase
-      </button>
-    </div>
   </app-page-header>
 
   <!-- Pending Draft Banner -->
@@ -196,7 +169,26 @@
       itemLabel="purchases"
       (pageChange)="goToPage($event)"
       (itemsPerPageChange)="changeItemsPerPage($event)"
-    />
+    >
+      <div pagination-actions class="flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="btn btn-outline btn-sm gap-2"
+          (click)="router.navigate(['/dashboard/purchases/create'])"
+        >
+          <ng-icon name="heroDocumentText" size="1rem" />
+          Create PO
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm gap-2"
+          (click)="router.navigate(['/dashboard/purchases/create'])"
+        >
+          <ng-icon name="heroPlus" size="1rem" />
+          Create Purchase
+        </button>
+      </div>
+    </app-pagination>
   }
 </div>
 
