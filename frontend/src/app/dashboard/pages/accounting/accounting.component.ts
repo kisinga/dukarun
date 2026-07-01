@@ -41,7 +41,6 @@ import {
   AccountingFilters,
   AccountingFiltersComponent,
 } from './components/accounting-filters.component';
-import { AccountingStats, AccountingStatsComponent } from './components/accounting-stats.component';
 import type { TabType } from './components/accounting-tabs.component';
 import { AccountsTabComponent } from './components/accounts-tab.component';
 import { OverviewTabComponent } from './components/overview-tab.component';
@@ -54,7 +53,6 @@ import { TransactionsTabComponent } from './components/transactions-tab.componen
   imports: [
     CommonModule,
     TransactionDetailModalComponent,
-    AccountingStatsComponent,
     AccountingFiltersComponent,
     OverviewTabComponent,
     AccountsTabComponent,

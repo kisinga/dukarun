@@ -1,38 +1,30 @@
 <div class="space-y-5 lg:space-y-6 anim-stagger">
-  <!-- Header -->
-  <div class="flex items-start justify-between gap-4">
-    <div class="flex-1 min-w-0">
-      <h1 class="text-2xl lg:text-3xl font-bold tracking-tight">Ledger</h1>
-      <p class="text-sm text-base-content/60 mt-1">
-        View chart of accounts, transactions, and financial history
-      </p>
-    </div>
-
-    <div class="flex gap-2 shrink-0">
-      <button
-        (click)="loadData()"
-        class="btn btn-ghost btn-square btn-sm lg:btn-md"
-        [class.loading]="isLoading()"
-        title="Refresh accounting"
-      >
-        @if (!isLoading()) {
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-        }
-      </button>
-    </div>
+  <!-- Refresh (the section header lives in the parent Finances layout) -->
+  <div class="flex justify-end">
+    <button
+      (click)="loadData()"
+      class="btn btn-ghost btn-square btn-sm lg:btn-md"
+      [class.loading]="isLoading()"
+      title="Refresh"
+      aria-label="Refresh"
+    >
+      @if (!isLoading()) {
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+          />
+        </svg>
+      }
+    </button>
   </div>
 
   <!-- Error Alert -->
@@ -55,11 +47,6 @@
       <span class="flex-1">{{ err }}</span>
       <button (click)="error.set(null)" class="btn btn-sm">Dismiss</button>
     </div>
-  }
-
-  <!-- Summary Statistics Cards (visible in Overview and Transactions tabs) -->
-  @if (activeTab() === 'overview' || activeTab() === 'transactions') {
-    <app-accounting-stats [stats]="stats()" [formatCurrency]="formatCurrency" />
   }
 
   <!-- Filters Bar -->
