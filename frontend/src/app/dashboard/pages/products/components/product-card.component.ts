@@ -1,12 +1,19 @@
-import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
-import { CurrencyService } from '../../../../core/services/currency.service';
+import { MoneyComponent } from '../../../../core/components/money.component';
 import {
   ProductLabelComponent,
   type ProductLabelFacetValue,
 } from '../../shared/components/product-label.component';
+import {
+  isServiceProduct,
+  priceRange,
+  stockBadgeClass,
+  stockDisplay,
+  stockTextClass,
+  totalStock,
+} from '../utils/product-presentation';
 
 export interface ProductCardData {
   id: string;
@@ -28,61 +35,40 @@ export interface ProductCardData {
 export type ProductAction = 'view' | 'edit' | 'purchase' | 'delete';
 
 /**
- * Reusable product card component for mobile view
- * Displays product summary with collapsible details
+ * Mobile product list item. Collapsed shows identity + one key line (variants ·
+ * stock · price); expanded shows the actual variants (the thing you can't see
+ * collapsed) + actions. Stock tone / price come from the shared presentation
+ * util so this can't drift from the desktop table row.
  */
 @Component({
   selector: 'app-product-card',
-  imports: [CommonModule, RouterLink, NgIcon, ProductLabelComponent],
+  imports: [RouterLink, NgIcon, MoneyComponent, ProductLabelComponent],
   templateUrl: './product-card.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProductCardComponent {
-  private readonly currencyService = inject(CurrencyService);
   readonly product = input.required<ProductCardData>();
   readonly canEdit = input<boolean>(true);
   readonly action = output<{ action: ProductAction; productId: string }>();
 
-  variantCount(): number {
-    return this.product().variants?.length || 0;
-  }
-
-  totalStock(): number {
-    return this.product().variants?.reduce((sum, v) => sum + (v.stockOnHand || 0), 0) || 0;
-  }
-
-  isService(): boolean {
-    return this.product().variants?.some((v) => v.trackInventory === false) || false;
-  }
-
-  getStockDisplay(): string {
-    if (this.isService()) {
-      return '∞';
-    }
-    return this.totalStock().toString();
-  }
-
-  priceRange(): string {
-    const variants = this.product().variants;
-    if (!variants || variants.length === 0) return 'N/A';
-
-    const prices = variants.map((v) => v.priceWithTax);
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-
-    if (minPrice === maxPrice) {
-      return this.formatPrice(minPrice);
-    }
-
-    return `${this.formatPrice(minPrice)} - ${this.formatPrice(maxPrice)}`;
-  }
+  readonly variants = computed(() => this.product().variants ?? []);
+  readonly variantCount = computed(() => this.variants().length);
+  readonly isService = computed(() => isServiceProduct(this.variants()));
+  readonly stockTotal = computed(() => totalStock(this.variants()));
+  readonly stockLabel = computed(() => stockDisplay(this.stockTotal(), this.isService()));
+  readonly stockText = computed(() => stockTextClass(this.stockTotal(), this.isService()));
+  readonly price = computed(() => priceRange(this.variants()));
 
   getThumbnail(): string | null {
     return this.product().featuredAsset?.preview || null;
   }
 
-  private formatPrice(price: number): string {
-    return this.currencyService.format(price, false); // Amount only
+  variantBadgeClass(v: { stockOnHand?: number; trackInventory?: boolean }): string {
+    return stockBadgeClass(v.stockOnHand ?? 0, v.trackInventory === false);
+  }
+
+  variantStock(v: { stockOnHand?: number; trackInventory?: boolean }): string {
+    return stockDisplay(v.stockOnHand ?? 0, v.trackInventory === false);
   }
 
   onAction(actionType: ProductAction): void {

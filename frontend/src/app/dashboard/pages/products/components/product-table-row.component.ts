@@ -1,18 +1,25 @@
-import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
-import { CurrencyService } from '../../../../core/services/currency.service';
+import { MoneyComponent } from '../../../../core/components/money.component';
 import { ProductLabelComponent } from '../../shared/components/product-label.component';
 import { ProductAction, ProductCardData } from './product-card.component';
+import {
+  isServiceProduct,
+  priceRange,
+  stockBadgeClass,
+  stockDisplay,
+  totalStock,
+} from '../utils/product-presentation';
 
 /**
- * Product table row component for desktop view
- * Compact row representation with action buttons
+ * Product table row (desktop). Compact columnar row; the variant detail rows are
+ * rendered by the parent table so they align under the same columns. Stock tone
+ * and price come from the shared presentation util (see the mobile card).
  */
 @Component({
   selector: '[app-product-table-row]',
-  imports: [CommonModule, RouterLink, NgIcon, ProductLabelComponent],
+  imports: [RouterLink, NgIcon, MoneyComponent, ProductLabelComponent],
   host: {
     class: 'hover cursor-pointer',
     '(click)': 'onExpandClick()',
@@ -21,48 +28,19 @@ import { ProductAction, ProductCardData } from './product-card.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProductTableRowComponent {
-  private readonly currencyService = inject(CurrencyService);
-
   readonly product = input.required<ProductCardData>();
   readonly canEdit = input<boolean>(true);
   readonly expanded = input<boolean>(false);
   readonly action = output<{ action: ProductAction; productId: string }>();
   readonly toggleExpand = output<void>();
 
-  variantCount(): number {
-    return this.product().variants?.length || 0;
-  }
-
-  totalStock(): number {
-    return this.product().variants?.reduce((sum, v) => sum + (v.stockOnHand || 0), 0) || 0;
-  }
-
-  isService(): boolean {
-    return this.product().variants?.some((v) => v.trackInventory === false) || false;
-  }
-
-  getStockDisplay(): string {
-    if (this.isService()) {
-      return '∞';
-    }
-    return this.totalStock().toString();
-  }
-
-  priceRange(): string {
-    const variants = this.product().variants;
-    if (!variants || variants.length === 0) return 'N/A';
-
-    // Prices are in cents (currency service will convert them)
-    const prices = variants.map((v) => v.priceWithTax);
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-
-    if (minPrice === maxPrice) {
-      return this.currencyService.format(minPrice, false); // Amount only
-    }
-
-    return `${this.currencyService.format(minPrice, false)} - ${this.currencyService.format(maxPrice, false)}`;
-  }
+  readonly variants = computed(() => this.product().variants ?? []);
+  readonly variantCount = computed(() => this.variants().length);
+  readonly isService = computed(() => isServiceProduct(this.variants()));
+  readonly stockTotal = computed(() => totalStock(this.variants()));
+  readonly stockLabel = computed(() => stockDisplay(this.stockTotal(), this.isService()));
+  readonly stockBadge = computed(() => stockBadgeClass(this.stockTotal(), this.isService()));
+  readonly price = computed(() => priceRange(this.variants()));
 
   getThumbnail(): string | null {
     return this.product().featuredAsset?.preview || null;

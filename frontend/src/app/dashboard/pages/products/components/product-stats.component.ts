@@ -28,13 +28,14 @@ export class ProductStatsComponent {
 
   readonly items = computed<StatItem[]>(() => {
     const s = this.stats();
+    const n = (v: number) => v.toLocaleString('en-KE');
     return [
-      { label: 'products', value: s.totalProducts },
-      { label: 'variants', value: s.totalVariants },
-      { label: 'in stock', value: s.totalStock },
+      { label: 'products', value: n(s.totalProducts) },
+      { label: 'variants', value: n(s.totalVariants) },
+      { label: 'in stock', value: n(s.totalStock) },
       {
         label: 'low stock',
-        value: s.lowStock,
+        value: n(s.lowStock),
         tone: s.lowStock > 0 ? 'warning' : 'neutral',
         filter: 'lowStock',
         active: this.lowStockActive(),

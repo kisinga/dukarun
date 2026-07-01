@@ -176,7 +176,19 @@ export class ApolloService {
 
     return new ApolloClient({
       link: from([errorLink, authLink, httpLink]),
-      cache: new InMemoryCache(),
+      // Vendure custom-field objects are embedded (no `id`), so Apollo can't
+      // identify them to merge partial results and warns "cache data may be lost".
+      // `merge: true` shallow-merges existing + incoming (incoming wins on overlap),
+      // preserving fields fetched by different queries and silencing the warning.
+      cache: new InMemoryCache({
+        typePolicies: {
+          CustomerCustomFields: { merge: true },
+          ProductCustomFields: { merge: true },
+          ProductVariantCustomFields: { merge: true },
+          OrderCustomFields: { merge: true },
+          AddressCustomFields: { merge: true },
+        },
+      }),
       // `errorPolicy: 'all'` defaults are registered in src/apollo.d.ts
       // (Apollo Client 4.2+ requires declaring default options for type safety).
       defaultOptions: {

@@ -26,7 +26,7 @@ import { DetectionCoordinator } from './detection/detection-coordinator';
 import { DetectionResult } from './detection/detection.types';
 import { MLDetector } from './detection/ml-detector';
 
-type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
+type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error' | 'unavailable';
 
 /**
  * Product scanner component with dual detection (barcode + ML)
@@ -149,6 +149,13 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error';
             <button class="btn btn-primary min-h-12 px-6" (click)="toggleScanner()">
               Try again
             </button>
+          } @else if (scannerStatus() === 'unavailable') {
+            <ng-icon name="heroMagnifyingGlass" size="2.25rem" class="text-base-content/50" />
+            <p class="font-semibold">Scanning not available here</p>
+            <p class="text-sm text-base-content/70">
+              This browser can't scan barcodes and no camera-recognition products are set up. Search
+              for the product by name below.
+            </p>
           } @else if (scannerStatus() === 'initializing') {
             <span class="loading loading-spinner loading-lg text-primary"></span>
             <p class="text-sm text-base-content/70">Starting camera…</p>
@@ -287,14 +294,19 @@ export class ProductScannerComponent implements OnInit, OnDestroy {
       }
 
       // Initialize all detectors
-      const anyReady = await this.coordinator.initializeDetectors();
+      await this.coordinator.initializeDetectors();
+      this.activeDetectors.set(this.coordinator.getReadyDetectors());
 
-      if (!anyReady) {
-        console.warn('[ProductScanner] No detectors initialized successfully');
-        // Continue anyway - camera will still work, just no detection
+      if (this.activeDetectors().length === 0) {
+        // Nothing can scan here (e.g. a desktop browser without the BarcodeDetector API and no
+        // enrolled products for ML). Surface it and steer to manual search rather than opening a
+        // live-but-dead camera.
+        console.warn('[ProductScanner] No detectors available — scanning disabled, use search');
+        this.scannerStatus.set('unavailable');
+        this.scannerReady.emit();
+        return;
       }
 
-      this.activeDetectors.set(this.coordinator.getReadyDetectors());
       this.scannerStatus.set('ready');
       this.scannerReady.emit();
 

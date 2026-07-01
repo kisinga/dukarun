@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import { Router, RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
-import { CurrencyService } from '../../../../core/services/currency.service';
+import { MoneyComponent } from '../../../../core/components/money.component';
 import { OrderStateBadgeComponent } from './order-state-badge.component';
 import { getOrderAmountOwing } from '../utils/order-payment.util';
 import { toDisplayDate } from '../../../../core/utils/date.util';
@@ -44,75 +44,80 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
 
 @Component({
   selector: 'app-order-card',
-  imports: [OrderStateBadgeComponent, RouterLink, HoverPreviewHostComponent, NgIcon],
+  imports: [
+    OrderStateBadgeComponent,
+    RouterLink,
+    HoverPreviewHostComponent,
+    NgIcon,
+    MoneyComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
-      class="bg-base-100 border border-base-300 rounded-xl shadow-sm cursor-pointer
-             transition-colors hover:bg-base-200/30 active:bg-base-200/50"
+      class="bg-base-100 border border-base-300/60 rounded-xl cursor-pointer
+             transition-colors hover:bg-base-200/30 active:bg-base-200/50 p-3"
       (click)="navigateToOrder()"
     >
-      <div class="p-4">
-        <div class="flex gap-3">
-          <div class="avatar shrink-0">
-            <div
-              class="w-14 h-14 rounded-lg ring-2 ring-base-300 ring-offset-1 bg-base-200 flex items-center justify-center"
-            >
-              <ng-icon name="heroDocumentText" size="1.75rem" class="text-primary" />
-            </div>
+      <!-- Code + state -->
+      <div class="flex items-start justify-between gap-2">
+        <h3 class="min-w-0 truncate font-mono text-sm font-bold leading-tight">
+          {{ order().code }}
+        </h3>
+        <app-order-state-badge
+          [state]="order().state"
+          [reversedAt]="order().customFields?.reversedAt ?? null"
+        />
+      </div>
+
+      <!-- Meta + amount -->
+      <div class="mt-1.5 flex items-end justify-between gap-3">
+        <div class="min-w-0 text-xs text-base-content/60">
+          <div class="flex items-center gap-1.5">
+            <span class="shrink-0">
+              {{ getItemCount() }} {{ getItemCount() === 1 ? 'item' : 'items' }}
+            </span>
+            <span class="w-1 h-1 rounded-full bg-base-content/30 shrink-0"></span>
+            @if (order().customer?.id) {
+              <app-hover-preview-host
+                previewKey="customer"
+                [entityId]="order().customer!.id"
+                class="min-w-0"
+              >
+                <a
+                  [routerLink]="['/dashboard/customers', order().customer!.id]"
+                  class="link link-hover block truncate"
+                  (click)="$event.stopPropagation()"
+                  >{{ getCustomerName() }}</a
+                >
+              </app-hover-preview-host>
+            } @else {
+              <span class="truncate">{{ getCustomerName() }}</span>
+            }
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-start justify-between gap-2 mb-1">
-              <h3 class="text-base font-bold line-clamp-1 leading-tight">{{ order().code }}</h3>
-              <app-order-state-badge
-                [state]="order().state"
-                [reversedAt]="order().customFields?.reversedAt ?? null"
-              />
-            </div>
-            <div class="flex items-center gap-2 mb-1 text-xs text-base-content/60">
-              <span>{{ getItemCount() }} items</span>
-              <span class="w-1 h-1 rounded-full bg-base-content/30"></span>
-              @if (order().customer?.id) {
-                <app-hover-preview-host previewKey="customer" [entityId]="order().customer!.id">
-                  <a
-                    [routerLink]="['/dashboard/customers', order().customer!.id]"
-                    class="link link-hover"
-                    (click)="$event.stopPropagation()"
-                    >{{ getCustomerName() }}</a
-                  >
-                </app-hover-preview-host>
-              } @else if (order().customer) {
-                <span>{{ getCustomerName() }}</span>
-              } @else {
-                <span>Walk-in</span>
-              }
-            </div>
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-xs text-base-content/50">
-                {{ formatDate(order().orderPlacedAt || order().createdAt) }}
-              </p>
-              <div class="text-right">
-                <p class="text-lg font-bold text-primary font-mono tracking-tight">
-                  {{ formatCurrency(order().totalWithTax) }}
-                </p>
-                @if (amountOwing() > 0) {
-                  <p class="text-xs font-medium text-warning">
-                    Due {{ formatCurrency(amountOwing()) }}
-                  </p>
-                }
-              </div>
-            </div>
+          <div class="mt-0.5 text-base-content/45">
+            {{ formatDate(order().orderPlacedAt || order().createdAt) }}
           </div>
+        </div>
+        <div class="shrink-0 text-right">
+          <p class="text-base font-bold tabular-nums">
+            <app-money [value]="order().totalWithTax" />
+          </p>
+          @if (amountOwing() > 0) {
+            <p class="text-xs font-medium text-warning">
+              Due <app-money [value]="amountOwing()" />
+            </p>
+          }
         </div>
       </div>
 
+      <!-- Actions -->
       @if (canPay() || canPrint() || canVoid()) {
-        <div class="border-t border-base-300/50 px-4 py-2 flex justify-end gap-2">
+        <div class="mt-2.5 flex items-center gap-2 border-t border-base-300/50 pt-2.5">
           @if (canPay()) {
             <button
               type="button"
               (click)="onAction('pay'); $event.stopPropagation()"
-              class="btn btn-success btn-xs gap-1"
+              class="btn btn-success btn-xs"
             >
               Pay
             </button>
@@ -131,7 +136,7 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
             <button
               type="button"
               (click)="onAction('void'); $event.stopPropagation()"
-              class="btn btn-ghost btn-error btn-xs gap-1"
+              class="btn btn-ghost btn-error btn-xs ml-auto"
             >
               Void
             </button>
@@ -142,7 +147,6 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
   `,
 })
 export class OrderCardComponent {
-  private readonly currencyService = inject(CurrencyService);
   private readonly router = inject(Router);
   readonly order = input.required<OrderCardData>();
   readonly action = output<{ action: OrderAction; orderId: string }>();
@@ -159,10 +163,6 @@ export class OrderCardComponent {
 
   formatDate(dateString: string): string {
     return toDisplayDate(dateString, 'medium');
-  }
-
-  formatCurrency(amount: number): string {
-    return this.currencyService.format(amount, false);
   }
 
   canPrint(): boolean {

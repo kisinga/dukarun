@@ -1,17 +1,14 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  OnInit,
   computed,
   effect,
   inject,
-  PLATFORM_ID,
   signal,
 } from '@angular/core';
-import { isPlatformBrowser } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import { Router, RouterModule } from '@angular/router';
 import { CashierSessionService } from '../../../core/services/cashier-session/cashier-session.service';
-import { ShiftModalTriggerService } from '../../../core/services/cashier-session/shift-modal-trigger.service';
 import { CompanyService } from '../../../core/services/company.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { DashboardService, PeriodStats } from '../../../core/services/dashboard.service';
@@ -20,7 +17,7 @@ import { AuthPermissionsService } from '../../../core/services/auth/auth-permiss
 import { OrderTableRowComponent } from '../orders/components/order-table-row.component';
 import { OrderCardComponent } from '../orders/components/order-card.component';
 import { EchartContainerComponent } from '../../components/shared/charts/echart-container.component';
-import { RefreshButtonComponent } from '../../components/shared/refresh-button.component';
+import { PageHeaderComponent } from '../../components/shared/page-header.component';
 
 type Period = 'today' | 'week' | 'month';
 
@@ -49,26 +46,25 @@ interface CategoryData {
     OrderTableRowComponent,
     OrderCardComponent,
     EchartContainerComponent,
-    RefreshButtonComponent,
+    PageHeaderComponent,
+    NgIcon,
   ],
   templateUrl: './overview.component.html',
   styleUrl: './overview.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class OverviewComponent implements OnInit {
-  private readonly platformId = inject(PLATFORM_ID);
+export class OverviewComponent {
   private readonly dashboardService = inject(DashboardService);
   private readonly companyService = inject(CompanyService);
   protected readonly currencyService = inject(CurrencyService);
   private readonly router = inject(Router);
-  protected readonly cashierSessionService = inject(CashierSessionService);
-  protected readonly shiftModalTrigger = inject(ShiftModalTriggerService);
+  private readonly cashierSessionService = inject(CashierSessionService);
 
   protected readonly selectedPeriod = signal<Period>('today');
   protected readonly expandedCategory = signal<string | null>(null);
 
-  /** Sales (revenue) chart section: collapsible, default expanded on viewport >= 768px (md). */
-  protected readonly salesChartExpanded = signal(true);
+  /** Sales (revenue) chart section: collapsed by default so it never reserves space when sparse. */
+  protected readonly salesChartExpanded = signal(false);
 
   protected toggleSalesChartExpanded(): void {
     this.salesChartExpanded.update((v) => !v);
@@ -106,30 +102,6 @@ export class OverviewComponent implements OnInit {
     return this.dashboardService.stats()?.variantCount || 0;
   });
 
-  /** Period-driven revenue: prefer COGS-derived (salesSummary) when available, else ledger sales */
-  protected readonly periodRevenueFormatted = computed(() => {
-    const stats = this.dashboardService.stats();
-    const period = this.selectedPeriod();
-    const summary = stats?.salesSummary;
-    if (summary) {
-      const revenue = summary[period]?.revenue ?? 0;
-      return this.currencyService.format(revenue);
-    }
-    const categories = this.categories();
-    const sales = categories.find((c) => c.type === 'sales');
-    if (!sales) return this.currencyService.format(0);
-    const stat = sales.stats.find((s) => s.period === period);
-    return stat?.amount ?? this.currencyService.format(0);
-  });
-
-  /** Gross profit (margin in currency) for selected period from COGS-derived salesSummary */
-  protected readonly periodGrossProfitFormatted = computed(() => {
-    const summary = this.dashboardService.stats()?.salesSummary;
-    const period = this.selectedPeriod();
-    const margin = summary?.[period]?.margin ?? 0;
-    return this.currencyService.format(margin);
-  });
-
   /** Order count for selected period from salesSummary */
   protected readonly periodOrderCount = computed(() => {
     const summary = this.dashboardService.stats()?.salesSummary;
@@ -137,24 +109,10 @@ export class OverviewComponent implements OnInit {
     return summary?.[period]?.orderCount ?? null;
   });
 
-  /** Profit margin %: period-driven from salesSummary when available, else analytics (e.g. 30D) */
+  // Analytics (30D) feeds the sales chart + its loading state.
   private readonly analyticsService = inject(AnalyticsService);
   protected readonly analyticsStats = this.analyticsService.stats;
   protected readonly analyticsLoading = this.analyticsService.isLoading;
-  protected readonly profitMarginPercent = computed(() => {
-    const stats = this.dashboardService.stats();
-    const period = this.selectedPeriod();
-    const summary = stats?.salesSummary;
-    if (summary) {
-      const p = summary[period];
-      if (p && p.revenue > 0) {
-        return Math.round((p.margin / p.revenue) * 1000) / 10;
-      }
-      return null;
-    }
-    const margin = this.analyticsStats()?.averageProfitMargin;
-    return margin != null ? Math.round(margin * 10) / 10 : null;
-  });
 
   /** Date range [start, end] (YYYY-MM-DD) for the selected period — matches backend period boundaries */
   private readonly periodDateRange = computed(() => {
@@ -210,11 +168,8 @@ export class OverviewComponent implements OnInit {
     return trend.some((p) => p.date >= start && p.date <= end);
   });
 
-  protected readonly sessionOpen = this.cashierSessionService.hasActiveSession;
-
   protected readonly stockValueStats = this.dashboardService.stockValueStats;
   protected readonly stockValueLoading = this.dashboardService.stockValueLoading;
-  protected readonly platformMetrics = this.dashboardService.platformMetrics;
 
   private readonly authPermissions = inject(AuthPermissionsService);
 
@@ -236,7 +191,6 @@ export class OverviewComponent implements OnInit {
         if (companyId) {
           this.dashboardService.fetchDashboardData();
           void this.analyticsService.fetch('30d'); // 30d for profit margin + sales chart
-          void this.dashboardService.loadPlatformMetrics();
           // Stock value is admin-only — skip the query for non-admins
           if (this.hasAdminStats()) {
             void this.dashboardService.loadStockValueStats();
@@ -245,20 +199,6 @@ export class OverviewComponent implements OnInit {
       },
       { allowSignalWrites: true },
     );
-  }
-
-  ngOnInit(): void {
-    // Data fetching handled by constructor effect
-    // Sales chart: default collapsed on viewports < 1080 (md), expanded on larger
-    if (isPlatformBrowser(this.platformId) && !window.matchMedia('(min-width: 1080px)').matches) {
-      this.salesChartExpanded.set(false);
-    }
-  }
-
-  refreshStockValue(): void {
-    if (this.hasAdminStats()) {
-      void this.dashboardService.loadStockValueStats(true);
-    }
   }
 
   private createCategoryData(
@@ -334,7 +274,9 @@ export class OverviewComponent implements OnInit {
   async refresh(): Promise<void> {
     await this.dashboardService.refresh();
     void this.analyticsService.fetch('30d');
-    void this.dashboardService.loadPlatformMetrics();
+    if (this.hasAdminStats()) {
+      void this.dashboardService.loadStockValueStats(true);
+    }
     const companyId = this.companyService.activeCompanyId();
     if (companyId) {
       const channelId = parseInt(companyId, 10);

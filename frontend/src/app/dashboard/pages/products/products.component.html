@@ -103,8 +103,8 @@
       </div>
     }
 
-    <!-- Filters -->
-    <div filters class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+    <!-- Filters — 2-up on phones (no truncation), one row on desktop -->
+    <div filters class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
       @for (code of facetCodes; track code) {
         <app-product-list-facet-selector
           [facetCode]="code"
@@ -126,23 +126,24 @@
         [value]="sortBy() ?? ''"
         (change)="setSortBy($any($event.target).value || null)"
       >
-        <option value="">Sort by...</option>
-        <option value="name_asc">Name A-Z</option>
-        <option value="name_desc">Name Z-A</option>
+        <option value="">Sort by…</option>
+        <option value="name_asc">Name A–Z</option>
+        <option value="name_desc">Name Z–A</option>
       </select>
-      <label
-        class="flex items-center justify-center gap-2 cursor-pointer rounded-lg border border-base-300 px-3 h-8 bg-base-100 hover:bg-base-200 transition-colors text-sm"
-        [class.border-warning]="showLowStockOnly()"
-        [class.bg-warning/10]="showLowStockOnly()"
+      <button
+        type="button"
+        class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border px-3 text-sm transition-colors"
+        [class]="
+          showLowStockOnly()
+            ? 'border-warning bg-warning/10 text-warning'
+            : 'border-base-300 bg-base-100 text-base-content/70 hover:bg-base-200'
+        "
+        [attr.aria-pressed]="showLowStockOnly()"
+        (click)="toggleLowStockFilter(!showLowStockOnly())"
       >
-        <span class="whitespace-nowrap">Low Stock</span>
-        <input
-          type="checkbox"
-          class="checkbox checkbox-warning checkbox-xs"
-          [checked]="showLowStockOnly()"
-          (change)="toggleLowStockFilter($any($event.target).checked)"
-        />
-      </label>
+        <ng-icon name="heroExclamationTriangle" size="0.9rem" />
+        <span class="whitespace-nowrap">Low stock</span>
+      </button>
     </div>
   </app-list-search-bar>
 
@@ -157,7 +158,7 @@
 
   <!-- Loading State -->
   @if (isLoading()) {
-    <div class="card bg-base-100 shadow">
+    <div class="rounded-box border border-base-300/60 bg-base-100">
       <div class="card-body">
         <div class="flex flex-col items-center justify-center py-16">
           <span class="loading loading-spinner loading-lg text-primary"></span>
@@ -169,7 +170,7 @@
 
   <!-- Empty State -->
   @else if (totalItems() === 0 && !error()) {
-    <div class="card bg-base-100 shadow">
+    <div class="rounded-box border border-base-300/60 bg-base-100">
       <div class="card-body">
         <div class="text-center py-12 lg:py-16 px-4">
           <div
@@ -229,15 +230,15 @@
     </div>
 
     <!-- Desktop: Table View -->
-    <div class="card bg-base-100 shadow hidden lg:block">
+    <div class="rounded-box border border-base-300/60 bg-base-100 hidden lg:block">
       <div class="overflow-x-auto">
-        <table class="table table-zebra">
+        <table class="table">
           <thead>
             <tr>
               <th class="w-16">Image</th>
               <th>Product</th>
               <th>Variants</th>
-              <th>Price Range</th>
+              <th>Price</th>
               <th class="text-center">Stock</th>
               <th class="text-center">Status</th>
               <th class="text-right">Actions</th>
@@ -253,27 +254,33 @@
                 (toggleExpand)="toggleExpand(product.id)"
                 (action)="onProductAction($event)"
               ></tr>
-              <!-- Expansion panel — daisyUI collapse, toggled by row click -->
-              <tr>
-                <td colspan="7" class="!p-0 !bg-transparent">
-                  <div
-                    class="collapse"
-                    [class.collapse-open]="isExpanded(product.id)"
-                    [class.collapse-close]="!isExpanded(product.id)"
-                  >
-                    <div class="collapse-title hidden"></div>
-                    <div class="collapse-content !p-0">
-                      @if ((product.variants ?? []).length > 0) {
-                        <app-variant-list
-                          [variants]="variantListItems(product)"
-                          [display]="'table'"
-                          [wrapperClass]="'ml-[6.5rem] mr-4'"
-                        />
-                      }
-                    </div>
-                  </div>
-                </td>
-              </tr>
+              <!-- Variant detail rows — aligned under the parent columns -->
+              @if (isExpanded(product.id)) {
+                @for (v of product.variants ?? []; track v.id) {
+                  <tr class="bg-base-200/20 text-base-content/80">
+                    <td></td>
+                    <td class="!py-1.5">
+                      <div class="flex items-center gap-2 border-l-2 border-primary/20 pl-3">
+                        <span class="text-sm">{{ v.name }}</span>
+                        <span class="text-xs text-base-content/50 font-mono">{{ v.sku }}</span>
+                      </div>
+                    </td>
+                    <td></td>
+                    <td class="!py-1.5">
+                      <span class="text-sm tabular-nums"
+                        ><app-money [value]="v.priceWithTax"
+                      /></span>
+                    </td>
+                    <td class="!py-1.5 text-center">
+                      <span class="badge badge-sm" [class]="variantBadgeClass(v)">
+                        {{ variantStock(v) }}
+                      </span>
+                    </td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                }
+              }
             }
           </tbody>
         </table>

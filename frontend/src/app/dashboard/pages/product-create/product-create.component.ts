@@ -174,6 +174,12 @@ export class ProductCreateComponent implements OnInit {
   // Identification method chosen (barcode | label-photos)
   readonly identificationMethod = signal<'barcode' | 'label-photos' | null>('barcode');
   readonly photoCount = signal(0);
+  /**
+   * Captured label photos, owned by the parent so they survive the Stage-1 subtree being
+   * destroyed when the user advances to Stage 2 to submit. Set in onPhotosChanged; read at
+   * submit + enrollment instead of the (by-then destroyed) photo-manager viewChild.
+   */
+  readonly capturedPhotos = signal<File[]>([]);
   readonly barcodeValue = signal<string>(''); // Track barcode as signal
   readonly productNameValue = signal<string>(''); // Track name as signal
   readonly productNameValid = signal<boolean>(false); // Track name validity
@@ -386,8 +392,11 @@ export class ProductCreateComponent implements OnInit {
       this.measurementUnit.set(null);
       this.variantDimensions.set([]);
       this.howSoldPreset.set(null);
-      this.skus.clear();
-      this.skuValidityTrigger.update((v) => v + 1);
+      // Guard: don't wipe loaded variants while editing an existing product (see generateSkus).
+      if (!(this.isEditMode() && this.skus.length > 0)) {
+        this.skus.clear();
+        this.skuValidityTrigger.update((v) => v + 1);
+      }
     }
 
     // Always return to Stage 1 when switching type in create flow (edit mode handled separately)
@@ -588,6 +597,11 @@ export class ProductCreateComponent implements OnInit {
    * Generate SKUs based on current configuration
    */
   generateSkus(): void {
+    // Never auto-regenerate SKUs from Stage-1 selectors while editing a product that already has
+    // loaded variants: those carry real names/prices/variant IDs, and edit submit does a full
+    // delete+recreate overwrite. Regenerating here would silently replace them with name-derived
+    // placeholders (data loss). First-time/empty generation is still allowed.
+    if (this.isEditMode() && this.skus.length > 0) return;
     this.skus.clear();
 
     if (this.itemType() === 'service') {
@@ -805,6 +819,9 @@ export class ProductCreateComponent implements OnInit {
    * Handle label photos uploaded
    */
   onPhotosChanged(photos: File[]): void {
+    // Keep the actual File[] on the parent — the Stage-1 photo-manager that owns them is destroyed
+    // when the user moves to Stage 2 to submit, so submit/enrollment can't read it from the child.
+    this.capturedPhotos.set(photos);
     this.photoCount.set(photos.length);
     if (photos.length >= 5) {
       this.identificationMethod.set('label-photos');
@@ -1095,6 +1112,22 @@ export class ProductCreateComponent implements OnInit {
           this.submitError.set(error || 'Failed to update product');
           return;
         }
+        // Persist any newly captured photos as assets. The edit Stage-1 photo UI only captures NEW
+        // photos (existing assets aren't shown there), so append them — updateProductAssets merges,
+        // keeping existing photos and the current featured image.
+        const newEditPhotos = this.capturedPhotos();
+        if (newEditPhotos.length > 0) {
+          const photosOk = await this.productService.updateProductAssets(
+            productId,
+            newEditPhotos,
+            [],
+          );
+          if (!photosOk) {
+            this.submitError.set(
+              'Product updated, but photo upload failed. You can add photos later.',
+            );
+          }
+        }
         // Re-enroll from any newly captured photos (no backfill: existing products gain
         // recognition only when re-saved with photos). Fire-and-forget.
         this.enrollFromPhotos(productId);
@@ -1116,43 +1149,31 @@ export class ProductCreateComponent implements OnInit {
           // the model on first use, so it must not block save/navigation).
           this.enrollFromPhotos(productId);
 
-          // Upload photos if any were added (Phase 2 - non-blocking)
-          const identificationSelector = this.identificationSelector();
-          if (identificationSelector) {
-            const photoManager = identificationSelector.photoManager();
-            if (photoManager) {
-              const photos = photoManager.getPhotos();
-              if (photos.length > 0) {
-                console.log(`Transaction Phase 2: Uploading ${photos.length} photo(s)...`);
-                try {
-                  const assetIds = await this.productService.uploadProductPhotos(productId, photos);
-                  if (assetIds && assetIds.length > 0) {
-                    console.log('Transaction Phase 2 COMPLETE: Photos uploaded');
-                    this.submitSuccess.set(true);
-                  } else {
-                    console.warn('Transaction Phase 2 FAILED: Photos upload failed');
-                    console.warn(
-                      'But product was successfully created (photos can be added later)',
-                    );
-                    // Show partial success message
-                    this.submitError.set(
-                      'Product created, but photo upload failed. You can add photos later.',
-                    );
-                  }
-                } catch (photoError: any) {
-                  console.error('Photo upload error:', photoError);
-                  this.submitError.set(
-                    'Product created, but photo upload failed. You can add photos later.',
-                  );
-                }
-              } else {
-                console.log('No photos to upload');
+          // Upload photos if any were added (Phase 2 - non-blocking). Read the parent-owned
+          // capturedPhotos: the Stage-1 photo-manager viewChild is already destroyed here (we submit
+          // from Stage 2), which is exactly why featuredAsset/thumbnails silently never got set.
+          const photos = this.capturedPhotos();
+          if (photos.length > 0) {
+            console.log(`Transaction Phase 2: Uploading ${photos.length} photo(s)...`);
+            try {
+              const assetIds = await this.productService.uploadProductPhotos(productId, photos);
+              if (assetIds && assetIds.length > 0) {
+                console.log('Transaction Phase 2 COMPLETE: Photos uploaded');
                 this.submitSuccess.set(true);
+              } else {
+                console.warn('Transaction Phase 2 FAILED: Photos upload failed');
+                this.submitError.set(
+                  'Product created, but photo upload failed. You can add photos later.',
+                );
               }
-            } else {
-              this.submitSuccess.set(true);
+            } catch (photoError: any) {
+              console.error('Photo upload error:', photoError);
+              this.submitError.set(
+                'Product created, but photo upload failed. You can add photos later.',
+              );
             }
           } else {
+            console.log('No photos to upload');
             this.submitSuccess.set(true);
           }
 
@@ -1186,7 +1207,10 @@ export class ProductCreateComponent implements OnInit {
    * Uses the captured photo Files directly (independent of the Vendure asset upload).
    */
   private enrollFromPhotos(productId: string): void {
-    const photos = this.identificationSelector()?.photoManager()?.getPhotos() ?? [];
+    // Read the parent-owned captured photos, not the Stage-1 viewChild: by submit time the user is
+    // on Stage 2 and the photo-manager has been destroyed, so its getPhotos() would be empty (this
+    // is why recognition was never enrolled after create/edit).
+    const photos = this.capturedPhotos();
     if (!photos.length) return;
     void this.enrollmentService
       .enrollProduct(productId, photos)

@@ -12,8 +12,12 @@ import {
 import { createRoiCanvas, drawCenteredRoi } from '../../../../../core/services/ml-model/frame-roi';
 import { Detector, DetectionResult } from './detection.types';
 
-/** Minimum enrolled products before ML recognition arms (below this it's barcode-only). */
-const MIN_ENROLLED_PRODUCTS = 3;
+/**
+ * Minimum enrolled products before ML recognition arms. 1 is enough: with a single candidate there
+ * is no top1/top2 margin, so the matcher falls back to the absolute cosine threshold (tau), which
+ * bestMatch/calibrateTau already handle safely (margin := score; tau floored conservatively).
+ */
+const MIN_ENROLLED_PRODUCTS = 1;
 
 /**
  * ML detector: recognizes a product by embedding the centered region of the camera frame and
