@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { toDisplayDate } from '../../../../../core/utils/date.util';
 
 /**
  * Purchase Detail Header Component
@@ -44,13 +45,7 @@ export class PurchaseDetailHeaderComponent {
   readonly formattedDate = computed(() => {
     const date = this.purchaseDate();
     if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-KE', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return toDisplayDate(date, 'medium');
   });
 
   getPaymentStatusBadgeClass(): string {

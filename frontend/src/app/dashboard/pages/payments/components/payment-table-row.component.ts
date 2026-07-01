@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { PaymentWithOrder } from '../../../../core/services/payments.service';
+import { toDisplayDate } from '../../../../core/utils/date.util';
 import { PaymentStateBadgeComponent } from './payment-state-badge.component';
 
 export type PaymentAction = 'view' | 'viewOrder';
@@ -73,14 +74,7 @@ export class PaymentTableRowComponent {
   }
 
   formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-KE', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return toDisplayDate(dateString, 'medium');
   }
 
   formatCurrency(amount: number): string {

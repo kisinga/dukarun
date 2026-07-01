@@ -1485,6 +1485,48 @@ export const GET_PAYMENTS = graphql(`
   }
 `);
 
+// Single source for "a customer's orders + their payments", via the paginated
+// customer.orders relation. Used by the Payments page (customer context) and the
+// customer-detail page (recent orders + payments history). Complete and scoped —
+// never truncated by the global orders window.
+export const GET_CUSTOMER_ORDERS = graphql(`
+  query GetCustomerOrders($id: ID!, $options: OrderListOptions) {
+    customer(id: $id) {
+      id
+      firstName
+      lastName
+      emailAddress
+      orders(options: $options) {
+        items {
+          id
+          code
+          state
+          createdAt
+          orderPlacedAt
+          total
+          totalWithTax
+          currencyCode
+          payments {
+            id
+            state
+            amount
+            method
+            transactionId
+            createdAt
+            updatedAt
+            errorMessage
+            metadata
+          }
+          customFields {
+            reversedAt
+          }
+        }
+        totalItems
+      }
+    }
+  }
+`);
+
 export const GET_PAYMENT_FULL = graphql(`
   query GetPaymentFull($orderId: ID!) {
     order(id: $orderId) {

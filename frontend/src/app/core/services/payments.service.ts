@@ -1,6 +1,6 @@
 import { inject, Injectable, signal } from '@angular/core';
 import type { OrderListOptions } from '../graphql/generated/graphql';
-import { GET_PAYMENTS, GET_PAYMENT_FULL } from '../graphql/operations.graphql';
+import { GET_CUSTOMER_ORDERS, GET_PAYMENTS, GET_PAYMENT_FULL } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
 
 /**
@@ -52,6 +52,8 @@ export class PaymentsService {
   private readonly isLoadingSignal = signal(false);
   private readonly errorSignal = signal<string | null>(null);
   private readonly totalItemsSignal = signal(0);
+  // The customer whose payments are currently shown (customer-scoped fetch), if any.
+  private readonly customerContextSignal = signal<{ id: string; name: string } | null>(null);
 
   // Public readonly signals
   readonly payments = this.paymentsSignal.asReadonly();
@@ -60,6 +62,7 @@ export class PaymentsService {
   readonly isLoading = this.isLoadingSignal.asReadonly();
   readonly error = this.errorSignal.asReadonly();
   readonly totalItems = this.totalItemsSignal.asReadonly();
+  readonly customerContext = this.customerContextSignal.asReadonly();
 
   /**
    * Fetch payments by fetching orders and extracting payments
@@ -68,6 +71,7 @@ export class PaymentsService {
   async fetchPayments(options?: OrderListOptions): Promise<void> {
     this.isLoadingSignal.set(true);
     this.errorSignal.set(null);
+    this.customerContextSignal.set(null); // global fetch clears any customer scope
 
     try {
       const client = this.apolloService.getClient();
@@ -122,6 +126,95 @@ export class PaymentsService {
     } catch (error: any) {
       console.error('❌ Failed to fetch payments:', error);
       this.errorSignal.set(error.message || 'Failed to fetch payments');
+      this.paymentsSignal.set([]);
+      this.totalItemsSignal.set(0);
+    } finally {
+      this.isLoadingSignal.set(false);
+    }
+  }
+
+  /**
+   * Fetch all payments for a single customer via the paginated `customer.orders`
+   * relation. This is the correct, complete source for "payments by customer" —
+   * unlike the global orders window used by fetchPayments(), it never silently
+   * omits a customer's payments just because their orders aren't in the newest N.
+   *
+   * @param customerId - Customer ID
+   * @param options - Order list options (pagination, sorting) applied to the customer's orders
+   */
+  async fetchPaymentsForCustomer(customerId: string, options?: OrderListOptions): Promise<void> {
+    this.isLoadingSignal.set(true);
+    this.errorSignal.set(null);
+
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.query({
+        query: GET_CUSTOMER_ORDERS,
+        variables: {
+          id: customerId,
+          options: (options as OrderListOptions) || {
+            take: 100,
+            skip: 0,
+            sort: { createdAt: 'DESC' as any },
+          },
+        },
+        fetchPolicy: 'network-only',
+      });
+
+      const customer = result.data?.customer;
+      if (!customer) {
+        this.customerContextSignal.set(null);
+        this.paymentsSignal.set([]);
+        this.totalItemsSignal.set(0);
+        return;
+      }
+
+      const customerName =
+        `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim() || 'Customer';
+      this.customerContextSignal.set({ id: customer.id, name: customerName });
+
+      // Every order here belongs to this customer, so attach the customer to each.
+      const orderCustomer = {
+        id: customer.id,
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        emailAddress: customer.emailAddress ?? null,
+      };
+
+      const orders = customer.orders?.items ?? [];
+      const payments: PaymentWithOrder[] = [];
+      orders.forEach((order) => {
+        (order.payments ?? []).forEach((payment) => {
+          payments.push({
+            id: payment.id,
+            state: payment.state,
+            amount: payment.amount,
+            method: payment.method,
+            transactionId: payment.transactionId || null,
+            createdAt: payment.createdAt,
+            updatedAt: payment.updatedAt || payment.createdAt,
+            errorMessage: payment.errorMessage || null,
+            metadata: payment.metadata,
+            order: {
+              id: order.id,
+              code: order.code,
+              state: order.state,
+              createdAt: order.createdAt,
+              orderPlacedAt: order.orderPlacedAt || null,
+              customer: orderCustomer,
+            },
+          });
+        });
+      });
+
+      payments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      this.paymentsSignal.set(payments);
+      this.totalItemsSignal.set(payments.length);
+    } catch (error: any) {
+      console.error('❌ Failed to fetch customer payments:', error);
+      this.errorSignal.set(error.message || 'Failed to fetch customer payments');
+      this.customerContextSignal.set(null);
       this.paymentsSignal.set([]);
       this.totalItemsSignal.set(0);
     } finally {

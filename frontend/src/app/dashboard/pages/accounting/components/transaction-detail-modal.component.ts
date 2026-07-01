@@ -10,7 +10,11 @@ import {
   ElementRef,
 } from '@angular/core';
 import { JournalEntry } from '../../../../core/services/ledger/ledger.service';
-import { sourceTypeLabel } from '../utils/accounting-formatting';
+import {
+  formatCurrency as formatCurrencyCents,
+  formatDateTime,
+  sourceTypeLabel,
+} from '../utils/accounting-formatting';
 
 @Component({
   selector: 'app-transaction-detail-modal',
@@ -54,21 +58,11 @@ export class TransactionDetailModalComponent {
   }
 
   formatCurrency(amountInCents: number): string {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      minimumFractionDigits: 2,
-    }).format(amountInCents / 100);
+    return formatCurrencyCents(amountInCents);
   }
 
   formatDate(date: string): string {
-    return new Date(date).toLocaleDateString('en-KE', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatDateTime(date);
   }
 
   getTotalDebit(entry: JournalEntry | null): number {

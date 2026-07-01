@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@ang
 import { Router } from '@angular/router';
 import { ApprovalRequest, ApprovalService } from '../../../core/services/approval.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { CurrencyService } from '../../../core/services/currency.service';
 import { PageHeaderComponent } from '../shared/components/page-header.component';
 
 @Component({
@@ -207,6 +208,7 @@ export class ApprovalsComponent implements OnInit {
   private readonly approvalService = inject(ApprovalService);
   private readonly notificationService = inject(NotificationService);
   private readonly router = inject(Router);
+  private readonly currencyService = inject(CurrencyService);
 
   readonly activeTab = signal<'pending' | 'all' | 'mine'>('pending');
   readonly approvals = signal<ApprovalRequest[]>([]);
@@ -353,11 +355,7 @@ export class ApprovalsComponent implements OnInit {
 
   formatCurrency(amountCents: number): string {
     if (!amountCents && amountCents !== 0) return '-';
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      minimumFractionDigits: 2,
-    }).format(amountCents / 100);
+    return this.currencyService.format(amountCents);
   }
 
   formatTime(dateStr: string): string {

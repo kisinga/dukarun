@@ -22,6 +22,7 @@ import { PurchaseService } from '../../../core/services/purchase.service';
 import { PurchaseDraft, PurchaseLineItem } from '../../../core/services/purchase.service.types';
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { SupplierService } from '../../../core/services/supplier.service';
+import { CurrencyService } from '../../../core/services/currency.service';
 import { PageHeaderComponent } from '../../components/shared/page-header.component';
 import { CompanySearchSelectComponent } from '../shared/components/company-search-select.component';
 import { ProductSearchViewComponent } from '../shared/components/product-search-view.component';
@@ -256,6 +257,7 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
   private readonly approvalServiceLocal = inject(ApprovalService);
   readonly purchaseService = inject(PurchaseService);
   readonly supplierService = inject(SupplierService);
+  private readonly currencyService = inject(CurrencyService);
   readonly productSearchService = inject(ProductSearchService);
   readonly stockLocationService = inject(StockLocationService);
   private readonly ledgerService = inject(LedgerService);
@@ -528,11 +530,7 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
   }
 
   formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      minimumFractionDigits: 2,
-    }).format(amount);
+    return this.currencyService.formatMajor(amount);
   }
 
   formatDateForInput(date: Date): string {

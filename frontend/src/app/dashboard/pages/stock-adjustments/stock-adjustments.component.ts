@@ -10,6 +10,7 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { StockAdjustmentService } from '../../../core/services/stock-adjustment.service';
+import { toDisplayDate } from '../../../core/utils/date.util';
 import { HoverPreviewHostComponent } from '../../components/shared/hover-preview-host/hover-preview-host.component';
 import { PageHeaderComponent } from '../../components/shared/page-header.component';
 import { ListSearchBarComponent } from '../../components/shared/list-search-bar.component';
@@ -135,8 +136,7 @@ export class StockAdjustmentsComponent implements OnInit {
 
   formatDate(value: unknown): string {
     if (value == null) return '—';
-    const d = new Date(value as string);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString(undefined, { dateStyle: 'short' });
+    return toDisplayDate(value as string | number | Date, 'short') || '—';
   }
 
   trackByAdjustmentId(_index: number, item: { id: string }): string {

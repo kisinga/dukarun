@@ -11,6 +11,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { CustomerService } from '../../../../core/services/customer.service';
 import { CustomerStatementService } from '../../../../core/services/customer/customer-statement.service';
+import { toDisplayDate } from '../../../../core/utils/date.util';
 
 /**
  * Customer Statement Page
@@ -92,11 +93,7 @@ export class CustomerStatementComponent implements OnInit {
 
   formatDate(date: string | null | undefined): string {
     if (!date) return '—';
-    return new Date(date).toLocaleDateString('en-KE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    return toDisplayDate(date, 'medium');
   }
 
   /** Settled payments for an order (for statement display). */

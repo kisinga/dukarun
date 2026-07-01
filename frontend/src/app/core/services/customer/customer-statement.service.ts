@@ -1,6 +1,9 @@
 import { inject, Injectable, signal } from '@angular/core';
 import type { OrderListOptions } from '../../graphql/generated/graphql';
-import { GET_ORDERS, SEND_CUSTOMER_STATEMENT_EMAIL } from '../../graphql/operations.graphql';
+import {
+  GET_CUSTOMER_ORDERS,
+  SEND_CUSTOMER_STATEMENT_EMAIL,
+} from '../../graphql/operations.graphql';
 import { ApolloService } from '../apollo.service';
 import { CustomerService } from '../customer.service';
 
@@ -39,8 +42,9 @@ export class CustomerStatementService {
       }
       const client = this.apollo.getClient();
       const result = await client.query({
-        query: GET_ORDERS,
+        query: GET_CUSTOMER_ORDERS,
         variables: {
+          id: customerId,
           options: {
             take: 500,
             skip: 0,
@@ -49,9 +53,7 @@ export class CustomerStatementService {
         },
         fetchPolicy: 'network-only',
       });
-      const items = result.data?.orders?.items ?? [];
-      const forCustomer = items.filter((o: any) => o.customer?.id === customerId);
-      this.ordersSignal.set(forCustomer);
+      this.ordersSignal.set(result.data?.customer?.orders?.items ?? []);
     } catch (err: any) {
       this.errorSignal.set(err?.message ?? 'Failed to load statement');
       this.ordersSignal.set([]);

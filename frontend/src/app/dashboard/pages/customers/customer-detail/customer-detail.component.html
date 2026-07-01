@@ -207,6 +207,64 @@
         }
       </div>
     </div>
+
+    <!-- Payments -->
+    <div class="card bg-base-100 shadow-sm border border-base-300/60">
+      <div class="card-body p-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+          <h3 class="font-bold text-base text-base-content">Payments</h3>
+          <a
+            [routerLink]="['/dashboard/payments']"
+            [queryParams]="{ customerId: customerId() }"
+            class="link link-hover text-sm"
+            >View all payments</a
+          >
+        </div>
+        @if (recentPayments().length === 0) {
+          <p class="text-sm text-base-content/60">No payments yet.</p>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="table table-zebra table-sm">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Order</th>
+                  <th>Method</th>
+                  <th class="text-right">Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (payment of recentPayments(); track payment.id) {
+                  <tr>
+                    <td class="whitespace-nowrap text-sm text-base-content/70">
+                      {{ formatDate(payment.createdAt) }}
+                    </td>
+                    <td>
+                      <a
+                        [routerLink]="['/dashboard/orders', payment.orderId]"
+                        class="link link-hover font-mono font-medium"
+                        >{{ payment.orderCode }}</a
+                      >
+                    </td>
+                    <td class="text-sm capitalize">{{ payment.method }}</td>
+                    <td class="text-right font-medium">{{ formatCurrency(payment.amount) }}</td>
+                    <td>
+                      <span
+                        class="badge badge-sm"
+                        [class.badge-success]="payment.state === 'Settled'"
+                        [class.badge-ghost]="payment.state !== 'Settled'"
+                        >{{ payment.state }}</span
+                      >
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
   }
 </div>
 

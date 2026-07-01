@@ -2,8 +2,8 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
-  OnInit,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -40,12 +40,16 @@ import { PaymentTableRowComponent } from './components/payment-table-row.compone
   templateUrl: './payments.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PaymentsComponent implements OnInit {
+export class PaymentsComponent {
   private readonly paymentsService = inject(PaymentsService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  private readonly queryParams = toSignal(this.route.queryParams, { initialValue: {} });
+  // Seed from the snapshot so the initial effect run already has the real params
+  // (avoids an initial empty-context global fetch, then a second scoped fetch).
+  private readonly queryParams = toSignal(this.route.queryParams, {
+    initialValue: this.route.snapshot.queryParams,
+  });
 
   // State from service
   readonly payments = this.paymentsService.payments;
@@ -63,6 +67,10 @@ export class PaymentsComponent implements OnInit {
   readonly contextCustomerName = computed(() => {
     const id = this.contextCustomerId();
     if (!id) return null;
+    // Prefer the authoritative customer from the scoped fetch (reliable even when
+    // the customer has zero payments); fall back to a loaded payment row.
+    const ctx = this.paymentsService.customerContext();
+    if (ctx && ctx.id === id) return ctx.name;
     const p = this.payments().find((x) => x.order.customer?.id === id);
     return p?.order.customer
       ? `${p.order.customer.firstName ?? ''} ${p.order.customer.lastName ?? ''}`.trim() || null
@@ -170,16 +178,28 @@ export class PaymentsComponent implements OnInit {
     return Math.min(this.currentPage() * this.itemsPerPage(), this.filteredPayments().length);
   });
 
-  ngOnInit(): void {
-    this.loadPayments();
+  constructor() {
+    // Load payments reactively: re-fetch whenever the customer context changes
+    // (or on first render). Customer context uses the scoped, complete fetch so a
+    // customer's payments are never silently truncated by the global orders window.
+    effect(() => {
+      const customerId = this.contextCustomerId();
+      void this.loadPaymentsFor(customerId);
+    });
+  }
+
+  private async loadPaymentsFor(customerId: string | null): Promise<void> {
+    const options = { take: 100, skip: 0, sort: { createdAt: 'DESC' as any } };
+    if (customerId) {
+      await this.paymentsService.fetchPaymentsForCustomer(customerId, options);
+    } else {
+      await this.paymentsService.fetchPayments(options);
+    }
+    this.currentPage.set(1);
   }
 
   async loadPayments(): Promise<void> {
-    await this.paymentsService.fetchPayments({
-      take: 100,
-      skip: 0,
-      sort: { createdAt: 'DESC' as any },
-    });
+    await this.loadPaymentsFor(this.contextCustomerId());
   }
 
   async refreshPayments(): Promise<void> {

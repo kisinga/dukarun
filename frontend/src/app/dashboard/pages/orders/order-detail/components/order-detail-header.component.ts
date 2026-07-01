@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { OrderStateBadgeComponent } from '../../components/order-state-badge.component';
 import type { OrderDetailHeaderInput } from '../order-detail.types';
+import { toDisplayDate } from '../../../../../core/utils/date.util';
 
 /**
  * Order Detail Header Component
@@ -42,12 +43,6 @@ export class OrderDetailHeaderComponent {
   readonly formattedDate = computed(() => {
     const date = this.orderDate();
     if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-KE', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return toDisplayDate(date, 'medium');
   });
 }

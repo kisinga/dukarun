@@ -49,10 +49,22 @@ export class CurrencyService {
    * Services should pass raw cents from GraphQL responses directly to this formatter.
    */
   format(amount: number, showCurrency: boolean = true): string {
-    const currency = this.currency();
+    // Vendure stores money in cents; convert to currency units first.
+    return this.formatUnits(amount / 100, showCurrency);
+  }
 
-    // ALWAYS convert from cents to currency units
-    const amountInCurrencyUnits = amount / 100;
+  /**
+   * Format an amount that is ALREADY in major currency units (whole shillings),
+   * not cents. Use for form models and calculations that work in major units
+   * (e.g. the purchase-create flow), so they share one output format.
+   *
+   * @param amount - Amount in MAJOR currency units (not cents)
+   */
+  formatMajor(amount: number, showCurrency: boolean = true): string {
+    return this.formatUnits(amount, showCurrency);
+  }
+
+  private formatUnits(amountInCurrencyUnits: number, showCurrency: boolean): string {
     // Only show decimals if the amount has a fractional part
     const hasDecimals = amountInCurrencyUnits % 1 !== 0;
     const formattedAmount = Math.abs(amountInCurrencyUnits).toLocaleString('en-KE', {
@@ -62,7 +74,7 @@ export class CurrencyService {
 
     if (showCurrency) {
       const prefix = amountInCurrencyUnits < 0 ? '-' : '';
-      return `${prefix}${currency} ${formattedAmount}`;
+      return `${prefix}${this.currency()} ${formattedAmount}`;
     }
 
     return formattedAmount;

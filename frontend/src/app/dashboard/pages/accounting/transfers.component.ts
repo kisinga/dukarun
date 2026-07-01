@@ -11,6 +11,7 @@ import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { CurrencyService } from '../../../core/services/currency.service';
 import { JournalEntry, LedgerService } from '../../../core/services/ledger/ledger.service';
+import { toDisplayDate } from '../../../core/utils/date.util';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { TransactionDetailModalComponent } from './components/transaction-detail-modal.component';
 import { CreateTransferModalComponent } from './create-transfer-modal.component';
@@ -89,11 +90,7 @@ export class TransfersComponent implements OnInit {
   }
 
   formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-KE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    return toDisplayDate(dateStr, 'medium');
   }
 
   getEntryAmount(entry: JournalEntry): number {

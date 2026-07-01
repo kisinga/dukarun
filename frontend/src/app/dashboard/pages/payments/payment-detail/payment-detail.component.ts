@@ -12,6 +12,7 @@ import { HoverPreviewHostComponent } from '../../../components/shared/hover-prev
 import { toSignal } from '@angular/core/rxjs-interop';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { PaymentsService } from '../../../../core/services/payments.service';
+import { toDisplayDate } from '../../../../core/utils/date.util';
 import { PaymentStateBadgeComponent } from '../components/payment-state-badge.component';
 
 /**
@@ -87,14 +88,7 @@ export class PaymentDetailComponent implements OnInit {
 
   formatDate(dateString: string | null | undefined): string {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-KE', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return toDisplayDate(dateString, 'medium');
   }
 
   goBack(): void {

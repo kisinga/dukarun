@@ -13,6 +13,7 @@ import { SupplierService } from '../../../../core/services/supplier.service';
 import { SupplierSearchService } from '../../../../core/services/supplier/supplier-search.service';
 import { ApolloService } from '../../../../core/services/apollo.service';
 import { GetPurchasesDocument, SortOrder } from '../../../../core/graphql/generated/graphql';
+import { toDisplayDate } from '../../../../core/utils/date.util';
 
 const RECENT_PURCHASES_TAKE = 15;
 
@@ -100,15 +101,7 @@ export class SupplierDetailComponent implements OnInit {
 
   formatDate(value: string | null | undefined): string {
     if (!value) return '—';
-    try {
-      return new Date(value).toLocaleDateString('en-KE', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      });
-    } catch {
-      return '—';
-    }
+    return toDisplayDate(value, 'medium');
   }
 
   formatCurrency(cents: number): string {

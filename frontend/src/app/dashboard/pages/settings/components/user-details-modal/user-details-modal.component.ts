@@ -12,6 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { UsersService } from '../../../../../core/services/users.service';
+import { toDisplayDate } from '../../../../../core/utils/date.util';
 
 @Component({
   selector: 'app-user-details-modal',
@@ -98,13 +99,7 @@ export class UserDetailsModalComponent implements OnInit {
 
   formatDate(dateString: string | null | undefined): string {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-KE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return toDisplayDate(dateString, 'medium');
   }
 
   getChannelNames(channels: Array<{ id: string; code: string; token: string }>): string {

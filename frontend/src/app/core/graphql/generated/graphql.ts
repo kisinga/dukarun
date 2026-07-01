@@ -11308,6 +11308,50 @@ export type GetPaymentsQuery = {
   };
 };
 
+export type GetCustomerOrdersQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+  options?: InputMaybe<OrderListOptions>;
+}>;
+
+export type GetCustomerOrdersQuery = {
+  __typename?: 'Query';
+  customer?: {
+    __typename?: 'Customer';
+    id: string;
+    firstName: string;
+    lastName: string;
+    emailAddress: string;
+    orders: {
+      __typename?: 'OrderList';
+      totalItems: number;
+      items: Array<{
+        __typename?: 'Order';
+        id: string;
+        code: string;
+        state: string;
+        createdAt: any;
+        orderPlacedAt?: any | null;
+        total: number;
+        totalWithTax: number;
+        currencyCode: CurrencyCode;
+        payments?: Array<{
+          __typename?: 'Payment';
+          id: string;
+          state: string;
+          amount: number;
+          method: string;
+          transactionId?: string | null;
+          createdAt: any;
+          updatedAt: any;
+          errorMessage?: string | null;
+          metadata?: any | null;
+        }> | null;
+        customFields?: { __typename?: 'OrderCustomFields'; reversedAt?: any | null } | null;
+      }>;
+    };
+  } | null;
+};
+
 export type GetPaymentFullQueryVariables = Exact<{
   orderId: Scalars['ID']['input'];
 }>;
@@ -19136,6 +19180,118 @@ export const GetPaymentsDocument = {
     },
   ],
 } as unknown as DocumentNode<GetPaymentsQuery, GetPaymentsQueryVariables>;
+export const GetCustomerOrdersDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetCustomerOrders' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'OrderListOptions' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'customer' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'id' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'orders' },
+                  arguments: [
+                    {
+                      kind: 'Argument',
+                      name: { kind: 'Name', value: 'options' },
+                      value: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
+                    },
+                  ],
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'items' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'state' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'orderPlacedAt' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'total' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'totalWithTax' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'currencyCode' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'payments' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'state' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'amount' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'method' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'transactionId' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'errorMessage' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'metadata' } },
+                                ],
+                              },
+                            },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'customFields' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'reversedAt' } },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalItems' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetCustomerOrdersQuery, GetCustomerOrdersQueryVariables>;
 export const GetPaymentFullDocument = {
   kind: 'Document',
   definitions: [

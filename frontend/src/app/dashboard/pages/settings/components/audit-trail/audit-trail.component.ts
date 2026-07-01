@@ -15,6 +15,7 @@ import {
   SettingsService,
 } from '../../../../../core/services/settings.service';
 import { ToastService } from '../../../../../core/services/toast.service';
+import { toDisplayDate } from '../../../../../core/utils/date.util';
 import { PaginationComponent } from '../../../../components/shared/pagination.component';
 import { AuditTrailFilterComponent } from '../audit-trail-filter/audit-trail-filter.component';
 import { UserDetailsModalComponent } from '../user-details-modal/user-details-modal.component';
@@ -174,12 +175,7 @@ export class AuditTrailComponent {
   }
 
   formatTimestamp(timestamp: string): string {
-    return new Date(timestamp).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return toDisplayDate(timestamp, 'datetime');
   }
 
   formatRelativeTime(timestamp: string): string {
@@ -192,7 +188,7 @@ export class AuditTrailComponent {
     if (diffMins < 60) return `${diffMins}m`;
     if (diffHours < 24) return `${diffHours}h`;
     if (diffDays < 7) return `${diffDays}d`;
-    return new Date(timestamp).toLocaleDateString();
+    return toDisplayDate(timestamp, 'datetime');
   }
 
   formatEventType(eventType: string): string {
