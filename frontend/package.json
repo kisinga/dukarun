@@ -55,7 +55,6 @@
     "@opentelemetry/sdk-trace-web": "^2.3.0",
     "@opentelemetry/semantic-conventions": "^1.38.0",
     "@tailwindcss/postcss": "^4.1.18",
-    "@tensorflow/tfjs": "^4.22.0",
     "apollo-angular": "^14.1.0",
     "daisyui": "^5.5.14",
     "dexie": "^4.3.0",

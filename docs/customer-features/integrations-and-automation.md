@@ -7,7 +7,7 @@ This guide explains how Dukarun connects to other systems and automates work, in
 ## What Problems This Solves
 
 - Connect Dukarun to **payment providers (Paystack)** and **observability tools**.
-- Receive **real-time notifications** about orders, stock, ML training and payments.
+- Receive **real-time notifications** about orders, stock, recognition workflows and payments.
 - Provide a stable **GraphQL API** for custom dashboards, data export and integrations.
 - Keep the platform **observable and debuggable** as you scale.
 
@@ -21,11 +21,11 @@ This guide explains how Dukarun connects to other systems and automates work, in
 - **Paystack subscription & payments integration** – Connect Dukarun’s own billing and subscriptions to Paystack, with webhooks and STK push support.  
   **Origin:** Dukarun-Exclusive (see `SUBSCRIPTION_INTEGRATION.md`).
 
-- **Event-driven notification system** – In-app toasts and web push notifications for key events (orders, stock, ML training, payments).  
+- **Event-driven notification system** – In-app toasts and web push notifications for key events (orders, stock, recognition workflows, payments).  
   **Origin:** Dukarun-Exclusive (see `NOTIFICATION_SYSTEM.md`).
 
-- **ML training pipeline endpoints** – GraphQL operations that external ML services can use to extract images, fetch manifests and upload trained models.  
-  **Origin:** Dukarun-Exclusive (see `ML_TRAINING_SETUP.md`).
+- **Recognition enrollment data** – Product GraphQL operations carry the embeddings used by the POS scanner.  
+  **Origin:** Dukarun-Exclusive (see `ML_PRODUCT_RECOGNITION.md`).
 
 - **Observability & monitoring** – Traces, metrics and logs via SigNoz and OpenTelemetry to keep the system healthy and support SLOs.  
   **Origin:** Dukarun-Exclusive (see `OBSERVABILITY.md`, `OBSERVABILITY_OPERATIONS.md`).
@@ -107,7 +107,7 @@ Per `NOTIFICATION_SYSTEM.md`, Dukarun can generate notifications for:
 
 - **Orders** – new orders, state transitions.
 - **Stock** – low stock alerts, stock movements.
-- **ML training** – training started, completed, or failed.
+- **Recognition enrollment** – product image enrollment and cache refresh events where enabled.
 - **Payments** – payment confirmed events.
 
 These can appear:
@@ -151,7 +151,7 @@ For typical users:
 - You will see a **notification bell** and toast messages indicating:
   - New orders.
   - Low stock on key items.
-  - Completion of ML training tasks.
+  - Product recognition enrollment or cache refresh updates.
   - Payment confirmations.
 
 For administrators:
@@ -162,20 +162,17 @@ For administrators:
 
 ---
 
-## ML Training & Automation Endpoints
+## Recognition Enrollment Data
 
-From `ML_TRAINING_SETUP.md`, Dukarun exposes ML-specific automation:
+Dukarun no longer exposes the old external training pipeline. Recognition is driven by product
+data:
 
-- **Photo extraction** – Command the system to gather all relevant product images for training.
-- **Manifest generation** – Get a JSON manifest listing products and associated images.
-- **Model upload** – Upload trained model files (JSON, weights, metadata) back to Dukarun.
+- **Product enrollment** – product creation/editing can store image embeddings on the product.
+- **Product prefetch** – dashboard startup caches product fingerprints for offline POS matching.
+- **Scanner matching** – the Sell page compares live frame embeddings against cached products.
 
-These operations can be used by:
-
-- In-house ML services.
-- External ML providers.
-
-They turn Dukarun into a **training-friendly platform**, not just a consumer of ML models.
+External systems should integrate through normal product and asset workflows rather than a
+dedicated trainer service.
 
 **Origin:** Dukarun-Exclusive.
 
@@ -203,7 +200,7 @@ As described in `OBSERVABILITY.md` and `INFRASTRUCTURE.md`:
   - Log correlation.
 - **OpenTelemetry** instrumentation:
   - Automatically captures HTTP, database and GraphQL calls.
-  - Adds business-specific spans (orders, payments, ML operations, registration).
+  - Adds business-specific spans (orders, payments, recognition operations, registration).
 
 For most customers, this is managed by the Dukarun platform operator, but it directly benefits you through:
 
@@ -298,5 +295,5 @@ Merchants then interact only with the **Subscription** UI; the underlying integr
 - **Dukarun-Exclusive**
   - Paystack subscription plugin and payment workflows.
   - Event-driven notification system with push support.
-  - ML training pipeline endpoints.
+  - Product recognition enrollment and offline POS matching.
   - Containerised deployment, first-run automation, and observability stack.

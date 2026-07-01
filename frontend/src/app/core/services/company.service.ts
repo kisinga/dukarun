@@ -56,16 +56,6 @@ export class CompanyService {
   }
 
   // --- Derived from active channel (computed) ---
-  readonly mlModelAssets = computed(() => {
-    const cf = this.activeChannelDataSignal()?.customFields;
-    if (!cf?.mlModelJsonAsset || !cf?.mlModelBinAsset || !cf?.mlMetadataAsset) return null;
-    return {
-      mlModelJsonAsset: cf.mlModelJsonAsset,
-      mlModelBinAsset: cf.mlModelBinAsset,
-      mlMetadataAsset: cf.mlMetadataAsset,
-    };
-  });
-
   readonly companyLogoAsset = computed(
     () => this.activeChannelDataSignal()?.customFields?.companyLogoAsset ?? null,
   );

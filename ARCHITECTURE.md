@@ -330,58 +330,45 @@ When creating a new business, manually provision:
 9. Receipt Generation
 ```
 
-### ML Model Flow
+### Product Recognition Flow
 
 ```
-1. Admin uploads product photos
+1. Admin enrolls label photos on a product
    ↓
-2. Photos stored in Vendure assets
+2. Frontend embedder creates image embeddings
    ↓
-3. Worker job: Train ML model
+3. Embeddings are saved on product custom fields
    ↓
-4. Model files saved to static directory
+4. Dashboard prefetch caches product fingerprints
    ↓
-5. metadata.json updated with model info
+5. Scanner embeds live camera frames
    ↓
-6. Frontend fetches model URLs
-   ↓
-7. Model cached in IndexedDB
-   ↓
-8. Real-time inference during sales
+6. POS matches frame embeddings against cached products
 ```
 
 ## ML Integration
 
-### Model Storage
+### Recognition Storage
 
 ```
-backend/static/assets/ml-models/
-├── {channelId}/
-│   ├── latest/
-│   │   ├── model.json       # TensorFlow.js architecture (~50 KB)
-│   │   ├── weights.bin      # Model weights (2-5 MB)
-│   │   └── metadata.json    # Training info & labels (~1 KB)
-│   └── temp/                # Atomic write staging
+Product.customFields
+├── mlEmbedding          # JSON array of image embeddings
+└── mlEmbeddingVersion   # Embedder version
 ```
 
-### Public URLs
+### Runtime Model
 
-Models served via Vendure's AssetServerPlugin:
-
-```
-https://domain.com/assets/ml-models/{channelId}/latest/model.json
-https://domain.com/assets/ml-models/{channelId}/latest/weights.bin
-https://domain.com/assets/ml-models/{channelId}/latest/metadata.json
-```
+Recognition runs in the frontend. There is no channel-level TensorFlow.js model file, model upload
+flow, or `ml-trainer` microservice in the active architecture.
 
 ### Security Model
 
-- **Public model files are safe** - Only contain product IDs
+- **No public per-channel model files** - Recognition fingerprints are fetched through normal product queries
 - **Sensitive data (prices, costs) fetched separately** via authenticated API
-- **Model versioning** for rollback capability
-- **Client-side caching** in IndexedDB for offline use
+- **Embedder versioning** guards incompatible fingerprints
+- **Client-side product caching** supports offline matching
 
-**See [ML_GUIDE.md](./ML_GUIDE.md) for complete implementation details**
+**See [ML_PRODUCT_RECOGNITION.md](./docs/ML_PRODUCT_RECOGNITION.md) for implementation details**
 
 ## Testing & Coverage
 

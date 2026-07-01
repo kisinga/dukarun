@@ -1,7 +1,7 @@
 # On-Device Product Recognition (Redesign)
 
 **Status:** Design approved, pre-implementation. Spike (Task 0) is the gate.
-**Supersedes:** `ML_TRAINING_SETUP.md` (the Teachable-Machine/`ml-trainer` pipeline — to be deleted).
+**Supersedes:** the removed Teachable-Machine / trainer-service setup notes.
 
 ---
 

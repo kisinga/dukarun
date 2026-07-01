@@ -33,7 +33,7 @@ npm run setup
 - 🚀 **[Setup & Deployment](./docs/INFRASTRUCTURE.md)** - Get started, deploy anywhere
 - 🆕 **[Fresh Setup](./docs/INFRASTRUCTURE.md#fresh-setup)** - First-time installation guide
 - 🏗️ **[Architecture](./ARCHITECTURE.md)** - System design and decisions
-- 🤖 **[ML Guide](./docs/ML_TRAINING_SETUP.md)** - AI model training
+- 🤖 **[ML Guide](./docs/ML_PRODUCT_RECOGNITION.md)** - On-device product recognition
 - 🗺️ **[Roadmap](./ROADMAP.md)** - Planned features
 
 - **[Frontend Architecture](./frontend/ARCHITECTURE.md)** - Angular app structure
@@ -66,7 +66,7 @@ npm run setup
 | **Backend**    | Vendure (NestJS) + TypeScript        |
 | **Database**   | PostgreSQL 16                        |
 | **Cache**      | Redis 7                              |
-| **ML**         | TensorFlow.js (client-side)          |
+| **ML**         | On-device image embeddings           |
 | **Deployment** | Container images (platform-agnostic) |
 
 ## Project Structure

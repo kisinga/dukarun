@@ -222,14 +222,7 @@ A quick overview of Dukarun-specific features on the Sell page and product setup
 - **Notifications:** **Settings** → **Notifications** (`/dashboard/settings/notifications`). Configure alerts for things like low stock, payments, or team activity. Check the in-app notification bell for real-time updates.
 - **Screenshot:** Audit trail list with filters; notification settings.
 
-### 3.5 ML Model and AI recognition
-
-- **Where:** **Admin** → **ML Model** (`/dashboard/admin/ml-model`)
-- **What it does:** Shows the status of your store's AI model — whether it's training, ready to use, or needs attention. The model is trained on your specific products to improve camera recognition on the Sell page.
-- **Tip:** If recognition is inaccurate, consider adding clearer product photos or retraining the model from this page.
-- **Screenshot:** ML model status screen.
-
-### 3.6 Multiple locations and cashier flow
+### 3.5 Multiple locations and cashier flow
 
 - **Multiple locations:** If your business has more than one store or warehouse, each one is a separate location. Stock and sometimes sales are tracked per location. You can switch between locations using the company/location selector in the app header.
 - **Cashier flow:** Some setups separate the roles of "salesperson" (creates the order) and "cashier" (takes the payment). If this applies to your store, you'll see relevant indicators on the Dashboard.

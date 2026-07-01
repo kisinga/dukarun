@@ -58,7 +58,6 @@ export class SubscriptionGuard implements CanActivate {
 
     // Allow auth mutations (user has no session yet during login/logout)
     // and subscription-related mutations even if expired.
-    // Also allow ML service mutations (they use service token auth, not user sessions)
     const subscriptionMutations = [
       'login', // Must always be allowed — no session exists yet at login time
       'logout',
@@ -66,9 +65,6 @@ export class SubscriptionGuard implements CanActivate {
       'verifySubscriptionPayment',
       'cancelSubscription',
       'updateChannelSettings', // Allow updating subscription settings
-      'completeTraining', // ML service - uses service token auth
-      'linkMlModelAssets', // ML service - uses service token auth
-      'setMlModelStatus', // ML service - uses service token auth
     ];
 
     if (subscriptionMutations.includes(mutationName)) {

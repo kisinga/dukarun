@@ -1,12 +1,9 @@
-import { Injectable, Injector, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { ApolloService } from './apollo.service';
 import { CacheSyncService } from './cache/cache-sync.service';
 import { CashierSessionService } from './cashier-session/cashier-session.service';
 import { CompanyService } from './company.service';
 import { CustomerSearchService } from './customer/customer-search.service';
-import { loadMlModelService } from './ml-model.loader';
-import type { MlModelService } from './ml-model/ml-model.service';
-import { ModelErrorType } from './ml-model/model-error.util';
 import { NotificationService } from './notification.service';
 import { NotificationStateService } from './notification/notification-state.service';
 import { PaymentMethodService } from './payment-method.service';
@@ -20,7 +17,6 @@ import { SupplierSearchService } from './supplier/supplier-search.service';
  */
 export interface InitStatus {
   productsLoaded: boolean;
-  modelLoaded: boolean;
   locationsLoaded: boolean;
   notificationsLoaded: boolean;
   channelId: string | null;
@@ -45,15 +41,12 @@ export class AppInitService {
   private readonly stockLocationService = inject(StockLocationService);
   private readonly notificationService = inject(NotificationService);
   private readonly notificationStateService = inject(NotificationStateService);
-  private readonly injector = inject(Injector);
   /** Injected so CacheSyncService is created and starts SSE when user has a channel */
   private readonly cacheSyncService = inject(CacheSyncService);
   private readonly cashierSessionService = inject(CashierSessionService);
-  private mlModelService: MlModelService | null = null;
 
   private readonly initStatusSignal = signal<InitStatus>({
     productsLoaded: false,
-    modelLoaded: false,
     locationsLoaded: false,
     notificationsLoaded: false,
     channelId: null,
@@ -94,26 +87,23 @@ export class AppInitService {
       // Run prefetch operations in parallel (payment methods, customers, suppliers populate cache for sell/checkout)
       const settled = await Promise.allSettled([
         this.prefetchProducts(channelId),
-        this.prefetchModel(channelId),
         this.prefetchStockLocations(),
         this.prefetchNotifications(),
         this.prefetchPaymentMethods(),
         this.prefetchCustomers(),
         this.prefetchSuppliers(),
       ]);
-      const [productsSuccess, modelSuccess, locationsSuccess, notificationsSuccess] = settled;
+      const [productsSuccess, locationsSuccess, notificationsSuccess] = settled;
 
       // Update status based on results
       this.initStatusSignal.update((s) => ({
         ...s,
         productsLoaded: productsSuccess.status === 'fulfilled' && productsSuccess.value,
-        modelLoaded: modelSuccess.status === 'fulfilled' && modelSuccess.value,
         locationsLoaded: locationsSuccess.status === 'fulfilled' && locationsSuccess.value,
         notificationsLoaded:
           notificationsSuccess.status === 'fulfilled' && notificationsSuccess.value,
         error:
           productsSuccess.status === 'rejected' ||
-          modelSuccess.status === 'rejected' ||
           locationsSuccess.status === 'rejected' ||
           notificationsSuccess.status === 'rejected'
             ? 'Some features failed to initialize'
@@ -121,15 +111,8 @@ export class AppInitService {
       }));
 
       const status = this.initStatusSignal();
-      if (
-        status.productsLoaded &&
-        status.modelLoaded &&
-        status.locationsLoaded &&
-        status.notificationsLoaded
-      ) {
+      if (status.productsLoaded && status.locationsLoaded && status.notificationsLoaded) {
         console.log('✅ Dashboard initialized');
-      } else if (status.productsLoaded && status.locationsLoaded && status.notificationsLoaded) {
-        console.log('⚠️ Dashboard initialized (ML unavailable)');
       } else {
         console.error('❌ Dashboard initialization incomplete');
       }
@@ -152,41 +135,6 @@ export class AppInitService {
       return await this.productCacheService.prefetchChannelProducts(channelId);
     } catch (error: any) {
       console.error('Failed to prefetch products:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Pre-load ML model for instant camera scanning
-   */
-  private async prefetchModel(channelId: string): Promise<boolean> {
-    try {
-      // Check if model exists first
-      const mlModelService = await this.ensureMlModelService();
-      const exists = await mlModelService.checkModelExists(channelId);
-      if (!exists.exists) {
-        console.warn('⚠️ ML model not available:', exists.error?.message || 'Model not configured');
-        return false;
-      }
-
-      const loaded = await mlModelService.loadModel(channelId);
-
-      // If loadModel returned false, check if it's a NOT_FOUND error (expected) or unexpected
-      if (!loaded) {
-        const error = mlModelService.error();
-        if (error?.type === ModelErrorType.NOT_FOUND) {
-          // Model not configured - this is expected, use warning
-          console.warn('⚠️ ML model not available:', error.message);
-        } else if (error) {
-          // Other errors (network, load errors) - log as error
-          console.error('❌ Failed to load ML model:', error.message);
-        }
-      }
-
-      return loaded;
-    } catch (error: any) {
-      // Only unexpected errors reach here (e.g., service initialization failures)
-      console.error('❌ Failed to prefetch ML model:', error);
       return false;
     }
   }
@@ -264,13 +212,11 @@ export class AppInitService {
     this.apolloService.clearCache();
     this.productCacheService.clearCache(this.lastInitChannelId() ?? undefined);
     this.salesSyncGuard.markSynced();
-    this.mlModelService?.unloadModel();
     this.stockLocationService.clearLocations();
     this.isInitializingSignal.set(false);
     this.lastInitChannelId.set(null);
     this.initStatusSignal.set({
       productsLoaded: false,
-      modelLoaded: false,
       locationsLoaded: false,
       notificationsLoaded: false,
       channelId: null,
@@ -293,22 +239,5 @@ export class AppInitService {
   isInitialized(): boolean {
     const status = this.initStatusSignal();
     return status.productsLoaded && status.channelId !== null;
-  }
-
-  /**
-   * Check if ML features are available
-   */
-  isMLReady(): boolean {
-    return this.initStatusSignal().modelLoaded;
-  }
-
-  private async ensureMlModelService(): Promise<MlModelService> {
-    if (this.mlModelService) {
-      return this.mlModelService;
-    }
-
-    const service = await loadMlModelService(this.injector);
-    this.mlModelService = service;
-    return service;
   }
 }

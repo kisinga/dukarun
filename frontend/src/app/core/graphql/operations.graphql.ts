@@ -193,21 +193,6 @@ export const GET_ACTIVE_CHANNEL = graphql(`
       token
       defaultCurrencyCode
       customFields {
-        mlModelJsonAsset {
-          id
-          source
-          name
-        }
-        mlModelBinAsset {
-          id
-          source
-          name
-        }
-        mlMetadataAsset {
-          id
-          source
-          name
-        }
         companyLogoAsset {
           id
           source
@@ -1614,81 +1599,6 @@ export const GET_ORDER_FULL = graphql(`
         phoneNumber
       }
     }
-  }
-`);
-
-// ============================================================================
-// ML MODEL & TRAINING
-// ============================================================================
-
-// REMOVED: GET_ML_MODEL_ASSETS - No longer needed with Asset relationships
-// The ML model assets are now fetched directly as part of the channel custom fields
-
-export const GET_ML_TRAINING_INFO = graphql(`
-  query GetMlTrainingInfo($channelId: ID!) {
-    mlTrainingInfo(channelId: $channelId) {
-      status
-      progress
-      startedAt
-      error
-      productCount
-      imageCount
-      hasActiveModel
-      lastTrainedAt
-    }
-  }
-`);
-
-export const GET_ML_TRAINING_MANIFEST = graphql(`
-  query GetMlTrainingManifest($channelId: ID!) {
-    mlTrainingManifest(channelId: $channelId) {
-      channelId
-      version
-      extractedAt
-      products {
-        productId
-        productName
-        images {
-          assetId
-          url
-          filename
-        }
-      }
-    }
-  }
-`);
-
-export const EXTRACT_PHOTOS_FOR_TRAINING = graphql(`
-  mutation ExtractPhotosForTraining($channelId: ID!) {
-    extractPhotosForTraining(channelId: $channelId)
-  }
-`);
-
-export const UPDATE_TRAINING_STATUS = graphql(`
-  mutation UpdateTrainingStatus($channelId: ID!, $status: String!, $progress: Int, $error: String) {
-    updateTrainingStatus(channelId: $channelId, status: $status, progress: $progress, error: $error)
-  }
-`);
-
-export const START_TRAINING = graphql(`
-  mutation StartTraining($channelId: ID!) {
-    startTraining(channelId: $channelId)
-  }
-`);
-
-export const COMPLETE_TRAINING = graphql(`
-  mutation CompleteTraining(
-    $channelId: ID!
-    $modelJson: Upload!
-    $weightsFile: Upload!
-    $metadata: Upload!
-  ) {
-    completeTraining(
-      channelId: $channelId
-      modelJson: $modelJson
-      weightsFile: $weightsFile
-      metadata: $metadata
-    )
   }
 `);
 

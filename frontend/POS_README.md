@@ -8,18 +8,17 @@
 
 ## Services
 
-- `MlModelService` - Loads models from `/assets/ml-models/{channelId}/`
+- `EmbedderService` - Creates image embeddings for label-photo recognition
 - `CameraService` - Device camera management
 - `BarcodeScannerService` - BarcodeDetector API
 - `ProductSearchService` - GraphQL queries
 
-## ML Models
+## Recognition Data
 
 ```
-backend/static/assets/ml-models/{channelId}/latest/
-├── model.json       # TF.js architecture
-├── weights.bin      # Weights
-└── metadata.json    # Product IDs (labels)
+Product.customFields
+├── mlEmbedding          # JSON image embeddings
+└── mlEmbeddingVersion   # Embedder compatibility guard
 ```
 
 ## Future: Cashier Role

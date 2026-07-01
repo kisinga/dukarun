@@ -112,7 +112,7 @@ mirror the down-migration pattern). Do NOT edit the old migrations `100000000000
 
 ## Phase 7 — Docs + final
 
-- Delete `docs/ML_TRAINING_SETUP.md` (obsolete). Update `docs/INFRASTRUCTURE.md`,
+- Delete the obsolete ML training setup doc. Update `docs/INFRASTRUCTURE.md`,
   `docs/DOCKER_WORKSPACE_BUILDS.md`, `docs/customer-features/ml-and-intelligence.md` to drop ml-trainer.
 - Full green build: backend `tsc`, frontend `ng build`, super-admin build.
 - **`spikes/recognition/`** — keep until the pre-launch separate-session accuracy test

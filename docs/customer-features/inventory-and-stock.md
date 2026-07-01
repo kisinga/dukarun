@@ -28,7 +28,7 @@ This guide explains how Dukarun helps you **track what you have, where it is, an
   **Origin:** Dukarun-Enhanced (frontend barcode components on Vendure catalog).
 
 - **Label-photo products (AI-ready)** – Fresh produce and services can be identified using price labels / service cards, not just barcodes.  
-  **Origin:** Dukarun-Exclusive (frontend ML + backend ML pipeline on top of Vendure assets).
+  **Origin:** Dukarun-Exclusive (on-device recognition with product-level embeddings).
 
 - **Service products without stock** – Services (haircuts, repairs) are treated as products that never go out of stock.  
   **Origin:** Vendure Core (trackInventory flag) configured by Dukarun.
@@ -82,9 +82,9 @@ Dukarun supports three main ways to identify items:
 
 - **Label/photo products** (fresh produce, bulk items)
   - Instead of scanning barcodes, you **take multiple photos of the price label/tag**.
-  - Dukarun trains a per-business ML model to recognise these labels.
-  - At POS, cashiers point the camera at the label; the model suggests the product and you choose the correct SKU (e.g. 2kg).
-  - **Origin:** Dukarun-Exclusive (ML pipeline described in `ARCHITECTURE.md` and `ML_TRAINING_SETUP.md`).
+  - Dukarun stores product-level embeddings for those label photos.
+  - At POS, cashiers point the camera at the label; on-device recognition suggests the product and you choose the correct SKU (e.g. 2kg).
+  - **Origin:** Dukarun-Exclusive (recognition flow described in `docs/ML_PRODUCT_RECOGNITION.md`).
 
 - **Service products**
   - Use the same product/variant model but set **inventory tracking off**.
@@ -235,7 +235,7 @@ This leverages Vendure’s native fields and avoids custom service entities.
 Later, you can:
 
 - Add more SKUs (e.g. 2kg, 5kg).
-- Link the product to label photos and/or ML training if using AI recognition.
+- Enroll label photos if using AI recognition.
 
 ---
 
@@ -313,6 +313,6 @@ Behind the scenes, Dukarun’s ledger and inventory services can tie these adjus
 
 - **Dukarun-Exclusive**
   - Label-photo-based products and ML recognition.
-  - Per-channel ML models and auto-extraction of product photos.
+  - On-device label recognition with product-level embeddings.
   - Planned stock conversion workflows with ledger integration.
   - Mobile-first product and inventory pages optimised for SMEs in African markets.

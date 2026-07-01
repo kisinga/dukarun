@@ -644,9 +644,6 @@ customFields: {
   companyLogoAsset: Asset | null; // Direct Asset relationship for logo
   cashierFlowEnabled: boolean;
   defaultStockLocationId: string | null; // NEW: Default location for orders
-  mlModelJsonAsset: Asset | null; // Direct Asset relationship
-  mlModelBinAsset: Asset | null; // Direct Asset relationship
-  mlMetadataAsset: Asset | null; // Direct Asset relationship
 }
 ```
 
@@ -1518,7 +1515,7 @@ async handleCompleteCashier(): Promise<void> {
 localStorage.setItem('company_session', JSON.stringify({
   companies: [...],
   activeCompanyId: '1',
-  channelData: { mlModelJsonAsset: { id: '...', source: '...' } },
+  channelData: { companyLogoAsset: { id: '...', source: '...' } },
   // Location data fetched separately with cashier settings
 }));
 ```

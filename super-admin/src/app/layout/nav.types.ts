@@ -7,8 +7,7 @@ export type NavIcon =
   | 'audit-log'
   | 'role-templates'
   | 'pending'
-  | 'subscription-tiers'
-  | 'ml-trainer';
+  | 'subscription-tiers';
 
 export interface NavItem {
   label: string;

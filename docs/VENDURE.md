@@ -14,7 +14,7 @@ This guide covers the technical setup, configuration, and advanced features of t
 
 - **Customer provisioning** - See [CUSTOMER_PROVISIONING.md](./CUSTOMER_PROVISIONING.md)
 - **Infrastructure deployment** - See [INFRASTRUCTURE.md](./INFRASTRUCTURE.md)
-- **ML model training** - See [ML_TRAINING_SETUP.md](./ML_TRAINING_SETUP.md)
+- **AI product recognition** - See [ML_PRODUCT_RECOGNITION.md](./ML_PRODUCT_RECOGNITION.md)
 
 ## Table of Contents
 
@@ -156,9 +156,6 @@ This migration completely replaces string-based asset ID custom fields with prop
 
 **Channel Custom Fields:**
 
-- `mlModelJsonAsset` → Asset relationship
-- `mlModelBinAsset` → Asset relationship
-- `mlMetadataAsset` → Asset relationship
 - `companyLogoAsset` → Asset relationship
 
 **PaymentMethod Custom Fields:**
@@ -241,9 +238,6 @@ npm run dev:server
 
 ```graphql
 type ChannelCustomFields {
-  mlModelJsonId: String
-  mlModelBinId: String
-  mlMetadataId: String
   companyLogoId: String
 }
 ```
@@ -252,9 +246,6 @@ type ChannelCustomFields {
 
 ```graphql
 type ChannelCustomFields {
-  mlModelJsonAsset: Asset
-  mlModelBinAsset: Asset
-  mlMetadataAsset: Asset
   companyLogoAsset: Asset
 }
 ```
@@ -435,19 +426,12 @@ This document outlines the **immediate, breaking change** refactoring of Vendure
 ```typescript
 // Channel custom fields
 customFields: {
-  mlModelJsonId: string | null;     // Asset ID string
-  mlModelBinId: string | null;      // Asset ID string
-  mlMetadataId: string | null;       // Asset ID string
   companyLogoId: string | null;     // Asset ID string
 }
 
 // Frontend usage (required secondary query)
-const assetIds = companyService.mlModelAssetIds();
-const assets = await apollo.query({
-  query: GET_ML_MODEL_ASSETS,
-  variables: { ids: [assetIds.mlModelJsonId, ...] }
-});
-const modelUrl = `/assets/${assets[0].source}`;
+const logoId = channel.customFields.companyLogoId;
+const logoUrl = `/assets/${logoId}`;
 ```
 
 #### After (Direct Asset Relationships)
@@ -455,22 +439,19 @@ const modelUrl = `/assets/${assets[0].source}`;
 ```typescript
 // Channel custom fields
 customFields: {
-  mlModelJsonAsset: Asset | null; // Direct Asset entity
-  mlModelBinAsset: Asset | null; // Direct Asset entity
-  mlMetadataAsset: Asset | null; // Direct Asset entity
   companyLogoAsset: Asset | null; // Direct Asset entity
 }
 
 // Frontend usage (no secondary query needed)
-const mlModelAssets = companyService.mlModelAssets();
-const modelUrl = `/assets/${mlModelAssets.mlModelJsonAsset.source}`;
+const logo = companyService.companyLogoAsset();
+const logoUrl = logo?.preview ?? logo?.source;
 ```
 
 ### Benefits
 
 #### 1. Performance Improvements
 
-- **Eliminates secondary queries**: No more `GET_ML_MODEL_ASSETS` query needed
+- **Eliminates secondary queries**: No more extra asset lookup query needed
 - **Single query efficiency**: All asset data fetched with channel data
 - **Reduced network requests**: From 2 queries to 1 query per channel load
 
@@ -511,14 +492,14 @@ const modelUrl = `/assets/${mlModelAssets.mlModelJsonAsset.source}`;
 ```typescript
 // OLD: String-based custom fields
 {
-  name: 'mlModelJsonId',
+  name: 'companyLogoId',
   type: 'string',
   // ...
 }
 
 // NEW: Asset relationship custom fields
 {
-  name: 'mlModelJsonAsset',
+  name: 'companyLogoAsset',
   type: 'relation',
   entity: 'Asset',
   // ...
@@ -532,29 +513,11 @@ const modelUrl = `/assets/${mlModelAssets.mlModelJsonAsset.source}`;
 ```graphql
 # OLD: String IDs requiring secondary queries
 customFields {
-  mlModelJsonId
-  mlModelBinId
-  mlMetadataId
   companyLogoId
 }
 
 # NEW: Direct Asset objects with source URLs
 customFields {
-  mlModelJsonAsset {
-    id
-    source
-    name
-  }
-  mlModelBinAsset {
-    id
-    source
-    name
-  }
-  mlMetadataAsset {
-    id
-    source
-    name
-  }
   companyLogoAsset {
     id
     source
@@ -570,37 +533,10 @@ customFields {
 
 ```typescript
 // OLD: String asset IDs
-readonly mlModelAssetIds = computed(() => {
-  const customFields = channelData?.customFields;
-  return {
-    mlModelJsonId: customFields?.mlModelJsonId,
-    mlModelBinId: customFields?.mlModelBinId,
-    mlMetadataId: customFields?.mlMetadataId,
-  };
-});
+readonly companyLogoId = computed(() => channelData?.customFields?.companyLogoId ?? null);
 
 // NEW: Direct Asset objects
-readonly mlModelAssets = computed(() => {
-  const customFields = channelData?.customFields;
-  return {
-    mlModelJsonAsset: customFields?.mlModelJsonAsset,
-    mlModelBinAsset: customFields?.mlModelBinAsset,
-    mlMetadataAsset: customFields?.mlMetadataAsset,
-  };
-});
-```
-
-**ML Model Service:**
-
-```typescript
-// OLD: Secondary query required
-const assetIds = this.companyService.mlModelAssetIds();
-const assets = await client.query({ query: GET_ML_MODEL_ASSETS, variables: { ids: [...] } });
-const modelUrl = `/assets/${assets[0].source}`;
-
-// NEW: Direct access to Asset objects
-const mlModelAssets = this.companyService.mlModelAssets();
-const modelUrl = `/assets/${mlModelAssets.mlModelJsonAsset.source}`;
+readonly companyLogoAsset = computed(() => channelData?.customFields?.companyLogoAsset ?? null);
 ```
 
 #### 5. Proxy URL Handling
@@ -642,8 +578,8 @@ npm run codegen
 # Test channel data loading
 npm run test:e2e -- --spec="channel-assets.spec.ts"
 
-# Verify ML model loading
-npm run test:e2e -- --spec="ml-model.spec.ts"
+# Verify channel asset loading
+npm run test:e2e -- --spec="channel-assets.spec.ts"
 ```
 
 #### 3. Integration Testing
@@ -667,7 +603,7 @@ docker-compose logs backend | grep "ConvertChannelAssetFieldsToRelationships"
 # 3. Test API endpoints
 curl -X POST http://localhost:3000/admin-api \
   -H "Content-Type: application/json" \
-  -d '{"query": "{ activeChannel { customFields { mlModelJsonAsset { id source } } } }"}'
+  -d '{"query": "{ activeChannel { customFields { companyLogoAsset { id source } } } }"}'
 ```
 
 #### 2. Frontend Deployment
@@ -921,6 +857,6 @@ Asset Creation
 
 - **Customer Provisioning:** [CUSTOMER_PROVISIONING.md](./CUSTOMER_PROVISIONING.md) - Step-by-step customer setup process
 - **Infrastructure:** [INFRASTRUCTURE.md](./INFRASTRUCTURE.md) - Server setup and deployment
-- **ML Training:** [ML_TRAINING_SETUP.md](./ML_TRAINING_SETUP.md) - Machine learning model setup
+- **AI Recognition:** [ML_PRODUCT_RECOGNITION.md](./ML_PRODUCT_RECOGNITION.md) - On-device product recognition
 - **General:** [README.md](./README.md) - Project overview and getting started
 - **Vendure Documentation:** https://docs.vendure.io

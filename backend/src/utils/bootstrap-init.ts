@@ -7,7 +7,7 @@ import {
   waitForDatabase,
 } from './database-detection';
 
-const CRITICAL_CUSTOM_TABLES = ['ml_extraction_queue'];
+const CRITICAL_CUSTOM_TABLES: string[] = [];
 
 async function runSchemaBootstrap(config: VendureConfig, reason: string): Promise<void> {
   console.log(`📦 ${reason} - creating Vendure core tables via synchronize`);

@@ -26,7 +26,7 @@ src/app/
 ## Routing
 
 - **Public**: `/login`.
-- **Protected**: `''` with `authGuard` and `LayoutComponent`, children: `dashboard`, `channels`, `channels/:id`, `users`, `platform-data`, `login-attempts`, `role-templates`, `pending-registrations`, `subscription-tiers`, `ml-trainer`. All children are lazy-loaded.
+- **Protected**: `''` with `authGuard` and `LayoutComponent`, children: `dashboard`, `channels`, `channels/:id`, `users`, `platform-data`, `login-attempts`, `role-templates`, `pending-registrations`, `subscription-tiers`. All children are lazy-loaded.
 
 ## GraphQL and codegen
 
