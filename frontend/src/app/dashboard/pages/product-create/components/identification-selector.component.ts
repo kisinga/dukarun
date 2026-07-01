@@ -209,7 +209,6 @@ export type IdentificationMethodType = 'barcode' | 'label-photos';
 })
 export class IdentificationSelectorComponent {
   // View references
-  readonly photoManager = viewChild<PhotoManagerComponent>('photoManager');
   readonly barcodeScanner = viewChild<BarcodeScannerComponent>('barcodeScanner');
 
   // Inputs

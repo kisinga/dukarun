@@ -6,7 +6,6 @@ import {
   computed,
   inject,
   signal,
-  viewChild,
 } from '@angular/core';
 import {
   AbstractControl,
@@ -116,10 +115,6 @@ export class ProductCreateComponent implements OnInit {
    * Template should wait for this before rendering the form
    */
   readonly isReady = this.appInitService.isReady;
-
-  // View references (for photo upload in submit)
-  readonly identificationSelector =
-    viewChild<IdentificationSelectorComponent>('identificationSelector');
 
   // Edit mode
   readonly isEditMode = signal(false);
