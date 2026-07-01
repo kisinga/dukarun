@@ -8,6 +8,11 @@
     </div>
   }
 
+  <!-- Owner-first money summary (Overview only) -->
+  @if (headerStats().length > 0) {
+    <app-stat-bar [stats]="headerStats()" />
+  }
+
   @if (activeTab() === 'transactions') {
     <app-accounting-filters
       [filters]="filters()"

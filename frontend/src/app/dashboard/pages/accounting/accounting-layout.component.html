@@ -1,16 +1,4 @@
 <div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
-  <app-page-header
-    title="Accounting"
-    subtitle="Overview, activity, accounts and expenses"
-    [showRefresh]="canRefresh()"
-    [isLoading]="viewLoading()"
-    (refresh)="refreshView()"
-  >
-    @if (headerStats().length > 0) {
-      <app-stat-bar header-stats [stats]="headerStats()" />
-    }
-  </app-page-header>
-
   <div class="overflow-x-auto">
     <div role="tablist" class="tabs tabs-box bg-base-200 w-fit">
       @for (tab of tabs; track tab.activeKey) {
@@ -29,5 +17,5 @@
     </div>
   </div>
 
-  <router-outlet (activate)="onActivate($event)" (deactivate)="onDeactivate()" />
+  <router-outlet />
 </div>

@@ -2,7 +2,15 @@ import type { Reconciliation } from '../../../core/services/cashier-session/cash
 import type { JournalEntry, LedgerAccount } from '../../../core/services/ledger/ledger.service';
 import type { AccountNode } from './account-node.types';
 import type { AccountingFilters } from './components/accounting-filters.component';
-import type { AccountingStats } from './components/accounting-stats.component';
+
+/** Ledger totals for the active filter window (debits/credits, net, count). */
+export interface AccountingStats {
+  totalDebits: number;
+  totalCredits: number;
+  netBalance: number;
+  transactionCount: number;
+  dateRange: string;
+}
 
 /** Shared data and helpers passed from accounting root to tabs. Single source for common inputs. */
 export interface AccountingContext {

@@ -1,23 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon } from '@ng-icons/core';
-import { PageHeaderComponent } from '../../components/shared/page-header.component';
-import { StatBarComponent, type StatItem } from '../../components/shared/stat-bar.component';
 
 const LEDGER = ['/dashboard/accounting/ledger'];
-
-/**
- * A child view the section header can drive: exposes its reload + loading so the
- * one top-of-page refresh works for whichever tab is active. Children satisfy
- * this by simply having a public `loadData()` + `isLoading` signal — no wiring.
- */
-interface RefreshableView {
-  loadData?: () => void;
-  isLoading?: () => boolean;
-  headerStats?: () => StatItem[];
-}
 
 interface FinanceTab {
   label: string;
@@ -82,7 +69,7 @@ const TABS: FinanceTab[] = [
 @Component({
   selector: 'app-accounting-layout',
   standalone: true,
-  imports: [RouterLink, RouterOutlet, NgIcon, PageHeaderComponent, StatBarComponent],
+  imports: [RouterLink, RouterOutlet, NgIcon],
   templateUrl: './accounting-layout.component.html',
   styleUrl: './accounting-layout.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -90,26 +77,6 @@ const TABS: FinanceTab[] = [
 export class AccountingLayoutComponent {
   private readonly router = inject(Router);
   protected readonly tabs = TABS;
-
-  /**
-   * The currently-routed child, captured from the router-outlet. Its `loadData`
-   * drives the single header refresh; `isLoading` its spin state. Read reactively
-   * in the computeds below so the button tracks the active tab's own signals.
-   */
-  private readonly activeView = signal<RefreshableView | null>(null);
-  protected readonly canRefresh = computed(() => typeof this.activeView()?.loadData === 'function');
-  protected readonly viewLoading = computed(() => this.activeView()?.isLoading?.() ?? false);
-  protected readonly headerStats = computed(() => this.activeView()?.headerStats?.() ?? []);
-
-  protected onActivate(view: unknown): void {
-    this.activeView.set(view as RefreshableView);
-  }
-  protected onDeactivate(): void {
-    this.activeView.set(null);
-  }
-  protected refreshView(): void {
-    this.activeView()?.loadData?.();
-  }
 
   private readonly currentUrl = toSignal(
     this.router.events.pipe(

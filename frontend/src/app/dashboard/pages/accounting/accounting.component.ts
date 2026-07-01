@@ -42,7 +42,7 @@ import {
   AccountingFilters,
   AccountingFiltersComponent,
 } from './components/accounting-filters.component';
-import type { StatItem } from '../../components/shared/stat-bar.component';
+import { StatBarComponent, type StatItem } from '../../components/shared/stat-bar.component';
 import type { TabType } from './components/accounting-tabs.component';
 import { AccountsTabComponent } from './components/accounts-tab.component';
 import { OverviewTabComponent } from './components/overview-tab.component';
@@ -55,6 +55,7 @@ import { TransactionsTabComponent } from './components/transactions-tab.componen
   imports: [
     CommonModule,
     NgIcon,
+    StatBarComponent,
     TransactionDetailModalComponent,
     AccountingFiltersComponent,
     OverviewTabComponent,
