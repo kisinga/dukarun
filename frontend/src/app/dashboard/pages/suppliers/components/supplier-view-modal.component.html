@@ -11,184 +11,176 @@
       <h3 class="text-lg font-bold text-base-content">Supplier Details</h3>
       <form method="dialog">
         <button class="btn btn-sm btn-circle btn-ghost" type="submit" aria-label="Close">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            ></path>
-          </svg>
+          <ng-icon name="heroXMark" size="1.25rem" />
         </button>
       </form>
     </div>
 
     <!-- Scrollable Content -->
-    <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-      <!-- Basic Information -->
-      <div
-        class="collapse collapse-arrow bg-base-200 border border-base-300"
-        [class.collapse-open]="isExpanded('basic')"
-      >
-        <input type="checkbox" [checked]="isExpanded('basic')" (change)="toggleSection('basic')" />
-        <div class="collapse-title text-base font-semibold px-4 py-3">📋 Basic Information</div>
-        <div class="collapse-content px-4 pb-4 space-y-3">
-          <div class="flex items-center gap-3 pb-3">
-            <div class="avatar placeholder">
-              <div class="bg-primary text-primary-content rounded-full w-14">
-                <span class="text-lg font-semibold">{{ getInitials() }}</span>
-              </div>
-            </div>
-            <div class="flex-1">
-              <h4 class="text-lg font-bold text-base-content">{{ getFullName() }}</h4>
-              @if (isVerified()) {
-                <div class="badge badge-success badge-sm gap-1 mt-1">
-                  <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fill-rule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clip-rule="evenodd"
-                    ></path>
-                  </svg>
-                  Verified
-                </div>
-              }
-            </div>
+    <div class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <!-- Identity -->
+      <div class="rounded-box border border-base-300 bg-base-100 p-4">
+        <div class="flex items-center gap-3">
+          <app-entity-avatar
+            [firstName]="supplier().firstName"
+            [lastName]="supplier().lastName"
+            size="lg"
+          />
+          <div class="min-w-0 flex-1">
+            <h4 class="text-lg font-bold text-base-content truncate">{{ getFullName() }}</h4>
+            @if (isVerified()) {
+              <app-status-badge type="success" label="Verified" [showIcon]="true" size="sm" />
+            }
           </div>
+        </div>
 
-          <div class="divider my-2"></div>
-
-          <div class="space-y-2">
-            @if (supplier().emailAddress) {
-              <div class="flex items-start gap-2">
-                <span class="text-sm font-medium text-base-content/70 min-w-[80px]">Email:</span>
-                <span class="text-sm text-base-content flex-1">{{ supplier().emailAddress }}</span>
-              </div>
-            }
-            @if (supplier().phoneNumber) {
-              <div class="flex items-start gap-2">
-                <span class="text-sm font-medium text-base-content/70 min-w-[80px]">Phone:</span>
-                <span class="text-sm text-base-content flex-1">{{ supplier().phoneNumber }}</span>
-              </div>
-            }
-            <div class="flex items-start gap-2">
-              <span class="text-sm font-medium text-base-content/70 min-w-[80px]">Created:</span>
-              <span class="text-sm text-base-content flex-1">{{
-                formatDate(supplier().createdAt)
-              }}</span>
+        <div class="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          @if (supplier().emailAddress) {
+            <div class="flex items-center gap-2 text-sm text-base-content/80">
+              <ng-icon name="heroEnvelope" class="text-base-content/50 shrink-0" />
+              <span class="truncate">{{ supplier().emailAddress }}</span>
             </div>
+          }
+          @if (supplier().phoneNumber) {
+            <div class="flex items-center gap-2 text-sm text-base-content/80">
+              <ng-icon name="heroPhone" class="text-base-content/50 shrink-0" />
+              <span class="truncate">{{ supplier().phoneNumber }}</span>
+            </div>
+          }
+          <div class="flex items-center gap-2 text-sm text-base-content/60">
+            <ng-icon name="heroCalendar" class="text-base-content/50 shrink-0" />
+            <span>Added {{ formatDate(supplier().createdAt) }}</span>
           </div>
         </div>
       </div>
 
-      <!-- Supplier Details -->
+      <!-- Payables & Credit (primary — visible without expanding) -->
+      @if (showCreditSection()) {
+        <app-detail-section title="Payables & Credit" icon="heroWallet">
+          <!-- Hero balance -->
+          <div class="flex items-end justify-between gap-3">
+            <div class="min-w-0">
+              <div
+                class="text-2xl font-bold leading-tight"
+                [class.text-warning]="getOutstandingAmount() < 0"
+                [class.text-error]="getOutstandingAmount() > 0"
+              >
+                {{ formatCurrency(getOutstandingAmountAbs()) }}
+              </div>
+              <div class="text-xs text-base-content/60">
+                {{ getOutstandingAmount() < 0 ? 'Owed' : 'Credit' }}
+              </div>
+            </div>
+            @if (isSupplierCreditApproved()) {
+              <app-status-badge type="success" label="Approved" [showIcon]="true" size="sm" />
+            } @else if (isSupplierCreditFrozen()) {
+              <app-status-badge type="neutral" label="Frozen" size="sm" />
+            } @else {
+              <app-status-badge type="warning" label="Not approved" size="sm" />
+            }
+          </div>
+
+          <!-- Compact KPI grid -->
+          @if (creditStats().length) {
+            <div
+              class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 border-t border-base-300 pt-3"
+            >
+              @for (stat of creditStats(); track stat.label) {
+                <div>
+                  <div class="text-xs text-base-content/55">{{ stat.label }}</div>
+                  <div
+                    class="text-sm font-semibold"
+                    [class]="stat.valueClass ?? 'text-base-content'"
+                  >
+                    {{ stat.value }}
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </app-detail-section>
+      }
+
+      <!-- Supplier details -->
       @if (
         getSupplierCode() !== 'N/A' ||
         getSupplierType() !== 'General' ||
         getContactPerson() ||
-        getPaymentTerms()
+        (getPaymentTerms() && !showCreditSection())
       ) {
-        <div
-          class="collapse collapse-arrow bg-base-200 border border-base-300"
-          [class.collapse-open]="isExpanded('details')"
-        >
-          <input
-            type="checkbox"
-            [checked]="isExpanded('details')"
-            (change)="toggleSection('details')"
-          />
-          <div class="collapse-title text-base font-semibold px-4 py-3">🏭 Supplier Details</div>
-          <div class="collapse-content px-4 pb-4 space-y-3">
-            <div class="grid grid-cols-2 gap-3">
-              @if (getSupplierCode() !== 'N/A') {
-                <div class="stat bg-base-100 rounded-lg p-3">
-                  <div class="stat-title text-xs">Supplier Code</div>
-                  <div class="stat-value text-sm text-primary">{{ getSupplierCode() }}</div>
-                </div>
-              }
-
-              @if (getSupplierType() !== 'General') {
-                <div class="stat bg-base-100 rounded-lg p-3">
-                  <div class="stat-title text-xs">Supplier Type</div>
-                  <div class="stat-value text-sm text-base-content">{{ getSupplierType() }}</div>
-                </div>
-              }
-            </div>
-
-            <div class="divider my-2"></div>
-
-            <div class="space-y-2">
-              @if (getContactPerson()) {
-                <div class="flex items-start gap-2">
-                  <span class="text-sm font-medium text-base-content/70 min-w-[100px]"
-                    >Contact Person:</span
-                  >
-                  <span class="text-sm text-base-content flex-1">{{ getContactPerson() }}</span>
-                </div>
-              }
-              @if (getPaymentTerms()) {
-                <div class="flex items-start gap-2">
-                  <span class="text-sm font-medium text-base-content/70 min-w-[100px]"
-                    >Payment Terms:</span
-                  >
-                  <span class="text-sm text-base-content flex-1">{{ getPaymentTerms() }}</span>
-                </div>
-              }
-            </div>
-          </div>
-        </div>
-      }
-
-      <!-- Addresses -->
-      @if (getAddresses().length > 0) {
-        <div
-          class="collapse collapse-arrow bg-base-200 border border-base-300"
-          [class.collapse-open]="isExpanded('addresses')"
-        >
-          <input
-            type="checkbox"
-            [checked]="isExpanded('addresses')"
-            (change)="toggleSection('addresses')"
-          />
-          <div class="collapse-title text-base font-semibold px-4 py-3">
-            📍 Addresses ({{ getAddresses().length }})
-          </div>
-          <div class="collapse-content px-4 pb-4 space-y-3">
-            @for (address of getAddresses(); track address.id) {
-              <div class="card bg-base-100 border border-base-300">
-                <div class="card-body p-3">
-                  @if (address.fullName) {
-                    <div class="font-semibold text-sm mb-2">{{ address.fullName }}</div>
-                  }
-                  <div class="text-sm text-base-content/80">{{ formatAddress(address) }}</div>
-                  @if (address.phoneNumber) {
-                    <div class="text-xs text-base-content/60 mt-1">
-                      Phone: {{ address.phoneNumber }}
-                    </div>
-                  }
-                </div>
+        <app-detail-section title="Details" icon="heroTag">
+          <div class="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+            @if (getSupplierCode() !== 'N/A') {
+              <div>
+                <div class="text-xs text-base-content/55">Code</div>
+                <div class="text-sm font-semibold text-primary">{{ getSupplierCode() }}</div>
+              </div>
+            }
+            @if (getSupplierType() !== 'General') {
+              <div>
+                <div class="text-xs text-base-content/55">Type</div>
+                <div class="text-sm font-semibold text-base-content">{{ getSupplierType() }}</div>
+              </div>
+            }
+            @if (getContactPerson()) {
+              <div>
+                <div class="text-xs text-base-content/55">Contact</div>
+                <div class="text-sm font-semibold text-base-content">{{ getContactPerson() }}</div>
+              </div>
+            }
+            @if (getPaymentTerms() && !showCreditSection()) {
+              <div>
+                <div class="text-xs text-base-content/55">Terms</div>
+                <div class="text-sm font-semibold text-base-content">{{ getPaymentTerms() }}</div>
               </div>
             }
           </div>
-        </div>
+        </app-detail-section>
+      }
+
+      <!-- Addresses (tertiary — collapsed by default) -->
+      @if (getAddresses().length > 0) {
+        <details class="group rounded-box border border-base-300 bg-base-100">
+          <summary
+            class="flex items-center gap-2 px-4 py-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+          >
+            <ng-icon name="heroMapPin" class="text-base-content/60 shrink-0" />
+            <span class="text-sm font-semibold text-base-content flex-1"
+              >Addresses ({{ getAddresses().length }})</span
+            >
+            <ng-icon
+              name="heroChevronDown"
+              class="text-base-content/40 -rotate-90 group-open:rotate-0 transition-transform"
+            />
+          </summary>
+          <div class="px-4 pb-4 divide-y divide-base-300">
+            @for (address of getAddresses(); track address.id) {
+              <div class="py-2.5 first:pt-0 last:pb-0">
+                @if (address.fullName) {
+                  <div class="font-semibold text-sm mb-0.5">{{ address.fullName }}</div>
+                }
+                <div class="text-sm text-base-content/80">{{ formatAddress(address) }}</div>
+                @if (address.phoneNumber) {
+                  <div class="mt-1 flex items-center gap-2 text-xs text-base-content/60">
+                    <ng-icon
+                      name="heroPhone"
+                      size="0.875rem"
+                      class="text-base-content/50 shrink-0"
+                    />
+                    <span class="truncate">{{ address.phoneNumber }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </details>
       }
 
       <!-- Notes -->
       @if (getNotes()) {
-        <div
-          class="collapse collapse-arrow bg-base-200 border border-base-300"
-          [class.collapse-open]="isExpanded('notes')"
-        >
-          <input
-            type="checkbox"
-            [checked]="isExpanded('notes')"
-            (change)="toggleSection('notes')"
-          />
-          <div class="collapse-title text-base font-semibold px-4 py-3">📝 Notes</div>
-          <div class="collapse-content px-4 pb-4">
-            <div class="text-sm text-base-content whitespace-pre-wrap">{{ getNotes() }}</div>
-          </div>
-        </div>
+        <app-detail-section title="Notes" icon="heroDocumentText">
+          <div class="text-sm text-base-content whitespace-pre-wrap">{{ getNotes() }}</div>
+        </app-detail-section>
       }
     </div>
 
@@ -197,49 +189,21 @@
       class="sticky bottom-0 bg-base-100 border-t border-base-300 px-4 py-3 flex flex-col sm:flex-row gap-2 flex-wrap"
     >
       <button class="btn btn-primary flex-1 min-w-[120px]" (click)="onViewPurchases()">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-          ></path>
-        </svg>
+        <ng-icon name="heroShoppingBag" />
         View Purchases
       </button>
       @if (isSupplierCreditApproved()) {
         <button class="btn btn-secondary flex-1 min-w-[120px]" (click)="onRecordPayment()">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-            ></path>
-          </svg>
+          <ng-icon name="heroBanknotes" />
           Record Payment
         </button>
       }
       <button class="btn btn-outline flex-1 min-w-[120px]" (click)="onEdit()">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-          ></path>
-        </svg>
+        <ng-icon name="heroPencilSquare" />
         Edit
       </button>
       <button class="btn btn-error btn-outline flex-1 min-w-[120px]" (click)="onDelete()">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-          ></path>
-        </svg>
+        <ng-icon name="heroTrash" />
         Delete
       </button>
     </div>

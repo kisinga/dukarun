@@ -1,16 +1,22 @@
-import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   ElementRef,
   inject,
   input,
   output,
-  signal,
   viewChild,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import { toDisplayDate } from '../../../../core/utils/date.util';
+import {
+  DetailSectionComponent,
+  type DetailStat,
+} from '../../../components/shared/detail-section.component';
+import { EntityAvatarComponent } from '../../../components/shared/entity-avatar.component';
+import { StatusBadgeComponent } from '../../../components/shared/status-badge.component';
 
 /**
  * Customer View Modal Component
@@ -20,7 +26,7 @@ import { toDisplayDate } from '../../../../core/utils/date.util';
 @Component({
   selector: 'app-customer-view-modal',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgIcon, DetailSectionComponent, EntityAvatarComponent, StatusBadgeComponent],
   templateUrl: './customer-view-modal.component.html',
   styleUrl: './customer-view-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -41,36 +47,10 @@ export class CustomerViewModalComponent {
   // Modal reference
   readonly modalRef = viewChild<ElementRef<HTMLDialogElement>>('modal');
 
-  // UI state
-  readonly expandedSections = signal<Set<string>>(new Set(['basic']));
-
-  /**
-   * Toggle section expansion
-   */
-  toggleSection(section: string): void {
-    const expanded = new Set(this.expandedSections());
-    if (expanded.has(section)) {
-      expanded.delete(section);
-    } else {
-      expanded.add(section);
-    }
-    this.expandedSections.set(expanded);
-  }
-
-  /**
-   * Check if section is expanded
-   */
-  isExpanded(section: string): boolean {
-    return this.expandedSections().has(section);
-  }
-
   /**
    * Show the modal
    */
   show(): void {
-    // Reset expanded sections
-    this.expandedSections.set(new Set(['basic']));
-
     const modal = this.modalRef()?.nativeElement;
     modal?.showModal();
   }
@@ -99,16 +79,6 @@ export class CustomerViewModalComponent {
   getFullName(): string {
     const c = this.customer();
     return `${c.firstName || ''} ${c.lastName || ''}`.trim();
-  }
-
-  /**
-   * Get initials
-   */
-  getInitials(): string {
-    const c = this.customer();
-    const first = c.firstName?.charAt(0) || '';
-    const last = c.lastName?.charAt(0) || '';
-    return (first + last).toUpperCase();
   }
 
   /**
@@ -189,6 +159,28 @@ export class CustomerViewModalComponent {
       this.isCreditFrozen()
     );
   }
+
+  /** KPI rows under the balance hero — built once so the template just iterates. */
+  readonly creditStats = computed<DetailStat[]>(() => {
+    const stats: DetailStat[] = [];
+    const limit = this.getCreditLimit();
+    if (limit > 0) {
+      stats.push({ label: 'Limit', value: this.formatCurrency(limit) });
+      if (this.isCreditApproved()) {
+        const available = this.getAvailableCredit();
+        stats.push({
+          label: 'Available',
+          value: this.formatCurrency(available),
+          valueClass: available > 0 ? 'text-success' : 'text-error',
+        });
+      }
+    }
+    const duration = this.getCreditDuration();
+    if (duration > 0) {
+      stats.push({ label: 'Terms', value: `${duration} days` });
+    }
+    return stats;
+  });
 
   /**
    * Get addresses

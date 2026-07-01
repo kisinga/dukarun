@@ -1,92 +1,122 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 
-export type StatCardColor =
-  | 'primary'
-  | 'secondary'
-  | 'accent'
-  | 'neutral'
-  | 'info'
-  | 'success'
-  | 'warning'
-  | 'error';
+/**
+ * Semantic tone for a stat. `neutral` = no colour (the default) — per the design
+ * spec, colour is reserved for meaning, so a plain count stays `base-content`.
+ * A tone is applied only when the value itself carries meaning (overdue → error,
+ * paid → success, needs-attention → warning …).
+ */
+export type StatTone = 'neutral' | 'primary' | 'success' | 'warning' | 'error' | 'info';
 
-const CARD_CLASSES: Record<StatCardColor, string> = {
-  primary: 'bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20',
-  secondary: 'bg-gradient-to-br from-secondary/10 to-secondary/5 border-secondary/20',
-  accent: 'bg-gradient-to-br from-accent/10 to-accent/5 border-accent/20',
-  neutral: 'bg-gradient-to-br from-neutral/10 to-neutral/5 border-neutral/20',
-  info: 'bg-gradient-to-br from-info/10 to-info/5 border-info/20',
-  success: 'bg-gradient-to-br from-success/10 to-success/5 border-success/20',
-  warning: 'bg-gradient-to-br from-warning/10 to-warning/5 border-warning/20',
-  error: 'bg-gradient-to-br from-error/10 to-error/5 border-error/20',
-};
-
-const ICON_CONTAINER_CLASSES: Record<StatCardColor, string> = {
-  primary: 'bg-primary/10',
-  secondary: 'bg-secondary/10',
-  accent: 'bg-accent/10',
-  neutral: 'bg-neutral/10',
-  info: 'bg-info/10',
-  success: 'bg-success/10',
-  warning: 'bg-warning/10',
-  error: 'bg-error/10',
-};
-
-const VALUE_CLASSES: Record<StatCardColor, string> = {
+// Static class maps — Tailwind v4 purges interpolated class strings, so every
+// class must appear here as a complete literal.
+const VALUE_CLASS: Record<StatTone, string> = {
+  neutral: 'text-base-content',
   primary: 'text-primary',
-  secondary: 'text-secondary',
-  accent: 'text-accent',
-  neutral: 'text-neutral',
-  info: 'text-info',
   success: 'text-success',
   warning: 'text-warning',
   error: 'text-error',
+  info: 'text-info',
 };
 
+const ICON_TINT: Record<StatTone, string> = {
+  neutral: 'bg-base-200 text-base-content/70',
+  primary: 'bg-primary/10 text-primary',
+  success: 'bg-success/10 text-success',
+  warning: 'bg-warning/10 text-warning',
+  error: 'bg-error/10 text-error',
+  info: 'bg-info/10 text-info',
+};
+
+const RING_CLASS: Record<StatTone, string> = {
+  neutral: 'ring-2 ring-base-content/30',
+  primary: 'ring-2 ring-primary',
+  success: 'ring-2 ring-success',
+  warning: 'ring-2 ring-warning',
+  error: 'ring-2 ring-error',
+  info: 'ring-2 ring-info',
+};
+
+const SURFACE = 'rounded-box border border-base-300/60 bg-base-100 shadow-sm p-3 sm:p-4';
+
 /**
- * Compact gradient stat card component
+ * Dashboard KPI card — one card recipe, clear hierarchy.
  *
- * A beautiful, space-efficient stat card with gradient background.
- * Used across all dashboard pages for consistent visual language.
+ * Hierarchy (per spec §1/§2): the value is the hero (≤24px, bold, tight,
+ * tabular); the label is small + muted; the icon is a subtle signifier. Colour
+ * is applied to the value only when `tone` is meaningful.
+ *
+ * When `interactive` it renders as a button with hover + active-ring signifiers
+ * (spec §5 "every action needs a response") and emits `select`.
  */
 @Component({
   selector: 'app-stat-card',
+  standalone: true,
+  imports: [NgIcon, NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block min-w-0' },
   template: `
-    <div class="card border transition-all duration-200 hover:shadow-md" [class]="getCardClasses()">
-      <div class="card-body p-3 lg:p-4">
-        <div class="flex items-center gap-3">
-          <div
+    @if (interactive()) {
+      <button type="button" [class]="containerClass()" (click)="select.emit()">
+        <ng-container [ngTemplateOutlet]="body" />
+      </button>
+    } @else {
+      <div [class]="containerClass()">
+        <ng-container [ngTemplateOutlet]="body" />
+      </div>
+    }
+
+    <ng-template #body>
+      <div class="flex items-center gap-3">
+        @if (icon(); as ic) {
+          <span
             class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-            [class]="getIconContainerClasses()"
+            [class]="iconTintClass()"
           >
-            <ng-content select="[icon]"></ng-content>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-xs text-base-content/60 truncate">{{ label() }}</p>
-            <p class="text-xl lg:text-2xl font-bold tracking-tight" [class]="getValueClasses()">
-              {{ value() }}
-            </p>
-          </div>
+            <ng-icon [name]="ic" size="1.25rem" />
+          </span>
+        }
+        <div class="min-w-0 flex-1">
+          <p class="text-xs text-base-content/60 truncate">{{ label() }}</p>
+          <p
+            class="text-2xl font-bold tracking-tight leading-tight tabular-nums truncate"
+            [class]="valueClass()"
+          >
+            {{ value() }}
+          </p>
+          @if (hint(); as h) {
+            <p class="text-xs text-base-content/50 truncate">{{ h }}</p>
+          }
         </div>
       </div>
-    </div>
+    </ng-template>
   `,
 })
 export class StatCardComponent {
   readonly label = input.required<string>();
   readonly value = input.required<string | number>();
-  readonly color = input<StatCardColor>('primary');
+  /** Semantic tone; `neutral` (default) leaves the value uncoloured. */
+  readonly tone = input<StatTone>('neutral');
+  /** Optional ng-icon name (must be in APP_ICONS), e.g. 'heroUsers'. */
+  readonly icon = input<string>();
+  /** Optional supporting line under the value (e.g. "3 overdue"). */
+  readonly hint = input<string>();
+  /** Render as a filter button with hover + active-ring signifiers. */
+  readonly interactive = input<boolean>(false);
+  readonly active = input<boolean>(false);
+  readonly select = output<void>();
 
-  getCardClasses(): string {
-    return CARD_CLASSES[this.color()];
-  }
+  readonly valueClass = computed(() => VALUE_CLASS[this.tone()]);
+  readonly iconTintClass = computed(() => ICON_TINT[this.tone()]);
 
-  getIconContainerClasses(): string {
-    return ICON_CONTAINER_CLASSES[this.color()];
-  }
-
-  getValueClasses(): string {
-    return VALUE_CLASSES[this.color()];
-  }
+  readonly containerClass = computed(() => {
+    const base = SURFACE;
+    if (!this.interactive()) return base;
+    const interactive =
+      'w-full text-left hover:shadow-md active:scale-[0.98] transition-all touch-manipulation cursor-pointer';
+    const ring = this.active() ? RING_CLASS[this.tone()] : '';
+    return `${base} ${interactive} ${ring}`.trim();
+  });
 }

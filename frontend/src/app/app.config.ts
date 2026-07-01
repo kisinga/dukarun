@@ -9,8 +9,10 @@ import {
 import { provideRouter, withPreloading, PreloadAllModules } from '@angular/router';
 import { provideServiceWorker } from '@angular/service-worker';
 import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
+import { provideIcons, provideNgIconsConfig } from '@ng-icons/core';
 
 import { routes } from './app.routes';
+import { APP_ICONS } from './core/icons/app-icons';
 import { NetworkService } from './core/services/network.service';
 import { TracingService } from './core/services/tracing.service';
 
@@ -36,6 +38,10 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
     provideHttpClient(),
+    // Register the app's icon set once; default size 1rem (16px) matches the
+    // dense UI, overridable per-icon via <ng-icon size="…">.
+    provideNgIconsConfig({ size: '1rem' }),
+    provideIcons(APP_ICONS),
     // Hydrate the prerendered public pages instead of re-rendering; withEventReplay
     // buffers clicks that land during hydration so nothing is lost.
     provideClientHydration(withEventReplay()),
