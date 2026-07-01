@@ -2,7 +2,7 @@
 # Dukarun Application Services
 # =====================================
 #
-# This file contains only application services (backend, frontend, super-admin, ml-trainer).
+# This file contains only application services (backend, frontend, super-admin).
 # Infrastructure services (databases, cache, observability) are in docker-compose.services.yml
 # Images are built by Coolify (or locally) from Dockerfiles; no registry pull.
 #
@@ -92,12 +92,6 @@ services:
       # Logging
       LOG_LEVEL: ${LOG_LEVEL}
 
-      # ML Training configuration (URLs use Docker service names; override in .env only if needed)
-      ML_TRAINER_URL: http://ml-trainer:3005
-      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN}
-      ML_TRAINING_INTERVAL_MINUTES: ${ML_TRAINING_INTERVAL_MINUTES}
-      ML_TRAINING_COOLDOWN_HOURS: ${ML_TRAINING_COOLDOWN_HOURS}
-
     volumes:
       - backend_assets:/usr/src/app/static/assets
       - backend_uploads:/usr/src/app/static/uploads
@@ -176,39 +170,6 @@ services:
         - curl
         - -f
         - http://localhost:4201/health
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # ========================================
-  # ML Trainer (Teachable Machine runner, port 3005)
-  # Backend calls this service at ML_TRAINER_URL (default http://ml-trainer:3005)
-  # ========================================
-  ml-trainer:
-    build:
-      context: .
-      dockerfile: ./ml-trainer/Dockerfile
-    platform: linux/amd64
-    restart: unless-stopped
-    networks:
-      - dukarun_services_network
-    environment:
-      NODE_ENV: ${NODE_ENV}
-      ML_PORT: ${ML_PORT}
-      # Backend URL uses Docker service name so ml-trainer can reach backend on the same network
-      BACKEND_INTERNAL_URL: http://backend:3000
-      ML_SERVICE_TOKEN: ${ML_SERVICE_TOKEN}
-    ports:
-      - '127.0.0.1:3005:3005'
-    healthcheck:
-      test:
-        - CMD
-        - wget
-        - --no-verbose
-        - --tries=1
-        - --spider
-        - http://localhost:3005/health
       interval: 30s
       timeout: 10s
       retries: 3

@@ -317,14 +317,6 @@ A log of who did what and when. You can filter by action type, user, or date. Ex
 
 Check your subscription status, trial period, or upgrade your plan. If your subscription expires, you can still log in and **view** your data, but you won't be able to create or change anything until you renew.
 
-### ML Model (AI recognition)
-
-**Path:** `/dashboard/admin/ml-model`
-
-If you use the camera feature on the Sell page, this shows the status of your AI model — whether it's training, ready, or needs attention. The model is trained specifically for your store's products.
-
----
-
 ## Stock adjustments
 
 **Where:** Tap **Stock Adjustments** in the sidebar (`/dashboard/stock-adjustments`). Requires the **Manage Stock Adjustments** permission.
@@ -402,7 +394,6 @@ Update your personal details — name, phone number, or email.
 | Admin — Shifts | `/dashboard/admin/shifts` | View shift history |
 | Admin — Audit Trail | `/dashboard/admin/audit-trail` | See who did what and when |
 | Admin — Subscription | `/dashboard/admin/subscription` | Check or upgrade your plan |
-| Admin — ML Model | `/dashboard/admin/ml-model` | AI recognition model status |
 | Settings — Notifications | `/dashboard/settings/notifications` | Configure alerts |
 | Profile | `/dashboard/profile` | Update your personal details |
 | Sign Up | `/signup` | Create a new account |

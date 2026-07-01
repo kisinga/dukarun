@@ -8,7 +8,8 @@
 
 - **[System Architecture](../ARCHITECTURE.md)** - Technical design and stack decisions
 - **[Infrastructure & Deployment](../INFRASTRUCTURE.md)** - Local dev and production setup
-- **[MLTraining Setup](../ML_TRAINING_SETUP.md)** - AI product recognition setup
+- **ML training setup** - obsolete Teachable-Machine notes removed; see
+  [ML product recognition](../docs/ML_PRODUCT_RECOGNITION.md) for the active architecture.
 - **[Development Roadmap](../ROADMAP.md)** - Planned features and timeline
 - **[Vendure Setup](../VENDURE_SETUP.md)** - Vendure setup, limitations and workarounds
 

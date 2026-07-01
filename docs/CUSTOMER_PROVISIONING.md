@@ -16,7 +16,7 @@ This guide provides a step-by-step process for provisioning new customers in the
 
 - **Technical system setup** - See [VENDURE.md](./VENDURE.md)
 - **Infrastructure deployment** - See [INFRASTRUCTURE.md](./INFRASTRUCTURE.md)
-- **ML model training** - See [ML_TRAINING_SETUP.md](./ML_TRAINING_SETUP.md)
+- **AI product recognition** - See [ML_PRODUCT_RECOGNITION.md](./ML_PRODUCT_RECOGNITION.md)
 
 ## Table of Contents
 
@@ -461,7 +461,7 @@ Consider implementing:
 
 - **Technical Setup:** [VENDURE.md](./VENDURE.md) - Backend configuration and technical details
 - **Infrastructure:** [INFRASTRUCTURE.md](./INFRASTRUCTURE.md) - Server setup and deployment
-- **ML Training:** [ML_TRAINING_SETUP.md](./ML_TRAINING_SETUP.md) - Machine learning model setup
+- **AI Recognition:** [ML_PRODUCT_RECOGNITION.md](./ML_PRODUCT_RECOGNITION.md) - On-device product recognition
 - **General:** [README.md](./README.md) - Project overview and getting started
 
 ---

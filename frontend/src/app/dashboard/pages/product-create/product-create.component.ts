@@ -31,6 +31,7 @@ import { CompanyService } from '../../../core/services/company.service';
 import { FacetService } from '../../../core/services/product/facet.service';
 import { normalizeBarcodeForApi } from '../../../core/services/product/barcode.util';
 import { ProductService } from '../../../core/services/product.service';
+import { EnrollmentService } from '../../../core/services/ml-model/enrollment.service';
 import { ProductValidationService } from '../../../core/services/product/product-validation.service';
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { HowSoldSelectorComponent } from './components/how-sold-selector.component';
@@ -108,6 +109,7 @@ export class ProductCreateComponent implements OnInit {
   private readonly validationService = inject(ProductValidationService);
   private readonly facetService = inject(FacetService);
   readonly companyService = inject(CompanyService);
+  private readonly enrollmentService = inject(EnrollmentService);
 
   /**
    * Whether dashboard initialization is complete (locations loaded)
@@ -1093,6 +1095,9 @@ export class ProductCreateComponent implements OnInit {
           this.submitError.set(error || 'Failed to update product');
           return;
         }
+        // Re-enroll from any newly captured photos (no backfill: existing products gain
+        // recognition only when re-saved with photos). Fire-and-forget.
+        this.enrollFromPhotos(productId);
         this.submitSuccess.set(true);
         setTimeout(() => {
           this.router.navigate(['/dashboard/products'], { queryParams: { refresh: '1' } });
@@ -1106,6 +1111,10 @@ export class ProductCreateComponent implements OnInit {
 
         if (productId) {
           console.log('Transaction Phase 1 COMPLETE: Product & Variants created');
+
+          // Enroll recognition fingerprints from the captured photos (fire-and-forget; may load
+          // the model on first use, so it must not block save/navigation).
+          this.enrollFromPhotos(productId);
 
           // Upload photos if any were added (Phase 2 - non-blocking)
           const identificationSelector = this.identificationSelector();
@@ -1169,6 +1178,24 @@ export class ProductCreateComponent implements OnInit {
    */
   submitForm(): void {
     this.onSubmit();
+  }
+
+  /**
+   * Fire-and-forget recognition enrollment from the photos currently in the photo manager.
+   * Embedding can download the model on first use, so this must never block save or navigation.
+   * Uses the captured photo Files directly (independent of the Vendure asset upload).
+   */
+  private enrollFromPhotos(productId: string): void {
+    const photos = this.identificationSelector()?.photoManager()?.getPhotos() ?? [];
+    if (!photos.length) return;
+    void this.enrollmentService
+      .enrollProduct(productId, photos)
+      .then((result) =>
+        console.log(`[Enrollment] stored ${result.enrolled} fingerprint(s) for ${productId}`),
+      )
+      .catch((err) =>
+        console.warn('[Enrollment] failed (product saved; photos can be added later):', err),
+      );
   }
 
   /**

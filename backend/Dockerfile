@@ -14,14 +14,13 @@ COPY package.json package-lock.json ./
 # Workspace package.json files must exist before npm ci so workspaces are resolved
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
-COPY ml-trainer/package.json ml-trainer/
 
 ENV NODE_ENV=development
 
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --quiet --no-audit --no-fund --include=dev --workspace=@dukarun/backend
 
-# Only backend source; frontend/ml-trainer excluded via dockerignore.backend
+# Only backend source; frontend excluded via dockerignore.backend
 COPY backend ./backend
 
 RUN npm run build -w @dukarun/backend

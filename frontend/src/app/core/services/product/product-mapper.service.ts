@@ -23,12 +23,33 @@ export class ProductMapperService {
       id: graphqlProduct.id,
       name: graphqlProduct.name,
       enabled: graphqlProduct.enabled,
+      barcode: graphqlProduct?.customFields?.barcode ?? undefined,
       featuredAsset: extractAssetPreview(graphqlProduct.featuredAsset),
       variants: (graphqlProduct.variants || []).map((v: any) =>
         this.toProductVariant(v, graphqlProduct),
       ),
       facetValues: facetValues.length > 0 ? facetValues : undefined,
+      mlFingerprint: this.parseFingerprint(graphqlProduct?.customFields?.mlEmbedding),
+      mlEmbeddingVersion: graphqlProduct?.customFields?.mlEmbeddingVersion ?? undefined,
     };
+  }
+
+  /**
+   * Parse the `mlEmbedding` custom field (a JSON string) into per-image embeddings, once, here at
+   * the mapper boundary. Any malformed/empty value yields undefined (treated as "not enrolled");
+   * it never throws into the product pipeline.
+   */
+  private parseFingerprint(raw: unknown): number[][] | undefined {
+    if (typeof raw !== 'string' || raw.length === 0) return undefined;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed.every((v) => Array.isArray(v))) {
+        return parsed as number[][];
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /**

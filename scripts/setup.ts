@@ -67,7 +67,7 @@ Examples:
 }
 
 const ROOT_DIR = path.resolve(__dirname, '..');
-const WORKSPACES = ['backend', 'frontend', 'ml-trainer'];
+const WORKSPACES = ['backend', 'frontend'];
 const NETWORK_NAME = 'dukarun_services_network';
 
 interface CheckResult {

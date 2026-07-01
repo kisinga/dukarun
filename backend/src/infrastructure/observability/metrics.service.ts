@@ -76,7 +76,6 @@ export class MetricsService {
       'method',
     ]);
     this.createCounter('ledger_postings_total', 'Total ledger postings', ['type', 'channel_id']);
-    this.createCounter('ml_extractions_total', 'Total ML extractions', ['channel_id', 'status']);
 
     // Performance metrics
     this.createHistogram('request_duration_seconds', 'Request duration in seconds', [
@@ -181,18 +180,6 @@ export class MetricsService {
     const counter = this.counters.get('ledger_postings_total');
     if (counter) {
       counter.add(1, { type, channel_id: channelId });
-    }
-  }
-
-  /**
-   * Record an ML extraction
-   */
-  recordMlExtraction(channelId: string, status: 'success' | 'failed'): void {
-    if (!env.observability.enabled) return;
-
-    const counter = this.counters.get('ml_extractions_total');
-    if (counter) {
-      counter.add(1, { channel_id: channelId, status });
     }
   }
 

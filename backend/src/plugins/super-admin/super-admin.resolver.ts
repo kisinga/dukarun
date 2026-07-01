@@ -16,8 +16,6 @@ import {
   Zone,
   ZoneService,
 } from '@vendure/core';
-import axios from 'axios';
-import { env } from '../../infrastructure/config/environment.config';
 import { getChannelStatus } from '../../domain/channel-custom-fields';
 import { ChannelAdminService } from '../../services/channels/channel-admin.service';
 import { AdminLoginAttemptService } from '../../infrastructure/audit/admin-login-attempt.service';
@@ -195,31 +193,6 @@ export class SuperAdminResolver {
     const services: { name: string; status: string; error?: string }[] = [
       { name: 'backend', status: 'ok' },
     ];
-
-    const trainerUrl = env.ml?.trainerUrl;
-    if (trainerUrl) {
-      try {
-        const { data } = await axios.get<{ status?: string }>(`${trainerUrl}/health`, {
-          timeout: 5000,
-        });
-        services.push({
-          name: 'ml-trainer',
-          status: data?.status === 'ok' ? 'ok' : 'unavailable',
-        });
-      } catch (err: unknown) {
-        const message =
-          err && typeof err === 'object' && 'message' in err
-            ? String((err as { message?: string }).message)
-            : 'Health check failed';
-        services.push({ name: 'ml-trainer', status: 'unavailable', error: message });
-      }
-    } else {
-      services.push({
-        name: 'ml-trainer',
-        status: 'unavailable',
-        error: 'ML_TRAINER_URL not configured',
-      });
-    }
 
     return {
       processMemory: { heapUsedMB, heapTotalMB, rssMB },

@@ -122,7 +122,7 @@ docker compose up -d
 
 ### Docker workspace builds
 
-Backend, frontend, and ml-trainer images are built **from the repository root** using the root `package-lock.json`. This keeps installs deterministic and avoids lockfile sync issues in CI. See **[DOCKER_WORKSPACE_BUILDS.md](./DOCKER_WORKSPACE_BUILDS.md)** for the pattern, why we use it, and what to do when changing dependencies.
+Backend, frontend, and super-admin images are built **from the repository root** using the root `package-lock.json`. This keeps installs deterministic and avoids lockfile sync issues in CI. See **[DOCKER_WORKSPACE_BUILDS.md](./DOCKER_WORKSPACE_BUILDS.md)** for the pattern, why we use it, and what to do when changing dependencies.
 
 **For Coolify Deployments:** Follow the same network setup steps above. Create the network via SSH or Coolify terminal before deploying services. If using Coolify's "Connect to Predefined Network" feature, change the network name from `dukarun_services_network` to `coolify` in both compose files.
 
@@ -401,7 +401,7 @@ The issue has been fixed by implementing **automatic database detection and init
 3. **Migration Application:**
 
    - Custom fields are added to existing tables
-   - ML training fields are added to Channel
+   - Channel custom fields are added or pruned by migrations
    - Customer/Supplier fields are added to Customer
    - Only pending migrations are executed (idempotent)
 
@@ -739,60 +739,16 @@ All services communicate via Docker service names on the shared `dukarun_service
 
 **Note:** Apps send telemetry to `signoz-otel-collector`, not `signoz`. The `signoz` service is the UI/API.
 
-### New Components
+### Product Recognition
 
-#### 1. ML Model Plugin (`backend/src/plugins/ml-model.plugin.ts`)
+The old ML model plugin and `ml-trainer` service have been removed. Product recognition now runs
+in the frontend using on-device embeddings stored on product custom fields:
 
-- **Custom Fields**: Adds `mlModelJson`, `mlModelBin`, `mlMetadata`, `mlModelVersion`, `mlModelStatus` to Channel entity
-- **GraphQL API**: Provides queries and mutations for model management
-- **File Serving**: Serves ML model files through authenticated API endpoints
-- **Admin UI**: Angular component for model upload/management in admin panel
+- `mlEmbedding`
+- `mlEmbeddingVersion`
 
-#### 2. Updated Frontend Service (`frontend/src/app/core/services/ml-model.service.ts`)
-
-- **API Integration**: Uses GraphQL queries instead of direct file fetching
-- **Model Loading**: Loads models from `/admin-api/ml-models/{channelId}/` endpoints
-- **Error Handling**: Improved error handling for API failures
-- **Caching**: Maintains IndexedDB caching for offline operation
-
-### Admin UI Integration
-
-#### Custom Fields in Channel Settings
-
-The ML model custom fields appear in the Channel detail page in the Admin UI:
-
-- **ML Model JSON File**: Dropdown to select uploaded model.json asset
-- **ML Model Binary Files**: Dropdown to select uploaded binary files
-- **ML Model Metadata**: Dropdown to select uploaded metadata.json asset
-- **ML Model Version**: Text field for version tracking
-- **ML Model Status**: Text field for status (active/inactive)
-
-#### Upload Workflow
-
-1. Go to **Assets** section in Admin UI
-2. Upload ML model files (model.json, metadata.json, binary files)
-3. Tag files appropriately (e.g., "ml-model", "model-json", "metadata")
-4. Go to **Settings → Channels**
-5. Select the appropriate channel
-6. Use the custom fields dropdowns to associate uploaded files with the channel
-
-### API Endpoints
-
-#### GraphQL Queries
-
-```graphql
-query GetMlModelInfo($channelId: ID!) {
-  mlModelInfo(channelId: $channelId) {
-    hasModel
-    version
-    status
-    trainedAt
-    productCount
-    imageCount
-    labels
-  }
-}
-```
+The dashboard product prefetch caches those fields with the catalog so the POS scanner can match
+camera frames without a channel-level model asset or backend training job.
 
 #### GraphQL Mutations
 

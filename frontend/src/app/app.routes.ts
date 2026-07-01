@@ -369,14 +369,6 @@ export const routes: Routes = [
               ),
           },
           {
-            path: 'ml-model',
-            canActivate: [settingsGuard],
-            loadComponent: () =>
-              import('./dashboard/pages/settings/components/ml-model-status/ml-model-status.component').then(
-                (m) => m.MlModelStatusComponent,
-              ),
-          },
-          {
             path: 'payment-methods',
             canActivate: [settingsGuard],
             loadComponent: () =>

@@ -9,6 +9,7 @@ import { ProductMapperService } from './product-mapper.service';
 import { SalesSyncGuardService } from '../sales-sync-guard.service';
 import type { ProductListOptions } from '../../graphql/generated/graphql';
 import { ProductSearchResult, ProductVariant } from './product-search.service';
+import { normalizeBarcodeForApi } from './barcode.util';
 
 const PRODUCTS_CACHE_KEY = 'products_list';
 const PRODUCTS_TTL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -76,6 +77,7 @@ export class ProductCacheService implements CacheSyncEntityHandler {
   // In-memory cache for instant access
   private productsById = new Map<string, ProductSearchResult>();
   private productsByName = new Map<string, ProductSearchResult[]>();
+  private productsByBarcode = new Map<string, ProductSearchResult>();
 
   readonly status = this.statusSignal.asReadonly();
 
@@ -118,13 +120,49 @@ export class ProductCacheService implements CacheSyncEntityHandler {
   private hydrateFromPayload(payload: ProductCachePayload): void {
     this.productsById.clear();
     this.productsByName.clear();
+    this.productsByBarcode.clear();
     for (const product of payload.products) {
-      this.productsById.set(product.id, product);
-      const normalizedName = product.name.toLowerCase();
-      const existing = this.productsByName.get(normalizedName) || [];
-      existing.push(product);
-      this.productsByName.set(normalizedName, existing);
+      this.indexProduct(product);
     }
+  }
+
+  /**
+   * Upsert a product into all in-memory indexes (id, name, barcode). The previous entry for the
+   * same id is removed from the secondary indexes first, so a renamed or re-barcoded product can't
+   * leave a stale entry behind.
+   */
+  private indexProduct(product: ProductSearchResult): void {
+    const prev = this.productsById.get(product.id);
+    if (prev) this.removeFromSecondaryIndexes(prev);
+    this.productsById.set(product.id, product);
+
+    const nameKey = product.name.toLowerCase();
+    const sameName = (this.productsByName.get(nameKey) ?? []).filter((p) => p.id !== product.id);
+    this.productsByName.set(nameKey, [...sameName, product]);
+
+    const barcode = normalizeBarcodeForApi(product.barcode);
+    if (barcode) this.productsByBarcode.set(barcode, product);
+  }
+
+  /** Remove a product from the name + barcode indexes (leaves productsById untouched). */
+  private removeFromSecondaryIndexes(product: ProductSearchResult): void {
+    const nameKey = product.name.toLowerCase();
+    const list = this.productsByName.get(nameKey);
+    if (list) {
+      const next = list.filter((p) => p.id !== product.id);
+      if (next.length) this.productsByName.set(nameKey, next);
+      else this.productsByName.delete(nameKey);
+    }
+    const barcode = normalizeBarcodeForApi(product.barcode);
+    if (barcode && this.productsByBarcode.get(barcode)?.id === product.id) {
+      this.productsByBarcode.delete(barcode);
+    }
+  }
+
+  /** Remove a product from all in-memory indexes. */
+  private unindexProduct(product: ProductSearchResult): void {
+    this.productsById.delete(product.id);
+    this.removeFromSecondaryIndexes(product);
   }
 
   private async prefetchFromNetwork(channelId: string): Promise<boolean> {
@@ -207,15 +245,52 @@ export class ProductCacheService implements CacheSyncEntityHandler {
    */
   hydrateProduct(product: ProductSearchResult): void {
     if (!product?.id) return;
-    this.productsById.set(product.id, product);
-    const normalizedName = product.name.toLowerCase();
-    const existing = this.productsByName.get(normalizedName) ?? [];
-    const without = existing.filter((p) => p.id !== product.id);
-    this.productsByName.set(normalizedName, [...without, product]);
+    this.indexProduct(product);
     this.statusSignal.update((s) => ({
       ...s,
       productCount: this.productsById.size,
     }));
+  }
+
+  /** Get a product from cache by its product-level barcode (offline barcode scanning). */
+  getProductByBarcode(barcode: string): ProductSearchResult | null {
+    const normalized = normalizeBarcodeForApi(barcode);
+    if (!normalized) return null;
+    return this.productsByBarcode.get(normalized) ?? null;
+  }
+
+  /**
+   * Targeted same-session update of a product's recognition fingerprint, WITHOUT touching its
+   * other fields (variants, prices, …). Used right after enrollment so the product is scannable
+   * immediately. No-op if the product isn't cached yet — the next prefetch loads it (with its
+   * fingerprint) from the backend.
+   */
+  setProductFingerprint(productId: string, fingerprint: number[][], embedderVersion: string): void {
+    const existing = this.productsById.get(productId);
+    if (!existing) return;
+    this.indexProduct({
+      ...existing,
+      mlFingerprint: fingerprint,
+      mlEmbeddingVersion: embedderVersion,
+    });
+  }
+
+  /**
+   * Enrolled image-recognition candidates from the cache: productId → per-image fingerprints.
+   * Excludes disabled products and any whose fingerprint was made with a different embedder
+   * version (those are skipped per-product, never matched in a mismatched embedding space).
+   */
+  getRecognitionCandidates(embedderVersion: string): Map<string, number[][]> {
+    const candidates = new Map<string, number[][]>();
+    for (const product of this.productsById.values()) {
+      if (product.enabled === false) continue;
+      if (product.mlEmbeddingVersion !== embedderVersion) continue;
+      const fingerprint = product.mlFingerprint;
+      if (Array.isArray(fingerprint) && fingerprint.length > 0) {
+        candidates.set(product.id, fingerprint);
+      }
+    }
+    return candidates;
   }
 
   /**
@@ -387,11 +462,7 @@ export class ProductCacheService implements CacheSyncEntityHandler {
       const raw = result.data?.product;
       if (!raw) return;
       const product = this.mapper.toProductSearchResult(raw);
-      this.productsById.set(product.id, product);
-      const normalizedName = product.name.toLowerCase();
-      const existing = this.productsByName.get(normalizedName) ?? [];
-      const without = existing.filter((p) => p.id !== product.id);
-      this.productsByName.set(normalizedName, [...without, product]);
+      this.indexProduct(product);
       this.statusSignal.update((s) => ({
         ...s,
         productCount: this.productsById.size,
@@ -415,14 +486,7 @@ export class ProductCacheService implements CacheSyncEntityHandler {
   invalidateOne(channelId: string, productId: string): void {
     const product = this.productsById.get(productId);
     if (!product) return;
-    this.productsById.delete(productId);
-    const normalizedName = product.name.toLowerCase();
-    const list = this.productsByName.get(normalizedName);
-    if (list) {
-      const next = list.filter((p) => p.id !== productId);
-      if (next.length) this.productsByName.set(normalizedName, next);
-      else this.productsByName.delete(normalizedName);
-    }
+    this.unindexProduct(product);
     this.statusSignal.update((s) => ({
       ...s,
       productCount: this.productsById.size,
@@ -452,6 +516,7 @@ export class ProductCacheService implements CacheSyncEntityHandler {
     console.log('[ProductCache] clearCache', { channelId });
     this.productsById.clear();
     this.productsByName.clear();
+    this.productsByBarcode.clear();
     if (channelId) {
       const scope = `channel:${channelId}` as const;
       this.appCache.removeKV(scope, PRODUCTS_CACHE_KEY);

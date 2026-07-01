@@ -20,6 +20,42 @@ export const productCustomFields: CustomFields['Product'] = [
     public: true,
     nullable: true,
   },
+  {
+    // On-device image-recognition fingerprint(s) for this product.
+    // JSON-encoded array of per-image embeddings (number[][], each 512-dim, fp32, L2-normalized),
+    // produced on the client by the MobileCLIP-S0 embedder at enrollment time. The client reads
+    // these to do offline nearest-match recognition; the backend never computes or interprets them.
+    name: 'mlEmbedding',
+    type: 'text',
+    label: [{ languageCode: LanguageCode.en, value: 'ML Recognition Fingerprint' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value:
+          'JSON array of on-device image-recognition embeddings (set by the app; do not edit).',
+      },
+    ],
+    public: true,
+    nullable: true,
+    ui: { readonly: true },
+  },
+  {
+    // The embedder version the fingerprints above were produced with (e.g. mobileclip-s0-fp32-v1).
+    // The client ignores fingerprints whose version != its current embedder, so a model change
+    // can never produce confident-wrong matches across embedding spaces.
+    name: 'mlEmbeddingVersion',
+    type: 'string',
+    label: [{ languageCode: LanguageCode.en, value: 'ML Fingerprint Version' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value: 'Embedder version the recognition fingerprint was produced with (set by the app).',
+      },
+    ],
+    public: true,
+    nullable: true,
+    ui: { readonly: true },
+  },
 ];
 
 export const orderCustomFields: CustomFields['Order'] = [

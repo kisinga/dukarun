@@ -786,17 +786,6 @@ export type ChannelCustomFields = {
   lastPaymentAmount?: Maybe<Scalars['Int']['output']>;
   lastPaymentDate?: Maybe<Scalars['DateTime']['output']>;
   maxAdminCount?: Maybe<Scalars['Int']['output']>;
-  mlImageCount?: Maybe<Scalars['Int']['output']>;
-  mlLastTrainedAt?: Maybe<Scalars['DateTime']['output']>;
-  mlMetadataAsset?: Maybe<Asset>;
-  mlModelBinAsset?: Maybe<Asset>;
-  mlModelJsonAsset?: Maybe<Asset>;
-  mlProductCount?: Maybe<Scalars['Int']['output']>;
-  mlTrainingError?: Maybe<Scalars['String']['output']>;
-  mlTrainingProgress?: Maybe<Scalars['Int']['output']>;
-  mlTrainingQueuedAt?: Maybe<Scalars['DateTime']['output']>;
-  mlTrainingStartedAt?: Maybe<Scalars['DateTime']['output']>;
-  mlTrainingStatus?: Maybe<Scalars['String']['output']>;
   paystackCustomerCode?: Maybe<Scalars['String']['output']>;
   paystackSubscriptionCode?: Maybe<Scalars['String']['output']>;
   requireOpeningCount?: Maybe<Scalars['Boolean']['output']>;
@@ -843,14 +832,6 @@ export type ChannelFilterParameter = {
   lastPaymentAmount?: InputMaybe<NumberOperators>;
   lastPaymentDate?: InputMaybe<DateOperators>;
   maxAdminCount?: InputMaybe<NumberOperators>;
-  mlImageCount?: InputMaybe<NumberOperators>;
-  mlLastTrainedAt?: InputMaybe<DateOperators>;
-  mlProductCount?: InputMaybe<NumberOperators>;
-  mlTrainingError?: InputMaybe<StringOperators>;
-  mlTrainingProgress?: InputMaybe<NumberOperators>;
-  mlTrainingQueuedAt?: InputMaybe<DateOperators>;
-  mlTrainingStartedAt?: InputMaybe<DateOperators>;
-  mlTrainingStatus?: InputMaybe<StringOperators>;
   outOfStockThreshold?: InputMaybe<NumberOperators>;
   paystackCustomerCode?: InputMaybe<StringOperators>;
   paystackSubscriptionCode?: InputMaybe<StringOperators>;
@@ -911,17 +892,6 @@ export type ChannelSortParameter = {
   lastPaymentAmount?: InputMaybe<SortOrder>;
   lastPaymentDate?: InputMaybe<SortOrder>;
   maxAdminCount?: InputMaybe<SortOrder>;
-  mlImageCount?: InputMaybe<SortOrder>;
-  mlLastTrainedAt?: InputMaybe<SortOrder>;
-  mlMetadataAsset?: InputMaybe<SortOrder>;
-  mlModelBinAsset?: InputMaybe<SortOrder>;
-  mlModelJsonAsset?: InputMaybe<SortOrder>;
-  mlProductCount?: InputMaybe<SortOrder>;
-  mlTrainingError?: InputMaybe<SortOrder>;
-  mlTrainingProgress?: InputMaybe<SortOrder>;
-  mlTrainingQueuedAt?: InputMaybe<SortOrder>;
-  mlTrainingStartedAt?: InputMaybe<SortOrder>;
-  mlTrainingStatus?: InputMaybe<SortOrder>;
   outOfStockThreshold?: InputMaybe<SortOrder>;
   paystackCustomerCode?: InputMaybe<SortOrder>;
   paystackSubscriptionCode?: InputMaybe<SortOrder>;
@@ -1332,17 +1302,6 @@ export type CreateChannelCustomFieldsInput = {
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
   maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
-  mlImageCount?: InputMaybe<Scalars['Int']['input']>;
-  mlLastTrainedAt?: InputMaybe<Scalars['DateTime']['input']>;
-  mlMetadataAssetId?: InputMaybe<Scalars['ID']['input']>;
-  mlModelBinAssetId?: InputMaybe<Scalars['ID']['input']>;
-  mlModelJsonAssetId?: InputMaybe<Scalars['ID']['input']>;
-  mlProductCount?: InputMaybe<Scalars['Int']['input']>;
-  mlTrainingError?: InputMaybe<Scalars['String']['input']>;
-  mlTrainingProgress?: InputMaybe<Scalars['Int']['input']>;
-  mlTrainingQueuedAt?: InputMaybe<Scalars['DateTime']['input']>;
-  mlTrainingStartedAt?: InputMaybe<Scalars['DateTime']['input']>;
-  mlTrainingStatus?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
@@ -1522,6 +1481,8 @@ export type CreatePaymentMethodInput = {
 
 export type CreateProductCustomFieldsInput = {
   barcode?: InputMaybe<Scalars['String']['input']>;
+  mlEmbedding?: InputMaybe<Scalars['String']['input']>;
+  mlEmbeddingVersion?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type CreateProductInput = {
@@ -2902,13 +2863,6 @@ export type IdOperators = {
   notIn?: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
-export type ImageManifestEntry = {
-  __typename?: 'ImageManifestEntry';
-  assetId: Scalars['String']['output'];
-  filename: Scalars['String']['output'];
-  url: Scalars['String']['output'];
-};
-
 export type ImportInfo = {
   __typename?: 'ImportInfo';
   errors?: Maybe<Array<Scalars['String']['output']>>;
@@ -3680,74 +3634,6 @@ export type MissingConditionsError = ErrorResult & {
   message: Scalars['String']['output'];
 };
 
-export type MlModelInfo = {
-  __typename?: 'MlModelInfo';
-  hasModel: Scalars['Boolean']['output'];
-  metadataId?: Maybe<Scalars['String']['output']>;
-  modelBinId?: Maybe<Scalars['String']['output']>;
-  modelJsonId?: Maybe<Scalars['String']['output']>;
-  status?: Maybe<Scalars['String']['output']>;
-  version?: Maybe<Scalars['String']['output']>;
-};
-
-export type MlSchedulerConfig = {
-  __typename?: 'MlSchedulerConfig';
-  cooldownHours: Scalars['Int']['output'];
-  intervalMinutes: Scalars['Int']['output'];
-};
-
-export type MlTrainerHealth = {
-  __typename?: 'MlTrainerHealth';
-  error?: Maybe<Scalars['String']['output']>;
-  status: Scalars['String']['output'];
-  uptimeSeconds?: Maybe<Scalars['Float']['output']>;
-};
-
-export type MlTrainerJob = {
-  __typename?: 'MlTrainerJob';
-  channelId: Scalars['String']['output'];
-  completedAt?: Maybe<Scalars['DateTime']['output']>;
-  error?: Maybe<Scalars['String']['output']>;
-  failedAt?: Maybe<Scalars['DateTime']['output']>;
-  startedAt?: Maybe<Scalars['DateTime']['output']>;
-  status: Scalars['String']['output'];
-};
-
-export type MlTrainingDataSummary = {
-  __typename?: 'MlTrainingDataSummary';
-  extractedAt?: Maybe<Scalars['DateTime']['output']>;
-  imageCount: Scalars['Int']['output'];
-  productCount: Scalars['Int']['output'];
-  products: Array<MlTrainingDataSummaryProduct>;
-};
-
-export type MlTrainingDataSummaryProduct = {
-  __typename?: 'MlTrainingDataSummaryProduct';
-  imageCount: Scalars['Int']['output'];
-  productName: Scalars['String']['output'];
-};
-
-export type MlTrainingInfo = {
-  __typename?: 'MlTrainingInfo';
-  error?: Maybe<Scalars['String']['output']>;
-  hasActiveModel: Scalars['Boolean']['output'];
-  imageCount: Scalars['Int']['output'];
-  lastTrainedAt?: Maybe<Scalars['DateTime']['output']>;
-  productCount: Scalars['Int']['output'];
-  progress: Scalars['Int']['output'];
-  queuedAt?: Maybe<Scalars['DateTime']['output']>;
-  startedAt?: Maybe<Scalars['DateTime']['output']>;
-  status: Scalars['String']['output'];
-};
-
-export type MlTrainingManifest = {
-  __typename?: 'MlTrainingManifest';
-  channelId: Scalars['String']['output'];
-  extractedAt: Scalars['DateTime']['output'];
-  products: Array<ProductManifestEntry>;
-  version: Scalars['String']['output'];
-};
-
 export type ModifyOrderInput = {
   addItems?: InputMaybe<Array<AddItemInput>>;
   adjustOrderLines?: InputMaybe<Array<OrderLineInput>>;
@@ -3876,12 +3762,8 @@ export type Mutation = {
   cancelPayment: CancelPaymentResult;
   /** Cancel subscription auto-renewal */
   cancelSubscription: Scalars['Boolean']['output'];
-  /** Clear all ML model files for a channel */
-  clearMlModel: Scalars['Boolean']['output'];
   closeAccountingPeriod: PeriodEndCloseResult;
   closeCashierSession: CashierSessionSummary;
-  /** Complete training and upload model files (multipart) */
-  completeTraining: Scalars['Boolean']['output'];
   confirmPurchase: StockPurchase;
   /** Create a new Administrator */
   createAdministrator: Administrator;
@@ -4061,15 +3943,11 @@ export type Mutation = {
   duplicateEntity: DuplicateEntityResult;
   explainVariance: CashDrawerCount;
   extendTrialPlatform: Channel;
-  /** Manually trigger photo extraction */
-  extractPhotosForTraining: Scalars['Boolean']['output'];
   flushBufferedJobs: Success;
   importProducts?: Maybe<ImportInfo>;
   /** Initiate subscription purchase */
   initiateSubscriptionPurchase: InitiatePurchaseResult;
   inviteChannelAdministrator: Administrator;
-  /** Link existing Asset IDs to channel (simpler than file upload) */
-  linkMlModelAssets: Scalars['Boolean']['output'];
   /**
    * Authenticates the user using the native authentication strategy. This mutation is an alias for authenticate({ native: { ... }})
    *
@@ -4092,16 +3970,12 @@ export type Mutation = {
   overrideCustomerBalance: BalanceOverrideResult;
   paySingleOrder: PaymentAllocationResult;
   paySinglePurchase: SupplierPaymentAllocationResult;
-  /** Queue a channel for training on the next scheduler run. */
-  queueTraining: Scalars['Boolean']['output'];
   recordCashCount: CashCountResult;
   recordExpense: RecordExpenseResult;
   recordPayment: PaymentAllocationResult;
   recordPurchase: StockPurchase;
   recordStockAdjustment: InventoryStockAdjustment;
   refreshAnalytics: Scalars['Boolean']['output'];
-  /** Refresh product/image counts from current catalog. Per-channel cooldown applies. */
-  refreshTrainingCounts: Scalars['Boolean']['output'];
   refundOrder: RefundOrderResult;
   reindex: Job;
   rejectUser: UserAuthorizationResult;
@@ -4166,8 +4040,6 @@ export type Mutation = {
   setDraftOrderShippingAddress: Order;
   /** Sets the shipping method by id, which can be obtained with the `eligibleShippingMethodsForDraftOrder` query */
   setDraftOrderShippingMethod: SetOrderShippingMethodResult;
-  /** Set ML model status (active/inactive/training) */
-  setMlModelStatus: Scalars['Boolean']['output'];
   setOrderCustomFields?: Maybe<Order>;
   /** Allows a different Customer to be assigned to an Order. Added in v2.2.0. */
   setOrderCustomer?: Maybe<Order>;
@@ -4178,11 +4050,6 @@ export type Mutation = {
   setSettingsStoreValues: Array<SetSettingsStoreValueResult>;
   settlePayment: SettlePaymentResult;
   settleRefund: SettleRefundResult;
-  /**
-   * Start in-process model training for a channel.
-   * Requires 'ready' status (photos extracted) or will trigger extraction.
-   */
-  startTraining: Scalars['Boolean']['output'];
   subscribeToPush: Scalars['Boolean']['output'];
   transitionFulfillmentToState: TransitionFulfillmentToStateResult;
   transitionOrderToState?: Maybe<TransitionOrderToStateResult>;
@@ -4274,12 +4141,8 @@ export type Mutation = {
   updateTaxCategory: TaxCategory;
   /** Update an existing TaxRate */
   updateTaxRate: TaxRate;
-  /** Update training status (for external training services) */
-  updateTrainingStatus: Scalars['Boolean']['output'];
   /** Update an existing Zone */
   updateZone: Zone;
-  /** Upload model files manually (model.json, weights.bin, metadata.json). Admin auth. */
-  uploadModelManually: Scalars['Boolean']['output'];
   verifyEmailRegistrationOTP: RegistrationResult;
   verifyLoginOTP: LoginResult;
   verifyMpesaTransactions: MpesaVerification;
@@ -4422,10 +4285,6 @@ export type MutationCancelSubscriptionArgs = {
   channelId: Scalars['ID']['input'];
 };
 
-export type MutationClearMlModelArgs = {
-  channelId: Scalars['ID']['input'];
-};
-
 export type MutationCloseAccountingPeriodArgs = {
   channelId: Scalars['Int']['input'];
   periodEndDate: Scalars['DateTime']['input'];
@@ -4433,13 +4292,6 @@ export type MutationCloseAccountingPeriodArgs = {
 
 export type MutationCloseCashierSessionArgs = {
   input: CloseCashierSessionInput;
-};
-
-export type MutationCompleteTrainingArgs = {
-  channelId: Scalars['ID']['input'];
-  metadata: Scalars['Upload']['input'];
-  modelJson: Scalars['Upload']['input'];
-  weightsFile: Scalars['Upload']['input'];
 };
 
 export type MutationConfirmPurchaseArgs = {
@@ -4831,10 +4683,6 @@ export type MutationExtendTrialPlatformArgs = {
   trialEndsAt: Scalars['DateTime']['input'];
 };
 
-export type MutationExtractPhotosForTrainingArgs = {
-  channelId: Scalars['ID']['input'];
-};
-
 export type MutationFlushBufferedJobsArgs = {
   bufferIds?: InputMaybe<Array<Scalars['String']['input']>>;
 };
@@ -4854,13 +4702,6 @@ export type MutationInitiateSubscriptionPurchaseArgs = {
 
 export type MutationInviteChannelAdministratorArgs = {
   input: InviteAdministratorInput;
-};
-
-export type MutationLinkMlModelAssetsArgs = {
-  channelId: Scalars['ID']['input'];
-  metadataId: Scalars['ID']['input'];
-  modelBinId: Scalars['ID']['input'];
-  modelJsonId: Scalars['ID']['input'];
 };
 
 export type MutationLoginArgs = {
@@ -4902,10 +4743,6 @@ export type MutationPaySinglePurchaseArgs = {
   input: PaySinglePurchaseInput;
 };
 
-export type MutationQueueTrainingArgs = {
-  channelId: Scalars['ID']['input'];
-};
-
 export type MutationRecordCashCountArgs = {
   input: RecordCashCountInput;
 };
@@ -4924,10 +4761,6 @@ export type MutationRecordPurchaseArgs = {
 
 export type MutationRecordStockAdjustmentArgs = {
   input: RecordStockAdjustmentInput;
-};
-
-export type MutationRefreshTrainingCountsArgs = {
-  channelId: Scalars['ID']['input'];
 };
 
 export type MutationRefundOrderArgs = {
@@ -5079,11 +4912,6 @@ export type MutationSetDraftOrderShippingMethodArgs = {
   shippingMethodId: Scalars['ID']['input'];
 };
 
-export type MutationSetMlModelStatusArgs = {
-  channelId: Scalars['ID']['input'];
-  status: Scalars['String']['input'];
-};
-
 export type MutationSetOrderCustomFieldsArgs = {
   input: UpdateOrderInput;
 };
@@ -5110,10 +4938,6 @@ export type MutationSettlePaymentArgs = {
 
 export type MutationSettleRefundArgs = {
   input: SettleRefundInput;
-};
-
-export type MutationStartTrainingArgs = {
-  channelId: Scalars['ID']['input'];
 };
 
 export type MutationSubscribeToPushArgs = {
@@ -5367,22 +5191,8 @@ export type MutationUpdateTaxRateArgs = {
   input: UpdateTaxRateInput;
 };
 
-export type MutationUpdateTrainingStatusArgs = {
-  channelId: Scalars['ID']['input'];
-  error?: InputMaybe<Scalars['String']['input']>;
-  progress?: InputMaybe<Scalars['Int']['input']>;
-  status: Scalars['String']['input'];
-};
-
 export type MutationUpdateZoneArgs = {
   input: UpdateZoneInput;
-};
-
-export type MutationUploadModelManuallyArgs = {
-  channelId: Scalars['ID']['input'];
-  metadata: Scalars['Upload']['input'];
-  modelJson: Scalars['Upload']['input'];
-  weightsFile: Scalars['Upload']['input'];
 };
 
 export type MutationVerifyEmailRegistrationOtpArgs = {
@@ -6626,6 +6436,8 @@ export type ProductVariantListArgs = {
 export type ProductCustomFields = {
   __typename?: 'ProductCustomFields';
   barcode?: Maybe<Scalars['String']['output']>;
+  mlEmbedding?: Maybe<Scalars['String']['output']>;
+  mlEmbeddingVersion?: Maybe<Scalars['String']['output']>;
 };
 
 export type ProductFilterParameter = {
@@ -6638,6 +6450,8 @@ export type ProductFilterParameter = {
   facetValueId?: InputMaybe<IdOperators>;
   id?: InputMaybe<IdOperators>;
   languageCode?: InputMaybe<StringOperators>;
+  mlEmbedding?: InputMaybe<StringOperators>;
+  mlEmbeddingVersion?: InputMaybe<StringOperators>;
   name?: InputMaybe<StringOperators>;
   optionGroupId?: InputMaybe<IdOperators>;
   sku?: InputMaybe<StringOperators>;
@@ -6662,13 +6476,6 @@ export type ProductListOptions = {
   sort?: InputMaybe<ProductSortParameter>;
   /** Takes n results, for use in pagination */
   take?: InputMaybe<Scalars['Int']['input']>;
-};
-
-export type ProductManifestEntry = {
-  __typename?: 'ProductManifestEntry';
-  images: Array<ImageManifestEntry>;
-  productId: Scalars['String']['output'];
-  productName: Scalars['String']['output'];
 };
 
 export type ProductOption = Node & {
@@ -6849,6 +6656,8 @@ export type ProductSortParameter = {
   createdAt?: InputMaybe<SortOrder>;
   description?: InputMaybe<SortOrder>;
   id?: InputMaybe<SortOrder>;
+  mlEmbedding?: InputMaybe<SortOrder>;
+  mlEmbeddingVersion?: InputMaybe<SortOrder>;
   name?: InputMaybe<SortOrder>;
   slug?: InputMaybe<SortOrder>;
   updatedAt?: InputMaybe<SortOrder>;
@@ -7284,20 +7093,6 @@ export type Query = {
   me?: Maybe<CurrentUser>;
   /** Get metrics for the given interval and metric types. */
   metricSummary: Array<MetricSummary>;
-  /** Get ML model info for a specific channel */
-  mlModelInfo: MlModelInfo;
-  /** Scheduler config (interval and cooldown from env). Read-only. */
-  mlSchedulerConfig: MlSchedulerConfig;
-  /** ML trainer service health (proxied from ml-trainer). Never throws; returns status ok or unavailable. */
-  mlTrainerHealth: MlTrainerHealth;
-  /** Active/recent jobs on the ML trainer service (proxied from ml-trainer). */
-  mlTrainerJobs: Array<MlTrainerJob>;
-  /** Training data summary for a channel (admin-visible; no URLs). Composed from manifest. */
-  mlTrainingDataSummary: MlTrainingDataSummary;
-  /** Get detailed training info including status and stats */
-  mlTrainingInfo: MlTrainingInfo;
-  /** Get photo manifest for training (JSON with URLs) */
-  mlTrainingManifest: MlTrainingManifest;
   notificationsForChannel: NotificationList;
   /** Open batches for a variant (and optional location) for batch selection when recording a sale. */
   openBatchesForVariant: Array<OpenBatchForVariant>;
@@ -7380,8 +7175,6 @@ export type Query = {
   taxRates: TaxRateList;
   testEligibleShippingMethods: Array<ShippingMethodQuote>;
   testShippingMethod: TestShippingMethodResult;
-  /** Export training manifest as JSON (read-only; no channel update). For manual training or client-side zip. */
-  trainingManifestExport: TrainingManifestExportResult;
   unpaidOrdersForCustomer: Array<Order>;
   unpaidPurchasesForSupplier: Array<StockPurchase>;
   validateCredit: CreditValidationResult;
@@ -7651,22 +7444,6 @@ export type QueryMetricSummaryArgs = {
   input?: InputMaybe<MetricSummaryInput>;
 };
 
-export type QueryMlModelInfoArgs = {
-  channelId: Scalars['ID']['input'];
-};
-
-export type QueryMlTrainingDataSummaryArgs = {
-  channelId: Scalars['ID']['input'];
-};
-
-export type QueryMlTrainingInfoArgs = {
-  channelId: Scalars['ID']['input'];
-};
-
-export type QueryMlTrainingManifestArgs = {
-  channelId: Scalars['ID']['input'];
-};
-
 export type QueryNotificationsForChannelArgs = {
   channelId: Scalars['ID']['input'];
   options?: InputMaybe<NotificationListOptions>;
@@ -7898,10 +7675,6 @@ export type QueryTestEligibleShippingMethodsArgs = {
 
 export type QueryTestShippingMethodArgs = {
   input: TestShippingMethodInput;
-};
-
-export type QueryTrainingManifestExportArgs = {
-  channelId: Scalars['ID']['input'];
 };
 
 export type QueryUnpaidOrdersForCustomerArgs = {
@@ -9340,11 +9113,6 @@ export type TimeSeriesPoint = {
   value: Scalars['Float']['output'];
 };
 
-export type TrainingManifestExportResult = {
-  __typename?: 'TrainingManifestExportResult';
-  manifestJson: Scalars['String']['output'];
-};
-
 export type TransitionFulfillmentToStateResult = Fulfillment | FulfillmentStateTransitionError;
 
 export type TransitionOrderToStateResult = Order | OrderStateTransitionError;
@@ -9441,17 +9209,6 @@ export type UpdateChannelCustomFieldsInput = {
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
   maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
-  mlImageCount?: InputMaybe<Scalars['Int']['input']>;
-  mlLastTrainedAt?: InputMaybe<Scalars['DateTime']['input']>;
-  mlMetadataAssetId?: InputMaybe<Scalars['ID']['input']>;
-  mlModelBinAssetId?: InputMaybe<Scalars['ID']['input']>;
-  mlModelJsonAssetId?: InputMaybe<Scalars['ID']['input']>;
-  mlProductCount?: InputMaybe<Scalars['Int']['input']>;
-  mlTrainingError?: InputMaybe<Scalars['String']['input']>;
-  mlTrainingProgress?: InputMaybe<Scalars['Int']['input']>;
-  mlTrainingQueuedAt?: InputMaybe<Scalars['DateTime']['input']>;
-  mlTrainingStartedAt?: InputMaybe<Scalars['DateTime']['input']>;
-  mlTrainingStatus?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
@@ -9690,6 +9447,8 @@ export type UpdatePaymentMethodInput = {
 
 export type UpdateProductCustomFieldsInput = {
   barcode?: InputMaybe<Scalars['String']['input']>;
+  mlEmbedding?: InputMaybe<Scalars['String']['input']>;
+  mlEmbeddingVersion?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateProductInput = {
@@ -10199,9 +9958,6 @@ export type GetActiveChannelQuery = {
       subscriptionStatus?: string | null;
       trialEndsAt?: any | null;
       subscriptionExpiresAt?: any | null;
-      mlModelJsonAsset?: { __typename?: 'Asset'; id: string; source: string; name: string } | null;
-      mlModelBinAsset?: { __typename?: 'Asset'; id: string; source: string; name: string } | null;
-      mlMetadataAsset?: { __typename?: 'Asset'; id: string; source: string; name: string } | null;
       companyLogoAsset?: {
         __typename?: 'Asset';
         id: string;
@@ -10621,6 +10377,12 @@ export type GetProductQuery = {
     __typename?: 'Product';
     id: string;
     name: string;
+    customFields?: {
+      __typename?: 'ProductCustomFields';
+      barcode?: string | null;
+      mlEmbedding?: string | null;
+      mlEmbeddingVersion?: string | null;
+    } | null;
     featuredAsset?: { __typename?: 'Asset'; preview: string } | null;
     facetValues: Array<{
       __typename?: 'FacetValue';
@@ -10719,6 +10481,12 @@ export type PrefetchProductsQuery = {
       id: string;
       name: string;
       enabled: boolean;
+      customFields?: {
+        __typename?: 'ProductCustomFields';
+        barcode?: string | null;
+        mlEmbedding?: string | null;
+        mlEmbeddingVersion?: string | null;
+      } | null;
       featuredAsset?: { __typename?: 'Asset'; preview: string } | null;
       facetValues: Array<{
         __typename?: 'FacetValue';
@@ -11669,86 +11437,6 @@ export type GetOrderFullQuery = {
     } | null;
   } | null;
 };
-
-export type GetMlTrainingInfoQueryVariables = Exact<{
-  channelId: Scalars['ID']['input'];
-}>;
-
-export type GetMlTrainingInfoQuery = {
-  __typename?: 'Query';
-  mlTrainingInfo: {
-    __typename?: 'MlTrainingInfo';
-    status: string;
-    progress: number;
-    startedAt?: any | null;
-    error?: string | null;
-    productCount: number;
-    imageCount: number;
-    hasActiveModel: boolean;
-    lastTrainedAt?: any | null;
-  };
-};
-
-export type GetMlTrainingManifestQueryVariables = Exact<{
-  channelId: Scalars['ID']['input'];
-}>;
-
-export type GetMlTrainingManifestQuery = {
-  __typename?: 'Query';
-  mlTrainingManifest: {
-    __typename?: 'MlTrainingManifest';
-    channelId: string;
-    version: string;
-    extractedAt: any;
-    products: Array<{
-      __typename?: 'ProductManifestEntry';
-      productId: string;
-      productName: string;
-      images: Array<{
-        __typename?: 'ImageManifestEntry';
-        assetId: string;
-        url: string;
-        filename: string;
-      }>;
-    }>;
-  };
-};
-
-export type ExtractPhotosForTrainingMutationVariables = Exact<{
-  channelId: Scalars['ID']['input'];
-}>;
-
-export type ExtractPhotosForTrainingMutation = {
-  __typename?: 'Mutation';
-  extractPhotosForTraining: boolean;
-};
-
-export type UpdateTrainingStatusMutationVariables = Exact<{
-  channelId: Scalars['ID']['input'];
-  status: Scalars['String']['input'];
-  progress?: InputMaybe<Scalars['Int']['input']>;
-  error?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-export type UpdateTrainingStatusMutation = {
-  __typename?: 'Mutation';
-  updateTrainingStatus: boolean;
-};
-
-export type StartTrainingMutationVariables = Exact<{
-  channelId: Scalars['ID']['input'];
-}>;
-
-export type StartTrainingMutation = { __typename?: 'Mutation'; startTraining: boolean };
-
-export type CompleteTrainingMutationVariables = Exact<{
-  channelId: Scalars['ID']['input'];
-  modelJson: Scalars['Upload']['input'];
-  weightsFile: Scalars['Upload']['input'];
-  metadata: Scalars['Upload']['input'];
-}>;
-
-export type CompleteTrainingMutation = { __typename?: 'Mutation'; completeTraining: boolean };
 
 export type GetCustomersQueryVariables = Exact<{
   options?: InputMaybe<CustomerListOptions>;
@@ -13959,6 +13647,25 @@ export type UpdateProductWithFacetsMutation = {
   };
 };
 
+export type UpdateProductEmbeddingMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+  mlEmbedding?: InputMaybe<Scalars['String']['input']>;
+  mlEmbeddingVersion?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type UpdateProductEmbeddingMutation = {
+  __typename?: 'Mutation';
+  updateProduct: {
+    __typename?: 'Product';
+    id: string;
+    customFields?: {
+      __typename?: 'ProductCustomFields';
+      mlEmbedding?: string | null;
+      mlEmbeddingVersion?: string | null;
+    } | null;
+  };
+};
+
 export const UpdateOrderLineQuantityDocument = {
   kind: 'Document',
   definitions: [
@@ -14790,42 +14497,6 @@ export const GetActiveChannelDocument = {
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
-                      {
-                        kind: 'Field',
-                        name: { kind: 'Name', value: 'mlModelJsonAsset' },
-                        selectionSet: {
-                          kind: 'SelectionSet',
-                          selections: [
-                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'source' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'name' } },
-                          ],
-                        },
-                      },
-                      {
-                        kind: 'Field',
-                        name: { kind: 'Name', value: 'mlModelBinAsset' },
-                        selectionSet: {
-                          kind: 'SelectionSet',
-                          selections: [
-                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'source' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'name' } },
-                          ],
-                        },
-                      },
-                      {
-                        kind: 'Field',
-                        name: { kind: 'Name', value: 'mlMetadataAsset' },
-                        selectionSet: {
-                          kind: 'SelectionSet',
-                          selections: [
-                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'source' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'name' } },
-                          ],
-                        },
-                      },
                       {
                         kind: 'Field',
                         name: { kind: 'Name', value: 'companyLogoAsset' },
@@ -16448,6 +16119,18 @@ export const GetProductDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'name' } },
                 {
                   kind: 'Field',
+                  name: { kind: 'Name', value: 'customFields' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'barcode' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'mlEmbedding' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'mlEmbeddingVersion' } },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
                   name: { kind: 'Name', value: 'featuredAsset' },
                   selectionSet: {
                     kind: 'SelectionSet',
@@ -16785,6 +16468,18 @@ export const PrefetchProductsDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'name' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'enabled' } },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'customFields' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'barcode' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'mlEmbedding' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'mlEmbeddingVersion' } },
+                          ],
+                        },
+                      },
                       {
                         kind: 'Field',
                         name: { kind: 'Name', value: 'featuredAsset' },
@@ -19708,341 +19403,6 @@ export const GetOrderFullDocument = {
     },
   ],
 } as unknown as DocumentNode<GetOrderFullQuery, GetOrderFullQueryVariables>;
-export const GetMlTrainingInfoDocument = {
-  kind: 'Document',
-  definitions: [
-    {
-      kind: 'OperationDefinition',
-      operation: 'query',
-      name: { kind: 'Name', value: 'GetMlTrainingInfo' },
-      variableDefinitions: [
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
-          },
-        },
-      ],
-      selectionSet: {
-        kind: 'SelectionSet',
-        selections: [
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'mlTrainingInfo' },
-            arguments: [
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'channelId' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
-              },
-            ],
-            selectionSet: {
-              kind: 'SelectionSet',
-              selections: [
-                { kind: 'Field', name: { kind: 'Name', value: 'status' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'progress' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'startedAt' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'error' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'productCount' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'imageCount' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'hasActiveModel' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'lastTrainedAt' } },
-              ],
-            },
-          },
-        ],
-      },
-    },
-  ],
-} as unknown as DocumentNode<GetMlTrainingInfoQuery, GetMlTrainingInfoQueryVariables>;
-export const GetMlTrainingManifestDocument = {
-  kind: 'Document',
-  definitions: [
-    {
-      kind: 'OperationDefinition',
-      operation: 'query',
-      name: { kind: 'Name', value: 'GetMlTrainingManifest' },
-      variableDefinitions: [
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
-          },
-        },
-      ],
-      selectionSet: {
-        kind: 'SelectionSet',
-        selections: [
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'mlTrainingManifest' },
-            arguments: [
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'channelId' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
-              },
-            ],
-            selectionSet: {
-              kind: 'SelectionSet',
-              selections: [
-                { kind: 'Field', name: { kind: 'Name', value: 'channelId' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'version' } },
-                { kind: 'Field', name: { kind: 'Name', value: 'extractedAt' } },
-                {
-                  kind: 'Field',
-                  name: { kind: 'Name', value: 'products' },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: 'productId' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'productName' } },
-                      {
-                        kind: 'Field',
-                        name: { kind: 'Name', value: 'images' },
-                        selectionSet: {
-                          kind: 'SelectionSet',
-                          selections: [
-                            { kind: 'Field', name: { kind: 'Name', value: 'assetId' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'url' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'filename' } },
-                          ],
-                        },
-                      },
-                    ],
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      },
-    },
-  ],
-} as unknown as DocumentNode<GetMlTrainingManifestQuery, GetMlTrainingManifestQueryVariables>;
-export const ExtractPhotosForTrainingDocument = {
-  kind: 'Document',
-  definitions: [
-    {
-      kind: 'OperationDefinition',
-      operation: 'mutation',
-      name: { kind: 'Name', value: 'ExtractPhotosForTraining' },
-      variableDefinitions: [
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
-          },
-        },
-      ],
-      selectionSet: {
-        kind: 'SelectionSet',
-        selections: [
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'extractPhotosForTraining' },
-            arguments: [
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'channelId' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
-              },
-            ],
-          },
-        ],
-      },
-    },
-  ],
-} as unknown as DocumentNode<
-  ExtractPhotosForTrainingMutation,
-  ExtractPhotosForTrainingMutationVariables
->;
-export const UpdateTrainingStatusDocument = {
-  kind: 'Document',
-  definitions: [
-    {
-      kind: 'OperationDefinition',
-      operation: 'mutation',
-      name: { kind: 'Name', value: 'UpdateTrainingStatus' },
-      variableDefinitions: [
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
-          },
-        },
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'status' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
-          },
-        },
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'progress' } },
-          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
-        },
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'error' } },
-          type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
-        },
-      ],
-      selectionSet: {
-        kind: 'SelectionSet',
-        selections: [
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'updateTrainingStatus' },
-            arguments: [
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'channelId' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
-              },
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'status' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'status' } },
-              },
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'progress' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'progress' } },
-              },
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'error' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'error' } },
-              },
-            ],
-          },
-        ],
-      },
-    },
-  ],
-} as unknown as DocumentNode<UpdateTrainingStatusMutation, UpdateTrainingStatusMutationVariables>;
-export const StartTrainingDocument = {
-  kind: 'Document',
-  definitions: [
-    {
-      kind: 'OperationDefinition',
-      operation: 'mutation',
-      name: { kind: 'Name', value: 'StartTraining' },
-      variableDefinitions: [
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
-          },
-        },
-      ],
-      selectionSet: {
-        kind: 'SelectionSet',
-        selections: [
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'startTraining' },
-            arguments: [
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'channelId' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
-              },
-            ],
-          },
-        ],
-      },
-    },
-  ],
-} as unknown as DocumentNode<StartTrainingMutation, StartTrainingMutationVariables>;
-export const CompleteTrainingDocument = {
-  kind: 'Document',
-  definitions: [
-    {
-      kind: 'OperationDefinition',
-      operation: 'mutation',
-      name: { kind: 'Name', value: 'CompleteTraining' },
-      variableDefinitions: [
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
-          },
-        },
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'modelJson' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'Upload' } },
-          },
-        },
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'weightsFile' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'Upload' } },
-          },
-        },
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'metadata' } },
-          type: {
-            kind: 'NonNullType',
-            type: { kind: 'NamedType', name: { kind: 'Name', value: 'Upload' } },
-          },
-        },
-      ],
-      selectionSet: {
-        kind: 'SelectionSet',
-        selections: [
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'completeTraining' },
-            arguments: [
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'channelId' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'channelId' } },
-              },
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'modelJson' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'modelJson' } },
-              },
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'weightsFile' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'weightsFile' } },
-              },
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'metadata' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'metadata' } },
-              },
-            ],
-          },
-        ],
-      },
-    },
-  ],
-} as unknown as DocumentNode<CompleteTrainingMutation, CompleteTrainingMutationVariables>;
 export const GetCustomersDocument = {
   kind: 'Document',
   definitions: [
@@ -26366,4 +25726,104 @@ export const UpdateProductWithFacetsDocument = {
 } as unknown as DocumentNode<
   UpdateProductWithFacetsMutation,
   UpdateProductWithFacetsMutationVariables
+>;
+export const UpdateProductEmbeddingDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateProductEmbedding' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'mlEmbedding' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'mlEmbeddingVersion' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateProduct' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: {
+                  kind: 'ObjectValue',
+                  fields: [
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'id' },
+                      value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'customFields' },
+                      value: {
+                        kind: 'ObjectValue',
+                        fields: [
+                          {
+                            kind: 'ObjectField',
+                            name: { kind: 'Name', value: 'mlEmbedding' },
+                            value: {
+                              kind: 'Variable',
+                              name: { kind: 'Name', value: 'mlEmbedding' },
+                            },
+                          },
+                          {
+                            kind: 'ObjectField',
+                            name: { kind: 'Name', value: 'mlEmbeddingVersion' },
+                            value: {
+                              kind: 'Variable',
+                              name: { kind: 'Name', value: 'mlEmbeddingVersion' },
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'customFields' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'mlEmbedding' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'mlEmbeddingVersion' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  UpdateProductEmbeddingMutation,
+  UpdateProductEmbeddingMutationVariables
 >;

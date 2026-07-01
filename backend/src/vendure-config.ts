@@ -30,7 +30,6 @@ import {
 } from './plugins/credit/permissions';
 import { FractionalQuantityPlugin } from './plugins/inventory/fractional-quantity.plugin';
 import { LedgerPlugin } from './plugins/ledger/ledger.plugin';
-import { MlModelPlugin } from './plugins/ml/ml-model.plugin';
 import { AnalyticsPlugin } from './plugins/analytics/analytics.plugin';
 import { SuperAdminPlugin } from './plugins/super-admin/super-admin.plugin';
 import { CacheSyncPlugin } from './plugins/cache-sync/cache-sync.plugin';
@@ -136,20 +135,14 @@ export const config: VendureConfig = {
       // Documents
       '.pdf',
       'application/pdf',
-      // ML Model files
+      // Data
       '.json',
       'application/json',
-      '.bin',
-      'application/octet-stream',
-      '.pb', // TensorFlow
-      '.h5', // Keras
-      '.onnx', // ONNX
-      '.tflite', // TensorFlow Lite
     ],
-    uploadMaxFileSize: 52428800, // 50MB for large model files
+    uploadMaxFileSize: 52428800, // 50MB
   },
   authOptions: {
-    // Cookie-first: app uses cookie only (EventSource/SSE cannot send headers). Bearer kept for scripts (e.g. deploy-ml-model.js).
+    // Cookie-first: app uses cookie only (EventSource/SSE cannot send headers). Bearer kept for scripts/CLI.
     // Vendure applies cookie-session to admin/shop only when cookieOptions.name is an object, so req.session is set and AuthGuard sees the token.
     tokenMethod: ['cookie', 'bearer'],
     superadminCredentials: {
@@ -177,7 +170,7 @@ export const config: VendureConfig = {
   // --- Auth transport (tokenMethod) pros/cons ---
   // Cookie-only: Single path for browser (GraphQL + SSE). No header/cookie sync. EventSource works. Scripts/CLI cannot use admin-api without a cookie jar.
   // Bearer-only: Scripts/CLI/mobile easy. SSE cannot send headers, so cache-sync would need a separate workaround.
-  // Cookie + bearer (current): App uses cookie; scripts (e.g. deploy-ml-model.js) keep using Bearer. Cookie-first order so browser requests use session cookie when present.
+  // Cookie + bearer (current): App uses cookie; scripts/CLI keep using Bearer. Cookie-first order so browser requests use session cookie when present.
   dbConnectionOptions: {
     type: 'postgres',
     synchronize: false, // Never use in production
@@ -202,10 +195,6 @@ export const config: VendureConfig = {
     ],
   },
   // Custom field definitions extracted to config/custom-fields/ for maintainability.
-  // ML Model Management: Tag-based versioning + custom field activation
-  // - Assets tagged: ml-model, channel-{id}, v{version}, trained-{date}
-  // - Active model: Asset IDs in Channel.customFields
-  // - Deploy: backend/scripts/deploy-ml-model.js
   customFields: {
     Product: productCustomFields!,
     Channel: channelCustomFields!,
@@ -230,7 +219,6 @@ export const config: VendureConfig = {
   plugins: [
     EnvironmentPlugin, // Must be first to ensure env config is available
     GraphiqlPlugin.init(),
-    MlModelPlugin,
     PriceOverridePlugin,
     ChannelSettingsPlugin,
     FractionalQuantityPlugin,

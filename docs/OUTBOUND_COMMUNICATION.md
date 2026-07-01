@@ -16,7 +16,6 @@ This document describes when and how the server initiates communication (in-app,
 |-------------|--------|
 | order_payment_settled, order_fulfilled, order_cancelled | Order state transition (event) |
 | subscription_expiring_soon, subscription_expired, subscription_renewed | Subscription alert (event) |
-| ml_status | ML training/extraction status (event) |
 | admin_action | Admin/user created or updated (event) |
 | customer_created, credit_approved, repayment_deadline | Customer lifecycle (event) |
 | balance_changed_admin | Customer balance changed – in-app to channel admins (event) |

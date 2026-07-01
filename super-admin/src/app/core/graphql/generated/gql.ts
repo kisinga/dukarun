@@ -37,20 +37,6 @@ type Documents = {
     "\n  query PendingRegistrations {\n    pendingRegistrations {\n      userId\n      identifier\n      createdAt\n      administrator {\n        id\n        firstName\n        lastName\n        emailAddress\n      }\n    }\n  }\n": typeof types.PendingRegistrationsDocument,
     "\n  mutation ApproveUser($userId: ID!) {\n    approveUser(userId: $userId) {\n      id\n      identifier\n      authorizationStatus\n    }\n  }\n": typeof types.ApproveUserDocument,
     "\n  mutation RejectUser($userId: ID!, $reason: String) {\n    rejectUser(userId: $userId, reason: $reason) {\n      id\n      identifier\n      authorizationStatus\n    }\n  }\n": typeof types.RejectUserDocument,
-    "\n  query MlTrainerHealth {\n    mlTrainerHealth {\n      status\n      uptimeSeconds\n      error\n    }\n  }\n": typeof types.MlTrainerHealthDocument,
-    "\n  query MlTrainingInfo($channelId: ID!) {\n    mlTrainingInfo(channelId: $channelId) {\n      status\n      progress\n      startedAt\n      error\n      productCount\n      imageCount\n      hasActiveModel\n      lastTrainedAt\n      queuedAt\n    }\n  }\n": typeof types.MlTrainingInfoDocument,
-    "\n  query MlTrainingDataSummary($channelId: ID!) {\n    mlTrainingDataSummary(channelId: $channelId) {\n      extractedAt\n      productCount\n      imageCount\n      products {\n        productName\n        imageCount\n      }\n    }\n  }\n": typeof types.MlTrainingDataSummaryDocument,
-    "\n  query MlSchedulerConfig {\n    mlSchedulerConfig {\n      intervalMinutes\n      cooldownHours\n    }\n  }\n": typeof types.MlSchedulerConfigDocument,
-    "\n  query MlTrainerJobs {\n    mlTrainerJobs {\n      channelId\n      status\n      startedAt\n      completedAt\n      failedAt\n      error\n    }\n  }\n": typeof types.MlTrainerJobsDocument,
-    "\n  query MlModelInfo($channelId: ID!) {\n    mlModelInfo(channelId: $channelId) {\n      hasModel\n      version\n      status\n      modelJsonId\n      modelBinId\n      metadataId\n    }\n  }\n": typeof types.MlModelInfoDocument,
-    "\n  mutation QueueTraining($channelId: ID!) {\n    queueTraining(channelId: $channelId)\n  }\n": typeof types.QueueTrainingDocument,
-    "\n  mutation StartTraining($channelId: ID!) {\n    startTraining(channelId: $channelId)\n  }\n": typeof types.StartTrainingDocument,
-    "\n  mutation ExtractPhotosForTraining($channelId: ID!) {\n    extractPhotosForTraining(channelId: $channelId)\n  }\n": typeof types.ExtractPhotosForTrainingDocument,
-    "\n  mutation SetMlModelStatus($channelId: ID!, $status: String!) {\n    setMlModelStatus(channelId: $channelId, status: $status)\n  }\n": typeof types.SetMlModelStatusDocument,
-    "\n  mutation ClearMlModel($channelId: ID!) {\n    clearMlModel(channelId: $channelId)\n  }\n": typeof types.ClearMlModelDocument,
-    "\n  mutation RefreshTrainingCounts($channelId: ID!) {\n    refreshTrainingCounts(channelId: $channelId)\n  }\n": typeof types.RefreshTrainingCountsDocument,
-    "\n  query TrainingManifestExport($channelId: ID!) {\n    trainingManifestExport(channelId: $channelId) {\n      manifestJson\n    }\n  }\n": typeof types.TrainingManifestExportDocument,
-    "\n  mutation UploadModelManually($channelId: ID!, $modelJson: Upload!, $weightsFile: Upload!, $metadata: Upload!) {\n    uploadModelManually(channelId: $channelId, modelJson: $modelJson, weightsFile: $weightsFile, metadata: $metadata)\n  }\n": typeof types.UploadModelManuallyDocument,
     "\n  query RegistrationSeedContext {\n    registrationSeedContext {\n      zone {\n        id\n        name\n        members {\n          id\n          name\n          code\n        }\n      }\n      taxRate {\n        id\n        name\n        categoryName\n        value\n      }\n    }\n  }\n": typeof types.RegistrationSeedContextDocument,
     "\n  mutation UpdateRegistrationTaxRate($input: UpdateRegistrationTaxRateInput!) {\n    updateRegistrationTaxRate(input: $input) {\n      id\n      name\n      categoryName\n      value\n    }\n  }\n": typeof types.UpdateRegistrationTaxRateDocument,
     "\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n    }\n  }\n": typeof types.PlatformSettingsDocument,
@@ -88,20 +74,6 @@ const documents: Documents = {
     "\n  query PendingRegistrations {\n    pendingRegistrations {\n      userId\n      identifier\n      createdAt\n      administrator {\n        id\n        firstName\n        lastName\n        emailAddress\n      }\n    }\n  }\n": types.PendingRegistrationsDocument,
     "\n  mutation ApproveUser($userId: ID!) {\n    approveUser(userId: $userId) {\n      id\n      identifier\n      authorizationStatus\n    }\n  }\n": types.ApproveUserDocument,
     "\n  mutation RejectUser($userId: ID!, $reason: String) {\n    rejectUser(userId: $userId, reason: $reason) {\n      id\n      identifier\n      authorizationStatus\n    }\n  }\n": types.RejectUserDocument,
-    "\n  query MlTrainerHealth {\n    mlTrainerHealth {\n      status\n      uptimeSeconds\n      error\n    }\n  }\n": types.MlTrainerHealthDocument,
-    "\n  query MlTrainingInfo($channelId: ID!) {\n    mlTrainingInfo(channelId: $channelId) {\n      status\n      progress\n      startedAt\n      error\n      productCount\n      imageCount\n      hasActiveModel\n      lastTrainedAt\n      queuedAt\n    }\n  }\n": types.MlTrainingInfoDocument,
-    "\n  query MlTrainingDataSummary($channelId: ID!) {\n    mlTrainingDataSummary(channelId: $channelId) {\n      extractedAt\n      productCount\n      imageCount\n      products {\n        productName\n        imageCount\n      }\n    }\n  }\n": types.MlTrainingDataSummaryDocument,
-    "\n  query MlSchedulerConfig {\n    mlSchedulerConfig {\n      intervalMinutes\n      cooldownHours\n    }\n  }\n": types.MlSchedulerConfigDocument,
-    "\n  query MlTrainerJobs {\n    mlTrainerJobs {\n      channelId\n      status\n      startedAt\n      completedAt\n      failedAt\n      error\n    }\n  }\n": types.MlTrainerJobsDocument,
-    "\n  query MlModelInfo($channelId: ID!) {\n    mlModelInfo(channelId: $channelId) {\n      hasModel\n      version\n      status\n      modelJsonId\n      modelBinId\n      metadataId\n    }\n  }\n": types.MlModelInfoDocument,
-    "\n  mutation QueueTraining($channelId: ID!) {\n    queueTraining(channelId: $channelId)\n  }\n": types.QueueTrainingDocument,
-    "\n  mutation StartTraining($channelId: ID!) {\n    startTraining(channelId: $channelId)\n  }\n": types.StartTrainingDocument,
-    "\n  mutation ExtractPhotosForTraining($channelId: ID!) {\n    extractPhotosForTraining(channelId: $channelId)\n  }\n": types.ExtractPhotosForTrainingDocument,
-    "\n  mutation SetMlModelStatus($channelId: ID!, $status: String!) {\n    setMlModelStatus(channelId: $channelId, status: $status)\n  }\n": types.SetMlModelStatusDocument,
-    "\n  mutation ClearMlModel($channelId: ID!) {\n    clearMlModel(channelId: $channelId)\n  }\n": types.ClearMlModelDocument,
-    "\n  mutation RefreshTrainingCounts($channelId: ID!) {\n    refreshTrainingCounts(channelId: $channelId)\n  }\n": types.RefreshTrainingCountsDocument,
-    "\n  query TrainingManifestExport($channelId: ID!) {\n    trainingManifestExport(channelId: $channelId) {\n      manifestJson\n    }\n  }\n": types.TrainingManifestExportDocument,
-    "\n  mutation UploadModelManually($channelId: ID!, $modelJson: Upload!, $weightsFile: Upload!, $metadata: Upload!) {\n    uploadModelManually(channelId: $channelId, modelJson: $modelJson, weightsFile: $weightsFile, metadata: $metadata)\n  }\n": types.UploadModelManuallyDocument,
     "\n  query RegistrationSeedContext {\n    registrationSeedContext {\n      zone {\n        id\n        name\n        members {\n          id\n          name\n          code\n        }\n      }\n      taxRate {\n        id\n        name\n        categoryName\n        value\n      }\n    }\n  }\n": types.RegistrationSeedContextDocument,
     "\n  mutation UpdateRegistrationTaxRate($input: UpdateRegistrationTaxRateInput!) {\n    updateRegistrationTaxRate(input: $input) {\n      id\n      name\n      categoryName\n      value\n    }\n  }\n": types.UpdateRegistrationTaxRateDocument,
     "\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n    }\n  }\n": types.PlatformSettingsDocument,
@@ -222,62 +194,6 @@ export function graphql(source: "\n  mutation ApproveUser($userId: ID!) {\n    a
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation RejectUser($userId: ID!, $reason: String) {\n    rejectUser(userId: $userId, reason: $reason) {\n      id\n      identifier\n      authorizationStatus\n    }\n  }\n"): (typeof documents)["\n  mutation RejectUser($userId: ID!, $reason: String) {\n    rejectUser(userId: $userId, reason: $reason) {\n      id\n      identifier\n      authorizationStatus\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query MlTrainerHealth {\n    mlTrainerHealth {\n      status\n      uptimeSeconds\n      error\n    }\n  }\n"): (typeof documents)["\n  query MlTrainerHealth {\n    mlTrainerHealth {\n      status\n      uptimeSeconds\n      error\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query MlTrainingInfo($channelId: ID!) {\n    mlTrainingInfo(channelId: $channelId) {\n      status\n      progress\n      startedAt\n      error\n      productCount\n      imageCount\n      hasActiveModel\n      lastTrainedAt\n      queuedAt\n    }\n  }\n"): (typeof documents)["\n  query MlTrainingInfo($channelId: ID!) {\n    mlTrainingInfo(channelId: $channelId) {\n      status\n      progress\n      startedAt\n      error\n      productCount\n      imageCount\n      hasActiveModel\n      lastTrainedAt\n      queuedAt\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query MlTrainingDataSummary($channelId: ID!) {\n    mlTrainingDataSummary(channelId: $channelId) {\n      extractedAt\n      productCount\n      imageCount\n      products {\n        productName\n        imageCount\n      }\n    }\n  }\n"): (typeof documents)["\n  query MlTrainingDataSummary($channelId: ID!) {\n    mlTrainingDataSummary(channelId: $channelId) {\n      extractedAt\n      productCount\n      imageCount\n      products {\n        productName\n        imageCount\n      }\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query MlSchedulerConfig {\n    mlSchedulerConfig {\n      intervalMinutes\n      cooldownHours\n    }\n  }\n"): (typeof documents)["\n  query MlSchedulerConfig {\n    mlSchedulerConfig {\n      intervalMinutes\n      cooldownHours\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query MlTrainerJobs {\n    mlTrainerJobs {\n      channelId\n      status\n      startedAt\n      completedAt\n      failedAt\n      error\n    }\n  }\n"): (typeof documents)["\n  query MlTrainerJobs {\n    mlTrainerJobs {\n      channelId\n      status\n      startedAt\n      completedAt\n      failedAt\n      error\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query MlModelInfo($channelId: ID!) {\n    mlModelInfo(channelId: $channelId) {\n      hasModel\n      version\n      status\n      modelJsonId\n      modelBinId\n      metadataId\n    }\n  }\n"): (typeof documents)["\n  query MlModelInfo($channelId: ID!) {\n    mlModelInfo(channelId: $channelId) {\n      hasModel\n      version\n      status\n      modelJsonId\n      modelBinId\n      metadataId\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation QueueTraining($channelId: ID!) {\n    queueTraining(channelId: $channelId)\n  }\n"): (typeof documents)["\n  mutation QueueTraining($channelId: ID!) {\n    queueTraining(channelId: $channelId)\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation StartTraining($channelId: ID!) {\n    startTraining(channelId: $channelId)\n  }\n"): (typeof documents)["\n  mutation StartTraining($channelId: ID!) {\n    startTraining(channelId: $channelId)\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation ExtractPhotosForTraining($channelId: ID!) {\n    extractPhotosForTraining(channelId: $channelId)\n  }\n"): (typeof documents)["\n  mutation ExtractPhotosForTraining($channelId: ID!) {\n    extractPhotosForTraining(channelId: $channelId)\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation SetMlModelStatus($channelId: ID!, $status: String!) {\n    setMlModelStatus(channelId: $channelId, status: $status)\n  }\n"): (typeof documents)["\n  mutation SetMlModelStatus($channelId: ID!, $status: String!) {\n    setMlModelStatus(channelId: $channelId, status: $status)\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation ClearMlModel($channelId: ID!) {\n    clearMlModel(channelId: $channelId)\n  }\n"): (typeof documents)["\n  mutation ClearMlModel($channelId: ID!) {\n    clearMlModel(channelId: $channelId)\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation RefreshTrainingCounts($channelId: ID!) {\n    refreshTrainingCounts(channelId: $channelId)\n  }\n"): (typeof documents)["\n  mutation RefreshTrainingCounts($channelId: ID!) {\n    refreshTrainingCounts(channelId: $channelId)\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query TrainingManifestExport($channelId: ID!) {\n    trainingManifestExport(channelId: $channelId) {\n      manifestJson\n    }\n  }\n"): (typeof documents)["\n  query TrainingManifestExport($channelId: ID!) {\n    trainingManifestExport(channelId: $channelId) {\n      manifestJson\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation UploadModelManually($channelId: ID!, $modelJson: Upload!, $weightsFile: Upload!, $metadata: Upload!) {\n    uploadModelManually(channelId: $channelId, modelJson: $modelJson, weightsFile: $weightsFile, metadata: $metadata)\n  }\n"): (typeof documents)["\n  mutation UploadModelManually($channelId: ID!, $modelJson: Upload!, $weightsFile: Upload!, $metadata: Upload!) {\n    uploadModelManually(channelId: $channelId, modelJson: $modelJson, weightsFile: $weightsFile, metadata: $metadata)\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

@@ -5,7 +5,6 @@
   "workspaces": [
     "backend",
     "frontend",
-    "ml-trainer",
     "super-admin"
   ],
   "engines": {
@@ -15,10 +14,9 @@
     "setup": "ts-node scripts/setup.ts",
     "predev": "npm run setup -- --quick --fix",
     "dev": "npm run services:up && npm run dev:all",
-    "dev:all": "concurrently -k -n BE,FE,ML,SA -c blue,green,red,magenta npm:dev:backend npm:dev:frontend npm:dev:ml npm:dev:super-admin",
+    "dev:all": "concurrently -k -n BE,FE,SA -c blue,green,magenta npm:dev:backend npm:dev:frontend npm:dev:super-admin",
     "dev:backend": "npm run dev -w @dukarun/backend",
     "dev:frontend": "npm start -w @dukarun/frontend",
-    "dev:ml": "npm run dev -w @dukarun/ml-trainer",
     "dev:super-admin": "npm start -w super-admin",
     "codegen": "npm run codegen -w @dukarun/frontend && npm run codegen -w super-admin",
     "codegen:watch": "npm run codegen:watch -w @dukarun/frontend",

@@ -160,6 +160,55 @@ export class ProductApiService {
   }
 
   /**
+   * Write a product's on-device recognition fingerprint(s) + embedder version. Pass nulls to clear.
+   *
+   * Only the two ML custom fields are sent; Vendure does a partial custom-field update, so the
+   * product's other custom fields (e.g. barcode) are preserved. Defined inline with `gql` (like the
+   * other product update mutations here) so it doesn't depend on the codegen `graphql()` map.
+   */
+  async updateProductEmbedding(
+    productId: string,
+    embeddingJson: string | null,
+    embedderVersion: string | null,
+  ): Promise<boolean> {
+    const UPDATE_PRODUCT_EMBEDDING: TypedDocumentNode<
+      { updateProduct?: { id: string } | null },
+      Record<string, unknown>
+    > = gql`
+      mutation UpdateProductEmbedding($id: ID!, $mlEmbedding: String, $mlEmbeddingVersion: String) {
+        updateProduct(
+          input: {
+            id: $id
+            customFields: { mlEmbedding: $mlEmbedding, mlEmbeddingVersion: $mlEmbeddingVersion }
+          }
+        ) {
+          id
+          customFields {
+            mlEmbedding
+            mlEmbeddingVersion
+          }
+        }
+      }
+    `;
+
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.mutate({
+        mutation: UPDATE_PRODUCT_EMBEDDING,
+        variables: {
+          id: productId,
+          mlEmbedding: embeddingJson,
+          mlEmbeddingVersion: embedderVersion,
+        },
+      });
+      return !!result.data?.updateProduct?.id;
+    } catch (error) {
+      console.error('Failed to write product embedding:', error);
+      return false;
+    }
+  }
+
+  /**
    * Get product details by ID
    */
   async getProductById(id: string): Promise<any | null> {

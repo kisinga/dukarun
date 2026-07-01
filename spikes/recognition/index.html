@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recognition spike — Dukahub</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 0; background: #14110f; color: #ece7e1; }
+    main { max-width: 820px; margin: 0 auto; padding: 24px 18px 64px; }
+    h1 { font-size: 18px; }
+    p.sub { color: #b8b0a6; margin-top: -6px; }
+    .row { display: flex; flex-wrap: wrap; gap: 16px; margin: 14px 0; align-items: end; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    label { font-size: 12px; color: #b8b0a6; }
+    input[type=file], input[type=number], select { background: #211c19; color: #ece7e1; border: 1px solid #3a322c; border-radius: 6px; padding: 7px; }
+    input[type=number] { width: 70px; }
+    button { background: #d98c3f; color: #1a1410; border: 0; border-radius: 6px; padding: 9px 18px; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: .45; cursor: default; }
+    #status { white-space: pre-wrap; color: #b8b0a6; font-size: 12px; min-height: 2em; }
+    pre#out { background: #0e0c0a; border: 1px solid #2a2420; border-radius: 8px; padding: 14px; overflow-x: auto; white-space: pre-wrap; }
+    code { background: #211c19; padding: 1px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>On-device recognition spike</h1>
+  <p class="sub">Measures whether nearest-match separates your real products. Pass = false-accept ≤2%,
+     genuine accept ≥85%, embed ≤~100ms. No app code — throwaway.</p>
+
+  <p>Pick <strong>one dataset folder</strong>. Each subfolder is one item (named with the product id)
+     and holds that product's photos:</p>
+  <p><code>dataset/&lt;productId&gt;/photo1.jpg, photo2.jpg …</code></p>
+  <p>Use varied photos per item (lighting, angle, distance, background). The harness holds some out
+     to test against. Include 2–3 look-alike items.</p>
+
+  <div class="row">
+    <div class="field">
+      <label for="dataset">Dataset folder</label>
+      <input id="dataset" type="file" webkitdirectory directory multiple />
+    </div>
+    <div class="field">
+      <label for="enrollPct">Enrol %</label>
+      <input id="enrollPct" type="number" min="10" max="90" step="10" value="60" />
+    </div>
+    <div class="field">
+      <label for="which">Embedder</label>
+      <select id="which">
+        <option value="mobilenet">MobileNet (default, light)</option>
+        <option value="mobileclip">MobileCLIP-S0 (heavier, experimental)</option>
+        <option value="both">Both (compare)</option>
+      </select>
+    </div>
+    <button id="run" disabled>Run</button>
+  </div>
+
+  <div id="status"></div>
+  <pre id="out"></pre>
+</main>
+<script type="module" src="./harness.js"></script>
+</body>
+</html>

@@ -20,6 +20,7 @@
             "browser": "src/main.ts",
             "server": "src/main.server.ts",
             "outputMode": "static",
+            "externalDependencies": ["onnxruntime-node", "sharp"],
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "assets": [

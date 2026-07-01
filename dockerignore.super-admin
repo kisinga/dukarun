@@ -27,5 +27,3 @@ backend/*
 !backend/package.json
 frontend/*
 !frontend/package.json
-ml-trainer/*
-!ml-trainer/package.json
