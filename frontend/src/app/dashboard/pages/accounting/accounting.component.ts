@@ -43,7 +43,6 @@ import {
 } from './components/accounting-filters.component';
 import { AccountingStats, AccountingStatsComponent } from './components/accounting-stats.component';
 import type { TabType } from './components/accounting-tabs.component';
-import { AccountingTabsComponent } from './components/accounting-tabs.component';
 import { AccountsTabComponent } from './components/accounts-tab.component';
 import { OverviewTabComponent } from './components/overview-tab.component';
 import { ReconciliationTabComponent } from './components/reconciliation-tab.component';
@@ -57,7 +56,6 @@ import { TransactionsTabComponent } from './components/transactions-tab.componen
     TransactionDetailModalComponent,
     AccountingStatsComponent,
     AccountingFiltersComponent,
-    AccountingTabsComponent,
     OverviewTabComponent,
     AccountsTabComponent,
     TransactionsTabComponent,

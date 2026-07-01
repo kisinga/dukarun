@@ -73,10 +73,7 @@
     (clearFilters)="clearFilters()"
   />
 
-  <!-- Tabs -->
-  <app-accounting-tabs />
-
-  <!-- Tab Content -->
+  <!-- Tab Content (navigation lives in the parent Finances layout) -->
   <div class="mt-3">
     <!-- Overview Tab -->
     @if (activeTab() === 'overview') {
