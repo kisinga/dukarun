@@ -17,6 +17,7 @@ COPY package.json package-lock.json ./
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
 COPY super-admin/package.json super-admin/
+COPY storefront/package.json storefront/
 
 RUN npm ci --quiet --no-audit --no-fund --include=dev
 

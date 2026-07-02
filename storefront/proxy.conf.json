@@ -1,0 +1,7 @@
+{
+  "$comment": "Dev server proxy: backend shop-api + product assets + SEO endpoints. Host header preserved so the backend can resolve the merchant subdomain (use ?store=<slug> locally).",
+  "/shop-api": { "target": "http://localhost:3000", "secure": false, "changeOrigin": false },
+  "/assets": { "target": "http://localhost:3000", "secure": false, "changeOrigin": false },
+  "/sitemap.xml": { "target": "http://localhost:3000", "secure": false, "changeOrigin": false },
+  "/robots.txt": { "target": "http://localhost:3000", "secure": false, "changeOrigin": false }
+}

@@ -29,15 +29,16 @@ export class PaymentEventsAdapter implements OnModuleInit {
 
         if (toState === 'Settled' && this.financialService) {
           // This safety net only backstops CASH-SALE postings (Debit cash / Credit Sales).
-          // Credit payments are never cash sales: a credit purchase posts a CreditSale entry and
-          // a credit repayment posts a PaymentAllocation entry (Debit cash / Credit AR) synchronously
+          // Allocation payments are never cash sales: a credit repayment or a cashier
+          // settlement posts a PaymentAllocation entry (Debit cash / Credit AR) synchronously
           // in the same transaction that settles the payment. Re-posting them here as a cash sale
           // would double-count cash AND book phantom revenue, because the ledger's idempotency key is
           // (sourceType, sourceId) and the 'PaymentAllocation' entry never collides with the 'Payment'
           // entry this path writes for the same payment id. Skip them — they are already posted.
-          if (payment.metadata?.paymentType === 'credit') {
+          const paymentType = payment.metadata?.paymentType;
+          if (paymentType === 'credit' || paymentType === 'cashier-settlement') {
             this.logger.debug(
-              `Skipping safety-net posting for credit payment ${payment.id}: ` +
+              `Skipping safety-net posting for allocation payment ${payment.id} (type: ${paymentType}): ` +
                 `posted synchronously as CreditSale/PaymentAllocation, not a cash sale.`
             );
             return;

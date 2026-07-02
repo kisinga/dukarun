@@ -146,6 +146,8 @@ export class OrderCreationService {
           // 10. Handle payment and fulfillment based on order type
           if (input.isCreditSale) {
             await this.handleCreditSale(transactionCtx, order, customerId);
+          } else if (input.isCashierFlow) {
+            await this.handleCashierFlow(transactionCtx, order, customerId);
           } else {
             await this.handleCashSale(transactionCtx, order, input);
           }
@@ -247,33 +249,8 @@ export class OrderCreationService {
   ): Promise<void> {
     await this.orderFulfillmentService.fulfillOrder(ctx, order.id);
 
-    // Ensure we have a fully-hydrated order with customer relation for ledger posting
-    let orderForPosting = order;
-    if (!orderForPosting.customer) {
-      const reloaded = await this.orderService.findOne(ctx, order.id, ['customer']);
-      if (reloaded) {
-        orderForPosting = reloaded;
-      }
-    }
-
-    // Post credit sale to ledger automatically (single source of truth)
-    if (this.ledgerTransactionService) {
-      const transactionData = {
-        ctx,
-        sourceId: orderForPosting.id.toString(),
-        channelId: ctx.channelId as number,
-        order: orderForPosting,
-        isCreditSale: true as const,
-      };
-
-      const result = await this.ledgerTransactionService.postTransaction(transactionData);
-      if (!result.success) {
-        throw new Error(`Failed to post credit sale to ledger: ${result.error}`);
-      }
-    } else if (this.financialService) {
-      // Fallback to FinancialService for backward compatibility
-      await this.financialService.recordSale(ctx, orderForPosting);
-    }
+    // Post credit sale to ledger automatically (single source of truth): DR AR / CR SALES.
+    await this.postFulfilledUnpaidSale(ctx, order);
 
     if (this.auditService) {
       await this.auditService.log(ctx, 'credit.sale.created', {
@@ -287,6 +264,91 @@ export class OrderCreationService {
         },
       });
     }
+  }
+
+  /**
+   * Handle cashier flow: park the order for settlement at the cashier counter.
+   *
+   * The salesperson rings up the sale and hands over the goods; the customer pays at
+   * the cashier (possibly splitting across tenders). Ledger-wise this is identical to a
+   * credit sale (fulfill + DR AR / CR SALES), but it is NOT subject to credit approval —
+   * the receivable is transient and is cleared when the cashier settles the order
+   * (see PaymentAllocationService.settleOrderPayments). We mark the order pending so it
+   * surfaces in the cashier settlement queue (pendingCashierOrders).
+   */
+  private async handleCashierFlow(
+    ctx: RequestContext,
+    order: Order,
+    customerId: string
+  ): Promise<void> {
+    await this.orderFulfillmentService.fulfillOrder(ctx, order.id);
+
+    // Post the fulfilled-but-unpaid sale to the ledger: DR AR / CR SALES.
+    // This is what makes the order "owing" and settleable; a bare fulfillment of an
+    // unpaid order would leave nothing for the cashier to collect against.
+    await this.postFulfilledUnpaidSale(ctx, order);
+
+    // Mark the order as awaiting collection at the cashier.
+    await this.markCashierPending(ctx, order.id);
+
+    if (this.auditService) {
+      await this.auditService.log(ctx, 'order.cashier.parked', {
+        entityType: 'Order',
+        entityId: order.id.toString(),
+        data: {
+          customerId,
+          orderTotal: order.total,
+          orderCode: order.code,
+          isCashierFlow: true,
+        },
+      });
+    }
+  }
+
+  /**
+   * Post a fulfilled-but-unpaid sale to the ledger (DR ACCOUNTS_RECEIVABLE / CR SALES).
+   * Shared by the credit-sale and cashier-flow paths, which are ledger-identical.
+   */
+  private async postFulfilledUnpaidSale(ctx: RequestContext, order: Order): Promise<void> {
+    // Ensure we have a fully-hydrated order with customer relation for ledger posting
+    let orderForPosting = order;
+    if (!orderForPosting.customer) {
+      const reloaded = await this.orderService.findOne(ctx, order.id, ['customer']);
+      if (reloaded) {
+        orderForPosting = reloaded;
+      }
+    }
+
+    if (this.ledgerTransactionService) {
+      const transactionData = {
+        ctx,
+        sourceId: orderForPosting.id.toString(),
+        channelId: ctx.channelId as number,
+        order: orderForPosting,
+        isCreditSale: true as const,
+      };
+
+      const result = await this.ledgerTransactionService.postTransaction(transactionData);
+      if (!result.success) {
+        throw new Error(`Failed to post fulfilled unpaid sale to ledger: ${result.error}`);
+      }
+    } else if (this.financialService) {
+      // Fallback to FinancialService for backward compatibility
+      await this.financialService.recordSale(ctx, orderForPosting);
+    }
+  }
+
+  /**
+   * Mark an order as pending settlement at the cashier (custom-field column update).
+   * Cleared to null once the order is fully settled.
+   */
+  private async markCashierPending(ctx: RequestContext, orderId: ID): Promise<void> {
+    const orderRepo = this.connection.getRepository(ctx, Order);
+    // customFields are individual columns, so this updates only cashierPendingAt.
+    await orderRepo.update(
+      { id: orderId },
+      { customFields: { cashierPendingAt: new Date() } as any }
+    );
   }
 
   /**

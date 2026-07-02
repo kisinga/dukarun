@@ -41,6 +41,9 @@ export const CHANNEL_DETAIL_PLATFORM = graphql(`
         smsUsedThisPeriod
         smsPeriodEnd
         smsLimitFromTier
+        publicStorefrontEnabled
+        publicSlug
+        publicWhatsAppNumber
       }
       defaultShippingZone {
         id
@@ -249,6 +252,19 @@ export const UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM = graphql(`
         cashierFlowEnabled
         cashControlEnabled
         enablePrinter
+      }
+    }
+  }
+`);
+
+export const UPDATE_CHANNEL_PUBLIC_STOREFRONT_PLATFORM = graphql(`
+  mutation UpdateChannelPublicStorefrontPlatform($input: UpdateChannelPublicStorefrontInput!) {
+    updateChannelPublicStorefrontPlatform(input: $input) {
+      id
+      customFields {
+        publicStorefrontEnabled
+        publicSlug
+        publicWhatsAppNumber
       }
     }
   }

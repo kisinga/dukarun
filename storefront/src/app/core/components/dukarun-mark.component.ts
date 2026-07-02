@@ -1,0 +1,18 @@
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+
+/** The Dukarun storefront app mark (self-contained brand colours; renders on any theme). */
+@Component({
+  selector: 'app-dukarun-mark',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <svg viewBox="0 6 48 52" [attr.class]="cls()" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="6" width="48" height="52" rx="10" fill="#E85D2F" />
+      <rect x="22" y="20" width="16" height="28" rx="8" fill="#FFF5F0" />
+      <rect x="4" y="10" width="40" height="4" rx="2" fill="rgba(255,255,255,0.4)" />
+    </svg>
+  `,
+})
+export class DukarunMarkComponent {
+  readonly cls = input('h-6 w-auto');
+}

@@ -375,4 +375,52 @@ export const channelCustomFields: CustomFields['Channel'] = [
     nullable: true,
     ui: { tab: 'Subscription' },
   },
+
+  // ─── Public Storefront ─────────────────────────────────────
+  {
+    name: 'publicStorefrontEnabled',
+    type: 'boolean',
+    label: [{ languageCode: LanguageCode.en, value: 'Enable Public Storefront' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value:
+          "Publish this channel's catalogue to its public storefront subdomain. Takes effect only when the channel is APPROVED and its subscription is active.",
+      },
+    ],
+    defaultValue: false,
+    public: true,
+    nullable: false,
+    ui: { tab: 'Public Storefront' },
+  },
+  {
+    name: 'publicSlug',
+    type: 'string',
+    label: [{ languageCode: LanguageCode.en, value: 'Public Storefront Slug (subdomain)' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value:
+          'Subdomain label for this store, e.g. "mama-mboga" → mama-mboga.dukarun.com. Lowercase letters, digits and hyphens only; must be globally unique.',
+      },
+    ],
+    public: true,
+    nullable: true,
+    ui: { tab: 'Public Storefront' },
+  },
+  {
+    name: 'publicWhatsAppNumber',
+    type: 'string',
+    label: [{ languageCode: LanguageCode.en, value: 'Public WhatsApp Number' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value:
+          'WhatsApp number in E.164 format (e.g. +254712345678) shown as the "Order via WhatsApp" contact on the public storefront.',
+      },
+    ],
+    public: true,
+    nullable: true,
+    ui: { tab: 'Public Storefront' },
+  },
 ];

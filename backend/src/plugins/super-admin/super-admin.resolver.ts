@@ -38,6 +38,11 @@ import { PendingRegistrationsService } from './pending-registrations.service';
 import { PlatformAdminService } from './platform-admin.service';
 import { PlatformStatsService } from './platform-stats.service';
 import { SubscriptionTier } from '../subscriptions/subscription.entity';
+import {
+  normalizeStorefrontSlug,
+  validateStorefrontSlug,
+  validateWhatsAppNumber,
+} from '../../utils/storefront-slug.util';
 
 const VALID_STATUSES = ['UNAPPROVED', 'APPROVED', 'DISABLED', 'BANNED'] as const;
 
@@ -158,6 +163,9 @@ export class SuperAdminResolver {
         smsUsedThisPeriod: typeof cf.smsUsedThisPeriod === 'number' ? cf.smsUsedThisPeriod : 0,
         smsPeriodEnd: cf.smsPeriodEnd ?? null,
         smsLimitFromTier,
+        publicStorefrontEnabled: cf.publicStorefrontEnabled === true,
+        publicSlug: cf.publicSlug ?? null,
+        publicWhatsAppNumber: cf.publicWhatsAppNumber ?? null,
       },
       defaultShippingZone: ch.defaultShippingZone
         ? { id: String(ch.defaultShippingZone.id), name: ch.defaultShippingZone.name ?? '' }
@@ -608,6 +616,105 @@ export class SuperAdminResolver {
       entityId: input.channelId,
       data: updates,
     });
+    return updated;
+  }
+
+  /**
+   * Assign / clear a channel's public storefront settings (subdomain slug, enabled flag, WhatsApp
+   * number). Platform-operator only. Validates the slug (DNS label + reserved list + global
+   * uniqueness) and the WhatsApp number (E.164), and refuses to enable a storefront without a slug.
+   * Only the fields present in `input` are changed.
+   */
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async updateChannelPublicStorefrontPlatform(
+    @Ctx() ctx: RequestContext,
+    @Args('input')
+    input: {
+      channelId: string;
+      publicSlug?: string | null;
+      publicStorefrontEnabled?: boolean;
+      publicWhatsAppNumber?: string | null;
+    }
+  ) {
+    const emptyCtx = RequestContext.empty();
+    const channel = await this.channelService.findOne(emptyCtx, input.channelId);
+    if (!channel) {
+      throw new Error('Channel not found');
+    }
+    const cf = (channel.customFields ?? {}) as Record<string, unknown>;
+    const updates: Record<string, unknown> = {};
+
+    // Slug: empty/null clears it; otherwise validate + enforce global uniqueness (excluding self).
+    if (input.publicSlug !== undefined) {
+      if (input.publicSlug === null || input.publicSlug.trim() === '') {
+        updates.publicSlug = null;
+      } else {
+        const slug = normalizeStorefrontSlug(input.publicSlug);
+        const slugError = validateStorefrontSlug(slug);
+        if (slugError) {
+          throw new Error(slugError);
+        }
+        const clash = await this.connection.getRepository(emptyCtx, Channel).findOne({
+          // `as any`: custom field not in Vendure's generated where-type; TypeORM maps the embedded
+          // `customFieldsPublicslug` column at runtime.
+          where: { customFields: { publicSlug: slug } as any },
+        });
+        if (clash && String(clash.id) !== String(input.channelId)) {
+          throw new Error(`Subdomain "${slug}" is already assigned to another channel.`);
+        }
+        updates.publicSlug = slug;
+      }
+    }
+
+    // WhatsApp number: empty/null clears it; otherwise validate E.164.
+    if (input.publicWhatsAppNumber !== undefined) {
+      if (input.publicWhatsAppNumber === null || input.publicWhatsAppNumber.trim() === '') {
+        updates.publicWhatsAppNumber = null;
+      } else {
+        const num = input.publicWhatsAppNumber.trim();
+        const numError = validateWhatsAppNumber(num);
+        if (numError) {
+          throw new Error(numError);
+        }
+        updates.publicWhatsAppNumber = num;
+      }
+    }
+
+    if (input.publicStorefrontEnabled !== undefined) {
+      updates.publicStorefrontEnabled = input.publicStorefrontEnabled;
+    }
+
+    // A storefront cannot be enabled without a subdomain slug (either set now or already present).
+    const finalEnabled =
+      updates.publicStorefrontEnabled !== undefined
+        ? updates.publicStorefrontEnabled === true
+        : cf.publicStorefrontEnabled === true;
+    const finalSlug =
+      updates.publicSlug !== undefined ? updates.publicSlug : ((cf.publicSlug as string) ?? null);
+    if (finalEnabled && !finalSlug) {
+      throw new Error('Cannot enable the public storefront without a subdomain slug.');
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return channel;
+    }
+
+    await this.channelService.update(emptyCtx, {
+      id: input.channelId,
+      customFields: { ...cf, ...updates },
+    });
+    const updated = await this.channelService.findOne(emptyCtx, input.channelId);
+    if (!updated) throw new Error('Channel not found after update');
+    await this.platformAuditService.log(
+      ctx,
+      PLATFORM_AUDIT_EVENTS.CHANNEL_PUBLIC_STOREFRONT_UPDATED,
+      {
+        entityType: 'Channel',
+        entityId: input.channelId,
+        data: updates,
+      }
+    );
     return updated;
   }
 

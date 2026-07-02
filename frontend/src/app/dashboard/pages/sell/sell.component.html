@@ -129,6 +129,16 @@
       (removeItem)="handleCartItemRemove($event)"
       (clearCart)="handleClearCart()"
     />
+    @if (cartItems().length > 0) {
+      <button
+        class="btn btn-ghost btn-sm w-full mt-2 gap-2 border border-dashed border-base-300"
+        (click)="handleSaveAsProforma()"
+        [disabled]="isProcessingCheckout()"
+      >
+        <ng-icon name="heroDocumentText" size="1.125rem" />
+        Save as quote
+      </button>
+    }
   }
 </div>
 
@@ -186,6 +196,7 @@
   [error]="checkoutError()"
   [isProcessing]="isProcessingCheckout()"
   [cashierFlowEnabled]="cashierFlowEnabled()"
+  [canSettleOrders]="canSettleOrders()"
   [triggerSuccess]="successTrigger()"
   [enablePrinter]="enablePrinter()"
   [selectedCustomer]="selectedCustomer()"
@@ -208,8 +219,15 @@
   (customerCreateForCash)="handleCustomerCreateForCash($event)"
   (paymentMethodSelect)="handlePaymentMethodSelect($event)"
   (selectCredit)="handleCheckoutCredit()"
-  (saveAsProforma)="handleSaveAsProforma()"
-  (selectCash)="handleCheckoutCash()"
+  (selectSplit)="handleCheckoutSplit()"
   (selectCashier)="handleCheckoutCashier()"
   (closeModal)="handleCheckoutModalClose()"
+/>
+
+<!-- Split payment (cash + M-Pesa) collection -->
+<app-settle-order-modal
+  #splitModal
+  (confirm)="onSplitConfirm($event)"
+  (settled)="onSplitSettled()"
+  (cancelled)="onSplitCancelled()"
 />

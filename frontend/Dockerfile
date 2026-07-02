@@ -14,6 +14,7 @@ COPY package.json package-lock.json ./
 # Workspace package.json files must exist before npm ci so workspaces are resolved
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
+COPY storefront/package.json storefront/
 
 RUN npm ci --quiet --no-audit --no-fund --include=dev
 

@@ -22,7 +22,7 @@ import { CheckoutCashierComponent } from './checkout/checkout-cashier.component'
 import { CheckoutCreditComponent } from './checkout/checkout-credit.component';
 import { CheckoutSuccessComponent } from './checkout/checkout-success.component';
 
-type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
+type CheckoutType = 'credit' | 'cashier' | null;
 
 /**
  * Unified checkout modal handling all payment flows
@@ -122,8 +122,11 @@ type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
                   [selectedCustomerForCash]="selectedCustomerForCash()"
                   [customerSearchResultsForCash]="customerSearchResultsForCash()"
                   [isSearchingCustomersForCash]="isSearchingCustomersForCash()"
+                  [cashierFlowEnabled]="cashierFlowEnabled()"
+                  [canSettleOrders]="canSettleOrders()"
                   (selectCredit)="selectCredit.emit()"
-                  (saveAsProforma)="saveAsProforma.emit()"
+                  (selectSplit)="selectSplit.emit()"
+                  (selectCashier)="selectCashier.emit()"
                   (paymentMethodSelect)="onPaymentMethodSelect($event)"
                   (customerSearchForCash)="customerSearchForCash.emit($event)"
                   (customerSelectForCash)="customerSelectForCash.emit($event)"
@@ -153,6 +156,7 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
   readonly error = input<string | null>(null);
   readonly isProcessing = input<boolean>(false);
   readonly cashierFlowEnabled = input<boolean>(false);
+  readonly canSettleOrders = input<boolean>(false);
   readonly triggerSuccess = input<{ amount: number; method: string } | null>(null);
 
   readonly enablePrinter = input<boolean>(true);
@@ -185,8 +189,7 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
 
   // Payment selection outputs
   readonly selectCredit = output<void>();
-  readonly saveAsProforma = output<void>();
-  readonly selectCash = output<void>();
+  readonly selectSplit = output<void>();
   readonly selectCashier = output<void>();
 
   // Dynamic payment methods

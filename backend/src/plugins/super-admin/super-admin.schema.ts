@@ -43,6 +43,9 @@ export const SUPER_ADMIN_SCHEMA = gql`
     smsUsedThisPeriod: Int
     smsPeriodEnd: DateTime
     smsLimitFromTier: Int
+    publicStorefrontEnabled: Boolean!
+    publicSlug: String
+    publicWhatsAppNumber: String
   }
 
   type PlatformStats {
@@ -72,6 +75,17 @@ export const SUPER_ADMIN_SCHEMA = gql`
     cashierFlowEnabled: Boolean
     cashControlEnabled: Boolean
     enablePrinter: Boolean
+  }
+
+  """
+  Assign/clear a channel's public storefront settings. Only the provided fields are changed.
+  Slug and WhatsApp number are validated; enabling requires a slug to be set.
+  """
+  input UpdateChannelPublicStorefrontInput {
+    channelId: ID!
+    publicSlug: String
+    publicStorefrontEnabled: Boolean
+    publicWhatsAppNumber: String
   }
 
   type PlatformAdministrator {
@@ -296,6 +310,7 @@ export const SUPER_ADMIN_SCHEMA = gql`
     updateChannelStatusPlatform(channelId: ID!, status: String!): Channel!
     extendTrialPlatform(channelId: ID!, trialEndsAt: DateTime!): Channel!
     updateChannelFeatureFlagsPlatform(input: UpdateChannelFeatureFlagsInput!): Channel!
+    updateChannelPublicStorefrontPlatform(input: UpdateChannelPublicStorefrontInput!): Channel!
     approveUser(userId: ID!): UserAuthorizationResult!
     rejectUser(userId: ID!, reason: String): UserAuthorizationResult!
     createRoleTemplate(input: CreateRoleTemplateInput!): PlatformRoleTemplate!

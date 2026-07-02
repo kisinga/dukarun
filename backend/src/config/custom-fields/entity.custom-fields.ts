@@ -35,7 +35,10 @@ export const productCustomFields: CustomFields['Product'] = [
           'JSON array of on-device image-recognition embeddings (set by the app; do not edit).',
       },
     ],
-    public: true,
+    // NOT public: the shop API is internet-facing (public storefronts). These fingerprints are
+    // proprietary and only read by the authenticated app via the admin API, which exposes all
+    // custom fields regardless of this flag.
+    public: false,
     nullable: true,
     ui: { readonly: true },
   },
@@ -52,7 +55,8 @@ export const productCustomFields: CustomFields['Product'] = [
         value: 'Embedder version the recognition fingerprint was produced with (set by the app).',
       },
     ],
-    public: true,
+    // NOT public — see mlEmbedding above (shop API is internet-facing).
+    public: false,
     nullable: true,
     ui: { readonly: true },
   },
@@ -131,6 +135,25 @@ export const orderCustomFields: CustomFields['Order'] = [
     public: false,
     nullable: true,
     ui: { tab: 'Inventory' },
+  },
+  {
+    // Marks an order parked at the cashier: rung up by a salesperson, fulfilled and
+    // owing (DR AR / CR SALES), awaiting collection at the cashier counter. Set when the
+    // order is created with isCashierFlow; cleared (null) once the order is fully settled.
+    // Drives the cashier settlement queue (pendingCashierOrders). Distinguishes a
+    // cashier-park from a long-term credit sale, which are otherwise ledger-identical.
+    name: 'cashierPendingAt',
+    type: 'datetime',
+    label: [{ languageCode: LanguageCode.en, value: 'Cashier Pending Since' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value:
+          'When this order was sent to the cashier for payment; null once fully settled or if not a cashier-flow order.',
+      },
+    ],
+    public: false,
+    nullable: true,
   },
 ];
 
@@ -293,7 +316,9 @@ export const productVariantCustomFields: CustomFields['ProductVariant'] = [
         value: 'Maximum discounted price in cents (serves as discount limit)',
       },
     ],
-    public: true,
+    // NOT public: wholesale/cost data must not leak to the internet-facing shop API. The
+    // authenticated app reads it via the admin API (which ignores this flag).
+    public: false,
     nullable: true,
     ui: { tab: 'Pricing' },
   },

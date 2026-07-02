@@ -2010,6 +2010,52 @@ export const PAY_SINGLE_ORDER = graphql(`
   }
 `);
 
+export const PENDING_CASHIER_ORDERS = graphql(`
+  query PendingCashierOrders {
+    pendingCashierOrders {
+      amountOwing
+      pendingSince
+      order {
+        id
+        code
+        state
+        total
+        totalWithTax
+        createdAt
+        customer {
+          id
+          firstName
+          lastName
+        }
+        lines {
+          id
+          quantity
+          productVariant {
+            id
+            name
+          }
+        }
+      }
+    }
+  }
+`);
+
+export const SETTLE_ORDER_PAYMENTS = graphql(`
+  mutation SettleOrderPayments($input: SettleOrderPaymentsInput!) {
+    settleOrderPayments(input: $input) {
+      orderId
+      orderCode
+      amountSettled
+      remainingOwing
+      fullySettled
+      tenders {
+        paymentMethodCode
+        amount
+      }
+    }
+  }
+`);
+
 export const SEND_CUSTOMER_STATEMENT_EMAIL = graphql(`
   mutation SendCustomerStatementEmail($customerId: ID!) {
     sendCustomerStatementEmail(customerId: $customerId)
