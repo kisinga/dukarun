@@ -9,6 +9,7 @@ import type { NavIcon } from '../../layout/nav.types';
 const NAV_ICON_MAP: Record<NavIcon, string> = {
   overview: 'heroChartBar',
   sell: 'heroShoppingCart',
+  cashier: 'heroBanknotes',
   sales: 'heroClipboardDocumentList',
   payments: 'heroCreditCard',
   expenses: 'heroDocumentText',

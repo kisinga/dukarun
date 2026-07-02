@@ -38,6 +38,7 @@ import {
   ManageCustomerCreditLimitPermission,
   OverrideCustomerBalancePermission,
   ReverseOrderPermission,
+  SettleOrderPermission,
 } from './permissions';
 import { OrderReversalApprovalSubscriber } from './order-reversal-approval.subscriber';
 import { OrderReversalResolver } from './order-reversal.resolver';
@@ -149,6 +150,49 @@ const COMBINED_SCHEMA = gql`
     debitAccountCode: String
   }
 
+  """
+  One tender in a (possibly split) cashier settlement. amount in smallest currency unit (cents).
+  """
+  input OrderTenderInput {
+    paymentMethodCode: String!
+    amount: Int!
+    referenceNumber: String
+  }
+
+  """
+  Settle a single order with one or more tenders (split payment). Amounts in cents.
+  """
+  input SettleOrderPaymentsInput {
+    orderId: ID!
+    tenders: [OrderTenderInput!]!
+  }
+
+  type SettledTender {
+    paymentMethodCode: String!
+    amount: Int!
+  }
+
+  """
+  Result of settling an order at the cashier. All amounts in smallest currency unit (cents).
+  """
+  type SettleOrderPaymentsResult {
+    orderId: ID!
+    orderCode: String!
+    tenders: [SettledTender!]!
+    amountSettled: Int!
+    remainingOwing: Int!
+    fullySettled: Boolean!
+  }
+
+  """
+  An order parked at the cashier awaiting collection. amountOwing in smallest currency unit (cents).
+  """
+  type CashierPendingOrder {
+    order: Order!
+    amountOwing: Int!
+    pendingSince: DateTime
+  }
+
   type CreditValidationResult {
     isValid: Boolean!
     error: String
@@ -184,6 +228,10 @@ const COMBINED_SCHEMA = gql`
     unpaidOrdersForCustomer(customerId: ID!): [Order!]!
     orderPaymentStatus(orderId: ID!): OrderPaymentStatus
     validateCredit(input: ValidateCreditInput!): CreditValidationResult!
+    """
+    Orders parked at the cashier and still owing (the cashier settlement queue).
+    """
+    pendingCashierOrders: [CashierPendingOrder!]!
   }
 
   type OrderReversalResult {
@@ -236,6 +284,7 @@ const COMBINED_SCHEMA = gql`
     recordPayment(input: RecordPaymentInput!): PaymentAllocationResult!
     allocateBulkPayment(input: PaymentAllocationInput!): PaymentAllocationResult!
     paySingleOrder(input: PaySingleOrderInput!): PaymentAllocationResult!
+    settleOrderPayments(input: SettleOrderPaymentsInput!): SettleOrderPaymentsResult!
     reverseOrder(orderId: ID!): OrderReversalResult!
     voidOrder(orderId: ID!): OrderReversalResult!
     reversePayment(paymentId: ID!): PaymentReversalResult!
@@ -379,6 +428,7 @@ const COMBINED_SCHEMA = gql`
       ManageSupplierCreditPurchasesPermission,
       OverrideCustomerBalancePermission,
       ReverseOrderPermission,
+      SettleOrderPermission,
     ];
 
     // Replace the placeholder credit payment handler with a DI-backed instance.

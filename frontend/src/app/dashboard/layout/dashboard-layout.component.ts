@@ -106,6 +106,12 @@ export class DashboardLayoutComponent implements OnInit {
         label: 'Operations',
         items: [
           { label: 'Sell', icon: 'sell', route: '/dashboard/sell' },
+          {
+            label: 'Cashier',
+            icon: 'cashier',
+            route: '/dashboard/cashier',
+            visible: () => auth.canSettleOrders(),
+          },
           { label: 'Products', icon: 'products', route: '/dashboard/products' },
           { label: 'Sales', icon: 'sales', route: '/dashboard/orders' },
           { label: 'Purchases', icon: 'purchases', route: '/dashboard/purchases' },

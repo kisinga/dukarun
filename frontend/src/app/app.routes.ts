@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard, noAuthGuard } from './core/guards/auth.guard';
+import { cashierGuard } from './core/guards/cashier.guard';
 import { creditGuard } from './core/guards/credit.guard';
 import { financialsGuard } from './core/guards/financials.guard';
 import { productGuard } from './core/guards/product.guard';
@@ -75,6 +76,12 @@ export const routes: Routes = [
         path: 'sell',
         loadComponent: () =>
           import('./dashboard/pages/sell/sell.component').then((m) => m.SellComponent),
+      },
+      {
+        path: 'cashier',
+        canActivate: [cashierGuard],
+        loadComponent: () =>
+          import('./dashboard/pages/cashier/cashier.component').then((m) => m.CashierComponent),
       },
       {
         path: 'products',

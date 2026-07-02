@@ -132,6 +132,25 @@ export const orderCustomFields: CustomFields['Order'] = [
     nullable: true,
     ui: { tab: 'Inventory' },
   },
+  {
+    // Marks an order parked at the cashier: rung up by a salesperson, fulfilled and
+    // owing (DR AR / CR SALES), awaiting collection at the cashier counter. Set when the
+    // order is created with isCashierFlow; cleared (null) once the order is fully settled.
+    // Drives the cashier settlement queue (pendingCashierOrders). Distinguishes a
+    // cashier-park from a long-term credit sale, which are otherwise ledger-identical.
+    name: 'cashierPendingAt',
+    type: 'datetime',
+    label: [{ languageCode: LanguageCode.en, value: 'Cashier Pending Since' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value:
+          'When this order was sent to the cashier for payment; null once fully settled or if not a cashier-flow order.',
+      },
+    ],
+    public: false,
+    nullable: true,
+  },
 ];
 
 export const paymentCustomFields: CustomFields['Payment'] = [

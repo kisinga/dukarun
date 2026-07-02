@@ -11,7 +11,7 @@ import {
   idsAreEqual,
   isGraphQlErrorResult,
 } from '@vendure/core';
-import { In } from 'typeorm';
+import { In, IsNull, Not } from 'typeorm';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { OpenSessionService } from '../financial/open-session.service';
 import { ChartOfAccountsService } from '../financial/chart-of-accounts.service';
@@ -51,6 +51,35 @@ export interface PaymentAllocationResult {
   remainingBalance: number; // In smallest currency unit (cents)
   totalAllocated: number; // In smallest currency unit (cents)
   excessPayment: number; // In smallest currency unit (cents) - amount paid beyond what's owed
+}
+
+/** One tender in a (possibly split) order settlement. */
+export interface OrderTenderInput {
+  paymentMethodCode: string; // Channel PaymentMethod.code or handler code (e.g. cash, mpesa)
+  amount: number; // In smallest currency unit (cents)
+  referenceNumber?: string; // e.g. M-Pesa transaction code; stored in payment metadata
+}
+
+/** Input for settling a single order with one or more tenders (split payment). */
+export interface SettleOrderPaymentsInput {
+  orderId: string;
+  tenders: OrderTenderInput[];
+}
+
+export interface SettleOrderPaymentsResult {
+  orderId: string;
+  orderCode: string;
+  tenders: Array<{ paymentMethodCode: string; amount: number }>;
+  amountSettled: number; // Sum of tenders (cents)
+  remainingOwing: number; // Order AR balance after settlement (cents); 0 when fully paid
+  fullySettled: boolean;
+}
+
+/** An order awaiting collection at the cashier, with its ledger-derived amount owing. */
+export interface CashierPendingOrder {
+  order: Order;
+  amountOwing: number; // In smallest currency unit (cents)
+  pendingSince: Date | null;
 }
 
 @Injectable()
@@ -477,6 +506,219 @@ export class PaymentAllocationService {
         excessPayment: 0,
       };
     });
+  }
+
+  /**
+   * Settle a single order at the cashier with one or more tenders (split payment).
+   *
+   * Strictly order-scoped: the amount owing is read from the ledger by orderId (never by
+   * customer), so concurrent orders on the shared walk-in customer never bleed into each
+   * other. Each tender becomes a settled Payment plus a PaymentAllocation entry
+   * (DR <tender account> / CR ACCOUNTS_RECEIVABLE), tagged with the open session for
+   * shift reconciliation. The whole settlement is atomic — any failing tender rolls back
+   * every tender. When the order is fully paid, the cashier-pending marker is cleared.
+   *
+   * The receivable being paid down was posted up front, either by a cashier-flow park or a
+   * credit sale (both DR AR / CR SALES at fulfillment), which is why settlement is uniformly
+   * an allocation against AR rather than a fresh cash-sale posting.
+   */
+  async settleOrderPayments(
+    ctx: RequestContext,
+    input: SettleOrderPaymentsInput
+  ): Promise<SettleOrderPaymentsResult> {
+    const order = await this.orderService.findOne(ctx, input.orderId, ['customer', 'payments']);
+    if (!order) {
+      throw new UserInputError(`Order ${input.orderId} not found`);
+    }
+    if (!order.customer) {
+      throw new UserInputError(`Order ${order.code} has no customer associated`);
+    }
+    if (!['ArrangingPayment', 'Fulfilled', 'PartiallyFulfilled'].includes(order.state)) {
+      throw new UserInputError(
+        `Order ${order.code} is in state "${order.state}" and cannot be settled. Only orders in "ArrangingPayment", "Fulfilled", or "PartiallyFulfilled" states can be settled.`
+      );
+    }
+
+    const tenders = input.tenders ?? [];
+    if (tenders.length === 0) {
+      throw new UserInputError('At least one payment tender is required to settle an order.');
+    }
+    for (const tender of tenders) {
+      if (!tender.paymentMethodCode?.trim()) {
+        throw new UserInputError('Each tender must specify a payment method.');
+      }
+      if (!Number.isInteger(tender.amount) || tender.amount <= 0) {
+        throw new UserInputError('Each tender amount must be a positive whole number of cents.');
+      }
+    }
+
+    const totalTendered = tenders.reduce((sum, tender) => sum + tender.amount, 0);
+
+    // Ledger is the source of truth for this order's outstanding balance (AR by orderId).
+    const status = await this.financialService.getOrderPaymentStatus(ctx, order.id.toString());
+    const outstandingAmount = status.amountOwing;
+    if (outstandingAmount <= 0) {
+      throw new UserInputError(`Order ${order.code} has no outstanding payment.`);
+    }
+    if (totalTendered > outstandingAmount) {
+      throw new UserInputError(
+        `Total tendered (${totalTendered}) cannot exceed the amount owing (${outstandingAmount}). Reduce a tender or remove one.`
+      );
+    }
+
+    // Resolve every tender's payment method to a channel PaymentMethod.code up front (fail fast).
+    const resolvedTenders: Array<{ code: string; amount: number; referenceNumber?: string }> = [];
+    for (const tender of tenders) {
+      const code = await this.resolvePaymentMethodCode(ctx, tender.paymentMethodCode);
+      resolvedTenders.push({
+        code,
+        amount: tender.amount,
+        referenceNumber: tender.referenceNumber?.trim() || undefined,
+      });
+    }
+
+    const session = await this.cashierSessionService.requireOpenSession(
+      ctx,
+      ctx.channelId as number
+    );
+    const customerId = order.customer.id.toString();
+
+    // Move the money atomically: every tender settles and posts, or none does.
+    const tendersPaid = await this.connection.withTransaction(ctx, async transactionCtx => {
+      // Re-load the order inside the transaction so each createPayment sees fresh state.
+      const txOrder = await this.orderService.findOne(transactionCtx, input.orderId, [
+        'customer',
+        'payments',
+      ]);
+      if (!txOrder) {
+        throw new UserInputError(`Order ${input.orderId} not found`);
+      }
+
+      const paid: Array<{ paymentMethodCode: string; amount: number }> = [];
+      for (const tender of resolvedTenders) {
+        // paymentType 'cashier-settlement' marks this as an allocation (DR cash / CR AR),
+        // not a cash sale, so the PaymentEventsAdapter safety net does NOT re-post it.
+        const metadata: Record<string, unknown> = {
+          paymentType: 'cashier-settlement',
+          customerId,
+          allocatedAmount: tender.amount,
+        };
+        if (tender.referenceNumber) {
+          metadata.referenceNumber = tender.referenceNumber;
+        }
+
+        const payment = await this.addAllocatedPaymentToOrder(
+          transactionCtx,
+          txOrder,
+          tender.amount,
+          tender.code,
+          metadata
+        );
+
+        await this.financialService.recordPaymentAllocation(
+          transactionCtx,
+          payment.id.toString(),
+          txOrder,
+          tender.code,
+          tender.amount,
+          undefined,
+          session.id,
+          customerId
+        );
+
+        paid.push({ paymentMethodCode: tender.code, amount: tender.amount });
+      }
+
+      await this.updateOrderCustomFields(transactionCtx, txOrder.id, {
+        lastModifiedByUserId: transactionCtx.activeUserId || undefined,
+      });
+
+      return paid;
+    });
+
+    // Read the true remaining owing AFTER commit (the ledger query runs on a non-transactional
+    // connection, so an in-transaction read would not see the just-posted allocations). This is
+    // also what makes the marker-clear correct under concurrent partial settlements: whichever
+    // request observes the order fully paid clears the marker.
+    const finalStatus = await this.financialService.getOrderPaymentStatus(ctx, order.id.toString());
+    const remainingOwing = finalStatus.amountOwing;
+    const fullySettled = remainingOwing <= 0;
+    if (fullySettled) {
+      await this.clearCashierPending(ctx, order.id);
+    }
+
+    if (this.auditService) {
+      await this.auditService.log(ctx, 'order.cashier.settled', {
+        entityType: 'Order',
+        entityId: order.id.toString(),
+        data: {
+          orderCode: order.code,
+          customerId,
+          amountSettled: totalTendered,
+          remainingOwing,
+          fullySettled,
+          tenders: tendersPaid,
+        },
+      });
+    }
+
+    this.logger.log(
+      `Settled order ${order.code} with ${tendersPaid.length} tender(s) totalling ${totalTendered}. ` +
+        `Remaining owing: ${remainingOwing}`
+    );
+
+    return {
+      orderId: order.id.toString(),
+      orderCode: order.code,
+      tenders: tendersPaid,
+      amountSettled: totalTendered,
+      remainingOwing,
+      fullySettled,
+    };
+  }
+
+  /**
+   * Orders parked at the cashier and still owing (the cashier settlement queue).
+   *
+   * Channel-scoped, filtered to the cashier-pending marker, then defensively narrowed to
+   * orders that still owe per the ledger (so a reversed/voided-but-still-marked order does
+   * not linger in the queue). Oldest first.
+   */
+  async getPendingCashierOrders(ctx: RequestContext): Promise<CashierPendingOrder[]> {
+    const orderRepo = this.connection.getRepository(ctx, Order);
+    const orders = await orderRepo.find({
+      where: {
+        state: In(['ArrangingPayment', 'Fulfilled', 'PartiallyFulfilled']),
+        customFields: { cashierPendingAt: Not(IsNull()) } as any,
+      },
+      relations: ['customer'],
+      order: { createdAt: 'ASC' }, // Oldest first
+    });
+
+    // Channel isolation + correctness: getOrderPaymentStatus reads AR by orderId within the
+    // request's channel, so an order parked in another channel resolves to amountOwing 0 here
+    // and is excluded. This also drops any order whose receivable was reversed/voided while the
+    // marker was left set. (Same ledger-as-source-of-truth pattern as getUnpaidOrdersForCustomer.)
+    const pending: CashierPendingOrder[] = [];
+    for (const order of orders) {
+      const status = await this.financialService.getOrderPaymentStatus(ctx, order.id.toString());
+      if (status.amountOwing > 0) {
+        pending.push({
+          order,
+          amountOwing: status.amountOwing,
+          pendingSince: (order.customFields as any)?.cashierPendingAt ?? null,
+        });
+      }
+    }
+    return pending;
+  }
+
+  /**
+   * Clear the cashier-pending marker once an order is fully settled (column-level update).
+   */
+  private async clearCashierPending(ctx: RequestContext, orderId: ID): Promise<void> {
+    const orderRepo = this.connection.getRepository(ctx, Order);
+    await orderRepo.update({ id: orderId }, { customFields: { cashierPendingAt: null } as any });
   }
 
   /**

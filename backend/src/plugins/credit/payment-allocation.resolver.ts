@@ -8,7 +8,11 @@ import {
   PaymentAllocationInput,
   PaymentAllocationResult,
   RecordPaymentInput,
+  SettleOrderPaymentsInput,
+  SettleOrderPaymentsResult,
+  CashierPendingOrder,
 } from '../../services/payments/payment-allocation.service';
+import { SettleOrderPermission } from './permissions';
 
 interface PaySingleOrderInput {
   orderId: string;
@@ -41,6 +45,22 @@ export class PaymentAllocationResolver {
     @Args('customerId') customerId: string
   ): Promise<Order[]> {
     return this.paymentAllocationService.getUnpaidOrdersForCustomer(ctx, customerId);
+  }
+
+  @Query()
+  @Allow(SettleOrderPermission.Permission)
+  async pendingCashierOrders(@Ctx() ctx: RequestContext): Promise<CashierPendingOrder[]> {
+    return this.paymentAllocationService.getPendingCashierOrders(ctx);
+  }
+
+  @Mutation()
+  @Allow(SettleOrderPermission.Permission)
+  async settleOrderPayments(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: SettleOrderPaymentsInput
+  ): Promise<SettleOrderPaymentsResult> {
+    // Audit is emitted by the service as 'order.cashier.settled' with per-tender detail.
+    return this.paymentAllocationService.settleOrderPayments(ctx, input);
   }
 
   @Mutation()

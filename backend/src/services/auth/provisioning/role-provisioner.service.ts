@@ -22,6 +22,7 @@ import {
   ApproveCustomerCreditPermission,
   ManageCustomerCreditLimitPermission,
   ReverseOrderPermission,
+  SettleOrderPermission,
 } from '../../../plugins/credit/permissions';
 import { ManageStockAdjustmentsPermission } from '../../../plugins/stock/permissions';
 import {
@@ -102,6 +103,7 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
       ManageSupplierCreditPurchasesPermission.Permission as Permission,
       ReverseOrderPermission.Permission as Permission,
       ManageApprovalsPermission.Permission as Permission,
+      SettleOrderPermission.Permission as Permission,
     ],
   },
   cashier: {
@@ -118,6 +120,7 @@ export const ROLE_TEMPLATES: Record<string, RoleTemplate> = {
       ApproveCustomerCreditPermission.Permission as Permission,
       ManageReconciliationPermission.Permission as Permission,
       ManageApprovalsPermission.Permission as Permission,
+      SettleOrderPermission.Permission as Permission,
     ],
   },
   accountant: {
@@ -245,6 +248,7 @@ export class RoleProvisionerService {
     ManageSupplierCreditPurchasesPermission.Permission as Permission,
     ReverseOrderPermission.Permission as Permission,
     ManageApprovalsPermission.Permission as Permission,
+    SettleOrderPermission.Permission as Permission,
   ];
 
   constructor(

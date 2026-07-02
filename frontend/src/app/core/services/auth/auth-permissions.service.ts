@@ -133,6 +133,21 @@ export class AuthPermissionsService {
   });
 
   /**
+   * Can settle orders at the cashier (collect payment / split payments). Backed by the
+   * `SettleOrder` permission (granted to admin/cashier) or SuperAdmin. Gates the cashier
+   * queue route and the settlement action.
+   */
+  readonly canSettleOrders = computed(() => {
+    const user = this.sessionService.user();
+    if (!user?.user?.roles) return false;
+    return user.user.roles.some(
+      (role) =>
+        role.permissions.includes('SettleOrder' as Permission) ||
+        role.permissions.includes(Permission.SuperAdmin),
+    );
+  });
+
+  /**
    * Check if user has a specific role (extend as needed)
    */
   hasRole(role: string): boolean {
