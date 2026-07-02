@@ -35,7 +35,10 @@ export const productCustomFields: CustomFields['Product'] = [
           'JSON array of on-device image-recognition embeddings (set by the app; do not edit).',
       },
     ],
-    public: true,
+    // NOT public: the shop API is internet-facing (public storefronts). These fingerprints are
+    // proprietary and only read by the authenticated app via the admin API, which exposes all
+    // custom fields regardless of this flag.
+    public: false,
     nullable: true,
     ui: { readonly: true },
   },
@@ -52,7 +55,8 @@ export const productCustomFields: CustomFields['Product'] = [
         value: 'Embedder version the recognition fingerprint was produced with (set by the app).',
       },
     ],
-    public: true,
+    // NOT public — see mlEmbedding above (shop API is internet-facing).
+    public: false,
     nullable: true,
     ui: { readonly: true },
   },
@@ -312,7 +316,9 @@ export const productVariantCustomFields: CustomFields['ProductVariant'] = [
         value: 'Maximum discounted price in cents (serves as discount limit)',
       },
     ],
-    public: true,
+    // NOT public: wholesale/cost data must not leak to the internet-facing shop API. The
+    // authenticated app reads it via the admin API (which ignores this flag).
+    public: false,
     nullable: true,
     ui: { tab: 'Pricing' },
   },

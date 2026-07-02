@@ -26,6 +26,9 @@ export interface PlatformChannelResult {
     smsUsedThisPeriod: number;
     smsPeriodEnd: Date | null;
     smsLimitFromTier: number | null;
+    publicStorefrontEnabled: boolean;
+    publicSlug: string | null;
+    publicWhatsAppNumber: string | null;
   };
 }
 
@@ -111,6 +114,9 @@ export class PlatformStatsService {
         smsUsedThisPeriod: typeof cf.smsUsedThisPeriod === 'number' ? cf.smsUsedThisPeriod : 0,
         smsPeriodEnd: cf.smsPeriodEnd ? new Date(cf.smsPeriodEnd) : null,
         smsLimitFromTier,
+        publicStorefrontEnabled: cf.publicStorefrontEnabled === true,
+        publicSlug: (cf.publicSlug as string) ?? null,
+        publicWhatsAppNumber: (cf.publicWhatsAppNumber as string) ?? null,
       },
     };
   }

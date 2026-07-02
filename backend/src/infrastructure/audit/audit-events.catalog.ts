@@ -76,6 +76,7 @@ export const PLATFORM_AUDIT_EVENTS = {
   CHANNEL_STATUS_UPDATED: 'platform.channel.status_updated',
   CHANNEL_TRIAL_EXTENDED: 'platform.channel.trial_extended',
   CHANNEL_FEATURE_FLAGS_UPDATED: 'platform.channel.feature_flags_updated',
+  CHANNEL_PUBLIC_STOREFRONT_UPDATED: 'platform.channel.public_storefront_updated',
   USER_APPROVED: 'platform.user.approved',
   USER_REJECTED: 'platform.user.rejected',
   ROLE_TEMPLATE_CREATED: 'platform.role_template.created',

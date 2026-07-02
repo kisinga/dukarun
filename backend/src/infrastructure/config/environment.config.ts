@@ -49,6 +49,8 @@ export class EnvironmentConfig implements OnModuleInit {
     superAdminUrl: '', // Super Admin app origin for CORS (e.g. http://localhost:4201)
     assetUrlPrefix: '',
     assetUploadDir: '',
+    // Base domain for public merchant storefronts, e.g. 'dukarun.com' → merchant.dukarun.com.
+    storefrontBaseDomain: '',
   };
 
   // Email configuration
@@ -216,6 +218,7 @@ export class EnvironmentConfig implements OnModuleInit {
     this.app.assetUrlPrefix = process.env.ASSET_URL_PREFIX || '';
     this.app.assetUploadDir =
       process.env.ASSET_UPLOAD_DIR || path.join(process.cwd(), 'static/assets');
+    this.app.storefrontBaseDomain = process.env.STOREFRONT_BASE_DOMAIN || 'dukarun.com';
 
     // Load Email configuration
     this.email.transport = process.env.MAIL_TRANSPORT || 'file';

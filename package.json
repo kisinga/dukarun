@@ -5,7 +5,8 @@
   "workspaces": [
     "backend",
     "frontend",
-    "super-admin"
+    "super-admin",
+    "storefront"
   ],
   "engines": {
     "node": ">=22.22.1"
@@ -14,14 +15,17 @@
     "setup": "ts-node scripts/setup.ts",
     "predev": "npm run setup -- --quick --fix",
     "dev": "npm run services:up && npm run dev:all",
-    "dev:all": "concurrently -k -n BE,FE,SA -c blue,green,magenta npm:dev:backend npm:dev:frontend npm:dev:super-admin",
+    "dev:all": "concurrently -k -n BE,FE,SA,ST -c blue,green,magenta,cyan npm:dev:backend npm:dev:frontend npm:dev:super-admin npm:dev:storefront",
     "dev:backend": "npm run dev -w @dukarun/backend",
     "dev:frontend": "npm start -w @dukarun/frontend",
     "dev:super-admin": "npm start -w super-admin",
-    "codegen": "npm run codegen -w @dukarun/frontend && npm run codegen -w super-admin",
+    "dev:storefront": "npm start -w @dukarun/storefront",
+    "codegen": "npm run codegen -w @dukarun/frontend && npm run codegen -w super-admin && npm run codegen -w @dukarun/storefront",
     "codegen:watch": "npm run codegen:watch -w @dukarun/frontend",
     "codegen:super-admin": "npm run codegen -w super-admin",
     "codegen:super-admin:watch": "npm run codegen:watch -w super-admin",
+    "codegen:storefront": "npm run codegen -w @dukarun/storefront",
+    "codegen:storefront:watch": "npm run codegen:watch -w @dukarun/storefront",
     "services:up": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml up -d",
     "services:down": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml down",
     "test": "npm run test --workspaces --if-present",

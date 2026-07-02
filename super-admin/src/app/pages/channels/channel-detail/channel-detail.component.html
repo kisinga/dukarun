@@ -113,6 +113,58 @@
       </div>
     </div>
   </div>
+  <div class="card card-border bg-base-100 shadow mb-6">
+    <div class="card-body">
+      <h2 class="card-title text-base">Public storefront</h2>
+      <p class="text-sm text-base-content/70 mb-2">
+        Assign a subdomain and publish this channel's catalogue publicly (browse-only + WhatsApp enquiry).
+        The store goes live only when the channel is APPROVED and its subscription is active.
+      </p>
+      <div class="flex flex-col gap-3 max-w-md">
+        <label class="form-control w-full">
+          <span class="label label-text">Subdomain slug</span>
+          <input
+            type="text"
+            class="input input-bordered input-sm w-full"
+            placeholder="e.g. mama-mboga"
+            [ngModel]="publicSlug()"
+            (ngModelChange)="publicSlug.set($event)"
+          />
+          @if (storefrontUrl()) {
+            <span class="label"><span class="label-text-alt text-base-content/60">{{ storefrontUrl() }}</span></span>
+          }
+        </label>
+        <label class="form-control w-full">
+          <span class="label label-text">WhatsApp number (E.164)</span>
+          <input
+            type="text"
+            class="input input-bordered input-sm w-full"
+            placeholder="+254712345678"
+            [ngModel]="publicWhatsAppNumber()"
+            (ngModelChange)="publicWhatsAppNumber.set($event)"
+          />
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            class="toggle toggle-primary toggle-sm"
+            [checked]="publicStorefrontEnabled()"
+            (change)="publicStorefrontEnabled.set(!publicStorefrontEnabled())"
+          />
+          <span class="label-text">Publish storefront</span>
+        </label>
+        @if (storefrontError()) {
+          <div role="alert" class="alert alert-error py-2"><span class="text-sm">{{ storefrontError() }}</span></div>
+        }
+        @if (storefrontSaved()) {
+          <div role="alert" class="alert alert-success py-2"><span class="text-sm">Saved.</span></div>
+        }
+        <button type="button" class="btn btn-primary btn-sm self-start" (click)="updatePublicStorefront()" [disabled]="saving()">
+          Save storefront
+        </button>
+      </div>
+    </div>
+  </div>
   @if (analytics(); as a) {
     <div class="card card-border bg-base-100 shadow mb-6">
       <div class="card-body">

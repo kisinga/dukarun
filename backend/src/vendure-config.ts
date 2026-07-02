@@ -39,6 +39,7 @@ import { PriceOverridePlugin } from './plugins/pricing/price-override.plugin';
 import { ManageStockAdjustmentsPermission } from './plugins/stock/permissions';
 import { StockPlugin } from './plugins/stock/stock.plugin';
 import { SubscriptionPlugin } from './plugins/subscriptions/subscription.plugin';
+import { StorefrontPlugin } from './plugins/storefront/storefront.plugin';
 import { cashPaymentHandler, mpesaPaymentHandler } from './services/payments/payment-handlers';
 import {
   channelCustomFields,
@@ -85,6 +86,22 @@ const CORS_ALLOWED_ORIGINS = [
     .filter(Boolean) || []),
 ];
 
+// Public merchant storefronts are served from *.{STOREFRONT_BASE_DOMAIN} and call the shop API
+// anonymously, so their (dynamic) subdomain origins are allowed here in addition to the fixed list.
+// NOTE: Vendure applies one CORS config to both shop and admin APIs, so this wildcard is also
+// visible to admin-api — acceptable because admin-api is auth-protected and storefront subdomains
+// are provisioned manually by us (an attacker cannot obtain a *.<baseDomain> origin).
+function isStorefrontOrigin(requestOrigin: string): boolean {
+  const base = env.app.storefrontBaseDomain;
+  if (!base) return false;
+  try {
+    const host = new URL(requestOrigin).hostname.toLowerCase();
+    return host === base || host.endsWith('.' + base);
+  } catch {
+    return false;
+  }
+}
+
 export const config: VendureConfig = {
   apiOptions: {
     port: serverPort,
@@ -97,7 +114,11 @@ export const config: VendureConfig = {
         requestOrigin: string | undefined,
         callback: (err: Error | null, allow?: boolean | string) => void
       ) => {
-        if (!requestOrigin || CORS_ALLOWED_ORIGINS.includes(requestOrigin)) {
+        if (
+          !requestOrigin ||
+          CORS_ALLOWED_ORIGINS.includes(requestOrigin) ||
+          isStorefrontOrigin(requestOrigin)
+        ) {
           return callback(null, requestOrigin || true);
         }
         callback(null, false);
@@ -234,6 +255,7 @@ export const config: VendureConfig = {
     CreditPlugin, // Depends on LedgerPlugin
     CustomerPlugin, // Customer duplicate prevention
     SubscriptionPlugin,
+    StorefrontPlugin, // Public per-merchant storefront: shop-api storefront(slug) + sitemap/robots
     ChannelEventsPlugin,
     // PhoneAuthPlugin must be registered early so its strategy can be added to adminAuthenticationStrategy
     PhoneAuthPlugin,

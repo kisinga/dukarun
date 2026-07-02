@@ -14,6 +14,7 @@ import {
   EXTEND_TRIAL_PLATFORM,
   UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM,
   UPDATE_CHANNEL_ZONES_PLATFORM,
+  UPDATE_CHANNEL_PUBLIC_STOREFRONT_PLATFORM,
 } from '../../../core/graphql/operations.graphql';
 
 interface PlatformZone {
@@ -36,6 +37,9 @@ interface PlatformChannel {
     smsUsedThisPeriod?: number;
     smsPeriodEnd?: string | null;
     smsLimitFromTier?: number | null;
+    publicStorefrontEnabled?: boolean;
+    publicSlug?: string | null;
+    publicWhatsAppNumber?: string | null;
   };
   defaultShippingZone?: PlatformZone | null;
   defaultTaxZone?: PlatformZone | null;
@@ -92,9 +96,20 @@ export class ChannelDetailComponent implements OnInit {
   cashierFlowEnabled = signal(false);
   cashControlEnabled = signal(true);
   enablePrinter = signal(true);
+  publicStorefrontEnabled = signal(false);
+  publicSlug = signal('');
+  publicWhatsAppNumber = signal('');
+  storefrontError = signal<string | null>(null);
+  storefrontSaved = signal(false);
   saving = signal(false);
 
   id = computed(() => this.route.snapshot.paramMap.get('id') ?? '');
+
+  // Preview of the resulting public subdomain. Base domain matches the backend STOREFRONT_BASE_DOMAIN.
+  storefrontUrl = computed(() => {
+    const s = this.publicSlug().trim().toLowerCase();
+    return s ? `https://${s}.dukarun.com` : '';
+  });
 
   async ngOnInit(): Promise<void> {
     const id = this.id();
@@ -148,6 +163,9 @@ export class ChannelDetailComponent implements OnInit {
         this.cashierFlowEnabled.set(ch.customFields.cashierFlowEnabled);
         this.cashControlEnabled.set(ch.customFields.cashControlEnabled);
         this.enablePrinter.set(ch.customFields.enablePrinter);
+        this.publicStorefrontEnabled.set(ch.customFields.publicStorefrontEnabled ?? false);
+        this.publicSlug.set(ch.customFields.publicSlug ?? '');
+        this.publicWhatsAppNumber.set(ch.customFields.publicWhatsAppNumber ?? '');
       }
       this.analytics.set((analyticsResult.data as any)?.analyticsStatsForChannel ?? null);
       this.auditLogs.set((auditResult.data as any)?.auditLogsForChannel ?? []);
@@ -300,6 +318,49 @@ export class ChannelDetailComponent implements OnInit {
           },
         });
       }
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  async updatePublicStorefront(): Promise<void> {
+    const id = this.id();
+    if (!id) return;
+    this.saving.set(true);
+    this.storefrontError.set(null);
+    this.storefrontSaved.set(false);
+    const slug = this.publicSlug().trim().toLowerCase() || null;
+    const whatsapp = this.publicWhatsAppNumber().trim() || null;
+    const enabled = this.publicStorefrontEnabled();
+    try {
+      await this.apollo.getClient().mutate({
+        mutation: UPDATE_CHANNEL_PUBLIC_STOREFRONT_PLATFORM,
+        variables: {
+          input: {
+            channelId: id,
+            publicSlug: slug,
+            publicStorefrontEnabled: enabled,
+            publicWhatsAppNumber: whatsapp,
+          },
+        },
+      });
+      // Reflect the server-normalised slug locally.
+      this.publicSlug.set(slug ?? '');
+      const ch = this.channel();
+      if (ch) {
+        this.channel.set({
+          ...ch,
+          customFields: {
+            ...ch.customFields,
+            publicStorefrontEnabled: enabled,
+            publicSlug: slug,
+            publicWhatsAppNumber: whatsapp,
+          },
+        });
+      }
+      this.storefrontSaved.set(true);
+    } catch (err: any) {
+      this.storefrontError.set(err?.message ?? 'Failed to save storefront settings.');
     } finally {
       this.saving.set(false);
     }

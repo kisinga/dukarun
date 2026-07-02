@@ -683,6 +683,14 @@ export type CashDrawerCount = {
   varianceReason?: Maybe<Scalars['String']['output']>;
 };
 
+/** An order parked at the cashier awaiting collection. amountOwing in smallest currency unit (cents). */
+export type CashierPendingOrder = {
+  __typename?: 'CashierPendingOrder';
+  amountOwing: Scalars['Int']['output'];
+  order: Order;
+  pendingSince?: Maybe<Scalars['DateTime']['output']>;
+};
+
 export type CashierSession = {
   __typename?: 'CashierSession';
   cashierUserId: Scalars['Int']['output'];
@@ -765,6 +773,9 @@ export type ChannelCustomFields = {
   maxAdminCount?: Maybe<Scalars['Int']['output']>;
   paystackCustomerCode?: Maybe<Scalars['String']['output']>;
   paystackSubscriptionCode?: Maybe<Scalars['String']['output']>;
+  publicSlug?: Maybe<Scalars['String']['output']>;
+  publicStorefrontEnabled?: Maybe<Scalars['Boolean']['output']>;
+  publicWhatsAppNumber?: Maybe<Scalars['String']['output']>;
   requireOpeningCount?: Maybe<Scalars['Boolean']['output']>;
   smsPeriodEnd?: Maybe<Scalars['DateTime']['output']>;
   smsUsageByCategory?: Maybe<Scalars['String']['output']>;
@@ -813,6 +824,9 @@ export type ChannelFilterParameter = {
   paystackCustomerCode?: InputMaybe<StringOperators>;
   paystackSubscriptionCode?: InputMaybe<StringOperators>;
   pricesIncludeTax?: InputMaybe<BooleanOperators>;
+  publicSlug?: InputMaybe<StringOperators>;
+  publicStorefrontEnabled?: InputMaybe<BooleanOperators>;
+  publicWhatsAppNumber?: InputMaybe<StringOperators>;
   requireOpeningCount?: InputMaybe<BooleanOperators>;
   smsPeriodEnd?: InputMaybe<DateOperators>;
   smsUsageByCategory?: InputMaybe<StringOperators>;
@@ -872,6 +886,9 @@ export type ChannelSortParameter = {
   outOfStockThreshold?: InputMaybe<SortOrder>;
   paystackCustomerCode?: InputMaybe<SortOrder>;
   paystackSubscriptionCode?: InputMaybe<SortOrder>;
+  publicSlug?: InputMaybe<SortOrder>;
+  publicStorefrontEnabled?: InputMaybe<SortOrder>;
+  publicWhatsAppNumber?: InputMaybe<SortOrder>;
   requireOpeningCount?: InputMaybe<SortOrder>;
   smsPeriodEnd?: InputMaybe<SortOrder>;
   smsUsageByCategory?: InputMaybe<SortOrder>;
@@ -1281,6 +1298,9 @@ export type CreateChannelCustomFieldsInput = {
   maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
+  publicSlug?: InputMaybe<Scalars['String']['input']>;
+  publicStorefrontEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  publicWhatsAppNumber?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
   smsPeriodEnd?: InputMaybe<Scalars['DateTime']['input']>;
   smsUsageByCategory?: InputMaybe<Scalars['String']['input']>;
@@ -1420,6 +1440,7 @@ export type CreateInventoryReconciliationInput = {
 
 export type CreateOrderCustomFieldsInput = {
   auditCreatedAt?: InputMaybe<Scalars['DateTime']['input']>;
+  cashierPendingAt?: InputMaybe<Scalars['DateTime']['input']>;
   cogsStatus?: InputMaybe<Scalars['String']['input']>;
   createdByUserIdId?: InputMaybe<Scalars['ID']['input']>;
   lastModifiedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
@@ -4007,6 +4028,7 @@ export type Mutation = {
   setSettingsStoreValue: SetSettingsStoreValueResult;
   /** Set multiple key-value pairs in a transaction (each automatically scoped) */
   setSettingsStoreValues: Array<SetSettingsStoreValueResult>;
+  settleOrderPayments: SettleOrderPaymentsResult;
   settlePayment: SettlePaymentResult;
   settleRefund: SettleRefundResult;
   subscribeToPush: Scalars['Boolean']['output'];
@@ -4035,6 +4057,7 @@ export type Mutation = {
   updateChannelFeatureFlagsPlatform: Channel;
   updateChannelLogo: ChannelSettings;
   updateChannelPaymentMethod: PaymentMethod;
+  updateChannelPublicStorefrontPlatform: Channel;
   updateChannelStatus: Channel;
   updateChannelStatusPlatform: Channel;
   updateChannelZonesPlatform: Channel;
@@ -5075,6 +5098,11 @@ export type MutationSetSettingsStoreValuesArgs = {
 };
 
 
+export type MutationSettleOrderPaymentsArgs = {
+  input: SettleOrderPaymentsInput;
+};
+
+
 export type MutationSettlePaymentArgs = {
   id: Scalars['ID']['input'];
 };
@@ -5178,6 +5206,11 @@ export type MutationUpdateChannelLogoArgs = {
 
 export type MutationUpdateChannelPaymentMethodArgs = {
   input: UpdatePaymentMethodInput;
+};
+
+
+export type MutationUpdateChannelPublicStorefrontPlatformArgs = {
+  input: UpdateChannelPublicStorefrontInput;
 };
 
 
@@ -5655,6 +5688,7 @@ export type OrderAddress = {
 export type OrderCustomFields = {
   __typename?: 'OrderCustomFields';
   auditCreatedAt?: Maybe<Scalars['DateTime']['output']>;
+  cashierPendingAt?: Maybe<Scalars['DateTime']['output']>;
   cogsStatus?: Maybe<Scalars['String']['output']>;
   createdByUserId?: Maybe<User>;
   lastModifiedByUserId?: Maybe<User>;
@@ -5668,6 +5702,7 @@ export type OrderFilterParameter = {
   active?: InputMaybe<BooleanOperators>;
   aggregateOrderId?: InputMaybe<IdOperators>;
   auditCreatedAt?: InputMaybe<DateOperators>;
+  cashierPendingAt?: InputMaybe<DateOperators>;
   code?: InputMaybe<StringOperators>;
   cogsStatus?: InputMaybe<StringOperators>;
   createdAt?: InputMaybe<DateOperators>;
@@ -5873,6 +5908,7 @@ export type OrderReversalResult = {
 export type OrderSortParameter = {
   aggregateOrderId?: InputMaybe<SortOrder>;
   auditCreatedAt?: InputMaybe<SortOrder>;
+  cashierPendingAt?: InputMaybe<SortOrder>;
   code?: InputMaybe<SortOrder>;
   cogsStatus?: InputMaybe<SortOrder>;
   createdAt?: InputMaybe<SortOrder>;
@@ -5919,6 +5955,13 @@ export type OrderTaxSummary = {
   taxRate: Scalars['Float']['output'];
   /** The total tax being applied to the Order at this taxRate */
   taxTotal: Scalars['Money']['output'];
+};
+
+/** One tender in a (possibly split) cashier settlement. amount in smallest currency unit (cents). */
+export type OrderTenderInput = {
+  amount: Scalars['Int']['input'];
+  paymentMethodCode: Scalars['String']['input'];
+  referenceNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
 export enum OrderType {
@@ -6386,6 +6429,8 @@ export enum Permission {
   ReadZone = 'ReadZone',
   /** Allows reversing an order (ledger reversal and mark order reversed). */
   ReverseOrder = 'ReverseOrder',
+  /** Allows settling orders at the cashier, including split payments across multiple tenders. */
+  SettleOrder = 'SettleOrder',
   /** SuperAdmin has unrestricted access to all operations */
   SuperAdmin = 'SuperAdmin',
   /** Grants permission to update Administrator */
@@ -6435,7 +6480,9 @@ export enum Permission {
   /** Grants permission to update TaxRate */
   UpdateTaxRate = 'UpdateTaxRate',
   /** Grants permission to update Zone */
-  UpdateZone = 'UpdateZone'
+  UpdateZone = 'UpdateZone',
+  /** Allows viewing business financial figures (balances, period status, reconciliation reporting). */
+  ViewFinancials = 'ViewFinancials'
 }
 
 export type PermissionDefinition = {
@@ -6531,6 +6578,9 @@ export type PlatformChannelCustomFields = {
   cashierFlowEnabled: Scalars['Boolean']['output'];
   enablePrinter: Scalars['Boolean']['output'];
   maxAdminCount: Scalars['Int']['output'];
+  publicSlug?: Maybe<Scalars['String']['output']>;
+  publicStorefrontEnabled: Scalars['Boolean']['output'];
+  publicWhatsAppNumber?: Maybe<Scalars['String']['output']>;
   smsLimitFromTier?: Maybe<Scalars['Int']['output']>;
   smsPeriodEnd?: Maybe<Scalars['DateTime']['output']>;
   smsUsedThisPeriod?: Maybe<Scalars['Int']['output']>;
@@ -7314,6 +7364,8 @@ export type Query = {
   paymentMethodEligibilityCheckers: Array<ConfigurableOperationDefinition>;
   paymentMethodHandlers: Array<ConfigurableOperationDefinition>;
   paymentMethods: PaymentMethodList;
+  /** Orders parked at the cashier and still owing (the cashier settlement queue). */
+  pendingCashierOrders: Array<CashierPendingOrder>;
   pendingRegistrations: Array<PendingRegistration>;
   pendingSearchIndexUpdates: Scalars['Int']['output'];
   pendingVarianceReviews: Array<CashDrawerCount>;
@@ -8678,6 +8730,23 @@ export enum SettingsStoreScopeType {
   USER_AND_CHANNEL = 'USER_AND_CHANNEL'
 }
 
+/** Settle a single order with one or more tenders (split payment). Amounts in cents. */
+export type SettleOrderPaymentsInput = {
+  orderId: Scalars['ID']['input'];
+  tenders: Array<OrderTenderInput>;
+};
+
+/** Result of settling an order at the cashier. All amounts in smallest currency unit (cents). */
+export type SettleOrderPaymentsResult = {
+  __typename?: 'SettleOrderPaymentsResult';
+  amountSettled: Scalars['Int']['output'];
+  fullySettled: Scalars['Boolean']['output'];
+  orderCode: Scalars['String']['output'];
+  orderId: Scalars['ID']['output'];
+  remainingOwing: Scalars['Int']['output'];
+  tenders: Array<SettledTender>;
+};
+
 /** Returned if the Payment settlement fails */
 export type SettlePaymentError = ErrorResult & {
   __typename?: 'SettlePaymentError';
@@ -8694,6 +8763,12 @@ export type SettleRefundInput = {
 };
 
 export type SettleRefundResult = Refund | RefundStateTransitionError;
+
+export type SettledTender = {
+  __typename?: 'SettledTender';
+  amount: Scalars['Int']['output'];
+  paymentMethodCode: Scalars['String']['output'];
+};
 
 export type ShiftModalPrefillData = {
   __typename?: 'ShiftModalPrefillData';
@@ -9507,6 +9582,9 @@ export type UpdateChannelCustomFieldsInput = {
   maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
+  publicSlug?: InputMaybe<Scalars['String']['input']>;
+  publicStorefrontEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  publicWhatsAppNumber?: InputMaybe<Scalars['String']['input']>;
   requireOpeningCount?: InputMaybe<Scalars['Boolean']['input']>;
   smsPeriodEnd?: InputMaybe<Scalars['DateTime']['input']>;
   smsUsageByCategory?: InputMaybe<Scalars['String']['input']>;
@@ -9545,6 +9623,17 @@ export type UpdateChannelInput = {
   sellerId?: InputMaybe<Scalars['ID']['input']>;
   token?: InputMaybe<Scalars['String']['input']>;
   trackInventory?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+/**
+ * Assign/clear a channel's public storefront settings. Only the provided fields are changed.
+ * Slug and WhatsApp number are validated; enabling requires a slug to be set.
+ */
+export type UpdateChannelPublicStorefrontInput = {
+  channelId: Scalars['ID']['input'];
+  publicSlug?: InputMaybe<Scalars['String']['input']>;
+  publicStorefrontEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  publicWhatsAppNumber?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateChannelResult = Channel | LanguageNotAvailableError;
@@ -9688,6 +9777,7 @@ export type UpdateOrderAddressInput = {
 
 export type UpdateOrderCustomFieldsInput = {
   auditCreatedAt?: InputMaybe<Scalars['DateTime']['input']>;
+  cashierPendingAt?: InputMaybe<Scalars['DateTime']['input']>;
   cogsStatus?: InputMaybe<Scalars['String']['input']>;
   createdByUserIdId?: InputMaybe<Scalars['ID']['input']>;
   lastModifiedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
@@ -10030,7 +10120,7 @@ export type ChannelDetailPlatformQueryVariables = Exact<{
 }>;
 
 
-export type ChannelDetailPlatformQuery = { __typename?: 'Query', channelDetailPlatform?: { __typename?: 'PlatformChannelDetail', id: string, code: string, token: string, customFields: { __typename?: 'PlatformChannelCustomFields', status: string, trialEndsAt?: any | null, subscriptionStatus?: string | null, maxAdminCount: number, cashierFlowEnabled: boolean, cashControlEnabled: boolean, enablePrinter: boolean, smsUsedThisPeriod?: number | null, smsPeriodEnd?: any | null, smsLimitFromTier?: number | null }, defaultShippingZone?: { __typename?: 'PlatformZone', id: string, name: string } | null, defaultTaxZone?: { __typename?: 'PlatformZone', id: string, name: string } | null } | null };
+export type ChannelDetailPlatformQuery = { __typename?: 'Query', channelDetailPlatform?: { __typename?: 'PlatformChannelDetail', id: string, code: string, token: string, customFields: { __typename?: 'PlatformChannelCustomFields', status: string, trialEndsAt?: any | null, subscriptionStatus?: string | null, maxAdminCount: number, cashierFlowEnabled: boolean, cashControlEnabled: boolean, enablePrinter: boolean, smsUsedThisPeriod?: number | null, smsPeriodEnd?: any | null, smsLimitFromTier?: number | null, publicStorefrontEnabled: boolean, publicSlug?: string | null, publicWhatsAppNumber?: string | null }, defaultShippingZone?: { __typename?: 'PlatformZone', id: string, name: string } | null, defaultTaxZone?: { __typename?: 'PlatformZone', id: string, name: string } | null } | null };
 
 export type UpdateChannelZonesPlatformMutationVariables = Exact<{
   input: UpdateChannelZonesInput;
@@ -10124,6 +10214,13 @@ export type UpdateChannelFeatureFlagsPlatformMutationVariables = Exact<{
 
 
 export type UpdateChannelFeatureFlagsPlatformMutation = { __typename?: 'Mutation', updateChannelFeatureFlagsPlatform: { __typename?: 'Channel', id: string, customFields?: { __typename?: 'ChannelCustomFields', maxAdminCount?: number | null, cashierFlowEnabled?: boolean | null, cashControlEnabled?: boolean | null, enablePrinter?: boolean | null } | null } };
+
+export type UpdateChannelPublicStorefrontPlatformMutationVariables = Exact<{
+  input: UpdateChannelPublicStorefrontInput;
+}>;
+
+
+export type UpdateChannelPublicStorefrontPlatformMutation = { __typename?: 'Mutation', updateChannelPublicStorefrontPlatform: { __typename?: 'Channel', id: string, customFields?: { __typename?: 'ChannelCustomFields', publicStorefrontEnabled?: boolean | null, publicSlug?: string | null, publicWhatsAppNumber?: string | null } | null } };
 
 export type GetSubscriptionTiersQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -10253,7 +10350,7 @@ export type PlatformAuditLogsQuery = { __typename?: 'Query', platformAuditLogs: 
 
 export const AuthenticateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"Authenticate"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"username"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"password"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"authenticate"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"native"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"username"},"value":{"kind":"Variable","name":{"kind":"Name","value":"username"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"password"},"value":{"kind":"Variable","name":{"kind":"Name","value":"password"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CurrentUser"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]}}]} as unknown as DocumentNode<AuthenticateMutation, AuthenticateMutationVariables>;
 export const PlatformZonesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformZones"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformZones"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<PlatformZonesQuery, PlatformZonesQueryVariables>;
-export const ChannelDetailPlatformDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ChannelDetailPlatform"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"channelDetailPlatform"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"customFields"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"trialEndsAt"}},{"kind":"Field","name":{"kind":"Name","value":"subscriptionStatus"}},{"kind":"Field","name":{"kind":"Name","value":"maxAdminCount"}},{"kind":"Field","name":{"kind":"Name","value":"cashierFlowEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"cashControlEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"enablePrinter"}},{"kind":"Field","name":{"kind":"Name","value":"smsUsedThisPeriod"}},{"kind":"Field","name":{"kind":"Name","value":"smsPeriodEnd"}},{"kind":"Field","name":{"kind":"Name","value":"smsLimitFromTier"}}]}},{"kind":"Field","name":{"kind":"Name","value":"defaultShippingZone"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"defaultTaxZone"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<ChannelDetailPlatformQuery, ChannelDetailPlatformQueryVariables>;
+export const ChannelDetailPlatformDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ChannelDetailPlatform"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"channelDetailPlatform"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"customFields"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"trialEndsAt"}},{"kind":"Field","name":{"kind":"Name","value":"subscriptionStatus"}},{"kind":"Field","name":{"kind":"Name","value":"maxAdminCount"}},{"kind":"Field","name":{"kind":"Name","value":"cashierFlowEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"cashControlEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"enablePrinter"}},{"kind":"Field","name":{"kind":"Name","value":"smsUsedThisPeriod"}},{"kind":"Field","name":{"kind":"Name","value":"smsPeriodEnd"}},{"kind":"Field","name":{"kind":"Name","value":"smsLimitFromTier"}},{"kind":"Field","name":{"kind":"Name","value":"publicStorefrontEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"publicSlug"}},{"kind":"Field","name":{"kind":"Name","value":"publicWhatsAppNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"defaultShippingZone"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"defaultTaxZone"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<ChannelDetailPlatformQuery, ChannelDetailPlatformQueryVariables>;
 export const UpdateChannelZonesPlatformDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateChannelZonesPlatform"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateChannelZonesInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateChannelZonesPlatform"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateChannelZonesPlatformMutation, UpdateChannelZonesPlatformMutationVariables>;
 export const PlatformChannelsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformChannels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformChannels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"customFields"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"trialEndsAt"}},{"kind":"Field","name":{"kind":"Name","value":"subscriptionStatus"}},{"kind":"Field","name":{"kind":"Name","value":"maxAdminCount"}},{"kind":"Field","name":{"kind":"Name","value":"cashierFlowEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"cashControlEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"enablePrinter"}},{"kind":"Field","name":{"kind":"Name","value":"smsUsedThisPeriod"}},{"kind":"Field","name":{"kind":"Name","value":"smsPeriodEnd"}},{"kind":"Field","name":{"kind":"Name","value":"smsLimitFromTier"}}]}}]}}]}}]} as unknown as DocumentNode<PlatformChannelsQuery, PlatformChannelsQueryVariables>;
 export const PlatformStatsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformStats"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformStats"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalChannels"}},{"kind":"Field","name":{"kind":"Name","value":"channelsByStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"UNAPPROVED"}},{"kind":"Field","name":{"kind":"Name","value":"APPROVED"}},{"kind":"Field","name":{"kind":"Name","value":"DISABLED"}},{"kind":"Field","name":{"kind":"Name","value":"BANNED"}}]}},{"kind":"Field","name":{"kind":"Name","value":"trialExpiringSoonCount"}},{"kind":"Field","name":{"kind":"Name","value":"activeSubscriptionsCount"}}]}}]}}]} as unknown as DocumentNode<PlatformStatsQuery, PlatformStatsQueryVariables>;
@@ -10267,6 +10364,7 @@ export const AdminLoginAttemptsDocument = {"kind":"Document","definitions":[{"ki
 export const UpdateChannelStatusPlatformDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateChannelStatusPlatform"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"status"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateChannelStatusPlatform"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}},{"kind":"Argument","name":{"kind":"Name","value":"status"},"value":{"kind":"Variable","name":{"kind":"Name","value":"status"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"customFields"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]}}]} as unknown as DocumentNode<UpdateChannelStatusPlatformMutation, UpdateChannelStatusPlatformMutationVariables>;
 export const ExtendTrialPlatformDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ExtendTrialPlatform"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"trialEndsAt"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"DateTime"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"extendTrialPlatform"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}},{"kind":"Argument","name":{"kind":"Name","value":"trialEndsAt"},"value":{"kind":"Variable","name":{"kind":"Name","value":"trialEndsAt"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"customFields"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"trialEndsAt"}}]}}]}}]}}]} as unknown as DocumentNode<ExtendTrialPlatformMutation, ExtendTrialPlatformMutationVariables>;
 export const UpdateChannelFeatureFlagsPlatformDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateChannelFeatureFlagsPlatform"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateChannelFeatureFlagsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateChannelFeatureFlagsPlatform"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"customFields"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"maxAdminCount"}},{"kind":"Field","name":{"kind":"Name","value":"cashierFlowEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"cashControlEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"enablePrinter"}}]}}]}}]}}]} as unknown as DocumentNode<UpdateChannelFeatureFlagsPlatformMutation, UpdateChannelFeatureFlagsPlatformMutationVariables>;
+export const UpdateChannelPublicStorefrontPlatformDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateChannelPublicStorefrontPlatform"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateChannelPublicStorefrontInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateChannelPublicStorefrontPlatform"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"customFields"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"publicStorefrontEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"publicSlug"}},{"kind":"Field","name":{"kind":"Name","value":"publicWhatsAppNumber"}}]}}]}}]}}]} as unknown as DocumentNode<UpdateChannelPublicStorefrontPlatformMutation, UpdateChannelPublicStorefrontPlatformMutationVariables>;
 export const GetSubscriptionTiersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetSubscriptionTiers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getSubscriptionTiers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"priceMonthly"}},{"kind":"Field","name":{"kind":"Name","value":"priceYearly"}},{"kind":"Field","name":{"kind":"Name","value":"features"}},{"kind":"Field","name":{"kind":"Name","value":"smsLimit"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode<GetSubscriptionTiersQuery, GetSubscriptionTiersQueryVariables>;
 export const CreateSubscriptionTierDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateSubscriptionTier"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateSubscriptionTierInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createSubscriptionTier"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"priceMonthly"}},{"kind":"Field","name":{"kind":"Name","value":"priceYearly"}},{"kind":"Field","name":{"kind":"Name","value":"smsLimit"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]} as unknown as DocumentNode<CreateSubscriptionTierMutation, CreateSubscriptionTierMutationVariables>;
 export const UpdateSubscriptionTierDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateSubscriptionTier"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateSubscriptionTierInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateSubscriptionTier"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"priceMonthly"}},{"kind":"Field","name":{"kind":"Name","value":"priceYearly"}},{"kind":"Field","name":{"kind":"Name","value":"smsLimit"}},{"kind":"Field","name":{"kind":"Name","value":"isActive"}}]}}]}}]} as unknown as DocumentNode<UpdateSubscriptionTierMutation, UpdateSubscriptionTierMutationVariables>;
