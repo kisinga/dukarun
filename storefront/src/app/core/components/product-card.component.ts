@@ -9,6 +9,7 @@ export interface ProductCardVM {
   imageUrl: string | null;
   price: string;
   inStock: boolean;
+  manufacturer: string | null;
 }
 
 @Component({
@@ -45,7 +46,12 @@ export interface ProductCardVM {
           </div>
         }
       </div>
-      <div class="flex flex-1 flex-col gap-1.5 p-3">
+      <div class="flex flex-1 flex-col gap-1 p-3">
+        @if (product().manufacturer) {
+          <span class="truncate text-[0.7rem] font-semibold uppercase tracking-wide text-base-content/40">
+            {{ product().manufacturer }}
+          </span>
+        }
         <h3 class="line-clamp-2 text-sm font-medium leading-snug text-base-content group-hover:text-primary">
           {{ product().name }}
         </h3>

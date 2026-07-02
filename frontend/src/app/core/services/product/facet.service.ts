@@ -56,7 +56,9 @@ export class FacetService {
       variables: {
         input: {
           code,
-          isPrivate: true,
+          // Manufacturer is shown on the public storefront (brand), so it must be public.
+          // Category/tags stay private (internal POS filtering).
+          isPrivate: code !== FACET_CODE_MANUFACTURER,
           translations: [{ languageCode: LanguageCode.en, name: displayName }],
         },
       },
