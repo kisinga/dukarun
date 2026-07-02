@@ -18,6 +18,10 @@ export const RESERVED_SUBDOMAINS = [
   'health',
   'dev',
   'staging',
+  // Platform discovery/default hosts — resolve to the directory, never a merchant.
+  'store',
+  'stores',
+  'shop',
 ];
 
 /** True for localhost / bare IP hosts, where there are no real merchant subdomains. */

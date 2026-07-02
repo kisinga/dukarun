@@ -23,6 +23,10 @@ export const RESERVED_STOREFRONT_SLUGS = [
   'health',
   'dev',
   'staging',
+  // Platform discovery/default hosts (e.g. store.dukarun.com) — never assignable to a merchant.
+  'store',
+  'stores',
+  'shop',
 ];
 
 /** Canonical form of a slug: trimmed and lowercased. */
