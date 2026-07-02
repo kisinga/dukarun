@@ -25,27 +25,8 @@ export interface SelectedPaymentMethod {
         />
       }
 
-      <!-- Step 2: Payment Method Selection -->
+      <!-- Step 2: Collect payment -->
       <div class="space-y-3">
-        <!-- Save as Proforma Button -->
-        <button
-          class="btn btn-ghost btn-lg w-full flex items-center justify-center gap-3 interactive-press min-h-[52px] border-2 border-dashed border-base-300"
-          (click)="saveAsProforma.emit()"
-        >
-          <ng-icon name="heroDocumentText" size="1.5rem" />
-          <span class="font-bold text-base sm:text-lg">Save as Proforma</span>
-        </button>
-
-        <!-- Credit Button (Large, Isolated, Above Grid) -->
-        <button
-          class="btn btn-warning btn-lg w-full flex items-center justify-center gap-3 interactive-press min-h-[52px]"
-          (click)="selectCredit.emit()"
-        >
-          <ng-icon name="heroCreditCard" size="1.5rem" />
-          <span class="font-bold text-base sm:text-lg">Credit Sale</span>
-        </button>
-
-        <!-- Cash Payment Methods Grid -->
         @if (paymentMethodsError()) {
           <div class="alert alert-error anim-fade-in-down">
             <ng-icon name="heroExclamationCircle" size="1rem" class="flex-shrink-0" />
@@ -55,6 +36,7 @@ export interface SelectedPaymentMethod {
             </div>
           </div>
         } @else {
+          <!-- Payment method grid (one tap = full amount in that method) -->
           <div class="grid grid-cols-2 gap-2 sm:gap-3 anim-stagger">
             @for (method of paymentMethods(); track method.id; let i = $index) {
               <button
@@ -98,10 +80,9 @@ export interface SelectedPaymentMethod {
             }
           </div>
 
-          <!-- Confirmation after cash method selection -->
           @if (selectedPaymentMethod()) {
+            <!-- Confirmation after a single method is chosen -->
             <div class="space-y-3 anim-fade-in-up">
-              <!-- Optional Customer Selection (Collapsible/Minimal) -->
               @if (!selectedCustomerForCash()) {
                 <details class="collapse collapse-arrow bg-base-200 rounded-lg">
                   <summary class="collapse-title text-xs sm:text-sm font-medium py-2 min-h-0">
@@ -174,6 +155,40 @@ export interface SelectedPaymentMethod {
                 }
               </div>
             </div>
+          } @else {
+            <!-- Split (part cash, part M-Pesa) — one control that always sums to the total.
+                 Only shown to users who can take money (SettleOrder); others send to cashier. -->
+            @if (canSettleOrders()) {
+              <button
+                class="btn btn-outline btn-lg w-full flex items-center justify-center gap-3 interactive-press min-h-[52px]"
+                (click)="selectSplit.emit()"
+              >
+                <ng-icon name="heroScale" size="1.5rem" />
+                <span class="font-bold text-base sm:text-lg">Split cash + M-Pesa</span>
+              </button>
+            }
+
+            <div class="divider text-xs text-base-content/50 my-1">or</div>
+
+            <!-- Credit sale -->
+            <button
+              class="btn btn-warning btn-lg w-full flex items-center justify-center gap-3 interactive-press min-h-[52px]"
+              (click)="selectCredit.emit()"
+            >
+              <ng-icon name="heroCreditCard" size="1.5rem" />
+              <span class="font-bold text-base sm:text-lg">Credit Sale</span>
+            </button>
+
+            <!-- Send to cashier (only when the channel uses cashier flow) -->
+            @if (cashierFlowEnabled()) {
+              <button
+                class="btn btn-ghost btn-lg w-full flex items-center justify-center gap-3 interactive-press min-h-[52px] border-2 border-dashed border-base-300"
+                (click)="selectCashier.emit()"
+              >
+                <ng-icon name="heroBanknotes" size="1.5rem" />
+                <span class="font-bold text-base sm:text-lg">Send to cashier</span>
+              </button>
+            }
           }
         }
       </div>
@@ -191,11 +206,14 @@ export class CheckoutCashComponent {
   readonly selectedCustomerForCash = input<Customer | null>(null);
   readonly customerSearchResultsForCash = input<Customer[]>([]);
   readonly isSearchingCustomersForCash = input<boolean>(false);
+  readonly cashierFlowEnabled = input<boolean>(false);
+  readonly canSettleOrders = input<boolean>(false);
 
   readonly enablePrinter = input<boolean>(true);
 
   readonly selectCredit = output<void>();
-  readonly saveAsProforma = output<void>();
+  readonly selectSplit = output<void>();
+  readonly selectCashier = output<void>();
   readonly paymentMethodSelect = output<SelectedPaymentMethod>();
   readonly customerSearchForCash = output<string>();
   readonly customerSelectForCash = output<Customer | null>();

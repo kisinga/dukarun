@@ -5,7 +5,6 @@ import {
   ElementRef,
   computed,
   inject,
-  input,
   output,
   signal,
   viewChild,
@@ -14,10 +13,7 @@ import { FormsModule } from '@angular/forms';
 import { NgIcon } from '@ng-icons/core';
 import { firstValueFrom } from 'rxjs';
 import { CashierSessionService } from '../../../../core/services/cashier-session/cashier-session.service';
-import {
-  CashierSettlementService,
-  OrderTenderInput,
-} from '../../../../core/services/cashier/cashier-settlement.service';
+import { OrderTenderInput } from '../../../../core/services/cashier/cashier-settlement.service';
 import { CompanyService } from '../../../../core/services/company.service';
 import { CurrencyService } from '../../../../core/services/currency.service';
 import {
@@ -25,27 +21,30 @@ import {
   PaymentMethodService,
 } from '../../../../core/services/payment-method.service';
 
+/** Context for a collection: the total to collect and who/what it's for. */
 export interface SettleOrderModalData {
-  orderId: string;
-  orderCode: string;
-  customerName: string;
-  /** Amount owing in smallest currency unit (cents). */
-  amountOwing: number;
+  /** Amount to collect, in smallest currency unit (cents). */
+  total: number;
+  orderCode?: string;
+  customerName?: string;
 }
 
-/** One editable tender row in the split-payment form. */
-interface TenderRow {
-  paymentMethodCode: string;
-  amountInput: string; // currency units as typed
-  referenceNumber: string;
+interface MethodRef {
+  code: string;
+  name: string;
 }
 
 /**
- * Settle Order Modal
+ * Collect Payment (cash + M-Pesa split)
  *
- * Collects payment for a parked order using one or more tenders (split payment).
- * Each tender picks a payment method and an amount; the running "left to allocate"
- * total keeps the cashier honest. Submits atomically via settleOrderPayments.
+ * The single money-collection control, used both in the cashier queue and inline at
+ * checkout. Because there are exactly two methods, they are complements: the slider
+ * splits the fixed total between M-Pesa and cash, so it can never mis-add. Drag to
+ * split, type either amount for precision, or use the ± steppers / quick chips.
+ *
+ * It does NOT talk to the backend. On confirm it emits the resulting tenders; the parent
+ * decides what to do (settle a parked order, or create+settle inline) and reports back via
+ * succeed()/fail(). This keeps one UI with two call sites.
  */
 @Component({
   selector: 'app-settle-order-modal',
@@ -54,209 +53,198 @@ interface TenderRow {
   template: `
     <dialog #modal class="modal modal-bottom sm:modal-middle" (click)="onBackdropClick($event)">
       <div
-        class="modal-box max-w-lg w-full mx-4 max-h-[92vh] overflow-y-auto p-4 sm:p-6"
+        class="modal-box max-w-md w-full mx-4 max-h-[92vh] overflow-y-auto p-4 sm:p-6"
         (click)="$event.stopPropagation()"
       >
         <!-- Header -->
         <div class="flex items-center justify-between mb-4 pb-3 border-b border-base-300">
           <div>
-            <h3 class="text-lg font-bold text-base-content">Collect payment</h3>
-            @if (data(); as d) {
-              <div class="text-xs text-base-content/60 mt-0.5">
-                {{ d.orderCode }} · {{ d.customerName }}
-              </div>
+            <h3 class="text-lg font-bold text-base-content">
+              Collect {{ formatCurrency(total()) }}
+            </h3>
+            @if (contextLine(); as ctx) {
+              <div class="text-xs text-base-content/60 mt-0.5">{{ ctx }}</div>
             }
           </div>
-          <form method="dialog">
-            <button
-              class="btn btn-sm btn-circle btn-ghost"
-              type="submit"
-              [disabled]="isProcessing()"
-              aria-label="Close"
-            >
-              <ng-icon name="heroXMark" size="1.25rem" />
-            </button>
-          </form>
-        </div>
-
-        <!-- Amount due / allocation summary -->
-        <div class="grid grid-cols-2 gap-3 mb-4">
-          <div class="p-3 rounded-lg bg-base-200">
-            <div class="text-xs text-base-content/60">Amount due</div>
-            <div class="text-lg font-bold">{{ formatCurrency(amountOwing()) }}</div>
-          </div>
-          <div
-            class="p-3 rounded-lg"
-            [class.bg-success/10]="remainingCents() === 0"
-            [class.bg-base-200]="remainingCents() !== 0"
+          <button
+            class="btn btn-sm btn-circle btn-ghost"
+            type="button"
+            [disabled]="phase() === 'processing'"
+            (click)="onCancel()"
+            aria-label="Close"
           >
-            <div class="text-xs text-base-content/60">Left to allocate</div>
-            <div
-              class="text-lg font-bold"
-              [class.text-success]="remainingCents() === 0"
-              [class.text-error]="remainingCents() < 0"
-            >
-              {{ formatCurrency(remainingCents()) }}
-            </div>
-          </div>
+            <ng-icon name="heroXMark" size="1.25rem" />
+          </button>
         </div>
 
-        <!-- Success -->
-        @if (successResult(); as res) {
-          <div class="alert alert-success mb-4">
-            <ng-icon name="heroCheckCircle" size="1.25rem" />
+        @if (phase() === 'success') {
+          <div class="alert alert-success">
+            <ng-icon name="heroCheckCircle" size="1.5rem" />
             <div class="flex-1">
-              <div class="font-semibold">
-                {{ res.fullySettled ? 'Order settled in full' : 'Partial payment recorded' }}
-              </div>
-              <div class="text-xs mt-1">Collected: {{ formatCurrency(res.amountSettled) }}</div>
-              @if (!res.fullySettled) {
-                <div class="text-xs">Still owing: {{ formatCurrency(res.remainingOwing) }}</div>
-              }
+              <div class="font-semibold">Payment collected</div>
+              <div class="text-xs mt-1">{{ formatCurrency(total()) }} settled in full</div>
             </div>
           </div>
-        }
+        } @else {
+          <!-- Error -->
+          @if (error(); as err) {
+            <div class="alert alert-error mb-4">
+              <ng-icon name="heroXCircle" size="1.25rem" />
+              <span class="text-sm">{{ err }}</span>
+            </div>
+          }
 
-        <!-- Error -->
-        @if (error(); as err) {
-          <div class="alert alert-error mb-4">
-            <ng-icon name="heroXCircle" size="1.25rem" />
-            <span class="text-sm">{{ err }}</span>
-          </div>
-        }
+          <!-- No session -->
+          @if (!cashierSessionService.hasActiveSession()) {
+            <div class="alert alert-warning mb-4">
+              <ng-icon name="heroExclamationTriangle" size="1.25rem" />
+              <span class="text-sm"
+                >Open a shift to collect payments. Go to the Dashboard and tap "Open shift"
+                first.</span
+              >
+            </div>
+          }
 
-        <!-- No session warning -->
-        @if (!successResult() && !cashierSessionService.hasActiveSession()) {
-          <div class="alert alert-warning mb-4">
-            <ng-icon name="heroExclamationTriangle" size="1.25rem" />
-            <span class="text-sm"
-              >Open a shift to collect payments. Go to the Dashboard and click "Open shift"
-              first.</span
-            >
-          </div>
-        }
-
-        @if (!successResult()) {
-          @if (isLoadingPaymentMethods()) {
+          @if (isLoadingMethods()) {
             <div class="flex items-center justify-center py-8">
               <span class="loading loading-spinner loading-md"></span>
-              <span class="ml-2 text-sm text-base-content/60">Loading payment methods…</span>
             </div>
-          } @else if (paymentMethods().length === 0) {
+          } @else if (!cashMethod() || !mpesaMethod()) {
             <div class="alert alert-warning">
               <ng-icon name="heroExclamationTriangle" size="1.25rem" />
-              <span class="text-sm">No payment methods available.</span>
+              <span class="text-sm"
+                >Cash and M-Pesa must both be set up as payment methods to collect here.</span
+              >
             </div>
           } @else {
-            <!-- Tender rows -->
-            <div class="space-y-3">
-              @for (tender of tenders(); track $index; let i = $index) {
-                <div class="p-3 rounded-lg border border-base-300 bg-base-100">
-                  <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-semibold text-base-content/70"
-                      >Payment {{ i + 1 }}</span
-                    >
-                    @if (tenders().length > 1) {
-                      <button
-                        type="button"
-                        class="btn btn-xs btn-ghost text-error"
-                        (click)="removeTender(i)"
-                        [disabled]="isProcessing()"
-                        aria-label="Remove payment"
-                      >
-                        <ng-icon name="heroTrash" size="1rem" />
-                      </button>
-                    }
-                  </div>
-
-                  <div class="flex flex-col sm:flex-row gap-2">
-                    <select
-                      class="select select-bordered select-sm flex-1"
-                      [ngModel]="tender.paymentMethodCode"
-                      (ngModelChange)="updateTender(i, { paymentMethodCode: $event })"
-                      [disabled]="isProcessing()"
-                      [attr.aria-label]="'Payment method ' + (i + 1)"
-                    >
-                      @for (method of paymentMethods(); track method.id) {
-                        <option [value]="method.code">{{ method.name }}</option>
-                      }
-                    </select>
-
-                    <div class="flex gap-2">
-                      <input
-                        type="text"
-                        inputmode="decimal"
-                        placeholder="Amount"
-                        class="input input-bordered input-sm w-28"
-                        [ngModel]="tender.amountInput"
-                        (ngModelChange)="updateTender(i, { amountInput: $event })"
-                        [disabled]="isProcessing()"
-                        [attr.aria-label]="'Amount ' + (i + 1)"
-                      />
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-ghost"
-                        (click)="fillRemaining(i)"
-                        [disabled]="isProcessing()"
-                        title="Fill remaining"
-                      >
-                        Rest
-                      </button>
-                    </div>
-                  </div>
-
+            <!-- Two readouts -->
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div class="p-3 rounded-lg bg-success/10 border border-success/30">
+                <div class="text-xs font-semibold text-success">M-Pesa</div>
+                <div class="flex items-center gap-1 mt-1">
+                  <button
+                    class="btn btn-xs btn-circle btn-ghost"
+                    type="button"
+                    (click)="nudgeMpesa(-1)"
+                    aria-label="Less M-Pesa"
+                  >
+                    –
+                  </button>
                   <input
                     type="text"
-                    placeholder="Reference (e.g. M-Pesa code) — optional"
-                    class="input input-bordered input-sm w-full mt-2"
-                    [ngModel]="tender.referenceNumber"
-                    (ngModelChange)="updateTender(i, { referenceNumber: $event })"
-                    [disabled]="isProcessing()"
-                    [attr.aria-label]="'Reference ' + (i + 1)"
+                    inputmode="decimal"
+                    class="input input-sm input-bordered w-full text-center font-bold"
+                    [ngModel]="mpesaDisplay()"
+                    (ngModelChange)="onMpesaTyped($event)"
+                    aria-label="M-Pesa amount"
                   />
+                  <button
+                    class="btn btn-xs btn-circle btn-ghost"
+                    type="button"
+                    (click)="nudgeMpesa(1)"
+                    aria-label="More M-Pesa"
+                  >
+                    +
+                  </button>
                 </div>
-              }
+              </div>
+              <div class="p-3 rounded-lg bg-base-200 border border-base-300">
+                <div class="text-xs font-semibold text-base-content/70">Cash</div>
+                <div class="flex items-center gap-1 mt-1">
+                  <button
+                    class="btn btn-xs btn-circle btn-ghost"
+                    type="button"
+                    (click)="nudgeMpesa(1)"
+                    aria-label="Less cash"
+                  >
+                    –
+                  </button>
+                  <input
+                    type="text"
+                    inputmode="decimal"
+                    class="input input-sm input-bordered w-full text-center font-bold"
+                    [ngModel]="cashDisplay()"
+                    (ngModelChange)="onCashTyped($event)"
+                    aria-label="Cash amount"
+                  />
+                  <button
+                    class="btn btn-xs btn-circle btn-ghost"
+                    type="button"
+                    (click)="nudgeMpesa(-1)"
+                    aria-label="More cash"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <button
-              type="button"
-              class="btn btn-sm btn-ghost gap-1 mt-3"
-              (click)="addTender()"
-              [disabled]="isProcessing() || remainingCents() <= 0"
-            >
-              <ng-icon name="heroPlus" size="1rem" />
-              Split across another method
-            </button>
+            <!-- Slider: M-Pesa (left) ↔ Cash (right) -->
+            <input
+              type="range"
+              class="range range-primary range-sm w-full"
+              min="0"
+              [max]="total()"
+              [step]="step()"
+              [ngModel]="mpesaCents()"
+              (ngModelChange)="setMpesa($any($event))"
+              aria-label="Split between M-Pesa and cash"
+            />
+            <div class="flex justify-between text-[11px] text-base-content/50 mt-1 mb-3">
+              <span>All M-Pesa</span>
+              <span>All cash</span>
+            </div>
+
+            <!-- Quick presets -->
+            <div class="flex gap-2 mb-3">
+              <button class="btn btn-xs flex-1" type="button" (click)="setMpesa(0)">
+                All cash
+              </button>
+              <button class="btn btn-xs flex-1" type="button" (click)="setMpesa(halfCents())">
+                50 / 50
+              </button>
+              <button class="btn btn-xs flex-1" type="button" (click)="setMpesa(total())">
+                All M-Pesa
+              </button>
+            </div>
+
+            <!-- M-Pesa reference (only when M-Pesa portion > 0) -->
+            @if (mpesaCents() > 0) {
+              <input
+                type="text"
+                class="input input-bordered input-sm w-full mb-3"
+                placeholder="M-Pesa reference (e.g. QGH7X…) — optional"
+                [ngModel]="reference()"
+                (ngModelChange)="reference.set($event)"
+                aria-label="M-Pesa reference"
+              />
+            }
 
             <!-- Actions -->
-            <div class="modal-action pt-4 flex-col gap-2">
+            <div class="flex flex-col gap-2">
               <button
-                type="button"
                 class="btn btn-primary w-full"
-                [class.loading]="isProcessing()"
+                type="button"
+                [class.loading]="phase() === 'processing'"
+                [disabled]="!canConfirm()"
                 (click)="onConfirm()"
-                [disabled]="!canSubmit()"
               >
-                @if (isProcessing()) {
+                @if (phase() === 'processing') {
                   Processing…
                 } @else {
-                  Collect {{ formatCurrency(totalTenderedCents()) }}
+                  Collect {{ formatCurrency(total()) }}
                 }
               </button>
               <button
-                type="button"
                 class="btn btn-ghost w-full"
+                type="button"
+                [disabled]="phase() === 'processing'"
                 (click)="onCancel()"
-                [disabled]="isProcessing()"
               >
                 Cancel
               </button>
             </div>
           }
-        } @else {
-          <div class="modal-action pt-4 flex-col gap-2">
-            <button type="button" class="btn btn-primary w-full" (click)="onClose()">Done</button>
-          </div>
         }
       </div>
 
@@ -267,53 +255,60 @@ interface TenderRow {
   `,
 })
 export class SettleOrderModalComponent {
-  private readonly settlementService = inject(CashierSettlementService);
   private readonly paymentMethodService = inject(PaymentMethodService);
   protected readonly cashierSessionService = inject(CashierSessionService);
   private readonly companyService = inject(CompanyService);
   readonly currencyService = inject(CurrencyService);
 
-  readonly data = input<SettleOrderModalData | null>(null);
-
+  /** Emitted on confirm with the tenders to collect; the parent performs the settlement. */
+  readonly confirm = output<OrderTenderInput[]>();
+  /** Emitted after a successful settlement (parent called succeed()). */
   readonly settled = output<void>();
   readonly cancelled = output<void>();
 
-  readonly modalRef = viewChild<ElementRef<HTMLDialogElement>>('modal');
+  private readonly modalRef = viewChild<ElementRef<HTMLDialogElement>>('modal');
 
-  readonly isProcessing = signal(false);
+  private readonly data = signal<SettleOrderModalData | null>(null);
+  readonly phase = signal<'form' | 'processing' | 'success'>('form');
   readonly error = signal<string | null>(null);
-  readonly paymentMethods = signal<PaymentMethod[]>([]);
-  readonly isLoadingPaymentMethods = signal(false);
-  readonly tenders = signal<TenderRow[]>([]);
-  readonly successResult = signal<{
-    amountSettled: number;
-    remainingOwing: number;
-    fullySettled: boolean;
-  } | null>(null);
+  readonly isLoadingMethods = signal(false);
+  readonly cashMethod = signal<MethodRef | null>(null);
+  readonly mpesaMethod = signal<MethodRef | null>(null);
 
-  readonly amountOwing = computed(() => this.data()?.amountOwing ?? 0);
+  /** Single source of truth: how much of the total goes to M-Pesa (cents). Cash is the rest. */
+  readonly mpesaCents = signal(0);
+  readonly reference = signal('');
 
-  readonly totalTenderedCents = computed(() =>
-    this.tenders().reduce((sum, t) => sum + this.parseCents(t.amountInput), 0),
-  );
+  readonly total = computed(() => this.data()?.total ?? 0);
+  readonly cashCents = computed(() => Math.max(this.total() - this.mpesaCents(), 0));
+  readonly halfCents = computed(() => this.snap(Math.round(this.total() / 2)));
+  readonly step = computed(() => this.niceStep(this.total()));
 
-  readonly remainingCents = computed(() => this.amountOwing() - this.totalTenderedCents());
+  readonly mpesaDisplay = computed(() => this.toUnits(this.mpesaCents()));
+  readonly cashDisplay = computed(() => this.toUnits(this.cashCents()));
 
-  readonly canSubmit = computed(() => {
-    if (this.isProcessing()) return false;
-    if (!this.cashierSessionService.hasActiveSession()) return false;
-    const total = this.totalTenderedCents();
-    if (total <= 0) return false;
-    if (total > this.amountOwing()) return false;
-    // Every non-empty tender must have a method and a positive amount.
-    return this.tenders().every((t) => !!t.paymentMethodCode && this.parseCents(t.amountInput) > 0);
+  readonly contextLine = computed(() => {
+    const d = this.data();
+    if (!d) return '';
+    return [d.orderCode, d.customerName].filter(Boolean).join(' · ');
   });
 
-  async show(): Promise<void> {
+  readonly canConfirm = computed(
+    () =>
+      this.phase() === 'form' &&
+      this.cashierSessionService.hasActiveSession() &&
+      this.total() > 0 &&
+      !!this.cashMethod() &&
+      !!this.mpesaMethod(),
+  );
+
+  /** Open the modal for a given total. */
+  async show(data: SettleOrderModalData): Promise<void> {
+    this.data.set(data);
+    this.phase.set('form');
     this.error.set(null);
-    this.successResult.set(null);
-    this.isProcessing.set(false);
-    this.tenders.set([]);
+    this.reference.set('');
+    this.mpesaCents.set(0); // default: all cash
 
     const companyId = this.companyService.activeCompanyId();
     if (companyId) {
@@ -322,18 +317,7 @@ export class SettleOrderModalComponent {
         await firstValueFrom(this.cashierSessionService.getCurrentSession(channelId));
       }
     }
-
-    await this.loadPaymentMethods();
-
-    // Seed a single tender pre-filled to the full amount with the first method.
-    const firstMethod = this.paymentMethods()[0]?.code ?? '';
-    this.tenders.set([
-      {
-        paymentMethodCode: firstMethod,
-        amountInput: this.toCurrencyInput(this.amountOwing()),
-        referenceNumber: '',
-      },
-    ]);
+    await this.loadMethods();
 
     this.modalRef()?.nativeElement.showModal();
   }
@@ -342,94 +326,89 @@ export class SettleOrderModalComponent {
     this.modalRef()?.nativeElement.close();
   }
 
-  private async loadPaymentMethods(): Promise<void> {
-    this.isLoadingPaymentMethods.set(true);
+  /** Parent → modal: settlement succeeded. Shows the success state, then closes. */
+  succeed(): void {
+    this.phase.set('success');
+    setTimeout(() => {
+      this.hide();
+      this.settled.emit();
+    }, 1400);
+  }
+
+  /** Parent → modal: settlement failed; re-enable the form with a message. */
+  fail(message: string): void {
+    this.phase.set('form');
+    this.error.set(message);
+  }
+
+  private async loadMethods(): Promise<void> {
+    this.isLoadingMethods.set(true);
     try {
       const methods = await this.paymentMethodService.getPaymentMethods();
-      this.paymentMethods.set(
-        methods.filter((m) => m.enabled && m.customFields?.isActive !== false),
-      );
+      const active = methods.filter((m) => m.enabled && m.customFields?.isActive !== false);
+      this.cashMethod.set(this.pick(active, /cash/i));
+      this.mpesaMethod.set(this.pick(active, /m-?pesa/i));
     } catch (err: any) {
       this.error.set(err?.message || 'Failed to load payment methods.');
-      this.paymentMethods.set([]);
+      this.cashMethod.set(null);
+      this.mpesaMethod.set(null);
     } finally {
-      this.isLoadingPaymentMethods.set(false);
+      this.isLoadingMethods.set(false);
     }
   }
 
-  addTender(): void {
-    const firstMethod = this.paymentMethods()[0]?.code ?? '';
-    const remaining = this.remainingCents();
-    this.tenders.update((rows) => [
-      ...rows,
-      {
-        paymentMethodCode: firstMethod,
-        amountInput: remaining > 0 ? this.toCurrencyInput(remaining) : '',
-        referenceNumber: '',
-      },
-    ]);
+  private pick(methods: PaymentMethod[], pattern: RegExp): MethodRef | null {
+    const m = methods.find((pm) => pattern.test(pm.code) || pattern.test(pm.name));
+    return m ? { code: m.code, name: m.name } : null;
   }
 
-  removeTender(index: number): void {
-    this.tenders.update((rows) => rows.filter((_, i) => i !== index));
+  setMpesa(cents: number): void {
+    const clamped = Math.min(Math.max(Math.round(cents), 0), this.total());
+    this.mpesaCents.set(clamped);
   }
 
-  updateTender(index: number, patch: Partial<TenderRow>): void {
-    this.tenders.update((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  nudgeMpesa(direction: number): void {
+    this.setMpesa(this.snap(this.mpesaCents() + direction * this.step()));
   }
 
-  /** Fill this row with whatever is still unallocated (plus its own current amount). */
-  fillRemaining(index: number): void {
-    const own = this.parseCents(this.tenders()[index]?.amountInput ?? '');
-    const target = this.remainingCents() + own;
-    this.updateTender(index, { amountInput: this.toCurrencyInput(Math.max(target, 0)) });
+  onMpesaTyped(value: string): void {
+    this.setMpesa(this.parseCents(value));
   }
 
-  async onConfirm(): Promise<void> {
-    const d = this.data();
-    if (!d || !this.canSubmit()) return;
+  onCashTyped(value: string): void {
+    this.setMpesa(this.total() - this.parseCents(value));
+  }
 
-    const tenders: OrderTenderInput[] = this.tenders()
-      .map((t) => ({
-        paymentMethodCode: t.paymentMethodCode,
-        amount: this.parseCents(t.amountInput),
-        referenceNumber: t.referenceNumber.trim() || undefined,
-      }))
-      .filter((t) => t.amount > 0);
-
-    this.isProcessing.set(true);
-    this.error.set(null);
-    try {
-      const result = await this.settlementService.settleOrder(d.orderId, tenders);
-      this.successResult.set({
-        amountSettled: result.amountSettled,
-        remainingOwing: result.remainingOwing,
-        fullySettled: result.fullySettled,
+  onConfirm(): void {
+    if (!this.canConfirm()) return;
+    const cash = this.cashMethod();
+    const mpesa = this.mpesaMethod();
+    const tenders: OrderTenderInput[] = [];
+    if (this.cashCents() > 0 && cash) {
+      tenders.push({ paymentMethodCode: cash.code, amount: this.cashCents() });
+    }
+    if (this.mpesaCents() > 0 && mpesa) {
+      tenders.push({
+        paymentMethodCode: mpesa.code,
+        amount: this.mpesaCents(),
+        referenceNumber: this.reference().trim() || undefined,
       });
-      setTimeout(() => {
-        this.settled.emit();
-        this.hide();
-      }, 1500);
-    } catch (err: any) {
-      this.error.set(err?.message || 'Failed to collect payment. Please try again.');
-    } finally {
-      this.isProcessing.set(false);
     }
+    if (tenders.length === 0) return;
+    this.phase.set('processing');
+    this.error.set(null);
+    this.confirm.emit(tenders);
   }
 
   onCancel(): void {
+    if (this.phase() === 'processing') return;
     this.hide();
     this.cancelled.emit();
   }
 
-  onClose(): void {
-    this.hide();
-    this.settled.emit();
-  }
-
   onBackdropClick(event: MouseEvent): void {
     const modal = this.modalRef()?.nativeElement;
-    if (modal && event.target === modal && !this.isProcessing()) {
+    if (modal && event.target === modal) {
       this.onCancel();
     }
   }
@@ -438,17 +417,32 @@ export class SettleOrderModalComponent {
     return this.currencyService.format(cents, false);
   }
 
-  /** Parse a typed currency string (units) into whole cents. */
+  /** Round to the nearest slider step so drag/steppers land on clean values. */
+  private snap(cents: number): number {
+    const s = this.step();
+    return Math.round(cents / s) * s;
+  }
+
+  /** A "nice" slider step scaled to the total (~20 stops), in cents. */
+  private niceStep(total: number): number {
+    if (total <= 0) return 100;
+    const target = total / 20;
+    const nice = [100, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000];
+    for (const s of nice) {
+      if (s >= target) return s;
+    }
+    return nice[nice.length - 1];
+  }
+
   private parseCents(raw: string): number {
     const trimmed = (raw ?? '').trim();
     if (!trimmed) return 0;
     const parsed = parseFloat(trimmed.replace(/,/g, ''));
-    if (Number.isNaN(parsed) || parsed <= 0) return 0;
+    if (Number.isNaN(parsed) || parsed < 0) return 0;
     return Math.round(parsed * 100);
   }
 
-  /** Render cents as a plain currency-unit string for an input field. */
-  private toCurrencyInput(cents: number): string {
+  private toUnits(cents: number): string {
     return (cents / 100).toFixed(2);
   }
 }

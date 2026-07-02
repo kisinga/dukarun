@@ -12,11 +12,9 @@ import { CurrencyService } from '../../../core/services/currency.service';
 import {
   CashierPendingOrderView,
   CashierSettlementService,
+  OrderTenderInput,
 } from '../../../core/services/cashier/cashier-settlement.service';
-import {
-  SettleOrderModalComponent,
-  SettleOrderModalData,
-} from './components/settle-order-modal.component';
+import { SettleOrderModalComponent } from './components/settle-order-modal.component';
 
 /**
  * Cashier Queue
@@ -116,7 +114,7 @@ import {
 
     <app-settle-order-modal
       #settleModal
-      [data]="activeOrder()"
+      (confirm)="onConfirm($event)"
       (settled)="onSettled()"
       (cancelled)="onCancelled()"
     />
@@ -131,7 +129,7 @@ export class CashierComponent implements OnInit {
   readonly orders = signal<CashierPendingOrderView[]>([]);
   readonly isLoading = signal(false);
   readonly error = signal<string | null>(null);
-  readonly activeOrder = signal<SettleOrderModalData | null>(null);
+  private readonly selectedItem = signal<CashierPendingOrderView | null>(null);
 
   ngOnInit(): void {
     void this.refresh();
@@ -150,22 +148,32 @@ export class CashierComponent implements OnInit {
   }
 
   collect(item: CashierPendingOrderView): void {
-    this.activeOrder.set({
-      orderId: item.order.id,
+    this.selectedItem.set(item);
+    void this.settleModal()?.show({
+      total: item.amountOwing,
       orderCode: item.order.code,
       customerName: this.customerName(item),
-      amountOwing: item.amountOwing,
     });
-    void this.settleModal()?.show();
+  }
+
+  async onConfirm(tenders: OrderTenderInput[]): Promise<void> {
+    const item = this.selectedItem();
+    if (!item) return;
+    try {
+      await this.settlementService.settleOrder(item.order.id, tenders);
+      this.settleModal()?.succeed();
+    } catch (err: any) {
+      this.settleModal()?.fail(err?.message || 'Failed to collect payment. Please try again.');
+    }
   }
 
   onSettled(): void {
-    this.activeOrder.set(null);
+    this.selectedItem.set(null);
     void this.refresh();
   }
 
   onCancelled(): void {
-    this.activeOrder.set(null);
+    this.selectedItem.set(null);
   }
 
   customerName(item: CashierPendingOrderView): string {

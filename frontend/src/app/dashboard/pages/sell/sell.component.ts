@@ -8,6 +8,7 @@ import {
   effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
@@ -28,6 +29,11 @@ import {
 import { SalesSyncGuardService } from '../../../core/services/sales-sync-guard.service';
 import { ShiftModalTriggerService } from '../../../core/services/cashier-session/shift-modal-trigger.service';
 import { StockLocationService } from '../../../core/services/stock-location.service';
+import {
+  CashierSettlementService,
+  OrderTenderInput,
+} from '../../../core/services/cashier/cashier-settlement.service';
+import { SettleOrderModalComponent } from '../cashier/components/settle-order-modal.component';
 import { CartComponent, CartItem } from './components/cart.component';
 import { CheckoutFabComponent } from './components/checkout-fab.component';
 import { CheckoutModalComponent } from './components/checkout-modal.component';
@@ -68,6 +74,7 @@ type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
     CartComponent,
     CheckoutFabComponent,
     CheckoutModalComponent,
+    SettleOrderModalComponent,
   ],
   templateUrl: './sell.component.html',
   styleUrl: './sell.component.scss',
@@ -78,6 +85,7 @@ export class SellComponent implements OnInit, OnDestroy {
   private readonly companyService = inject(CompanyService);
   private readonly stockLocationService = inject(StockLocationService);
   private readonly orderService = inject(OrderService);
+  private readonly cashierSettlementService = inject(CashierSettlementService);
   private readonly ordersService = inject(OrdersService);
   private readonly authService = inject(AuthService);
   protected readonly cartService = inject(CartService);
@@ -149,7 +157,14 @@ export class SellComponent implements OnInit, OnDestroy {
     this.cartItems().reduce((sum, item) => sum + item.quantity, 0),
   );
 
+  // Whether the current user can take money (settle) — gates inline Split.
+  readonly canSettleOrders = computed(() => this.authService.canSettleOrders());
+
   // Checkout state
+  private readonly splitModal = viewChild<SettleOrderModalComponent>('splitModal');
+  /** Parked order created for an in-progress inline split; reused across retries so a
+   * failed settle never spawns a duplicate. */
+  private readonly splitOrderId = signal<string | null>(null);
   readonly showCheckoutModal = signal<boolean>(false);
   readonly checkoutType = signal<CheckoutType>(null);
   readonly isProcessingCheckout = signal<boolean>(false);
@@ -472,6 +487,78 @@ export class SellComponent implements OnInit, OnDestroy {
     this.checkoutType.set('cashier');
     this.showCheckoutModal.set(true);
     this.resetCheckoutState();
+  }
+
+  /**
+   * Split (cash + M-Pesa) inline: close the payment menu and open the collection slider.
+   * The parked order is created only on confirm (see onSplitConfirm), so cancelling here
+   * leaves nothing behind.
+   */
+  handleCheckoutSplit(): void {
+    this.splitOrderId.set(null); // fresh split; no parked order yet
+    this.showCheckoutModal.set(false);
+    void this.splitModal()?.show({ total: this.cartTotal() });
+  }
+
+  /**
+   * Confirm a split at checkout: create the order parked (once), then settle it with the
+   * tenders. The parked order id is remembered so a failed settle followed by a retry
+   * settles the same order instead of creating a duplicate.
+   */
+  async onSplitConfirm(tenders: OrderTenderInput[]): Promise<void> {
+    if (!this.salesSyncGuard.canSell()) {
+      this.splitModal()?.fail(
+        "Sync required. You've made 3 sales since last sync. Please refresh and try again.",
+      );
+      return;
+    }
+    try {
+      let orderId = this.splitOrderId();
+      if (!orderId) {
+        const order = await this.orderService.createOrder({
+          cartItems: this.cartItems().map((item) => ({
+            variantId: item.variant.id,
+            quantity: item.quantity,
+            customLinePrice: item.customLinePrice,
+            priceOverrideReason: item.priceOverrideReason,
+          })),
+          paymentMethodCode: 'cash-payment',
+          isCashierFlow: true,
+        });
+        orderId = order.id;
+        this.splitOrderId.set(orderId);
+      }
+      await this.cashierSettlementService.settleOrder(orderId, tenders);
+      this.salesSyncGuard.recordSale();
+      this.splitModal()?.succeed();
+    } catch (error) {
+      console.error('❌ Split payment failed:', error);
+      this.splitModal()?.fail(
+        error instanceof Error ? error.message : 'Failed to collect payment. Please try again.',
+      );
+    }
+  }
+
+  /** Split collected: clear the cart. */
+  onSplitSettled(): void {
+    this.splitOrderId.set(null);
+    this.cartService.clearCart();
+    this.cartItems.set([]);
+    this.showNotification('Payment collected', 'success');
+  }
+
+  /**
+   * Split cancelled. If nothing was created yet, we just reopen the payment menu. If an
+   * order was already parked (a settle failed before cancel), it stays on the cashier
+   * queue for collection — nothing is lost — and we return to the cart.
+   */
+  onSplitCancelled(): void {
+    if (this.splitOrderId()) {
+      this.splitOrderId.set(null);
+      this.showNotification('Saved to the cashier queue', 'warning');
+      return;
+    }
+    this.showCheckoutModal.set(true);
   }
 
   handleCheckoutCash(): void {

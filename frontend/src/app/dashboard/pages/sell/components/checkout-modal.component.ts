@@ -122,8 +122,11 @@ type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
                   [selectedCustomerForCash]="selectedCustomerForCash()"
                   [customerSearchResultsForCash]="customerSearchResultsForCash()"
                   [isSearchingCustomersForCash]="isSearchingCustomersForCash()"
+                  [cashierFlowEnabled]="cashierFlowEnabled()"
+                  [canSettleOrders]="canSettleOrders()"
                   (selectCredit)="selectCredit.emit()"
-                  (saveAsProforma)="saveAsProforma.emit()"
+                  (selectSplit)="selectSplit.emit()"
+                  (selectCashier)="selectCashier.emit()"
                   (paymentMethodSelect)="onPaymentMethodSelect($event)"
                   (customerSearchForCash)="customerSearchForCash.emit($event)"
                   (customerSelectForCash)="customerSelectForCash.emit($event)"
@@ -153,6 +156,7 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
   readonly error = input<string | null>(null);
   readonly isProcessing = input<boolean>(false);
   readonly cashierFlowEnabled = input<boolean>(false);
+  readonly canSettleOrders = input<boolean>(false);
   readonly triggerSuccess = input<{ amount: number; method: string } | null>(null);
 
   readonly enablePrinter = input<boolean>(true);
@@ -185,7 +189,7 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
 
   // Payment selection outputs
   readonly selectCredit = output<void>();
-  readonly saveAsProforma = output<void>();
+  readonly selectSplit = output<void>();
   readonly selectCash = output<void>();
   readonly selectCashier = output<void>();
 
