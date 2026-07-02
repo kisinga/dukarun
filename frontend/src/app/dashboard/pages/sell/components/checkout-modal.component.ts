@@ -22,7 +22,7 @@ import { CheckoutCashierComponent } from './checkout/checkout-cashier.component'
 import { CheckoutCreditComponent } from './checkout/checkout-credit.component';
 import { CheckoutSuccessComponent } from './checkout/checkout-success.component';
 
-type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
+type CheckoutType = 'credit' | 'cashier' | null;
 
 /**
  * Unified checkout modal handling all payment flows
@@ -190,7 +190,6 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
   // Payment selection outputs
   readonly selectCredit = output<void>();
   readonly selectSplit = output<void>();
-  readonly selectCash = output<void>();
   readonly selectCashier = output<void>();
 
   // Dynamic payment methods

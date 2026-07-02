@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  OnDestroy,
   computed,
   inject,
   output,
@@ -254,8 +255,9 @@ interface MethodRef {
     </dialog>
   `,
 })
-export class SettleOrderModalComponent {
+export class SettleOrderModalComponent implements OnDestroy {
   private readonly paymentMethodService = inject(PaymentMethodService);
+  private successTimer: ReturnType<typeof setTimeout> | null = null;
   protected readonly cashierSessionService = inject(CashierSessionService);
   private readonly companyService = inject(CompanyService);
   readonly currencyService = inject(CurrencyService);
@@ -329,10 +331,23 @@ export class SettleOrderModalComponent {
   /** Parent → modal: settlement succeeded. Shows the success state, then closes. */
   succeed(): void {
     this.phase.set('success');
-    setTimeout(() => {
+    this.clearSuccessTimer();
+    this.successTimer = setTimeout(() => {
+      this.successTimer = null;
       this.hide();
       this.settled.emit();
     }, 1400);
+  }
+
+  ngOnDestroy(): void {
+    this.clearSuccessTimer();
+  }
+
+  private clearSuccessTimer(): void {
+    if (this.successTimer) {
+      clearTimeout(this.successTimer);
+      this.successTimer = null;
+    }
   }
 
   /** Parent → modal: settlement failed; re-enable the form with a message. */

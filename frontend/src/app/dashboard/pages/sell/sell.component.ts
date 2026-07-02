@@ -43,7 +43,7 @@ import { ProductConfirmModalComponent } from './components/product-confirm-modal
 import { ProductSearchViewComponent } from '../shared/components/product-search-view.component';
 import { ProductScannerComponent } from './components/product-scanner.component';
 
-type CheckoutType = 'credit' | 'cashier' | 'cash' | null;
+type CheckoutType = 'credit' | 'cashier' | null;
 
 /**
  * Main POS sell page - orchestrates child components
@@ -530,6 +530,12 @@ export class SellComponent implements OnInit, OnDestroy {
       }
       await this.cashierSettlementService.settleOrder(orderId, tenders);
       this.salesSyncGuard.recordSale();
+      // Settlement is committed — clear local state NOW, not on the modal's post-animation
+      // `settled` event (which never fires if the user navigates away during the 1.4s success
+      // animation, which would otherwise leave the paid cart intact and re-sellable).
+      this.splitOrderId.set(null);
+      this.cartService.clearCart();
+      this.cartItems.set([]);
       this.splitModal()?.succeed();
     } catch (error) {
       console.error('❌ Split payment failed:', error);
@@ -539,11 +545,8 @@ export class SellComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Split collected: clear the cart. */
+  /** Split collected (cart was already cleared on success in onSplitConfirm). */
   onSplitSettled(): void {
-    this.splitOrderId.set(null);
-    this.cartService.clearCart();
-    this.cartItems.set([]);
     this.showNotification('Payment collected', 'success');
   }
 
@@ -559,12 +562,6 @@ export class SellComponent implements OnInit, OnDestroy {
       return;
     }
     this.showCheckoutModal.set(true);
-  }
-
-  handleCheckoutCash(): void {
-    this.checkoutType.set('cash');
-    this.showCheckoutModal.set(true);
-    this.resetCheckoutState();
   }
 
   async handleSaveAsProforma(): Promise<void> {
