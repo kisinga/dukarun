@@ -35,7 +35,7 @@ import {
 } from '../../../core/services/cashier/cashier-settlement.service';
 import { SettleOrderModalComponent } from '../cashier/components/settle-order-modal.component';
 import { CartComponent, CartItem } from './components/cart.component';
-import { CheckoutFabComponent } from './components/checkout-fab.component';
+import { CheckoutBarComponent } from './components/checkout-bar.component';
 import { CheckoutModalComponent } from './components/checkout-modal.component';
 import { SelectedPaymentMethod } from './components/checkout/checkout-cash.component';
 import { Customer } from './components/customer-selector.component';
@@ -72,7 +72,7 @@ type CheckoutType = 'credit' | 'cashier' | null;
     ProductSearchViewComponent,
     ProductConfirmModalComponent,
     CartComponent,
-    CheckoutFabComponent,
+    CheckoutBarComponent,
     CheckoutModalComponent,
     SettleOrderModalComponent,
   ],

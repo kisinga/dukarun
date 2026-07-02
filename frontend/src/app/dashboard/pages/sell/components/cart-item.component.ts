@@ -98,8 +98,9 @@ export interface CartItemData {
         </div>
       </div>
 
-      <!-- Desktop: single-row table-like layout -->
-      <div class="hidden md:flex md:items-center md:gap-4 md:min-w-0">
+      <!-- Desktop: single-row table-like layout with fixed qty/price columns so
+           steppers and prices line up across every row -->
+      <div class="hidden md:flex md:items-center md:gap-3 md:min-w-0">
         <button
           class="btn btn-outline btn-square h-9 w-9 min-h-0 shrink-0 border-error/60 text-error/80 hover:bg-error/10 hover:border-error touch-manipulation"
           (click)="removeItem.emit(item().variant.id)"
@@ -124,10 +125,10 @@ export interface CartItemData {
             </div>
           }
         </div>
-        <div class="shrink-0">
+        <div class="shrink-0 flex justify-center w-32">
           <ng-container *ngTemplateOutlet="qtyControls" />
         </div>
-        <div class="shrink-0 min-w-[7rem]">
+        <div class="shrink-0 flex justify-end w-44">
           <ng-container *ngTemplateOutlet="priceControls" />
         </div>
       </div>
@@ -187,7 +188,7 @@ export interface CartItemData {
         <!-- Price display — tap/click to edit (opens price modal) -->
         <button
           type="button"
-          class="flex flex-col items-end rounded-lg px-3 py-2 min-h-11 min-w-[4rem] md:px-1.5 md:py-0.5 md:min-h-0 transition-colors touch-manipulation"
+          class="flex flex-col items-end rounded-lg px-3 py-2 min-h-11 min-w-[4rem] md:w-24 md:px-1.5 md:py-0.5 md:min-h-0 transition-colors touch-manipulation"
           [class.border]="canOverridePrices()"
           [class.border-base-300]="canOverridePrices()"
           [class.cursor-pointer]="canOverridePrices()"

@@ -32,7 +32,13 @@
 }
 
 <!-- Main Content -->
-<div class="container-app py-4 md:py-6 space-y-4 md:space-y-6 pb-20 md:pb-6 anim-stagger">
+<div
+  class="container-app py-4 md:py-6 space-y-4 md:space-y-6 anim-stagger"
+  [class.pb-20]="cartItems().length === 0"
+  [class.md:pb-6]="cartItems().length === 0"
+  [class.pb-40]="cartItems().length > 0"
+  [class.lg:pb-24]="cartItems().length > 0"
+>
   <!-- Search View (independent state; results only when user has typed; variants expanded by default) -->
   <app-product-search-view
     [searchResults]="searchResultsForMainView()"
@@ -129,33 +135,28 @@
       (removeItem)="handleCartItemRemove($event)"
       (clearCart)="handleClearCart()"
     />
-    @if (cartItems().length > 0) {
-      <button
-        class="btn btn-ghost btn-sm w-full mt-2 gap-2 border border-dashed border-base-300"
-        (click)="handleSaveAsProforma()"
-        [disabled]="isProcessingCheckout()"
-      >
-        <ng-icon name="heroDocumentText" size="1.125rem" />
-        Save as quote
-      </button>
-    }
   }
 </div>
 
-<!-- Checkout FAB -->
+<!-- Sticky checkout bar (total · save as quote · checkout) -->
 @if (cartItems().length > 0) {
-  <app-checkout-fab
+  <app-checkout-bar
     [total]="cartTotal()"
     [disabled]="!cashierSessionService.hasActiveSession()"
+    [processing]="isProcessingCheckout()"
     [cartJustUpdated]="cartItemAdded()"
     (checkout)="handleProceedToCheckout()"
+    (saveQuote)="handleSaveAsProforma()"
   />
 }
 
-<!-- Floating Camera Button (Mobile only, when searching) -->
+<!-- Floating Camera Button (Mobile only, when searching) — sits above the
+     checkout bar when the cart has items so the two don't overlap -->
 @if (isManualSearchActive()) {
   <button
-    class="btn btn-circle btn-primary btn-lg fixed bottom-20 right-4 z-40 md:hidden shadow-lg"
+    class="btn btn-circle btn-primary btn-lg fixed right-4 z-40 md:hidden shadow-lg"
+    [class.bottom-20]="cartItems().length === 0"
+    [class.bottom-44]="cartItems().length > 0"
     (click)="handleClearSearch()"
     aria-label="Back to camera"
   >
