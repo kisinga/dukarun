@@ -58,6 +58,7 @@ export const SEARCH_PRODUCTS = graphql(`
         }
         currencyCode
         inStock
+        facetValueIds
       }
       facetValues {
         count
@@ -67,6 +68,7 @@ export const SEARCH_PRODUCTS = graphql(`
           facet {
             id
             name
+            code
           }
         }
       }
@@ -88,6 +90,15 @@ export const PRODUCT_DETAIL = graphql(`
       assets {
         id
         preview
+      }
+      facetValues {
+        id
+        name
+        facet {
+          id
+          code
+          name
+        }
       }
       variants {
         id

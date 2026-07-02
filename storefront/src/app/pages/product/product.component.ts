@@ -11,6 +11,7 @@ import { ActivatedRoute } from '@angular/router';
 
 import { PRODUCT_DETAIL } from '../../core/graphql/operations.graphql';
 import { withImagePreset } from '../../core/utils/asset.util';
+import { manufacturerFromFacets } from '../../core/utils/facet.util';
 import { ApolloService } from '../../core/services/apollo.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { SeoService } from '../../core/services/seo.service';
@@ -72,7 +73,12 @@ const JSONLD_ID = 'ld-product';
         </div>
 
         <div class="flex flex-col gap-4">
-          <h1 class="text-2xl font-bold">{{ name() }}</h1>
+          <div>
+            @if (manufacturer()) {
+              <p class="text-sm font-semibold uppercase tracking-wide text-base-content/50">{{ manufacturer() }}</p>
+            }
+            <h1 class="text-2xl font-bold">{{ name() }}</h1>
+          </div>
 
           @if (selected(); as v) {
             <div class="flex items-center gap-3">
@@ -131,6 +137,7 @@ export class ProductComponent implements OnDestroy {
   private readonly state = inject(StorefrontStateService);
 
   readonly name = signal('');
+  readonly manufacturer = signal<string | null>(null);
   readonly description = signal('');
   readonly images = signal<string[]>([]);
   readonly mainImage = signal<string | null>(null);
@@ -186,6 +193,7 @@ export class ProductComponent implements OnDestroy {
       const p = res.data?.product;
       if (!p) {
         this.name.set('');
+        this.manufacturer.set(null);
         this.seo.setPage({ title: 'Product not found', noindex: true });
         return;
       }
@@ -195,6 +203,7 @@ export class ProductComponent implements OnDestroy {
       );
       const uniqueImgs = [...new Set(imgs)];
       this.name.set(p.name);
+      this.manufacturer.set(manufacturerFromFacets(p.facetValues));
       this.description.set(p.description ?? '');
       this.images.set(uniqueImgs);
       this.mainImage.set(uniqueImgs[0] ?? null);
@@ -227,12 +236,14 @@ export class ProductComponent implements OnDestroy {
       image: images[0] ?? store?.logoUrl ?? null,
       canonicalPath: `/products/${slug}`,
     });
+    const mfr = this.manufacturer();
     this.seo.setJsonLd(JSONLD_ID, {
       '@context': 'https://schema.org',
       '@type': 'Product',
       name: productName,
       description: plain,
       image: images,
+      ...(mfr ? { brand: { '@type': 'Brand', name: mfr } } : {}),
       ...(v
         ? {
             offers: {

@@ -10,6 +10,7 @@ import { ApolloService } from '../../core/services/apollo.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { SeoService } from '../../core/services/seo.service';
 import { StorefrontStateService } from '../../core/services/storefront-state.service';
+import { buildManufacturerMap, manufacturerOf } from '../../core/utils/facet.util';
 import { buildWhatsAppLink } from '../../core/utils/whatsapp.util';
 
 interface CollectionChip {
@@ -198,8 +199,9 @@ export class HomeComponent implements OnInit {
       fetchPolicy: 'network-only',
     });
     const search = res.data?.search;
+    const mfrMap = buildManufacturerMap(search?.facetValues);
     return {
-      items: (search?.items ?? []).map(i => this.toCard(i)),
+      items: (search?.items ?? []).map(i => this.toCard(i, mfrMap)),
       total: search?.totalItems ?? 0,
     };
   }
@@ -219,20 +221,25 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  private toCard(item: {
-    slug: string;
-    productName: string;
-    productAsset?: { preview: string } | null;
-    priceWithTax: { min: number; max: number } | { value: number };
-    currencyCode: string;
-    inStock: boolean;
-  }): ProductCardVM {
+  private toCard(
+    item: {
+      slug: string;
+      productName: string;
+      productAsset?: { preview: string } | null;
+      priceWithTax: { min: number; max: number } | { value: number };
+      currencyCode: string;
+      inStock: boolean;
+      facetValueIds: readonly string[];
+    },
+    mfrMap: Map<string, string>
+  ): ProductCardVM {
     return {
       slug: item.slug,
       name: item.productName,
       imageUrl: item.productAsset?.preview ?? null,
       price: this.currency.formatSearchPrice(item.priceWithTax, item.currencyCode),
       inStock: item.inStock,
+      manufacturer: manufacturerOf(item.facetValueIds, mfrMap),
     };
   }
 }
