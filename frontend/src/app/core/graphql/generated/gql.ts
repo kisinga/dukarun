@@ -105,6 +105,8 @@ type Documents = {
   '\n  mutation RecordPayment($input: RecordPaymentInput!) {\n    recordPayment(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n': typeof types.RecordPaymentDocument;
   '\n  mutation AllocateBulkPayment($input: PaymentAllocationInput!) {\n    allocateBulkPayment(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n': typeof types.AllocateBulkPaymentDocument;
   '\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n': typeof types.PaySingleOrderDocument;
+  '\n  query PendingCashierOrders {\n    pendingCashierOrders {\n      amountOwing\n      pendingSince\n      order {\n        id\n        code\n        state\n        total\n        totalWithTax\n        createdAt\n        customer {\n          id\n          firstName\n          lastName\n        }\n        lines {\n          id\n          quantity\n          productVariant {\n            id\n            name\n          }\n        }\n      }\n    }\n  }\n': typeof types.PendingCashierOrdersDocument;
+  '\n  mutation SettleOrderPayments($input: SettleOrderPaymentsInput!) {\n    settleOrderPayments(input: $input) {\n      orderId\n      orderCode\n      amountSettled\n      remainingOwing\n      fullySettled\n      tenders {\n        paymentMethodCode\n        amount\n      }\n    }\n  }\n': typeof types.SettleOrderPaymentsDocument;
   '\n  mutation SendCustomerStatementEmail($customerId: ID!) {\n    sendCustomerStatementEmail(customerId: $customerId)\n  }\n': typeof types.SendCustomerStatementEmailDocument;
   '\n  mutation PaySinglePurchase($input: PaySinglePurchaseInput!) {\n    paySinglePurchase(input: $input) {\n      purchasesPaid {\n        purchaseId\n        purchaseReference\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n      excessPayment\n    }\n  }\n': typeof types.PaySinglePurchaseDocument;
   '\n  query GetSupplierCreditSummary($supplierId: ID!) {\n    supplierCreditSummary(supplierId: $supplierId) {\n      supplierId\n      isSupplierCreditApproved\n      supplierCreditLimit\n      outstandingAmount\n      availableCredit\n      lastRepaymentDate\n      lastRepaymentAmount\n      supplierCreditDuration\n    }\n  }\n': typeof types.GetSupplierCreditSummaryDocument;
@@ -372,6 +374,10 @@ const documents: Documents = {
     types.AllocateBulkPaymentDocument,
   '\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n':
     types.PaySingleOrderDocument,
+  '\n  query PendingCashierOrders {\n    pendingCashierOrders {\n      amountOwing\n      pendingSince\n      order {\n        id\n        code\n        state\n        total\n        totalWithTax\n        createdAt\n        customer {\n          id\n          firstName\n          lastName\n        }\n        lines {\n          id\n          quantity\n          productVariant {\n            id\n            name\n          }\n        }\n      }\n    }\n  }\n':
+    types.PendingCashierOrdersDocument,
+  '\n  mutation SettleOrderPayments($input: SettleOrderPaymentsInput!) {\n    settleOrderPayments(input: $input) {\n      orderId\n      orderCode\n      amountSettled\n      remainingOwing\n      fullySettled\n      tenders {\n        paymentMethodCode\n        amount\n      }\n    }\n  }\n':
+    types.SettleOrderPaymentsDocument,
   '\n  mutation SendCustomerStatementEmail($customerId: ID!) {\n    sendCustomerStatementEmail(customerId: $customerId)\n  }\n':
     types.SendCustomerStatementEmailDocument,
   '\n  mutation PaySinglePurchase($input: PaySinglePurchaseInput!) {\n    paySinglePurchase(input: $input) {\n      purchasesPaid {\n        purchaseId\n        purchaseReference\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n      excessPayment\n    }\n  }\n':
@@ -1098,6 +1104,18 @@ export function graphql(
 export function graphql(
   source: '\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n',
 ): (typeof documents)['\n  mutation PaySingleOrder($input: PaySingleOrderInput!) {\n    paySingleOrder(input: $input) {\n      ordersPaid {\n        orderId\n        orderCode\n        amountPaid\n      }\n      remainingBalance\n      totalAllocated\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  query PendingCashierOrders {\n    pendingCashierOrders {\n      amountOwing\n      pendingSince\n      order {\n        id\n        code\n        state\n        total\n        totalWithTax\n        createdAt\n        customer {\n          id\n          firstName\n          lastName\n        }\n        lines {\n          id\n          quantity\n          productVariant {\n            id\n            name\n          }\n        }\n      }\n    }\n  }\n',
+): (typeof documents)['\n  query PendingCashierOrders {\n    pendingCashierOrders {\n      amountOwing\n      pendingSince\n      order {\n        id\n        code\n        state\n        total\n        totalWithTax\n        createdAt\n        customer {\n          id\n          firstName\n          lastName\n        }\n        lines {\n          id\n          quantity\n          productVariant {\n            id\n            name\n          }\n        }\n      }\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation SettleOrderPayments($input: SettleOrderPaymentsInput!) {\n    settleOrderPayments(input: $input) {\n      orderId\n      orderCode\n      amountSettled\n      remainingOwing\n      fullySettled\n      tenders {\n        paymentMethodCode\n        amount\n      }\n    }\n  }\n',
+): (typeof documents)['\n  mutation SettleOrderPayments($input: SettleOrderPaymentsInput!) {\n    settleOrderPayments(input: $input) {\n      orderId\n      orderCode\n      amountSettled\n      remainingOwing\n      fullySettled\n      tenders {\n        paymentMethodCode\n        amount\n      }\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
