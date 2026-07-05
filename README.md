@@ -9,6 +9,8 @@
 Dukarun helps shopkeepers ditch manual data entry and expensive barcode scanners. Use your phone's camera to instantly recognize products, process sales, and manage inventory—all powered by custom AI trained on your products.
 
 [![Tests](https://github.com/kisinga/Dukarun/actions/workflows/test.yml/badge.svg)](https://github.com/kisinga/Dukarun/actions/workflows/test.yml)
+![Backend Coverage](./badges/backend-coverage.svg)
+![Frontend Coverage](./badges/frontend-coverage.svg)
 ![Coverage](./badges/coverage.svg)
 
 ## Quick Start

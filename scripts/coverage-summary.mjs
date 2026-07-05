@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { join, dirname } from 'node:path';
 
 const coverageTargets = [
-  { label: 'Backend', path: 'backend/coverage/lcov.info' },
-  { label: 'Frontend', path: 'frontend/coverage/lcov.info' },
+  { label: 'Backend', badgeLabel: 'backend', badgeName: 'backend-coverage.svg', path: 'backend/coverage/lcov.info' },
+  { label: 'Frontend', badgeLabel: 'frontend', badgeName: 'frontend-coverage.svg', path: 'frontend/coverage/lcov.info' },
 ];
 
 const args = new Map();
@@ -172,6 +172,28 @@ if (badgePath && badgePath !== true) {
   const color = colorForCoverage(combinedLineCoverage);
   mkdirSync(dirname(badgePath), { recursive: true });
   writeFileSync(badgePath, badgeSvg('coverage', message, color));
+}
+
+const badgeDir = args.get('--badge-dir');
+if (badgeDir && badgeDir !== true) {
+  mkdirSync(badgeDir, { recursive: true });
+
+  for (const result of results) {
+    const lineCoverage = result.totals
+      ? percent(result.totals.linesHit, result.totals.linesFound)
+      : null;
+    const message = result.totals ? formatPercent(lineCoverage) : 'unknown';
+    writeFileSync(
+      join(badgeDir, result.badgeName),
+      badgeSvg(result.badgeLabel, message, colorForCoverage(lineCoverage)),
+    );
+  }
+
+  const message = complete ? formatPercent(combinedLineCoverage) : 'unknown';
+  writeFileSync(
+    join(badgeDir, 'coverage.svg'),
+    badgeSvg('coverage', message, colorForCoverage(combinedLineCoverage)),
+  );
 }
 
 if (!args.has('--quiet')) {

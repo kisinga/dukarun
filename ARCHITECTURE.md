@@ -443,6 +443,8 @@ coverageReporter: {
 
 ```markdown
 [![Tests](https://github.com/kisinga/Dukarun/actions/workflows/test.yml/badge.svg)](https://github.com/kisinga/Dukarun/actions/workflows/test.yml)
+![Backend Coverage](./badges/backend-coverage.svg)
+![Frontend Coverage](./badges/frontend-coverage.svg)
 ![Coverage](./badges/coverage.svg)
 ```
 
@@ -451,7 +453,7 @@ coverageReporter: {
 - **Separate Jobs**: Backend and frontend tests run independently
 - **Artifact Upload**: Coverage files stored as downloadable GitHub Actions artifacts
 - **Coverage Summary**: Combined LCOV results are written to the GitHub Actions job summary
-- **Repository Badge**: Pushes to `main` refresh `badges/coverage.svg`
+- **Repository Badges**: Pushes to `main` refresh backend, frontend, and combined coverage badges under `badges/`
 
 ### Local Development
 
@@ -472,7 +474,7 @@ npm run coverage:summary
 
 - **Backend**: `backend/coverage/index.html`
 - **Frontend**: `frontend/coverage/lcov-report/index.html`
-- **Combined**: GitHub Actions job summary and `badges/coverage.svg`
+- **Combined**: GitHub Actions job summary and the SVG badges under `badges/`
 
 ### Best Practices
 
