@@ -453,7 +453,7 @@ coverageReporter: {
 - **Separate Jobs**: Backend and frontend tests run independently
 - **Artifact Upload**: Coverage files stored as downloadable GitHub Actions artifacts
 - **Coverage Summary**: Combined LCOV results are written to the GitHub Actions job summary
-- **Repository Badges**: Pushes to `main` refresh backend, frontend, and combined coverage badges under `badges/`
+- **Repository Badges**: Successful pushes to `main` open or update a PR with refreshed backend, frontend, and combined coverage badges
 
 ### Local Development
 
