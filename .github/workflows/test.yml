@@ -146,10 +146,11 @@ jobs:
           fi
 
           branch="automation/update-coverage-badge"
+          pr_url="https://github.com/${{ github.repository }}/pull/new/$branch"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin "$branch:refs/remotes/origin/$branch" || true
+          git fetch origin "$branch:refs/remotes/origin/$branch" 2>/dev/null || true
           git switch -c "$branch"
           git add badges
           git commit -m "chore: update coverage badges"
@@ -159,11 +160,19 @@ jobs:
           if [ -n "$pr_number" ]; then
             gh pr edit "$pr_number" \
               --title "chore: update coverage badges" \
-              --body "Updates the repository-owned backend, frontend, and combined coverage badges from the latest successful main run."
+              --body "Updates the repository-owned backend, frontend, and combined coverage badges from the latest successful main run." || true
           else
             gh pr create \
               --base main \
               --head "$branch" \
               --title "chore: update coverage badges" \
-              --body "Updates the repository-owned backend, frontend, and combined coverage badges from the latest successful main run."
+              --body "Updates the repository-owned backend, frontend, and combined coverage badges from the latest successful main run." || {
+                echo "GitHub Actions is not permitted to create pull requests for this repository."
+                echo "Open the coverage badge PR manually: $pr_url"
+                echo "### Coverage badge PR" >> "$GITHUB_STEP_SUMMARY"
+                echo "" >> "$GITHUB_STEP_SUMMARY"
+                echo "GitHub Actions pushed \`$branch\`, but repository settings blocked automatic PR creation." >> "$GITHUB_STEP_SUMMARY"
+                echo "" >> "$GITHUB_STEP_SUMMARY"
+                echo "Open the PR manually: $pr_url" >> "$GITHUB_STEP_SUMMARY"
+              }
           fi
