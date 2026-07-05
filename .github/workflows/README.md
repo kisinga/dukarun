@@ -6,14 +6,14 @@ This directory contains the CI/CD workflows for the dukarun project.
 
 ### 1. Test Suite (`test.yml`)
 
-- **Purpose**: Runs backend and frontend tests and uploads coverage (per-job and combined).
+- **Purpose**: Runs backend and frontend tests, uploads coverage artifacts, writes a GitHub Actions coverage summary, and refreshes the repository-owned coverage badge on `main`.
 - **Triggers**: `push` and `pull_request` to the `main` branch only.
 - **Jobs**:
-  - **test-backend**: Build and test backend (Node 20). Uploads backend coverage artifact and to Codecov.
-  - **test-frontend**: Build and test frontend (Node 20, Chrome). Uploads frontend coverage artifact and to Codecov.
-  - **coverage-combined**: Runs after both test jobs (even if one fails). Downloads available coverage artifacts and uploads combined coverage to Codecov when files exist.
+  - **test-backend**: Build and test backend (Node 22). Uploads the backend coverage artifact.
+  - **test-frontend**: Build and test frontend (Node 22, Chrome). Uploads the frontend coverage artifact.
+  - **coverage-combined**: Runs after both test jobs (even if one fails). Downloads available coverage artifacts, writes the coverage table to the GitHub Actions summary, and updates `badges/coverage.svg` on pushes to `main`.
 - **Environment**: Both test jobs run with `HUSKY=0` so git hooks are not installed in CI (root `prepare` also skips when `CI=true` or `HUSKY=0`).
-- **Node.js**: v20 for all jobs.
+- **Node.js**: v22.23.1 for all jobs.
 
 ### 2. Docker image builds
 
@@ -34,4 +34,4 @@ To require tests to pass before merging into `main`:
 
 ## Node.js Version
 
-All workflows use Node.js v20. The root `package.json` documents this with `"engines": { "node": ">=20" }`.
+All workflows use Node.js v22.23.1. The root `package.json` documents this with `"engines": { "node": ">=22.22.1" }`.

@@ -398,7 +398,7 @@ The project follows a **behavior-driven testing approach** focused on real-world
 | ------------ | ------------- | --------------- | ----------------------------- |
 | **Backend**  | Jest          | 20%             | Integration & business logic  |
 | **Frontend** | Angular/Karma | 20%             | Component behavior & services |
-| **Combined** | Codecov       | 20%             | Realistic integration focus   |
+| **Combined** | GitHub Actions | 20%             | Realistic integration focus   |
 
 ### Test Configuration
 
@@ -443,17 +443,15 @@ coverageReporter: {
 
 ```markdown
 [![Tests](https://github.com/kisinga/Dukarun/actions/workflows/test.yml/badge.svg)](https://github.com/kisinga/Dukarun/actions/workflows/test.yml)
-[![Coverage](https://codecov.io/gh/kisinga/Dukarun/branch/main/graph/badge.svg)](https://codecov.io/gh/kisinga/Dukarun)
-[![Backend Coverage](https://codecov.io/gh/kisinga/Dukarun/branch/main/graph/badge.svg?flag=backend)](https://codecov.io/gh/kisinga/Dukarun)
-[![Frontend Coverage](https://codecov.io/gh/kisinga/Dukarun/branch/main/graph/badge.svg?flag=frontend)](https://codecov.io/gh/kisinga/Dukarun)
+![Coverage](./badges/coverage.svg)
 ```
 
 #### CI/CD Pipeline
 
 - **Separate Jobs**: Backend and frontend tests run independently
-- **Artifact Upload**: Coverage files stored for combined reporting
-- **Codecov Integration**: Automatic coverage upload with flags
-- **PR Comments**: Coverage feedback on pull requests
+- **Artifact Upload**: Coverage files stored as downloadable GitHub Actions artifacts
+- **Coverage Summary**: Combined LCOV results are written to the GitHub Actions job summary
+- **Repository Badge**: Pushes to `main` refresh `badges/coverage.svg`
 
 ### Local Development
 
@@ -461,21 +459,20 @@ coverageReporter: {
 
 ```bash
 # Backend coverage
-cd backend
-npm run test:coverage
-npm run coverage:report
+npm run test:coverage -w @dukarun/backend
 
 # Frontend coverage
-cd frontend
-npm run test:coverage
-npm run coverage:report
+npm run test:coverage -w @dukarun/frontend
+
+# Combined summary and badge
+npm run coverage:summary
 ```
 
 #### Coverage Reports
 
 - **Backend**: `backend/coverage/index.html`
 - **Frontend**: `frontend/coverage/lcov-report/index.html`
-- **Combined**: Available in CI only
+- **Combined**: GitHub Actions job summary and `badges/coverage.svg`
 
 ### Best Practices
 
@@ -491,12 +488,12 @@ npm run coverage:report
 
 - **No Chrome**: Frontend uses mock coverage
 - **Empty Coverage**: Tests are mostly mocks (expected)
-- **Missing Reports**: Run `npm run coverage:report`
+- **Missing Reports**: Run the relevant `test:coverage` command first
 
 #### CI Issues
 
-- **Upload Failures**: Check Codecov token
-- **Missing Badges**: Verify repository settings
+- **Artifact Failures**: Check that `backend/coverage/` and `frontend/coverage/` exist after tests
+- **Missing Badges**: Verify the workflow has `contents: write` permission and is running on `main`
 - **Coverage Gaps**: Review test coverage patterns
 
 ## Security
