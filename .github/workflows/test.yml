@@ -93,6 +93,7 @@ jobs:
     permissions:
       actions: read   # required for download-artifact
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -132,18 +133,37 @@ jobs:
           fi
 
       - name: Summarize coverage
-        run: node scripts/coverage-summary.mjs --markdown "$GITHUB_STEP_SUMMARY" --badge badges/coverage.svg
+        run: node scripts/coverage-summary.mjs --markdown "$GITHUB_STEP_SUMMARY" --badge-dir badges
 
-      - name: Commit coverage badge
+      - name: Open coverage badges pull request
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.test-backend.result == 'success' && needs.test-frontend.result == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if git diff --quiet -- badges/coverage.svg; then
+          if git diff --quiet -- badges; then
             echo "Coverage badge is already up to date."
             exit 0
           fi
 
+          branch="automation/update-coverage-badge"
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add badges/coverage.svg
-          git commit -m "chore: update coverage badge"
-          git push
+          git fetch origin "$branch:refs/remotes/origin/$branch" || true
+          git switch -c "$branch"
+          git add badges
+          git commit -m "chore: update coverage badges"
+          git push --force-with-lease origin "$branch"
+
+          pr_number="$(gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number')"
+          if [ -n "$pr_number" ]; then
+            gh pr edit "$pr_number" \
+              --title "chore: update coverage badges" \
+              --body "Updates the repository-owned backend, frontend, and combined coverage badges from the latest successful main run."
+          else
+            gh pr create \
+              --base main \
+              --head "$branch" \
+              --title "chore: update coverage badges" \
+              --body "Updates the repository-owned backend, frontend, and combined coverage badges from the latest successful main run."
+          fi
