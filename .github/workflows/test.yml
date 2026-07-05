@@ -38,14 +38,8 @@ jobs:
         with:
           name: backend-coverage
           path: ./backend/coverage/
-
-      - name: Upload backend coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./backend/coverage/lcov.info
-          flags: backend
-          name: backend-coverage
-          fail_ci_if_error: false
+          if-no-files-found: error
+          retention-days: 14
 
   test-frontend:
     runs-on: ubuntu-22.04
@@ -89,15 +83,8 @@ jobs:
         with:
           name: frontend-coverage
           path: ./frontend/coverage/
-
-      - name: Upload frontend coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./frontend/coverage/lcov.info
-          flags: frontend
-          name: frontend-coverage
-          fail_ci_if_error: false
-        continue-on-error: true
+          if-no-files-found: error
+          retention-days: 14
 
   coverage-combined:
     runs-on: ubuntu-latest
@@ -105,7 +92,7 @@ jobs:
     if: always()
     permissions:
       actions: read   # required for download-artifact
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout code
@@ -115,9 +102,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22.23.1'
-
-      - name: Install codecov CLI
-        run: npm install -g codecov
 
       - name: Download backend coverage
         uses: actions/download-artifact@v4
@@ -147,21 +131,19 @@ jobs:
             echo "❌ Frontend coverage not found"
           fi
 
-      - name: Upload combined coverage
+      - name: Summarize coverage
+        run: node scripts/coverage-summary.mjs --markdown "$GITHUB_STEP_SUMMARY" --badge badges/coverage.svg
+
+      - name: Commit coverage badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.test-backend.result == 'success' && needs.test-frontend.result == 'success'
         run: |
-          # Create a list of available coverage files
-          COVERAGE_FILES=""
-          if [ -f "./backend/coverage/lcov.info" ]; then
-            COVERAGE_FILES="$COVERAGE_FILES ./backend/coverage/lcov.info"
-          fi
-          if [ -f "./frontend/coverage/lcov.info" ]; then
-            COVERAGE_FILES="$COVERAGE_FILES ./frontend/coverage/lcov.info"
+          if git diff --quiet -- badges/coverage.svg; then
+            echo "Coverage badge is already up to date."
+            exit 0
           fi
 
-          if [ -n "$COVERAGE_FILES" ]; then
-            echo "Uploading combined coverage with files: $COVERAGE_FILES"
-            npx codecov --files $COVERAGE_FILES --flags combined --name combined-coverage
-          else
-            echo "No coverage files found, skipping combined coverage upload"
-          fi
-        continue-on-error: true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add badges/coverage.svg
+          git commit -m "chore: update coverage badge"
+          git push

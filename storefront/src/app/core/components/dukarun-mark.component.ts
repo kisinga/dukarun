@@ -6,7 +6,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <img src="/assets/logo/dukarun-icon-dark.svg" alt="Dukarun" [attr.class]="cls()" />
+    <img src="/favicon.svg" alt="Dukarun" [attr.class]="cls()" />
   `,
 })
 export class DukarunMarkComponent {

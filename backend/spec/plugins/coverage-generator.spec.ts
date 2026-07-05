@@ -1,7 +1,7 @@
 /**
  * Coverage Generator Test
  *
- * This test ensures we have some basic coverage data for Codecov
+ * This test ensures we have some basic coverage data
  * without requiring complex integration tests.
  */
 
