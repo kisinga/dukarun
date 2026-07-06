@@ -130,7 +130,7 @@ export class EnvironmentConfig implements OnModuleInit {
   readonly adminNotifications = {
     email: '', // ADMIN_NOTIFICATION_EMAIL - receives registration alerts
     phone: '', // ADMIN_NOTIFICATION_PHONE - receives SMS alerts
-    channels: 'email', // ADMIN_NOTIFICATION_CHANNELS - comma-separated: email,sms
+    channels: 'email', // ADMIN_NOTIFICATION_CHANNELS - comma-separated: email,sms,whatsapp
   };
 
   // Communication/delivery configuration (single gating for SMS, email, WhatsApp, OTP delivery)

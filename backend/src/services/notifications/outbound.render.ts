@@ -114,7 +114,7 @@ const RENDERERS: Record<string, RenderFn> = {
     return {
       inAppTitle: '',
       inAppMessage: '',
-      whatsappBody: `Your account balance has been updated.\n\nOutstanding balance: KES ${formatted}.\n\nIf you have questions about this update, please contact your supplier.`,
+      whatsappBody: `Your account balance has been updated.\n\n*Outstanding balance: KES ${formatted}*\n\nIf you have questions about this update, please contact your supplier.`,
       emailSubject: 'Your account balance has been updated',
       emailBody: `Your account balance has been updated.\n\nOutstanding balance: KES ${formatted}.\n\nIf you have questions about this update, please contact your supplier.`,
     };

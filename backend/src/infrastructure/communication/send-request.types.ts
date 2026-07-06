@@ -9,11 +9,19 @@ export type CommunicationChannel = 'sms' | 'email' | 'whatsapp';
 /**
  * Result of a single send operation
  */
+export type DeliveryErrorCode =
+  | 'not_configured'
+  | 'invalid_recipient'
+  | 'gateway_error'
+  | 'network_error'
+  | 'unknown';
+
 export interface DeliveryResult {
   success: boolean;
   channel: CommunicationChannel;
   messageId?: string;
   error?: string;
+  errorCode?: DeliveryErrorCode;
 }
 
 /**

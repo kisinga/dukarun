@@ -60,6 +60,17 @@ export function formatPhoneNumber(phoneNumber: string): string {
 }
 
 /**
+ * Check if a normalized phone number is a Kenyan mobile number (07XXXXXXXX or 01XXXXXXXX).
+ * WhatsApp and mobile-only APIs should use this to reject landlines.
+ *
+ * @param phone - Normalized phone number in 0XXXXXXXXX format
+ * @returns true if the number is a mobile number
+ */
+export function isMobilePhoneNumber(phone: string): boolean {
+  return /^0[17]\d{8}$/.test(phone);
+}
+
+/**
  * Validate if a phone number is in the correct format: 0XXXXXXXXX
  *
  * @param phoneNumber - Phone number to validate
