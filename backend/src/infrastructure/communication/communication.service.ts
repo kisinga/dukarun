@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EventBus, RequestContext } from '@vendure/core';
 import { env } from '../config/environment.config';
 import { SmsService } from '../sms/sms.service';
+import { OpenWaService } from '../whatsapp/open-wa.service';
 import { SmsUsageService } from '../../services/sms/sms-usage.service';
 import { maskEmail } from '../../utils/email.utils';
 import { isSentinelEmail } from '../../utils/email.utils';
@@ -15,7 +16,7 @@ const SMS_MAX_LENGTH = 160;
 /**
  * Communication Service
  *
- * Single entry point for all delivery (SMS, email). Applies one dev gate: log payload first,
+ * Single entry point for all delivery (SMS, email, WhatsApp). Applies one dev gate: log payload first,
  * then optionally skip real send. Channel-scoped SMS is subject to per-tier limits (SmsUsageService).
  * SMS body is limited to 160 characters. OTP and platform-level SMS (no channelId) are not counted against channel limits.
  */
@@ -25,6 +26,7 @@ export class CommunicationService {
 
   constructor(
     private readonly smsService: SmsService,
+    private readonly openWaService: OpenWaService,
     private readonly eventBus: EventBus,
     private readonly smsUsageService: SmsUsageService
   ) {}
@@ -61,6 +63,10 @@ export class CommunicationService {
         this.logger.warn(
           `[COMMUNICATION DEV] ${purpose} | channel=sms | to=${recipient} | body=${bodyStr}`
         );
+      } else if (channel === 'whatsapp') {
+        this.logger.warn(
+          `[COMMUNICATION DEV] ${purpose} | channel=whatsapp | to=${recipient} | body=${bodyStr}`
+        );
       } else {
         this.logger.warn(
           `[COMMUNICATION DEV] ${purpose} | channel=email | to=${maskEmail(recipient)} | body=${bodyStr}`
@@ -72,6 +78,12 @@ export class CommunicationService {
     if (env.communication.devMode) {
       this.logger.log('[COMMUNICATION DEV] Skipping real send');
       return { success: true, channel };
+    }
+
+    if (metadata?.purpose !== 'otp' && !this.isChannelEnabled(channel)) {
+      const errMsg = `Communication channel "${channel}" is disabled by COMMUNICATION_CHANNELS`;
+      this.logger.warn(errMsg);
+      return { success: false, channel, error: errMsg };
     }
 
     if (channel === 'sms') {
@@ -105,6 +117,12 @@ export class CommunicationService {
       return result;
     }
 
+    if (channel === 'whatsapp') {
+      const message =
+        typeof body === 'string' ? body : String((body as Record<string, unknown>)?.text ?? body);
+      return this.sendWhatsApp(recipient, message);
+    }
+
     return this.sendEmail(recipient, body, ctx, request.template);
   }
 
@@ -128,6 +146,10 @@ export class CommunicationService {
       );
       return { success: false, channel: 'sms', error: errMsg };
     }
+  }
+
+  async sendWhatsApp(phoneNumber: string, message: string): Promise<DeliveryResult> {
+    return this.openWaService.sendText(phoneNumber, message);
   }
 
   /**

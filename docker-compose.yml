@@ -84,6 +84,11 @@ services:
       TEXTSMS_PARTNER_ID: ${TEXTSMS_PARTNER_ID}
       TEXTSMS_SHORTCODE: ${TEXTSMS_SHORTCODE}
 
+      # WhatsApp/OpenWA notification configuration
+      OPENWA_BASE_URL: ${OPENWA_BASE_URL}
+      OPENWA_API_KEY: ${OPENWA_API_KEY}
+      OPENWA_SESSION: ${OPENWA_SESSION}
+
       # Push Notification Configuration (VAPID) - set VAPID_EMAIL in env e.g. mailto:admin@example.com
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}

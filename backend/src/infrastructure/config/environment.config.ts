@@ -89,6 +89,13 @@ export class EnvironmentConfig implements OnModuleInit {
     vapidSubject: '',
   };
 
+  // WhatsApp notification configuration (OpenWA Gateway)
+  readonly whatsapp = {
+    openWaBaseUrl: '',
+    openWaApiKey: '',
+    openWaSession: 'default',
+  };
+
   // Paystack configuration
   readonly paystack = {
     secretKey: '',
@@ -126,10 +133,10 @@ export class EnvironmentConfig implements OnModuleInit {
     channels: 'email', // ADMIN_NOTIFICATION_CHANNELS - comma-separated: email,sms
   };
 
-  // Communication/delivery configuration (single gating for SMS, email, OTP delivery)
+  // Communication/delivery configuration (single gating for SMS, email, WhatsApp, OTP delivery)
   readonly communication = {
     devMode: false, // COMMUNICATION_DEV_MODE or isDevelopment() - when true, log payload and skip real send
-    channels: { sms: true, email: true }, // COMMUNICATION_CHANNELS - comma-separated sms,email to enable
+    channels: { sms: true, email: true, whatsapp: true }, // COMMUNICATION_CHANNELS - comma-separated sms,email,whatsapp to enable
   };
 
   /**
@@ -248,6 +255,11 @@ export class EnvironmentConfig implements OnModuleInit {
     this.push.vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
     this.push.vapidSubject = process.env.VAPID_EMAIL || '';
 
+    // Load WhatsApp/OpenWA configuration
+    this.whatsapp.openWaBaseUrl = process.env.OPENWA_BASE_URL || '';
+    this.whatsapp.openWaApiKey = process.env.OPENWA_API_KEY || '';
+    this.whatsapp.openWaSession = process.env.OPENWA_SESSION || 'default';
+
     // Load Paystack configuration
     this.paystack.secretKey = process.env.PAYSTACK_SECRET_KEY || '';
     this.paystack.publicKey = process.env.PAYSTACK_PUBLIC_KEY || '';
@@ -295,6 +307,7 @@ export class EnvironmentConfig implements OnModuleInit {
     this.communication.channels = {
       sms: commChannels.includes('sms'),
       email: commChannels.includes('email'),
+      whatsapp: commChannels.includes('whatsapp'),
     };
 
     this.validate();

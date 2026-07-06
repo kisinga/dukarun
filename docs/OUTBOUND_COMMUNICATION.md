@@ -1,14 +1,14 @@
 # Outbound communication
 
-This document describes when and how the server initiates communication (in-app, SMS, email) to customers, channel admins, and platform admins.
+This document describes when and how the server initiates communication (in-app, WhatsApp, SMS, email) to customers, channel admins, and platform admins.
 
 ## Flow
 
 1. **Trigger**: Something happens (e.g. balance changed, shift closed, order paid, company registered). The trigger is represented by a **trigger key** (e.g. `balance_changed`, `shift_closed`).
 2. **Single path**: All triggers go through `OutboundDeliveryService.deliver(ctx, triggerKey, payload)`.
-3. **Config**: For each trigger key, `OUTBOUND_CONFIG` (in code) defines audience and channels (in-app, SMS, email).
+3. **Config**: For each trigger key, `OUTBOUND_CONFIG` (in code) defines audience and channels (in-app, WhatsApp, SMS, email).
 4. **Content**: Message content is rendered from code-based templates in `outbound.render.ts`.
-5. **Delivery**: The deliver function calls existing `NotificationService` (in-app) and `CommunicationService` (SMS/email). No new transport layer.
+5. **Delivery**: The deliver function calls existing `NotificationService` (in-app) and `CommunicationService` (WhatsApp/SMS/email).
 
 ## When (triggers)
 
@@ -19,7 +19,7 @@ This document describes when and how the server initiates communication (in-app,
 | admin_action | Admin/user created or updated (event) |
 | customer_created, credit_approved, repayment_deadline | Customer lifecycle (event) |
 | balance_changed_admin | Customer balance changed – in-app to channel admins (event) |
-| balance_changed | Customer balance changed – SMS to customer (event) |
+| balance_changed | Customer balance changed – WhatsApp to customer (event) |
 | channel_approved, channel_status_changed | Channel status (event) |
 | stock_low | Low stock alert (event) |
 | company_registered | New company registration (event) |
@@ -37,10 +37,17 @@ Optional payload field `targetUserIds` overrides in-app recipients (e.g. approva
 ## How (channels)
 
 - **in-app**: Stored in `notification` table; shown in dashboard. Respects user preferences per `NotificationType`.
+- **WhatsApp**: Sent via `CommunicationService.send` (channel `whatsapp`) through the OpenWA Gateway (`POST /api/sessions/:session/messages/send-text`). Used for notification messages only, not OTP.
 - **SMS**: Sent via `CommunicationService.send` (channel `sms`). Subject to env `COMMUNICATION_CHANNELS` and per-tier limits when `channelId` is set. SMS category (e.g. `ACCOUNT_NOTIFICATION`, `ADMIN`) is set in outbound config.
 - **Email**: Sent via `CommunicationService.send` (channel `email`). Currently only company_registered uses email; generic transactional email can be extended later.
 
-Channel availability: `COMMUNICATION_CHANNELS` (env) enables SMS/email globally. `ADMIN_NOTIFICATION_CHANNELS` controls platform admin delivery (email,sms).
+Channel availability: `COMMUNICATION_CHANNELS` (env) enables WhatsApp/SMS/email globally. `ADMIN_NOTIFICATION_CHANNELS` controls platform admin delivery (email,sms).
+
+OpenWA configuration:
+
+- `OPENWA_BASE_URL` – OpenWA Gateway base URL, e.g. `http://openwa:2785`.
+- `OPENWA_API_KEY` – sent as the `X-API-Key` header.
+- `OPENWA_SESSION` – OpenWA session id, defaults to `default`.
 
 ## Where it’s configured
 

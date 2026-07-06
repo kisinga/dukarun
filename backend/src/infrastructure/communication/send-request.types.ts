@@ -4,7 +4,7 @@ import type { SmsCategory } from '../../domain/sms-categories';
 /**
  * Delivery channel for communication
  */
-export type CommunicationChannel = 'sms' | 'email';
+export type CommunicationChannel = 'sms' | 'email' | 'whatsapp';
 
 /**
  * Result of a single send operation
@@ -22,7 +22,7 @@ export interface DeliveryResult {
  */
 export interface SendRequest {
   channel: CommunicationChannel;
-  /** Recipient: phone number (E.164 or national format) for SMS, email address for email */
+  /** Recipient: phone number for SMS/WhatsApp, email address for email */
   recipient: string;
   /**
    * Body: for SMS a string message; for OTP email the OTP string (handler adds template vars).

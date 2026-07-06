@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Customer, RequestContext, TransactionalConnection, User } from '@vendure/core';
 import { env } from '../../infrastructure/config/environment.config';
+import { validatePhoneNumber } from '../../utils/phone.utils';
 import { CommunicationService } from '../../infrastructure/communication/communication.service';
 import { ChannelUserService } from '../../services/auth/channel-user.service';
 import { OUTBOUND_CONFIG, type OutboundAudience } from './outbound.config';
@@ -17,7 +18,7 @@ export type OutboundPayload = Record<string, unknown> & {
 
 /**
  * Single entry point for server-initiated communication.
- * Uses outbound config + render; delegates to NotificationService (in-app) and CommunicationService (SMS/email).
+ * Uses outbound config + render; delegates to NotificationService (in-app) and CommunicationService (SMS/email/WhatsApp).
  */
 @Injectable()
 export class OutboundDeliveryService {
@@ -31,7 +32,7 @@ export class OutboundDeliveryService {
   ) {}
 
   /**
-   * Deliver a trigger: resolve audience, render content, send in-app and/or SMS/email.
+   * Deliver a trigger: resolve audience, render content, send in-app and/or SMS/email/WhatsApp.
    */
   async deliver(ctx: RequestContext, triggerKey: string, payload: OutboundPayload): Promise<void> {
     const config = OUTBOUND_CONFIG[triggerKey];
@@ -58,7 +59,7 @@ export class OutboundDeliveryService {
     }
 
     if (config.channels.sms) {
-      const phones = await this.resolveSmsRecipients(ctx, config.audience, channelId, payload);
+      const phones = await this.resolvePhoneRecipients(ctx, config.audience, channelId, payload);
       const smsBody = rendered.smsBody;
       if (smsBody && phones.length > 0) {
         const purpose =
@@ -99,6 +100,26 @@ export class OutboundDeliveryService {
         }
       }
     }
+
+    if (config.channels.whatsapp) {
+      const phones = await this.resolvePhoneRecipients(ctx, config.audience, channelId, payload);
+      const whatsappBody = rendered.whatsappBody ?? rendered.smsBody;
+      if (whatsappBody && phones.length > 0) {
+        for (const phone of phones) {
+          const result = await this.communicationService.send({
+            channel: 'whatsapp',
+            recipient: phone,
+            body: whatsappBody,
+            ctx,
+            channelId: config.audience === 'platform_admin' ? undefined : channelId,
+            metadata: { purpose: 'account_notification' },
+          });
+          if (!result.success) {
+            this.logger.warn(`Outbound WhatsApp failed for ${triggerKey}: ${result.error}`);
+          }
+        }
+      }
+    }
   }
 
   private async resolveInAppRecipients(
@@ -121,7 +142,7 @@ export class OutboundDeliveryService {
     return [];
   }
 
-  private async resolveSmsRecipients(
+  private async resolvePhoneRecipients(
     ctx: RequestContext,
     audience: OutboundAudience,
     _channelId: string | undefined,
@@ -135,7 +156,9 @@ export class OutboundDeliveryService {
       if (!customer) return [];
       const cf = (customer as any).customFields || {};
       const phone = cf.phoneNumber ?? (customer as any).user?.identifier ?? null;
-      if (phone && typeof phone === 'string' && phone.trim()) return [phone.trim()];
+      if (phone && typeof phone === 'string' && phone.trim() && validatePhoneNumber(phone.trim())) {
+        return [phone.trim()];
+      }
       return [];
     }
     if (audience === 'platform_admin' && env.adminNotifications.phone) {
