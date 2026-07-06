@@ -140,13 +140,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if git diff --quiet -- badges; then
+          if [ -z "$(git status --porcelain -- badges)" ]; then
             echo "Coverage badge is already up to date."
             exit 0
           fi
 
-          branch="automation/update-coverage-badge"
-          pr_url="https://github.com/${{ github.repository }}/pull/new/$branch"
+          branch="automation/update-coverage-badges"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -156,23 +155,19 @@ jobs:
           git commit -m "chore: update coverage badges"
           git push --force-with-lease origin "$branch"
 
+          body="Updates the repository-owned backend, frontend, and combined coverage badges from the latest successful main run."
           pr_number="$(gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number')"
+
           if [ -n "$pr_number" ]; then
-            gh pr edit "$pr_number" \
-              --title "chore: update coverage badges" \
-              --body "Updates the repository-owned backend, frontend, and combined coverage badges from the latest successful main run." || true
+            gh pr edit "$pr_number" --title "chore: update coverage badges" --body "$body"
           else
-            gh pr create \
-              --base main \
-              --head "$branch" \
-              --title "chore: update coverage badges" \
-              --body "Updates the repository-owned backend, frontend, and combined coverage badges from the latest successful main run." || {
-                echo "GitHub Actions is not permitted to create pull requests for this repository."
-                echo "Open the coverage badge PR manually: $pr_url"
-                echo "### Coverage badge PR" >> "$GITHUB_STEP_SUMMARY"
-                echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "GitHub Actions pushed \`$branch\`, but repository settings blocked automatic PR creation." >> "$GITHUB_STEP_SUMMARY"
-                echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "Open the PR manually: $pr_url" >> "$GITHUB_STEP_SUMMARY"
-              }
+            gh pr create --base main --head "$branch" --title "chore: update coverage badges" --body "$body"
+            pr_number="$(gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number')"
+          fi
+
+          if [ -n "$pr_number" ]; then
+            gh pr merge "$pr_number" --squash --auto --delete-branch || {
+              echo "Coverage badge PR #$pr_number was created, but auto-merge is not available."
+              echo "Review and merge it manually to update README badges."
+            }
           fi

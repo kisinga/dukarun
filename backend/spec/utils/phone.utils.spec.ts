@@ -2,6 +2,7 @@ import {
   formatPhoneNumber,
   toInternationalFormat,
   validatePhoneNumber,
+  isMobilePhoneNumber,
 } from '../../src/utils/phone.utils';
 
 describe('phone.utils', () => {
@@ -66,6 +67,24 @@ describe('phone.utils', () => {
 
     it('should return false for invalid numbers', () => {
       expect(validatePhoneNumber('12345')).toBe(false);
+    });
+  });
+
+  describe('isMobilePhoneNumber', () => {
+    it('should return true for 07XXXXXXXX mobile numbers', () => {
+      expect(isMobilePhoneNumber('0712345678')).toBe(true);
+    });
+
+    it('should return true for 01XXXXXXXX mobile numbers', () => {
+      expect(isMobilePhoneNumber('0112345678')).toBe(true);
+    });
+
+    it('should return false for landline numbers', () => {
+      expect(isMobilePhoneNumber('0201234567')).toBe(false);
+    });
+
+    it('should return false for invalid numbers', () => {
+      expect(isMobilePhoneNumber('12345')).toBe(false);
     });
   });
 

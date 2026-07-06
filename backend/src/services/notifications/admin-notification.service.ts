@@ -31,11 +31,12 @@ export class AdminNotificationService {
 
   constructor(private readonly outboundDelivery: OutboundDeliveryService) {}
 
-  private getEnabledChannels(): { email: boolean; sms: boolean } {
+  private getEnabledChannels(): { email: boolean; sms: boolean; whatsapp: boolean } {
     const channelsStr = env.adminNotifications.channels.toLowerCase();
     return {
       email: channelsStr.includes('email'),
       sms: channelsStr.includes('sms'),
+      whatsapp: channelsStr.includes('whatsapp'),
     };
   }
 
@@ -43,7 +44,8 @@ export class AdminNotificationService {
     const channels = this.getEnabledChannels();
     const hasEmail = channels.email && !!env.adminNotifications.email;
     const hasSms = channels.sms && !!env.adminNotifications.phone;
-    return hasEmail || hasSms;
+    const hasWhatsApp = channels.whatsapp && !!env.adminNotifications.phone;
+    return hasEmail || hasSms || hasWhatsApp;
   }
 
   /**
@@ -55,7 +57,7 @@ export class AdminNotificationService {
   ): Promise<void> {
     if (!this.isConfigured()) {
       this.logger.warn(
-        'Admin notifications not configured. Set ADMIN_NOTIFICATION_EMAIL/PHONE to receive registration alerts.'
+        'Admin notifications not configured. Set ADMIN_NOTIFICATION_EMAIL and/or ADMIN_NOTIFICATION_PHONE, and include email/sms/whatsapp in ADMIN_NOTIFICATION_CHANNELS to receive registration alerts.'
       );
       return;
     }

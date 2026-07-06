@@ -11,7 +11,7 @@ This directory contains the CI/CD workflows for the dukarun project.
 - **Jobs**:
   - **test-backend**: Build and test backend (Node 22). Uploads the backend coverage artifact.
   - **test-frontend**: Build and test frontend (Node 22, Chrome). Uploads the frontend coverage artifact.
-  - **coverage-combined**: Runs after both test jobs (even if one fails). Downloads available coverage artifacts, writes the coverage table to the GitHub Actions summary, and updates the backend, frontend, and combined badges on pushes to `main`.
+  - **coverage-combined**: Runs after both test jobs (even if one fails). Downloads available coverage artifacts, writes the coverage table to the GitHub Actions summary, and opens or updates a PR with refreshed backend, frontend, and combined badges after successful pushes to `main`.
 - **Environment**: Both test jobs run with `HUSKY=0` so git hooks are not installed in CI (root `prepare` also skips when `CI=true` or `HUSKY=0`).
 - **Node.js**: v22.23.1 for all jobs.
 

@@ -7,7 +7,7 @@ import { FinancialService } from '../financial/financial.service';
  * Channel Communication Service
  *
  * Business logic service for credit-related customer communications.
- * Publishes events; NotificationSubscriber delivers in-app and SMS/email via OutboundDeliveryService.
+ * Publishes events; NotificationSubscriber delivers in-app and WhatsApp/SMS/email via OutboundDeliveryService.
  * Customer balance is read from the ledger (FinancialService) as the single source of truth.
  */
 @Injectable()
@@ -98,7 +98,7 @@ export class ChannelCommunicationService {
   }
 
   /**
-   * Send starting balance notification (in-app event + SMS/email to customer).
+   * Send starting balance notification (in-app event + WhatsApp/SMS/email to customer).
    * Uses ledger as source of truth for customer balance.
    */
   async sendStartingBalanceNotification(ctx: RequestContext, customerId: string): Promise<void> {
@@ -141,7 +141,7 @@ export class ChannelCommunicationService {
   }
 
   /**
-   * Send balance change notification. Publishes event; subscriber delivers in-app and SMS via outbound.
+   * Send balance change notification. Publishes event; subscriber delivers in-app and WhatsApp via outbound.
    */
   async sendBalanceChangeNotification(
     ctx: RequestContext,
