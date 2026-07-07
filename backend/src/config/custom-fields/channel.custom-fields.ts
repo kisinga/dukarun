@@ -313,6 +313,34 @@ export const channelCustomFields: CustomFields['Channel'] = [
     nullable: true,
     ui: { tab: 'Subscription' },
   },
+  {
+    name: 'subscriptionExemptUntil',
+    type: 'datetime',
+    label: [{ languageCode: LanguageCode.en, value: 'Subscription Exempt Until' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value: 'Explicit temporary exemption end date. Blank expiry dates do not grant access.',
+      },
+    ],
+    public: false,
+    nullable: true,
+    ui: { tab: 'Subscription' },
+  },
+  {
+    name: 'subscriptionExemptReason',
+    type: 'text',
+    label: [{ languageCode: LanguageCode.en, value: 'Subscription Exempt Reason' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value: 'Internal reason for a temporary subscription exemption.',
+      },
+    ],
+    public: false,
+    nullable: true,
+    ui: { tab: 'Subscription' },
+  },
 
   // ─── Events ────────────────────────────────────────────────
   {

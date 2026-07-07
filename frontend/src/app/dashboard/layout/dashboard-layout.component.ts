@@ -22,6 +22,7 @@ import { NetworkService } from '../../core/services/network.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { NotificationStateService } from '../../core/services/notification/notification-state.service';
 import { SubscriptionService } from '../../core/services/subscription.service';
+import { ToastService } from '../../core/services/toast.service';
 import {
   CashierSessionService,
   type PaymentMethodReconciliationConfig,
@@ -65,6 +66,7 @@ export class DashboardLayoutComponent implements OnInit {
   private readonly notificationService = inject(NotificationService);
   private readonly notificationStateService = inject(NotificationStateService);
   private readonly subscriptionService = inject(SubscriptionService);
+  private readonly toastService = inject(ToastService);
   private readonly router = inject(Router);
   private readonly networkService = inject(NetworkService);
   protected readonly cashierSessionService = inject(CashierSessionService);
@@ -193,6 +195,19 @@ export class DashboardLayoutComponent implements OnInit {
 
   // Subscription status
   protected readonly isTrialActive = this.subscriptionService.isTrialActive;
+  protected readonly isSubscriptionReadOnly = computed(
+    () => this.subscriptionService.accessState().access === 'read_only',
+  );
+  protected readonly subscriptionReadonlyMessage = computed(() => {
+    const state = this.subscriptionService.accessState();
+    if (state.status === 'cancelled') {
+      return 'Your subscription is cancelled. Renew to continue editing.';
+    }
+    return this.subscriptionService.getReadOnlyMessage();
+  });
+  protected readonly subscriptionReadonlyExpiresAt = computed(
+    () => this.subscriptionService.accessState().expiresAt,
+  );
   protected readonly hasSuperAdminPermission = this.authService.hasSuperAdminPermission;
   protected readonly vendureAdminUrl = (): string => environment.vendureAdminUrl ?? '/admin';
 
@@ -339,9 +354,9 @@ export class DashboardLayoutComponent implements OnInit {
     const message = notification.message?.toLowerCase() || '';
     return (
       title.includes('trial') ||
-      title.includes('early tester') ||
+      title.includes('subscription') ||
       message.includes('trial') ||
-      message.includes('early tester')
+      message.includes('subscription')
     );
   }
 
@@ -369,12 +384,10 @@ export class DashboardLayoutComponent implements OnInit {
         userId: this.user()?.user?.id || '',
         channelId: this.activeCompanyId() || '',
         type: 'PAYMENT',
-        title: status.isEarlyTester ? 'Early Tester Program' : 'Trial Period Active',
-        message: status.isEarlyTester
-          ? "You're part of our early testers program. Upgrade anytime to support the platform!"
-          : status.daysRemaining
-            ? `Your trial ends in ${status.daysRemaining} day${status.daysRemaining !== 1 ? 's' : ''}. Upgrade now to continue using all features.`
-            : 'Your trial period is active. Upgrade now to continue using all features.',
+        title: 'Trial Period Active',
+        message: status.daysRemaining
+          ? `Your trial ends in ${status.daysRemaining} day${status.daysRemaining !== 1 ? 's' : ''}. Upgrade now to continue using all features.`
+          : 'Your trial period is active. Upgrade now to continue using all features.',
         read: false,
         createdAt: new Date().toISOString(),
         data: {
@@ -405,6 +418,7 @@ export class DashboardLayoutComponent implements OnInit {
 
   /** Open the shift modal in "open shift" mode. */
   openOpenDayModal(): void {
+    if (!this.canStartWriteAction()) return;
     const companyId = this.companyService.activeCompanyId();
     if (!companyId) return;
     const channelId = parseInt(companyId, 10);
@@ -437,6 +451,7 @@ export class DashboardLayoutComponent implements OnInit {
 
   /** Open the shift modal in "close shift" mode. */
   openCloseDayModal(): void {
+    if (!this.canStartWriteAction()) return;
     const session = this.cashierSessionService.currentSession();
     if (!session) return;
     this.cashierSessionService.error.set(null);
@@ -598,6 +613,7 @@ export class DashboardLayoutComponent implements OnInit {
   }
 
   async submitDayModal(): Promise<void> {
+    if (!this.canStartWriteAction()) return;
     const mode = this.dayModalMode();
     const config = this.dayModalConfig();
     const balances = this.dayModalBalances();
@@ -665,6 +681,19 @@ export class DashboardLayoutComponent implements OnInit {
     } else {
       this.shiftModalTrigger.openOpenModal();
     }
+  }
+
+  private canStartWriteAction(): boolean {
+    if (this.subscriptionService.ensureCanWrite()) {
+      return true;
+    }
+    this.toastService.show(
+      'Read-only mode',
+      this.subscriptionService.getReadOnlyMessage(),
+      'warning',
+      4000,
+    );
+    return false;
   }
 
   /** Returns a registered ng-icon name for a notification type (rendered via <ng-icon [name]>). */

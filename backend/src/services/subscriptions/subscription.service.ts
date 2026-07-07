@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   Channel,
   ChannelService,
@@ -14,15 +14,25 @@ import {
 } from '../../plugins/subscriptions/subscription.entity';
 import { PaystackService } from '../payments/paystack.service';
 import { generatePaystackEmailFromPhone } from '../../utils/email.utils';
+import {
+  evaluateSubscriptionAccess,
+  SubscriptionAccess,
+  SubscriptionPolicyReason,
+  SubscriptionPolicyStatus,
+} from './subscription-access.policy';
 
 export interface SubscriptionStatus {
   isValid: boolean;
-  status: 'trial' | 'active' | 'expired' | 'cancelled';
+  access: SubscriptionAccess;
+  status: SubscriptionPolicyStatus;
+  reason: SubscriptionPolicyReason;
   daysRemaining?: number;
   expiresAt?: Date;
   trialEndsAt?: Date;
+  exemptionEndsAt?: Date;
+  exemptionReason?: string;
+  canWrite: boolean;
   canPerformAction: boolean;
-  isEarlyTester?: boolean; // true if expiry dates are blank (set by admin)
 }
 
 export interface InitiatePurchaseResult {
@@ -64,119 +74,34 @@ export class SubscriptionService {
       throw new Error(`Channel ${channelId} not found`);
     }
 
-    const customFields = channel.customFields as any;
-    const status = customFields.subscriptionStatus || 'trial';
+    const customFields = channel.customFields as Record<string, unknown>;
+    const decision = evaluateSubscriptionAccess(customFields);
 
-    // Check if in trial
-    if (status === 'trial') {
-      const trialEndsAt = customFields.trialEndsAt ? new Date(customFields.trialEndsAt) : null;
-      if (!trialEndsAt) {
-        // Early tester - no expiry set by admin, allow full access indefinitely
-        return {
-          isValid: true,
-          status: 'trial',
-          canPerformAction: true,
-          isEarlyTester: true,
-          // No daysRemaining or trialEndsAt - indicates indefinite access
-        };
-      }
-      if (trialEndsAt > new Date()) {
-        const daysRemaining = Math.ceil(
-          (trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-        );
-        return {
-          isValid: true,
-          status: 'trial',
-          daysRemaining,
-          trialEndsAt: trialEndsAt ?? undefined,
-          canPerformAction: true,
-          isEarlyTester: false,
-        };
-      } else {
-        // Trial expired, mark as expired
-        await this.handleExpiredSubscription(ctx, channelId);
-        return {
-          isValid: false,
-          status: 'expired',
-          canPerformAction: false,
-          isEarlyTester: false,
-        };
-      }
+    if (
+      decision.status === 'expired' &&
+      customFields.subscriptionStatus !== 'expired' &&
+      customFields.subscriptionStatus !== 'cancelled'
+    ) {
+      await this.handleExpiredSubscription(ctx, channelId);
     }
 
-    // Check if subscription is active
-    if (status === 'active') {
-      const expiresAt = customFields.subscriptionExpiresAt
-        ? new Date(customFields.subscriptionExpiresAt)
-        : null;
-      if (!expiresAt) {
-        // Early tester - no expiry set by admin, allow full access indefinitely
-        return {
-          isValid: true,
-          status: 'active',
-          canPerformAction: true,
-          isEarlyTester: true,
-          // No daysRemaining or expiresAt - indicates indefinite access
-        };
-      }
-      if (expiresAt > new Date()) {
-        const daysRemaining = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-        return {
-          isValid: true,
-          status: 'active',
-          daysRemaining,
-          expiresAt: expiresAt ?? undefined,
-          canPerformAction: true,
-          isEarlyTester: false,
-        };
-      } else {
-        // Subscription expired
-        await this.handleExpiredSubscription(ctx, channelId);
-        return {
-          isValid: false,
-          status: 'expired',
-          expiresAt: expiresAt ?? undefined,
-          canPerformAction: false,
-          isEarlyTester: false,
-        };
-      }
-    }
-
-    // Cancelled or expired
-    return {
-      isValid: false,
-      status: status as 'expired' | 'cancelled',
-      canPerformAction: false,
-      isEarlyTester: false,
-    };
+    return decision;
   }
 
   /**
    * Check if channel is in trial period
    */
   async isInTrial(ctx: RequestContext, channel: Channel): Promise<boolean> {
-    const customFields = channel.customFields as any;
-    if (customFields.subscriptionStatus !== 'trial') {
-      return false;
-    }
-
-    const trialEndsAt = customFields.trialEndsAt ? new Date(customFields.trialEndsAt) : null;
-    return trialEndsAt ? trialEndsAt > new Date() : false;
+    const decision = evaluateSubscriptionAccess(channel.customFields as Record<string, unknown>);
+    return decision.status === 'trial' && decision.access === 'full';
   }
 
   /**
    * Check if subscription is active
    */
   async isSubscriptionActive(ctx: RequestContext, channel: Channel): Promise<boolean> {
-    const customFields = channel.customFields as any;
-    if (customFields.subscriptionStatus !== 'active') {
-      return false;
-    }
-
-    const expiresAt = customFields.subscriptionExpiresAt
-      ? new Date(customFields.subscriptionExpiresAt)
-      : null;
-    return expiresAt ? expiresAt > new Date() : false;
+    const decision = evaluateSubscriptionAccess(channel.customFields as Record<string, unknown>);
+    return decision.status === 'active' && decision.access === 'full';
   }
 
   /**
@@ -441,8 +366,7 @@ export class SubscriptionService {
       throw new Error('Subscription tier not found');
     }
 
-    // Prepaid extension logic: New Expiry = MAX(Current Expiry, Trial End, Now) + Billing Cycle
-    // Handles blank expiry dates (early testers) gracefully
+    // Prepaid extension logic: New Expiry = MAX(Current Expiry, Trial End, Now) + Billing Cycle.
     const billingCycle = customFields.billingCycle || 'monthly';
     const currentExpiry = customFields.subscriptionExpiresAt
       ? new Date(customFields.subscriptionExpiresAt)
@@ -466,6 +390,8 @@ export class SubscriptionService {
       subscriptionStatus: 'active',
       subscriptionStartedAt: customFields.subscriptionStartedAt || new Date(),
       subscriptionExpiresAt: expiresAt,
+      subscriptionExemptUntil: null,
+      subscriptionExemptReason: null,
       lastPaymentDate: new Date(),
       lastPaymentAmount: paystackData.amount,
     };
@@ -675,11 +601,12 @@ export class SubscriptionService {
     const status = await this.checkSubscriptionStatus(ctx, channelId);
 
     // Allow subscription-related actions even if expired
-    if (action.includes('subscription') || action.includes('payment')) {
+    const normalizedAction = action.toLowerCase();
+    if (normalizedAction.includes('subscription') || normalizedAction.includes('payment')) {
       return true;
     }
 
-    return status.canPerformAction;
+    return status.canWrite;
   }
 
   /**
@@ -708,6 +635,12 @@ export class SubscriptionService {
     billingCycle?: string;
     lastPaymentDate?: Date;
     lastPaymentAmount?: number;
+    access: SubscriptionAccess;
+    reason: SubscriptionPolicyReason;
+    expiresAt?: Date;
+    exemptionEndsAt?: Date;
+    exemptionReason?: string;
+    canWrite: boolean;
   }> {
     const channel = await this.channelService.findOne(ctx, channelId);
     if (!channel) {
@@ -729,10 +662,11 @@ export class SubscriptionService {
     if (tierId && tierId !== '-1') {
       tier = await this.getSubscriptionTier(tierId);
     }
+    const access = evaluateSubscriptionAccess(customFields);
 
     return {
       tier: tier || null,
-      status: customFields.subscriptionStatus || 'trial',
+      status: access.status,
       trialEndsAt: customFields.trialEndsAt ? new Date(customFields.trialEndsAt) : undefined,
       subscriptionStartedAt: customFields.subscriptionStartedAt
         ? new Date(customFields.subscriptionStartedAt)
@@ -745,6 +679,12 @@ export class SubscriptionService {
         ? new Date(customFields.lastPaymentDate)
         : undefined,
       lastPaymentAmount: customFields.lastPaymentAmount || undefined,
+      access: access.access,
+      reason: access.reason,
+      expiresAt: access.expiresAt,
+      exemptionEndsAt: access.exemptionEndsAt,
+      exemptionReason: access.exemptionReason,
+      canWrite: access.canWrite,
     };
   }
 

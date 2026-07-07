@@ -21,15 +21,23 @@ export interface SubscriptionTier {
   isActive: boolean;
 }
 
+export type SubscriptionAccess = 'full' | 'read_only';
+
 export interface SubscriptionStatus {
   isValid: boolean;
-  status: 'trial' | 'active' | 'expired' | 'cancelled';
+  access: SubscriptionAccess;
+  status: 'trial' | 'active' | 'expired' | 'cancelled' | 'exempt';
+  reason: string;
   daysRemaining?: number;
-  expiresAt?: Date;
-  trialEndsAt?: Date;
+  expiresAt?: Date | string | null;
+  trialEndsAt?: Date | string | null;
+  exemptionEndsAt?: Date | string | null;
+  exemptionReason?: string | null;
+  canWrite: boolean;
   canPerformAction: boolean;
-  isEarlyTester?: boolean;
 }
+
+const SUBSCRIPTION_READ_ONLY_MESSAGE = 'Your subscription is read-only. Renew to continue editing.';
 
 /**
  * Service for subscription management with Paystack integration
@@ -72,27 +80,39 @@ export class SubscriptionService {
   // Computed signals
   readonly isTrialActive = computed(() => {
     const status = this.subscriptionStatusSignal();
-    return status?.status === 'trial' && status.isValid;
+    return status?.status === 'trial' && status.access === 'full';
   });
 
   readonly isSubscriptionActive = computed(() => {
     const status = this.subscriptionStatusSignal();
-    return status?.status === 'active' && status.isValid;
+    return status?.status === 'active' && status.access === 'full';
   });
 
   readonly isExpired = computed(() => {
     const status = this.subscriptionStatusSignal();
-    return status?.status === 'expired' || status?.status === 'cancelled';
+    return status?.access === 'read_only';
   });
 
+  readonly canWrite = computed(() => this.subscriptionStatusSignal()?.canWrite ?? false);
+
   readonly canPerformAction = computed(() => {
+    return this.canWrite();
+  });
+
+  readonly accessState = computed(() => {
     const status = this.subscriptionStatusSignal();
-    return status?.canPerformAction ?? false;
+    return {
+      access: status?.access ?? ('read_only' as SubscriptionAccess),
+      status: status?.status ?? 'expired',
+      reason: status?.reason ?? 'unknown_status',
+      expiresAt: status?.expiresAt ?? null,
+      canWrite: status?.canWrite ?? false,
+    };
   });
 
   readonly hasIndefiniteTrial = computed(() => {
     const status = this.subscriptionStatusSignal();
-    return status?.status === 'trial' && !status.trialEndsAt;
+    return status?.reason === 'explicit_exemption';
   });
 
   /**
@@ -113,8 +133,7 @@ export class SubscriptionService {
       this.tiersSignal.set(tiers as SubscriptionTier[]);
       return tiers as SubscriptionTier[];
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to fetch subscription tiers';
+      const errorMessage = this.normalizeAccessError(error, 'Failed to fetch subscription tiers');
       this.errorSignal.set(errorMessage);
       console.error('Failed to fetch subscription tiers:', error);
       return [];
@@ -145,8 +164,7 @@ export class SubscriptionService {
 
       return result.data?.getChannelSubscription ?? null;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to fetch subscription details';
+      const errorMessage = this.normalizeAccessError(error, 'Failed to fetch subscription details');
       this.errorSignal.set(errorMessage);
       console.error('Failed to fetch channel subscription:', error);
       return null;
@@ -187,7 +205,8 @@ export class SubscriptionService {
 
       // Check for GraphQL errors first
       if (result.error) {
-        const errorMessage = result.error.message || 'Unknown error';
+        const errorMessage = this.normalizeAccessError(result.error, 'Unknown error');
+        this.errorSignal.set(errorMessage);
         console.warn('GraphQL error when checking subscription status:', errorMessage);
         return null;
       }
@@ -209,8 +228,7 @@ export class SubscriptionService {
       this.subscriptionStatusSignal.set(status);
       return status;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to check subscription status';
+      const errorMessage = this.normalizeAccessError(error, 'Failed to check subscription status');
       this.errorSignal.set(errorMessage);
       console.error('Failed to check subscription status:', error);
       return null;
@@ -320,7 +338,7 @@ export class SubscriptionService {
         message: response.message || undefined,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to initiate purchase';
+      const errorMessage = this.normalizeAccessError(error, 'Failed to initiate purchase');
       this.errorSignal.set(errorMessage);
       console.error('Failed to initiate purchase:', error);
       return { success: false, message: errorMessage };
@@ -364,7 +382,7 @@ export class SubscriptionService {
 
       return success;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to verify payment';
+      const errorMessage = this.normalizeAccessError(error, 'Failed to verify payment');
       this.errorSignal.set(errorMessage);
       console.error('Failed to verify payment:', error);
       return false;
@@ -403,7 +421,7 @@ export class SubscriptionService {
 
       return success;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to cancel subscription';
+      const errorMessage = this.normalizeAccessError(error, 'Failed to cancel subscription');
       this.errorSignal.set(errorMessage);
       console.error('Failed to cancel subscription:', error);
       return false;
@@ -416,10 +434,29 @@ export class SubscriptionService {
    * Check access level (for read-only mode enforcement)
    */
   checkAccessLevel(): 'full' | 'read-only' {
-    const status = this.subscriptionStatusSignal();
-    if (!status || !status.canPerformAction) {
-      return 'read-only';
+    return this.accessState().access === 'full' ? 'full' : 'read-only';
+  }
+
+  ensureCanWrite(message = SUBSCRIPTION_READ_ONLY_MESSAGE): boolean {
+    if (this.canWrite()) {
+      return true;
     }
-    return 'full';
+    this.errorSignal.set(message);
+    return false;
+  }
+
+  getReadOnlyMessage(): string {
+    return SUBSCRIPTION_READ_ONLY_MESSAGE;
+  }
+
+  private normalizeAccessError(error: unknown, fallback: string): string {
+    const message = error instanceof Error ? error.message : String(error || '');
+    if (
+      message.includes('Subscription access denied') ||
+      message.includes('Channel context is required')
+    ) {
+      return SUBSCRIPTION_READ_ONLY_MESSAGE;
+    }
+    return message || fallback;
   }
 }

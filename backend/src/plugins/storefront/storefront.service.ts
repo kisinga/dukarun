@@ -10,6 +10,7 @@ import {
 } from '@vendure/core';
 
 import { normalizeStorefrontSlug } from '../../utils/storefront-slug.util';
+import { evaluateSubscriptionAccess } from '../../services/subscriptions/subscription-access.policy';
 
 /** Resolved public storefront identity for a single merchant channel. */
 export interface StorefrontResult {
@@ -186,18 +187,9 @@ export class StorefrontService {
     return channel.code;
   }
 
-  /** Catalogue is visible while the subscription is active or trialing and not past its end date. */
+  /** Catalogue is visible only when the shared subscription policy grants full access. */
   private isCatalogueVisible(cf: Record<string, any>): boolean {
-    const now = Date.now();
-    const notPast = (d: unknown) => (d ? new Date(d as string).getTime() > now : true);
-    switch (cf.subscriptionStatus) {
-      case 'active':
-        return notPast(cf.subscriptionExpiresAt);
-      case 'trial':
-        return notPast(cf.trialEndsAt);
-      default:
-        return false; // expired / cancelled / unknown
-    }
+    return evaluateSubscriptionAccess(cf).access === 'full';
   }
 
   private toIso(d: Date | string | null | undefined): string | null {

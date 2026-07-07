@@ -28,22 +28,33 @@ export const SUBSCRIPTION_SCHEMA = gql`
 
   type SubscriptionStatus {
     isValid: Boolean!
+    access: String!
     status: String!
+    reason: String!
     daysRemaining: Int
     expiresAt: DateTime
     trialEndsAt: DateTime
+    exemptionEndsAt: DateTime
+    exemptionReason: String
+    canWrite: Boolean!
     canPerformAction: Boolean!
   }
 
   type ChannelSubscription {
     tier: SubscriptionTier
     status: String!
+    access: String!
+    reason: String!
     trialEndsAt: DateTime
     subscriptionStartedAt: DateTime
     subscriptionExpiresAt: DateTime
+    expiresAt: DateTime
+    exemptionEndsAt: DateTime
+    exemptionReason: String
     billingCycle: String
     lastPaymentDate: DateTime
     lastPaymentAmount: Int
+    canWrite: Boolean!
   }
 
   type InitiatePurchaseResult {

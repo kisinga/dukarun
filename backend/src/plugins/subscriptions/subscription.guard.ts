@@ -13,6 +13,17 @@ import { getVendureRequestContext } from '../../infrastructure/audit/get-request
 @Injectable()
 export class SubscriptionGuard implements CanActivate {
   private readonly logger = new Logger(SubscriptionGuard.name);
+  private readonly allowedMutations = new Set([
+    'login',
+    'logout',
+    'requestRegistrationOTP',
+    'verifyRegistrationOTP',
+    'requestLoginOTP',
+    'verifyLoginOTP',
+    'initiateSubscriptionPurchase',
+    'verifySubscriptionPayment',
+    'cancelSubscription',
+  ]);
 
   constructor(private subscriptionService: SubscriptionService) {}
 
@@ -30,15 +41,23 @@ export class SubscriptionGuard implements CanActivate {
       return true;
     }
 
-    // Extract the actual Vendure RequestContext from the Express request.
-    const ctx = getVendureRequestContext(context);
-    if (!ctx) {
-      return true;
-    }
-
     // Skip if not a mutation
     if (operation.operation !== 'mutation') {
       return true; // Allow all queries
+    }
+
+    // Get mutation name
+    const mutationName = info.fieldName;
+
+    // Allow auth mutations (no channel/session yet) and billing mutations for renewal.
+    if (this.allowedMutations.has(mutationName)) {
+      return true;
+    }
+
+    const ctx = getVendureRequestContext(context);
+    if (!ctx) {
+      this.logger.warn(`Blocked mutation ${mutationName} - request context missing`);
+      throw new Error('Subscription access could not be verified. Please try again.');
     }
 
     // Superadmins are never subject to subscription restrictions
@@ -46,56 +65,38 @@ export class SubscriptionGuard implements CanActivate {
       return true;
     }
 
-    // Get channel ID from context
     const channelId = ctx.channelId;
     if (!channelId) {
-      // No channel context, allow (might be system operation)
-      return true;
-    }
-
-    // Get mutation name
-    const mutationName = info.fieldName;
-
-    // Allow auth mutations (user has no session yet during login/logout)
-    // and subscription-related mutations even if expired.
-    const subscriptionMutations = [
-      'login', // Must always be allowed — no session exists yet at login time
-      'logout',
-      'initiateSubscriptionPurchase',
-      'verifySubscriptionPayment',
-      'cancelSubscription',
-      'updateChannelSettings', // Allow updating subscription settings
-    ];
-
-    if (subscriptionMutations.includes(mutationName)) {
-      return true;
+      this.logger.warn(`Blocked mutation ${mutationName} - channel context missing`);
+      throw new Error('Channel context is required for this action.');
     }
 
     try {
-      // Check subscription status
       const status = await this.subscriptionService.checkSubscriptionStatus(ctx, String(channelId));
 
-      if (!status.canPerformAction) {
+      if (!status.canWrite) {
         this.logger.warn(
-          `Blocked mutation ${mutationName} for channel ${channelId} - subscription status: ${status.status}`
+          `Blocked mutation ${mutationName} for channel ${channelId} - subscription status: ${status.status}, reason: ${status.reason}`
         );
         throw new Error(
-          `Subscription expired. Please renew your subscription to continue. Current status: ${status.status}`
+          `Subscription access denied. Current status: ${status.status}. Please renew your subscription to continue.`
         );
       }
 
       return true;
     } catch (error) {
-      // If error is already our subscription error, re-throw it
-      if (error instanceof Error && error.message.includes('Subscription expired')) {
+      if (
+        error instanceof Error &&
+        (error.message.includes('Subscription access denied') ||
+          error.message.includes('Channel context is required'))
+      ) {
         throw error;
       }
 
-      // For other errors, log and allow (fail-safe)
       this.logger.error(
         `Error checking subscription status: ${error instanceof Error ? error.message : String(error)}`
       );
-      return true;
+      throw new Error('Subscription access could not be verified. Please try again.');
     }
   }
 }

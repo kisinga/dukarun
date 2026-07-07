@@ -75,8 +75,11 @@ export class SubscriptionExpirySubscriber extends WorkerBackgroundTaskBase {
 
         const channelId = channel.id.toString();
 
-        // Skip already-expired subscriptions
         if (expiresAt <= now) {
+          await this.channelService.update(ctx, {
+            id: channelId,
+            customFields: { subscriptionStatus: 'expired' },
+          });
           continue;
         }
 
