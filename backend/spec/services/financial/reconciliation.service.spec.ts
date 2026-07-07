@@ -259,7 +259,7 @@ describe('ReconciliationService', () => {
         ctx,
         'CASH_ON_HAND',
         1,
-        '2026-01-15'
+        { asOfDate: '2026-01-15' }
       );
       expect(result).toHaveLength(1);
       expect(result[0].expectedBalanceCents).toBe('1200');

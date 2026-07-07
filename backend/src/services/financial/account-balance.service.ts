@@ -27,7 +27,7 @@ export class AccountBalanceService {
     ctx: RequestContext,
     accountCode: string,
     channelId: number,
-    asOfDate?: string
+    options?: { asOfDate?: string; startDate?: string }
   ): Promise<AccountBalance> {
     const accountRepo = this.connection.rawConnection.getRepository(Account);
     const account = await accountRepo.findOne({
@@ -47,11 +47,11 @@ export class AccountBalanceService {
 
     // If account is a parent, roll up balances from sub-accounts
     if (account.isParent) {
-      return this.getParentAccountBalance(ctx, channelId, account.id, asOfDate);
+      return this.getParentAccountBalance(ctx, channelId, account.id, options);
     }
 
     // For sub-accounts, query journal lines directly
-    return this.getSubAccountBalance(ctx, channelId, account.id, asOfDate);
+    return this.getSubAccountBalance(ctx, channelId, account.id, options);
   }
 
   /**
@@ -61,7 +61,7 @@ export class AccountBalanceService {
     ctx: RequestContext,
     channelId: number,
     parentAccountId: string,
-    asOfDate?: string
+    options?: { asOfDate?: string; startDate?: string }
   ): Promise<AccountBalance> {
     const accountRepo = this.connection.rawConnection.getRepository(Account);
     const parentAccount = await accountRepo.findOne({
@@ -92,7 +92,7 @@ export class AccountBalanceService {
 
     // Sum balances of all sub-accounts (parallelized for performance)
     const subBalancePromises = subAccounts.map(subAccount =>
-      this.getSubAccountBalance(ctx, channelId, subAccount.id, asOfDate)
+      this.getSubAccountBalance(ctx, channelId, subAccount.id, options)
     );
     const subBalances = await Promise.all(subBalancePromises);
 
@@ -116,7 +116,7 @@ export class AccountBalanceService {
     ctx: RequestContext,
     channelId: number,
     accountId: string,
-    asOfDate?: string
+    options?: { asOfDate?: string; startDate?: string }
   ): Promise<AccountBalance> {
     const journalLineRepo = this.connection.rawConnection.getRepository(JournalLine);
     const accountRepo = this.connection.rawConnection.getRepository(Account);
@@ -135,9 +135,15 @@ export class AccountBalanceService {
       .where('line.channelId = :channelId', { channelId })
       .andWhere('line.accountId = :accountId', { accountId });
 
-    if (asOfDate) {
+    if (options?.startDate) {
+      queryBuilder = queryBuilder.andWhere('entry.entryDate >= :startDate', {
+        startDate: options.startDate,
+      });
+    }
+
+    if (options?.asOfDate) {
       queryBuilder = queryBuilder.andWhere('entry.entryDate <= :asOfDate', {
-        asOfDate,
+        asOfDate: options.asOfDate,
       });
     }
 
