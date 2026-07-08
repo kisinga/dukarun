@@ -933,10 +933,12 @@ export type ChannelSubscription = {
   __typename?: 'ChannelSubscription';
   access: Scalars['String']['output'];
   billingCycle?: Maybe<Scalars['String']['output']>;
+  canRead: Scalars['Boolean']['output'];
   canWrite: Scalars['Boolean']['output'];
   exemptionEndsAt?: Maybe<Scalars['DateTime']['output']>;
   exemptionReason?: Maybe<Scalars['String']['output']>;
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  gracePeriodEnd?: Maybe<Scalars['DateTime']['output']>;
   lastPaymentAmount?: Maybe<Scalars['Int']['output']>;
   lastPaymentDate?: Maybe<Scalars['DateTime']['output']>;
   reason: Scalars['String']['output'];
@@ -8887,11 +8889,13 @@ export type SubscriptionStatus = {
   __typename?: 'SubscriptionStatus';
   access: Scalars['String']['output'];
   canPerformAction: Scalars['Boolean']['output'];
+  canRead: Scalars['Boolean']['output'];
   canWrite: Scalars['Boolean']['output'];
   daysRemaining?: Maybe<Scalars['Int']['output']>;
   exemptionEndsAt?: Maybe<Scalars['DateTime']['output']>;
   exemptionReason?: Maybe<Scalars['String']['output']>;
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  gracePeriodEnd?: Maybe<Scalars['DateTime']['output']>;
   isValid: Scalars['Boolean']['output'];
   reason: Scalars['String']['output'];
   status: Scalars['String']['output'];
@@ -12746,10 +12750,12 @@ export type GetChannelSubscriptionQuery = {
     expiresAt?: any | null;
     exemptionEndsAt?: any | null;
     exemptionReason?: string | null;
+    gracePeriodEnd?: any | null;
     billingCycle?: string | null;
     lastPaymentDate?: any | null;
     lastPaymentAmount?: number | null;
     canWrite: boolean;
+    canRead: boolean;
     tier?: {
       __typename?: 'SubscriptionTier';
       id: string;
@@ -12780,7 +12786,9 @@ export type CheckSubscriptionStatusQuery = {
     trialEndsAt?: any | null;
     exemptionEndsAt?: any | null;
     exemptionReason?: string | null;
+    gracePeriodEnd?: any | null;
     canWrite: boolean;
+    canRead: boolean;
     canPerformAction: boolean;
   };
 };
@@ -23029,10 +23037,12 @@ export const GetChannelSubscriptionDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'expiresAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'exemptionEndsAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'exemptionReason' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'gracePeriodEnd' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'billingCycle' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'lastPaymentDate' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'lastPaymentAmount' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'canWrite' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'canRead' } },
               ],
             },
           },
@@ -23080,7 +23090,9 @@ export const CheckSubscriptionStatusDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'trialEndsAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'exemptionEndsAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'exemptionReason' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'gracePeriodEnd' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'canWrite' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'canRead' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'canPerformAction' } },
               ],
             },

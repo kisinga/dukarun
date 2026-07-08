@@ -2679,10 +2679,12 @@ export const GET_CHANNEL_SUBSCRIPTION = graphql(`
       expiresAt
       exemptionEndsAt
       exemptionReason
+      gracePeriodEnd
       billingCycle
       lastPaymentDate
       lastPaymentAmount
       canWrite
+      canRead
     }
   }
 `);
@@ -2699,7 +2701,9 @@ export const CHECK_SUBSCRIPTION_STATUS = graphql(`
       trialEndsAt
       exemptionEndsAt
       exemptionReason
+      gracePeriodEnd
       canWrite
+      canRead
       canPerformAction
     }
   }

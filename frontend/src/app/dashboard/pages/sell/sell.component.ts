@@ -96,6 +96,31 @@ export class SellComponent implements OnInit, OnDestroy {
   private readonly printPreferences = inject(PrintPreferencesService);
   private readonly salesSyncGuard = inject(SalesSyncGuardService);
 
+  /**
+   * Map backend subscription errors to user-friendly POS messages.
+   * Unmatched errors return the fallback so internal GraphQL details are not
+   * surfaced to the cashier.
+   */
+  private static formatCheckoutError(error: unknown, fallback: string): string {
+    if (!(error instanceof Error)) {
+      return fallback;
+    }
+    const msg = error.message.toLowerCase();
+    if (msg.includes('subscription suspended')) {
+      return 'Subscription suspended. Please contact support or renew your subscription to continue selling.';
+    }
+    if (msg.includes('subscription access denied')) {
+      return 'Subscription access denied. Please renew your subscription to continue selling.';
+    }
+    if (
+      msg.includes('channel context is required') ||
+      msg.includes('subscription access could not be verified')
+    ) {
+      return 'Unable to verify subscription status. Please refresh and try again.';
+    }
+    return fallback;
+  }
+
   // Configuration
   readonly channelId = computed(() => this.companyService.activeCompanyId() || 'T_1');
   readonly cashierFlowEnabled = computed(() => this.stockLocationService.cashierFlowEnabled());
@@ -540,7 +565,7 @@ export class SellComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('❌ Split payment failed:', error);
       this.splitModal()?.fail(
-        error instanceof Error ? error.message : 'Failed to collect payment. Please try again.',
+        SellComponent.formatCheckoutError(error, 'Failed to collect payment. Please try again.'),
       );
     }
   }
@@ -602,7 +627,9 @@ export class SellComponent implements OnInit, OnDestroy {
       this.showCheckoutModal.set(false);
     } catch (error) {
       console.error('Proforma creation failed:', error);
-      this.checkoutError.set(error instanceof Error ? error.message : 'Failed to create proforma.');
+      this.checkoutError.set(
+        SellComponent.formatCheckoutError(error, 'Failed to create proforma.'),
+      );
     } finally {
       this.isProcessingCheckout.set(false);
     }
@@ -829,7 +856,9 @@ export class SellComponent implements OnInit, OnDestroy {
       }, 3000);
     } catch (error) {
       console.error('❌ Cashier submission failed:', error);
-      this.checkoutError.set('Failed to send to cashier. Please try again.');
+      this.checkoutError.set(
+        SellComponent.formatCheckoutError(error, 'Failed to send to cashier. Please try again.'),
+      );
     } finally {
       this.isProcessingCheckout.set(false);
     }
@@ -962,7 +991,9 @@ export class SellComponent implements OnInit, OnDestroy {
       // Don't clear selected customer - keep it visible so user can see updated credit amounts
     } catch (error) {
       console.error('Credit sale failed:', error);
-      this.checkoutError.set('Failed to create credit sale. Please try again.');
+      this.checkoutError.set(
+        SellComponent.formatCheckoutError(error, 'Failed to create credit sale. Please try again.'),
+      );
     } finally {
       this.isProcessingCheckout.set(false);
     }
@@ -1055,7 +1086,9 @@ export class SellComponent implements OnInit, OnDestroy {
       }, 2000);
     } catch (error) {
       console.error('❌ Cash sale failed:', error);
-      this.checkoutError.set('Failed to complete sale. Please try again.');
+      this.checkoutError.set(
+        SellComponent.formatCheckoutError(error, 'Failed to complete sale. Please try again.'),
+      );
     } finally {
       this.isProcessingCheckout.set(false);
     }

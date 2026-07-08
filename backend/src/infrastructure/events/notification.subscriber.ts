@@ -73,7 +73,15 @@ export class NotificationSubscriber implements OnModuleInit {
   private async handleSubscription(event: SubscriptionAlertEvent): Promise<void> {
     try {
       const triggerKey =
-        event.alertType === 'expiring_soon' ? 'subscription_expiring_soon' : 'subscription_renewed';
+        event.alertType === 'expiring_soon'
+          ? 'subscription_expiring_soon'
+          : event.alertType === 'expired'
+            ? 'subscription_expired'
+            : event.alertType === 'grace_period_ending'
+              ? 'subscription_grace_period_ending'
+              : event.alertType === 'hard_expired'
+                ? 'subscription_hard_expired'
+                : 'subscription_renewed';
       await this.outboundDelivery.deliver(event.ctx, triggerKey, {
         ...event.data,
         channelId: event.channelId,

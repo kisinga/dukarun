@@ -6,7 +6,7 @@
         <h2 class="text-lg sm:text-xl font-bold">Subscription</h2>
         <p class="text-sm opacity-60">Manage your plan and billing</p>
       </div>
-      @if (access() === 'read_only') {
+      @if (access() === 'read_only' || access() === 'blocked') {
         <button class="btn btn-primary btn-sm w-full sm:w-auto" (click)="openPaymentModal()">
           Renew Now
         </button>
@@ -43,6 +43,14 @@
           <span class="w-1.5 h-1.5 bg-warning-content rounded-full"></span>
           Read-only
         </div>
+        @if (gracePeriodEnd(); as graceEnd) {
+          <span class="text-xs opacity-70">Access ends {{ graceEnd | date: 'mediumDate' }}</span>
+        }
+      } @else if (access() === 'blocked') {
+        <div class="badge badge-error gap-1">
+          <span class="w-1.5 h-1.5 bg-error-content rounded-full"></span>
+          Suspended
+        </div>
       }
     </div>
 
@@ -68,7 +76,7 @@
       </div>
     }
 
-    <!-- Expired Alert -->
+    <!-- Expired / Suspended Alert -->
     @if (access() === 'read_only') {
       <div class="alert alert-warning py-3 mb-4">
         <svg
@@ -86,6 +94,25 @@
         <div class="text-sm">
           <span class="font-medium">Read-only access</span>
           <p class="text-xs opacity-80 mt-0.5">{{ readOnlyMessage() }}</p>
+        </div>
+      </div>
+    } @else if (access() === 'blocked') {
+      <div class="alert alert-error py-3 mb-4">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fill-rule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+            clip-rule="evenodd"
+          />
+        </svg>
+        <div class="text-sm">
+          <span class="font-medium">Account suspended</span>
+          <p class="text-xs opacity-80 mt-0.5">{{ suspendedMessage() }}</p>
         </div>
       </div>
     }

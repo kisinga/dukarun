@@ -51,6 +51,48 @@ const RENDERERS: Record<string, RenderFn> = {
       ? `${p.company}: subscription renewed successfully.`
       : 'Your subscription has been renewed successfully.',
   }),
+  subscription_expired: p => {
+    const company = String(p.company || 'your company');
+    const graceDate = p.gracePeriodEnd
+      ? new Date(String(p.gracePeriodEnd)).toLocaleDateString('en-KE', { dateStyle: 'long' })
+      : null;
+    const graceLine = graceDate
+      ? ` You can still view data until ${graceDate}, then access will be suspended.`
+      : '';
+    return {
+      inAppTitle: 'Subscription Expired',
+      inAppMessage: `${company}: subscription has expired.${graceLine}`,
+      emailSubject: `Action required: ${company} subscription has expired`,
+      emailBody: `Hi ${company} Team,\n\nYour DukaRun subscription has expired.${graceLine}\n\nPlease renew now to restore full access:\nhttps://dukarun.com/dashboard/admin/subscription\n\n– The DukaRun Team`,
+      smsBody: `DukaRun: ${company} subscription has expired. Renew now at https://dukarun.com/dashboard/admin/subscription`,
+    };
+  },
+  subscription_grace_period_ending: p => {
+    const company = String(p.company || 'your company');
+    const days = p.daysRemaining ?? 'a few';
+    const dayWord = days === 1 ? 'day' : 'days';
+    const graceDate = p.gracePeriodEnd
+      ? new Date(String(p.gracePeriodEnd)).toLocaleDateString('en-KE', { dateStyle: 'long' })
+      : null;
+    const expiryLine = graceDate ? `\nAccess will be suspended on ${graceDate}.` : '';
+    return {
+      inAppTitle: 'Subscription Access Ending Soon',
+      inAppMessage: `${company}: read-only access ends in ${days} ${dayWord}. Renew to avoid suspension.`,
+      emailSubject: `Urgent: ${company} subscription access ends in ${days} ${dayWord}`,
+      emailBody: `Hi ${company} Team,\n\nYour DukaRun subscription has expired and your read-only access ends in ${days} ${dayWord}.${expiryLine}\n\nRenew now to keep your store online:\nhttps://dukarun.com/dashboard/admin/subscription\n\n– The DukaRun Team`,
+      smsBody: `DukaRun: ${company} read-only access ends in ${days} ${dayWord}. Renew now to avoid suspension.`,
+    };
+  },
+  subscription_hard_expired: p => {
+    const company = String(p.company || 'your company');
+    return {
+      inAppTitle: 'Subscription Suspended',
+      inAppMessage: `${company}: subscription access has been suspended. Contact support to reactivate.`,
+      emailSubject: `Suspended: ${company} subscription access`,
+      emailBody: `Hi ${company} Team,\n\nYour DukaRun subscription access has been suspended because the renewal grace period has ended.\n\nContact support or renew your subscription to reactivate your account:\nhttps://dukarun.com/dashboard/admin/subscription\n\n– The DukaRun Team`,
+      smsBody: `DukaRun: ${company} subscription is suspended. Contact support or renew to reactivate.`,
+    };
+  },
   ml_status: p => {
     const op = p.operation === 'training' ? 'Training' : 'Extraction';
     const status = String(p.status ?? '');

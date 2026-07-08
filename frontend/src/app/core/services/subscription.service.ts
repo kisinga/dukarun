@@ -21,7 +21,7 @@ export interface SubscriptionTier {
   isActive: boolean;
 }
 
-export type SubscriptionAccess = 'full' | 'read_only';
+export type SubscriptionAccess = 'full' | 'read_only' | 'blocked';
 
 export interface SubscriptionStatus {
   isValid: boolean;
@@ -33,11 +33,15 @@ export interface SubscriptionStatus {
   trialEndsAt?: Date | string | null;
   exemptionEndsAt?: Date | string | null;
   exemptionReason?: string | null;
+  gracePeriodEnd?: Date | string | null;
   canWrite: boolean;
+  canRead: boolean;
   canPerformAction: boolean;
 }
 
 const SUBSCRIPTION_READ_ONLY_MESSAGE = 'Your subscription is read-only. Renew to continue editing.';
+const SUBSCRIPTION_SUSPENDED_MESSAGE =
+  'Your subscription is suspended. Contact support to reactivate your account.';
 
 /**
  * Service for subscription management with Paystack integration
@@ -88,16 +92,24 @@ export class SubscriptionService {
     return status?.status === 'active' && status.access === 'full';
   });
 
+  readonly isReadOnly = computed(() => this.subscriptionStatusSignal()?.access === 'read_only');
+
+  readonly isBlocked = computed(() => this.subscriptionStatusSignal()?.access === 'blocked');
+
   readonly isExpired = computed(() => {
-    const status = this.subscriptionStatusSignal();
-    return status?.access === 'read_only';
+    const access = this.subscriptionStatusSignal()?.access;
+    return access === 'read_only' || access === 'blocked';
   });
 
   readonly canWrite = computed(() => this.subscriptionStatusSignal()?.canWrite ?? false);
 
+  readonly canRead = computed(() => this.subscriptionStatusSignal()?.canRead ?? false);
+
   readonly canPerformAction = computed(() => {
     return this.canWrite();
   });
+
+  readonly gracePeriodEnd = computed(() => this.subscriptionStatusSignal()?.gracePeriodEnd ?? null);
 
   readonly accessState = computed(() => {
     const status = this.subscriptionStatusSignal();
@@ -106,7 +118,9 @@ export class SubscriptionService {
       status: status?.status ?? 'expired',
       reason: status?.reason ?? 'unknown_status',
       expiresAt: status?.expiresAt ?? null,
+      gracePeriodEnd: status?.gracePeriodEnd ?? null,
       canWrite: status?.canWrite ?? false,
+      canRead: status?.canRead ?? false,
     };
   });
 
@@ -437,11 +451,11 @@ export class SubscriptionService {
     return this.accessState().access === 'full' ? 'full' : 'read-only';
   }
 
-  ensureCanWrite(message = SUBSCRIPTION_READ_ONLY_MESSAGE): boolean {
+  ensureCanWrite(message?: string): boolean {
     if (this.canWrite()) {
       return true;
     }
-    this.errorSignal.set(message);
+    this.errorSignal.set(message ?? this.getAccessDeniedMessage());
     return false;
   }
 
@@ -449,8 +463,19 @@ export class SubscriptionService {
     return SUBSCRIPTION_READ_ONLY_MESSAGE;
   }
 
+  getSuspendedMessage(): string {
+    return SUBSCRIPTION_SUSPENDED_MESSAGE;
+  }
+
+  private getAccessDeniedMessage(): string {
+    return this.isBlocked() ? SUBSCRIPTION_SUSPENDED_MESSAGE : SUBSCRIPTION_READ_ONLY_MESSAGE;
+  }
+
   private normalizeAccessError(error: unknown, fallback: string): string {
     const message = error instanceof Error ? error.message : String(error || '');
+    if (message.includes('Subscription suspended')) {
+      return SUBSCRIPTION_SUSPENDED_MESSAGE;
+    }
     if (
       message.includes('Subscription access denied') ||
       message.includes('Channel context is required')

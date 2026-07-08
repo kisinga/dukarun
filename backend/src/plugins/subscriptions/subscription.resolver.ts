@@ -7,6 +7,7 @@ import { PLATFORM_AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.c
 import { PaystackService } from '../../services/payments/paystack.service';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
 import { SubscriptionTier } from './subscription.entity';
+import { SubscriptionAccess } from './subscription-access.decorator';
 
 /**
  * GraphQL schema extension for subscription management
@@ -36,7 +37,9 @@ export const SUBSCRIPTION_SCHEMA = gql`
     trialEndsAt: DateTime
     exemptionEndsAt: DateTime
     exemptionReason: String
+    gracePeriodEnd: DateTime
     canWrite: Boolean!
+    canRead: Boolean!
     canPerformAction: Boolean!
   }
 
@@ -51,10 +54,12 @@ export const SUBSCRIPTION_SCHEMA = gql`
     expiresAt: DateTime
     exemptionEndsAt: DateTime
     exemptionReason: String
+    gracePeriodEnd: DateTime
     billingCycle: String
     lastPaymentDate: DateTime
     lastPaymentAmount: Int
     canWrite: Boolean!
+    canRead: Boolean!
   }
 
   type InitiatePurchaseResult {
@@ -156,12 +161,14 @@ export class SubscriptionResolver {
 
   @Query()
   @Allow(Permission.ReadSettings)
+  @SubscriptionAccess('public')
   async getSubscriptionTiers(@Ctx() ctx: RequestContext): Promise<SubscriptionTier[]> {
     return this.subscriptionService.getAllSubscriptionTiers();
   }
 
   @Query()
   @Allow(Permission.ReadSettings)
+  @SubscriptionAccess('public')
   async getChannelSubscription(
     @Ctx() ctx: RequestContext,
     @Args() args: { channelId?: ID }
@@ -177,6 +184,7 @@ export class SubscriptionResolver {
 
   @Query()
   @Allow(Permission.ReadSettings)
+  @SubscriptionAccess('public')
   async checkSubscriptionStatus(
     @Ctx() ctx: RequestContext,
     @Args() args: { channelId?: ID }
@@ -259,6 +267,7 @@ export class SubscriptionResolver {
 
   @Mutation()
   @Allow(Permission.UpdateSettings)
+  @SubscriptionAccess('public')
   async initiateSubscriptionPurchase(
     @Ctx() ctx: RequestContext,
     @Args()
@@ -326,6 +335,7 @@ export class SubscriptionResolver {
 
   @Mutation()
   @Allow(Permission.UpdateSettings)
+  @SubscriptionAccess('public')
   async verifySubscriptionPayment(
     @Ctx() ctx: RequestContext,
     @Args()
@@ -352,6 +362,7 @@ export class SubscriptionResolver {
 
   @Mutation()
   @Allow(Permission.UpdateSettings)
+  @SubscriptionAccess('public')
   async cancelSubscription(
     @Ctx() ctx: RequestContext,
     @Args() args: { channelId: ID }

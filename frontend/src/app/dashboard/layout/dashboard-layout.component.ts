@@ -198,15 +198,21 @@ export class DashboardLayoutComponent implements OnInit {
   protected readonly isSubscriptionReadOnly = computed(
     () => this.subscriptionService.accessState().access === 'read_only',
   );
+  protected readonly isSubscriptionSuspended = computed(
+    () => this.subscriptionService.accessState().access === 'blocked',
+  );
   protected readonly subscriptionReadonlyMessage = computed(() => {
     const state = this.subscriptionService.accessState();
+    if (state.access === 'blocked') {
+      return this.subscriptionService.getSuspendedMessage();
+    }
     if (state.status === 'cancelled') {
       return 'Your subscription is cancelled. Renew to continue editing.';
     }
     return this.subscriptionService.getReadOnlyMessage();
   });
   protected readonly subscriptionReadonlyExpiresAt = computed(
-    () => this.subscriptionService.accessState().expiresAt,
+    () => this.subscriptionService.accessState().gracePeriodEnd,
   );
   protected readonly hasSuperAdminPermission = this.authService.hasSuperAdminPermission;
   protected readonly vendureAdminUrl = (): string => environment.vendureAdminUrl ?? '/admin';
@@ -687,9 +693,12 @@ export class DashboardLayoutComponent implements OnInit {
     if (this.subscriptionService.ensureCanWrite()) {
       return true;
     }
+    const title = this.isSubscriptionSuspended() ? 'Account suspended' : 'Read-only mode';
     this.toastService.show(
-      'Read-only mode',
-      this.subscriptionService.getReadOnlyMessage(),
+      title,
+      this.subscriptionService.accessState().access === 'blocked'
+        ? this.subscriptionService.getSuspendedMessage()
+        : this.subscriptionService.getReadOnlyMessage(),
       'warning',
       4000,
     );

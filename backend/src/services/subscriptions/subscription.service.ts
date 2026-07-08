@@ -12,14 +12,19 @@ import {
   SubscriptionTier,
   SubscriptionTierFeatures,
 } from '../../plugins/subscriptions/subscription.entity';
-import { PaystackService } from '../payments/paystack.service';
 import { generatePaystackEmailFromPhone } from '../../utils/email.utils';
+import { PaystackService } from '../payments/paystack.service';
 import {
-  evaluateSubscriptionAccess,
+  getDefaultGracePeriodEnd,
+  parseDate,
   SubscriptionAccess,
   SubscriptionPolicyReason,
   SubscriptionPolicyStatus,
 } from './subscription-access.policy';
+import {
+  clearSubscriptionAccess,
+  getSubscriptionAccess,
+} from '../../plugins/subscriptions/subscription.context';
 
 export interface SubscriptionStatus {
   isValid: boolean;
@@ -31,7 +36,9 @@ export interface SubscriptionStatus {
   trialEndsAt?: Date;
   exemptionEndsAt?: Date;
   exemptionReason?: string;
+  gracePeriodEnd?: Date;
   canWrite: boolean;
+  canRead: boolean;
   canPerformAction: boolean;
 }
 
@@ -53,6 +60,7 @@ export class SubscriptionService {
   private readonly trialDays = parseInt(process.env.SUBSCRIPTION_TRIAL_DAYS || '30', 10);
   private readonly CACHE_TTL_SECONDS = 10; // 10 seconds (for Redis SETEX)
   private readonly CACHE_NAMESPACE = 'payment:status';
+  private readonly expiryTransitionLock = new Set<string>();
 
   constructor(
     private channelService: ChannelService,
@@ -75,7 +83,7 @@ export class SubscriptionService {
     }
 
     const customFields = channel.customFields as Record<string, unknown>;
-    const decision = evaluateSubscriptionAccess(customFields);
+    let decision = getSubscriptionAccess(ctx, channelId, customFields);
 
     if (
       decision.status === 'expired' &&
@@ -83,6 +91,13 @@ export class SubscriptionService {
       customFields.subscriptionStatus !== 'cancelled'
     ) {
       await this.handleExpiredSubscription(ctx, channelId);
+      clearSubscriptionAccess(ctx, channelId);
+      const updatedChannel = await this.channelService.findOne(ctx, channelId);
+      decision = getSubscriptionAccess(
+        ctx,
+        channelId,
+        updatedChannel?.customFields as Record<string, unknown>
+      );
     }
 
     return decision;
@@ -92,7 +107,11 @@ export class SubscriptionService {
    * Check if channel is in trial period
    */
   async isInTrial(ctx: RequestContext, channel: Channel): Promise<boolean> {
-    const decision = evaluateSubscriptionAccess(channel.customFields as Record<string, unknown>);
+    const decision = getSubscriptionAccess(
+      ctx,
+      channel.id.toString(),
+      channel.customFields as Record<string, unknown>
+    );
     return decision.status === 'trial' && decision.access === 'full';
   }
 
@@ -100,7 +119,11 @@ export class SubscriptionService {
    * Check if subscription is active
    */
   async isSubscriptionActive(ctx: RequestContext, channel: Channel): Promise<boolean> {
-    const decision = evaluateSubscriptionAccess(channel.customFields as Record<string, unknown>);
+    const decision = getSubscriptionAccess(
+      ctx,
+      channel.id.toString(),
+      channel.customFields as Record<string, unknown>
+    );
     return decision.status === 'active' && decision.access === 'full';
   }
 
@@ -392,6 +415,8 @@ export class SubscriptionService {
       subscriptionExpiresAt: expiresAt,
       subscriptionExemptUntil: null,
       subscriptionExemptReason: null,
+      subscriptionGracePeriodEnd: null,
+      subscriptionExpiredReminderSentAt: null,
       lastPaymentDate: new Date(),
       lastPaymentAmount: paystackData.amount,
     };
@@ -408,6 +433,10 @@ export class SubscriptionService {
       id: channelId,
       customFields: updateData,
     });
+
+    // Renewal updated the channel fields; clear any cached decision so the same
+    // request (and subsequent requests) see the renewed state immediately.
+    clearSubscriptionAccess(ctx, channelId);
 
     // Publish subscription renewed event
     this.eventBus.publish(
@@ -550,7 +579,9 @@ export class SubscriptionService {
   }
 
   /**
-   * Handle expired subscription
+   * Request-driven transition: called when a live request detects that an active
+   * or trial subscription has just expired. Computes the grace base date and
+   * delegates to {@link enterGracePeriod}.
    */
   async handleExpiredSubscription(ctx: RequestContext, channelId: string): Promise<void> {
     const channel = await this.channelService.findOne(ctx, channelId);
@@ -558,17 +589,195 @@ export class SubscriptionService {
       return;
     }
 
-    const customFields = channel.customFields as any;
+    const customFields = channel.customFields as Record<string, unknown>;
     if (customFields.subscriptionStatus === 'expired') {
       return; // Already expired
     }
 
-    await this.channelService.update(ctx, {
-      id: channelId,
-      customFields: { subscriptionStatus: 'expired' },
+    const expiredReminderSent = !!customFields.subscriptionExpiredReminderSentAt;
+    if (expiredReminderSent) {
+      // The expired alert was already handled; the worker will drive hard_expired.
+      return;
+    }
+
+    const expiryDate =
+      parseDate(customFields.subscriptionExpiresAt) ?? parseDate(customFields.trialEndsAt);
+    const exemptionEndsAt = parseDate(customFields.subscriptionExemptUntil);
+    // If the channel was covered by an exemption that has since lapsed, the grace
+    // period should start from the exemption end date rather than the original
+    // subscription expiry date.
+    const graceBaseDate = exemptionEndsAt ?? expiryDate ?? new Date();
+
+    await this.enterGracePeriod(ctx, channelId, {
+      baseDate: graceBaseDate,
+      expiryDate,
     });
 
     this.logger.log(`Subscription expired for channel ${channelId}`);
+  }
+
+  /**
+   * Transition a channel into the expired state with a computed grace period.
+   * This is the single writer for subscription expiry transitions.
+   *
+   * Returns `true` only if this caller was the first to perform the transition
+   * (and, for non-silent calls, emit the alert). Callers that lose the race or
+   * find the channel already transitioned receive `false` and must not publish
+   * duplicate events.
+   */
+  async enterGracePeriod(
+    ctx: RequestContext,
+    channelId: string,
+    input: { baseDate?: Date; expiryDate?: Date; silent?: boolean }
+  ): Promise<boolean> {
+    const channel = await this.channelService.findOne(ctx, channelId);
+    if (!channel) {
+      return false;
+    }
+
+    const customFields = channel.customFields as Record<string, unknown>;
+    const alreadyExpired =
+      customFields.subscriptionStatus === 'expired' && !!customFields.subscriptionGracePeriodEnd;
+    if (alreadyExpired) {
+      return false;
+    }
+
+    if (this.expiryTransitionLock.has(channelId)) {
+      return false;
+    }
+    this.expiryTransitionLock.add(channelId);
+
+    try {
+      // Re-check after acquiring the lock so a concurrent caller that already
+      // wrote the transition does not repeat the work.
+      const lockedChannel = await this.channelService.findOne(ctx, channelId);
+      if (!lockedChannel) {
+        return false;
+      }
+      const lockedFields = lockedChannel.customFields as Record<string, unknown>;
+      if (
+        lockedFields.subscriptionStatus === 'expired' &&
+        !!lockedFields.subscriptionGracePeriodEnd
+      ) {
+        return false;
+      }
+
+      const now = new Date();
+      const baseDate = input.baseDate ?? now;
+      const gracePeriodEnd = getDefaultGracePeriodEnd(baseDate);
+
+      // Atomic cross-process claim: only the winner writes the transition.
+      const transitionTtlSeconds = Math.max(
+        Math.ceil((gracePeriodEnd.getTime() - now.getTime()) / 1000) + 86400,
+        86400
+      );
+      const claimKey = channelId;
+      const claimed = await this.redisCache.setnx(
+        'subscription:expiry-transition',
+        claimKey,
+        true,
+        transitionTtlSeconds
+      );
+      if (!claimed) {
+        return false;
+      }
+
+      try {
+        await this.channelService.update(ctx, {
+          id: channelId,
+          customFields: {
+            subscriptionStatus: 'expired',
+            subscriptionGracePeriodEnd: gracePeriodEnd,
+          },
+        });
+      } catch (error) {
+        // Release the claim so the next attempt can retry the DB write.
+        await this.redisCache.delete('subscription:expiry-transition', claimKey);
+        throw error;
+      }
+
+      if (!input.silent) {
+        if (gracePeriodEnd <= now) {
+          this.eventBus.publish(
+            new SubscriptionAlertEvent(ctx, channelId, 'hard_expired', {
+              gracePeriodEnd: gracePeriodEnd.toISOString(),
+              daysRemaining: 0,
+              company: (channel as any).code || 'your company',
+            })
+          );
+        } else {
+          this.eventBus.publish(
+            new SubscriptionAlertEvent(ctx, channelId, 'expired', {
+              expiresAt: input.expiryDate?.toISOString(),
+              gracePeriodEnd: gracePeriodEnd.toISOString(),
+              company: (channel as any).code || 'your company',
+            })
+          );
+        }
+
+        await this.markExpiredReminderSent(ctx, channelId);
+      }
+
+      return true;
+    } finally {
+      this.expiryTransitionLock.delete(channelId);
+    }
+  }
+
+  /**
+   * Suspend a legacy expired channel with no known expiry source. Sets the grace
+   * period end to now so it is immediately blocked without granting a fresh grace
+   * period. Never suspends an active channel; use {@link enterGracePeriod} for
+   * normal expiry transitions.
+   *
+   * Returns `true` only if this caller performed the suspension so the caller
+   * can decide whether to publish a duplicate alert.
+   */
+  async suspendLegacyExpired(ctx: RequestContext, channelId: string): Promise<boolean> {
+    const channel = await this.channelService.findOne(ctx, channelId);
+    if (!channel) {
+      return false;
+    }
+
+    const customFields = channel.customFields as Record<string, unknown>;
+    if (customFields.subscriptionStatus !== 'expired') {
+      this.logger.warn(
+        `Refusing to suspendLegacyExpired channel ${channelId} with status ${customFields.subscriptionStatus}`
+      );
+      return false;
+    }
+
+    if (customFields.subscriptionGracePeriodEnd) {
+      // Already transitioned; don't overwrite an existing grace period.
+      return false;
+    }
+
+    const now = new Date();
+    const claimKey = `${channelId}:legacy`;
+    const claimed = await this.redisCache.setnx(
+      'subscription:expiry-transition',
+      claimKey,
+      true,
+      86400
+    );
+    if (!claimed) {
+      return false;
+    }
+
+    try {
+      await this.channelService.update(ctx, {
+        id: channelId,
+        customFields: {
+          subscriptionStatus: 'expired',
+          subscriptionGracePeriodEnd: now,
+        },
+      });
+    } catch (error) {
+      await this.redisCache.delete('subscription:expiry-transition', claimKey);
+      throw error;
+    }
+
+    return true;
   }
 
   /**
@@ -640,7 +849,9 @@ export class SubscriptionService {
     expiresAt?: Date;
     exemptionEndsAt?: Date;
     exemptionReason?: string;
+    gracePeriodEnd?: Date;
     canWrite: boolean;
+    canRead: boolean;
   }> {
     const channel = await this.channelService.findOne(ctx, channelId);
     if (!channel) {
@@ -662,7 +873,7 @@ export class SubscriptionService {
     if (tierId && tierId !== '-1') {
       tier = await this.getSubscriptionTier(tierId);
     }
-    const access = evaluateSubscriptionAccess(customFields);
+    const access = getSubscriptionAccess(ctx, channelId, customFields);
 
     return {
       tier: tier || null,
@@ -684,7 +895,9 @@ export class SubscriptionService {
       expiresAt: access.expiresAt,
       exemptionEndsAt: access.exemptionEndsAt,
       exemptionReason: access.exemptionReason,
+      gracePeriodEnd: access.gracePeriodEnd,
       canWrite: access.canWrite,
+      canRead: access.canRead,
     };
   }
 

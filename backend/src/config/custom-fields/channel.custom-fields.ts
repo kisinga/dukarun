@@ -341,6 +341,20 @@ export const channelCustomFields: CustomFields['Channel'] = [
     nullable: true,
     ui: { tab: 'Subscription' },
   },
+  {
+    name: 'subscriptionGracePeriodEnd',
+    type: 'datetime',
+    label: [{ languageCode: LanguageCode.en, value: 'Subscription Grace Period End' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value: 'After subscription expiry, read-only access is allowed until this date.',
+      },
+    ],
+    public: false,
+    nullable: true,
+    ui: { tab: 'Subscription' },
+  },
 
   // ─── Events ────────────────────────────────────────────────
   {

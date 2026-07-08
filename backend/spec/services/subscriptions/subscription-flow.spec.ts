@@ -16,7 +16,7 @@ import { generatePaystackEmailFromPhone } from '../../../src/utils/email.utils';
 import { SubscriptionAlertEvent } from '../../../src/infrastructure/events/custom-events';
 
 describe('Subscription Flow Integration', () => {
-  const ctx = {} as RequestContext;
+  let ctx: RequestContext;
   let subscriptionService: SubscriptionService;
   let mockChannelService: jest.Mocked<ChannelService>;
   let mockPaystackService: jest.Mocked<PaystackService>;
@@ -26,6 +26,7 @@ describe('Subscription Flow Integration', () => {
   const TEST_TIER_ID = '00000000-0000-0000-0000-000000000001';
 
   beforeEach(() => {
+    ctx = {} as RequestContext;
     // Mock ChannelService
     mockChannelService = {
       findOne: jest.fn(),
@@ -50,6 +51,7 @@ describe('Subscription Flow Integration', () => {
     mockRedisCache = {
       get: jest.fn(async () => null),
       set: jest.fn(async () => {}),
+      setnx: jest.fn(async () => true),
       delete: jest.fn(async () => {}),
       exists: jest.fn(async () => false),
     } as any;
