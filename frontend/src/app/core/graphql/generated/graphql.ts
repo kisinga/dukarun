@@ -805,8 +805,11 @@ export type ChannelCustomFields = {
   smsUsedThisPeriod?: Maybe<Scalars['Int']['output']>;
   status?: Maybe<Scalars['String']['output']>;
   stockValueCache?: Maybe<Scalars['String']['output']>;
+  subscriptionExemptReason?: Maybe<Scalars['String']['output']>;
+  subscriptionExemptUntil?: Maybe<Scalars['DateTime']['output']>;
   subscriptionExpiredReminderSentAt?: Maybe<Scalars['DateTime']['output']>;
   subscriptionExpiresAt?: Maybe<Scalars['DateTime']['output']>;
+  subscriptionGracePeriodEnd?: Maybe<Scalars['DateTime']['output']>;
   subscriptionStartedAt?: Maybe<Scalars['DateTime']['output']>;
   subscriptionStatus?: Maybe<Scalars['String']['output']>;
   subscriptionTier?: Maybe<SubscriptionTier>;
@@ -856,8 +859,11 @@ export type ChannelFilterParameter = {
   smsUsedThisPeriod?: InputMaybe<NumberOperators>;
   status?: InputMaybe<StringOperators>;
   stockValueCache?: InputMaybe<StringOperators>;
+  subscriptionExemptReason?: InputMaybe<StringOperators>;
+  subscriptionExemptUntil?: InputMaybe<DateOperators>;
   subscriptionExpiredReminderSentAt?: InputMaybe<DateOperators>;
   subscriptionExpiresAt?: InputMaybe<DateOperators>;
+  subscriptionGracePeriodEnd?: InputMaybe<DateOperators>;
   subscriptionStartedAt?: InputMaybe<DateOperators>;
   subscriptionStatus?: InputMaybe<StringOperators>;
   token?: InputMaybe<StringOperators>;
@@ -918,8 +924,11 @@ export type ChannelSortParameter = {
   smsUsedThisPeriod?: InputMaybe<SortOrder>;
   status?: InputMaybe<SortOrder>;
   stockValueCache?: InputMaybe<SortOrder>;
+  subscriptionExemptReason?: InputMaybe<SortOrder>;
+  subscriptionExemptUntil?: InputMaybe<SortOrder>;
   subscriptionExpiredReminderSentAt?: InputMaybe<SortOrder>;
   subscriptionExpiresAt?: InputMaybe<SortOrder>;
+  subscriptionGracePeriodEnd?: InputMaybe<SortOrder>;
   subscriptionStartedAt?: InputMaybe<SortOrder>;
   subscriptionStatus?: InputMaybe<SortOrder>;
   subscriptionTier?: InputMaybe<SortOrder>;
@@ -1338,8 +1347,11 @@ export type CreateChannelCustomFieldsInput = {
   smsUsedThisPeriod?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   stockValueCache?: InputMaybe<Scalars['String']['input']>;
+  subscriptionExemptReason?: InputMaybe<Scalars['String']['input']>;
+  subscriptionExemptUntil?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionExpiredReminderSentAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionExpiresAt?: InputMaybe<Scalars['DateTime']['input']>;
+  subscriptionGracePeriodEnd?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionStartedAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionStatus?: InputMaybe<Scalars['String']['input']>;
   subscriptionTierId?: InputMaybe<Scalars['ID']['input']>;
@@ -4109,6 +4121,7 @@ export type Mutation = {
   updateChannelPublicStorefrontPlatform: Channel;
   updateChannelStatus: Channel;
   updateChannelStatusPlatform: Channel;
+  updateChannelSubscriptionPlatform: Channel;
   updateChannelZonesPlatform: Channel;
   /** Update an existing Collection */
   updateCollection: Collection;
@@ -5065,6 +5078,10 @@ export type MutationUpdateChannelStatusArgs = {
 export type MutationUpdateChannelStatusPlatformArgs = {
   channelId: Scalars['ID']['input'];
   status: Scalars['String']['input'];
+};
+
+export type MutationUpdateChannelSubscriptionPlatformArgs = {
+  input: UpdateChannelSubscriptionInput;
 };
 
 export type MutationUpdateChannelZonesPlatformArgs = {
@@ -6381,6 +6398,9 @@ export type PlatformChannelCustomFields = {
   smsPeriodEnd?: Maybe<Scalars['DateTime']['output']>;
   smsUsedThisPeriod?: Maybe<Scalars['Int']['output']>;
   status: Scalars['String']['output'];
+  subscriptionExemptReason?: Maybe<Scalars['String']['output']>;
+  subscriptionExemptUntil?: Maybe<Scalars['DateTime']['output']>;
+  subscriptionExpiresAt?: Maybe<Scalars['DateTime']['output']>;
   subscriptionStatus?: Maybe<Scalars['String']['output']>;
   trialEndsAt?: Maybe<Scalars['DateTime']['output']>;
 };
@@ -9308,8 +9328,11 @@ export type UpdateChannelCustomFieldsInput = {
   smsUsedThisPeriod?: InputMaybe<Scalars['Int']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   stockValueCache?: InputMaybe<Scalars['String']['input']>;
+  subscriptionExemptReason?: InputMaybe<Scalars['String']['input']>;
+  subscriptionExemptUntil?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionExpiredReminderSentAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionExpiresAt?: InputMaybe<Scalars['DateTime']['input']>;
+  subscriptionGracePeriodEnd?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionStartedAt?: InputMaybe<Scalars['DateTime']['input']>;
   subscriptionStatus?: InputMaybe<Scalars['String']['input']>;
   subscriptionTierId?: InputMaybe<Scalars['ID']['input']>;
@@ -9354,6 +9377,19 @@ export type UpdateChannelPublicStorefrontInput = {
 };
 
 export type UpdateChannelResult = Channel | LanguageNotAvailableError;
+
+/**
+ * Direct subscription-field editing for platform admins. Only the provided fields
+ * are changed; pass null to clear a date or reason.
+ */
+export type UpdateChannelSubscriptionInput = {
+  channelId: Scalars['ID']['input'];
+  subscriptionExemptReason?: InputMaybe<Scalars['String']['input']>;
+  subscriptionExemptUntil?: InputMaybe<Scalars['DateTime']['input']>;
+  subscriptionExpiresAt?: InputMaybe<Scalars['DateTime']['input']>;
+  subscriptionStatus?: InputMaybe<Scalars['String']['input']>;
+  trialEndsAt?: InputMaybe<Scalars['DateTime']['input']>;
+};
 
 export type UpdateChannelZonesInput = {
   channelId: Scalars['ID']['input'];

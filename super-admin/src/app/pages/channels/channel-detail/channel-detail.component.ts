@@ -12,6 +12,7 @@ import {
   NOTIFICATIONS_FOR_CHANNEL,
   UPDATE_CHANNEL_STATUS_PLATFORM,
   EXTEND_TRIAL_PLATFORM,
+  UPDATE_CHANNEL_SUBSCRIPTION_PLATFORM,
   UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM,
   UPDATE_CHANNEL_ZONES_PLATFORM,
   UPDATE_CHANNEL_PUBLIC_STOREFRONT_PLATFORM,
@@ -30,6 +31,9 @@ interface PlatformChannel {
     status: string;
     trialEndsAt: string | null;
     subscriptionStatus: string;
+    subscriptionExpiresAt: string | null;
+    subscriptionExemptUntil: string | null;
+    subscriptionExemptReason: string | null;
     maxAdminCount: number;
     cashierFlowEnabled: boolean;
     cashControlEnabled: boolean;
@@ -88,8 +92,13 @@ export class ChannelDetailComponent implements OnInit {
   error = signal<string | null>(null);
 
   statusOptions = ['UNAPPROVED', 'APPROVED', 'DISABLED', 'BANNED'];
+  subscriptionStatusOptions = ['trial', 'active', 'expired', 'cancelled'];
   newStatus = signal('');
+  newSubscriptionStatus = signal('');
   newTrialEndsAt = signal('');
+  newSubscriptionExpiresAt = signal('');
+  newSubscriptionExemptUntil = signal('');
+  newSubscriptionExemptReason = signal('');
   newMaxAdminCount = signal<number>(5);
   selectedShippingZoneId = signal('');
   selectedTaxZoneId = signal('');
@@ -153,9 +162,18 @@ export class ChannelDetailComponent implements OnInit {
       this.zones.set(zonesResult.data?.platformZones ?? []);
       if (ch) {
         this.newStatus.set(ch.customFields.status);
+        this.newSubscriptionStatus.set(ch.customFields.subscriptionStatus);
         if (ch.customFields.trialEndsAt) {
           this.newTrialEndsAt.set(ch.customFields.trialEndsAt.toString().slice(0, 10));
         }
+        if (ch.customFields.subscriptionExpiresAt) {
+          this.newSubscriptionExpiresAt.set(ch.customFields.subscriptionExpiresAt.toString().slice(0, 10));
+        }
+        if (ch.customFields.subscriptionExemptUntil) {
+          this.newSubscriptionExemptUntil.set(ch.customFields.subscriptionExemptUntil.toString().slice(0, 10));
+        }
+        this.newSubscriptionExemptReason.set(ch.customFields.subscriptionExemptReason ?? '');
+
         const max = ch.customFields.maxAdminCount;
         this.newMaxAdminCount.set(typeof max === 'number' && max > 0 ? max : 5);
         this.selectedShippingZoneId.set(ch.defaultShippingZone?.id ?? '');
@@ -236,7 +254,79 @@ export class ChannelDetailComponent implements OnInit {
         variables: { channelId: id, trialEndsAt: new Date(dateStr).toISOString() },
       });
       const ch = this.channel();
-      if (ch) this.channel.set({ ...ch, customFields: { ...ch.customFields, trialEndsAt: dateStr } });
+      if (ch) this.channel.set({ ...ch, customFields: { ...ch.customFields, trialEndsAt: dateStr, subscriptionStatus: 'trial' } });
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  async updateSubscriptionStatus(): Promise<void> {
+    const id = this.id();
+    const status = this.newSubscriptionStatus();
+    if (!id || !status) return;
+    this.saving.set(true);
+    try {
+      await this.apollo.getClient().mutate({
+        mutation: UPDATE_CHANNEL_SUBSCRIPTION_PLATFORM,
+        variables: { input: { channelId: id, subscriptionStatus: status } },
+      });
+      const ch = this.channel();
+      if (ch) this.channel.set({ ...ch, customFields: { ...ch.customFields, subscriptionStatus: status } });
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  async updateSubscriptionExpiry(): Promise<void> {
+    const id = this.id();
+    if (!id) return;
+    this.saving.set(true);
+    try {
+      const dateStr = this.newSubscriptionExpiresAt();
+      await this.apollo.getClient().mutate({
+        mutation: UPDATE_CHANNEL_SUBSCRIPTION_PLATFORM,
+        variables: {
+          input: {
+            channelId: id,
+            subscriptionExpiresAt: dateStr ? new Date(dateStr).toISOString() : null,
+          },
+        },
+      });
+      const ch = this.channel();
+      if (ch) this.channel.set({ ...ch, customFields: { ...ch.customFields, subscriptionExpiresAt: dateStr || null } });
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  async updateSubscriptionExemption(): Promise<void> {
+    const id = this.id();
+    if (!id) return;
+    this.saving.set(true);
+    try {
+      const dateStr = this.newSubscriptionExemptUntil();
+      const reason = this.newSubscriptionExemptReason().trim();
+      await this.apollo.getClient().mutate({
+        mutation: UPDATE_CHANNEL_SUBSCRIPTION_PLATFORM,
+        variables: {
+          input: {
+            channelId: id,
+            subscriptionExemptUntil: dateStr ? new Date(dateStr).toISOString() : null,
+            subscriptionExemptReason: reason || null,
+          },
+        },
+      });
+      const ch = this.channel();
+      if (ch) {
+        this.channel.set({
+          ...ch,
+          customFields: {
+            ...ch.customFields,
+            subscriptionExemptUntil: dateStr || null,
+            subscriptionExemptReason: reason || null,
+          },
+        });
+      }
     } finally {
       this.saving.set(false);
     }
