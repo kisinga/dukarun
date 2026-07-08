@@ -1,24 +1,36 @@
 import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { Permission } from '@vendure/common/lib/generated-types';
+import { Reflector } from '@nestjs/core';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
 import { getVendureRequestContext } from '../../infrastructure/audit/get-request-context';
+import {
+  SUBSCRIPTION_ACCESS_METADATA,
+  SubscriptionAccessLevel,
+} from './subscription-access.decorator';
+import { resolveRegistryAccessLevel } from './operation-access.registry';
 
 /**
- * Guard to enforce read-only mode for expired subscriptions
+ * Global guard that enforces subscription access at the GraphQL operation boundary.
  *
- * Allows queries but blocks mutations when subscription is expired or cancelled.
- * Exceptions are made for subscription-related mutations.
+ * Each top-level query/mutation declares its required access level via either:
+ *   - the `@SubscriptionAccess()` decorator, or
+ *   - the `OPERATION_ACCESS_REGISTRY` for Vendure built-ins, or
+ *   - a safe default (`write` for mutations, `read` for queries).
+ *
+ * Unknown nested field resolvers are ignored; enforcement only happens at the
+ * root Query/Mutation level.
  */
 @Injectable()
 export class SubscriptionGuard implements CanActivate {
   private readonly logger = new Logger(SubscriptionGuard.name);
 
-  constructor(private subscriptionService: SubscriptionService) {}
+  constructor(
+    private readonly subscriptionService: SubscriptionService,
+    private readonly reflector: Reflector
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Only run for GraphQL; HTTP routes (e.g. cache-sync SSE) have no operation.
-    // ContextType in NestJS may not include 'graphql' in its union; runtime can still be 'graphql'.
     if ((context.getType() as string) !== 'graphql') {
       return true;
     }
@@ -30,72 +42,102 @@ export class SubscriptionGuard implements CanActivate {
       return true;
     }
 
-    // Extract the actual Vendure RequestContext from the Express request.
-    const ctx = getVendureRequestContext(context);
-    if (!ctx) {
+    // Only enforce on root Query/Mutation fields. Nested field resolvers inherit
+    // the access decision of their parent operation.
+    const parentTypeName = info.parentType?.name;
+    if (parentTypeName !== 'Query' && parentTypeName !== 'Mutation') {
       return true;
     }
 
-    // Skip if not a mutation
-    if (operation.operation !== 'mutation') {
-      return true; // Allow all queries
+    const fieldName = info.fieldName;
+
+    // Resolve the request context early so API-scoped registry entries can be
+    // matched correctly. Public operations are still allowed when context is missing.
+    const ctx = getVendureRequestContext(context);
+    const apiType = ctx?.apiType;
+    const requiredLevel = this.resolveRequiredLevel(
+      context,
+      operation.operation,
+      fieldName,
+      apiType
+    );
+
+    if (requiredLevel === 'public') {
+      return true;
     }
 
-    // Superadmins are never subject to subscription restrictions
+    if (!ctx) {
+      this.logger.warn(`Blocked ${operation.operation} ${fieldName} - request context missing`);
+      throw new Error('Subscription access could not be verified. Please try again.');
+    }
+
     if (ctx.userHasPermissions([Permission.SuperAdmin])) {
       return true;
     }
 
-    // Get channel ID from context
     const channelId = ctx.channelId;
     if (!channelId) {
-      // No channel context, allow (might be system operation)
-      return true;
-    }
-
-    // Get mutation name
-    const mutationName = info.fieldName;
-
-    // Allow auth mutations (user has no session yet during login/logout)
-    // and subscription-related mutations even if expired.
-    const subscriptionMutations = [
-      'login', // Must always be allowed — no session exists yet at login time
-      'logout',
-      'initiateSubscriptionPurchase',
-      'verifySubscriptionPayment',
-      'cancelSubscription',
-      'updateChannelSettings', // Allow updating subscription settings
-    ];
-
-    if (subscriptionMutations.includes(mutationName)) {
-      return true;
+      this.logger.warn(`Blocked ${operation.operation} ${fieldName} - channel context missing`);
+      throw new Error('Channel context is required for this action.');
     }
 
     try {
-      // Check subscription status
       const status = await this.subscriptionService.checkSubscriptionStatus(ctx, String(channelId));
 
-      if (!status.canPerformAction) {
+      if (requiredLevel === 'read' && !status.canRead) {
         this.logger.warn(
-          `Blocked mutation ${mutationName} for channel ${channelId} - subscription status: ${status.status}`
+          `Blocked ${operation.operation} ${fieldName} for channel ${channelId} - subscription suspended, reason: ${status.reason}`
         );
         throw new Error(
-          `Subscription expired. Please renew your subscription to continue. Current status: ${status.status}`
+          'Subscription suspended. Please contact support or renew your subscription to reactivate access.'
+        );
+      }
+
+      if (requiredLevel === 'write' && !status.canWrite) {
+        this.logger.warn(
+          `Blocked mutation ${fieldName} for channel ${channelId} - subscription status: ${status.status}, reason: ${status.reason}`
+        );
+        throw new Error(
+          `Subscription access denied. Current status: ${status.status}. Please renew your subscription to continue.`
         );
       }
 
       return true;
     } catch (error) {
-      // If error is already our subscription error, re-throw it
-      if (error instanceof Error && error.message.includes('Subscription expired')) {
+      if (
+        error instanceof Error &&
+        (error.message.includes('Subscription suspended') ||
+          error.message.includes('Subscription access denied') ||
+          error.message.includes('Channel context is required'))
+      ) {
         throw error;
       }
 
-      // For other errors, log and allow (fail-safe)
       this.logger.error(
         `Error checking subscription status: ${error instanceof Error ? error.message : String(error)}`
       );
-      return true;
+      throw new Error('Subscription access could not be verified. Please try again.');
     }
+  }
+
+  private resolveRequiredLevel(
+    context: ExecutionContext,
+    operationType: string,
+    fieldName: string,
+    apiType?: string
+  ): SubscriptionAccessLevel {
+    const metadata = this.reflector.get<SubscriptionAccessLevel>(
+      SUBSCRIPTION_ACCESS_METADATA,
+      context.getHandler()
+    );
+
+    if (metadata) {
+      return metadata;
+    }
+
+    return (
+      resolveRegistryAccessLevel(fieldName, apiType) ??
+      (operationType === 'mutation' ? 'write' : 'read')
+    );
   }
 }

@@ -359,16 +359,17 @@ export class NotificationService {
   }
 
   /**
-   * Get the minimum daysRemaining from recent "Subscription Expiring Soon" notifications
-   * for this channel. Used to avoid duplicate expiring_soon alerts for the same threshold.
+   * Get the minimum daysRemaining from recent notifications with a given title
+   * for this channel. Used to avoid duplicate alerts for the same threshold.
    * Returns null if no such notifications exist.
    *
-   * Logic: only emit expiring_soon when current daysRemaining < this value (or null).
+   * Logic: only emit when current daysRemaining < this value (or null).
    * E.g. sent at 7 days → min=7; at 3 days we emit (3<7); sent at 3 → min=3; at 1 we emit (1<3).
    */
-  async getLastExpiringSoonThreshold(
+  async getLastNotificationThreshold(
     ctx: RequestContext,
     channelId: string,
+    title: string,
     withinDays: number = 35
   ): Promise<number | null> {
     const cutoff = new Date();
@@ -379,7 +380,7 @@ export class NotificationService {
       .createQueryBuilder('n')
       .where('n.channelId = :channelId', { channelId })
       .andWhere('n.type = :type', { type: NotificationType.PAYMENT })
-      .andWhere('n.title = :title', { title: 'Subscription Expiring Soon' })
+      .andWhere('n.title = :title', { title })
       .andWhere('n.createdAt >= :cutoff', { cutoff })
       .select(['n.data'])
       .getMany();
@@ -387,10 +388,27 @@ export class NotificationService {
     let minDays: number | null = null;
     for (const n of notifications) {
       const days = n.data?.daysRemaining;
-      if (typeof days === 'number' && (days === 1 || days === 3 || days === 7)) {
+      if (typeof days === 'number' && days >= 0) {
         minDays = minDays === null ? days : Math.min(minDays, days);
       }
     }
     return minDays;
+  }
+
+  /**
+   * Get the minimum daysRemaining from recent "Subscription Expiring Soon" notifications.
+   * @deprecated Use getLastNotificationThreshold with a specific title.
+   */
+  async getLastExpiringSoonThreshold(
+    ctx: RequestContext,
+    channelId: string,
+    withinDays: number = 35
+  ): Promise<number | null> {
+    return this.getLastNotificationThreshold(
+      ctx,
+      channelId,
+      'Subscription Expiring Soon',
+      withinDays
+    );
   }
 }

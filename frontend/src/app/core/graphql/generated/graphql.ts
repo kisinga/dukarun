@@ -931,9 +931,17 @@ export type ChannelSortParameter = {
 
 export type ChannelSubscription = {
   __typename?: 'ChannelSubscription';
+  access: Scalars['String']['output'];
   billingCycle?: Maybe<Scalars['String']['output']>;
+  canRead: Scalars['Boolean']['output'];
+  canWrite: Scalars['Boolean']['output'];
+  exemptionEndsAt?: Maybe<Scalars['DateTime']['output']>;
+  exemptionReason?: Maybe<Scalars['String']['output']>;
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  gracePeriodEnd?: Maybe<Scalars['DateTime']['output']>;
   lastPaymentAmount?: Maybe<Scalars['Int']['output']>;
   lastPaymentDate?: Maybe<Scalars['DateTime']['output']>;
+  reason: Scalars['String']['output'];
   status: Scalars['String']['output'];
   subscriptionExpiresAt?: Maybe<Scalars['DateTime']['output']>;
   subscriptionStartedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -8879,10 +8887,17 @@ export type StructFieldConfig =
 
 export type SubscriptionStatus = {
   __typename?: 'SubscriptionStatus';
+  access: Scalars['String']['output'];
   canPerformAction: Scalars['Boolean']['output'];
+  canRead: Scalars['Boolean']['output'];
+  canWrite: Scalars['Boolean']['output'];
   daysRemaining?: Maybe<Scalars['Int']['output']>;
+  exemptionEndsAt?: Maybe<Scalars['DateTime']['output']>;
+  exemptionReason?: Maybe<Scalars['String']['output']>;
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  gracePeriodEnd?: Maybe<Scalars['DateTime']['output']>;
   isValid: Scalars['Boolean']['output'];
+  reason: Scalars['String']['output'];
   status: Scalars['String']['output'];
   trialEndsAt?: Maybe<Scalars['DateTime']['output']>;
 };
@@ -12727,12 +12742,20 @@ export type GetChannelSubscriptionQuery = {
   getChannelSubscription: {
     __typename?: 'ChannelSubscription';
     status: string;
+    access: string;
+    reason: string;
     trialEndsAt?: any | null;
     subscriptionStartedAt?: any | null;
     subscriptionExpiresAt?: any | null;
+    expiresAt?: any | null;
+    exemptionEndsAt?: any | null;
+    exemptionReason?: string | null;
+    gracePeriodEnd?: any | null;
     billingCycle?: string | null;
     lastPaymentDate?: any | null;
     lastPaymentAmount?: number | null;
+    canWrite: boolean;
+    canRead: boolean;
     tier?: {
       __typename?: 'SubscriptionTier';
       id: string;
@@ -12755,10 +12778,17 @@ export type CheckSubscriptionStatusQuery = {
   checkSubscriptionStatus: {
     __typename?: 'SubscriptionStatus';
     isValid: boolean;
+    access: string;
     status: string;
+    reason: string;
     daysRemaining?: number | null;
     expiresAt?: any | null;
     trialEndsAt?: any | null;
+    exemptionEndsAt?: any | null;
+    exemptionReason?: string | null;
+    gracePeriodEnd?: any | null;
+    canWrite: boolean;
+    canRead: boolean;
     canPerformAction: boolean;
   };
 };
@@ -22999,12 +23029,20 @@ export const GetChannelSubscriptionDocument = {
                   },
                 },
                 { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'access' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'reason' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'trialEndsAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'subscriptionStartedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'subscriptionExpiresAt' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'expiresAt' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'exemptionEndsAt' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'exemptionReason' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'gracePeriodEnd' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'billingCycle' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'lastPaymentDate' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'lastPaymentAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'canWrite' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'canRead' } },
               ],
             },
           },
@@ -23044,10 +23082,17 @@ export const CheckSubscriptionStatusDocument = {
               kind: 'SelectionSet',
               selections: [
                 { kind: 'Field', name: { kind: 'Name', value: 'isValid' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'access' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'status' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'reason' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'daysRemaining' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'expiresAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'trialEndsAt' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'exemptionEndsAt' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'exemptionReason' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'gracePeriodEnd' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'canWrite' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'canRead' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'canPerformAction' } },
               ],
             },

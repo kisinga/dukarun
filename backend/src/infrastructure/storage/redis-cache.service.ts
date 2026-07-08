@@ -65,6 +65,38 @@ export class RedisCacheService {
   }
 
   /**
+   * Set value only if the key does not already exist. Returns `true` if the key
+   * was set, `false` if it already existed.
+   */
+  async setnx<T>(namespace: string, key: string, value: T, ttlSeconds: number): Promise<boolean> {
+    const cacheKey = this.getCacheKey(namespace, key);
+
+    if (this.isRedisAvailable() && this.otpService) {
+      try {
+        const serialized = JSON.stringify(value);
+        // Atomic SET EX NX: a losing call returns null instead of refreshing TTL.
+        const result = await this.otpService.redis!.set(
+          cacheKey,
+          serialized,
+          'EX',
+          ttlSeconds,
+          'NX'
+        );
+        return result === 'OK';
+      } catch (error) {
+        this.logger.error(
+          `Redis setnx failed for ${cacheKey}; failing closed: ${error instanceof Error ? error.message : String(error)}`
+        );
+        return false;
+      }
+    }
+
+    // Without Redis we cannot make a cross-process claim. Failing closed prevents
+    // duplicate transitions; callers should retry on the next tick/interval.
+    return false;
+  }
+
+  /**
    * Get value from cache
    */
   async get<T>(namespace: string, key: string): Promise<T | null> {

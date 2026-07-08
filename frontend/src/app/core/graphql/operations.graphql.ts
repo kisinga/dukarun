@@ -2671,12 +2671,20 @@ export const GET_CHANNEL_SUBSCRIPTION = graphql(`
         features
       }
       status
+      access
+      reason
       trialEndsAt
       subscriptionStartedAt
       subscriptionExpiresAt
+      expiresAt
+      exemptionEndsAt
+      exemptionReason
+      gracePeriodEnd
       billingCycle
       lastPaymentDate
       lastPaymentAmount
+      canWrite
+      canRead
     }
   }
 `);
@@ -2685,10 +2693,17 @@ export const CHECK_SUBSCRIPTION_STATUS = graphql(`
   query CheckSubscriptionStatus($channelId: ID) {
     checkSubscriptionStatus(channelId: $channelId) {
       isValid
+      access
       status
+      reason
       daysRemaining
       expiresAt
       trialEndsAt
+      exemptionEndsAt
+      exemptionReason
+      gracePeriodEnd
+      canWrite
+      canRead
       canPerformAction
     }
   }

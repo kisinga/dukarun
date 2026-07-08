@@ -46,6 +46,30 @@ describe('AccountBalanceService', () => {
     service = new AccountBalanceService(mockConnection);
   });
 
+  function createMockQueryBuilder(rawOneResult?: { debitTotal: string; creditTotal: string }) {
+    const mockGetRawOne = jest.fn() as jest.MockedFunction<() => Promise<any>>;
+    if (rawOneResult) {
+      (mockGetRawOne as any).mockResolvedValue(rawOneResult);
+    }
+
+    const mockQueryBuilder: any = {
+      createQueryBuilder: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      getRawOne: mockGetRawOne,
+    };
+
+    mockJournalLineRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+    return mockQueryBuilder;
+  }
+
+  function hasParam(calls: any[][], key: string): boolean {
+    return calls.some(call => call[1] && Object.prototype.hasOwnProperty.call(call[1], key));
+  }
+
   describe('getAccountBalance', () => {
     it('should return balance for sub-account directly from journal lines', async () => {
       const account: Account = {
@@ -78,7 +102,9 @@ describe('AccountBalanceService', () => {
 
       mockJournalLineRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
 
-      const result = await service.getAccountBalance(ctx, 'CASH_ON_HAND', 1, '2024-01-31');
+      const result = await service.getAccountBalance(ctx, 'CASH_ON_HAND', 1, {
+        asOfDate: '2024-01-31',
+      });
 
       expect(result.accountCode).toBe('CASH_ON_HAND');
       expect(result.balance).toBe(500); // 1000 - 500
@@ -146,12 +172,94 @@ describe('AccountBalanceService', () => {
 
       mockJournalLineRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
 
-      const result = await service.getAccountBalance(ctx, 'CASH', 1, '2024-01-31');
+      const result = await service.getAccountBalance(ctx, 'CASH', 1, { asOfDate: '2024-01-31' });
 
       expect(result.accountCode).toBe('CASH');
       expect(result.balance).toBe(1200); // (1000-200) + (500-100)
       expect(result.debitTotal).toBe(1500);
       expect(result.creditTotal).toBe(300);
+    });
+
+    it('should apply startDate filter to each sub-account in parent rollup', async () => {
+      const parentAccount: Account = {
+        id: 'parent-1',
+        channelId: 1,
+        code: 'CASH',
+        name: 'Cash',
+        type: 'asset',
+        isActive: true,
+        isParent: true,
+      } as Account;
+
+      const subAccount1: Account = {
+        id: 'sub-1',
+        channelId: 1,
+        code: 'CASH_ON_HAND',
+        name: 'Cash on Hand',
+        type: 'asset',
+        isActive: true,
+        isParent: false,
+        parentAccountId: 'parent-1',
+      } as Account;
+
+      mockAccountRepo.findOne.mockResolvedValue(parentAccount);
+      mockAccountRepo.find.mockResolvedValue([subAccount1]);
+
+      const mockQueryBuilder = createMockQueryBuilder({ debitTotal: '100', creditTotal: '0' });
+
+      const result = await service.getAccountBalance(ctx, 'CASH', 1, {
+        asOfDate: '2024-01-31',
+        startDate: '2024-01-01',
+      });
+
+      expect(result.balance).toBe(100);
+      expect(hasParam(mockQueryBuilder.andWhere.mock.calls, 'startDate')).toBe(true);
+    });
+
+    it('should apply startDate filter when provided', async () => {
+      const account: Account = {
+        id: 'account-1',
+        channelId: 1,
+        code: 'SALES',
+        name: 'Sales Revenue',
+        type: 'income',
+        isActive: true,
+        isParent: false,
+      } as Account;
+
+      mockAccountRepo.findOne.mockResolvedValue(account);
+
+      const mockQueryBuilder = createMockQueryBuilder({ debitTotal: '0', creditTotal: '500' });
+
+      const result = await service.getAccountBalance(ctx, 'SALES', 1, {
+        asOfDate: '2024-01-31',
+        startDate: '2024-01-01',
+      });
+
+      expect(result.balance).toBe(-500);
+      expect(hasParam(mockQueryBuilder.andWhere.mock.calls, 'startDate')).toBe(true);
+      expect(hasParam(mockQueryBuilder.andWhere.mock.calls, 'asOfDate')).toBe(true);
+    });
+
+    it('should not apply startDate filter when omitted', async () => {
+      const account: Account = {
+        id: 'account-1',
+        channelId: 1,
+        code: 'SALES',
+        name: 'Sales Revenue',
+        type: 'income',
+        isActive: true,
+        isParent: false,
+      } as Account;
+
+      mockAccountRepo.findOne.mockResolvedValue(account);
+
+      const mockQueryBuilder = createMockQueryBuilder({ debitTotal: '0', creditTotal: '500' });
+
+      await service.getAccountBalance(ctx, 'SALES', 1, { asOfDate: '2024-01-31' });
+
+      expect(hasParam(mockQueryBuilder.andWhere.mock.calls, 'startDate')).toBe(false);
+      expect(hasParam(mockQueryBuilder.andWhere.mock.calls, 'asOfDate')).toBe(true);
     });
 
     it('should return a zero balance if account not found', async () => {

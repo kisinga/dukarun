@@ -2,6 +2,7 @@ import { Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, GlobalSettingsService, Permission, RequestContext } from '@vendure/core';
 import gql from 'graphql-tag';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
+import { SubscriptionAccess } from './subscription-access.decorator';
 
 /**
  * Display-safe subscription tier for public/marketing (shop API).
@@ -43,12 +44,14 @@ export class SubscriptionPublicResolver {
 
   @Query()
   @Allow(Permission.Public)
+  @SubscriptionAccess('public')
   async getPublicSubscriptionTiers() {
     return this.subscriptionService.getActiveSubscriptionTiersForPublic();
   }
 
   @Query()
   @Allow(Permission.Public)
+  @SubscriptionAccess('public')
   async getPublicPlatformConfig(@Ctx() ctx: RequestContext) {
     const settings = await this.globalSettingsService.getSettings(ctx);
     const trialDays = (settings as { customFields?: { trialDays?: number } }).customFields

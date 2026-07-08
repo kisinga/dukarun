@@ -47,8 +47,19 @@ export class SubscriptionStatusComponent implements OnInit {
     return this.subscriptionService.subscriptionStatus()?.daysRemaining ?? null;
   });
 
-  readonly trialEndsAt = computed(() => this.companyService.trialEndsAt());
-  readonly subscriptionExpiresAt = computed(() => this.companyService.subscriptionExpiresAt());
+  readonly trialEndsAt = computed(
+    () => this.subscriptionService.subscriptionStatus()?.trialEndsAt ?? null,
+  );
+  readonly subscriptionExpiresAt = computed(
+    () => this.subscriptionService.subscriptionStatus()?.expiresAt ?? null,
+  );
+  readonly readOnlyMessage = computed(() => this.subscriptionService.getReadOnlyMessage());
+  readonly suspendedMessage = computed(() => this.subscriptionService.getSuspendedMessage());
+  readonly access = computed(() => this.subscriptionService.accessState().access);
+  readonly status = computed(() => this.subscriptionService.subscriptionStatus()?.status ?? null);
+  readonly gracePeriodEnd = computed(
+    () => this.subscriptionService.subscriptionStatus()?.gracePeriodEnd ?? null,
+  );
 
   readonly currentTierName = computed(() => {
     const subscription = this.channelSubscription();

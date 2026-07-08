@@ -42,7 +42,12 @@ export class SubscriptionAlertEvent extends DukaHubEvent {
   constructor(
     ctx: RequestContext,
     channelId: string,
-    public readonly alertType: 'expiring_soon' | 'renewed',
+    public readonly alertType:
+      | 'expiring_soon'
+      | 'renewed'
+      | 'expired'
+      | 'grace_period_ending'
+      | 'hard_expired',
     data: Record<string, any> = {}
   ) {
     super(ctx, channelId, { alertType, ...data });

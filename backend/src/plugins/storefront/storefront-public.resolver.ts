@@ -3,6 +3,7 @@ import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
 import { gql } from 'graphql-tag';
 
 import { StorefrontService } from './storefront.service';
+import { SubscriptionAccess } from '../subscriptions/subscription-access.decorator';
 
 /**
  * Public shop-api schema for resolving a merchant storefront by its subdomain slug.
@@ -42,6 +43,7 @@ export class StorefrontPublicResolver {
 
   @Query()
   @Allow(Permission.Public)
+  @SubscriptionAccess('public')
   async storefront(@Ctx() ctx: RequestContext, @Args('slug') slug: string) {
     const result = await this.storefrontService.resolveStorefront(ctx, slug);
     return result ? this.toPublic(result) : null;
@@ -49,6 +51,7 @@ export class StorefrontPublicResolver {
 
   @Query()
   @Allow(Permission.Public)
+  @SubscriptionAccess('public')
   async publicStorefronts(@Ctx() ctx: RequestContext) {
     const list = await this.storefrontService.listStorefronts(ctx);
     return list.map(r => this.toPublic(r));

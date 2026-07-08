@@ -95,7 +95,10 @@ export class LedgerQueryService {
         ctx,
         query.accountCode,
         query.channelId,
-        query.endDate
+        {
+          asOfDate: query.endDate,
+          startDate: query.startDate,
+        }
       );
 
       // Cache the result

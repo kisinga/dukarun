@@ -101,7 +101,7 @@ export class InventoryReconciliationService {
       ctx,
       ACCOUNT_CODES.INVENTORY,
       channelId,
-      periodEndDate
+      { asOfDate: periodEndDate }
     );
 
     const ledgerBalanceStr = BigInt(ledgerBalance.balance).toString();

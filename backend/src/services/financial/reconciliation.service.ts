@@ -374,7 +374,7 @@ export class ReconciliationService {
           ctx,
           account.code,
           channelId,
-          asOfDate
+          { asOfDate }
         );
         result.push({
           accountCode: account.code,
@@ -419,7 +419,7 @@ export class ReconciliationService {
           ctx,
           account.code,
           channelId,
-          asOfDate
+          { asOfDate }
         );
         result.push({
           accountId: account.id,
@@ -545,7 +545,7 @@ export class ReconciliationService {
           ctx,
           account.code,
           reconciliation.channelId,
-          reconciliation.snapshotAt
+          { asOfDate: reconciliation.snapshotAt }
         );
         expectedStr = String(balance.balance);
         const expected = BigInt(expectedStr);
@@ -630,7 +630,7 @@ export class ReconciliationService {
               ctx,
               account.code,
               reconciliation.channelId,
-              reconciliation.snapshotAt
+              { asOfDate: reconciliation.snapshotAt }
             );
             expectedStr = String(balance.balance);
             const expected = BigInt(expectedStr);
@@ -796,6 +796,9 @@ export class ReconciliationService {
     startDate: string,
     endDate: string
   ): Promise<any> {
-    return this.accountBalanceService.getAccountBalance(ctx, accountCode, channelId, endDate);
+    return this.accountBalanceService.getAccountBalance(ctx, accountCode, channelId, {
+      asOfDate: endDate,
+      startDate,
+    });
   }
 }

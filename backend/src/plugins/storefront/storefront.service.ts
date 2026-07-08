@@ -10,6 +10,11 @@ import {
 } from '@vendure/core';
 
 import { normalizeStorefrontSlug } from '../../utils/storefront-slug.util';
+import {
+  SubscriptionAccess,
+  SubscriptionPolicyReason,
+} from '../../services/subscriptions/subscription-access.policy';
+import { getSubscriptionAccess } from '../subscriptions/subscription.context';
 
 /** Resolved public storefront identity for a single merchant channel. */
 export interface StorefrontResult {
@@ -22,6 +27,12 @@ export interface StorefrontResult {
   /** True only when the channel's subscription is active/trialing. When false the storefront
    *  should show branding but hide the catalogue (and be marked noindex). */
   catalogueVisible: boolean;
+  /** Current subscription access level for the storefront. */
+  access: SubscriptionAccess;
+  /** Human-readable reason for the current access level. */
+  reason: SubscriptionPolicyReason;
+  /** When access is read_only, the date full access will be suspended. */
+  gracePeriodEnd?: Date;
 }
 
 /** A single URL for a channel's sitemap. `loc` is a path (e.g. /products/rice). */
@@ -69,7 +80,7 @@ export class StorefrontService {
       relations: ['seller', 'customFields.companyLogoAsset'],
     });
     if (!channel) return null;
-    return this.buildResult(channel);
+    return this.buildResult(ctx, channel);
   }
 
   /**
@@ -86,15 +97,16 @@ export class StorefrontService {
       take: MAX_DIRECTORY_STORES,
     });
     return channels
-      .map(ch => this.buildResult(ch))
+      .map(ch => this.buildResult(ctx, ch))
       .filter((r): r is StorefrontResult => r !== null && r.catalogueVisible && !!r.slug);
   }
 
   /** Gate + shape a channel into a StorefrontResult, or null if it is not an eligible public store. */
-  private buildResult(channel: Channel): StorefrontResult | null {
+  private buildResult(ctx: RequestContext, channel: Channel): StorefrontResult | null {
     const cf = channel.customFields as Record<string, any>;
     if (cf.publicStorefrontEnabled !== true) return null;
     if (cf.status !== 'APPROVED') return null;
+    const decision = getSubscriptionAccess(ctx, channel.id.toString(), cf);
     return {
       channel,
       channelToken: channel.token,
@@ -102,7 +114,10 @@ export class StorefrontService {
       slug: (cf.publicSlug as string) ?? '',
       logo: (cf.companyLogoAsset as Asset) ?? null,
       whatsappNumber: (cf.publicWhatsAppNumber as string) ?? null,
-      catalogueVisible: this.isCatalogueVisible(cf),
+      catalogueVisible: decision.access === 'full',
+      access: decision.access,
+      reason: decision.reason,
+      gracePeriodEnd: decision.gracePeriodEnd,
     };
   }
 
@@ -184,20 +199,6 @@ export class StorefrontService {
       return sellerName.replace(/\s+Seller$/i, '').trim() || sellerName;
     }
     return channel.code;
-  }
-
-  /** Catalogue is visible while the subscription is active or trialing and not past its end date. */
-  private isCatalogueVisible(cf: Record<string, any>): boolean {
-    const now = Date.now();
-    const notPast = (d: unknown) => (d ? new Date(d as string).getTime() > now : true);
-    switch (cf.subscriptionStatus) {
-      case 'active':
-        return notPast(cf.subscriptionExpiresAt);
-      case 'trial':
-        return notPast(cf.trialEndsAt);
-      default:
-        return false; // expired / cancelled / unknown
-    }
   }
 
   private toIso(d: Date | string | null | undefined): string | null {

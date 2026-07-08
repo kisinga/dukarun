@@ -51,6 +51,21 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
     channels: { inApp: true, sms: false, email: false, whatsapp: false },
     inAppType: NotificationType.PAYMENT,
   },
+  subscription_expired: {
+    audience: 'channel_admins',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
+  subscription_grace_period_ending: {
+    audience: 'channel_admins',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
+  subscription_hard_expired: {
+    audience: 'channel_admins',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
   // ML status (channel admins, in-app)
   ml_status: {
     audience: 'channel_admins',

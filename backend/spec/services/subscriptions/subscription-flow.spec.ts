@@ -7,7 +7,7 @@
  * - Scheduler finds expiring channels
  */
 
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Channel, ChannelService, EventBus, RequestContext } from '@vendure/core';
 import { RedisCacheService } from '../../../src/infrastructure/storage/redis-cache.service';
 import { PaystackService } from '../../../src/services/payments/paystack.service';
@@ -16,7 +16,7 @@ import { generatePaystackEmailFromPhone } from '../../../src/utils/email.utils';
 import { SubscriptionAlertEvent } from '../../../src/infrastructure/events/custom-events';
 
 describe('Subscription Flow Integration', () => {
-  const ctx = {} as RequestContext;
+  let ctx: RequestContext;
   let subscriptionService: SubscriptionService;
   let mockChannelService: jest.Mocked<ChannelService>;
   let mockPaystackService: jest.Mocked<PaystackService>;
@@ -26,6 +26,7 @@ describe('Subscription Flow Integration', () => {
   const TEST_TIER_ID = '00000000-0000-0000-0000-000000000001';
 
   beforeEach(() => {
+    ctx = {} as RequestContext;
     // Mock ChannelService
     mockChannelService = {
       findOne: jest.fn(),
@@ -50,6 +51,7 @@ describe('Subscription Flow Integration', () => {
     mockRedisCache = {
       get: jest.fn(async () => null),
       set: jest.fn(async () => {}),
+      setnx: jest.fn(async () => true),
       delete: jest.fn(async () => {}),
       exists: jest.fn(async () => false),
     } as any;
@@ -348,14 +350,16 @@ describe('Subscription Flow Integration', () => {
     });
   });
 
-  describe('Early Tester Support (Blank Expiry Dates)', () => {
-    it('should allow full access for trial with blank trialEndsAt', async () => {
+  describe('Subscription Access Policy', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+    it('should block trial access with blank trialEndsAt unless explicitly exempt', async () => {
       const channelId = '1';
       const mockChannel: Channel = {
         id: channelId,
         customFields: {
           subscriptionStatus: 'trial',
-          // trialEndsAt is intentionally blank (set by admin for early testers)
         },
       } as any;
 
@@ -363,21 +367,22 @@ describe('Subscription Flow Integration', () => {
 
       const status = await subscriptionService.checkSubscriptionStatus(ctx, channelId);
 
-      expect(status.isValid).toBe(true);
+      expect(status.isValid).toBe(false);
+      expect(status.access).toBe('read_only');
       expect(status.status).toBe('trial');
-      expect(status.canPerformAction).toBe(true);
-      expect(status.isEarlyTester).toBe(true);
+      expect(status.reason).toBe('missing_trial_end');
+      expect(status.canWrite).toBe(false);
+      expect(status.canPerformAction).toBe(false);
       expect(status.trialEndsAt).toBeUndefined();
       expect(status.daysRemaining).toBeUndefined();
     });
 
-    it('should allow full access for active subscription with blank subscriptionExpiresAt', async () => {
+    it('should block active access with blank subscriptionExpiresAt unless explicitly exempt', async () => {
       const channelId = '1';
       const mockChannel: Channel = {
         id: channelId,
         customFields: {
           subscriptionStatus: 'active',
-          // subscriptionExpiresAt is intentionally blank (set by admin for early testers)
         },
       } as any;
 
@@ -385,12 +390,40 @@ describe('Subscription Flow Integration', () => {
 
       const status = await subscriptionService.checkSubscriptionStatus(ctx, channelId);
 
-      expect(status.isValid).toBe(true);
+      expect(status.isValid).toBe(false);
+      expect(status.access).toBe('read_only');
       expect(status.status).toBe('active');
-      expect(status.canPerformAction).toBe(true);
-      expect(status.isEarlyTester).toBe(true);
+      expect(status.reason).toBe('missing_subscription_expiry');
+      expect(status.canWrite).toBe(false);
+      expect(status.canPerformAction).toBe(false);
       expect(status.expiresAt).toBeUndefined();
       expect(status.daysRemaining).toBeUndefined();
+    });
+
+    it('should allow full access with an explicit exemption', async () => {
+      const channelId = '1';
+      const mockChannel: Channel = {
+        id: channelId,
+        customFields: {
+          subscriptionStatus: 'trial',
+          subscriptionExemptUntil: '2024-03-01T00:00:00.000Z',
+          subscriptionExemptReason: 'pilot',
+        },
+      } as any;
+
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2024-02-15'));
+      mockChannelService.findOne.mockResolvedValue(mockChannel);
+
+      const status = await subscriptionService.checkSubscriptionStatus(ctx, channelId);
+
+      expect(status.isValid).toBe(true);
+      expect(status.access).toBe('full');
+      expect(status.status).toBe('exempt');
+      expect(status.reason).toBe('explicit_exemption');
+      expect(status.canWrite).toBe(true);
+
+      jest.useRealTimers();
     });
 
     it('should handle prepaid extension with blank expiry dates', async () => {
@@ -405,7 +438,6 @@ describe('Subscription Flow Integration', () => {
         id: channelId,
         customFields: {
           subscriptionStatus: 'trial',
-          // Both expiry dates blank - early tester
           billingCycle: 'monthly',
           subscriptionTierId: 'tier-1',
         },
@@ -462,7 +494,6 @@ describe('Subscription Flow Integration', () => {
       expect(status.isValid).toBe(true);
       expect(status.status).toBe('trial');
       expect(status.canPerformAction).toBe(true);
-      expect(status.isEarlyTester).toBe(false);
       expect(status.daysRemaining).toBeGreaterThan(0);
       expect(status.daysRemaining).toBeLessThanOrEqual(10);
 
@@ -495,7 +526,6 @@ describe('Subscription Flow Integration', () => {
       expect(status.isValid).toBe(false);
       expect(status.status).toBe('expired');
       expect(status.canPerformAction).toBe(false);
-      expect(status.isEarlyTester).toBe(false);
 
       // Restore real timers
       jest.useRealTimers();
@@ -525,7 +555,6 @@ describe('Subscription Flow Integration', () => {
       expect(status.isValid).toBe(true);
       expect(status.status).toBe('active');
       expect(status.canPerformAction).toBe(true);
-      expect(status.isEarlyTester).toBe(false);
       expect(status.daysRemaining).toBeGreaterThan(0);
       expect(status.daysRemaining).toBeLessThanOrEqual(21); // Allow some margin for date calculation
 
@@ -558,7 +587,6 @@ describe('Subscription Flow Integration', () => {
       expect(status.isValid).toBe(false);
       expect(status.status).toBe('expired');
       expect(status.canPerformAction).toBe(false);
-      expect(status.isEarlyTester).toBe(false);
 
       // Restore real timers
       jest.useRealTimers();
