@@ -24,6 +24,9 @@
         <p class="text-sm"><span class="font-semibold">Status</span> {{ ch.customFields.status }}</p>
         <p class="text-sm"><span class="font-semibold">Trial ends</span> {{ formatDate(ch.customFields.trialEndsAt) }}</p>
         <p class="text-sm"><span class="font-semibold">Subscription</span> {{ ch.customFields.subscriptionStatus }}</p>
+        <p class="text-sm"><span class="font-semibold">Subscription expires</span> {{ formatDate(ch.customFields.subscriptionExpiresAt) }}</p>
+        <p class="text-sm"><span class="font-semibold">Exempt until</span> {{ formatDate(ch.customFields.subscriptionExemptUntil) }}</p>
+        <p class="text-sm"><span class="font-semibold">Exempt reason</span> {{ ch.customFields.subscriptionExemptReason || '—' }}</p>
       </div>
     </div>
     <div class="card card-border bg-base-100 shadow">
@@ -53,6 +56,38 @@
         <div class="flex flex-wrap items-center gap-2">
           <input type="date" class="input input-bordered input-sm" [ngModel]="newTrialEndsAt()" (ngModelChange)="newTrialEndsAt.set($event)" />
           <button type="button" class="btn btn-primary btn-sm" (click)="extendTrial()" [disabled]="saving()">Save</button>
+        </div>
+      </div>
+    </div>
+    <div class="card card-border bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-base">Subscription status</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <select class="select select-bordered select-sm" [ngModel]="newSubscriptionStatus()" (ngModelChange)="newSubscriptionStatus.set($event)">
+            @for (opt of subscriptionStatusOptions; track opt) {
+              <option [value]="opt">{{ opt }}</option>
+            }
+          </select>
+          <button type="button" class="btn btn-primary btn-sm" (click)="updateSubscriptionStatus()" [disabled]="saving()">Save</button>
+        </div>
+      </div>
+    </div>
+    <div class="card card-border bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-base">Subscription expiry</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <input type="date" class="input input-bordered input-sm" [ngModel]="newSubscriptionExpiresAt()" (ngModelChange)="newSubscriptionExpiresAt.set($event)" />
+          <button type="button" class="btn btn-primary btn-sm" (click)="updateSubscriptionExpiry()" [disabled]="saving()">Save</button>
+        </div>
+      </div>
+    </div>
+    <div class="card card-border bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-base">Subscription exemption</h2>
+        <div class="flex flex-col gap-2">
+          <input type="date" class="input input-bordered input-sm" placeholder="Exempt until" [ngModel]="newSubscriptionExemptUntil()" (ngModelChange)="newSubscriptionExemptUntil.set($event)" />
+          <input type="text" class="input input-bordered input-sm" placeholder="Reason" [ngModel]="newSubscriptionExemptReason()" (ngModelChange)="newSubscriptionExemptReason.set($event)" />
+          <button type="button" class="btn btn-primary btn-sm" (click)="updateSubscriptionExemption()" [disabled]="saving()">Save exemption</button>
         </div>
       </div>
     </div>

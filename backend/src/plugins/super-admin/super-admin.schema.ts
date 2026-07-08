@@ -36,6 +36,9 @@ export const SUPER_ADMIN_SCHEMA = gql`
     status: String!
     trialEndsAt: DateTime
     subscriptionStatus: String
+    subscriptionExpiresAt: DateTime
+    subscriptionExemptUntil: DateTime
+    subscriptionExemptReason: String
     maxAdminCount: Int!
     cashierFlowEnabled: Boolean!
     cashControlEnabled: Boolean!
@@ -75,6 +78,19 @@ export const SUPER_ADMIN_SCHEMA = gql`
     cashierFlowEnabled: Boolean
     cashControlEnabled: Boolean
     enablePrinter: Boolean
+  }
+
+  """
+  Direct subscription-field editing for platform admins. Only the provided fields
+  are changed; pass null to clear a date or reason.
+  """
+  input UpdateChannelSubscriptionInput {
+    channelId: ID!
+    subscriptionStatus: String
+    trialEndsAt: DateTime
+    subscriptionExpiresAt: DateTime
+    subscriptionExemptUntil: DateTime
+    subscriptionExemptReason: String
   }
 
   """
@@ -309,6 +325,7 @@ export const SUPER_ADMIN_SCHEMA = gql`
     updateChannelZonesPlatform(input: UpdateChannelZonesInput!): Channel!
     updateChannelStatusPlatform(channelId: ID!, status: String!): Channel!
     extendTrialPlatform(channelId: ID!, trialEndsAt: DateTime!): Channel!
+    updateChannelSubscriptionPlatform(input: UpdateChannelSubscriptionInput!): Channel!
     updateChannelFeatureFlagsPlatform(input: UpdateChannelFeatureFlagsInput!): Channel!
     updateChannelPublicStorefrontPlatform(input: UpdateChannelPublicStorefrontInput!): Channel!
     approveUser(userId: ID!): UserAuthorizationResult!

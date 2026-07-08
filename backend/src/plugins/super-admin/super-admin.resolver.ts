@@ -45,6 +45,7 @@ import {
 } from '../../utils/storefront-slug.util';
 
 const VALID_STATUSES = ['UNAPPROVED', 'APPROVED', 'DISABLED', 'BANNED'] as const;
+const VALID_SUBSCRIPTION_STATUSES = ['trial', 'active', 'expired', 'cancelled'] as const;
 
 @Resolver()
 export class SuperAdminResolver {
@@ -547,15 +548,97 @@ export class SuperAdminResolver {
       trialEndsAt instanceof Date ? trialEndsAt : new Date(trialEndsAt as unknown as string);
     await this.channelService.update(emptyCtx, {
       id: channelId,
-      customFields: { trialEndsAt: date },
+      customFields: {
+        trialEndsAt: date,
+        subscriptionStatus: 'trial',
+        subscriptionGracePeriodEnd: null,
+        subscriptionExpiredReminderSentAt: null,
+      },
     });
     const updated = await this.channelService.findOne(emptyCtx, channelId);
     if (!updated) throw new Error('Channel not found after update');
     await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.CHANNEL_TRIAL_EXTENDED, {
       entityType: 'Channel',
       entityId: channelId,
-      data: { trialEndsAt: date.toISOString() },
+      data: { trialEndsAt: date.toISOString(), subscriptionStatus: 'trial' },
     });
+    return updated;
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async updateChannelSubscriptionPlatform(
+    @Ctx() ctx: RequestContext,
+    @Args('input')
+    input: {
+      channelId: string;
+      subscriptionStatus?: string | null;
+      trialEndsAt?: Date | string | null;
+      subscriptionExpiresAt?: Date | string | null;
+      subscriptionExemptUntil?: Date | string | null;
+      subscriptionExemptReason?: string | null;
+    }
+  ) {
+    const emptyCtx = RequestContext.empty();
+    const channel = await this.channelService.findOne(emptyCtx, input.channelId);
+    if (!channel) {
+      throw new Error('Channel not found');
+    }
+
+    const customFields: Record<string, any> = {};
+
+    if (input.subscriptionStatus !== undefined) {
+      if (
+        input.subscriptionStatus !== null &&
+        !VALID_SUBSCRIPTION_STATUSES.includes(input.subscriptionStatus as any)
+      ) {
+        throw new Error(
+          `Invalid subscriptionStatus: ${input.subscriptionStatus}. Allowed: ${VALID_SUBSCRIPTION_STATUSES.join(', ')}`
+        );
+      }
+      customFields.subscriptionStatus = input.subscriptionStatus;
+      // Leaving the expired state also means we are re-activating, so clear stale expiry flags.
+      if (input.subscriptionStatus === 'trial' || input.subscriptionStatus === 'active') {
+        customFields.subscriptionGracePeriodEnd = null;
+        customFields.subscriptionExpiredReminderSentAt = null;
+      }
+    }
+
+    const parseDateInput = (value: Date | string | null | undefined): Date | null | undefined => {
+      if (value === undefined) return undefined;
+      if (value === null) return null;
+      return value instanceof Date ? value : new Date(value);
+    };
+
+    const trialEndsAt = parseDateInput(input.trialEndsAt);
+    if (trialEndsAt !== undefined) customFields.trialEndsAt = trialEndsAt;
+
+    const subscriptionExpiresAt = parseDateInput(input.subscriptionExpiresAt);
+    if (subscriptionExpiresAt !== undefined)
+      customFields.subscriptionExpiresAt = subscriptionExpiresAt;
+
+    const subscriptionExemptUntil = parseDateInput(input.subscriptionExemptUntil);
+    if (subscriptionExemptUntil !== undefined) {
+      customFields.subscriptionExemptUntil = subscriptionExemptUntil;
+    }
+    if (input.subscriptionExemptReason !== undefined) {
+      customFields.subscriptionExemptReason = input.subscriptionExemptReason;
+    }
+
+    await this.channelService.update(emptyCtx, {
+      id: input.channelId,
+      customFields,
+    });
+
+    const updated = await this.channelService.findOne(emptyCtx, input.channelId);
+    if (!updated) throw new Error('Channel not found after update');
+
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.CHANNEL_SUBSCRIPTION_UPDATED, {
+      entityType: 'Channel',
+      entityId: input.channelId,
+      data: { ...customFields },
+    });
+
     return updated;
   }
 

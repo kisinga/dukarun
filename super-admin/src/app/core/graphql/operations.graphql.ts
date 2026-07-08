@@ -34,6 +34,9 @@ export const CHANNEL_DETAIL_PLATFORM = graphql(`
         status
         trialEndsAt
         subscriptionStatus
+        subscriptionExpiresAt
+        subscriptionExemptUntil
+        subscriptionExemptReason
         maxAdminCount
         cashierFlowEnabled
         cashControlEnabled
@@ -238,7 +241,25 @@ export const EXTEND_TRIAL_PLATFORM = graphql(`
   mutation ExtendTrialPlatform($channelId: ID!, $trialEndsAt: DateTime!) {
     extendTrialPlatform(channelId: $channelId, trialEndsAt: $trialEndsAt) {
       id
-      customFields { trialEndsAt }
+      customFields {
+        trialEndsAt
+        subscriptionStatus
+      }
+    }
+  }
+`);
+
+export const UPDATE_CHANNEL_SUBSCRIPTION_PLATFORM = graphql(`
+  mutation UpdateChannelSubscriptionPlatform($input: UpdateChannelSubscriptionInput!) {
+    updateChannelSubscriptionPlatform(input: $input) {
+      id
+      customFields {
+        subscriptionStatus
+        trialEndsAt
+        subscriptionExpiresAt
+        subscriptionExemptUntil
+        subscriptionExemptReason
+      }
     }
   }
 `);
