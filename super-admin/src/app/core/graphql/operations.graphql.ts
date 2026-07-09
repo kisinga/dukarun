@@ -440,8 +440,16 @@ export const UPDATE_CUSTOMER_NOTIFICATIONS_ENABLED = graphql(`
 `);
 
 export const SEND_TEST_WHATSAPP_NOTIFICATION = graphql(`
-  mutation SendTestWhatsAppNotification($phoneNumber: String!, $message: String!) {
-    sendTestWhatsAppNotification(phoneNumber: $phoneNumber, message: $message) {
+  mutation SendTestWhatsAppNotification(
+    $phoneNumber: String!
+    $message: String!
+    $templateKey: String
+  ) {
+    sendTestWhatsAppNotification(
+      phoneNumber: $phoneNumber
+      message: $message
+      templateKey: $templateKey
+    ) {
       success
       channel
       error

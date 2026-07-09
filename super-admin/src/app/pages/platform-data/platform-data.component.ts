@@ -59,6 +59,7 @@ export class PlatformDataComponent implements OnInit {
   savingCustomerNotifications = signal(false);
   testPhoneNumber = signal<string>('');
   testMessage = signal<string>('');
+  testWhatsAppTemplateKey = signal<string>('');
   sendingTestWhatsApp = signal(false);
   testWhatsAppResult = signal<{ success: boolean; message: string } | null>(null);
   testChannelId = signal<string>('');
@@ -164,8 +165,16 @@ export class PlatformDataComponent implements OnInit {
   async sendTestWhatsApp(): Promise<void> {
     const phone = this.testPhoneNumber().trim();
     const message = this.testMessage().trim();
-    if (!phone || !message) {
-      this.testWhatsAppResult.set({ success: false, message: 'Phone and message are required' });
+    const templateKey = this.testWhatsAppTemplateKey().trim();
+    if (!phone) {
+      this.testWhatsAppResult.set({ success: false, message: 'Phone number is required' });
+      return;
+    }
+    if (!message && !templateKey) {
+      this.testWhatsAppResult.set({
+        success: false,
+        message: 'Message or template key is required',
+      });
       return;
     }
     this.sendingTestWhatsApp.set(true);
@@ -180,7 +189,7 @@ export class PlatformDataComponent implements OnInit {
         };
       }>({
         mutation: SEND_TEST_WHATSAPP_NOTIFICATION as DocumentNode,
-        variables: { phoneNumber: phone, message },
+        variables: { phoneNumber: phone, message, templateKey: templateKey || null },
       });
       const data = result.data?.sendTestWhatsAppNotification;
       if (data?.success) {

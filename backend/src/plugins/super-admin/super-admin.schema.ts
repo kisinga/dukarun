@@ -356,6 +356,7 @@ export const SUPER_ADMIN_SCHEMA = gql`
     sendTestWhatsAppNotification(
       phoneNumber: String!
       message: String!
+      templateKey: String
     ): SendTestNotificationResult!
     sendTestCustomerNotification(
       channelId: ID!

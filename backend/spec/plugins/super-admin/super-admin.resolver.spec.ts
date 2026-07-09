@@ -93,7 +93,7 @@ describe('SuperAdminResolver notification controls', () => {
       expect(communicationService.send).not.toHaveBeenCalled();
     });
 
-    it('sends a WhatsApp message via CommunicationService', async () => {
+    it('sends a WhatsApp message via CommunicationService and bypasses the channel gate', async () => {
       const result = await resolver.sendTestWhatsAppNotification('0712345678', 'Test message');
 
       expect(communicationService.send).toHaveBeenCalledWith(
@@ -101,9 +101,36 @@ describe('SuperAdminResolver notification controls', () => {
           channel: 'whatsapp',
           recipient: '0712345678',
           body: 'Test message',
+          metadata: { purpose: 'admin_notification', bypassEnabledCheck: true },
         })
       );
       expect(result.success).toBe(true);
+    });
+
+    it('renders a template and sends the generated WhatsApp body', async () => {
+      const result = await resolver.sendTestWhatsAppNotification('0712345678', '', 'shift_closed');
+
+      const sent = (communicationService.send as jest.MockedFunction<CommunicationService['send']>)
+        .mock.calls[0][0];
+      expect(sent.channel).toBe('whatsapp');
+      expect(sent.recipient).toBe('0712345678');
+      expect(typeof sent.body).toBe('string');
+      expect(sent.body).toContain('Shift Closed');
+      expect(sent.body).toContain('Test Store');
+      expect(sent.body).toContain('Total sales');
+      expect(sent.metadata).toEqual({
+        purpose: 'admin_notification',
+        bypassEnabledCheck: true,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('requires either a message or a template key', async () => {
+      const result = await resolver.sendTestWhatsAppNotification('0712345678', '');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Message or template key is required');
+      expect(communicationService.send).not.toHaveBeenCalled();
     });
   });
 

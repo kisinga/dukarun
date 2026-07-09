@@ -80,7 +80,8 @@ export class CommunicationService {
       return { success: true, channel };
     }
 
-    if (metadata?.purpose !== 'otp' && !this.isChannelEnabled(channel)) {
+    const bypassEnabledCheck = metadata?.bypassEnabledCheck === true;
+    if (metadata?.purpose !== 'otp' && !bypassEnabledCheck && !this.isChannelEnabled(channel)) {
       const errMsg = `Communication channel "${channel}" is disabled by COMMUNICATION_CHANNELS`;
       this.logger.warn(errMsg);
       return { success: false, channel, error: errMsg };
