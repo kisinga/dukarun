@@ -1,4 +1,30 @@
 <div class="space-y-4">
+  <div class="card bg-base-100 shadow-lg">
+    <div class="card-body p-4 sm:p-6">
+      <div class="mb-4">
+        <h2 class="text-lg sm:text-xl font-bold">Notification categories</h2>
+        <p class="text-sm opacity-60">Choose which notifications are sent for this business.</p>
+      </div>
+      <div class="divide-y divide-base-300">
+        @for (category of notificationCategories; track category.key) {
+          <label class="flex items-center justify-between gap-4 py-3 cursor-pointer">
+            <span>
+              <span class="block text-sm font-medium">{{ category.label }}</span>
+              <span class="block text-xs opacity-60">{{ category.description }}</span>
+            </span>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary toggle-sm"
+              [checked]="categoryPreferences()[category.key]"
+              [disabled]="!categorySettingsAvailable() || savingCategory() !== null"
+              (change)="toggleCategory(category.key)"
+            />
+          </label>
+        }
+      </div>
+    </div>
+  </div>
+
   <!-- Push Notifications Card -->
   <div class="card bg-base-100 shadow-lg">
     <div class="card-body p-4 sm:p-6">
@@ -68,29 +94,6 @@
           }
           {{ getButtonText() }}
         </button>
-      </div>
-
-      <!-- Notification Types (Collapsible) -->
-      <div class="collapse collapse-arrow bg-base-200 mt-4">
-        <input type="checkbox" />
-        <div class="collapse-title font-medium py-3 min-h-0">Notification Types</div>
-        <div class="collapse-content">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-            @for (type of notificationTypes; track type.key) {
-              <div class="flex items-center justify-between p-2 bg-base-100 rounded-lg">
-                <div class="flex items-center gap-2">
-                  <span class="text-lg">{{ type.icon }}</span>
-                  <div>
-                    <div class="text-sm font-medium">{{ type.label }}</div>
-                    <div class="text-xs opacity-60 hidden sm:block">{{ type.description }}</div>
-                  </div>
-                </div>
-                <span class="badge badge-xs badge-success">On</span>
-              </div>
-            }
-          </div>
-          <p class="text-xs opacity-50 mt-3">Per-type filtering coming soon</p>
-        </div>
       </div>
     </div>
   </div>

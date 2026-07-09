@@ -1997,6 +1997,29 @@ export type LedgerAccountsResult = {
   items: Array<LedgerAccount>;
 };
 
+export type LedgerDivergenceCount = {
+  __typename?: 'LedgerDivergenceCount';
+  count: Scalars['Int']['output'];
+  entityType: Scalars['String']['output'];
+};
+
+export type LedgerDivergenceItem = {
+  __typename?: 'LedgerDivergenceItem';
+  descriptor: Scalars['String']['output'];
+  difference: Scalars['Int']['output'];
+  entityId: Scalars['ID']['output'];
+  entityType: Scalars['String']['output'];
+  entityValue: Scalars['Int']['output'];
+  ledgerValue: Scalars['Int']['output'];
+};
+
+export type LedgerDivergenceSummary = {
+  __typename?: 'LedgerDivergenceSummary';
+  byEntityType: Array<LedgerDivergenceCount>;
+  items: Array<LedgerDivergenceItem>;
+  totalDivergences: Scalars['Int']['output'];
+};
+
 export type LocaleStringCustomFieldConfig = CustomField & {
   __typename?: 'LocaleStringCustomFieldConfig';
   deprecated?: Maybe<Scalars['Boolean']['output']>;
@@ -3651,6 +3674,7 @@ export type Query = {
   journalEntry?: Maybe<JournalEntry>;
   lastClosedSessionClosingBalances: Array<LastClosingBalance>;
   ledgerAccounts: LedgerAccountsResult;
+  ledgerDivergences: LedgerDivergenceSummary;
   /** Returns information about the current authenticated User */
   me?: Maybe<CurrentUser>;
   /** Returns the possible next states that the activeOrder can transition to */
@@ -3814,6 +3838,11 @@ export type QueryJournalEntryArgs = {
 
 export type QueryLastClosedSessionClosingBalancesArgs = {
   channelId: Scalars['Int']['input'];
+};
+
+
+export type QueryLedgerDivergencesArgs = {
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
 };
 
 

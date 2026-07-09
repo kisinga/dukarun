@@ -1,10 +1,11 @@
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
+import { Args, Mutation, Query, ResolveField, Resolver, Root } from '@nestjs/graphql';
+import { Allow, Ctx, Logger, Permission, RequestContext } from '@vendure/core';
 import { ManageStockAdjustmentsPermission } from './permissions';
 import { ManageSupplierCreditPurchasesPermission } from '../credit/supplier-credit.permissions';
 import { StockManagementService } from '../../services/stock/stock-management.service';
 import { StockQueryService } from '../../services/stock/stock-query.service';
 import { PurchaseService } from '../../services/stock/purchase.service';
+import { FinancialService } from '../../services/financial/financial.service';
 import { StockPurchase } from '../../services/stock/entities/purchase.entity';
 import { InventoryStockAdjustment } from '../../services/stock/entities/stock-adjustment.entity';
 
@@ -59,11 +60,33 @@ interface RecordStockAdjustmentInput {
 
 @Resolver('StockPurchase')
 export class StockResolver {
+  private static readonly loggerCtx = 'StockPurchaseFieldResolver';
+
   constructor(
     private readonly stockManagementService: StockManagementService,
     private readonly stockQueryService: StockQueryService,
-    private readonly purchaseService: PurchaseService
+    private readonly purchaseService: PurchaseService,
+    private readonly financialService: FinancialService
   ) {}
+
+  @ResolveField()
+  @Allow(Permission.ReadProduct)
+  async amountOwing(
+    @Root() purchase: StockPurchase,
+    @Ctx() ctx: RequestContext
+  ): Promise<number | null> {
+    try {
+      const status = await this.financialService.getPurchasePaymentStatus(ctx, purchase.id);
+      return status.amountOwing;
+    } catch (e) {
+      Logger.error(
+        `Failed to compute amountOwing for purchase ${purchase.id}: ${e instanceof Error ? e.message : String(e)}`,
+        StockResolver.loggerCtx
+      );
+      // Return null so a ledger failure never falsely shows an unpaid purchase as paid.
+      return null;
+    }
+  }
 
   @Query()
   @Allow(Permission.ReadProduct)

@@ -34,12 +34,12 @@ export class OrderStateBadgeComponent {
   readonly reversedAt = input<string | null | undefined>(null);
 
   readonly label = computed(() => {
+    // Voided/reversed orders should never show a balance due, even if an outstanding amount is passed.
+    if (this.reversedAt() != null) return 'Voided';
     const outstanding = this.outstandingAmount();
     if (outstanding != null && outstanding > 0) {
       return `Balance due ${this.currencyService.format(outstanding, false)}`;
     }
-    const reversed = this.reversedAt() != null;
-    if (reversed) return 'Voided';
     const state = this.state();
     const statusMap: Record<string, string> = {
       Draft: 'Draft',

@@ -15,6 +15,7 @@ import {
   ManageCustomerCreditLimitPermission,
   OverrideCustomerBalancePermission,
 } from './permissions';
+import { ManageSupplierCreditPurchasesPermission } from './supplier-credit.permissions';
 
 interface ApproveCustomerCreditInput {
   customerId: string;
@@ -208,6 +209,44 @@ export class CreditResolver {
     );
     return {
       customerId: input.customerId,
+      ...result,
+    };
+  }
+
+  @Mutation()
+  @Allow(OverrideCustomerBalancePermission.Permission)
+  async rebuildCustomerBalanceFromModel(
+    @Ctx() ctx: RequestContext,
+    @Args('customerId') customerId: string,
+    @Args('note', { nullable: true }) note?: string
+  ) {
+    const result = await this.creditService.rebuildLedgerFromModel(
+      ctx,
+      customerId,
+      'customer',
+      note
+    );
+    return {
+      customerId,
+      ...result,
+    };
+  }
+
+  @Mutation()
+  @Allow(ManageSupplierCreditPurchasesPermission.Permission)
+  async rebuildSupplierBalanceFromModel(
+    @Ctx() ctx: RequestContext,
+    @Args('supplierId') supplierId: string,
+    @Args('note', { nullable: true }) note?: string
+  ) {
+    const result = await this.creditService.rebuildLedgerFromModel(
+      ctx,
+      supplierId,
+      'supplier',
+      note
+    );
+    return {
+      customerId: supplierId,
       ...result,
     };
   }

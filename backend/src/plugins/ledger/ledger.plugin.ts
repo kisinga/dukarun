@@ -26,10 +26,17 @@ import { FinancialService } from '../../services/financial/financial.service';
 import { LedgerPostingService } from '../../services/financial/ledger-posting.service';
 import { LedgerTransactionService } from '../../services/financial/ledger-transaction.service';
 import { OpenSessionService } from '../../services/financial/open-session.service';
+import {
+  LedgerConsistencyGuard,
+  OrderArProjection,
+  PurchaseApProjection,
+  InventoryValuationProjection,
+} from '../../services/financial/ledger-projection';
 import { PurchasePostingStrategy } from '../../services/financial/strategies/purchase-posting.strategy';
 import { SalePostingStrategy } from '../../services/financial/strategies/sale-posting.strategy';
 import { InventoryReconciliationService } from '../../services/financial/inventory-reconciliation.service';
 import { LedgerQueryService } from '../../services/financial/ledger-query.service';
+import { LedgerDivergenceService } from '../../services/financial/ledger-divergence.service';
 import { StockValuationService } from '../../services/financial/stock-valuation.service';
 import { AnalyticsQueryService } from '../../services/analytics/analytics-query.service';
 import { PeriodEndClosingService } from '../../services/financial/period-end-closing.service';
@@ -49,6 +56,8 @@ import { DashboardStatsResolver } from './dashboard-stats.resolver';
 import { DASHBOARD_STATS_SCHEMA } from './dashboard-stats.schema';
 import { LedgerViewerResolver } from './ledger-viewer.resolver';
 import { LEDGER_VIEWER_SCHEMA } from './ledger-viewer.schema';
+import { LedgerDivergenceResolver } from './ledger-divergence.resolver';
+import { LEDGER_DIVERGENCE_SCHEMA } from './ledger-divergence.schema';
 import { ReconciliationResolver } from './reconciliation.resolver';
 import { PeriodManagementResolver } from './period-management.resolver';
 import { PERIOD_MANAGEMENT_SCHEMA } from './period-management.schema';
@@ -71,6 +80,7 @@ const COMBINED_SCHEMA = gql`
   ${DASHBOARD_STATS_SCHEMA}
   ${LEDGER_VIEWER_SCHEMA}
   ${PERIOD_MANAGEMENT_SCHEMA}
+  ${LEDGER_DIVERGENCE_SCHEMA}
 `;
 
 @VendurePlugin({
@@ -106,6 +116,7 @@ const COMBINED_SCHEMA = gql`
     ChannelPaymentMethodService,
     DashboardStatsResolver,
     LedgerViewerResolver,
+    LedgerDivergenceResolver,
     ReconciliationResolver,
     PeriodManagementResolver,
     LedgerQueryService,
@@ -125,6 +136,11 @@ const COMBINED_SCHEMA = gql`
     LedgerTransactionService,
     FinancialService,
     OpenSessionService,
+    LedgerConsistencyGuard,
+    OrderArProjection,
+    PurchaseApProjection,
+    InventoryValuationProjection,
+    LedgerDivergenceService,
   ],
   exports: [
     PostingService,
@@ -133,6 +149,10 @@ const COMBINED_SCHEMA = gql`
     ChannelPaymentMethodService,
     FinancialService,
     InventoryService,
+    LedgerConsistencyGuard,
+    OrderArProjection,
+    PurchaseApProjection,
+    InventoryValuationProjection,
   ],
   configuration: config => {
     // Register custom permissions
@@ -152,6 +172,7 @@ const COMBINED_SCHEMA = gql`
     resolvers: [
       DashboardStatsResolver,
       LedgerViewerResolver,
+      LedgerDivergenceResolver,
       ReconciliationResolver,
       PeriodManagementResolver,
       StockValueStatsResolver,
@@ -162,6 +183,7 @@ const COMBINED_SCHEMA = gql`
     resolvers: [
       DashboardStatsResolver,
       LedgerViewerResolver,
+      LedgerDivergenceResolver,
       ReconciliationResolver,
       PeriodManagementResolver,
       StockValueStatsResolver,

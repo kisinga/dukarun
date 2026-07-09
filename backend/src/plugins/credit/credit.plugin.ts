@@ -23,6 +23,7 @@ import { OrderPaymentService } from '../../services/orders/order-payment.service
 import { OrderReversalService } from '../../services/orders/order-reversal.service';
 import { OrderStateService } from '../../services/orders/order-state.service';
 import { PriceOverrideService } from '../../services/orders/price-override.service';
+import { OrderReconciliationService } from '../../services/payments/order-reconciliation.service';
 import { PaymentAllocationService } from '../../services/payments/payment-allocation.service';
 import { PaymentEventsAdapter } from '../../services/payments/payment-events.adapter';
 import { CustomerStatementService } from '../../services/customers/customer-statement.service';
@@ -32,6 +33,8 @@ import { CreditPaymentSubscriber } from './credit-payment.subscriber';
 import { CreditResolver } from './credit.resolver';
 import { CustomerFieldResolver } from './customer.resolver';
 import { CustomerStatementResolver } from './customer-statement.resolver';
+import { OrderAmountOwingLoader } from './order-amount-owing.loader';
+import { OrderFieldResolver } from './order.resolver';
 import { PaymentAllocationResolver } from './payment-allocation.resolver';
 import {
   ApproveCustomerCreditPermission,
@@ -114,6 +117,33 @@ const COMBINED_SCHEMA = gql`
     orderId: ID!
     orderCode: String!
     amountPaid: Float!
+  }
+
+  type OrderReconciliationItem {
+    orderId: ID!
+    orderCode: String!
+    customerId: ID
+    orderModelOwing: Int!
+    ledgerOwing: Int!
+    difference: Int!
+    orderTotal: Int!
+  }
+
+  type OrderReconciliationResult {
+    items: [OrderReconciliationItem!]!
+    totalItems: Int!
+  }
+
+  input ReconcileOrderInput {
+    orderId: ID!
+    strategy: String!
+    note: String
+  }
+
+  type ReconcileOrderResult {
+    orderId: ID!
+    success: Boolean!
+    message: String!
   }
 
   """
@@ -207,11 +237,23 @@ const COMBINED_SCHEMA = gql`
   }
 
   extend type Customer {
-    outstandingAmount: Float!
+    """
+    Customer balance (AR). Cents. Null when the ledger balance cannot be computed.
+    """
+    outstandingAmount: Float
     """
     Supplier balance (AP). Only non-zero when customer is a supplier. Cents.
+    Null when the ledger balance cannot be computed.
     """
-    supplierOutstandingAmount: Float!
+    supplierOutstandingAmount: Float
+  }
+
+  extend type Order {
+    """
+    Amount still owed on this order, in smallest currency unit (cents).
+    Computed from the ledger (Accounts Receivable) and is the single source of truth.
+    """
+    amountOwing: Int!
   }
 
   """
@@ -232,6 +274,10 @@ const COMBINED_SCHEMA = gql`
     Orders parked at the cashier and still owing (the cashier settlement queue).
     """
     pendingCashierOrders: [CashierPendingOrder!]!
+    """
+    Superadmin diagnostic: orders whose order-model outstanding differs from the ledger.
+    """
+    divergentOrders(toleranceCents: Int): OrderReconciliationResult!
   }
 
   type OrderReversalResult {
@@ -290,6 +336,18 @@ const COMBINED_SCHEMA = gql`
     reversePayment(paymentId: ID!): PaymentReversalResult!
     overrideCustomerBalance(input: OverrideCustomerBalanceInput!): BalanceOverrideResult!
     sendCustomerStatementEmail(customerId: ID!): Boolean!
+    """
+    Superadmin action: mark a divergent order as reconciled with a chosen strategy.
+    """
+    reconcileOrder(input: ReconcileOrderInput!): ReconcileOrderResult!
+    """
+    Superadmin action: rebuild an order's state from the ledger AR balance.
+    """
+    rebuildOrderFromLedger(orderId: ID!, note: String): ReconcileOrderResult!
+    """
+    Superadmin action: rebuild the ledger AR balance from the customer's order model.
+    """
+    rebuildCustomerBalanceFromModel(customerId: ID!, note: String): BalanceOverrideResult!
   }
 
   """
@@ -370,6 +428,14 @@ const COMBINED_SCHEMA = gql`
       input: SupplierPaymentAllocationInput!
     ): SupplierPaymentAllocationResult!
     paySinglePurchase(input: PaySinglePurchaseInput!): SupplierPaymentAllocationResult!
+    """
+    Superadmin action: rebuild a purchase's payment state from the ledger.
+    """
+    rebuildPurchaseFromLedger(purchaseId: ID!): StockPurchase!
+    """
+    Superadmin action: rebuild the ledger AP balance from the supplier's purchase model.
+    """
+    rebuildSupplierBalanceFromModel(supplierId: ID!, note: String): BalanceOverrideResult!
   }
 `;
 
@@ -398,12 +464,15 @@ const COMBINED_SCHEMA = gql`
     OrderReversalService,
     OrderStateService,
     // Payment services
+    OrderReconciliationService,
     PaymentAllocationService,
     PaymentReversalService,
     SupplierPaymentAllocationService,
     // Resolvers and subscribers
     CreditResolver,
     CustomerFieldResolver,
+    OrderAmountOwingLoader,
+    OrderFieldResolver,
     CreditPaymentSubscriber,
     OrderReversalApprovalSubscriber,
     PaymentAllocationResolver,
@@ -418,6 +487,7 @@ const COMBINED_SCHEMA = gql`
     ChartOfAccountsService,
     CreditService,
     CreditValidatorService,
+    OrderReconciliationService,
   ],
   configuration: config => {
     // Register custom permissions
@@ -447,6 +517,7 @@ const COMBINED_SCHEMA = gql`
     resolvers: [
       CreditResolver,
       CustomerFieldResolver,
+      OrderFieldResolver,
       OrderReversalResolver,
       PaymentReversalResolver,
       PaymentAllocationResolver,

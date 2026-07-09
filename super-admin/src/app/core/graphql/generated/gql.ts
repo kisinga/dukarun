@@ -50,7 +50,11 @@ type Documents = {
     "\n  mutation DeleteRoleTemplate($id: ID!) {\n    deleteRoleTemplate(id: $id)\n  }\n": typeof types.DeleteRoleTemplateDocument,
     "\n  query AdministratorDetail($administratorId: ID!) {\n    administratorDetail(administratorId: $administratorId) {\n      id\n      firstName\n      lastName\n      emailAddress\n      userId\n      identifier\n      authorizationStatus\n      isSuperAdmin\n      roles {\n        id\n        code\n        channelIds\n        permissions\n      }\n    }\n  }\n": typeof types.AdministratorDetailDocument,
     "\n  mutation UpdateAdministratorPermissions(\n    $administratorId: ID!\n    $channelId: ID!\n    $permissions: [String!]!\n  ) {\n    updateAdministratorPermissions(\n      administratorId: $administratorId\n      channelId: $channelId\n      permissions: $permissions\n    ) {\n      id\n      roles {\n        id\n        code\n        channelIds\n        permissions\n      }\n    }\n  }\n": typeof types.UpdateAdministratorPermissionsDocument,
+    "\n  query DivergentOrders($toleranceCents: Int) {\n    divergentOrders(toleranceCents: $toleranceCents) {\n      items {\n        orderId\n        orderCode\n        customerId\n        orderModelOwing\n        ledgerOwing\n        difference\n        orderTotal\n      }\n      totalItems\n    }\n  }\n": typeof types.DivergentOrdersDocument,
+    "\n  mutation ReconcileOrder($input: ReconcileOrderInput!) {\n    reconcileOrder(input: $input) {\n      orderId\n      success\n      message\n    }\n  }\n": typeof types.ReconcileOrderDocument,
     "\n  query PlatformAuditLogs($options: PlatformAuditLogOptions) {\n    platformAuditLogs(options: $options) {\n      id\n      timestamp\n      eventType\n      entityType\n      entityId\n      userId\n      ipAddress\n      data\n      source\n    }\n  }\n": typeof types.PlatformAuditLogsDocument,
+    "\n  query NotificationPreferencesForChannel($channelId: ID!) {\n    notificationPreferencesForChannel(channelId: $channelId) {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n": typeof types.NotificationPreferencesForChannelDocument,
+    "\n  mutation UpdateNotificationPreferencesForChannel($channelId: ID!, $input: ChannelNotificationPreferencesInput!) {\n    updateNotificationPreferencesForChannel(channelId: $channelId, input: $input) {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n": typeof types.UpdateNotificationPreferencesForChannelDocument,
 };
 const documents: Documents = {
     "\n  mutation Authenticate($username: String!, $password: String!) {\n    authenticate(input: { native: { username: $username, password: $password } }) {\n      ... on CurrentUser {\n        id\n      }\n    }\n  }\n": types.AuthenticateDocument,
@@ -89,7 +93,11 @@ const documents: Documents = {
     "\n  mutation DeleteRoleTemplate($id: ID!) {\n    deleteRoleTemplate(id: $id)\n  }\n": types.DeleteRoleTemplateDocument,
     "\n  query AdministratorDetail($administratorId: ID!) {\n    administratorDetail(administratorId: $administratorId) {\n      id\n      firstName\n      lastName\n      emailAddress\n      userId\n      identifier\n      authorizationStatus\n      isSuperAdmin\n      roles {\n        id\n        code\n        channelIds\n        permissions\n      }\n    }\n  }\n": types.AdministratorDetailDocument,
     "\n  mutation UpdateAdministratorPermissions(\n    $administratorId: ID!\n    $channelId: ID!\n    $permissions: [String!]!\n  ) {\n    updateAdministratorPermissions(\n      administratorId: $administratorId\n      channelId: $channelId\n      permissions: $permissions\n    ) {\n      id\n      roles {\n        id\n        code\n        channelIds\n        permissions\n      }\n    }\n  }\n": types.UpdateAdministratorPermissionsDocument,
+    "\n  query DivergentOrders($toleranceCents: Int) {\n    divergentOrders(toleranceCents: $toleranceCents) {\n      items {\n        orderId\n        orderCode\n        customerId\n        orderModelOwing\n        ledgerOwing\n        difference\n        orderTotal\n      }\n      totalItems\n    }\n  }\n": types.DivergentOrdersDocument,
+    "\n  mutation ReconcileOrder($input: ReconcileOrderInput!) {\n    reconcileOrder(input: $input) {\n      orderId\n      success\n      message\n    }\n  }\n": types.ReconcileOrderDocument,
     "\n  query PlatformAuditLogs($options: PlatformAuditLogOptions) {\n    platformAuditLogs(options: $options) {\n      id\n      timestamp\n      eventType\n      entityType\n      entityId\n      userId\n      ipAddress\n      data\n      source\n    }\n  }\n": types.PlatformAuditLogsDocument,
+    "\n  query NotificationPreferencesForChannel($channelId: ID!) {\n    notificationPreferencesForChannel(channelId: $channelId) {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n": types.NotificationPreferencesForChannelDocument,
+    "\n  mutation UpdateNotificationPreferencesForChannel($channelId: ID!, $input: ChannelNotificationPreferencesInput!) {\n    updateNotificationPreferencesForChannel(channelId: $channelId, input: $input) {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n": types.UpdateNotificationPreferencesForChannelDocument,
 };
 
 /**
@@ -253,7 +261,23 @@ export function graphql(source: "\n  mutation UpdateAdministratorPermissions(\n 
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
+export function graphql(source: "\n  query DivergentOrders($toleranceCents: Int) {\n    divergentOrders(toleranceCents: $toleranceCents) {\n      items {\n        orderId\n        orderCode\n        customerId\n        orderModelOwing\n        ledgerOwing\n        difference\n        orderTotal\n      }\n      totalItems\n    }\n  }\n"): (typeof documents)["\n  query DivergentOrders($toleranceCents: Int) {\n    divergentOrders(toleranceCents: $toleranceCents) {\n      items {\n        orderId\n        orderCode\n        customerId\n        orderModelOwing\n        ledgerOwing\n        difference\n        orderTotal\n      }\n      totalItems\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation ReconcileOrder($input: ReconcileOrderInput!) {\n    reconcileOrder(input: $input) {\n      orderId\n      success\n      message\n    }\n  }\n"): (typeof documents)["\n  mutation ReconcileOrder($input: ReconcileOrderInput!) {\n    reconcileOrder(input: $input) {\n      orderId\n      success\n      message\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
 export function graphql(source: "\n  query PlatformAuditLogs($options: PlatformAuditLogOptions) {\n    platformAuditLogs(options: $options) {\n      id\n      timestamp\n      eventType\n      entityType\n      entityId\n      userId\n      ipAddress\n      data\n      source\n    }\n  }\n"): (typeof documents)["\n  query PlatformAuditLogs($options: PlatformAuditLogOptions) {\n    platformAuditLogs(options: $options) {\n      id\n      timestamp\n      eventType\n      entityType\n      entityId\n      userId\n      ipAddress\n      data\n      source\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query NotificationPreferencesForChannel($channelId: ID!) {\n    notificationPreferencesForChannel(channelId: $channelId) {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n"): (typeof documents)["\n  query NotificationPreferencesForChannel($channelId: ID!) {\n    notificationPreferencesForChannel(channelId: $channelId) {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation UpdateNotificationPreferencesForChannel($channelId: ID!, $input: ChannelNotificationPreferencesInput!) {\n    updateNotificationPreferencesForChannel(channelId: $channelId, input: $input) {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n"): (typeof documents)["\n  mutation UpdateNotificationPreferencesForChannel($channelId: ID!, $input: ChannelNotificationPreferencesInput!) {\n    updateNotificationPreferencesForChannel(channelId: $channelId, input: $input) {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};

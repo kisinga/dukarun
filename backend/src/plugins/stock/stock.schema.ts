@@ -9,6 +9,7 @@ export const STOCK_ADMIN_SCHEMA = gql`
     referenceNumber: String
     totalCost: Int!
     paymentStatus: String!
+    amountOwing: Int
     notes: String
     isCreditPurchase: Boolean!
     status: String!

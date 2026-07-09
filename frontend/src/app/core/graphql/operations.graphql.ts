@@ -1420,6 +1420,7 @@ export const GET_ORDERS = graphql(`
         total
         totalWithTax
         currencyCode
+        amountOwing
         customer {
           id
           firstName
@@ -1506,6 +1507,7 @@ export const GET_CUSTOMER_ORDERS = graphql(`
           total
           totalWithTax
           currencyCode
+          amountOwing
           payments {
             id
             state
@@ -1580,6 +1582,7 @@ export const GET_ORDER_FULL = graphql(`
       total
       totalWithTax
       currencyCode
+      amountOwing
       customer {
         id
         firstName

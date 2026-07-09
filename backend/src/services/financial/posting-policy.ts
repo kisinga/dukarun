@@ -535,3 +535,48 @@ export function createBalanceAdjustmentEntry(
     };
   }
 }
+
+/**
+ * Context for posting a supplier balance adjustment entry.
+ * Used to manually override a supplier AP balance via a ledger entry.
+ */
+export interface SupplierBalanceAdjustmentPostingContext {
+  amount: number; // absolute value of delta, in cents
+  direction: 'increase' | 'decrease'; // increase = we owe supplier more, decrease = we owe less
+  supplierId: string;
+  reason: string;
+}
+
+/**
+ * Generate journal entry template for a supplier balance adjustment.
+ *
+ * AP is a liability account: credit increases what we owe, debit decreases it.
+ * Increase (we owe more):    Credit AP, Debit BALANCE_ADJUSTMENT
+ * Decrease (we owe less):    Debit AP, Credit BALANCE_ADJUSTMENT
+ */
+export function createSupplierBalanceAdjustmentEntry(
+  context: SupplierBalanceAdjustmentPostingContext
+): JournalEntryTemplate {
+  const meta = {
+    supplierId: context.supplierId,
+    reason: context.reason,
+  };
+
+  if (context.direction === 'increase') {
+    return {
+      lines: [
+        { accountCode: ACCOUNT_CODES.BALANCE_ADJUSTMENT, debit: context.amount, meta },
+        { accountCode: ACCOUNT_CODES.ACCOUNTS_PAYABLE, credit: context.amount, meta },
+      ],
+      memo: `Supplier balance adjustment (increase) for supplier ${context.supplierId}: ${context.reason}`,
+    };
+  } else {
+    return {
+      lines: [
+        { accountCode: ACCOUNT_CODES.ACCOUNTS_PAYABLE, debit: context.amount, meta },
+        { accountCode: ACCOUNT_CODES.BALANCE_ADJUSTMENT, credit: context.amount, meta },
+      ],
+      memo: `Supplier balance adjustment (decrease) for supplier ${context.supplierId}: ${context.reason}`,
+    };
+  }
+}

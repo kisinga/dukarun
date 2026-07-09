@@ -3,6 +3,10 @@ import { ID, RequestContext, TransactionalConnection, UserInputError } from '@ve
 import { LedgerPostingService } from '../financial/ledger-posting.service';
 import { StockValuationService } from '../financial/stock-valuation.service';
 import {
+  InventoryValuationProjection,
+  LedgerConsistencyGuard,
+} from '../financial/ledger-projection';
+import {
   BatchAllocation,
   CostAllocationRequest,
   CostAllocationResult,
@@ -187,8 +191,24 @@ export class InventoryService {
     private readonly costingStrategy: FifoCostingStrategy,
     private readonly expiryPolicy: DefaultExpiryPolicy,
     private readonly ledgerPostingService: LedgerPostingService,
-    private readonly stockValuationService: StockValuationService
+    private readonly stockValuationService: StockValuationService,
+    private readonly ledgerConsistencyGuard: LedgerConsistencyGuard,
+    private readonly inventoryValuationProjection: InventoryValuationProjection
   ) {}
+
+  /**
+   * Fail closed if batch inventory valuation has drifted from the ledger INVENTORY account.
+   * Call before any operation that changes batch quantities or ledger inventory postings.
+   */
+  private async assertInventoryLedgerInSync(ctx: RequestContext): Promise<void> {
+    const channelId = ctx.channelId as number;
+    const valuation = await this.inventoryValuationProjection.loadEntity(ctx, channelId);
+    await this.ledgerConsistencyGuard.assertInSync(
+      ctx,
+      this.inventoryValuationProjection,
+      valuation
+    );
+  }
 
   async getBatchStockOnHand(
     ctx: RequestContext,
@@ -243,6 +263,7 @@ export class InventoryService {
   async recordPurchase(ctx: RequestContext, input: RecordPurchaseInput): Promise<PurchaseResult> {
     // No nested withTransaction — caller provides the transaction context.
     // This ensures batches are immediately visible within the caller's transaction.
+    await this.assertInventoryLedgerInSync(ctx);
     try {
       const batches: InventoryBatch[] = [];
       const movements: InventoryMovement[] = [];
@@ -345,6 +366,7 @@ export class InventoryService {
    * Record a sale and allocate COGS
    */
   async recordSale(ctx: RequestContext, input: RecordSaleInput): Promise<SaleResult> {
+    await this.assertInventoryLedgerInSync(ctx);
     return this.connection.withTransaction(ctx, async transactionCtx => {
       try {
         const allAllocations: BatchAllocation[] = [];
@@ -636,6 +658,7 @@ export class InventoryService {
     ctx: RequestContext,
     input: ApplyAdjustmentToBatchesInput
   ): Promise<ApplyAdjustmentToBatchesResult> {
+    await this.assertInventoryLedgerInSync(ctx);
     const channelId = Number(input.channelId);
     const variantId = input.productVariantId;
     const locationId = input.stockLocationId;
@@ -871,6 +894,7 @@ export class InventoryService {
     ctx: RequestContext,
     input: RecordAdjustmentInput
   ): Promise<AdjustmentResult> {
+    await this.assertInventoryLedgerInSync(ctx);
     return this.connection.withTransaction(ctx, async transactionCtx => {
       try {
         const movements: InventoryMovement[] = [];
@@ -914,6 +938,7 @@ export class InventoryService {
    * Record a write-off with COGS allocation
    */
   async recordWriteOff(ctx: RequestContext, input: RecordWriteOffInput): Promise<WriteOffResult> {
+    await this.assertInventoryLedgerInSync(ctx);
     return this.connection.withTransaction(ctx, async transactionCtx => {
       try {
         const allAllocations: BatchAllocation[] = [];

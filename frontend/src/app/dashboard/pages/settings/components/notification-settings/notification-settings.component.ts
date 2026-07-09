@@ -1,6 +1,16 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { NotificationService } from '../../../../../core/services/notification.service';
+import {
+  NotificationCategory,
+  NotificationService,
+} from '../../../../../core/services/notification.service';
 import { ToastService } from '../../../../../core/services/toast.service';
 
 @Component({
@@ -9,18 +19,55 @@ import { ToastService } from '../../../../../core/services/toast.service';
   templateUrl: './notification-settings.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class NotificationSettingsComponent {
+export class NotificationSettingsComponent implements OnInit {
   private readonly notificationService = inject(NotificationService);
   private readonly toastService = inject(ToastService);
 
   private readonly selectedTypeSignal = signal<string>('');
   private readonly isLoadingSignal = signal<boolean>(false);
+  private readonly savingCategorySignal = signal<NotificationCategory | null>(null);
+  private readonly categorySettingsAvailableSignal = signal(false);
 
   readonly isPushEnabled = this.notificationService.isPushEnabled;
   readonly isLoading = this.isLoadingSignal.asReadonly();
   readonly selectedType = this.selectedTypeSignal.asReadonly();
   readonly notifications = this.notificationService.notifications;
   readonly permission = this.notificationService.permission;
+  readonly categoryPreferences = this.notificationService.categoryPreferences;
+  readonly savingCategory = this.savingCategorySignal.asReadonly();
+  readonly categorySettingsAvailable = this.categorySettingsAvailableSignal.asReadonly();
+
+  readonly notificationCategories: ReadonlyArray<{
+    key: NotificationCategory;
+    label: string;
+    description: string;
+  }> = [
+    {
+      key: 'customer',
+      label: 'Customer notifications',
+      description: 'Customer activity alerts and messages sent directly to customers',
+    },
+    {
+      key: 'orders',
+      label: 'Sales & orders',
+      description: 'Order payment, fulfilment and cancellation updates',
+    },
+    {
+      key: 'stock',
+      label: 'Stock',
+      description: 'Low-stock and inventory alerts',
+    },
+    {
+      key: 'finance',
+      label: 'Money & billing',
+      description: 'Subscription, billing and shift alerts',
+    },
+    {
+      key: 'operations',
+      label: 'Operations',
+      description: 'Approvals, channel status and administrative alerts',
+    },
+  ];
 
   readonly notificationTypes = [
     { key: 'ORDER', label: 'Orders', icon: '💰', description: 'Order updates', enabled: true },
@@ -35,6 +82,36 @@ export class NotificationSettingsComponent {
     if (!selectedType) return notifications;
     return notifications.filter((n) => n.type === selectedType);
   });
+
+  async ngOnInit(): Promise<void> {
+    try {
+      await this.notificationService.loadCategoryPreferences();
+      this.categorySettingsAvailableSignal.set(true);
+    } catch (error) {
+      console.error('Failed to load notification categories:', error);
+      this.toastService.show('Error', 'Failed to load notification settings', 'error');
+    }
+  }
+
+  async toggleCategory(category: NotificationCategory): Promise<void> {
+    const enabled = !this.categoryPreferences()[category];
+    this.savingCategorySignal.set(category);
+    try {
+      await this.notificationService.updateCategoryPreference(category, enabled);
+      this.toastService.show(
+        'Notifications',
+        `${this.notificationCategories.find((item) => item.key === category)?.label} ${
+          enabled ? 'enabled' : 'disabled'
+        }`,
+        'success',
+      );
+    } catch (error) {
+      console.error('Failed to update notification category:', error);
+      this.toastService.show('Error', 'Failed to update notification settings', 'error');
+    } finally {
+      this.savingCategorySignal.set(null);
+    }
+  }
 
   async togglePushNotifications(): Promise<void> {
     this.isLoadingSignal.set(true);

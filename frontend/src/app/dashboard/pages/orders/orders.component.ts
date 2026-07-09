@@ -369,10 +369,7 @@ export class OrdersComponent implements OnInit {
       : 'Walk-in Customer';
 
     const total = order.totalWithTax || order.total || 0;
-    const settled = (order.payments || [])
-      .filter((p: { state: string }) => p.state === 'Settled')
-      .reduce((sum: number, p: { amount: number }) => sum + p.amount, 0);
-    const orderBasedOutstanding = Math.max(0, total - settled);
+    const orderBasedOutstanding = order.amountOwing ?? 0;
 
     const status = await this.ordersService.getOrderPaymentStatus(orderId);
     const outstanding =

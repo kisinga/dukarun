@@ -771,6 +771,7 @@ export type ChannelCustomFields = {
   lastPaymentAmount?: Maybe<Scalars['Int']['output']>;
   lastPaymentDate?: Maybe<Scalars['DateTime']['output']>;
   maxAdminCount?: Maybe<Scalars['Int']['output']>;
+  notificationCategoryPreferences?: Maybe<Scalars['String']['output']>;
   paystackCustomerCode?: Maybe<Scalars['String']['output']>;
   paystackSubscriptionCode?: Maybe<Scalars['String']['output']>;
   publicSlug?: Maybe<Scalars['String']['output']>;
@@ -823,6 +824,7 @@ export type ChannelFilterParameter = {
   lastPaymentAmount?: InputMaybe<NumberOperators>;
   lastPaymentDate?: InputMaybe<DateOperators>;
   maxAdminCount?: InputMaybe<NumberOperators>;
+  notificationCategoryPreferences?: InputMaybe<StringOperators>;
   outOfStockThreshold?: InputMaybe<NumberOperators>;
   paystackCustomerCode?: InputMaybe<StringOperators>;
   paystackSubscriptionCode?: InputMaybe<StringOperators>;
@@ -869,6 +871,23 @@ export type ChannelListOptions = {
   take?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type ChannelNotificationPreferences = {
+  __typename?: 'ChannelNotificationPreferences';
+  customer: Scalars['Boolean']['output'];
+  finance: Scalars['Boolean']['output'];
+  operations: Scalars['Boolean']['output'];
+  orders: Scalars['Boolean']['output'];
+  stock: Scalars['Boolean']['output'];
+};
+
+export type ChannelNotificationPreferencesInput = {
+  customer?: InputMaybe<Scalars['Boolean']['input']>;
+  finance?: InputMaybe<Scalars['Boolean']['input']>;
+  operations?: InputMaybe<Scalars['Boolean']['input']>;
+  orders?: InputMaybe<Scalars['Boolean']['input']>;
+  stock?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
 export type ChannelSettings = {
   __typename?: 'ChannelSettings';
   cashierFlowEnabled: Scalars['Boolean']['output'];
@@ -889,6 +908,7 @@ export type ChannelSortParameter = {
   lastPaymentAmount?: InputMaybe<SortOrder>;
   lastPaymentDate?: InputMaybe<SortOrder>;
   maxAdminCount?: InputMaybe<SortOrder>;
+  notificationCategoryPreferences?: InputMaybe<SortOrder>;
   outOfStockThreshold?: InputMaybe<SortOrder>;
   paystackCustomerCode?: InputMaybe<SortOrder>;
   paystackSubscriptionCode?: InputMaybe<SortOrder>;
@@ -1313,6 +1333,7 @@ export type CreateChannelCustomFieldsInput = {
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
   maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
+  notificationCategoryPreferences?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   publicSlug?: InputMaybe<Scalars['String']['input']>;
@@ -1464,6 +1485,9 @@ export type CreateOrderCustomFieldsInput = {
   cogsStatus?: InputMaybe<Scalars['String']['input']>;
   createdByUserIdId?: InputMaybe<Scalars['ID']['input']>;
   lastModifiedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
+  reconciledAt?: InputMaybe<Scalars['DateTime']['input']>;
+  reconciliationNote?: InputMaybe<Scalars['String']['input']>;
+  reconciliationStrategy?: InputMaybe<Scalars['String']['input']>;
   reversedAt?: InputMaybe<Scalars['DateTime']['input']>;
   reversedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -2100,10 +2124,14 @@ export type Customer = Node & {
   id: Scalars['ID']['output'];
   lastName: Scalars['String']['output'];
   orders: OrderList;
-  outstandingAmount: Scalars['Float']['output'];
+  /** Customer balance (AR). Cents. Null when the ledger balance cannot be computed. */
+  outstandingAmount?: Maybe<Scalars['Float']['output']>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
-  /** Supplier balance (AP). Only non-zero when customer is a supplier. Cents. */
-  supplierOutstandingAmount: Scalars['Float']['output'];
+  /**
+   * Supplier balance (AP). Only non-zero when customer is a supplier. Cents.
+   * Null when the ledger balance cannot be computed.
+   */
+  supplierOutstandingAmount?: Maybe<Scalars['Float']['output']>;
   title?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['DateTime']['output'];
   user?: Maybe<User>;
@@ -3530,6 +3558,29 @@ export type LedgerAccountsResult = {
   items: Array<LedgerAccount>;
 };
 
+export type LedgerDivergenceCount = {
+  __typename?: 'LedgerDivergenceCount';
+  count: Scalars['Int']['output'];
+  entityType: Scalars['String']['output'];
+};
+
+export type LedgerDivergenceItem = {
+  __typename?: 'LedgerDivergenceItem';
+  descriptor: Scalars['String']['output'];
+  difference: Scalars['Int']['output'];
+  entityId: Scalars['ID']['output'];
+  entityType: Scalars['String']['output'];
+  entityValue: Scalars['Int']['output'];
+  ledgerValue: Scalars['Int']['output'];
+};
+
+export type LedgerDivergenceSummary = {
+  __typename?: 'LedgerDivergenceSummary';
+  byEntityType: Array<LedgerDivergenceCount>;
+  items: Array<LedgerDivergenceItem>;
+  totalDivergences: Scalars['Int']['output'];
+};
+
 export type LocaleStringCustomFieldConfig = CustomField & {
   __typename?: 'LocaleStringCustomFieldConfig';
   deprecated?: Maybe<Scalars['Boolean']['output']>;
@@ -3970,6 +4021,16 @@ export type Mutation = {
   overrideCustomerBalance: BalanceOverrideResult;
   paySingleOrder: PaymentAllocationResult;
   paySinglePurchase: SupplierPaymentAllocationResult;
+  /** Superadmin action: rebuild the ledger AR balance from the customer's order model. */
+  rebuildCustomerBalanceFromModel: BalanceOverrideResult;
+  /** Superadmin action: rebuild an order's state from the ledger AR balance. */
+  rebuildOrderFromLedger: ReconcileOrderResult;
+  /** Superadmin action: rebuild a purchase's payment state from the ledger. */
+  rebuildPurchaseFromLedger: StockPurchase;
+  /** Superadmin action: rebuild the ledger AP balance from the supplier's purchase model. */
+  rebuildSupplierBalanceFromModel: BalanceOverrideResult;
+  /** Superadmin action: mark a divergent order as reconciled with a chosen strategy. */
+  reconcileOrder: ReconcileOrderResult;
   recordCashCount: CashCountResult;
   recordExpense: RecordExpenseResult;
   recordPayment: PaymentAllocationResult;
@@ -4076,6 +4137,7 @@ export type Mutation = {
   updateChannelAdmin: Administrator;
   updateChannelFeatureFlagsPlatform: Channel;
   updateChannelLogo: ChannelSettings;
+  updateChannelNotificationPreferences: ChannelNotificationPreferences;
   updateChannelPaymentMethod: PaymentMethod;
   updateChannelPublicStorefrontPlatform: Channel;
   updateChannelStatus: Channel;
@@ -4103,6 +4165,7 @@ export type Mutation = {
   /** Update one or more FacetValues */
   updateFacetValues: Array<FacetValue>;
   updateGlobalSettings: UpdateGlobalSettingsResult;
+  updateNotificationPreferencesForChannel: ChannelNotificationPreferences;
   updateOrderLineQuantity: UpdateOrderItemsResult;
   updateOrderNote: HistoryEntry;
   /** Update an existing PaymentMethod */
@@ -4887,6 +4950,34 @@ export type MutationPaySinglePurchaseArgs = {
 };
 
 
+export type MutationRebuildCustomerBalanceFromModelArgs = {
+  customerId: Scalars['ID']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type MutationRebuildOrderFromLedgerArgs = {
+  note?: InputMaybe<Scalars['String']['input']>;
+  orderId: Scalars['ID']['input'];
+};
+
+
+export type MutationRebuildPurchaseFromLedgerArgs = {
+  purchaseId: Scalars['ID']['input'];
+};
+
+
+export type MutationRebuildSupplierBalanceFromModelArgs = {
+  note?: InputMaybe<Scalars['String']['input']>;
+  supplierId: Scalars['ID']['input'];
+};
+
+
+export type MutationReconcileOrderArgs = {
+  input: ReconcileOrderInput;
+};
+
+
 export type MutationRecordCashCountArgs = {
   input: RecordCashCountInput;
 };
@@ -5225,6 +5316,11 @@ export type MutationUpdateChannelLogoArgs = {
 };
 
 
+export type MutationUpdateChannelNotificationPreferencesArgs = {
+  input: ChannelNotificationPreferencesInput;
+};
+
+
 export type MutationUpdateChannelPaymentMethodArgs = {
   input: UpdatePaymentMethodInput;
 };
@@ -5320,6 +5416,12 @@ export type MutationUpdateFacetValuesArgs = {
 
 export type MutationUpdateGlobalSettingsArgs = {
   input: UpdateGlobalSettingsInput;
+};
+
+
+export type MutationUpdateNotificationPreferencesForChannelArgs = {
+  channelId: Scalars['ID']['input'];
+  input: ChannelNotificationPreferencesInput;
 };
 
 
@@ -5633,6 +5735,11 @@ export type Order = Node & {
   active: Scalars['Boolean']['output'];
   aggregateOrder?: Maybe<Order>;
   aggregateOrderId?: Maybe<Scalars['ID']['output']>;
+  /**
+   * Amount still owed on this order, in smallest currency unit (cents).
+   * Computed from the ledger (Accounts Receivable) and is the single source of truth.
+   */
+  amountOwing: Scalars['Int']['output'];
   billingAddress?: Maybe<OrderAddress>;
   channels: Array<Channel>;
   /** A unique code for the Order */
@@ -5718,6 +5825,9 @@ export type OrderCustomFields = {
   cogsStatus?: Maybe<Scalars['String']['output']>;
   createdByUserId?: Maybe<User>;
   lastModifiedByUserId?: Maybe<User>;
+  reconciledAt?: Maybe<Scalars['DateTime']['output']>;
+  reconciliationNote?: Maybe<Scalars['String']['output']>;
+  reconciliationStrategy?: Maybe<Scalars['String']['output']>;
   reversedAt?: Maybe<Scalars['DateTime']['output']>;
   reversedByUserId?: Maybe<User>;
 };
@@ -5727,6 +5837,7 @@ export type OrderFilterParameter = {
   _or?: InputMaybe<Array<OrderFilterParameter>>;
   active?: InputMaybe<BooleanOperators>;
   aggregateOrderId?: InputMaybe<IdOperators>;
+  amountOwing?: InputMaybe<NumberOperators>;
   auditCreatedAt?: InputMaybe<DateOperators>;
   cashierPendingAt?: InputMaybe<DateOperators>;
   code?: InputMaybe<StringOperators>;
@@ -5736,6 +5847,9 @@ export type OrderFilterParameter = {
   customerLastName?: InputMaybe<StringOperators>;
   id?: InputMaybe<IdOperators>;
   orderPlacedAt?: InputMaybe<DateOperators>;
+  reconciledAt?: InputMaybe<DateOperators>;
+  reconciliationNote?: InputMaybe<StringOperators>;
+  reconciliationStrategy?: InputMaybe<StringOperators>;
   reversedAt?: InputMaybe<DateOperators>;
   shipping?: InputMaybe<NumberOperators>;
   shippingWithTax?: InputMaybe<NumberOperators>;
@@ -5924,6 +6038,23 @@ export type OrderProcessState = {
   to: Array<Scalars['String']['output']>;
 };
 
+export type OrderReconciliationItem = {
+  __typename?: 'OrderReconciliationItem';
+  customerId?: Maybe<Scalars['ID']['output']>;
+  difference: Scalars['Int']['output'];
+  ledgerOwing: Scalars['Int']['output'];
+  orderCode: Scalars['String']['output'];
+  orderId: Scalars['ID']['output'];
+  orderModelOwing: Scalars['Int']['output'];
+  orderTotal: Scalars['Int']['output'];
+};
+
+export type OrderReconciliationResult = {
+  __typename?: 'OrderReconciliationResult';
+  items: Array<OrderReconciliationItem>;
+  totalItems: Scalars['Int']['output'];
+};
+
 export type OrderReversalResult = {
   __typename?: 'OrderReversalResult';
   /** True if the order had settled payments before reversal (refund is not automatic). */
@@ -5933,6 +6064,7 @@ export type OrderReversalResult = {
 
 export type OrderSortParameter = {
   aggregateOrderId?: InputMaybe<SortOrder>;
+  amountOwing?: InputMaybe<SortOrder>;
   auditCreatedAt?: InputMaybe<SortOrder>;
   cashierPendingAt?: InputMaybe<SortOrder>;
   code?: InputMaybe<SortOrder>;
@@ -5943,6 +6075,9 @@ export type OrderSortParameter = {
   id?: InputMaybe<SortOrder>;
   lastModifiedByUserId?: InputMaybe<SortOrder>;
   orderPlacedAt?: InputMaybe<SortOrder>;
+  reconciledAt?: InputMaybe<SortOrder>;
+  reconciliationNote?: InputMaybe<SortOrder>;
+  reconciliationStrategy?: InputMaybe<SortOrder>;
   reversedAt?: InputMaybe<SortOrder>;
   reversedByUserId?: InputMaybe<SortOrder>;
   shipping?: InputMaybe<SortOrder>;
@@ -7321,6 +7456,7 @@ export type Query = {
   cashierSessions: CashierSessionList;
   channel?: Maybe<Channel>;
   channelDetailPlatform?: Maybe<PlatformChannelDetail>;
+  channelNotificationPreferences: ChannelNotificationPreferences;
   channelReconciliationConfig: Array<PaymentMethodReconciliationConfig>;
   channels: ChannelList;
   checkAuthorizationStatus: AuthorizationStatus;
@@ -7344,6 +7480,8 @@ export type Query = {
   customerGroups: CustomerGroupList;
   customers: CustomerList;
   dashboardStats: DashboardStats;
+  /** Superadmin diagnostic: orders whose order-model outstanding differs from the ledger. */
+  divergentOrders: OrderReconciliationResult;
   /** Ledger accounts eligible as payment/debit sources (asset, leaf, excluding AR and inventory). */
   eligibleDebitAccounts: LedgerAccountsResult;
   /** Returns a list of eligible shipping methods for the draft Order */
@@ -7380,9 +7518,11 @@ export type Query = {
   journalEntry?: Maybe<JournalEntry>;
   lastClosedSessionClosingBalances: Array<LastClosingBalance>;
   ledgerAccounts: LedgerAccountsResult;
+  ledgerDivergences: LedgerDivergenceSummary;
   me?: Maybe<CurrentUser>;
   /** Get metrics for the given interval and metric types. */
   metricSummary: Array<MetricSummary>;
+  notificationPreferencesForChannel: ChannelNotificationPreferences;
   notificationsForChannel: NotificationList;
   /** Open batches for a variant (and optional location) for batch selection when recording a sale. */
   openBatchesForVariant: Array<OpenBatchForVariant>;
@@ -7686,6 +7826,11 @@ export type QueryDashboardStatsArgs = {
 };
 
 
+export type QueryDivergentOrdersArgs = {
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type QueryEligibleShippingMethodsForDraftOrderArgs = {
   orderId: Scalars['ID']['input'];
 };
@@ -7793,8 +7938,18 @@ export type QueryLastClosedSessionClosingBalancesArgs = {
 };
 
 
+export type QueryLedgerDivergencesArgs = {
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type QueryMetricSummaryArgs = {
   input?: InputMaybe<MetricSummaryInput>;
+};
+
+
+export type QueryNotificationPreferencesForChannelArgs = {
+  channelId: Scalars['ID']['input'];
 };
 
 
@@ -8108,6 +8263,19 @@ export type QueryZoneArgs = {
 
 export type QueryZonesArgs = {
   options?: InputMaybe<ZoneListOptions>;
+};
+
+export type ReconcileOrderInput = {
+  note?: InputMaybe<Scalars['String']['input']>;
+  orderId: Scalars['ID']['input'];
+  strategy: Scalars['String']['input'];
+};
+
+export type ReconcileOrderResult = {
+  __typename?: 'ReconcileOrderResult';
+  message: Scalars['String']['output'];
+  orderId: Scalars['ID']['output'];
+  success: Scalars['Boolean']['output'];
 };
 
 export type Reconciliation = {
@@ -9058,6 +9226,7 @@ export enum StockMovementType {
 
 export type StockPurchase = {
   __typename?: 'StockPurchase';
+  amountOwing?: Maybe<Scalars['Int']['output']>;
   createdAt: Scalars['DateTime']['output'];
   id: Scalars['ID']['output'];
   isCreditPurchase: Scalars['Boolean']['output'];
@@ -9616,6 +9785,7 @@ export type UpdateChannelCustomFieldsInput = {
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
   maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
+  notificationCategoryPreferences?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   publicSlug?: InputMaybe<Scalars['String']['input']>;
@@ -9833,6 +10003,9 @@ export type UpdateOrderCustomFieldsInput = {
   cogsStatus?: InputMaybe<Scalars['String']['input']>;
   createdByUserIdId?: InputMaybe<Scalars['ID']['input']>;
   lastModifiedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
+  reconciledAt?: InputMaybe<Scalars['DateTime']['input']>;
+  reconciliationNote?: InputMaybe<Scalars['String']['input']>;
+  reconciliationStrategy?: InputMaybe<Scalars['String']['input']>;
   reversedAt?: InputMaybe<Scalars['DateTime']['input']>;
   reversedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -10086,6 +10259,7 @@ export type UserCustomFields = {
   __typename?: 'UserCustomFields';
   authorizationStatus?: Maybe<Scalars['String']['output']>;
   notificationPreferences?: Maybe<Scalars['String']['output']>;
+  phoneNumber?: Maybe<Scalars['String']['output']>;
 };
 
 export type UserInfo = {
@@ -10399,12 +10573,41 @@ export type UpdateAdministratorPermissionsMutationVariables = Exact<{
 
 export type UpdateAdministratorPermissionsMutation = { __typename?: 'Mutation', updateAdministratorPermissions: { __typename?: 'PlatformAdministratorDetail', id: string, roles: Array<{ __typename?: 'PlatformAdministratorRoleDetail', id: string, code: string, channelIds: Array<string>, permissions: Array<string> }> } };
 
+export type DivergentOrdersQueryVariables = Exact<{
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type DivergentOrdersQuery = { __typename?: 'Query', divergentOrders: { __typename?: 'OrderReconciliationResult', totalItems: number, items: Array<{ __typename?: 'OrderReconciliationItem', orderId: string, orderCode: string, customerId?: string | null, orderModelOwing: number, ledgerOwing: number, difference: number, orderTotal: number }> } };
+
+export type ReconcileOrderMutationVariables = Exact<{
+  input: ReconcileOrderInput;
+}>;
+
+
+export type ReconcileOrderMutation = { __typename?: 'Mutation', reconcileOrder: { __typename?: 'ReconcileOrderResult', orderId: string, success: boolean, message: string } };
+
 export type PlatformAuditLogsQueryVariables = Exact<{
   options?: InputMaybe<PlatformAuditLogOptions>;
 }>;
 
 
 export type PlatformAuditLogsQuery = { __typename?: 'Query', platformAuditLogs: Array<{ __typename?: 'PlatformAuditLog', id: string, timestamp: any, eventType: string, entityType?: string | null, entityId?: string | null, userId?: string | null, ipAddress?: string | null, data: any, source: string }> };
+
+export type NotificationPreferencesForChannelQueryVariables = Exact<{
+  channelId: Scalars['ID']['input'];
+}>;
+
+
+export type NotificationPreferencesForChannelQuery = { __typename?: 'Query', notificationPreferencesForChannel: { __typename?: 'ChannelNotificationPreferences', customer: boolean, orders: boolean, stock: boolean, finance: boolean, operations: boolean } };
+
+export type UpdateNotificationPreferencesForChannelMutationVariables = Exact<{
+  channelId: Scalars['ID']['input'];
+  input: ChannelNotificationPreferencesInput;
+}>;
+
+
+export type UpdateNotificationPreferencesForChannelMutation = { __typename?: 'Mutation', updateNotificationPreferencesForChannel: { __typename?: 'ChannelNotificationPreferences', customer: boolean, orders: boolean, stock: boolean, finance: boolean, operations: boolean } };
 
 
 export const AuthenticateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"Authenticate"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"username"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"password"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"authenticate"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"native"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"username"},"value":{"kind":"Variable","name":{"kind":"Name","value":"username"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"password"},"value":{"kind":"Variable","name":{"kind":"Name","value":"password"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"CurrentUser"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]}}]} as unknown as DocumentNode<AuthenticateMutation, AuthenticateMutationVariables>;
@@ -10443,4 +10646,8 @@ export const UpdateRoleTemplateDocument = {"kind":"Document","definitions":[{"ki
 export const DeleteRoleTemplateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteRoleTemplate"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteRoleTemplate"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode<DeleteRoleTemplateMutation, DeleteRoleTemplateMutationVariables>;
 export const AdministratorDetailDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AdministratorDetail"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"administratorId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"administratorDetail"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"administratorId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"administratorId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"emailAddress"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"identifier"}},{"kind":"Field","name":{"kind":"Name","value":"authorizationStatus"}},{"kind":"Field","name":{"kind":"Name","value":"isSuperAdmin"}},{"kind":"Field","name":{"kind":"Name","value":"roles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"channelIds"}},{"kind":"Field","name":{"kind":"Name","value":"permissions"}}]}}]}}]}}]} as unknown as DocumentNode<AdministratorDetailQuery, AdministratorDetailQueryVariables>;
 export const UpdateAdministratorPermissionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateAdministratorPermissions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"administratorId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"permissions"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateAdministratorPermissions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"administratorId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"administratorId"}}},{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}},{"kind":"Argument","name":{"kind":"Name","value":"permissions"},"value":{"kind":"Variable","name":{"kind":"Name","value":"permissions"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"roles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"channelIds"}},{"kind":"Field","name":{"kind":"Name","value":"permissions"}}]}}]}}]}}]} as unknown as DocumentNode<UpdateAdministratorPermissionsMutation, UpdateAdministratorPermissionsMutationVariables>;
+export const DivergentOrdersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DivergentOrders"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"toleranceCents"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"divergentOrders"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"toleranceCents"},"value":{"kind":"Variable","name":{"kind":"Name","value":"toleranceCents"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"orderId"}},{"kind":"Field","name":{"kind":"Name","value":"orderCode"}},{"kind":"Field","name":{"kind":"Name","value":"customerId"}},{"kind":"Field","name":{"kind":"Name","value":"orderModelOwing"}},{"kind":"Field","name":{"kind":"Name","value":"ledgerOwing"}},{"kind":"Field","name":{"kind":"Name","value":"difference"}},{"kind":"Field","name":{"kind":"Name","value":"orderTotal"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalItems"}}]}}]}}]} as unknown as DocumentNode<DivergentOrdersQuery, DivergentOrdersQueryVariables>;
+export const ReconcileOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ReconcileOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ReconcileOrderInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reconcileOrder"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"orderId"}},{"kind":"Field","name":{"kind":"Name","value":"success"}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<ReconcileOrderMutation, ReconcileOrderMutationVariables>;
 export const PlatformAuditLogsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformAuditLogs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"options"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"PlatformAuditLogOptions"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformAuditLogs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"options"},"value":{"kind":"Variable","name":{"kind":"Name","value":"options"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}},{"kind":"Field","name":{"kind":"Name","value":"eventType"}},{"kind":"Field","name":{"kind":"Name","value":"entityType"}},{"kind":"Field","name":{"kind":"Name","value":"entityId"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"ipAddress"}},{"kind":"Field","name":{"kind":"Name","value":"data"}},{"kind":"Field","name":{"kind":"Name","value":"source"}}]}}]}}]} as unknown as DocumentNode<PlatformAuditLogsQuery, PlatformAuditLogsQueryVariables>;
+export const NotificationPreferencesForChannelDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"NotificationPreferencesForChannel"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"notificationPreferencesForChannel"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"customer"}},{"kind":"Field","name":{"kind":"Name","value":"orders"}},{"kind":"Field","name":{"kind":"Name","value":"stock"}},{"kind":"Field","name":{"kind":"Name","value":"finance"}},{"kind":"Field","name":{"kind":"Name","value":"operations"}}]}}]}}]} as unknown as DocumentNode<NotificationPreferencesForChannelQuery, NotificationPreferencesForChannelQueryVariables>;
+export const UpdateNotificationPreferencesForChannelDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateNotificationPreferencesForChannel"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ChannelNotificationPreferencesInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateNotificationPreferencesForChannel"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}},{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"customer"}},{"kind":"Field","name":{"kind":"Name","value":"orders"}},{"kind":"Field","name":{"kind":"Name","value":"stock"}},{"kind":"Field","name":{"kind":"Name","value":"finance"}},{"kind":"Field","name":{"kind":"Name","value":"operations"}}]}}]}}]} as unknown as DocumentNode<UpdateNotificationPreferencesForChannelMutation, UpdateNotificationPreferencesForChannelMutationVariables>;

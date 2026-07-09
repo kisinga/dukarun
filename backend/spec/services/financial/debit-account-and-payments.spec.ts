@@ -9,6 +9,10 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Order, RequestContext, TransactionalConnection } from '@vendure/core';
 import { ChartOfAccountsService } from '../../../src/services/financial/chart-of-accounts.service';
 import { PaymentAllocationService } from '../../../src/services/payments/payment-allocation.service';
+import {
+  LedgerConsistencyGuard,
+  OrderArProjection,
+} from '../../../src/services/financial/ledger-projection';
 import { LedgerViewerResolver } from '../../../src/plugins/ledger/ledger-viewer.resolver';
 import { Account } from '../../../src/ledger/account.entity';
 import { ACCOUNT_CODES } from '../../../src/ledger/account-codes.constants';
@@ -219,6 +223,8 @@ describe('PaymentAllocationService.paySingleOrder', () => {
         .fn()
         .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
     } as any;
+    const orderArProjection = new OrderArProjection(mockFinancialService);
+    const ledgerConsistencyGuard = new LedgerConsistencyGuard();
     service = new PaymentAllocationService(
       mockConnection,
       mockOrderService,
@@ -228,6 +234,8 @@ describe('PaymentAllocationService.paySingleOrder', () => {
       mockChartOfAccountsService,
       mockCashierSessionService,
       mockChannelPaymentMethodService,
+      ledgerConsistencyGuard,
+      orderArProjection,
       undefined
     );
   });
@@ -417,6 +425,8 @@ describe('PaymentAllocationService.recordPayment', () => {
         .fn()
         .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
     } as any;
+    const orderArProjection = new OrderArProjection(mockFinancialService);
+    const ledgerConsistencyGuard = new LedgerConsistencyGuard();
     service = new PaymentAllocationService(
       mockConnection,
       mockOrderService,
@@ -426,6 +436,8 @@ describe('PaymentAllocationService.recordPayment', () => {
       mockChartOfAccountsService,
       mockCashierSessionService,
       mockChannelPaymentMethodService,
+      ledgerConsistencyGuard,
+      orderArProjection,
       undefined
     );
   });
@@ -493,6 +505,36 @@ describe('PaymentAllocationService.recordPayment', () => {
         orderId: 'order-1',
       })
     ).rejects.toThrow(/does not belong to customer/);
+
+    expect(mockPaymentService.createPayment).not.toHaveBeenCalled();
+  });
+
+  it('with orderId: rejects payment when order model and ledger are out of sync', async () => {
+    const order = {
+      id: 'order-1',
+      code: 'ORD-001',
+      state: 'ArrangingPayment',
+      total: 10000,
+      totalWithTax: 10000,
+      payments: [],
+      customer: { id: 'cust-1' },
+    };
+    mockOrderService.findOne.mockResolvedValue(order);
+    // Ledger says 8000 owing; model says 10000. Divergence should block payment.
+    mockFinancialService.getOrderPaymentStatus.mockResolvedValue({
+      totalOwed: 10000,
+      amountPaid: 2000,
+      amountOwing: 8000,
+    });
+
+    await expect(
+      service.recordPayment(ctx, {
+        customerId: 'cust-1',
+        paymentAmount: 8000,
+        paymentMethodCode: 'credit-1',
+        orderId: 'order-1',
+      })
+    ).rejects.toThrow(/out of sync with the ledger/);
 
     expect(mockPaymentService.createPayment).not.toHaveBeenCalled();
   });

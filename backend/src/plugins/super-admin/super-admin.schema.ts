@@ -310,6 +310,7 @@ export const SUPER_ADMIN_SCHEMA = gql`
     administratorsForChannel(channelId: ID!): [PlatformAdministrator!]!
     platformAdministrators(options: PlatformAdministratorListOptions): PlatformAdministratorList!
     notificationsForChannel(channelId: ID!, options: NotificationListOptions): NotificationList!
+    notificationPreferencesForChannel(channelId: ID!): ChannelNotificationPreferences!
     pendingRegistrations: [PendingRegistration!]!
     platformRoleTemplates: [PlatformRoleTemplate!]!
     adminLoginAttempts(limit: Int, skip: Int, since: DateTime): [AdminLoginAttempt!]!
@@ -327,6 +328,10 @@ export const SUPER_ADMIN_SCHEMA = gql`
     extendTrialPlatform(channelId: ID!, trialEndsAt: DateTime!): Channel!
     updateChannelSubscriptionPlatform(input: UpdateChannelSubscriptionInput!): Channel!
     updateChannelFeatureFlagsPlatform(input: UpdateChannelFeatureFlagsInput!): Channel!
+    updateNotificationPreferencesForChannel(
+      channelId: ID!
+      input: ChannelNotificationPreferencesInput!
+    ): ChannelNotificationPreferences!
     updateChannelPublicStorefrontPlatform(input: UpdateChannelPublicStorefrontInput!): Channel!
     approveUser(userId: ID!): UserAuthorizationResult!
     rejectUser(userId: ID!, reason: String): UserAuthorizationResult!

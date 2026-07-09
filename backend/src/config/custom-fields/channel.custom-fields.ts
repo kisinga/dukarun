@@ -123,6 +123,20 @@ export const channelCustomFields: CustomFields['Channel'] = [
     ui: { tab: 'Settings' },
   },
   {
+    name: 'notificationCategoryPreferences',
+    type: 'text',
+    label: [{ languageCode: LanguageCode.en, value: 'Notification Categories' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value: 'JSON switches for broad channel notification categories',
+      },
+    ],
+    public: false,
+    nullable: true,
+    ui: { tab: 'Settings' },
+  },
+  {
     name: 'stockValueCache',
     type: 'text',
     label: [{ languageCode: LanguageCode.en, value: 'Stock Value Cache' }],

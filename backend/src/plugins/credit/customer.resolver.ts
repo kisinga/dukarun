@@ -23,7 +23,10 @@ export class CustomerFieldResolver {
 
   @ResolveField()
   @Allow(Permission.ReadCustomer)
-  async outstandingAmount(@Root() customer: Customer, @Ctx() ctx: RequestContext): Promise<number> {
+  async outstandingAmount(
+    @Root() customer: Customer,
+    @Ctx() ctx: RequestContext
+  ): Promise<number | null> {
     try {
       const summary = await this.creditService.getCreditSummary(ctx, customer.id, 'customer');
       return summary.outstandingAmount;
@@ -34,7 +37,7 @@ export class CustomerFieldResolver {
         }`,
         CustomerFieldResolver.loggerCtx
       );
-      return 0;
+      return null;
     }
   }
 
@@ -43,7 +46,7 @@ export class CustomerFieldResolver {
   async supplierOutstandingAmount(
     @Root() customer: Customer,
     @Ctx() ctx: RequestContext
-  ): Promise<number> {
+  ): Promise<number | null> {
     const customFields = customer.customFields as { isSupplier?: boolean } | undefined;
     if (!customFields?.isSupplier) return 0;
     try {
@@ -56,7 +59,7 @@ export class CustomerFieldResolver {
         }`,
         CustomerFieldResolver.loggerCtx
       );
-      return 0;
+      return null;
     }
   }
 }

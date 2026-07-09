@@ -12,6 +12,7 @@ import {
   SettleOrderPaymentsResult,
   CashierPendingOrder,
 } from '../../services/payments/payment-allocation.service';
+import { OrderReconciliationService } from '../../services/payments/order-reconciliation.service';
 import { SettleOrderPermission } from './permissions';
 
 interface PaySingleOrderInput {
@@ -26,7 +27,8 @@ interface PaySingleOrderInput {
 export class PaymentAllocationResolver {
   constructor(
     private readonly paymentAllocationService: PaymentAllocationService,
-    private readonly financialService: FinancialService
+    private readonly financialService: FinancialService,
+    private readonly orderReconciliationService: OrderReconciliationService
   ) {}
 
   @Query()
@@ -111,5 +113,52 @@ export class PaymentAllocationResolver {
       input.referenceNumber,
       input.debitAccountCode
     );
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async divergentOrders(
+    @Ctx() ctx: RequestContext,
+    @Args('toleranceCents') toleranceCents?: number
+  ) {
+    return this.orderReconciliationService.findDivergentOrders(ctx, toleranceCents ?? 1);
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.ORDER_RECONCILED,
+    extractEntityId: (_result, args) => args.orderId ?? null,
+  })
+  async rebuildOrderFromLedger(
+    @Ctx() ctx: RequestContext,
+    @Args('orderId') orderId: string,
+    @Args('note', { nullable: true }) note?: string
+  ) {
+    const order = await this.orderReconciliationService.rebuildOrderFromLedger(ctx, orderId, note);
+    return {
+      orderId: order.id.toString(),
+      success: true,
+      message: `Order ${order.code} rebuilt from ledger.`,
+    };
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.ORDER_RECONCILED,
+    extractEntityId: (_result, args) => args.input?.orderId ?? null,
+  })
+  async reconcileOrder(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { orderId: string; strategy: string; note?: string }
+  ) {
+    const order = await this.orderReconciliationService.reconcileOrder(ctx, input);
+
+    return {
+      orderId: order.id.toString(),
+      success: true,
+      message: `Order ${order.code} reconciled with strategy ${input.strategy}.`,
+    };
   }
 }

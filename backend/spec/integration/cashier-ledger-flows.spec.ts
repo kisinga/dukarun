@@ -9,6 +9,10 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { RequestContext } from '@vendure/core';
 import { OpenSessionService } from '../../src/services/financial/open-session.service';
 import { PaymentAllocationService } from '../../src/services/payments/payment-allocation.service';
+import {
+  LedgerConsistencyGuard,
+  OrderArProjection,
+} from '../../src/services/financial/ledger-projection';
 import { PeriodManagementResolver } from '../../src/plugins/ledger/period-management.resolver';
 import { CashierSession } from '../../src/domain/cashier/cashier-session.entity';
 import { CashDrawerCount } from '../../src/domain/cashier/cash-drawer-count.entity';
@@ -150,6 +154,8 @@ describe('Cashier-ledger flows', () => {
           .fn()
           .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
       } as any;
+      const orderArProjectionFlowA = new OrderArProjection(mockPaymentFinancialService);
+      const ledgerConsistencyGuardFlowA = new LedgerConsistencyGuard();
       const paymentAllocationService = new PaymentAllocationService(
         {
           withTransaction: (c: any, fn: (t: any) => Promise<any>) => fn(c),
@@ -164,6 +170,8 @@ describe('Cashier-ledger flows', () => {
         } as any,
         cashierSessionService,
         mockChannelPaymentMethodForAllocation,
+        ledgerConsistencyGuardFlowA,
+        orderArProjectionFlowA,
         undefined as any
       );
 
@@ -241,6 +249,8 @@ describe('Cashier-ledger flows', () => {
           .fn()
           .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
       } as any;
+      const orderArProjectionFlowB = new OrderArProjection(mockFinancialService);
+      const ledgerConsistencyGuardFlowB = new LedgerConsistencyGuard();
       const paymentAllocationServiceFlowB = new PaymentAllocationService(
         {
           withTransaction: (c: any, fn: (t: any) => Promise<any>) => fn(c),
@@ -255,6 +265,8 @@ describe('Cashier-ledger flows', () => {
         } as any,
         mockCashierSessionServiceFlowB,
         mockChannelPaymentMethodServiceFlowB,
+        ledgerConsistencyGuardFlowB,
+        orderArProjectionFlowB,
         undefined as any
       );
 

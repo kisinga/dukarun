@@ -9,6 +9,7 @@ import {
   UserInputError,
 } from '@vendure/core';
 import { LedgerPostingService } from '../financial/ledger-posting.service';
+import { LedgerConsistencyGuard, OrderArProjection } from '../financial/ledger-projection';
 import { InventoryService } from '../inventory/inventory.service';
 import { OrderStateService } from './order-state.service';
 
@@ -36,7 +37,9 @@ export class OrderReversalService {
     private readonly orderStateService: OrderStateService,
     private readonly ledgerPostingService: LedgerPostingService,
     private readonly connection: TransactionalConnection,
-    private readonly inventoryService: InventoryService
+    private readonly inventoryService: InventoryService,
+    private readonly ledgerConsistencyGuard: LedgerConsistencyGuard,
+    private readonly orderArProjection: OrderArProjection
   ) {}
 
   /**
@@ -58,6 +61,10 @@ export class OrderReversalService {
       .filter(p => p.state === 'Settled')
       .reduce((sum, p) => sum + p.amount, 0);
     const hadPayments = settledPayments > 0;
+
+    // Fail closed if the order model and ledger disagree. Reversing a divergent
+    // order would make the drift harder to trace.
+    await this.ledgerConsistencyGuard.assertInSync(ctx, this.orderArProjection, order);
 
     const reversalDate = new Date().toISOString().slice(0, 10);
     await this.ledgerPostingService.postOrderReversal(ctx, order.id.toString(), {

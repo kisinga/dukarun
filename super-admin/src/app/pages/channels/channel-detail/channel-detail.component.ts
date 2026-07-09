@@ -1,4 +1,5 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { gql } from '@apollo/client/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { PageHeaderComponent } from '../../../shared/components/page-header';
@@ -71,6 +72,40 @@ export interface ChannelNotification {
   createdAt: string;
 }
 
+type NotificationCategory = 'customer' | 'orders' | 'stock' | 'finance' | 'operations';
+
+interface ChannelNotificationPreferences {
+  customer: boolean;
+  orders: boolean;
+  stock: boolean;
+  finance: boolean;
+  operations: boolean;
+}
+
+const NOTIFICATION_PREFERENCES_FOR_CHANNEL = gql`
+  query NotificationPreferencesForChannel($channelId: ID!) {
+    notificationPreferencesForChannel(channelId: $channelId) {
+      customer
+      orders
+      stock
+      finance
+      operations
+    }
+  }
+`;
+
+const UPDATE_NOTIFICATION_PREFERENCES_FOR_CHANNEL = gql`
+  mutation UpdateNotificationPreferencesForChannel($channelId: ID!, $input: ChannelNotificationPreferencesInput!) {
+    updateNotificationPreferencesForChannel(channelId: $channelId, input: $input) {
+      customer
+      orders
+      stock
+      finance
+      operations
+    }
+  }
+`;
+
 @Component({
   selector: 'app-channel-detail',
   standalone: true,
@@ -88,6 +123,13 @@ export class ChannelDetailComponent implements OnInit {
   auditLogs = signal<any[]>([]);
   admins = signal<PlatformAdministrator[]>([]);
   notifications = signal<ChannelNotification[]>([]);
+  notificationPreferences = signal<ChannelNotificationPreferences>({
+    customer: true,
+    orders: true,
+    stock: true,
+    finance: true,
+    operations: true,
+  });
   loading = signal(true);
   error = signal<string | null>(null);
 
@@ -111,6 +153,41 @@ export class ChannelDetailComponent implements OnInit {
   storefrontError = signal<string | null>(null);
   storefrontSaved = signal(false);
   saving = signal(false);
+  savingNotificationCategory = signal<NotificationCategory | null>(null);
+  notificationPreferencesAvailable = signal(false);
+  notificationPreferencesError = signal<string | null>(null);
+
+  readonly notificationCategories: ReadonlyArray<{
+    key: NotificationCategory;
+    label: string;
+    description: string;
+  }> = [
+    {
+      key: 'customer',
+      label: 'Customer notifications',
+      description: 'Customer activity alerts and messages sent directly to customers',
+    },
+    {
+      key: 'orders',
+      label: 'Sales & orders',
+      description: 'Order payment, fulfilment and cancellation updates',
+    },
+    {
+      key: 'stock',
+      label: 'Stock',
+      description: 'Low-stock and inventory alerts',
+    },
+    {
+      key: 'finance',
+      label: 'Money & billing',
+      description: 'Subscription, billing and shift alerts',
+    },
+    {
+      key: 'operations',
+      label: 'Operations',
+      description: 'Approvals, channel status and administrative alerts',
+    },
+  ];
 
   id = computed(() => this.route.snapshot.paramMap.get('id') ?? '');
 
@@ -125,37 +202,57 @@ export class ChannelDetailComponent implements OnInit {
     if (!id) return;
     const client = this.apollo.getClient();
     try {
-      const [chResult, zonesResult, analyticsResult, auditResult, adminsResult, notificationsResult] = await Promise.all([
+      const [chResult, zonesResult, analyticsResult, auditResult, adminsResult, notificationsResult, notificationPreferencesResult] = await Promise.all([
         client.query<{ channelDetailPlatform: PlatformChannel | null }>({
           query: CHANNEL_DETAIL_PLATFORM,
           variables: { channelId: id },
           fetchPolicy: 'network-only',
         }),
-        client.query<{ platformZones: PlatformZone[] }>({ query: PLATFORM_ZONES, fetchPolicy: 'network-only' }),
-        client.query({
-          query: ANALYTICS_STATS_FOR_CHANNEL,
-          variables: {
-            channelId: id,
-            timeRange: this.defaultTimeRange(),
-            limit: 10,
-          },
+        client.query<{ platformZones: PlatformZone[] }>({
+          query: PLATFORM_ZONES,
           fetchPolicy: 'network-only',
-        }).catch(() => ({ data: null })),
-        client.query({
-          query: AUDIT_LOGS_FOR_CHANNEL,
-          variables: { channelId: id, options: { limit: 20 } },
-          fetchPolicy: 'network-only',
-        }).catch(() => ({ data: { auditLogsForChannel: [] } })),
-        client.query<{ administratorsForChannel: PlatformAdministrator[] }>({
-          query: ADMINISTRATORS_FOR_CHANNEL,
-          variables: { channelId: id },
-          fetchPolicy: 'network-only',
-        }).catch(() => ({ data: { administratorsForChannel: [] } })),
-        client.query<{ notificationsForChannel: { items: ChannelNotification[] } }>({
-          query: NOTIFICATIONS_FOR_CHANNEL,
-          variables: { channelId: id, options: { take: 50 } },
-          fetchPolicy: 'network-only',
-        }).catch(() => ({ data: { notificationsForChannel: { items: [] } } })),
+        }),
+        client
+          .query({
+            query: ANALYTICS_STATS_FOR_CHANNEL,
+            variables: {
+              channelId: id,
+              timeRange: this.defaultTimeRange(),
+              limit: 10,
+            },
+            fetchPolicy: 'network-only',
+          })
+          .catch(() => ({ data: null })),
+        client
+          .query({
+            query: AUDIT_LOGS_FOR_CHANNEL,
+            variables: { channelId: id, options: { limit: 20 } },
+            fetchPolicy: 'network-only',
+          })
+          .catch(() => ({ data: { auditLogsForChannel: [] } })),
+        client
+          .query<{ administratorsForChannel: PlatformAdministrator[] }>({
+            query: ADMINISTRATORS_FOR_CHANNEL,
+            variables: { channelId: id },
+            fetchPolicy: 'network-only',
+          })
+          .catch(() => ({ data: { administratorsForChannel: [] } })),
+        client
+          .query<{ notificationsForChannel: { items: ChannelNotification[] } }>({
+            query: NOTIFICATIONS_FOR_CHANNEL,
+            variables: { channelId: id, options: { take: 50 } },
+            fetchPolicy: 'network-only',
+          })
+          .catch(() => ({ data: { notificationsForChannel: { items: [] } } })),
+        client
+          .query<{
+            notificationPreferencesForChannel: ChannelNotificationPreferences;
+          }>({
+            query: NOTIFICATION_PREFERENCES_FOR_CHANNEL,
+            variables: { channelId: id },
+            fetchPolicy: 'network-only',
+          })
+          .catch(() => ({ data: null })),
       ]);
       const ch = chResult.data?.channelDetailPlatform ?? null;
       this.channel.set(ch);
@@ -191,6 +288,11 @@ export class ChannelDetailComponent implements OnInit {
       this.notifications.set(
         (notificationsResult.data as { notificationsForChannel?: { items: ChannelNotification[] } })?.notificationsForChannel?.items ?? []
       );
+      const preferences = notificationPreferencesResult.data?.notificationPreferencesForChannel;
+      if (preferences) {
+        this.notificationPreferences.set(preferences);
+        this.notificationPreferencesAvailable.set(true);
+      }
     } catch (err: any) {
       this.error.set(err?.message ?? 'Failed to load');
     } finally {
@@ -226,6 +328,30 @@ export class ChannelDetailComponent implements OnInit {
     return isNaN(d.getTime()) ? '—' : d.toLocaleString();
   }
 
+  async toggleNotificationCategory(category: NotificationCategory): Promise<void> {
+    const channelId = this.id();
+    if (!channelId) return;
+    const enabled = !this.notificationPreferences()[category];
+    this.savingNotificationCategory.set(category);
+    this.notificationPreferencesError.set(null);
+    try {
+      const result = await this.apollo.getClient().mutate<{
+        updateNotificationPreferencesForChannel: ChannelNotificationPreferences;
+      }>({
+        mutation: UPDATE_NOTIFICATION_PREFERENCES_FOR_CHANNEL,
+        variables: { channelId, input: { [category]: enabled } },
+      });
+      const preferences = result.data?.updateNotificationPreferencesForChannel;
+      if (preferences) {
+        this.notificationPreferences.set(preferences);
+      }
+    } catch (error) {
+      this.notificationPreferencesError.set(error instanceof Error ? error.message : 'Failed to update notification settings');
+    } finally {
+      this.savingNotificationCategory.set(null);
+    }
+  }
+
   async updateStatus(): Promise<void> {
     const id = this.id();
     const status = this.newStatus();
@@ -254,7 +380,11 @@ export class ChannelDetailComponent implements OnInit {
         variables: { channelId: id, trialEndsAt: new Date(dateStr).toISOString() },
       });
       const ch = this.channel();
-      if (ch) this.channel.set({ ...ch, customFields: { ...ch.customFields, trialEndsAt: dateStr, subscriptionStatus: 'trial' } });
+      if (ch)
+        this.channel.set({
+          ...ch,
+          customFields: { ...ch.customFields, trialEndsAt: dateStr, subscriptionStatus: 'trial' },
+        });
     } finally {
       this.saving.set(false);
     }
@@ -271,7 +401,11 @@ export class ChannelDetailComponent implements OnInit {
         variables: { input: { channelId: id, subscriptionStatus: status } },
       });
       const ch = this.channel();
-      if (ch) this.channel.set({ ...ch, customFields: { ...ch.customFields, subscriptionStatus: status } });
+      if (ch)
+        this.channel.set({
+          ...ch,
+          customFields: { ...ch.customFields, subscriptionStatus: status },
+        });
     } finally {
       this.saving.set(false);
     }
@@ -293,7 +427,11 @@ export class ChannelDetailComponent implements OnInit {
         },
       });
       const ch = this.channel();
-      if (ch) this.channel.set({ ...ch, customFields: { ...ch.customFields, subscriptionExpiresAt: dateStr || null } });
+      if (ch)
+        this.channel.set({
+          ...ch,
+          customFields: { ...ch.customFields, subscriptionExpiresAt: dateStr || null },
+        });
     } finally {
       this.saving.set(false);
     }
