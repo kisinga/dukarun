@@ -37,6 +37,7 @@ import {
   NotificationService,
   NotificationType,
 } from '../../services/notifications/notification.service';
+import { renderOutbound } from '../../services/notifications/outbound.render';
 import { PendingRegistrationsService } from './pending-registrations.service';
 import { PlatformAdminService } from './platform-admin.service';
 import { PlatformStatsService } from './platform-stats.service';
@@ -699,22 +700,33 @@ export class SuperAdminResolver {
   @Allow(Permission.SuperAdmin)
   async sendTestWhatsAppNotification(
     @Args('phoneNumber') phoneNumber: string,
-    @Args('message') message: string
+    @Args('message') message: string,
+    @Args('templateKey') templateKey?: string
   ): Promise<{ success: boolean; channel: string; error?: string; info?: string }> {
     const normalized = phoneNumber?.trim();
     if (!normalized || !validatePhoneNumber(normalized)) {
       return { success: false, channel: 'whatsapp', error: 'Invalid phone number' };
     }
-    if (!message || !message.trim()) {
-      return { success: false, channel: 'whatsapp', error: 'Message is required' };
+
+    const template = templateKey?.trim();
+    const customMessage = message?.trim();
+    let body = customMessage;
+
+    if (template) {
+      const rendered = renderOutbound(template, this.buildTestPayload(template, customMessage));
+      body = rendered.whatsappBody ?? rendered.smsBody ?? customMessage;
+    }
+
+    if (!body) {
+      return { success: false, channel: 'whatsapp', error: 'Message or template key is required' };
     }
 
     const result = await this.communicationService.send({
       channel: 'whatsapp',
       recipient: normalized,
-      body: message.trim(),
+      body,
       ctx: RequestContext.empty(),
-      metadata: { purpose: 'admin_notification' },
+      metadata: { purpose: 'admin_notification', bypassEnabledCheck: true },
     });
 
     return {
@@ -723,6 +735,56 @@ export class SuperAdminResolver {
       error: result.error,
       info: result.success ? 'Test WhatsApp message queued' : undefined,
     };
+  }
+
+  private buildTestPayload(templateKey: string, customMessage?: string): Record<string, unknown> {
+    const now = new Date();
+    const openedAt = new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString();
+    const closedAt = now.toISOString();
+    const base = {
+      storeName: 'Test Store',
+      cashierName: 'Test Cashier',
+      sessionId: 'test-session-001',
+    };
+
+    if (templateKey === 'shift_opened') {
+      return {
+        ...base,
+        openedAt,
+        openingBalances: [
+          { accountCode: 'cash', declaredCents: 50000 },
+          { accountCode: 'mpesa', declaredCents: 20000 },
+        ],
+        totalOpeningVariance: 0,
+      };
+    }
+
+    if (templateKey === 'shift_closed') {
+      return {
+        ...base,
+        openedAt,
+        closedAt,
+        cashSales: 125000,
+        creditSales: 35000,
+        purchases: 15000,
+        cashTotal: 118000,
+        mpesaTotal: 42000,
+        totalCollected: 160000,
+        closingDeclared: 159500,
+        variance: -500,
+        varianceThresholdCents: 100,
+      };
+    }
+
+    if (templateKey === 'balance_changed') {
+      return {
+        customerName: 'Test Customer',
+        outstandingAmount: 12500,
+        currency: 'KES',
+      };
+    }
+
+    return { message: customMessage ?? `Test notification for ${templateKey}` };
   }
 
   @Mutation()

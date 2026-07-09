@@ -129,6 +129,10 @@ const COMBINED_SCHEMA = gql`
     ledgerOwing: Int!
     difference: Int!
     orderTotal: Int!
+    orderModelPaid: Int!
+    ledgerPaid: Int!
+    orderModelTotal: Int!
+    ledgerTotalOwed: Int!
   }
 
   type OrderReconciliationResult {

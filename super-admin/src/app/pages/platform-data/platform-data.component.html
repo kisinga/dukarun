@@ -100,7 +100,8 @@
         <div class="card-body">
           <h2 class="card-title text-lg">Test WhatsApp</h2>
           <p class="text-sm text-base-content/70 mb-4">
-            Send a one-off WhatsApp message to any valid number.
+            Send a one-off WhatsApp message to any valid number. Pick a template to preview real
+            notification copy, or write a custom message.
           </p>
           <div class="space-y-4">
             <label class="form-control w-full max-w-md">
@@ -113,6 +114,20 @@
                 name="testPhoneNumber"
                 placeholder="0712345678"
               />
+            </label>
+            <label class="form-control w-full max-w-md">
+              <span class="label"><span class="label-text">Template</span></span>
+              <select
+                class="select select-bordered w-full"
+                [ngModel]="testWhatsAppTemplateKey()"
+                (ngModelChange)="testWhatsAppTemplateKey.set($event)"
+                name="testWhatsAppTemplateKey"
+              >
+                <option value="">Custom message</option>
+                <option value="shift_opened">Shift opened</option>
+                <option value="shift_closed">Shift closed</option>
+                <option value="balance_changed">Balance changed</option>
+              </select>
             </label>
             <label class="form-control w-full max-w-md">
               <span class="label"><span class="label-text">Message</span></span>
