@@ -15,6 +15,10 @@ import { RequestContext } from '@vendure/core';
 import { BatchStockLocationStrategy } from '../../src/plugins/ledger/batch-stock-location.strategy';
 import { InventoryService } from '../../src/services/inventory/inventory.service';
 import { InventoryStoreService } from '../../src/services/inventory/inventory-store.service';
+import {
+  InventoryValuationProjection,
+  LedgerConsistencyGuard,
+} from '../../src/services/financial/ledger-projection';
 import { MovementType } from '../../src/services/inventory/entities/inventory-movement.entity';
 
 /* ---------- shared in-memory store ---------- */
@@ -202,13 +206,24 @@ function buildInventoryService(inventoryStore: any) {
     getName: jest.fn().mockReturnValue('FIFO'),
   };
 
+  const ledgerConsistencyGuard: LedgerConsistencyGuard = {
+    assertInSync: jest.fn<() => Promise<any>>().mockResolvedValue({}),
+    findDivergences: jest.fn<() => Promise<any[]>>().mockResolvedValue([]),
+  } as unknown as LedgerConsistencyGuard;
+
+  const inventoryValuationProjection: InventoryValuationProjection = {
+    loadEntity: jest.fn<() => Promise<any>>().mockResolvedValue({}),
+  } as unknown as InventoryValuationProjection;
+
   const service = new InventoryService(
     connection as any,
     inventoryStore as unknown as InventoryStoreService,
     costingStrategy as any,
     expiryPolicy as any,
     ledgerPostingService as any,
-    stockValuationService as any
+    stockValuationService as any,
+    ledgerConsistencyGuard,
+    inventoryValuationProjection
   );
 
   return { service, ledgerPostingService };

@@ -18,6 +18,10 @@ import { CostingStrategy } from '../../../src/services/inventory/interfaces/cost
 import { ExpiryPolicy } from '../../../src/services/inventory/interfaces/expiry-policy.interface';
 import { LedgerPostingService } from '../../../src/services/financial/ledger-posting.service';
 import { StockValuationService } from '../../../src/services/financial/stock-valuation.service';
+import {
+  InventoryValuationProjection,
+  LedgerConsistencyGuard,
+} from '../../../src/services/financial/ledger-projection';
 import { MovementType } from '../../../src/services/inventory/entities/inventory-movement.entity';
 
 describe('InventoryService — opening stock batches', () => {
@@ -58,6 +62,15 @@ describe('InventoryService — opening stock batches', () => {
       invalidateCache: jest.fn(),
     } as unknown as StockValuationService;
 
+    const ledgerConsistencyGuard: LedgerConsistencyGuard = {
+      assertInSync: jest.fn<() => Promise<any>>().mockResolvedValue({}),
+      findDivergences: jest.fn<() => Promise<any[]>>().mockResolvedValue([]),
+    } as unknown as LedgerConsistencyGuard;
+
+    const inventoryValuationProjection: InventoryValuationProjection = {
+      loadEntity: jest.fn<() => Promise<any>>().mockResolvedValue({}),
+    } as unknown as InventoryValuationProjection;
+
     const mockRepo = {
       create: jest.fn((dto: any) => dto),
       save: jest.fn((entity: any) => Promise.resolve(entity)),
@@ -73,7 +86,9 @@ describe('InventoryService — opening stock batches', () => {
       costingStrategy as any,
       expiryPolicy as any,
       ledgerPostingService,
-      stockValuationService
+      stockValuationService,
+      ledgerConsistencyGuard,
+      inventoryValuationProjection
     );
 
     return { service, inventoryStore };

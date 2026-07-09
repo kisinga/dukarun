@@ -5,6 +5,11 @@ import { AuditService } from '../../infrastructure/audit/audit.service';
 import { ChartOfAccountsService } from '../financial/chart-of-accounts.service';
 import { CreditService } from '../credit/credit.service';
 import { FinancialService } from '../financial/financial.service';
+import {
+  LedgerConsistencyGuard,
+  PurchaseApProjection,
+  PurchaseApSnapshot,
+} from '../financial/ledger-projection';
 import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
 import { StockPurchase } from '../stock/entities/purchase.entity';
 import { PurchasePayment } from '../stock/entities/purchase-payment.entity';
@@ -41,35 +46,14 @@ export class SupplierPaymentAllocationService {
     private readonly creditService: CreditService,
     private readonly financialService: FinancialService,
     private readonly chartOfAccountsService: ChartOfAccountsService,
+    private readonly ledgerConsistencyGuard: LedgerConsistencyGuard,
+    private readonly purchaseApProjection: PurchaseApProjection,
     @Optional() private readonly auditService?: AuditService
   ) {}
 
   /**
-   * Get paid amount per purchase (sum of PurchasePayment.amount) for a supplier in the channel.
-   * Single source of truth for how much has been paid on each purchase.
-   */
-  private async getPaidAmountByPurchaseId(
-    ctx: RequestContext,
-    supplierId: string
-  ): Promise<Map<string, number>> {
-    const paymentRepo = this.connection.getRepository(ctx, PurchasePayment);
-    const channelId = ctx.channelId as number;
-    const supplierIdNum = parseInt(String(supplierId), 10);
-    const payments = await paymentRepo.find({
-      where: { channelId, supplierId: supplierIdNum },
-      select: ['purchaseId', 'amount'],
-    });
-    const map = new Map<string, number>();
-    for (const p of payments) {
-      const current = map.get(p.purchaseId) ?? 0;
-      map.set(p.purchaseId, current + Number(p.amount));
-    }
-    return map;
-  }
-
-  /**
    * Get unpaid credit purchases for a supplier (oldest first).
-   * Uses paymentStatus for filtering; paidAmount for allocation comes from getPaidAmountByPurchaseId.
+   * Loads payments so the ledger projection can compute the entity-model view.
    */
   async getUnpaidPurchasesForSupplier(
     ctx: RequestContext,
@@ -85,12 +69,24 @@ export class SupplierPaymentAllocationService {
         isCreditPurchase: true,
         paymentStatus: In(['pending', 'partial']),
       },
+      relations: ['payments'],
       order: {
         createdAt: 'ASC', // Oldest first
       },
     });
 
     return purchases.filter(purchase => purchase.paymentStatus !== 'paid');
+  }
+
+  /**
+   * Verify the purchase-model AP balance matches the ledger before mutating payments.
+   * Returns the verified ledger snapshot so callers do not need to fetch it again.
+   */
+  private async assertPurchaseLedgerInSync(
+    ctx: RequestContext,
+    purchase: StockPurchase
+  ): Promise<PurchaseApSnapshot> {
+    return this.ledgerConsistencyGuard.assertInSync(ctx, this.purchaseApProjection, purchase);
   }
 
   /**
@@ -107,7 +103,7 @@ export class SupplierPaymentAllocationService {
         input.debitAccountCode.trim()
       );
     }
-    return this.connection.withTransaction(ctx, async transactionCtx => {
+    const allocationResult = await this.connection.withTransaction(ctx, async transactionCtx => {
       try {
         // 1. Get unpaid purchases
         let unpaidPurchases = await this.getUnpaidPurchasesForSupplier(
@@ -119,28 +115,40 @@ export class SupplierPaymentAllocationService {
           throw new UserInputError('No unpaid credit purchases found for this supplier.');
         }
 
-        // 2. Payment amount is already in cents
+        // 2. Filter to selected purchases if provided
+        if (input.purchaseIds && input.purchaseIds.length > 0) {
+          unpaidPurchases = unpaidPurchases.filter(purchase =>
+            input.purchaseIds!.includes(purchase.id)
+          );
+        }
+
+        // 3. Fail closed if any selected purchase has drifted from the ledger, and capture
+        // the verified ledger status for each purchase.
+        const purchaseStatusMap = new Map<
+          string,
+          { totalOwed: number; amountPaid: number; amountOwing: number }
+        >();
+        for (const purchase of unpaidPurchases) {
+          const status = await this.assertPurchaseLedgerInSync(transactionCtx, purchase);
+          purchaseStatusMap.set(purchase.id, status);
+        }
+
+        // 4. Payment amount is already in cents
         const paymentAmountInCents = input.paymentAmount;
 
-        // 3. Paid amount per purchase (single source of truth: sum of PurchasePayment)
-        const paidAmountByPurchaseId = await this.getPaidAmountByPurchaseId(
-          transactionCtx,
-          input.supplierId
-        );
-
-        // 4. Convert purchases to PaymentAllocationItem format
+        // 5. Build allocation items from ledger (AP balance per purchase) as source of truth
         const allocationItems: PaymentAllocationItem[] = unpaidPurchases.map(purchase => {
-          const paidAmount = paidAmountByPurchaseId.get(purchase.id) ?? 0;
+          const status = purchaseStatusMap.get(purchase.id)!;
           return {
             id: purchase.id,
             code: purchase.referenceNumber || purchase.id,
-            totalAmount: purchase.totalCost,
-            paidAmount,
+            totalAmount: status.totalOwed,
+            paidAmount: status.amountPaid,
             createdAt: purchase.createdAt,
           };
         });
 
-        // 5. Calculate allocation using shared utility
+        // 6. Calculate allocation using shared utility
         const calculation = calculatePaymentAllocation({
           itemsToPay: allocationItems,
           paymentAmount: paymentAmountInCents,
@@ -154,7 +162,7 @@ export class SupplierPaymentAllocationService {
           );
         }
 
-        // 6. Apply allocations: update paymentStatus, create PurchasePayment, post to ledger (single place)
+        // 7. Apply allocations: update paymentStatus, create PurchasePayment, post to ledger (single place)
         const purchasesPaid: Array<{
           purchaseId: string;
           purchaseReference: string;
@@ -170,22 +178,6 @@ export class SupplierPaymentAllocationService {
           if (!purchase) {
             continue;
           }
-
-          const currentPaidAmount =
-            allocationItems.find(item => item.id === allocation.itemId)?.paidAmount ?? 0;
-          const newPaidAmount = currentPaidAmount + allocation.amountToAllocate;
-          const newTotalCost = purchase.totalCost;
-
-          let newPaymentStatus: string;
-          if (newPaidAmount >= newTotalCost) {
-            newPaymentStatus = 'paid';
-          } else if (newPaidAmount > 0) {
-            newPaymentStatus = 'partial';
-          } else {
-            newPaymentStatus = 'pending';
-          }
-
-          await purchaseRepo.update({ id: purchase.id }, { paymentStatus: newPaymentStatus });
 
           // Persist payment for audit and so paidAmount = sum(PurchasePayment) stays single source of truth
           const paymentRecord = purchasePaymentRepo.create({
@@ -210,6 +202,26 @@ export class SupplierPaymentAllocationService {
             input.debitAccountCode?.trim()
           );
 
+          // Derive the new paymentStatus from the pre-posting ledger snapshot plus this
+          // allocation. Re-querying the global DataSource inside a transaction would miss
+          // the uncommitted supplier-payment entry, so we compute locally from the verified
+          // snapshot captured in purchaseStatusMap.
+          const snapshot = purchaseStatusMap.get(purchase.id);
+          const totalOwed = snapshot?.totalOwed ?? purchase.totalCost;
+          const paidBefore = snapshot?.amountPaid ?? 0;
+          const paidAfter = paidBefore + allocation.amountToAllocate;
+
+          let newPaymentStatus: string;
+          if (paidAfter >= totalOwed) {
+            newPaymentStatus = 'paid';
+          } else if (paidAfter > 0) {
+            newPaymentStatus = 'partial';
+          } else {
+            newPaymentStatus = 'pending';
+          }
+
+          await purchaseRepo.update({ id: purchase.id }, { paymentStatus: newPaymentStatus });
+
           purchasesPaid.push({
             purchaseId: purchase.id,
             purchaseReference: purchase.referenceNumber || purchase.id,
@@ -217,7 +229,7 @@ export class SupplierPaymentAllocationService {
           });
         }
 
-        // 7. Record repayment tracking if any payment was made
+        // 8. Record repayment tracking if any payment was made
         if (calculation.totalAllocated > 0) {
           await this.creditService.recordRepayment(
             transactionCtx,
@@ -227,59 +239,10 @@ export class SupplierPaymentAllocationService {
           );
         }
 
-        // 8. Remaining balance: use paid amounts from PurchasePayment (now includes new payments)
-        const remainingUnpaidPurchases = await this.getUnpaidPurchasesForSupplier(
-          transactionCtx,
-          input.supplierId
-        );
-        const paidAmountByPurchaseIdAfter = await this.getPaidAmountByPurchaseId(
-          transactionCtx,
-          input.supplierId
-        );
-        const remainingItems: PaymentAllocationItem[] = remainingUnpaidPurchases.map(purchase => {
-          const paidAmount = paidAmountByPurchaseIdAfter.get(purchase.id) ?? 0;
-          return {
-            id: purchase.id,
-            code: purchase.referenceNumber || purchase.id,
-            totalAmount: purchase.totalCost,
-            paidAmount,
-            createdAt: purchase.createdAt,
-          };
-        });
-        const remainingBalance = calculateRemainingBalance(remainingItems);
-        const excessPayment = calculation.excessPayment;
-        const totalAllocated = calculation.totalAllocated;
-
-        // 9. Log audit
-        if (this.auditService) {
-          await this.auditService.log(transactionCtx, 'supplier.payment.allocated', {
-            entityType: 'Customer',
-            entityId: input.supplierId,
-            data: {
-              paymentAmount: input.paymentAmount,
-              totalAllocated,
-              remainingBalance,
-              excessPayment,
-              purchasesPaid: purchasesPaid.map(p => ({
-                purchaseId: p.purchaseId,
-                purchaseReference: p.purchaseReference,
-                amountPaid: p.amountPaid,
-              })),
-              purchaseIds: input.purchaseIds || null,
-            },
-          });
-        }
-
-        this.logger.log(
-          `Supplier payment allocated: ${totalAllocated} across ${purchasesPaid.length} purchases for supplier ${input.supplierId}. ` +
-            `Remaining balance: ${remainingBalance}, Excess payment: ${excessPayment}`
-        );
-
         return {
           purchasesPaid,
-          remainingBalance,
-          totalAllocated,
-          excessPayment,
+          totalAllocated: calculation.totalAllocated,
+          excessPayment: calculation.excessPayment,
         };
       } catch (error) {
         this.logger.error(
@@ -288,6 +251,42 @@ export class SupplierPaymentAllocationService {
         throw error;
       }
     });
+
+    // 9. Remaining balance from ledger (AP by supplierId) as source of truth.
+    // Query AFTER the transaction commits: the global ledger query cannot see
+    // uncommitted supplier-payment entries, so reading inside the transaction
+    // returned the pre-payment balance.
+    const remainingBalance = await this.financialService.getSupplierBalance(ctx, input.supplierId);
+
+    // 10. Log audit
+    if (this.auditService) {
+      await this.auditService.log(ctx, 'supplier.payment.allocated', {
+        entityType: 'Customer',
+        entityId: input.supplierId,
+        data: {
+          paymentAmount: input.paymentAmount,
+          totalAllocated: allocationResult.totalAllocated,
+          remainingBalance,
+          excessPayment: allocationResult.excessPayment,
+          purchasesPaid: allocationResult.purchasesPaid.map(p => ({
+            purchaseId: p.purchaseId,
+            purchaseReference: p.purchaseReference,
+            amountPaid: p.amountPaid,
+          })),
+          purchaseIds: input.purchaseIds || null,
+        },
+      });
+    }
+
+    this.logger.log(
+      `Supplier payment allocated: ${allocationResult.totalAllocated} across ${allocationResult.purchasesPaid.length} purchases for supplier ${input.supplierId}. ` +
+        `Remaining balance: ${remainingBalance}, Excess payment: ${allocationResult.excessPayment}`
+    );
+
+    return {
+      ...allocationResult,
+      remainingBalance,
+    };
   }
 
   /**
@@ -302,6 +301,7 @@ export class SupplierPaymentAllocationService {
     const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
     const purchase = await purchaseRepo.findOne({
       where: { id: purchaseId, channelId: ctx.channelId as number },
+      relations: ['payments'],
     });
     if (!purchase) {
       throw new UserInputError(`Purchase ${purchaseId} not found.`);
@@ -309,9 +309,12 @@ export class SupplierPaymentAllocationService {
     if (!purchase.isCreditPurchase) {
       throw new UserInputError(`Purchase ${purchaseId} is not a credit purchase.`);
     }
-    const paidMap = await this.getPaidAmountByPurchaseId(ctx, String(purchase.supplierId));
-    const paidAmount = paidMap.get(purchase.id) ?? 0;
-    const outstanding = purchase.totalCost - paidAmount;
+
+    // Fail closed if purchase and ledger disagree. The ledger status is the source of truth
+    // for the purchase-level outstanding (AP balance for this purchase).
+    const status = await this.assertPurchaseLedgerInSync(ctx, purchase);
+    const outstanding = status.amountOwing;
+
     if (outstanding <= 0) {
       throw new UserInputError(`Purchase ${purchaseId} has no outstanding balance.`);
     }
@@ -330,5 +333,59 @@ export class SupplierPaymentAllocationService {
       purchaseIds: [purchaseId],
       debitAccountCode: debitAccountCode?.trim() || undefined,
     });
+  }
+
+  /**
+   * Human-approved rebuild: set a purchase's paymentStatus from the ledger AP balance.
+   * Does not mutate PurchasePayment records (audit trail). Superadmin only.
+   */
+  async rebuildPurchaseFromLedger(ctx: RequestContext, purchaseId: string): Promise<StockPurchase> {
+    const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
+    const purchase = await purchaseRepo.findOne({
+      where: { id: purchaseId, channelId: ctx.channelId as number },
+    });
+    if (!purchase) {
+      throw new UserInputError(`Purchase ${purchaseId} not found.`);
+    }
+    if (!purchase.isCreditPurchase) {
+      throw new UserInputError(`Purchase ${purchaseId} is not a credit purchase.`);
+    }
+
+    const status = await this.financialService.getPurchasePaymentStatus(ctx, purchaseId);
+
+    let newPaymentStatus: string;
+    if (status.amountOwing <= 0) {
+      newPaymentStatus = 'paid';
+    } else if (status.amountPaid <= 0) {
+      newPaymentStatus = 'pending';
+    } else {
+      newPaymentStatus = 'partial';
+    }
+
+    if (purchase.paymentStatus !== newPaymentStatus) {
+      purchase.paymentStatus = newPaymentStatus;
+      await purchaseRepo.save(purchase);
+
+      this.logger.log(
+        `Rebuilt purchase ${purchaseId} paymentStatus from ledger: ${newPaymentStatus} ` +
+          `(amountOwing=${status.amountOwing}, amountPaid=${status.amountPaid})`
+      );
+
+      if (this.auditService) {
+        await this.auditService.log(ctx, 'purchase.rebuild.from.ledger', {
+          entityType: 'Purchase',
+          entityId: purchaseId,
+          data: {
+            purchaseId,
+            newPaymentStatus,
+            amountOwing: status.amountOwing,
+            amountPaid: status.amountPaid,
+            totalOwed: status.totalOwed,
+          },
+        });
+      }
+    }
+
+    return purchase;
   }
 }

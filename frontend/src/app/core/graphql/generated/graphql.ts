@@ -794,6 +794,7 @@ export type ChannelCustomFields = {
   lastPaymentAmount?: Maybe<Scalars['Int']['output']>;
   lastPaymentDate?: Maybe<Scalars['DateTime']['output']>;
   maxAdminCount?: Maybe<Scalars['Int']['output']>;
+  notificationCategoryPreferences?: Maybe<Scalars['String']['output']>;
   paystackCustomerCode?: Maybe<Scalars['String']['output']>;
   paystackSubscriptionCode?: Maybe<Scalars['String']['output']>;
   publicSlug?: Maybe<Scalars['String']['output']>;
@@ -846,6 +847,7 @@ export type ChannelFilterParameter = {
   lastPaymentAmount?: InputMaybe<NumberOperators>;
   lastPaymentDate?: InputMaybe<DateOperators>;
   maxAdminCount?: InputMaybe<NumberOperators>;
+  notificationCategoryPreferences?: InputMaybe<StringOperators>;
   outOfStockThreshold?: InputMaybe<NumberOperators>;
   paystackCustomerCode?: InputMaybe<StringOperators>;
   paystackSubscriptionCode?: InputMaybe<StringOperators>;
@@ -892,6 +894,23 @@ export type ChannelListOptions = {
   take?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type ChannelNotificationPreferences = {
+  __typename?: 'ChannelNotificationPreferences';
+  customer: Scalars['Boolean']['output'];
+  finance: Scalars['Boolean']['output'];
+  operations: Scalars['Boolean']['output'];
+  orders: Scalars['Boolean']['output'];
+  stock: Scalars['Boolean']['output'];
+};
+
+export type ChannelNotificationPreferencesInput = {
+  customer?: InputMaybe<Scalars['Boolean']['input']>;
+  finance?: InputMaybe<Scalars['Boolean']['input']>;
+  operations?: InputMaybe<Scalars['Boolean']['input']>;
+  orders?: InputMaybe<Scalars['Boolean']['input']>;
+  stock?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
 export type ChannelSettings = {
   __typename?: 'ChannelSettings';
   cashierFlowEnabled: Scalars['Boolean']['output'];
@@ -912,6 +931,7 @@ export type ChannelSortParameter = {
   lastPaymentAmount?: InputMaybe<SortOrder>;
   lastPaymentDate?: InputMaybe<SortOrder>;
   maxAdminCount?: InputMaybe<SortOrder>;
+  notificationCategoryPreferences?: InputMaybe<SortOrder>;
   outOfStockThreshold?: InputMaybe<SortOrder>;
   paystackCustomerCode?: InputMaybe<SortOrder>;
   paystackSubscriptionCode?: InputMaybe<SortOrder>;
@@ -1336,6 +1356,7 @@ export type CreateChannelCustomFieldsInput = {
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
   maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
+  notificationCategoryPreferences?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   publicSlug?: InputMaybe<Scalars['String']['input']>;
@@ -1487,6 +1508,9 @@ export type CreateOrderCustomFieldsInput = {
   cogsStatus?: InputMaybe<Scalars['String']['input']>;
   createdByUserIdId?: InputMaybe<Scalars['ID']['input']>;
   lastModifiedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
+  reconciledAt?: InputMaybe<Scalars['DateTime']['input']>;
+  reconciliationNote?: InputMaybe<Scalars['String']['input']>;
+  reconciliationStrategy?: InputMaybe<Scalars['String']['input']>;
   reversedAt?: InputMaybe<Scalars['DateTime']['input']>;
   reversedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -2133,10 +2157,14 @@ export type Customer = Node & {
   id: Scalars['ID']['output'];
   lastName: Scalars['String']['output'];
   orders: OrderList;
-  outstandingAmount: Scalars['Float']['output'];
+  /** Customer balance (AR). Cents. Null when the ledger balance cannot be computed. */
+  outstandingAmount?: Maybe<Scalars['Float']['output']>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
-  /** Supplier balance (AP). Only non-zero when customer is a supplier. Cents. */
-  supplierOutstandingAmount: Scalars['Float']['output'];
+  /**
+   * Supplier balance (AP). Only non-zero when customer is a supplier. Cents.
+   * Null when the ledger balance cannot be computed.
+   */
+  supplierOutstandingAmount?: Maybe<Scalars['Float']['output']>;
   title?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['DateTime']['output'];
   user?: Maybe<User>;
@@ -3559,6 +3587,29 @@ export type LedgerAccountsResult = {
   items: Array<LedgerAccount>;
 };
 
+export type LedgerDivergenceCount = {
+  __typename?: 'LedgerDivergenceCount';
+  count: Scalars['Int']['output'];
+  entityType: Scalars['String']['output'];
+};
+
+export type LedgerDivergenceItem = {
+  __typename?: 'LedgerDivergenceItem';
+  descriptor: Scalars['String']['output'];
+  difference: Scalars['Int']['output'];
+  entityId: Scalars['ID']['output'];
+  entityType: Scalars['String']['output'];
+  entityValue: Scalars['Int']['output'];
+  ledgerValue: Scalars['Int']['output'];
+};
+
+export type LedgerDivergenceSummary = {
+  __typename?: 'LedgerDivergenceSummary';
+  byEntityType: Array<LedgerDivergenceCount>;
+  items: Array<LedgerDivergenceItem>;
+  totalDivergences: Scalars['Int']['output'];
+};
+
 export type LocaleStringCustomFieldConfig = CustomField & {
   __typename?: 'LocaleStringCustomFieldConfig';
   deprecated?: Maybe<Scalars['Boolean']['output']>;
@@ -4011,6 +4062,16 @@ export type Mutation = {
   overrideCustomerBalance: BalanceOverrideResult;
   paySingleOrder: PaymentAllocationResult;
   paySinglePurchase: SupplierPaymentAllocationResult;
+  /** Superadmin action: rebuild the ledger AR balance from the customer's order model. */
+  rebuildCustomerBalanceFromModel: BalanceOverrideResult;
+  /** Superadmin action: rebuild an order's state from the ledger AR balance. */
+  rebuildOrderFromLedger: ReconcileOrderResult;
+  /** Superadmin action: rebuild a purchase's payment state from the ledger. */
+  rebuildPurchaseFromLedger: StockPurchase;
+  /** Superadmin action: rebuild the ledger AP balance from the supplier's purchase model. */
+  rebuildSupplierBalanceFromModel: BalanceOverrideResult;
+  /** Superadmin action: mark a divergent order as reconciled with a chosen strategy. */
+  reconcileOrder: ReconcileOrderResult;
   recordCashCount: CashCountResult;
   recordExpense: RecordExpenseResult;
   recordPayment: PaymentAllocationResult;
@@ -4117,6 +4178,7 @@ export type Mutation = {
   updateChannelAdmin: Administrator;
   updateChannelFeatureFlagsPlatform: Channel;
   updateChannelLogo: ChannelSettings;
+  updateChannelNotificationPreferences: ChannelNotificationPreferences;
   updateChannelPaymentMethod: PaymentMethod;
   updateChannelPublicStorefrontPlatform: Channel;
   updateChannelStatus: Channel;
@@ -4144,6 +4206,7 @@ export type Mutation = {
   /** Update one or more FacetValues */
   updateFacetValues: Array<FacetValue>;
   updateGlobalSettings: UpdateGlobalSettingsResult;
+  updateNotificationPreferencesForChannel: ChannelNotificationPreferences;
   updateOrderLineQuantity: UpdateOrderItemsResult;
   updateOrderNote: HistoryEntry;
   /** Update an existing PaymentMethod */
@@ -4787,6 +4850,29 @@ export type MutationPaySinglePurchaseArgs = {
   input: PaySinglePurchaseInput;
 };
 
+export type MutationRebuildCustomerBalanceFromModelArgs = {
+  customerId: Scalars['ID']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type MutationRebuildOrderFromLedgerArgs = {
+  note?: InputMaybe<Scalars['String']['input']>;
+  orderId: Scalars['ID']['input'];
+};
+
+export type MutationRebuildPurchaseFromLedgerArgs = {
+  purchaseId: Scalars['ID']['input'];
+};
+
+export type MutationRebuildSupplierBalanceFromModelArgs = {
+  note?: InputMaybe<Scalars['String']['input']>;
+  supplierId: Scalars['ID']['input'];
+};
+
+export type MutationReconcileOrderArgs = {
+  input: ReconcileOrderInput;
+};
+
 export type MutationRecordCashCountArgs = {
   input: RecordCashCountInput;
 };
@@ -5062,6 +5148,10 @@ export type MutationUpdateChannelLogoArgs = {
   logoAssetId?: InputMaybe<Scalars['ID']['input']>;
 };
 
+export type MutationUpdateChannelNotificationPreferencesArgs = {
+  input: ChannelNotificationPreferencesInput;
+};
+
 export type MutationUpdateChannelPaymentMethodArgs = {
   input: UpdatePaymentMethodInput;
 };
@@ -5139,6 +5229,11 @@ export type MutationUpdateFacetValuesArgs = {
 
 export type MutationUpdateGlobalSettingsArgs = {
   input: UpdateGlobalSettingsInput;
+};
+
+export type MutationUpdateNotificationPreferencesForChannelArgs = {
+  channelId: Scalars['ID']['input'];
+  input: ChannelNotificationPreferencesInput;
 };
 
 export type MutationUpdateOrderLineQuantityArgs = {
@@ -5421,6 +5516,11 @@ export type Order = Node & {
   active: Scalars['Boolean']['output'];
   aggregateOrder?: Maybe<Order>;
   aggregateOrderId?: Maybe<Scalars['ID']['output']>;
+  /**
+   * Amount still owed on this order, in smallest currency unit (cents).
+   * Computed from the ledger (Accounts Receivable) and is the single source of truth.
+   */
+  amountOwing: Scalars['Int']['output'];
   billingAddress?: Maybe<OrderAddress>;
   channels: Array<Channel>;
   /** A unique code for the Order */
@@ -5505,6 +5605,9 @@ export type OrderCustomFields = {
   cogsStatus?: Maybe<Scalars['String']['output']>;
   createdByUserId?: Maybe<User>;
   lastModifiedByUserId?: Maybe<User>;
+  reconciledAt?: Maybe<Scalars['DateTime']['output']>;
+  reconciliationNote?: Maybe<Scalars['String']['output']>;
+  reconciliationStrategy?: Maybe<Scalars['String']['output']>;
   reversedAt?: Maybe<Scalars['DateTime']['output']>;
   reversedByUserId?: Maybe<User>;
 };
@@ -5514,6 +5617,7 @@ export type OrderFilterParameter = {
   _or?: InputMaybe<Array<OrderFilterParameter>>;
   active?: InputMaybe<BooleanOperators>;
   aggregateOrderId?: InputMaybe<IdOperators>;
+  amountOwing?: InputMaybe<NumberOperators>;
   auditCreatedAt?: InputMaybe<DateOperators>;
   cashierPendingAt?: InputMaybe<DateOperators>;
   code?: InputMaybe<StringOperators>;
@@ -5523,6 +5627,9 @@ export type OrderFilterParameter = {
   customerLastName?: InputMaybe<StringOperators>;
   id?: InputMaybe<IdOperators>;
   orderPlacedAt?: InputMaybe<DateOperators>;
+  reconciledAt?: InputMaybe<DateOperators>;
+  reconciliationNote?: InputMaybe<StringOperators>;
+  reconciliationStrategy?: InputMaybe<StringOperators>;
   reversedAt?: InputMaybe<DateOperators>;
   shipping?: InputMaybe<NumberOperators>;
   shippingWithTax?: InputMaybe<NumberOperators>;
@@ -5711,6 +5818,23 @@ export type OrderProcessState = {
   to: Array<Scalars['String']['output']>;
 };
 
+export type OrderReconciliationItem = {
+  __typename?: 'OrderReconciliationItem';
+  customerId?: Maybe<Scalars['ID']['output']>;
+  difference: Scalars['Int']['output'];
+  ledgerOwing: Scalars['Int']['output'];
+  orderCode: Scalars['String']['output'];
+  orderId: Scalars['ID']['output'];
+  orderModelOwing: Scalars['Int']['output'];
+  orderTotal: Scalars['Int']['output'];
+};
+
+export type OrderReconciliationResult = {
+  __typename?: 'OrderReconciliationResult';
+  items: Array<OrderReconciliationItem>;
+  totalItems: Scalars['Int']['output'];
+};
+
 export type OrderReversalResult = {
   __typename?: 'OrderReversalResult';
   /** True if the order had settled payments before reversal (refund is not automatic). */
@@ -5720,6 +5844,7 @@ export type OrderReversalResult = {
 
 export type OrderSortParameter = {
   aggregateOrderId?: InputMaybe<SortOrder>;
+  amountOwing?: InputMaybe<SortOrder>;
   auditCreatedAt?: InputMaybe<SortOrder>;
   cashierPendingAt?: InputMaybe<SortOrder>;
   code?: InputMaybe<SortOrder>;
@@ -5730,6 +5855,9 @@ export type OrderSortParameter = {
   id?: InputMaybe<SortOrder>;
   lastModifiedByUserId?: InputMaybe<SortOrder>;
   orderPlacedAt?: InputMaybe<SortOrder>;
+  reconciledAt?: InputMaybe<SortOrder>;
+  reconciliationNote?: InputMaybe<SortOrder>;
+  reconciliationStrategy?: InputMaybe<SortOrder>;
   reversedAt?: InputMaybe<SortOrder>;
   reversedByUserId?: InputMaybe<SortOrder>;
   shipping?: InputMaybe<SortOrder>;
@@ -7107,6 +7235,7 @@ export type Query = {
   cashierSessions: CashierSessionList;
   channel?: Maybe<Channel>;
   channelDetailPlatform?: Maybe<PlatformChannelDetail>;
+  channelNotificationPreferences: ChannelNotificationPreferences;
   channelReconciliationConfig: Array<PaymentMethodReconciliationConfig>;
   channels: ChannelList;
   checkAuthorizationStatus: AuthorizationStatus;
@@ -7130,6 +7259,8 @@ export type Query = {
   customerGroups: CustomerGroupList;
   customers: CustomerList;
   dashboardStats: DashboardStats;
+  /** Superadmin diagnostic: orders whose order-model outstanding differs from the ledger. */
+  divergentOrders: OrderReconciliationResult;
   /** Ledger accounts eligible as payment/debit sources (asset, leaf, excluding AR and inventory). */
   eligibleDebitAccounts: LedgerAccountsResult;
   /** Returns a list of eligible shipping methods for the draft Order */
@@ -7166,9 +7297,11 @@ export type Query = {
   journalEntry?: Maybe<JournalEntry>;
   lastClosedSessionClosingBalances: Array<LastClosingBalance>;
   ledgerAccounts: LedgerAccountsResult;
+  ledgerDivergences: LedgerDivergenceSummary;
   me?: Maybe<CurrentUser>;
   /** Get metrics for the given interval and metric types. */
   metricSummary: Array<MetricSummary>;
+  notificationPreferencesForChannel: ChannelNotificationPreferences;
   notificationsForChannel: NotificationList;
   /** Open batches for a variant (and optional location) for batch selection when recording a sale. */
   openBatchesForVariant: Array<OpenBatchForVariant>;
@@ -7432,6 +7565,10 @@ export type QueryDashboardStatsArgs = {
   startDate?: InputMaybe<Scalars['DateTime']['input']>;
 };
 
+export type QueryDivergentOrdersArgs = {
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type QueryEligibleShippingMethodsForDraftOrderArgs = {
   orderId: Scalars['ID']['input'];
 };
@@ -7518,8 +7655,16 @@ export type QueryLastClosedSessionClosingBalancesArgs = {
   channelId: Scalars['Int']['input'];
 };
 
+export type QueryLedgerDivergencesArgs = {
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type QueryMetricSummaryArgs = {
   input?: InputMaybe<MetricSummaryInput>;
+};
+
+export type QueryNotificationPreferencesForChannelArgs = {
+  channelId: Scalars['ID']['input'];
 };
 
 export type QueryNotificationsForChannelArgs = {
@@ -7773,6 +7918,19 @@ export type QueryZoneArgs = {
 
 export type QueryZonesArgs = {
   options?: InputMaybe<ZoneListOptions>;
+};
+
+export type ReconcileOrderInput = {
+  note?: InputMaybe<Scalars['String']['input']>;
+  orderId: Scalars['ID']['input'];
+  strategy: Scalars['String']['input'];
+};
+
+export type ReconcileOrderResult = {
+  __typename?: 'ReconcileOrderResult';
+  message: Scalars['String']['output'];
+  orderId: Scalars['ID']['output'];
+  success: Scalars['Boolean']['output'];
 };
 
 export type Reconciliation = {
@@ -8753,6 +8911,7 @@ export enum StockMovementType {
 
 export type StockPurchase = {
   __typename?: 'StockPurchase';
+  amountOwing?: Maybe<Scalars['Int']['output']>;
   createdAt: Scalars['DateTime']['output'];
   id: Scalars['ID']['output'];
   isCreditPurchase: Scalars['Boolean']['output'];
@@ -9317,6 +9476,7 @@ export type UpdateChannelCustomFieldsInput = {
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
   maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
+  notificationCategoryPreferences?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
   publicSlug?: InputMaybe<Scalars['String']['input']>;
@@ -9534,6 +9694,9 @@ export type UpdateOrderCustomFieldsInput = {
   cogsStatus?: InputMaybe<Scalars['String']['input']>;
   createdByUserIdId?: InputMaybe<Scalars['ID']['input']>;
   lastModifiedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
+  reconciledAt?: InputMaybe<Scalars['DateTime']['input']>;
+  reconciliationNote?: InputMaybe<Scalars['String']['input']>;
+  reconciliationStrategy?: InputMaybe<Scalars['String']['input']>;
   reversedAt?: InputMaybe<Scalars['DateTime']['input']>;
   reversedByUserIdId?: InputMaybe<Scalars['ID']['input']>;
 };
@@ -9798,6 +9961,7 @@ export type UserCustomFields = {
   __typename?: 'UserCustomFields';
   authorizationStatus?: Maybe<Scalars['String']['output']>;
   notificationPreferences?: Maybe<Scalars['String']['output']>;
+  phoneNumber?: Maybe<Scalars['String']['output']>;
 };
 
 export type UserInfo = {
@@ -11380,6 +11544,7 @@ export type GetOrdersQuery = {
       total: number;
       totalWithTax: number;
       currencyCode: CurrencyCode;
+      amountOwing: number;
       customer?: {
         __typename?: 'Customer';
         id: string;
@@ -11473,6 +11638,7 @@ export type GetCustomerOrdersQuery = {
         total: number;
         totalWithTax: number;
         currencyCode: CurrencyCode;
+        amountOwing: number;
         payments?: Array<{
           __typename?: 'Payment';
           id: string;
@@ -11556,6 +11722,7 @@ export type GetOrderFullQuery = {
     total: number;
     totalWithTax: number;
     currencyCode: CurrencyCode;
+    amountOwing: number;
     customer?: {
       __typename?: 'Customer';
       id: string;
@@ -11639,7 +11806,7 @@ export type GetCustomersQuery = {
       phoneNumber?: string | null;
       createdAt: any;
       updatedAt: any;
-      outstandingAmount: number;
+      outstandingAmount?: number | null;
       customFields?: {
         __typename?: 'CustomerCustomFields';
         isSupplier?: boolean | null;
@@ -11704,7 +11871,7 @@ export type GetCustomerQuery = {
     phoneNumber?: string | null;
     createdAt: any;
     updatedAt: any;
-    outstandingAmount: number;
+    outstandingAmount?: number | null;
     customFields?: {
       __typename?: 'CustomerCustomFields';
       isSupplier?: boolean | null;
@@ -12257,7 +12424,7 @@ export type GetSuppliersQuery = {
       phoneNumber?: string | null;
       createdAt: any;
       updatedAt: any;
-      supplierOutstandingAmount: number;
+      supplierOutstandingAmount?: number | null;
       customFields?: {
         __typename?: 'CustomerCustomFields';
         isSupplier?: boolean | null;
@@ -13856,6 +14023,36 @@ export type GetAnalyticsStatsQuery = {
 export type RefreshAnalyticsMutationVariables = Exact<{ [key: string]: never }>;
 
 export type RefreshAnalyticsMutation = { __typename?: 'Mutation'; refreshAnalytics: boolean };
+
+export type ChannelNotificationPreferencesQueryVariables = Exact<{ [key: string]: never }>;
+
+export type ChannelNotificationPreferencesQuery = {
+  __typename?: 'Query';
+  channelNotificationPreferences: {
+    __typename?: 'ChannelNotificationPreferences';
+    customer: boolean;
+    orders: boolean;
+    stock: boolean;
+    finance: boolean;
+    operations: boolean;
+  };
+};
+
+export type UpdateChannelNotificationPreferencesMutationVariables = Exact<{
+  input: ChannelNotificationPreferencesInput;
+}>;
+
+export type UpdateChannelNotificationPreferencesMutation = {
+  __typename?: 'Mutation';
+  updateChannelNotificationPreferences: {
+    __typename?: 'ChannelNotificationPreferences';
+    customer: boolean;
+    orders: boolean;
+    stock: boolean;
+    finance: boolean;
+    operations: boolean;
+  };
+};
 
 export type UpdateProductBasicMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -19225,6 +19422,7 @@ export const GetOrdersDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'total' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'totalWithTax' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currencyCode' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'amountOwing' } },
                       {
                         kind: 'Field',
                         name: { kind: 'Name', value: 'customer' },
@@ -19452,6 +19650,7 @@ export const GetCustomerOrdersDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'total' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'totalWithTax' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'currencyCode' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'amountOwing' } },
                             {
                               kind: 'Field',
                               name: { kind: 'Name', value: 'payments' },
@@ -19633,6 +19832,7 @@ export const GetOrderFullDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'total' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'totalWithTax' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'currencyCode' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'amountOwing' } },
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'customer' },
@@ -25961,6 +26161,90 @@ export const RefreshAnalyticsDocument = {
     },
   ],
 } as unknown as DocumentNode<RefreshAnalyticsMutation, RefreshAnalyticsMutationVariables>;
+export const ChannelNotificationPreferencesDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'ChannelNotificationPreferences' },
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'channelNotificationPreferences' },
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'customer' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'orders' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'stock' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'finance' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'operations' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  ChannelNotificationPreferencesQuery,
+  ChannelNotificationPreferencesQueryVariables
+>;
+export const UpdateChannelNotificationPreferencesDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateChannelNotificationPreferences' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: { kind: 'Name', value: 'ChannelNotificationPreferencesInput' },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateChannelNotificationPreferences' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'customer' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'orders' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'stock' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'finance' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'operations' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  UpdateChannelNotificationPreferencesMutation,
+  UpdateChannelNotificationPreferencesMutationVariables
+>;
 export const UpdateProductBasicDocument = {
   kind: 'Document',
   definitions: [

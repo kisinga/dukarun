@@ -1,5 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RequestContext, Role, TransactionalConnection, User, Administrator } from '@vendure/core';
+import {
+  ManageReconciliationPermission,
+  ViewFinancialsPermission,
+} from '../../plugins/ledger/permissions';
+
+const FINANCIAL_PERMISSIONS = [
+  ViewFinancialsPermission.Permission,
+  ManageReconciliationPermission.Permission,
+];
 
 @Injectable()
 export class ChannelUserService {
@@ -68,6 +77,69 @@ export class ChannelUserService {
     } catch (error) {
       this.logger.error(
         `Failed to get channel admin users for channel ${channelId}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Get channel admin user IDs who are allowed to see financial details.
+   * Filters by roles that include ViewFinancials or ManageReconciliation permissions.
+   */
+  async getChannelFinancialAdminUserIds(
+    ctx: RequestContext,
+    channelId: string,
+    options: { includeSuperAdmins?: boolean } = {}
+  ): Promise<string[]> {
+    try {
+      const administrators = await this.connection.rawConnection
+        .getRepository(Administrator)
+        .createQueryBuilder('administrator')
+        .innerJoinAndSelect('administrator.user', 'user')
+        .innerJoinAndSelect('user.roles', 'role')
+        .innerJoin('role.channels', 'channel')
+        .where('channel.id = :channelId', { channelId })
+        .andWhere('user.deletedAt IS NULL')
+        .getMany();
+
+      const userIds = new Set<string>();
+      for (const admin of administrators) {
+        if (!admin.user) continue;
+        const hasFinancialPermission = admin.user.roles?.some(role =>
+          role.permissions?.some(p => FINANCIAL_PERMISSIONS.includes(p as any))
+        );
+        if (hasFinancialPermission) {
+          userIds.add(admin.user.id.toString());
+        }
+      }
+
+      if (options.includeSuperAdmins ?? true) {
+        const superAdmins = await this.connection.rawConnection
+          .getRepository(Administrator)
+          .createQueryBuilder('administrator')
+          .innerJoinAndSelect('administrator.user', 'user')
+          .innerJoinAndSelect('user.roles', 'role')
+          .leftJoin('role.channels', 'channel')
+          .where('channel.id IS NULL')
+          .andWhere('user.deletedAt IS NULL')
+          .getMany();
+
+        for (const admin of superAdmins) {
+          if (!admin.user) continue;
+          const hasFinancialPermission = admin.user.roles?.some(role =>
+            role.permissions?.some(p => FINANCIAL_PERMISSIONS.includes(p as any))
+          );
+          if (hasFinancialPermission) {
+            userIds.add(admin.user.id.toString());
+          }
+        }
+      }
+
+      return Array.from(userIds);
+    } catch (error) {
+      this.logger.error(
+        `Failed to get channel financial admin users for channel ${channelId}: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined
       );
       return [];

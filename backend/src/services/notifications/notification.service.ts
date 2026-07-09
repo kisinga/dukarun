@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RequestContext, TransactionalConnection, User } from '@vendure/core';
+import { ChannelService, RequestContext, TransactionalConnection, User } from '@vendure/core';
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { ChannelUserService } from '../auth/channel-user.service';
 
@@ -26,6 +26,24 @@ export enum NotificationType {
 }
 
 /**
+ * Per-trigger preferences for shift open/close notifications.
+ */
+export interface ShiftTriggerPrefs {
+  whatsapp?: boolean;
+  inApp?: boolean;
+  email?: boolean;
+  sms?: boolean;
+}
+
+/**
+ * Shift notification preferences.
+ */
+export interface ShiftNotificationPrefs {
+  opened?: ShiftTriggerPrefs;
+  closed?: ShiftTriggerPrefs;
+}
+
+/**
  * User notification preferences structure.
  * Controls which notification channels are enabled per notification type.
  */
@@ -33,7 +51,28 @@ export interface UserNotificationPrefs {
   inApp?: Record<string, boolean>;
   sms?: Record<string, boolean> & { enabled?: boolean };
   push?: Record<string, boolean> & { enabled?: boolean };
+  shift?: ShiftNotificationPrefs;
 }
+
+export type NotificationCategory = 'customer' | 'orders' | 'stock' | 'finance' | 'operations';
+
+export interface ChannelNotificationPreferences {
+  customer: boolean;
+  orders: boolean;
+  stock: boolean;
+  finance: boolean;
+  operations: boolean;
+}
+
+export type ChannelNotificationPreferencesInput = Partial<ChannelNotificationPreferences>;
+
+export const DEFAULT_CHANNEL_NOTIFICATION_PREFERENCES: ChannelNotificationPreferences = {
+  customer: true,
+  orders: true,
+  stock: true,
+  finance: true,
+  operations: true,
+};
 
 @Entity()
 export class Notification {
@@ -98,7 +137,8 @@ export class NotificationService {
 
   constructor(
     private connection: TransactionalConnection,
-    private channelUserService: ChannelUserService
+    private channelUserService: ChannelUserService,
+    private channelService: ChannelService
   ) {}
 
   async createNotification(
@@ -155,9 +195,17 @@ export class NotificationService {
   }
 
   async markAsRead(ctx: RequestContext, notificationId: string): Promise<boolean> {
-    const result = await this.connection.rawConnection
-      .getRepository(Notification)
-      .update({ id: notificationId }, { read: true });
+    if (!ctx.activeUserId || !ctx.channelId) {
+      return false;
+    }
+    const result = await this.connection.rawConnection.getRepository(Notification).update(
+      {
+        id: notificationId,
+        userId: String(ctx.activeUserId),
+        channelId: String(ctx.channelId),
+      },
+      { read: true }
+    );
     return (result.affected || 0) > 0;
   }
 
@@ -211,6 +259,90 @@ export class NotificationService {
       });
 
     return { items, totalItems };
+  }
+
+  /**
+   * Channel-wide switches for broad notification groups. Missing or invalid
+   * preferences intentionally fall back to enabled for backwards compatibility.
+   */
+  async getChannelNotificationPreferences(
+    ctx: RequestContext,
+    channelId: string
+  ): Promise<ChannelNotificationPreferences> {
+    const channel = await this.channelService.findOne(ctx, channelId);
+    const raw = (channel?.customFields as Record<string, unknown> | undefined)
+      ?.notificationCategoryPreferences;
+
+    if (!raw) {
+      return { ...DEFAULT_CHANNEL_NOTIFICATION_PREFERENCES };
+    }
+
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!parsed || typeof parsed !== 'object') {
+        return { ...DEFAULT_CHANNEL_NOTIFICATION_PREFERENCES };
+      }
+      return this.normalizeChannelNotificationPreferences(
+        parsed as ChannelNotificationPreferencesInput
+      );
+    } catch {
+      this.logger.warn(`Invalid notification category preferences for channel ${channelId}`);
+      return { ...DEFAULT_CHANNEL_NOTIFICATION_PREFERENCES };
+    }
+  }
+
+  async updateChannelNotificationPreferences(
+    ctx: RequestContext,
+    channelId: string,
+    input: ChannelNotificationPreferencesInput
+  ): Promise<ChannelNotificationPreferences> {
+    const current = await this.getChannelNotificationPreferences(ctx, channelId);
+    const preferences = this.normalizeChannelNotificationPreferences({ ...current, ...input });
+
+    await this.channelService.update(ctx, {
+      id: channelId,
+      customFields: {
+        notificationCategoryPreferences: JSON.stringify(preferences),
+      } as any,
+    });
+
+    return preferences;
+  }
+
+  async isChannelNotificationCategoryEnabled(
+    ctx: RequestContext,
+    channelId: string,
+    category: NotificationCategory
+  ): Promise<boolean> {
+    const preferences = await this.getChannelNotificationPreferences(ctx, channelId);
+    return preferences[category];
+  }
+
+  private normalizeChannelNotificationPreferences(
+    input: ChannelNotificationPreferencesInput
+  ): ChannelNotificationPreferences {
+    return {
+      customer:
+        typeof input.customer === 'boolean'
+          ? input.customer
+          : DEFAULT_CHANNEL_NOTIFICATION_PREFERENCES.customer,
+      orders:
+        typeof input.orders === 'boolean'
+          ? input.orders
+          : DEFAULT_CHANNEL_NOTIFICATION_PREFERENCES.orders,
+      stock:
+        typeof input.stock === 'boolean'
+          ? input.stock
+          : DEFAULT_CHANNEL_NOTIFICATION_PREFERENCES.stock,
+      finance:
+        typeof input.finance === 'boolean'
+          ? input.finance
+          : DEFAULT_CHANNEL_NOTIFICATION_PREFERENCES.finance,
+      operations:
+        typeof input.operations === 'boolean'
+          ? input.operations
+          : DEFAULT_CHANNEL_NOTIFICATION_PREFERENCES.operations,
+    };
   }
 
   // ============================================================================
@@ -268,7 +400,26 @@ export class NotificationService {
       },
       sms: { enabled: true },
       push: { enabled: true },
+      shift: {
+        opened: { whatsapp: true, inApp: true, email: false },
+        closed: { whatsapp: true, inApp: true, email: false },
+      },
     };
+  }
+
+  /**
+   * Check if a shift notification channel is enabled for a user.
+   * Defaults to true if the preference is missing.
+   */
+  async isShiftNotificationEnabled(
+    ctx: RequestContext,
+    userId: string,
+    _channelId: string,
+    trigger: 'opened' | 'closed',
+    channel: 'whatsapp' | 'inApp' | 'email' | 'sms'
+  ): Promise<boolean> {
+    const prefs = await this.getUserPreferences(ctx, userId, _channelId);
+    return prefs.shift?.[trigger]?.[channel] !== false;
   }
 
   /**

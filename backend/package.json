@@ -45,6 +45,7 @@
     "@vendure/graphiql-plugin": "3.6.4",
     "axios": "^1.18.1",
     "concurrently": "10.0.3",
+    "dataloader": "^2.2.3",
     "dotenv": "17.4.2",
     "ioredis": "^5.11.1",
     "p-limit": "^7.3.0",

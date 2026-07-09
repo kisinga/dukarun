@@ -9,6 +9,10 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { RequestContext } from '@vendure/core';
 import { Order } from '@vendure/core';
 import { PaymentAllocationService } from '../../../src/services/payments/payment-allocation.service';
+import {
+  LedgerConsistencyGuard,
+  OrderArProjection,
+} from '../../../src/services/financial/ledger-projection';
 
 const MOCK_SESSION = { id: 'session-123', channelId: 1, status: 'open' as const };
 
@@ -62,6 +66,8 @@ describe('Session gate (requireOpenSession)', () => {
       metadata: { allocatedAmount: 5000 },
       createdAt: new Date(),
     };
+    const orderArProjection = new OrderArProjection(mockFinancialService);
+    const ledgerConsistencyGuard = new LedgerConsistencyGuard();
     return new PaymentAllocationService(
       mockConnection,
       mockOrderService,
@@ -76,6 +82,8 @@ describe('Session gate (requireOpenSession)', () => {
       mockChartOfAccountsService,
       mockCashierSessionService,
       mockChannelPaymentMethodService,
+      ledgerConsistencyGuard,
+      orderArProjection,
       undefined
     );
   }

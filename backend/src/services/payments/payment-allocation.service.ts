@@ -12,12 +12,21 @@ import {
   isGraphQlErrorResult,
 } from '@vendure/core';
 import { In, IsNull, Not } from 'typeorm';
+import {
+  AR_OWING_ORDER_STATES,
+  PAYABLE_ORDER_STATES,
+} from '../../constants/order-states.constants';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { OpenSessionService } from '../financial/open-session.service';
 import { ChartOfAccountsService } from '../financial/chart-of-accounts.service';
 import { FinancialService } from '../financial/financial.service';
 import { CreditService } from '../credit/credit.service';
 import { ChannelPaymentMethodService } from '../financial/channel-payment-method.service';
+import {
+  LedgerConsistencyGuard,
+  OrderArProjection,
+  OrderArSnapshot,
+} from '../financial/ledger-projection';
 import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
 import { PaymentAllocationItem, calculatePaymentAllocation } from './payment-allocation-base.types';
 
@@ -95,6 +104,8 @@ export class PaymentAllocationService {
     private readonly chartOfAccountsService: ChartOfAccountsService,
     private readonly cashierSessionService: OpenSessionService,
     private readonly channelPaymentMethodService: ChannelPaymentMethodService,
+    private readonly ledgerConsistencyGuard: LedgerConsistencyGuard,
+    private readonly orderArProjection: OrderArProjection,
     @Optional() private readonly auditService?: AuditService
   ) {}
 
@@ -159,7 +170,7 @@ export class PaymentAllocationService {
     const orders = await orderRepo.find({
       where: {
         customer: { id: customerId },
-        state: In(['ArrangingPayment', 'Fulfilled', 'PartiallyFulfilled']),
+        state: In(PAYABLE_ORDER_STATES),
       },
       relations: ['payments'],
       order: {
@@ -214,16 +225,24 @@ export class PaymentAllocationService {
           throw new UserInputError('No unpaid orders found for this customer.');
         }
 
-        // 3. Payment amount is already in cents
+        // 3. Fail closed if any selected order has drifted from the ledger, and capture
+        // the verified ledger status for each order.
+        const orderStatusMap = new Map<
+          string,
+          { totalOwed: number; amountPaid: number; amountOwing: number }
+        >();
+        for (const order of unpaidOrders) {
+          const status = await this.assertOrderLedgerInSync(transactionCtx, order);
+          orderStatusMap.set(order.id.toString(), status);
+        }
+
+        // 4. Payment amount is already in cents
         const paymentAmountInCents = input.paymentAmount;
 
-        // 4. Build allocation items from ledger (AR balance per order) as source of truth
+        // 5. Build allocation items from ledger (AR balance per order) as source of truth
         const allocationItems: PaymentAllocationItem[] = [];
         for (const order of unpaidOrders) {
-          const status = await this.financialService.getOrderPaymentStatus(
-            transactionCtx,
-            order.id.toString()
-          );
+          const status = orderStatusMap.get(order.id.toString())!;
           allocationItems.push({
             id: order.id.toString(),
             code: order.code,
@@ -233,7 +252,7 @@ export class PaymentAllocationService {
           });
         }
 
-        // 5. Calculate allocation using shared utility
+        // 6. Calculate allocation using shared utility
         const calculation = calculatePaymentAllocation({
           itemsToPay: allocationItems,
           paymentAmount: paymentAmountInCents,
@@ -247,7 +266,7 @@ export class PaymentAllocationService {
           );
         }
 
-        // 6. Apply allocations to orders
+        // 7. Apply allocations to orders
         const ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }> = [];
 
         // Track payment amounts allocated to each order for cache update
@@ -299,7 +318,7 @@ export class PaymentAllocationService {
           });
         }
 
-        // 7. Remaining balance from ledger (AR by customerId) as source of truth
+        // 8. Remaining balance from ledger (AR by customerId) as source of truth
         const remainingBalance = await this.financialService.getCustomerBalance(
           transactionCtx,
           input.customerId
@@ -358,6 +377,17 @@ export class PaymentAllocationService {
   }
 
   /**
+   * Verify the order-model AR balance matches the ledger before mutating payments.
+   * Returns the verified ledger snapshot so callers do not need to fetch it again.
+   */
+  private async assertOrderLedgerInSync(
+    ctx: RequestContext,
+    order: Order
+  ): Promise<OrderArSnapshot> {
+    return this.ledgerConsistencyGuard.assertInSync(ctx, this.orderArProjection, order);
+  }
+
+  /**
    * Pay a single order (convenience method for individual order payments)
    */
   async paySingleOrder(
@@ -379,15 +409,15 @@ export class PaymentAllocationService {
     }
 
     // Check if the order is in a state that allows payment
-    if (!['ArrangingPayment', 'Fulfilled', 'PartiallyFulfilled'].includes(order.state)) {
+    if (!PAYABLE_ORDER_STATES.includes(order.state as any)) {
       throw new UserInputError(
-        `Order ${order.code} is in state "${order.state}" and cannot be paid. Only orders in "ArrangingPayment", "Fulfilled", or "PartiallyFulfilled" states can be paid.`
+        `Order ${order.code} is in state "${order.state}" and cannot be paid. Only orders in "${PAYABLE_ORDER_STATES.join('", "')}" states can be paid.`
       );
     }
 
-    // Use ledger as source of truth for order-level outstanding (AR balance for this order).
-    // Query by order entity id (not API id) so we match how journal lines were written.
-    const status = await this.financialService.getOrderPaymentStatus(ctx, order.id.toString());
+    // Fail closed if order and ledger disagree. The ledger status is the source of truth
+    // for the order-level outstanding (AR balance for this order).
+    const status = await this.assertOrderLedgerInSync(ctx, order);
     const outstandingAmount = status.amountOwing;
 
     if (outstandingAmount <= 0) {
@@ -533,9 +563,9 @@ export class PaymentAllocationService {
     if (!order.customer) {
       throw new UserInputError(`Order ${order.code} has no customer associated`);
     }
-    if (!['ArrangingPayment', 'Fulfilled', 'PartiallyFulfilled'].includes(order.state)) {
+    if (!PAYABLE_ORDER_STATES.includes(order.state as any)) {
       throw new UserInputError(
-        `Order ${order.code} is in state "${order.state}" and cannot be settled. Only orders in "ArrangingPayment", "Fulfilled", or "PartiallyFulfilled" states can be settled.`
+        `Order ${order.code} is in state "${order.state}" and cannot be settled. Only orders in "${PAYABLE_ORDER_STATES.join('", "')}" states can be settled.`
       );
     }
 
@@ -584,57 +614,74 @@ export class PaymentAllocationService {
     const customerId = order.customer.id.toString();
 
     // Move the money atomically: every tender settles and posts, or none does.
-    const tendersPaid = await this.connection.withTransaction(ctx, async transactionCtx => {
-      // Re-load the order inside the transaction so each createPayment sees fresh state.
-      const txOrder = await this.orderService.findOne(transactionCtx, input.orderId, [
-        'customer',
-        'payments',
-      ]);
-      if (!txOrder) {
-        throw new UserInputError(`Order ${input.orderId} not found`);
-      }
-
-      const paid: Array<{ paymentMethodCode: string; amount: number }> = [];
-      for (const tender of resolvedTenders) {
-        // paymentType 'cashier-settlement' marks this as an allocation (DR cash / CR AR),
-        // not a cash sale, so the PaymentEventsAdapter safety net does NOT re-post it.
-        const metadata: Record<string, unknown> = {
-          paymentType: 'cashier-settlement',
-          customerId,
-          allocatedAmount: tender.amount,
-        };
-        if (tender.referenceNumber) {
-          metadata.referenceNumber = tender.referenceNumber;
+    // The order-state transition also happens inside the transaction so a payment can never
+    // commit while the state advance fails.
+    const { tendersPaid, stateAdvanced } = await this.connection.withTransaction(
+      ctx,
+      async transactionCtx => {
+        // Re-load the order inside the transaction so each createPayment sees fresh state.
+        const txOrder = await this.orderService.findOne(transactionCtx, input.orderId, [
+          'customer',
+          'payments',
+        ]);
+        if (!txOrder) {
+          throw new UserInputError(`Order ${input.orderId} not found`);
         }
 
-        const payment = await this.addAllocatedPaymentToOrder(
-          transactionCtx,
-          txOrder,
-          tender.amount,
-          tender.code,
-          metadata
-        );
+        const paid: Array<{ paymentMethodCode: string; amount: number }> = [];
+        for (const tender of resolvedTenders) {
+          // paymentType 'cashier-settlement' marks this as an allocation (DR cash / CR AR),
+          // not a cash sale, so the PaymentEventsAdapter safety net does NOT re-post it.
+          const metadata: Record<string, unknown> = {
+            paymentType: 'cashier-settlement',
+            customerId,
+            allocatedAmount: tender.amount,
+          };
+          if (tender.referenceNumber) {
+            metadata.referenceNumber = tender.referenceNumber;
+          }
 
-        await this.financialService.recordPaymentAllocation(
-          transactionCtx,
-          payment.id.toString(),
-          txOrder,
-          tender.code,
-          tender.amount,
-          undefined,
-          session.id,
-          customerId
-        );
+          const payment = await this.addAllocatedPaymentToOrder(
+            transactionCtx,
+            txOrder,
+            tender.amount,
+            tender.code,
+            metadata
+          );
 
-        paid.push({ paymentMethodCode: tender.code, amount: tender.amount });
+          await this.financialService.recordPaymentAllocation(
+            transactionCtx,
+            payment.id.toString(),
+            txOrder,
+            tender.code,
+            tender.amount,
+            undefined,
+            session.id,
+            customerId
+          );
+
+          paid.push({ paymentMethodCode: tender.code, amount: tender.amount });
+        }
+
+        await this.updateOrderCustomFields(transactionCtx, txOrder.id, {
+          lastModifiedByUserId: transactionCtx.activeUserId || undefined,
+        });
+
+        // Only advance out of pre-payment states. Fulfilled/Shipped/Delivered are terminal
+        // lifecycle states and must not be rewound to PaymentSettled.
+        let advanced = false;
+        if (txOrder.state === 'ArrangingPayment' || txOrder.state === 'PaymentAuthorized') {
+          await this.transitionOrderToState(
+            transactionCtx,
+            txOrder.id.toString(),
+            'PaymentSettled'
+          );
+          advanced = true;
+        }
+
+        return { tendersPaid: paid, stateAdvanced: advanced };
       }
-
-      await this.updateOrderCustomFields(transactionCtx, txOrder.id, {
-        lastModifiedByUserId: transactionCtx.activeUserId || undefined,
-      });
-
-      return paid;
-    });
+    );
 
     // Read the true remaining owing AFTER commit (the ledger query runs on a non-transactional
     // connection, so an in-transaction read would not see the just-posted allocations). This is
@@ -645,6 +692,10 @@ export class PaymentAllocationService {
     const fullySettled = remainingOwing <= 0;
     if (fullySettled) {
       await this.clearCashierPending(ctx, order.id);
+      // State was already advanced inside the transaction when legal to do so.
+      if (stateAdvanced) {
+        this.logger.log(`Order ${order.code} advanced to PaymentSettled during settlement`);
+      }
     }
 
     if (this.auditService) {
@@ -688,7 +739,7 @@ export class PaymentAllocationService {
     const orderRepo = this.connection.getRepository(ctx, Order);
     const orders = await orderRepo.find({
       where: {
-        state: In(['ArrangingPayment', 'Fulfilled', 'PartiallyFulfilled']),
+        state: In(PAYABLE_ORDER_STATES),
         customFields: { cashierPendingAt: Not(IsNull()) } as any,
       },
       relations: ['customer'],
@@ -711,6 +762,22 @@ export class PaymentAllocationService {
       }
     }
     return pending;
+  }
+
+  /**
+   * Transition an order to a target state, validating the result.
+   */
+  private async transitionOrderToState(
+    ctx: RequestContext,
+    orderId: string,
+    state: string
+  ): Promise<void> {
+    const result = await this.orderService.transitionToState(ctx, orderId, state as any);
+    if (isGraphQlErrorResult(result)) {
+      throw new UserInputError(
+        `Cannot transition order to ${state}: ${result.message || result.errorCode || 'Unknown error'}`
+      );
+    }
   }
 
   /**

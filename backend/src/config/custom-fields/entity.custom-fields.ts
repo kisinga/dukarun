@@ -155,6 +155,45 @@ export const orderCustomFields: CustomFields['Order'] = [
     public: false,
     nullable: true,
   },
+  {
+    name: 'reconciliationStrategy',
+    type: 'string',
+    label: [{ languageCode: LanguageCode.en, value: 'Reconciliation Strategy' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value: 'Strategy used by superadmin to reconcile this order (e.g., ledger, model).',
+      },
+    ],
+    public: false,
+    nullable: true,
+  },
+  {
+    name: 'reconciliationNote',
+    type: 'text',
+    label: [{ languageCode: LanguageCode.en, value: 'Reconciliation Note' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value: 'Human-readable note recorded when this order was reconciled.',
+      },
+    ],
+    public: false,
+    nullable: true,
+  },
+  {
+    name: 'reconciledAt',
+    type: 'datetime',
+    label: [{ languageCode: LanguageCode.en, value: 'Reconciled At' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value: 'Timestamp when a superadmin last reconciled this order.',
+      },
+    ],
+    public: false,
+    nullable: true,
+  },
 ];
 
 export const paymentCustomFields: CustomFields['Payment'] = [
@@ -369,6 +408,20 @@ export const userCustomFields: CustomFields['User'] = [
         label: [{ languageCode: LanguageCode.en, value: 'Rejected' }],
       },
     ],
+  },
+  {
+    name: 'phoneNumber',
+    type: 'string',
+    label: [{ languageCode: LanguageCode.en, value: 'Mobile Phone Number' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value: 'Mobile number for WhatsApp and SMS notifications (e.g. 0712345678).',
+      },
+    ],
+    public: false,
+    nullable: true,
+    ui: { tab: 'Notifications' },
   },
   {
     name: 'notificationPreferences',

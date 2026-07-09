@@ -1,5 +1,6 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
+import { ManageReconciliationPermission } from '../ledger/permissions';
 import { AuditLog as AuditLogDecorator } from '../../infrastructure/audit/audit-log.decorator';
 import { AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
 import {
@@ -55,5 +56,14 @@ export class SupplierPaymentAllocationResolver {
       input.paymentAmount,
       input.debitAccountCode
     );
+  }
+
+  @Mutation()
+  @Allow(ManageReconciliationPermission.Permission)
+  async rebuildPurchaseFromLedger(
+    @Ctx() ctx: RequestContext,
+    @Args('purchaseId') purchaseId: string
+  ): Promise<StockPurchase> {
+    return this.supplierPaymentAllocationService.rebuildPurchaseFromLedger(ctx, purchaseId);
   }
 }

@@ -7,7 +7,8 @@ export type NavIcon =
   | 'audit-log'
   | 'role-templates'
   | 'pending'
-  | 'subscription-tiers';
+  | 'subscription-tiers'
+  | 'order-reconciliation';
 
 export interface NavItem {
   label: string;

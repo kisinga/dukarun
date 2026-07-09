@@ -96,6 +96,8 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         balance: 0,
       }),
       getExpectedBalanceForReconciliation: (jest.fn() as any).mockResolvedValue(0),
+      getSalesBreakdown: (jest.fn() as any).mockResolvedValue({ cashSales: 0, creditSales: 0 }),
+      getPurchaseTotal: (jest.fn() as any).mockResolvedValue(0),
     } as any;
 
     mockReconciliationService = {
@@ -117,6 +119,9 @@ describe('CashierSessionService - Reconciliation Integration', () => {
     };
 
     const mockEventBus = { publish: jest.fn() };
+    const mockChannelService = {
+      findOne: (jest.fn() as any).mockResolvedValue({ id: 1, code: 'test-channel' }),
+    } as any;
 
     service = new (OpenSessionService as any)(
       mockConnection,
@@ -125,7 +130,8 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       mockFinancialService,
       mockChannelPaymentMethodService,
       mockAuditService,
-      mockEventBus
+      mockEventBus,
+      mockChannelService
     );
   });
 

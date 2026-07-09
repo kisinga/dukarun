@@ -16,6 +16,7 @@ export interface BalanceQuery {
   customerId?: string; // For AR account filtering
   supplierId?: string; // For AP account filtering
   orderId?: string; // For order-scoped AR queries
+  purchaseId?: string; // For purchase-scoped AP queries
   openSessionId?: string; // For session-scoped reconciliation
 }
 
@@ -61,8 +62,14 @@ export class LedgerQueryService {
    * For liabilities/income: negative balance = credit (normal)
    */
   async getAccountBalance(query: BalanceQuery): Promise<AccountBalance> {
-    // If no special filtering (customer/supplier/order/session), use AccountBalanceService for consistency
-    if (!query.customerId && !query.supplierId && !query.orderId && !query.openSessionId) {
+    // If no special filtering (customer/supplier/order/purchase/session), use AccountBalanceService for consistency
+    if (
+      !query.customerId &&
+      !query.supplierId &&
+      !query.orderId &&
+      !query.purchaseId &&
+      !query.openSessionId
+    ) {
       // Check cache first
       const cacheKey = this.getCacheKey(query);
       const cached = this.balanceCache.get(cacheKey);
@@ -171,6 +178,12 @@ export class LedgerQueryService {
       });
     }
 
+    if (query.purchaseId) {
+      queryBuilder = queryBuilder.andWhere('line.meta @> :purchaseFilter', {
+        purchaseFilter: JSON.stringify({ purchaseId: query.purchaseId }),
+      });
+    }
+
     if (query.openSessionId) {
       queryBuilder = queryBuilder.andWhere('line.meta @> :sessionFilter', {
         sessionFilter: JSON.stringify({ openSessionId: query.openSessionId }),
@@ -234,6 +247,58 @@ export class LedgerQueryService {
     // When we pay supplier: Debit AP = balance becomes less negative
     // Negative balance = we owe money, so return absolute value
     return Math.abs(balance.balance);
+  }
+
+  /**
+   * Get AR payment statuses for multiple orders in a single query.
+   * Returns a map of orderId -> { totalOwed, amountPaid, amountOwing }.
+   */
+  async getOrderPaymentStatuses(
+    channelId: number,
+    orderIds: string[]
+  ): Promise<Map<string, { totalOwed: number; amountPaid: number; amountOwing: number }>> {
+    if (orderIds.length === 0) {
+      return new Map();
+    }
+
+    const account = await this.dataSource.getRepository(Account).findOne({
+      where: { channelId, code: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE },
+    });
+
+    const result = new Map<
+      string,
+      { totalOwed: number; amountPaid: number; amountOwing: number }
+    >();
+
+    if (!account) {
+      return result;
+    }
+
+    const rows = (await this.dataSource
+      .getRepository(JournalLine)
+      .createQueryBuilder('line')
+      .innerJoin('line.entry', 'entry')
+      .where('line.channelId = :channelId', { channelId })
+      .andWhere('line.accountId = :accountId', { accountId: account.id })
+      .andWhere("line.meta->>'orderId' IN (:...orderIds)", { orderIds })
+      .select("line.meta->>'orderId'", 'orderId')
+      .addSelect('SUM(CAST(line.debit AS BIGINT))', 'debitTotal')
+      .addSelect('SUM(CAST(line.credit AS BIGINT))', 'creditTotal')
+      .groupBy("line.meta->>'orderId'")
+      .getRawMany()) as Array<{ orderId: string; debitTotal: string; creditTotal: string }>;
+
+    for (const row of rows) {
+      const debitTotal = parseInt(row.debitTotal || '0', 10);
+      const creditTotal = parseInt(row.creditTotal || '0', 10);
+      const balance = debitTotal - creditTotal;
+      result.set(row.orderId, {
+        totalOwed: debitTotal,
+        amountPaid: creditTotal,
+        amountOwing: Math.max(balance, 0),
+      });
+    }
+
+    return result;
   }
 
   /**
@@ -748,6 +813,6 @@ export class LedgerQueryService {
   }
 
   private getCacheKey(query: BalanceQuery): string {
-    return `${query.channelId}:${query.accountCode}:${query.startDate || ''}:${query.endDate || ''}:${query.customerId || ''}:${query.supplierId || ''}:${query.orderId || ''}:${query.openSessionId || ''}`;
+    return `${query.channelId}:${query.accountCode}:${query.startDate || ''}:${query.endDate || ''}:${query.customerId || ''}:${query.supplierId || ''}:${query.orderId || ''}:${query.purchaseId || ''}:${query.openSessionId || ''}`;
   }
 }

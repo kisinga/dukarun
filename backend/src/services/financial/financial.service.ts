@@ -86,6 +86,47 @@ export class FinancialService {
   }
 
   /**
+   * Get order payment statuses for multiple orders in a single ledger query.
+   * Returns a map of orderId -> { totalOwed, amountPaid, amountOwing }.
+   */
+  async getOrderPaymentStatuses(
+    ctx: RequestContext,
+    orderIds: string[]
+  ): Promise<Map<string, { totalOwed: number; amountPaid: number; amountOwing: number }>> {
+    return this.queryService.getOrderPaymentStatuses(ctx.channelId as number, orderIds);
+  }
+
+  /**
+   * Get purchase payment status from ledger (AP balance for a single purchase).
+   * Returns amounts in smallest currency unit (cents).
+   */
+  async getPurchasePaymentStatus(
+    ctx: RequestContext,
+    purchaseId: string
+  ): Promise<{
+    totalOwed: number;
+    amountPaid: number;
+    amountOwing: number;
+  }> {
+    const balance = await this.queryService.getAccountBalance({
+      channelId: ctx.channelId as number,
+      accountCode: ACCOUNT_CODES.ACCOUNTS_PAYABLE,
+      purchaseId,
+    });
+
+    // AP is a liability: credits increase what we owe, debits decrease it.
+    const totalOwedInCents = balance.creditTotal;
+    const amountPaidInCents = balance.debitTotal;
+    const amountOwingInCents = Math.max(-balance.balance, 0); // AP should not go positive (we should not overpay)
+
+    return {
+      totalOwed: totalOwedInCents,
+      amountPaid: amountPaidInCents,
+      amountOwing: amountOwingInCents,
+    };
+  }
+
+  /**
    * Get sales total for a period
    * Returns amount in smallest currency unit (cents)
    */
@@ -430,6 +471,52 @@ export class FinancialService {
       previousBalance,
       newBalance: targetBalance,
       adjustmentAmount: Math.abs(delta),
+    };
+  }
+
+  /**
+   * Adjust a supplier's AP balance to a target amount by posting a BalanceAdjustment entry.
+   * The ledger remains the single source of truth.
+   * Returns the previous balance, new balance, and adjustment amount (all in cents).
+   */
+  async adjustSupplierBalance(
+    ctx: RequestContext,
+    supplierId: string,
+    targetBalance: number,
+    reason: string
+  ): Promise<{ previousBalance: number; newBalance: number; adjustmentAmount: number }> {
+    if (targetBalance < 0) {
+      throw new UserInputError('Target balance cannot be negative. AP balance must be >= 0.');
+    }
+
+    // Use the signed AP balance so overpaid suppliers (positive signed balance) are handled
+    // correctly. A negative signed balance means we owe the supplier; positive means overpaid.
+    const accountBalance = await this.queryService.getAccountBalance({
+      channelId: ctx.channelId as number,
+      accountCode: ACCOUNT_CODES.ACCOUNTS_PAYABLE,
+      supplierId,
+    });
+    const previousSignedBalance = accountBalance.balance;
+    const targetSignedBalance = -targetBalance;
+    const signedDelta = targetSignedBalance - previousSignedBalance;
+
+    if (signedDelta === 0) {
+      const previousBalance = Math.max(0, -previousSignedBalance);
+      return { previousBalance, newBalance: previousBalance, adjustmentAmount: 0 };
+    }
+
+    const sourceId = `supplier-balance-adj-${randomUUID()}`;
+    await this.postingService.postSupplierBalanceAdjustment(ctx, sourceId, {
+      amount: Math.abs(signedDelta),
+      direction: signedDelta < 0 ? 'increase' : 'decrease',
+      supplierId,
+      reason,
+    });
+
+    return {
+      previousBalance: Math.max(0, -previousSignedBalance),
+      newBalance: targetBalance,
+      adjustmentAmount: Math.abs(signedDelta),
     };
   }
 

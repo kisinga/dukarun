@@ -18,6 +18,7 @@ import {
   PurchasePostingContext,
   RefundPostingContext,
   SalePostingContext,
+  SupplierBalanceAdjustmentPostingContext,
   SupplierPaymentPostingContext,
   createBalanceAdjustmentEntry,
   createCreditSaleEntry,
@@ -28,6 +29,7 @@ import {
   createPaymentAllocationEntry,
   createPaymentEntry,
   createRefundEntry,
+  createSupplierBalanceAdjustmentEntry,
   createSupplierPaymentEntry,
   createSupplierPurchaseEntry,
 } from './posting-policy';
@@ -367,6 +369,10 @@ export class LedgerPostingService {
 
       await this.postingService.post(ctx, 'InventoryPurchase', sourceId, payload);
 
+      for (const code of accountCodes) {
+        this.ledgerQueryService.invalidateCache(ctx.channelId as number, code);
+      }
+
       this.metricsService?.recordLedgerPosting(
         'InventoryPurchase',
         ctx.channelId?.toString() || ''
@@ -419,6 +425,10 @@ export class LedgerPostingService {
 
       await this.postingService.post(ctx, 'InventorySaleCogs', sourceId, payload);
 
+      for (const code of accountCodes) {
+        this.ledgerQueryService.invalidateCache(ctx.channelId as number, code);
+      }
+
       this.metricsService?.recordLedgerPosting(
         'InventorySaleCogs',
         ctx.channelId?.toString() || ''
@@ -470,6 +480,10 @@ export class LedgerPostingService {
       };
 
       await this.postingService.post(ctx, 'InventoryWriteOff', sourceId, payload);
+
+      for (const code of accountCodes) {
+        this.ledgerQueryService.invalidateCache(ctx.channelId as number, code);
+      }
 
       this.metricsService?.recordLedgerPosting(
         'InventoryWriteOff',
@@ -653,6 +667,38 @@ export class LedgerPostingService {
     }
     this.logger.log(
       `Posted balance adjustment ${sourceId} for customer ${context.customerId}, ` +
+        `${context.direction} ${context.amount}, reason: ${context.reason}`
+    );
+  }
+
+  /**
+   * Post a balance adjustment entry (manual override of supplier AP balance).
+   * Uses BALANCE_ADJUSTMENT equity account as contra-entry.
+   */
+  async postSupplierBalanceAdjustment(
+    ctx: RequestContext,
+    sourceId: string,
+    context: SupplierBalanceAdjustmentPostingContext
+  ): Promise<void> {
+    const template = createSupplierBalanceAdjustmentEntry(context);
+    const accountCodes = template.lines.map(l => l.accountCode);
+
+    await this.ensureAccountsExist(ctx, accountCodes);
+
+    const payload: PostingPayload = {
+      channelId: ctx.channelId as number,
+      entryDate: new Date().toISOString().slice(0, 10),
+      memo: template.memo,
+      lines: template.lines,
+    };
+
+    await this.postingService.post(ctx, 'BalanceAdjustment', sourceId, payload);
+
+    for (const code of accountCodes) {
+      this.ledgerQueryService.invalidateCache(ctx.channelId as number, code);
+    }
+    this.logger.log(
+      `Posted supplier balance adjustment ${sourceId} for supplier ${context.supplierId}, ` +
         `${context.direction} ${context.amount}, reason: ${context.reason}`
     );
   }

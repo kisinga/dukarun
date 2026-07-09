@@ -1,5 +1,5 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { Ctx, RequestContext } from '@vendure/core';
+import { Allow, Ctx, Permission, RequestContext } from '@vendure/core';
 import gql from 'graphql-tag';
 import { NotificationService } from '../../services/notifications/notification.service';
 import { PushNotificationService } from '../../services/notifications/push-notification.service';
@@ -42,9 +42,26 @@ export const notificationSchema = gql`
     keys: JSON!
   }
 
+  type ChannelNotificationPreferences {
+    customer: Boolean!
+    orders: Boolean!
+    stock: Boolean!
+    finance: Boolean!
+    operations: Boolean!
+  }
+
+  input ChannelNotificationPreferencesInput {
+    customer: Boolean
+    orders: Boolean
+    stock: Boolean
+    finance: Boolean
+    operations: Boolean
+  }
+
   extend type Query {
     getUserNotifications(options: NotificationListOptions): NotificationList!
     getUnreadCount: Int!
+    channelNotificationPreferences: ChannelNotificationPreferences!
   }
 
   extend type Mutation {
@@ -52,6 +69,9 @@ export const notificationSchema = gql`
     markAllAsRead: Int!
     subscribeToPush(subscription: PushSubscriptionInput!): Boolean!
     unsubscribeToPush: Boolean!
+    updateChannelNotificationPreferences(
+      input: ChannelNotificationPreferencesInput!
+    ): ChannelNotificationPreferences!
   }
 `;
 
@@ -90,6 +110,15 @@ export class NotificationResolver {
     }
 
     return this.notificationService.getUnreadCount(ctx, String(userId), String(channelId));
+  }
+
+  @Query()
+  @Allow(Permission.ReadSettings)
+  async channelNotificationPreferences(@Ctx() ctx: RequestContext) {
+    if (!ctx.channelId) {
+      throw new Error('Channel context is required');
+    }
+    return this.notificationService.getChannelNotificationPreferences(ctx, String(ctx.channelId));
   }
 
   @Mutation()
@@ -135,5 +164,21 @@ export class NotificationResolver {
     }
 
     return this.pushNotificationService.unsubscribeFromPush(ctx, String(userId));
+  }
+
+  @Mutation()
+  @Allow(Permission.UpdateSettings)
+  async updateChannelNotificationPreferences(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: Record<string, boolean | undefined>
+  ) {
+    if (!ctx.channelId) {
+      throw new Error('Channel context is required');
+    }
+    return this.notificationService.updateChannelNotificationPreferences(
+      ctx,
+      String(ctx.channelId),
+      input
+    );
   }
 }

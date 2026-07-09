@@ -4,7 +4,6 @@ import { NgIcon } from '@ng-icons/core';
 import { HoverPreviewHostComponent } from '../../../components/shared/hover-preview-host/hover-preview-host.component';
 import { MoneyComponent } from '../../../../core/components/money.component';
 import { OrderStateBadgeComponent } from './order-state-badge.component';
-import { getOrderAmountOwing } from '../utils/order-payment.util';
 import { toDisplayDate } from '../../../../core/utils/date.util';
 
 export interface OrderCardData {
@@ -16,6 +15,7 @@ export interface OrderCardData {
   total: number;
   totalWithTax: number;
   currencyCode: string;
+  amountOwing: number;
   customer?: {
     id: string;
     firstName: string;
@@ -65,6 +65,7 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
         </h3>
         <app-order-state-badge
           [state]="order().state"
+          [outstandingAmount]="amountOwing()"
           [reversedAt]="order().customFields?.reversedAt ?? null"
         />
       </div>
@@ -178,7 +179,7 @@ export class OrderCardComponent {
     );
   }
 
-  readonly amountOwing = computed(() => getOrderAmountOwing(this.order()));
+  readonly amountOwing = computed(() => this.order().amountOwing ?? 0);
 
   readonly canPay = computed(() => {
     const order = this.order();

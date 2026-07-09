@@ -1,4 +1,5 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { gql } from '@apollo/client/core';
 import {
   MarkAllAsReadDocument,
   MarkNotificationAsReadDocument,
@@ -9,6 +10,48 @@ import { NotificationLoaderService } from './notification/notification-loader.se
 import { NotificationPushService } from './notification/notification-push.service';
 import { NotificationStateService } from './notification/notification-state.service';
 import { ToastService } from './toast.service';
+
+export interface ChannelNotificationPreferences {
+  customer: boolean;
+  orders: boolean;
+  stock: boolean;
+  finance: boolean;
+  operations: boolean;
+}
+
+export type NotificationCategory = keyof ChannelNotificationPreferences;
+
+const DEFAULT_CATEGORY_PREFERENCES: ChannelNotificationPreferences = {
+  customer: true,
+  orders: true,
+  stock: true,
+  finance: true,
+  operations: true,
+};
+
+const GET_CHANNEL_NOTIFICATION_PREFERENCES = gql`
+  query ChannelNotificationPreferences {
+    channelNotificationPreferences {
+      customer
+      orders
+      stock
+      finance
+      operations
+    }
+  }
+`;
+
+const UPDATE_CHANNEL_NOTIFICATION_PREFERENCES = gql`
+  mutation UpdateChannelNotificationPreferences($input: ChannelNotificationPreferencesInput!) {
+    updateChannelNotificationPreferences(input: $input) {
+      customer
+      orders
+      stock
+      finance
+      operations
+    }
+  }
+`;
 
 /**
  * Notification Service (Facade)
@@ -38,6 +81,10 @@ export class NotificationService {
   // Delegate push signals from push service
   readonly isPushEnabled = this.pushService.isPushEnabled;
   readonly permission = this.pushService.permission;
+  private readonly categoryPreferencesSignal = signal<ChannelNotificationPreferences>({
+    ...DEFAULT_CATEGORY_PREFERENCES,
+  });
+  readonly categoryPreferences = this.categoryPreferencesSignal.asReadonly();
 
   /**
    * Load notifications list
@@ -60,6 +107,40 @@ export class NotificationService {
    */
   async loadAll(): Promise<void> {
     return this.loaderService.loadAll();
+  }
+
+  async loadCategoryPreferences(): Promise<ChannelNotificationPreferences> {
+    const result = await this.apolloService.getClient().query({
+      query: GET_CHANNEL_NOTIFICATION_PREFERENCES,
+      fetchPolicy: 'network-only',
+    });
+    const preferences = (
+      result.data as { channelNotificationPreferences?: ChannelNotificationPreferences } | undefined
+    )?.channelNotificationPreferences;
+    if (preferences) {
+      this.categoryPreferencesSignal.set(preferences);
+    }
+    return this.categoryPreferencesSignal();
+  }
+
+  async updateCategoryPreference(
+    category: NotificationCategory,
+    enabled: boolean,
+  ): Promise<ChannelNotificationPreferences> {
+    const result = await this.apolloService.getClient().mutate({
+      mutation: UPDATE_CHANNEL_NOTIFICATION_PREFERENCES,
+      variables: { input: { [category]: enabled } },
+    });
+    const preferences = (
+      result.data as
+        | { updateChannelNotificationPreferences?: ChannelNotificationPreferences }
+        | undefined
+    )?.updateChannelNotificationPreferences;
+    if (!preferences) {
+      throw new Error('Notification preferences were not returned');
+    }
+    this.categoryPreferencesSignal.set(preferences);
+    return preferences;
   }
 
   /**

@@ -22,19 +22,40 @@
       <div class="card-body">
         <h2 class="card-title text-base">Info</h2>
         <p class="text-sm"><span class="font-semibold">Status</span> {{ ch.customFields.status }}</p>
-        <p class="text-sm"><span class="font-semibold">Trial ends</span> {{ formatDate(ch.customFields.trialEndsAt) }}</p>
+        <p class="text-sm">
+          <span class="font-semibold">Trial ends</span>
+          {{ formatDate(ch.customFields.trialEndsAt) }}
+        </p>
         <p class="text-sm"><span class="font-semibold">Subscription</span> {{ ch.customFields.subscriptionStatus }}</p>
-        <p class="text-sm"><span class="font-semibold">Subscription expires</span> {{ formatDate(ch.customFields.subscriptionExpiresAt) }}</p>
-        <p class="text-sm"><span class="font-semibold">Exempt until</span> {{ formatDate(ch.customFields.subscriptionExemptUntil) }}</p>
-        <p class="text-sm"><span class="font-semibold">Exempt reason</span> {{ ch.customFields.subscriptionExemptReason || '—' }}</p>
+        <p class="text-sm">
+          <span class="font-semibold">Subscription expires</span>
+          {{ formatDate(ch.customFields.subscriptionExpiresAt) }}
+        </p>
+        <p class="text-sm">
+          <span class="font-semibold">Exempt until</span>
+          {{ formatDate(ch.customFields.subscriptionExemptUntil) }}
+        </p>
+        <p class="text-sm">
+          <span class="font-semibold">Exempt reason</span>
+          {{ ch.customFields.subscriptionExemptReason || '—' }}
+        </p>
       </div>
     </div>
     <div class="card card-border bg-base-100 shadow">
       <div class="card-body">
         <h2 class="card-title text-base">SMS credits (30-day period)</h2>
-        <p class="text-sm"><span class="font-semibold">Used this period</span> {{ ch.customFields.smsUsedThisPeriod ?? 0 }}</p>
-        <p class="text-sm"><span class="font-semibold">Limit (from tier)</span> {{ ch.customFields.smsLimitFromTier ?? '—' }}</p>
-        <p class="text-sm"><span class="font-semibold">Period ends</span> {{ formatDate(ch.customFields.smsPeriodEnd ?? null) }}</p>
+        <p class="text-sm">
+          <span class="font-semibold">Used this period</span>
+          {{ ch.customFields.smsUsedThisPeriod ?? 0 }}
+        </p>
+        <p class="text-sm">
+          <span class="font-semibold">Limit (from tier)</span>
+          {{ ch.customFields.smsLimitFromTier ?? '—' }}
+        </p>
+        <p class="text-sm">
+          <span class="font-semibold">Period ends</span>
+          {{ formatDate(ch.customFields.smsPeriodEnd ?? null) }}
+        </p>
       </div>
     </div>
     <div class="card card-border bg-base-100 shadow">
@@ -152,51 +173,37 @@
     <div class="card-body">
       <h2 class="card-title text-base">Public storefront</h2>
       <p class="text-sm text-base-content/70 mb-2">
-        Assign a subdomain and publish this channel's catalogue publicly (browse-only + WhatsApp enquiry).
-        The store goes live only when the channel is APPROVED and its subscription is active.
+        Assign a subdomain and publish this channel's catalogue publicly (browse-only + WhatsApp enquiry). The store goes live only when the channel is APPROVED and its subscription is active.
       </p>
       <div class="flex flex-col gap-3 max-w-md">
         <label class="form-control w-full">
           <span class="label label-text">Subdomain slug</span>
-          <input
-            type="text"
-            class="input input-bordered input-sm w-full"
-            placeholder="e.g. mama-mboga"
-            [ngModel]="publicSlug()"
-            (ngModelChange)="publicSlug.set($event)"
-          />
+          <input type="text" class="input input-bordered input-sm w-full" placeholder="e.g. mama-mboga" [ngModel]="publicSlug()" (ngModelChange)="publicSlug.set($event)" />
           @if (storefrontUrl()) {
-            <span class="label"><span class="label-text-alt text-base-content/60">{{ storefrontUrl() }}</span></span>
+            <span class="label"
+              ><span class="label-text-alt text-base-content/60">{{ storefrontUrl() }}</span></span
+            >
           }
         </label>
         <label class="form-control w-full">
           <span class="label label-text">WhatsApp number (E.164)</span>
-          <input
-            type="text"
-            class="input input-bordered input-sm w-full"
-            placeholder="+254712345678"
-            [ngModel]="publicWhatsAppNumber()"
-            (ngModelChange)="publicWhatsAppNumber.set($event)"
-          />
+          <input type="text" class="input input-bordered input-sm w-full" placeholder="+254712345678" [ngModel]="publicWhatsAppNumber()" (ngModelChange)="publicWhatsAppNumber.set($event)" />
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            class="toggle toggle-primary toggle-sm"
-            [checked]="publicStorefrontEnabled()"
-            (change)="publicStorefrontEnabled.set(!publicStorefrontEnabled())"
-          />
+          <input type="checkbox" class="toggle toggle-primary toggle-sm" [checked]="publicStorefrontEnabled()" (change)="publicStorefrontEnabled.set(!publicStorefrontEnabled())" />
           <span class="label-text">Publish storefront</span>
         </label>
         @if (storefrontError()) {
-          <div role="alert" class="alert alert-error py-2"><span class="text-sm">{{ storefrontError() }}</span></div>
+          <div role="alert" class="alert alert-error py-2">
+            <span class="text-sm">{{ storefrontError() }}</span>
+          </div>
         }
         @if (storefrontSaved()) {
-          <div role="alert" class="alert alert-success py-2"><span class="text-sm">Saved.</span></div>
+          <div role="alert" class="alert alert-success py-2">
+            <span class="text-sm">Saved.</span>
+          </div>
         }
-        <button type="button" class="btn btn-primary btn-sm self-start" (click)="updatePublicStorefront()" [disabled]="saving()">
-          Save storefront
-        </button>
+        <button type="button" class="btn btn-primary btn-sm self-start" (click)="updatePublicStorefront()" [disabled]="saving()">Save storefront</button>
       </div>
     </div>
   </div>
@@ -231,14 +238,47 @@
                 <td>{{ admin.firstName }} {{ admin.lastName }}</td>
                 <td>{{ admin.emailAddress || '—' }}</td>
                 <td>{{ admin.identifier }}</td>
-                <td><span class="badge badge-sm">{{ admin.authorizationStatus }}</span></td>
+                <td>
+                  <span class="badge badge-sm">{{ admin.authorizationStatus }}</span>
+                </td>
                 <td>{{ admin.roleCodes.join(', ') || '—' }}</td>
               </tr>
             } @empty {
-              <tr><td colspan="5" class="text-base-content/60">No admins for this channel.</td></tr>
+              <tr>
+                <td colspan="5" class="text-base-content/60">No admins for this channel.</td>
+              </tr>
             }
           </tbody>
         </table>
+      </div>
+    </div>
+  </div>
+  <div class="card card-border bg-base-100 shadow mb-6">
+    <div class="card-body">
+      <h2 class="card-title text-base">Notification categories</h2>
+      <p class="text-sm text-base-content/70 mb-2">Control which notifications this channel can send.</p>
+      @if (!notificationPreferencesAvailable()) {
+        <p class="text-sm text-warning mb-2">Notification settings could not be loaded.</p>
+      }
+      @if (notificationPreferencesError()) {
+        <p class="text-sm text-error mb-2">{{ notificationPreferencesError() }}</p>
+      }
+      <div class="divide-y divide-base-300">
+        @for (category of notificationCategories; track category.key) {
+          <label class="flex items-center justify-between gap-4 py-3 cursor-pointer">
+            <span>
+              <span class="block text-sm font-medium">{{ category.label }}</span>
+              <span class="block text-xs text-base-content/60">{{ category.description }}</span>
+            </span>
+            <input
+              type="checkbox"
+              class="toggle toggle-primary toggle-sm"
+              [checked]="notificationPreferences()[category.key]"
+              [disabled]="!notificationPreferencesAvailable() || savingNotificationCategory() !== null"
+              (change)="toggleNotificationCategory(category.key)"
+            />
+          </label>
+        }
       </div>
     </div>
   </div>
@@ -261,14 +301,18 @@
             @for (n of notifications(); track n.id) {
               <tr>
                 <td>{{ formatDate(n.createdAt) }}</td>
-                <td><span class="badge badge-sm badge-ghost">{{ n.type }}</span></td>
+                <td>
+                  <span class="badge badge-sm badge-ghost">{{ n.type }}</span>
+                </td>
                 <td>{{ n.title }}</td>
                 <td>{{ n.message }}</td>
                 <td>{{ n.read ? 'Yes' : 'No' }}</td>
                 <td class="text-base-content/70">{{ n.userId }}</td>
               </tr>
             } @empty {
-              <tr><td colspan="6" class="text-base-content/60">No notifications.</td></tr>
+              <tr>
+                <td colspan="6" class="text-base-content/60">No notifications.</td>
+              </tr>
             }
           </tbody>
         </table>

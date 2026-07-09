@@ -11,13 +11,18 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   Customer,
   ID,
+  Order,
   RequestContext,
   TransactionalConnection,
   UserInputError,
 } from '@vendure/core';
+import { In } from 'typeorm';
+import { AR_OWING_ORDER_STATES } from '../../constants/order-states.constants';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { ChannelCommunicationService } from '../channels/channel-communication.service';
 import { FinancialService } from '../financial/financial.service';
+import { StockPurchase } from '../stock/entities/purchase.entity';
+import { PurchasePayment } from '../stock/entities/purchase-payment.entity';
 import {
   CreditFieldMap,
   CreditPartyType,
@@ -215,7 +220,39 @@ export class CreditService {
   }
 
   /**
-   * Override a customer's balance by posting a BalanceAdjustment ledger entry.
+   * Rebuild the ledger balance from the independent order/purchase model.
+   *
+   * This computes what the entity should owe from its open orders (customer) or
+   * purchases (supplier), then posts a ledger adjustment so the ledger matches that
+   * model state. It trusts the model and mutates the ledger — the opposite of
+   * rebuilding model state from the ledger. Use only as a human-approved healing
+   * action for drift.
+   */
+  async rebuildLedgerFromModel(
+    ctx: RequestContext,
+    entityId: ID,
+    partyType: CreditPartyType,
+    note?: string
+  ): Promise<{ previousBalance: number; newBalance: number; adjustmentAmount: number }> {
+    const ledgerBalance = await this.getBalance(ctx, entityId, partyType);
+    const modelBalance =
+      partyType === 'supplier'
+        ? await this.getSupplierModelBalance(ctx, entityId)
+        : await this.getCustomerModelBalance(ctx, entityId);
+
+    const reason = note?.trim()
+      ? `Rebuild ledger from ${partyType} model: ${note.trim()}`
+      : `Rebuild ledger from ${partyType} model`;
+
+    this.logger.log(
+      `Rebuilding ledger for ${partyType} ${entityId} from model: ledger=${ledgerBalance}, model=${modelBalance}`
+    );
+
+    return this.overrideBalance(ctx, entityId, partyType, modelBalance, reason);
+  }
+
+  /**
+   * Override a customer/supplier balance by posting a BalanceAdjustment ledger entry.
    * The ledger remains the single source of truth.
    */
   async overrideBalance(
@@ -232,12 +269,20 @@ export class CreditService {
     // Verify entity exists
     await this.getEntityOrThrow(ctx, entityId, partyType);
 
-    const result = await this.financialService.adjustCustomerBalance(
-      ctx,
-      entityId.toString(),
-      targetBalance,
-      reason.trim()
-    );
+    const result =
+      partyType === 'supplier'
+        ? await this.financialService.adjustSupplierBalance(
+            ctx,
+            entityId.toString(),
+            targetBalance,
+            reason.trim()
+          )
+        : await this.financialService.adjustCustomerBalance(
+            ctx,
+            entityId.toString(),
+            targetBalance,
+            reason.trim()
+          );
 
     if (this.auditService) {
       await this.auditService.log(ctx, `${partyType}.balance.override`, {
@@ -294,6 +339,52 @@ export class CreditService {
     return partyType === 'supplier'
       ? this.financialService.getSupplierBalance(ctx, entityId.toString())
       : this.financialService.getCustomerBalance(ctx, entityId.toString());
+  }
+
+  /**
+   * Compute the customer's model-derived balance from its orders.
+   * Includes any order that can carry AR and subtracts settled payments.
+   */
+  private async getCustomerModelBalance(ctx: RequestContext, customerId: ID): Promise<number> {
+    const orderRepo = this.connection.getRepository(ctx, Order);
+    const orders = await orderRepo.find({
+      where: {
+        customer: { id: customerId },
+        channelId: ctx.channelId as number,
+        state: In(AR_OWING_ORDER_STATES),
+      } as any,
+      relations: ['payments'],
+    });
+
+    return orders.reduce((sum, order) => {
+      const totalOwed = order.totalWithTax || order.total || 0;
+      const settledPayments = (order.payments || [])
+        .filter(p => p.state === 'Settled')
+        .reduce((paid, p) => paid + Number(p.amount), 0);
+      return sum + Math.max(0, totalOwed - settledPayments);
+    }, 0);
+  }
+
+  /**
+   * Compute the supplier's model-derived balance from its purchases.
+   * Includes pending/partial purchases and subtracts recorded PurchasePayments.
+   */
+  private async getSupplierModelBalance(ctx: RequestContext, supplierId: ID): Promise<number> {
+    const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
+    const purchases = await purchaseRepo.find({
+      where: {
+        supplierId: Number(supplierId),
+        channelId: ctx.channelId as number,
+        paymentStatus: In(['pending', 'partial']),
+      },
+      relations: ['payments'],
+    });
+
+    return purchases.reduce((sum, purchase) => {
+      const totalOwed = purchase.totalCost || 0;
+      const paid = (purchase.payments || []).reduce((p, payment) => p + Number(payment.amount), 0);
+      return sum + Math.max(0, totalOwed - paid);
+    }, 0);
   }
 
   private mapToSummary(

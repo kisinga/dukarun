@@ -26,6 +26,7 @@ import { PaymentMethodService } from '../../../../core/services/payment-method.s
 import { AuthPermissionsService } from '../../../../core/services/auth/auth-permissions.service';
 import { ApolloService } from '../../../../core/services/apollo.service';
 import { REVERSE_PAYMENT } from '../../../../core/graphql/operations.graphql';
+import { isOrderVoidedOrReversed } from '../utils/order-payment.util';
 import { OrderDetailHeaderComponent } from './components/order-detail-header.component';
 import { OrderCustomerInfoComponent } from './components/order-customer-info.component';
 import { OrderAddressComponent } from './components/order-address.component';
@@ -157,7 +158,7 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
 
   readonly isUnpaidCreditOrder = computed(() => {
     const order = this.order();
-    if (!order || !this.isCreditOrder()) return false;
+    if (!order || !this.isCreditOrder() || isOrderVoidedOrReversed(order)) return false;
 
     const settledPayments = (order.payments || [])
       .filter((p: { state: string }) => p.state === 'Settled')
@@ -170,13 +171,7 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
   readonly outstandingAmount = computed(() => {
     const order = this.order();
     if (!order) return 0;
-
-    const settledPayments = (order.payments || [])
-      .filter((p: { state: string }) => p.state === 'Settled')
-      .reduce((sum: number, p: { amount: number }) => sum + p.amount, 0);
-
-    const orderTotal = order.totalWithTax || order.total;
-    return Math.max(0, orderTotal - settledPayments); // Keep in cents for consistency
+    return order.amountOwing ?? 0;
   });
 
   readonly orderReversedAt = computed(() => {

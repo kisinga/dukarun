@@ -11,6 +11,7 @@ import {
 } from '@vendure/core';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { FinancialService } from '../financial/financial.service';
+import { LedgerConsistencyGuard, OrderArProjection } from '../financial/ledger-projection';
 
 export interface PaymentReversalResult {
   paymentId: string;
@@ -27,6 +28,8 @@ export class PaymentReversalService {
     private readonly orderService: OrderService,
     private readonly paymentService: PaymentService,
     private readonly financialService: FinancialService,
+    private readonly ledgerConsistencyGuard: LedgerConsistencyGuard,
+    private readonly orderArProjection: OrderArProjection,
     @Optional() private readonly auditService?: AuditService
   ) {}
 
@@ -47,7 +50,7 @@ export class PaymentReversalService {
     }
 
     const order = payment.order
-      ? await this.orderService.findOne(ctx, payment.order.id, ['customer'])
+      ? await this.orderService.findOne(ctx, payment.order.id, ['customer', 'payments'])
       : null;
 
     if (!order) {
@@ -70,6 +73,9 @@ export class PaymentReversalService {
           `Cannot reverse individual payments on a reversed order.`
       );
     }
+
+    // Fail closed if the order model and ledger disagree.
+    await this.ledgerConsistencyGuard.assertInSync(ctx, this.orderArProjection, order);
 
     // Post the reversal — reads everything from the ledger
     const reversedAmount = await this.financialService.reversePayment(ctx, paymentId.toString());

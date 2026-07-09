@@ -13,6 +13,16 @@ describe('CreditService', () => {
     return {
       getCustomerBalance: jest.fn().mockResolvedValue(customerBalance as never),
       getSupplierBalance: jest.fn().mockResolvedValue(supplierBalance as never),
+      adjustCustomerBalance: jest.fn().mockResolvedValue({
+        previousBalance: customerBalance,
+        newBalance: customerBalance,
+        adjustmentAmount: 0,
+      } as never),
+      adjustSupplierBalance: jest.fn().mockResolvedValue({
+        previousBalance: supplierBalance,
+        newBalance: supplierBalance,
+        adjustmentAmount: 0,
+      } as never),
     } as unknown as FinancialService;
   };
 

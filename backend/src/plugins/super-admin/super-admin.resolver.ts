@@ -250,6 +250,15 @@ export class SuperAdminResolver {
 
   @Query()
   @Allow(Permission.SuperAdmin)
+  async notificationPreferencesForChannel(@Args('channelId') channelId: string) {
+    return this.notificationService.getChannelNotificationPreferences(
+      RequestContext.empty(),
+      channelId
+    );
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
   async pendingRegistrations() {
     return this.pendingRegistrationsService.getPendingRegistrations();
   }
@@ -700,6 +709,19 @@ export class SuperAdminResolver {
       data: updates,
     });
     return updated;
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async updateNotificationPreferencesForChannel(
+    @Args('channelId') channelId: string,
+    @Args('input') input: Record<string, boolean | undefined>
+  ) {
+    return this.notificationService.updateChannelNotificationPreferences(
+      RequestContext.empty(),
+      channelId,
+      input
+    );
   }
 
   /**

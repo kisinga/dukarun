@@ -1,5 +1,6 @@
 import { Channel, Customer, ProductVariant, StockLocation } from '@vendure/core';
 import { Column, Entity, Index, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { PurchasePayment } from './purchase-payment.entity';
 
 @Entity('stock_purchase')
 @Index('IDX_stock_purchase_channel', ['channelId'])
@@ -42,6 +43,9 @@ export class StockPurchase {
 
   @OneToMany(() => StockPurchaseLine, line => line.purchase, { cascade: true })
   lines: StockPurchaseLine[];
+
+  @OneToMany(() => PurchasePayment, payment => payment.purchase)
+  payments: PurchasePayment[];
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;

@@ -16,6 +16,11 @@ export type OutboundPayload = Record<string, unknown> & {
   customerId?: string;
 };
 
+interface PhoneRecipient {
+  phone: string;
+  userId?: string;
+}
+
 /**
  * Single entry point for server-initiated communication.
  * Uses outbound config + render; delegates to NotificationService (in-app) and CommunicationService (SMS/email/WhatsApp).
@@ -42,11 +47,35 @@ export class OutboundDeliveryService {
     }
 
     const channelId = payload.channelId ?? ctx.channelId?.toString();
+    if (
+      config.category &&
+      channelId &&
+      !(await this.notificationService.isChannelNotificationCategoryEnabled(
+        ctx,
+        channelId,
+        config.category
+      ))
+    ) {
+      this.logger.debug(
+        `Notification category "${config.category}" disabled for channel ${channelId}; skipping ${triggerKey}`
+      );
+      return;
+    }
+
     const rendered = renderOutbound(triggerKey, payload);
 
     if (config.channels.inApp) {
-      const userIds = await this.resolveInAppRecipients(ctx, config.audience, channelId, payload);
+      const userIds = await this.resolveInAppRecipients(
+        ctx,
+        config.audience,
+        channelId,
+        payload,
+        triggerKey
+      );
       for (const userId of userIds) {
+        if (!(await this.isShiftChannelEnabled(ctx, userId, channelId, triggerKey, 'inApp'))) {
+          continue;
+        }
         await this.notificationService.createNotificationIfEnabled(ctx, {
           userId,
           channelId: channelId ?? '',
@@ -59,12 +88,21 @@ export class OutboundDeliveryService {
     }
 
     if (config.channels.sms) {
-      const phones = await this.resolvePhoneRecipients(ctx, config.audience, channelId, payload);
+      const recipients = await this.resolvePhoneRecipients(
+        ctx,
+        config.audience,
+        channelId,
+        payload,
+        triggerKey
+      );
       const smsBody = rendered.smsBody;
-      if (smsBody && phones.length > 0) {
+      if (smsBody && recipients.length > 0) {
         const purpose =
           triggerKey === 'company_registered' ? 'admin_notification' : 'account_notification';
-        for (const phone of phones) {
+        for (const { phone, userId } of recipients) {
+          if (!(await this.isShiftChannelEnabled(ctx, userId, channelId, triggerKey, 'sms'))) {
+            continue;
+          }
           const result = await this.communicationService.send({
             channel: 'sms',
             recipient: phone,
@@ -82,7 +120,7 @@ export class OutboundDeliveryService {
     }
 
     if (config.channels.email) {
-      const emails = await this.resolveEmailRecipients(ctx, config.audience, payload);
+      const emails = await this.resolveEmailRecipients(ctx, config.audience, payload, triggerKey);
       const subject = rendered.emailSubject;
       const body = rendered.emailBody;
       if (subject && body && emails.length > 0) {
@@ -102,10 +140,19 @@ export class OutboundDeliveryService {
     }
 
     if (config.channels.whatsapp) {
-      const phones = await this.resolvePhoneRecipients(ctx, config.audience, channelId, payload);
+      const recipients = await this.resolvePhoneRecipients(
+        ctx,
+        config.audience,
+        channelId,
+        payload,
+        triggerKey
+      );
       const whatsappBody = rendered.whatsappBody ?? rendered.smsBody;
-      if (whatsappBody && phones.length > 0) {
-        for (const phone of phones) {
+      if (whatsappBody && recipients.length > 0) {
+        for (const { phone, userId } of recipients) {
+          if (!(await this.isShiftChannelEnabled(ctx, userId, channelId, triggerKey, 'whatsapp'))) {
+            continue;
+          }
           const result = await this.communicationService.send({
             channel: 'whatsapp',
             recipient: phone,
@@ -122,16 +169,46 @@ export class OutboundDeliveryService {
     }
   }
 
+  private isShiftTrigger(triggerKey: string): triggerKey is 'shift_opened' | 'shift_closed' {
+    return triggerKey === 'shift_opened' || triggerKey === 'shift_closed';
+  }
+
+  private async isShiftChannelEnabled(
+    ctx: RequestContext,
+    userId: string | undefined,
+    channelId: string | undefined,
+    triggerKey: string,
+    channel: 'whatsapp' | 'inApp' | 'sms' | 'email'
+  ): Promise<boolean> {
+    if (!userId || !channelId || !this.isShiftTrigger(triggerKey)) {
+      return true;
+    }
+    const trigger = triggerKey === 'shift_opened' ? 'opened' : 'closed';
+    return this.notificationService.isShiftNotificationEnabled(
+      ctx,
+      userId,
+      channelId,
+      trigger,
+      channel
+    );
+  }
+
   private async resolveInAppRecipients(
     ctx: RequestContext,
     audience: OutboundAudience,
     channelId: string | undefined,
-    payload: OutboundPayload
+    payload: OutboundPayload,
+    triggerKey: string
   ): Promise<string[]> {
     if (payload.targetUserIds && payload.targetUserIds.length > 0) {
       return payload.targetUserIds;
     }
     if (audience === 'channel_admins' && channelId) {
+      if (this.isShiftTrigger(triggerKey)) {
+        return this.channelUserService.getChannelFinancialAdminUserIds(ctx, channelId, {
+          includeSuperAdmins: true,
+        });
+      }
       return this.channelUserService.getChannelAdminUserIds(ctx, channelId, {
         includeSuperAdmins: true,
       });
@@ -146,8 +223,9 @@ export class OutboundDeliveryService {
     ctx: RequestContext,
     audience: OutboundAudience,
     _channelId: string | undefined,
-    payload: OutboundPayload
-  ): Promise<string[]> {
+    payload: OutboundPayload,
+    triggerKey: string
+  ): Promise<PhoneRecipient[]> {
     if (audience === 'customer' && payload.customerId) {
       const customer = await this.connection.getRepository(ctx, Customer).findOne({
         where: { id: payload.customerId },
@@ -157,12 +235,32 @@ export class OutboundDeliveryService {
       const cf = (customer as any).customFields || {};
       const phone = cf.phoneNumber ?? (customer as any).user?.identifier ?? null;
       if (phone && typeof phone === 'string' && phone.trim() && validatePhoneNumber(phone.trim())) {
-        return [phone.trim()];
+        return [{ phone: phone.trim() }];
       }
       return [];
     }
     if (audience === 'platform_admin' && env.adminNotifications.phone) {
-      return [env.adminNotifications.phone];
+      return [{ phone: env.adminNotifications.phone }];
+    }
+    if (audience === 'channel_admins' && _channelId) {
+      const adminIds = this.isShiftTrigger(triggerKey)
+        ? await this.channelUserService.getChannelFinancialAdminUserIds(ctx, _channelId, {
+            includeSuperAdmins: true,
+          })
+        : await this.channelUserService.getChannelAdminUserIds(ctx, _channelId, {
+            includeSuperAdmins: true,
+          });
+      const recipients: PhoneRecipient[] = [];
+      for (const userId of adminIds) {
+        const user = await this.connection.rawConnection
+          .getRepository(User)
+          .findOne({ where: { id: userId } });
+        const phone = (user?.customFields as Record<string, unknown> | undefined)?.phoneNumber;
+        if (typeof phone === 'string' && phone.trim() && validatePhoneNumber(phone.trim())) {
+          recipients.push({ phone: phone.trim(), userId });
+        }
+      }
+      return recipients;
     }
     return [];
   }
@@ -170,7 +268,8 @@ export class OutboundDeliveryService {
   private async resolveEmailRecipients(
     ctx: RequestContext,
     audience: OutboundAudience,
-    payload: OutboundPayload
+    payload: OutboundPayload,
+    triggerKey: string
   ): Promise<string[]> {
     if (audience === 'platform_admin' && env.adminNotifications.email) {
       return [env.adminNotifications.email];
@@ -187,12 +286,22 @@ export class OutboundDeliveryService {
     }
     if (audience === 'channel_admins' && payload.channelId) {
       // Send to the first channel admin with a valid email (single admin per notification).
-      const adminIds = await this.channelUserService.getChannelAdminUserIds(
-        ctx,
-        String(payload.channelId),
-        { includeSuperAdmins: false }
-      );
+      const adminIds = this.isShiftTrigger(triggerKey)
+        ? await this.channelUserService.getChannelFinancialAdminUserIds(
+            ctx,
+            String(payload.channelId),
+            { includeSuperAdmins: false }
+          )
+        : await this.channelUserService.getChannelAdminUserIds(ctx, String(payload.channelId), {
+            includeSuperAdmins: false,
+          });
       for (const userId of adminIds) {
+        if (
+          this.isShiftTrigger(triggerKey) &&
+          !(await this.isShiftChannelEnabled(ctx, userId, payload.channelId, triggerKey, 'email'))
+        ) {
+          continue;
+        }
         const user = await this.connection.rawConnection
           .getRepository(User)
           .findOne({ where: { id: userId } });

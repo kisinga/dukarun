@@ -44,6 +44,7 @@ export const AUDIT_EVENTS = {
   // Order operations
   ORDER_CREATED: 'order.created',
   ORDER_STATE_CHANGED: 'order.state_changed',
+  ORDER_RECONCILED: 'order.reconciled',
 
   // Product operations
   PRODUCT_CREATED: 'product.created',

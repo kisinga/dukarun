@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import {
   EventBus,
   Order,
@@ -13,7 +13,7 @@ import { BaseTransactionStrategy } from '../base-transaction-strategy';
 import { ChartOfAccountsService } from '../chart-of-accounts.service';
 import { LedgerPostingService } from '../ledger-posting.service';
 import { LedgerQueryService } from '../ledger-query.service';
-import { InventoryService, RecordSaleInput } from '../../inventory/inventory.service';
+import type { InventoryService, RecordSaleInput } from '../../inventory/inventory.service';
 import {
   PaymentPostingContext,
   SalePostingContext,
@@ -59,6 +59,7 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
     postingService: LedgerPostingService,
     queryService: LedgerQueryService,
     private readonly chartOfAccountsService: ChartOfAccountsService,
+    @Inject(forwardRef(() => require('../../inventory/inventory.service').InventoryService))
     private readonly inventoryService: InventoryService,
     private readonly orderService: OrderService,
     private readonly connection: TransactionalConnection,
