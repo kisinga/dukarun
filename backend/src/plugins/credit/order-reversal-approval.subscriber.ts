@@ -3,12 +3,13 @@ import { RequestContext } from '@vendure/core';
 import { ApprovalRequest } from '../../domain/approval/approval-request.entity';
 import { ApprovalHandlerRegistry } from '../../services/approval/approval-handler.registry';
 import { OrderReversalService } from '../../services/orders/order-reversal.service';
-import { OrderStateService } from '../../services/orders/order-state.service';
 
 /**
  * Registers the order_reversal approval handler.
- * When an order_reversal approval is approved, the handler runs the actual reversal
- * (post ledger entry and mark order reversed) and transitions the order to Cancelled.
+ * When an order_reversal approval is approved, the handler voids the order
+ * (transition to Cancelled). The OrderCancellationProcess hook performs payment
+ * cancellation, ledger reversal, inventory restoration, and marks the order
+ * reversed atomically.
  */
 @Injectable()
 export class OrderReversalApprovalSubscriber implements OnModuleInit {
@@ -16,8 +17,7 @@ export class OrderReversalApprovalSubscriber implements OnModuleInit {
 
   constructor(
     private readonly approvalHandlerRegistry: ApprovalHandlerRegistry,
-    private readonly orderReversalService: OrderReversalService,
-    private readonly orderStateService: OrderStateService
+    private readonly orderReversalService: OrderReversalService
   ) {}
 
   onModuleInit(): void {
@@ -34,8 +34,7 @@ export class OrderReversalApprovalSubscriber implements OnModuleInit {
       );
       return;
     }
-    await this.orderReversalService.reverseOrder(ctx, orderId);
-    await this.orderStateService.transitionToState(ctx, orderId, 'Cancelled');
-    this.logger.log(`Order ${orderId} reversed via approval ${request.id}.`);
+    await this.orderReversalService.voidOrder(ctx, orderId);
+    this.logger.log(`Order ${orderId} cancelled via approval ${request.id}.`);
   }
 }

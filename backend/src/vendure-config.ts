@@ -8,6 +8,7 @@ import {
   manualFulfillmentHandler,
   VendureConfig,
 } from '@vendure/core';
+import { OrderCancellationProcess } from './services/orders/order-cancellation-process';
 import { defaultEmailHandlers, EmailPlugin, FileBasedTemplateLoader } from '@vendure/email-plugin';
 import { otpEmailHandler } from './config/email/otp-email-handler';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
@@ -66,6 +67,7 @@ const customOrderProcess = configureDefaultOrderProcess({
   arrangingPaymentRequiresShipping: false, // Disable shipping requirement for POS
   arrangingPaymentRequiresCustomer: true, // Keep customer requirement
 });
+const orderCancellationProcess = new OrderCancellationProcess();
 
 // Allowed CORS origins — single source of truth for both shop-api and admin-api.
 // Always include localhost dev ports so super-admin works regardless of NODE_ENV.
@@ -232,7 +234,7 @@ export const config: VendureConfig = {
     GlobalSettings: globalSettingsCustomFields!,
   },
   orderOptions: {
-    process: [customOrderProcess],
+    process: [customOrderProcess, orderCancellationProcess],
   },
   shippingOptions: {
     fulfillmentHandlers: [manualFulfillmentHandler],
