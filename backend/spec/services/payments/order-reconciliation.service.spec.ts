@@ -23,6 +23,9 @@ describe('OrderReconciliationService', () => {
   let mockFinancialService: jest.Mocked<FinancialService>;
   let mockConnection: any;
   let mockOrderReversalService: jest.Mocked<OrderReversalService>;
+  let mockLedgerPostingService: jest.Mocked<
+    import('../../../src/services/financial/ledger-posting.service').LedgerPostingService
+  >;
 
   beforeEach(() => {
     mockOrderService = {
@@ -51,12 +54,17 @@ describe('OrderReconciliationService', () => {
       cancelOrder: jest.fn(),
     } as any;
 
+    mockLedgerPostingService = {
+      postBalanceAdjustment: jest.fn(),
+    } as any;
+
     service = new OrderReconciliationService(
       mockOrderService,
       mockPaymentService as any,
       ledgerConsistencyGuard,
       orderArProjection,
       mockFinancialService as any,
+      mockLedgerPostingService as any,
       mockConnection,
       mockOrderReversalService
     );

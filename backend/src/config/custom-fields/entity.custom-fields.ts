@@ -170,7 +170,7 @@ export const orderCustomFields: CustomFields['Order'] = [
   },
   {
     name: 'reconciliationNote',
-    type: 'text',
+    type: 'string',
     label: [{ languageCode: LanguageCode.en, value: 'Reconciliation Note' }],
     description: [
       {

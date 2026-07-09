@@ -501,6 +501,8 @@ export interface BalanceAdjustmentPostingContext {
   direction: 'increase' | 'decrease'; // increase = customer owes more, decrease = forgive debt
   customerId: string;
   reason: string;
+  /** Optional order-scoped AR adjustment. When provided, the journal line meta includes orderId. */
+  orderId?: string;
 }
 
 /**
@@ -512,10 +514,13 @@ export interface BalanceAdjustmentPostingContext {
 export function createBalanceAdjustmentEntry(
   context: BalanceAdjustmentPostingContext
 ): JournalEntryTemplate {
-  const meta = {
+  const meta: Record<string, unknown> = {
     customerId: context.customerId,
     reason: context.reason,
   };
+  if (context.orderId) {
+    meta.orderId = context.orderId;
+  }
 
   if (context.direction === 'increase') {
     return {
