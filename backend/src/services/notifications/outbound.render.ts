@@ -15,6 +15,49 @@ function formatCents(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
+function formatCentsKes(cents: number): string {
+  return `KES ${Number(cents / 100).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
+}
+
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function getVarianceEmoji(varianceCents: number, thresholdCents: number): string {
+  if (varianceCents === 0) return '🟢';
+  return Math.abs(varianceCents) > thresholdCents ? '🔴' : '🟡';
+}
+
+function formatShiftDate(iso: unknown): string {
+  if (!iso || typeof iso !== 'string') return '';
+  try {
+    return new Date(iso).toLocaleDateString('en-KE', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return '';
+  }
+}
+
+function formatShiftTime(iso: unknown): string | null {
+  if (!iso || typeof iso !== 'string') return null;
+  try {
+    return new Date(iso).toLocaleTimeString('en-KE', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return null;
+  }
+}
+
 type RenderFn = (payload: Record<string, unknown>) => RenderedOutbound;
 
 const RENDERERS: Record<string, RenderFn> = {
@@ -269,34 +312,122 @@ Please log in to the admin panel to review and approve this registration.
     };
   },
   shift_opened: p => {
-    const time = p.openedAt
-      ? new Date(String(p.openedAt)).toLocaleTimeString('en-KE', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : null;
+    const storeName = String(p.storeName || 'Your store');
+    const cashierName = String(p.cashierName || 'Unknown');
+    const date = formatShiftDate(p.openedAt);
+    const time = formatShiftTime(p.openedAt);
+    const balances = Array.isArray(p.openingBalances) ? p.openingBalances : [];
+    const totalVariance = Number(p.totalOpeningVariance ?? 0);
+
+    const header = `🟢 *Shift Opened — ${storeName}*`;
+    const metaLines = [
+      `*Cashier:* ${cashierName}`,
+      date ? `*Date:* ${date}` : '',
+      time ? `*Opened:* ${time}` : '',
+    ].filter(Boolean);
+
+    const balanceLines = balances.map((b: any) => {
+      const code = String(b.accountCode ?? '').replace(/_/g, ' ');
+      const declared = formatCentsKes(Number(b.declaredCents ?? 0));
+      return `• ${code}: ${declared}`;
+    });
+
+    const varianceLine =
+      totalVariance !== 0
+        ? `\n*Opening variance:* ${formatCentsKes(Math.abs(totalVariance))}${
+            totalVariance < 0 ? ' short' : ' over'
+          }`
+        : '';
+
+    const footer = `\n_View full report:_ https://dukarun.com/dashboard/accounting?sessionId=${p.sessionId}\n— DukaRun Shift Report`;
+
+    const whatsappBody = [header, '', ...metaLines, '', '*Opening balances*', ...balanceLines]
+      .filter(Boolean)
+      .join('\n');
+
     return {
       inAppTitle: 'Shift Opened',
       inAppMessage: time ? `Shift opened at ${time}.` : 'A new shift has been opened.',
+      whatsappBody: `${whatsappBody}${varianceLine}${footer}`,
     };
   },
   shift_closed: p => {
-    const time = p.closedAt
-      ? new Date(String(p.closedAt)).toLocaleTimeString('en-KE', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : null;
+    const storeName = String(p.storeName || 'Your store');
+    const cashierName = String(p.cashierName || 'Unknown');
+    const date = formatShiftDate(p.closedAt || p.openedAt);
+    const openedTime = formatShiftTime(p.openedAt);
+    const closedTime = formatShiftTime(p.closedAt);
     const varianceCents = Number(p.variance ?? 0);
-    const varianceText =
+    const thresholdCents = Number(p.varianceThresholdCents ?? 100);
+    const emoji = getVarianceEmoji(varianceCents, thresholdCents);
+
+    const openedAtMs = p.openedAt ? new Date(String(p.openedAt)).getTime() : 0;
+    const closedAtMs = p.closedAt ? new Date(String(p.closedAt)).getTime() : 0;
+    const durationMinutes =
+      openedAtMs && closedAtMs ? Math.round((closedAtMs - openedAtMs) / 60000) : 0;
+
+    const cashSales = Number(p.cashSales ?? 0);
+    const creditSales = Number(p.creditSales ?? 0);
+    const totalSales = cashSales + creditSales;
+    const purchases = Number(p.purchases ?? 0);
+    const cashTotal = Number(p.cashTotal ?? 0);
+    const mpesaTotal = Number(p.mpesaTotal ?? 0);
+    const totalCollected = Number(p.totalCollected ?? 0);
+    const closingDeclared = Number(p.closingDeclared ?? 0);
+
+    const header = `${emoji} *Shift Closed — ${storeName}*`;
+    const metaLines = [
+      `*Cashier:* ${cashierName}`,
+      date ? `*Date:* ${date}` : '',
+      openedTime && closedTime ? `*Time:* ${openedTime} – ${closedTime}` : '',
+      durationMinutes > 0 ? `*Duration:* ${formatDuration(durationMinutes)}` : '',
+    ].filter(Boolean);
+
+    const salesLines = [
+      `*Total sales:* ${formatCentsKes(totalSales)}`,
+      `• Cash sales: ${formatCentsKes(cashSales)}`,
+      `• Credit sales: ${formatCentsKes(creditSales)}`,
+      `• Purchases: ${formatCentsKes(purchases)}`,
+    ];
+
+    const collectionLines = [
+      `*Collections:*`,
+      `• Cash: ${formatCentsKes(cashTotal)}`,
+      `• M-Pesa: ${formatCentsKes(mpesaTotal)}`,
+      `• Total collected: ${formatCentsKes(totalCollected)}`,
+    ];
+
+    const varianceLine =
       varianceCents !== 0
-        ? ` Variance: KES ${(Math.abs(varianceCents) / 100).toFixed(2)}${varianceCents < 0 ? ' short' : ' over'}.`
-        : '';
+        ? `*Closing count:* ${formatCentsKes(closingDeclared)}\n*Variance:* ${formatCentsKes(
+            Math.abs(varianceCents)
+          )}${varianceCents < 0 ? ' short' : ' over'}`
+        : `*Closing count:* ${formatCentsKes(closingDeclared)}\n*Variance:* None 🟢`;
+
+    const footer = `\n_View full report:_ https://dukarun.com/dashboard/accounting?sessionId=${p.sessionId}\n— DukaRun Shift Report`;
+
+    const whatsappBody = [header, '', ...metaLines, '', ...salesLines, '', ...collectionLines]
+      .filter(Boolean)
+      .join('\n');
+
     return {
       inAppTitle: 'Shift Closed',
-      inAppMessage: time
-        ? `Shift closed at ${time}.${varianceText}`
-        : `Shift has been closed.${varianceText}`,
+      inAppMessage: closedTime
+        ? `Shift closed at ${closedTime}.${
+            varianceCents !== 0
+              ? ` Variance: ${formatCentsKes(Math.abs(varianceCents))}${
+                  varianceCents < 0 ? ' short' : ' over'
+                }.`
+              : ''
+          }`
+        : `Shift has been closed.${
+            varianceCents !== 0
+              ? ` Variance: ${formatCentsKes(Math.abs(varianceCents))}${
+                  varianceCents < 0 ? ' short' : ' over'
+                }.`
+              : ''
+          }`,
+      whatsappBody: `${whatsappBody}\n\n${varianceLine}${footer}`,
     };
   },
 };

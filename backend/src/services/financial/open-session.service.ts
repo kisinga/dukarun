@@ -1,10 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  Administrator,
   Channel,
+  ChannelService,
   EventBus,
   PaymentMethod,
   RequestContext,
   TransactionalConnection,
+  User,
 } from '@vendure/core';
 import { ShiftSessionEvent } from '../../infrastructure/events/custom-events';
 import { In } from 'typeorm';
@@ -131,7 +134,8 @@ export class OpenSessionService {
     private readonly financialService: FinancialService,
     private readonly channelPaymentMethodService: ChannelPaymentMethodService,
     private readonly auditService: AuditService,
-    private readonly eventBus: EventBus
+    private readonly eventBus: EventBus,
+    private readonly channelService: ChannelService
   ) {}
 
   /**
@@ -255,10 +259,27 @@ export class OpenSessionService {
     this.logger.log(
       `Cashier session ${savedSession.id} started for channel ${input.channelId} by user ${cashierUserId} (per-account opening)`
     );
+
+    const [cashierName, storeName] = await Promise.all([
+      this.getCashierName(ctx, cashierUserId),
+      this.getStoreName(ctx, input.channelId),
+    ]);
+    const totalOpeningVariance = perAccount.reduce((sum, a) => sum + a.varianceCents, 0);
+
     this.eventBus.publish(
       new ShiftSessionEvent(ctx, String(input.channelId), 'opened', savedSession.id, {
         sessionId: savedSession.id,
         openedAt: savedSession.openedAt?.toISOString?.(),
+        cashierUserId,
+        cashierName,
+        storeName,
+        openingBalances: perAccount.map(a => ({
+          accountCode: a.accountCode,
+          declaredCents: a.declaredCents,
+          expectedCents: a.expectedCents,
+          varianceCents: a.varianceCents,
+        })),
+        totalOpeningVariance,
       })
     );
     return savedSession;
@@ -455,11 +476,43 @@ export class OpenSessionService {
       this.logger.log(
         `Cashier session ${sessionId} closed. Expected: ${summary.ledgerTotals.cashTotal}, Declared: ${totalDeclared}, Variance: ${summary.variance}, ClosingCountId: ${closingCount.count.id}`
       );
+
+      const [cashierName, storeName, salesBreakdown, purchases] = await Promise.all([
+        this.getCashierName(txCtx, session.cashierUserId),
+        this.getStoreName(txCtx, channelId),
+        this.ledgerQueryService.getSalesBreakdown(
+          channelId,
+          session.openedAt.toISOString().slice(0, 10),
+          summary.closedAt ? summary.closedAt.toISOString().slice(0, 10) : undefined
+        ),
+        this.ledgerQueryService.getPurchaseTotal(
+          channelId,
+          session.openedAt.toISOString().slice(0, 10),
+          summary.closedAt ? summary.closedAt.toISOString().slice(0, 10) : undefined
+        ),
+      ]);
+      const channelSettings = await this.channelService.findOne(txCtx, channelId);
+      const varianceThresholdCents =
+        ((channelSettings?.customFields as Record<string, unknown> | undefined)
+          ?.varianceNotificationThreshold as number | undefined) ?? 100;
+
       this.eventBus.publish(
         new ShiftSessionEvent(txCtx, String(channelId), 'closed', sessionId, {
           sessionId,
+          openedAt: summary.openedAt?.toISOString?.(),
           closedAt: summary.closedAt?.toISOString?.(),
+          cashierUserId: session.cashierUserId,
+          cashierName,
+          storeName,
+          cashSales: salesBreakdown.cashSales,
+          creditSales: salesBreakdown.creditSales,
+          purchases,
+          cashTotal: summary.ledgerTotals.cashTotal,
+          mpesaTotal: summary.ledgerTotals.mpesaTotal,
+          totalCollected: summary.ledgerTotals.totalCollected,
+          closingDeclared: summary.closingDeclared,
           variance: summary.variance,
+          varianceThresholdCents,
         })
       );
       return summary;
@@ -884,6 +937,47 @@ export class OpenSessionService {
     }
 
     return session.channelId;
+  }
+
+  /**
+   * Get display name for a cashier user.
+   */
+  private async getCashierName(ctx: RequestContext, userId: number): Promise<string> {
+    try {
+      const admin = await this.connection.rawConnection.getRepository(Administrator).findOne({
+        where: { user: { id: userId } },
+        relations: ['user'],
+      });
+      if (admin) {
+        const parts = [admin.firstName, admin.lastName].filter(Boolean);
+        if (parts.length > 0) return parts.join(' ');
+      }
+      const user = await this.connection.rawConnection
+        .getRepository(User)
+        .findOne({ where: { id: userId.toString() } });
+      return user?.identifier || `User ${userId}`;
+    } catch {
+      return `User ${userId}`;
+    }
+  }
+
+  /**
+   * Get store name for a channel.
+   */
+  private async getStoreName(ctx: RequestContext, channelId: number): Promise<string> {
+    try {
+      const channel = await this.channelService.findOne(ctx, channelId);
+      return (channel as any)?.name || channel?.code || `Store ${channelId}`;
+    } catch {
+      return `Store ${channelId}`;
+    }
+  }
+
+  /**
+   * Format a cent amount as KES string.
+   */
+  private formatCents(cents: number): string {
+    return `KES ${(cents / 100).toLocaleString('en-KE', { minimumFractionDigits: 2 })}`;
   }
 
   // ============================================================================
