@@ -14,6 +14,7 @@ jobs:
       contents: read
     env:
       HUSKY: 0
+      onnxruntime-node-install-cuda: skip
 
     steps:
       - name: Checkout code
@@ -32,6 +33,8 @@ jobs:
           npm run build -w @dukarun/backend
           npm run test:coverage -w @dukarun/backend
         timeout-minutes: 10
+        env:
+          onnxruntime-node-install-cuda: skip
 
       - name: Upload backend coverage artifacts
         uses: actions/upload-artifact@v4
@@ -48,6 +51,7 @@ jobs:
       contents: read
     env:
       HUSKY: 0
+      onnxruntime-node-install-cuda: skip
 
     steps:
       - name: Checkout code
@@ -68,6 +72,8 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        env:
+          onnxruntime-node-install-cuda: skip
 
       - name: Production build (catches budget errors)
         run: npm run build -w @dukarun/frontend -- --configuration production

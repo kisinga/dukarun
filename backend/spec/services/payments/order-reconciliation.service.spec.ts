@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Order, OrderService, RequestContext } from '@vendure/core';
 import { FinancialService } from '../../../src/services/financial/financial.service';
 import { OrderReconciliationService } from '../../../src/services/payments/order-reconciliation.service';
+import { OrderReversalService } from '../../../src/services/orders/order-reversal.service';
 import {
   LedgerConsistencyGuard,
   OrderArProjection,
@@ -21,6 +22,7 @@ describe('OrderReconciliationService', () => {
   let mockPaymentService: jest.Mocked<import('@vendure/core').PaymentService>;
   let mockFinancialService: jest.Mocked<FinancialService>;
   let mockConnection: any;
+  let mockOrderReversalService: jest.Mocked<OrderReversalService>;
 
   beforeEach(() => {
     mockOrderService = {
@@ -45,13 +47,18 @@ describe('OrderReconciliationService', () => {
     const orderArProjection = new OrderArProjection(mockFinancialService as any);
     const ledgerConsistencyGuard = new LedgerConsistencyGuard();
 
+    mockOrderReversalService = {
+      cancelOrder: jest.fn(),
+    } as any;
+
     service = new OrderReconciliationService(
       mockOrderService,
       mockPaymentService as any,
       ledgerConsistencyGuard,
       orderArProjection,
       mockFinancialService as any,
-      mockConnection
+      mockConnection,
+      mockOrderReversalService
     );
   });
 

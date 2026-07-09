@@ -16,6 +16,9 @@ import {
   Zone,
   ZoneService,
 } from '@vendure/core';
+import { CommunicationService } from '../../infrastructure/communication/communication.service';
+import { OutboundDeliveryService } from '../../services/notifications/outbound-delivery.service';
+import { validatePhoneNumber } from '../../utils/phone.utils';
 import { getChannelStatus } from '../../domain/channel-custom-fields';
 import { ChannelAdminService } from '../../services/channels/channel-admin.service';
 import { AdminLoginAttemptService } from '../../infrastructure/audit/admin-login-attempt.service';
@@ -66,7 +69,9 @@ export class SuperAdminResolver {
     private readonly connection: TransactionalConnection,
     private readonly zoneService: ZoneService,
     private readonly taxRateService: TaxRateService,
-    private readonly globalSettingsService: GlobalSettingsService
+    private readonly globalSettingsService: GlobalSettingsService,
+    private readonly communicationService: CommunicationService,
+    private readonly outboundDeliveryService: OutboundDeliveryService
   ) {}
 
   @Query()
@@ -297,11 +302,16 @@ export class SuperAdminResolver {
 
   @Query()
   @Allow(Permission.SuperAdmin)
-  async platformSettings(@Ctx() ctx: RequestContext): Promise<{ trialDays: number }> {
+  async platformSettings(
+    @Ctx() ctx: RequestContext
+  ): Promise<{ trialDays: number; customerNotificationsEnabled: boolean }> {
     const settings = await this.globalSettingsService.getSettings(ctx);
     const raw = (settings as { customFields?: { trialDays?: number } }).customFields?.trialDays;
     const trialDays = typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : 30;
-    return { trialDays };
+    const customerNotificationsEnabled =
+      (settings as { customFields?: { customerNotificationsEnabled?: boolean } }).customFields
+        ?.customerNotificationsEnabled === true;
+    return { trialDays, customerNotificationsEnabled };
   }
 
   @Query()
@@ -666,6 +676,81 @@ export class SuperAdminResolver {
       data: { trialDays: value },
     });
     return { trialDays: value };
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async updateCustomerNotificationsEnabled(
+    @Ctx() ctx: RequestContext,
+    @Args('enabled') enabled: boolean
+  ): Promise<{ trialDays: number; customerNotificationsEnabled: boolean }> {
+    const value = enabled === true;
+    await this.connection.rawConnection.query(
+      `UPDATE global_settings SET "customFieldsCustomernotificationsenabled" = $1`,
+      [value]
+    );
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.PLATFORM_SETTINGS_UPDATED, {
+      data: { customerNotificationsEnabled: value },
+    });
+    return this.platformSettings(ctx);
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async sendTestWhatsAppNotification(
+    @Args('phoneNumber') phoneNumber: string,
+    @Args('message') message: string
+  ): Promise<{ success: boolean; channel: string; error?: string; info?: string }> {
+    const normalized = phoneNumber?.trim();
+    if (!normalized || !validatePhoneNumber(normalized)) {
+      return { success: false, channel: 'whatsapp', error: 'Invalid phone number' };
+    }
+    if (!message || !message.trim()) {
+      return { success: false, channel: 'whatsapp', error: 'Message is required' };
+    }
+
+    const result = await this.communicationService.send({
+      channel: 'whatsapp',
+      recipient: normalized,
+      body: message.trim(),
+      ctx: RequestContext.empty(),
+      metadata: { purpose: 'admin_notification' },
+    });
+
+    return {
+      success: result.success,
+      channel: result.channel ?? 'whatsapp',
+      error: result.error,
+      info: result.success ? 'Test WhatsApp message queued' : undefined,
+    };
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async sendTestCustomerNotification(
+    @Args('channelId') channelId: string,
+    @Args('customerId') customerId: string,
+    @Args('triggerKey') triggerKey: string
+  ): Promise<{ success: boolean; channel: string; error?: string; info?: string }> {
+    if (!triggerKey || !triggerKey.trim()) {
+      return { success: false, channel: 'none', error: 'triggerKey is required' };
+    }
+
+    const ctx = RequestContext.empty();
+    try {
+      await this.outboundDeliveryService.deliver(ctx, triggerKey.trim(), {
+        channelId,
+        customerId,
+      });
+      return {
+        success: true,
+        channel: 'outbound',
+        info: `Triggered ${triggerKey.trim()} for customer ${customerId}`,
+      };
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      return { success: false, channel: 'none', error: errMsg };
+    }
   }
 
   @Mutation()

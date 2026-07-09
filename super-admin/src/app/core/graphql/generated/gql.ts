@@ -41,8 +41,11 @@ type Documents = {
     "\n  mutation RejectUser($userId: ID!, $reason: String) {\n    rejectUser(userId: $userId, reason: $reason) {\n      id\n      identifier\n      authorizationStatus\n    }\n  }\n": typeof types.RejectUserDocument,
     "\n  query RegistrationSeedContext {\n    registrationSeedContext {\n      zone {\n        id\n        name\n        members {\n          id\n          name\n          code\n        }\n      }\n      taxRate {\n        id\n        name\n        categoryName\n        value\n      }\n    }\n  }\n": typeof types.RegistrationSeedContextDocument,
     "\n  mutation UpdateRegistrationTaxRate($input: UpdateRegistrationTaxRateInput!) {\n    updateRegistrationTaxRate(input: $input) {\n      id\n      name\n      categoryName\n      value\n    }\n  }\n": typeof types.UpdateRegistrationTaxRateDocument,
-    "\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n    }\n  }\n": typeof types.PlatformSettingsDocument,
-    "\n  mutation UpdatePlatformSettings($trialDays: Int!) {\n    updatePlatformSettings(trialDays: $trialDays) {\n      trialDays\n    }\n  }\n": typeof types.UpdatePlatformSettingsDocument,
+    "\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n      customerNotificationsEnabled\n    }\n  }\n": typeof types.PlatformSettingsDocument,
+    "\n  mutation UpdatePlatformSettings($trialDays: Int!) {\n    updatePlatformSettings(trialDays: $trialDays) {\n      trialDays\n      customerNotificationsEnabled\n    }\n  }\n": typeof types.UpdatePlatformSettingsDocument,
+    "\n  mutation UpdateCustomerNotificationsEnabled($enabled: Boolean!) {\n    updateCustomerNotificationsEnabled(enabled: $enabled) {\n      trialDays\n      customerNotificationsEnabled\n    }\n  }\n": typeof types.UpdateCustomerNotificationsEnabledDocument,
+    "\n  mutation SendTestWhatsAppNotification($phoneNumber: String!, $message: String!) {\n    sendTestWhatsAppNotification(phoneNumber: $phoneNumber, message: $message) {\n      success\n      channel\n      error\n      info\n    }\n  }\n": typeof types.SendTestWhatsAppNotificationDocument,
+    "\n  mutation SendTestCustomerNotification(\n    $channelId: ID!\n    $customerId: ID!\n    $triggerKey: String!\n  ) {\n    sendTestCustomerNotification(\n      channelId: $channelId\n      customerId: $customerId\n      triggerKey: $triggerKey\n    ) {\n      success\n      channel\n      error\n      info\n    }\n  }\n": typeof types.SendTestCustomerNotificationDocument,
     "\n  query PlatformRoleTemplates {\n    platformRoleTemplates {\n      id\n      code\n      name\n      description\n      permissions\n    }\n  }\n": typeof types.PlatformRoleTemplatesDocument,
     "\n  query AssignablePermissions {\n    assignablePermissions\n  }\n": typeof types.AssignablePermissionsDocument,
     "\n  mutation CreateRoleTemplate($input: CreateRoleTemplateInput!) {\n    createRoleTemplate(input: $input) {\n      id\n      code\n      name\n      description\n      permissions\n    }\n  }\n": typeof types.CreateRoleTemplateDocument,
@@ -84,8 +87,11 @@ const documents: Documents = {
     "\n  mutation RejectUser($userId: ID!, $reason: String) {\n    rejectUser(userId: $userId, reason: $reason) {\n      id\n      identifier\n      authorizationStatus\n    }\n  }\n": types.RejectUserDocument,
     "\n  query RegistrationSeedContext {\n    registrationSeedContext {\n      zone {\n        id\n        name\n        members {\n          id\n          name\n          code\n        }\n      }\n      taxRate {\n        id\n        name\n        categoryName\n        value\n      }\n    }\n  }\n": types.RegistrationSeedContextDocument,
     "\n  mutation UpdateRegistrationTaxRate($input: UpdateRegistrationTaxRateInput!) {\n    updateRegistrationTaxRate(input: $input) {\n      id\n      name\n      categoryName\n      value\n    }\n  }\n": types.UpdateRegistrationTaxRateDocument,
-    "\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n    }\n  }\n": types.PlatformSettingsDocument,
-    "\n  mutation UpdatePlatformSettings($trialDays: Int!) {\n    updatePlatformSettings(trialDays: $trialDays) {\n      trialDays\n    }\n  }\n": types.UpdatePlatformSettingsDocument,
+    "\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n      customerNotificationsEnabled\n    }\n  }\n": types.PlatformSettingsDocument,
+    "\n  mutation UpdatePlatformSettings($trialDays: Int!) {\n    updatePlatformSettings(trialDays: $trialDays) {\n      trialDays\n      customerNotificationsEnabled\n    }\n  }\n": types.UpdatePlatformSettingsDocument,
+    "\n  mutation UpdateCustomerNotificationsEnabled($enabled: Boolean!) {\n    updateCustomerNotificationsEnabled(enabled: $enabled) {\n      trialDays\n      customerNotificationsEnabled\n    }\n  }\n": types.UpdateCustomerNotificationsEnabledDocument,
+    "\n  mutation SendTestWhatsAppNotification($phoneNumber: String!, $message: String!) {\n    sendTestWhatsAppNotification(phoneNumber: $phoneNumber, message: $message) {\n      success\n      channel\n      error\n      info\n    }\n  }\n": types.SendTestWhatsAppNotificationDocument,
+    "\n  mutation SendTestCustomerNotification(\n    $channelId: ID!\n    $customerId: ID!\n    $triggerKey: String!\n  ) {\n    sendTestCustomerNotification(\n      channelId: $channelId\n      customerId: $customerId\n      triggerKey: $triggerKey\n    ) {\n      success\n      channel\n      error\n      info\n    }\n  }\n": types.SendTestCustomerNotificationDocument,
     "\n  query PlatformRoleTemplates {\n    platformRoleTemplates {\n      id\n      code\n      name\n      description\n      permissions\n    }\n  }\n": types.PlatformRoleTemplatesDocument,
     "\n  query AssignablePermissions {\n    assignablePermissions\n  }\n": types.AssignablePermissionsDocument,
     "\n  mutation CreateRoleTemplate($input: CreateRoleTemplateInput!) {\n    createRoleTemplate(input: $input) {\n      id\n      code\n      name\n      description\n      permissions\n    }\n  }\n": types.CreateRoleTemplateDocument,
@@ -225,11 +231,23 @@ export function graphql(source: "\n  mutation UpdateRegistrationTaxRate($input: 
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n    }\n  }\n"): (typeof documents)["\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n    }\n  }\n"];
+export function graphql(source: "\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n      customerNotificationsEnabled\n    }\n  }\n"): (typeof documents)["\n  query PlatformSettings {\n    platformSettings {\n      trialDays\n      customerNotificationsEnabled\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation UpdatePlatformSettings($trialDays: Int!) {\n    updatePlatformSettings(trialDays: $trialDays) {\n      trialDays\n    }\n  }\n"): (typeof documents)["\n  mutation UpdatePlatformSettings($trialDays: Int!) {\n    updatePlatformSettings(trialDays: $trialDays) {\n      trialDays\n    }\n  }\n"];
+export function graphql(source: "\n  mutation UpdatePlatformSettings($trialDays: Int!) {\n    updatePlatformSettings(trialDays: $trialDays) {\n      trialDays\n      customerNotificationsEnabled\n    }\n  }\n"): (typeof documents)["\n  mutation UpdatePlatformSettings($trialDays: Int!) {\n    updatePlatformSettings(trialDays: $trialDays) {\n      trialDays\n      customerNotificationsEnabled\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation UpdateCustomerNotificationsEnabled($enabled: Boolean!) {\n    updateCustomerNotificationsEnabled(enabled: $enabled) {\n      trialDays\n      customerNotificationsEnabled\n    }\n  }\n"): (typeof documents)["\n  mutation UpdateCustomerNotificationsEnabled($enabled: Boolean!) {\n    updateCustomerNotificationsEnabled(enabled: $enabled) {\n      trialDays\n      customerNotificationsEnabled\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SendTestWhatsAppNotification($phoneNumber: String!, $message: String!) {\n    sendTestWhatsAppNotification(phoneNumber: $phoneNumber, message: $message) {\n      success\n      channel\n      error\n      info\n    }\n  }\n"): (typeof documents)["\n  mutation SendTestWhatsAppNotification($phoneNumber: String!, $message: String!) {\n    sendTestWhatsAppNotification(phoneNumber: $phoneNumber, message: $message) {\n      success\n      channel\n      error\n      info\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SendTestCustomerNotification(\n    $channelId: ID!\n    $customerId: ID!\n    $triggerKey: String!\n  ) {\n    sendTestCustomerNotification(\n      channelId: $channelId\n      customerId: $customerId\n      triggerKey: $triggerKey\n    ) {\n      success\n      channel\n      error\n      info\n    }\n  }\n"): (typeof documents)["\n  mutation SendTestCustomerNotification(\n    $channelId: ID!\n    $customerId: ID!\n    $triggerKey: String!\n  ) {\n    sendTestCustomerNotification(\n      channelId: $channelId\n      customerId: $customerId\n      triggerKey: $triggerKey\n    ) {\n      success\n      channel\n      error\n      info\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

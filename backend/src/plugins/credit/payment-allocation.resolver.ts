@@ -161,4 +161,24 @@ export class PaymentAllocationResolver {
       message: `Order ${order.code} reconciled with strategy ${input.strategy}.`,
     };
   }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  @AuditLogDecorator({
+    eventType: AUDIT_EVENTS.ORDER_RECONCILED,
+    extractEntityId: (_result, args) => args.orderId ?? null,
+  })
+  async repairCancelledOrder(
+    @Ctx() ctx: RequestContext,
+    @Args('orderId') orderId: string,
+    @Args('note', { nullable: true }) note?: string
+  ) {
+    const order = await this.orderReconciliationService.repairCancelledOrder(ctx, orderId, note);
+
+    return {
+      orderId: order.id.toString(),
+      success: true,
+      message: `Order ${order.code} repaired: missing reversal posted.`,
+    };
+  }
 }

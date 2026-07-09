@@ -1435,6 +1435,7 @@ export type CreateCustomerCustomFieldsInput = {
   lastRepaymentAmount?: InputMaybe<Scalars['Float']['input']>;
   lastRepaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
+  notificationsEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   paymentTerms?: InputMaybe<Scalars['String']['input']>;
   supplierCreditDuration?: InputMaybe<Scalars['Int']['input']>;
   supplierCreditLimit?: InputMaybe<Scalars['Float']['input']>;
@@ -2190,6 +2191,7 @@ export type CustomerCustomFields = {
   lastRepaymentAmount?: Maybe<Scalars['Float']['output']>;
   lastRepaymentDate?: Maybe<Scalars['DateTime']['output']>;
   notes?: Maybe<Scalars['String']['output']>;
+  notificationsEnabled?: Maybe<Scalars['Boolean']['output']>;
   paymentTerms?: Maybe<Scalars['String']['output']>;
   supplierCreditDuration?: Maybe<Scalars['Int']['output']>;
   supplierCreditLimit?: Maybe<Scalars['Float']['output']>;
@@ -2216,6 +2218,7 @@ export type CustomerFilterParameter = {
   lastRepaymentAmount?: InputMaybe<NumberOperators>;
   lastRepaymentDate?: InputMaybe<DateOperators>;
   notes?: InputMaybe<StringOperators>;
+  notificationsEnabled?: InputMaybe<BooleanOperators>;
   outstandingAmount?: InputMaybe<NumberOperators>;
   paymentTerms?: InputMaybe<StringOperators>;
   phoneNumber?: InputMaybe<StringOperators>;
@@ -2315,6 +2318,7 @@ export type CustomerSortParameter = {
   lastRepaymentAmount?: InputMaybe<SortOrder>;
   lastRepaymentDate?: InputMaybe<SortOrder>;
   notes?: InputMaybe<SortOrder>;
+  notificationsEnabled?: InputMaybe<SortOrder>;
   outstandingAmount?: InputMaybe<SortOrder>;
   paymentTerms?: InputMaybe<SortOrder>;
   phoneNumber?: InputMaybe<SortOrder>;
@@ -2831,6 +2835,7 @@ export type GlobalSettings = {
 
 export type GlobalSettingsCustomFields = {
   __typename?: 'GlobalSettingsCustomFields';
+  customerNotificationsEnabled?: Maybe<Scalars['Boolean']['output']>;
   trialDays?: Maybe<Scalars['Int']['output']>;
 };
 
@@ -4133,6 +4138,8 @@ export type Mutation = {
   runPendingSearchIndexUpdates: Success;
   runScheduledTask: Success;
   sendCustomerStatementEmail: Scalars['Boolean']['output'];
+  sendTestCustomerNotification: SendTestNotificationResult;
+  sendTestWhatsAppNotification: SendTestNotificationResult;
   setCustomerForDraftOrder: SetCustomerForDraftOrderResult;
   /** Sets the billing address for a draft Order */
   setDraftOrderBillingAddress: Order;
@@ -4198,6 +4205,7 @@ export type Mutation = {
   /** Update an existing CustomerGroup */
   updateCustomerGroup: CustomerGroup;
   updateCustomerNote: HistoryEntry;
+  updateCustomerNotificationsEnabled: PlatformSettings;
   updateDraftPurchase: StockPurchase;
   /** Update an existing Facet */
   updateFacet: Facet;
@@ -5016,6 +5024,17 @@ export type MutationSendCustomerStatementEmailArgs = {
   customerId: Scalars['ID']['input'];
 };
 
+export type MutationSendTestCustomerNotificationArgs = {
+  channelId: Scalars['ID']['input'];
+  customerId: Scalars['ID']['input'];
+  triggerKey: Scalars['String']['input'];
+};
+
+export type MutationSendTestWhatsAppNotificationArgs = {
+  message: Scalars['String']['input'];
+  phoneNumber: Scalars['String']['input'];
+};
+
 export type MutationSetCustomerForDraftOrderArgs = {
   customerId?: InputMaybe<Scalars['ID']['input']>;
   input?: InputMaybe<CreateCustomerInput>;
@@ -5208,6 +5227,10 @@ export type MutationUpdateCustomerGroupArgs = {
 
 export type MutationUpdateCustomerNoteArgs = {
   input: UpdateCustomerNoteInput;
+};
+
+export type MutationUpdateCustomerNotificationsEnabledArgs = {
+  enabled: Scalars['Boolean']['input'];
 };
 
 export type MutationUpdateDraftPurchaseArgs = {
@@ -6571,6 +6594,7 @@ export type PlatformRoleTemplate = {
 /** Platform-wide settings (e.g. default trial length for new channels). */
 export type PlatformSettings = {
   __typename?: 'PlatformSettings';
+  customerNotificationsEnabled: Scalars['Boolean']['output'];
   trialDays: Scalars['Int']['output'];
 };
 
@@ -8522,6 +8546,14 @@ export type SellerSortParameter = {
   updatedAt?: InputMaybe<SortOrder>;
 };
 
+export type SendTestNotificationResult = {
+  __typename?: 'SendTestNotificationResult';
+  channel?: Maybe<Scalars['String']['output']>;
+  error?: Maybe<Scalars['String']['output']>;
+  info?: Maybe<Scalars['String']['output']>;
+  success: Scalars['Boolean']['output'];
+};
+
 export type ServerConfig = {
   __typename?: 'ServerConfig';
   /**
@@ -9608,6 +9640,7 @@ export type UpdateCustomerCustomFieldsInput = {
   lastRepaymentAmount?: InputMaybe<Scalars['Float']['input']>;
   lastRepaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
   notes?: InputMaybe<Scalars['String']['input']>;
+  notificationsEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   paymentTerms?: InputMaybe<Scalars['String']['input']>;
   supplierCreditDuration?: InputMaybe<Scalars['Int']['input']>;
   supplierCreditLimit?: InputMaybe<Scalars['Float']['input']>;
@@ -9664,6 +9697,7 @@ export type UpdateFacetValueInput = {
 };
 
 export type UpdateGlobalSettingsCustomFieldsInput = {
+  customerNotificationsEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   trialDays?: InputMaybe<Scalars['Int']['input']>;
 };
 
@@ -11820,6 +11854,7 @@ export type GetCustomersQuery = {
         lastRepaymentDate?: any | null;
         lastRepaymentAmount?: number | null;
         creditDuration?: number | null;
+        notificationsEnabled?: boolean | null;
       } | null;
       addresses?: Array<{
         __typename?: 'Address';
@@ -11885,6 +11920,7 @@ export type GetCustomerQuery = {
       lastRepaymentDate?: any | null;
       lastRepaymentAmount?: number | null;
       creditDuration?: number | null;
+      notificationsEnabled?: boolean | null;
     } | null;
     addresses?: Array<{
       __typename?: 'Address';
@@ -11955,6 +11991,7 @@ export type UpdateCustomerMutation = {
           notes?: string | null;
           isCreditApproved?: boolean | null;
           creditLimit?: number | null;
+          notificationsEnabled?: boolean | null;
         } | null;
       }
     | { __typename?: 'EmailAddressConflictError'; errorCode: ErrorCode; message: string };
@@ -20024,6 +20061,10 @@ export const GetCustomersDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'lastRepaymentDate' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'lastRepaymentAmount' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'creditDuration' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'notificationsEnabled' },
+                            },
                           ],
                         },
                       },
@@ -20187,6 +20228,7 @@ export const GetCustomerDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'lastRepaymentDate' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'lastRepaymentAmount' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'creditDuration' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'notificationsEnabled' } },
                     ],
                   },
                 },
@@ -20370,6 +20412,10 @@ export const UpdateCustomerDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'isCreditApproved' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'creditLimit' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'notificationsEnabled' },
+                            },
                           ],
                         },
                       },

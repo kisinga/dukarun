@@ -20,6 +20,8 @@ import { OrderCreationService } from '../../services/orders/order-creation.servi
 import { OrderFulfillmentService } from '../../services/orders/order-fulfillment.service';
 import { OrderItemService } from '../../services/orders/order-item.service';
 import { OrderPaymentService } from '../../services/orders/order-payment.service';
+import { OrderCancellationDetectorSubscriber } from '../../services/orders/order-cancellation-detector.subscriber';
+import { OrderCancellationProcess } from '../../services/orders/order-cancellation-process';
 import { OrderReversalService } from '../../services/orders/order-reversal.service';
 import { OrderStateService } from '../../services/orders/order-state.service';
 import { PriceOverrideService } from '../../services/orders/price-override.service';
@@ -348,6 +350,10 @@ const COMBINED_SCHEMA = gql`
     Superadmin action: rebuild the ledger AR balance from the customer's order model.
     """
     rebuildCustomerBalanceFromModel(customerId: ID!, note: String): BalanceOverrideResult!
+    """
+    Superadmin action: repair a Cancelled order whose ledger reversal was never posted.
+    """
+    repairCancelledOrder(orderId: ID!, note: String): ReconcileOrderResult!
   }
 
   """
@@ -463,6 +469,7 @@ const COMBINED_SCHEMA = gql`
     OrderPaymentService,
     OrderReversalService,
     OrderStateService,
+    OrderCancellationDetectorSubscriber,
     // Payment services
     OrderReconciliationService,
     PaymentAllocationService,

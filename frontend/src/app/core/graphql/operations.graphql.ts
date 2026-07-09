@@ -1676,6 +1676,7 @@ export const GET_CUSTOMERS = graphql(`
           lastRepaymentDate
           lastRepaymentAmount
           creditDuration
+          notificationsEnabled
         }
         addresses {
           id
@@ -1737,6 +1738,7 @@ export const GET_CUSTOMER = graphql(`
         lastRepaymentDate
         lastRepaymentAmount
         creditDuration
+        notificationsEnabled
       }
       addresses {
         id
@@ -1802,6 +1804,7 @@ export const UPDATE_CUSTOMER = graphql(`
           notes
           isCreditApproved
           creditLimit
+          notificationsEnabled
         }
       }
       ... on EmailAddressConflictError {

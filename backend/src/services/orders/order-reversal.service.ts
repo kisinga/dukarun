@@ -7,6 +7,7 @@ import {
   RequestContext,
   TransactionalConnection,
   UserInputError,
+  isGraphQlErrorResult,
 } from '@vendure/core';
 import { LedgerPostingService } from '../financial/ledger-posting.service';
 import { LedgerConsistencyGuard, OrderArProjection } from '../financial/ledger-projection';
@@ -22,10 +23,11 @@ export interface OrderReversalResult {
 /**
  * Order Reversal Service
  *
- * Posts a single ledger entry dated at the reversal date that reverses the order's net effect
- * (CreditSale + PaymentAllocation for credit orders, or Payment entries for cash orders),
- * and marks the order as reversed via custom fields.
- * Inventory/quantity restoration is left to Vendure.
+ * Provides the ledger-side bookkeeping for order cancellation:
+ * - cancelOrder: idempotent, does not require the order to be in sync. Used by
+ *   the OrderProcess cancellation hook so any path to Cancelled reverses AR.
+ * - reverseOrder: human-initiated reversal that fails closed on divergence.
+ * - voidOrder: thin wrapper around transitioning to Cancelled; the hook does the work.
  */
 @Injectable()
 export class OrderReversalService {
@@ -43,8 +45,80 @@ export class OrderReversalService {
   ) {}
 
   /**
+   * Cancel-side reversal: cancel payments, post an idempotent reversal entry,
+   * reverse inventory, and mark the order reversed.
+   *
+   * Does NOT assert ledger/model sync so it can repair divergent orders.
+   * Safe to call multiple times (idempotent).
+   */
+  async cancelOrder(ctx: RequestContext, orderId: ID): Promise<OrderReversalResult> {
+    const order = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
+    if (!order) {
+      throw new UserInputError(`Order ${orderId} not found`);
+    }
+
+    const customFields = (order.customFields as Record<string, unknown>) || {};
+    if (customFields.reversedAt) {
+      this.logger.debug(`Order ${order.code} is already reversed; skipping cancelOrder.`);
+      return { order, hadPayments: false };
+    }
+
+    const hadPayments = (order.payments || []).some(p => p.state === 'Settled');
+
+    for (const payment of order.payments || []) {
+      if (payment.state === 'Settled' || payment.state === 'Authorized') {
+        const result = await this.paymentService.transitionToState(ctx, payment.id, 'Cancelled');
+        if (result && 'errorCode' in result) {
+          throw new UserInputError(
+            `Failed to cancel payment ${payment.id} for order ${order.code}: ${result.message}`
+          );
+        }
+      }
+    }
+
+    try {
+      await this.ledgerPostingService.postOrderReversal(ctx, order.id.toString(), {
+        orderId: order.id.toString(),
+        orderCode: order.code,
+        customerId: order.customer?.id?.toString(),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('no ledger entries to reverse')) {
+        this.logger.warn(`Order ${order.code} has no ledger footprint; skipping reversal entry.`);
+      } else {
+        throw err;
+      }
+    }
+
+    await this.inventoryService.reverseSale(ctx, order.id.toString());
+
+    const orderRepo = this.connection.getRepository(ctx, Order);
+    await orderRepo.update(
+      { id: orderId },
+      {
+        customFields: {
+          ...customFields,
+          reversedAt: new Date(),
+          reversedByUserId: ctx.activeUserId ?? undefined,
+        } as Record<string, unknown>,
+      }
+    );
+
+    this.logger.log(
+      `Cancelled order ${order.code} (reversal entry posted, order marked reversed).`
+    );
+
+    const updatedOrder = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
+    return {
+      order: updatedOrder ?? order,
+      hadPayments,
+    };
+  }
+
+  /**
    * Reverse an order: post OrderReversal ledger entry and set order customFields (reversedAt, reversedByUserId).
-   * Idempotent: if reversal entry already exists, returns current order and hadPayments from order state.
+   * Idempotent: if reversal entry already exists, returns current order.
    */
   async reverseOrder(ctx: RequestContext, orderId: ID): Promise<OrderReversalResult> {
     const order = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
@@ -54,42 +128,31 @@ export class OrderReversalService {
 
     const customFields = (order.customFields as Record<string, unknown>) || {};
     if (customFields.reversedAt) {
-      throw new UserInputError(`Order ${order.code} is already reversed.`);
+      this.logger.debug(`Order ${order.code} is already reversed; skipping reverseOrder.`);
+      return { order, hadPayments: false };
     }
 
-    const settledPayments = (order.payments || [])
-      .filter(p => p.state === 'Settled')
-      .reduce((sum, p) => sum + p.amount, 0);
-    const hadPayments = settledPayments > 0;
+    const hadPayments = (order.payments || []).some(p => p.state === 'Settled');
 
     // Fail closed if the order model and ledger disagree. Reversing a divergent
     // order would make the drift harder to trace.
     await this.ledgerConsistencyGuard.assertInSync(ctx, this.orderArProjection, order);
 
-    const reversalDate = new Date().toISOString().slice(0, 10);
     await this.ledgerPostingService.postOrderReversal(ctx, order.id.toString(), {
       orderId: order.id.toString(),
       orderCode: order.code,
       customerId: order.customer?.id?.toString(),
-      reversalDate,
     });
 
-    try {
-      await this.inventoryService.reverseSale(ctx, order.id.toString());
-    } catch (err) {
-      this.logger.warn(
-        `Inventory reverseSale failed for order ${order.code}: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
+    await this.inventoryService.reverseSale(ctx, order.id.toString());
 
     const orderRepo = this.connection.getRepository(ctx, Order);
-    const now = new Date();
     await orderRepo.update(
       { id: orderId },
       {
         customFields: {
           ...customFields,
-          reversedAt: now,
+          reversedAt: new Date(),
           reversedByUserId: ctx.activeUserId ?? undefined,
         } as Record<string, unknown>,
       }
@@ -105,8 +168,9 @@ export class OrderReversalService {
   }
 
   /**
-   * Void an order: cancel payments (triggers credit repayment), run reversal (ledger + inventory),
-   * then transition order to Cancelled. Composes reverseOrder().
+   * Void an order: transition to Cancelled.
+   * The OrderProcess hook performs payment cancellation, ledger reversal, inventory restoration,
+   * and marks the order reversed atomically with the state change.
    */
   async voidOrder(ctx: RequestContext, orderId: ID): Promise<OrderReversalResult> {
     const order = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
@@ -114,33 +178,23 @@ export class OrderReversalService {
       throw new UserInputError(`Order ${orderId} not found`);
     }
 
-    const customFields = (order.customFields as Record<string, unknown>) || {};
-    if (customFields.reversedAt) {
-      throw new UserInputError(`Order ${order.code} is already reversed.`);
-    }
     if (order.state === 'Cancelled') {
       throw new UserInputError(`Order ${order.code} is already cancelled.`);
     }
 
-    const paymentsToCancel = (order.payments || []).filter(
-      p => p.state === 'Settled' || p.state === 'Authorized'
-    );
-    for (const payment of paymentsToCancel) {
-      const result = await this.paymentService.transitionToState(ctx, payment.id, 'Cancelled');
-      if (result && 'errorCode' in result) {
-        this.logger.warn(
-          `Failed to cancel payment ${payment.id} for order ${order.code}: ${result.message}`
-        );
-      }
-    }
+    const hadPayments = (order.payments || []).some(p => p.state === 'Settled');
 
-    const result = await this.reverseOrder(ctx, orderId);
-    await this.orderStateService.transitionToState(ctx, orderId, 'Cancelled');
+    const result = await this.orderService.transitionToState(ctx, orderId, 'Cancelled' as any);
+    if (isGraphQlErrorResult(result)) {
+      throw new UserInputError(
+        `Cannot void order ${order.code}: ${result.message || result.errorCode || 'Unknown error'}`
+      );
+    }
 
     const updatedOrder = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
     return {
-      order: updatedOrder ?? result.order,
-      hadPayments: result.hadPayments,
+      order: updatedOrder ?? order,
+      hadPayments,
     };
   }
 }

@@ -277,13 +277,17 @@ export class CustomerApiService {
         customFields:
           input.isCreditApproved !== undefined ||
           input.creditLimit !== undefined ||
-          input.creditDuration !== undefined
+          input.creditDuration !== undefined ||
+          input.notificationsEnabled !== undefined
             ? {
                 ...(input.isCreditApproved !== undefined && {
                   isCreditApproved: input.isCreditApproved,
                 }),
                 ...(input.creditLimit !== undefined && { creditLimit: input.creditLimit }),
                 ...(input.creditDuration !== undefined && { creditDuration: input.creditDuration }),
+                ...(input.notificationsEnabled !== undefined && {
+                  notificationsEnabled: input.notificationsEnabled,
+                }),
               }
             : undefined,
       };

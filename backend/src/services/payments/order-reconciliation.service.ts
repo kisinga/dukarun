@@ -10,6 +10,7 @@ import {
 } from '@vendure/core';
 import { AR_OWING_ORDER_STATES } from '../../constants/order-states.constants';
 import { FinancialService } from '../financial/financial.service';
+import { OrderReversalService } from '../../services/orders/order-reversal.service';
 import { LedgerConsistencyGuard, OrderArProjection } from '../financial/ledger-projection';
 
 export interface OrderReconciliationItem {
@@ -41,7 +42,8 @@ export class OrderReconciliationService {
     private readonly ledgerConsistencyGuard: LedgerConsistencyGuard,
     private readonly orderArProjection: OrderArProjection,
     private readonly financialService: FinancialService,
-    private readonly connection: TransactionalConnection
+    private readonly connection: TransactionalConnection,
+    private readonly orderReversalService: OrderReversalService
   ) {}
 
   async findDivergentOrders(
@@ -233,6 +235,56 @@ export class OrderReconciliationService {
     });
   }
 
+  /**
+   * Repair a Cancelled order whose ledger AR was never reversed.
+   *
+   * Idempotently posts the missing reversal, cancels payments, restores inventory,
+   * and marks the order reversed without changing its state.
+   */
+  async repairCancelledOrder(ctx: RequestContext, orderId: string, note?: string): Promise<Order> {
+    const order = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
+    if (!order) {
+      throw new UserInputError(`Order ${orderId} not found`);
+    }
+    if (order.state !== 'Cancelled') {
+      throw new UserInputError(`Order ${order.code} is not cancelled`);
+    }
+
+    await this.orderReversalService.cancelOrder(ctx, orderId);
+
+    const updatedOrder = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
+    if (!updatedOrder) {
+      throw new UserInputError(`Order ${orderId} disappeared after repair`);
+    }
+
+    const customFields = (updatedOrder.customFields as Record<string, unknown>) || {};
+    const reconciliationNote = [
+      `[${new Date().toISOString()}] repair-cancelled-order`,
+      note?.trim(),
+    ]
+      .filter(Boolean)
+      .join(' | ');
+
+    const orderRepo = this.connection.getRepository(ctx, Order);
+    await orderRepo.update(
+      { id: updatedOrder.id },
+      {
+        customFields: {
+          ...customFields,
+          reconciliationStrategy: 'repair-cancelled-order',
+          reconciliationNote,
+          reconciledAt: new Date(),
+        } as Record<string, unknown>,
+      }
+    );
+
+    const reloaded = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
+    if (!reloaded) {
+      throw new UserInputError(`Order ${orderId} disappeared after repair`);
+    }
+    return reloaded;
+  }
+
   private async fetchAllReconcilableOrders(ctx: RequestContext): Promise<Order[]> {
     const all: Order[] = [];
     const take = 1000;
@@ -244,7 +296,7 @@ export class OrderReconciliationService {
         {
           filter: {
             state: {
-              in: AR_OWING_ORDER_STATES,
+              in: [...AR_OWING_ORDER_STATES, 'Cancelled'],
             },
           },
           take,

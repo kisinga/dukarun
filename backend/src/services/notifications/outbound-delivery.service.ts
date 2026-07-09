@@ -1,5 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Customer, RequestContext, TransactionalConnection, User } from '@vendure/core';
+import {
+  Customer,
+  GlobalSettingsService,
+  RequestContext,
+  TransactionalConnection,
+  User,
+} from '@vendure/core';
 import { env } from '../../infrastructure/config/environment.config';
 import { validatePhoneNumber } from '../../utils/phone.utils';
 import { CommunicationService } from '../../infrastructure/communication/communication.service';
@@ -33,7 +39,8 @@ export class OutboundDeliveryService {
     private readonly notificationService: NotificationService,
     private readonly communicationService: CommunicationService,
     private readonly channelUserService: ChannelUserService,
-    private readonly connection: TransactionalConnection
+    private readonly connection: TransactionalConnection,
+    private readonly globalSettingsService: GlobalSettingsService
   ) {}
 
   /**
@@ -60,6 +67,16 @@ export class OutboundDeliveryService {
         `Notification category "${config.category}" disabled for channel ${channelId}; skipping ${triggerKey}`
       );
       return;
+    }
+
+    if (config.audience === 'customer') {
+      const canSend = await this.canNotifyCustomer(ctx, payload.customerId);
+      if (!canSend) {
+        this.logger.debug(
+          `Customer notifications disabled (global or per-customer); skipping ${triggerKey}`
+        );
+        return;
+      }
     }
 
     const rendered = renderOutbound(triggerKey, payload);
@@ -171,6 +188,40 @@ export class OutboundDeliveryService {
 
   private isShiftTrigger(triggerKey: string): triggerKey is 'shift_opened' | 'shift_closed' {
     return triggerKey === 'shift_opened' || triggerKey === 'shift_closed';
+  }
+
+  private async canNotifyCustomer(
+    ctx: RequestContext,
+    customerId: string | undefined
+  ): Promise<boolean> {
+    if (!customerId) {
+      return false;
+    }
+
+    try {
+      const settings = await this.globalSettingsService.getSettings(ctx);
+      const globalEnabled = (settings as any).customFields?.customerNotificationsEnabled === true;
+      if (!globalEnabled) {
+        return false;
+      }
+    } catch (error) {
+      this.logger.warn('Failed to read global customer notification setting', error);
+      return false;
+    }
+
+    try {
+      const customer = await this.connection.getRepository(ctx, Customer).findOne({
+        where: { id: customerId },
+      });
+      if (!customer) {
+        return false;
+      }
+      const cf = (customer as any).customFields || {};
+      return cf.notificationsEnabled === true;
+    } catch (error) {
+      this.logger.warn(`Failed to read customer notification preference: ${customerId}`, error);
+      return false;
+    }
   }
 
   private async isShiftChannelEnabled(

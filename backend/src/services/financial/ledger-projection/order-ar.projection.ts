@@ -23,11 +23,14 @@ export class OrderArProjection implements LedgerProjection<Order, OrderArSnapsho
   constructor(private readonly financialService: FinancialService) {}
 
   computeFromEntity(order: Order): OrderArSnapshot {
+    const customFields = (order.customFields as Record<string, unknown>) || {};
+    const isCancelled = order.state === 'Cancelled' || customFields.reversedAt != null;
+
     const totalOwed = order.totalWithTax || order.total;
     const settledPayments = (order.payments || [])
       .filter(p => p.state === 'Settled')
       .reduce((sum, p) => sum + p.amount, 0);
-    const amountOwing = Math.max(0, totalOwed - settledPayments);
+    const amountOwing = isCancelled ? 0 : Math.max(0, totalOwed - settledPayments);
 
     return {
       totalOwed,
