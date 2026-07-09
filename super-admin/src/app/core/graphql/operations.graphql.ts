@@ -416,6 +416,7 @@ export const PLATFORM_SETTINGS = graphql(`
   query PlatformSettings {
     platformSettings {
       trialDays
+      customerNotificationsEnabled
     }
   }
 `);
@@ -424,6 +425,46 @@ export const UPDATE_PLATFORM_SETTINGS = graphql(`
   mutation UpdatePlatformSettings($trialDays: Int!) {
     updatePlatformSettings(trialDays: $trialDays) {
       trialDays
+      customerNotificationsEnabled
+    }
+  }
+`);
+
+export const UPDATE_CUSTOMER_NOTIFICATIONS_ENABLED = graphql(`
+  mutation UpdateCustomerNotificationsEnabled($enabled: Boolean!) {
+    updateCustomerNotificationsEnabled(enabled: $enabled) {
+      trialDays
+      customerNotificationsEnabled
+    }
+  }
+`);
+
+export const SEND_TEST_WHATSAPP_NOTIFICATION = graphql(`
+  mutation SendTestWhatsAppNotification($phoneNumber: String!, $message: String!) {
+    sendTestWhatsAppNotification(phoneNumber: $phoneNumber, message: $message) {
+      success
+      channel
+      error
+      info
+    }
+  }
+`);
+
+export const SEND_TEST_CUSTOMER_NOTIFICATION = graphql(`
+  mutation SendTestCustomerNotification(
+    $channelId: ID!
+    $customerId: ID!
+    $triggerKey: String!
+  ) {
+    sendTestCustomerNotification(
+      channelId: $channelId
+      customerId: $customerId
+      triggerKey: $triggerKey
+    ) {
+      success
+      channel
+      error
+      info
     }
   }
 `);

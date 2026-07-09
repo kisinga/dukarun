@@ -3,6 +3,7 @@ import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.c
 import { AuditCorePlugin } from '../audit/audit-core.plugin';
 import { AnalyticsPlugin } from '../analytics/analytics.plugin';
 import { ChannelSettingsPlugin } from '../channels/channel-settings.plugin';
+import { CommunicationPlugin } from '../communication/communication.plugin';
 import { NotificationPlugin } from '../notifications/notification.plugin';
 import { PendingRegistrationsService } from './pending-registrations.service';
 import { PlatformAdminService } from './platform-admin.service';
@@ -16,6 +17,7 @@ import { SUPER_ADMIN_SCHEMA } from './super-admin.schema';
     AnalyticsPlugin,
     AuditCorePlugin,
     ChannelSettingsPlugin,
+    CommunicationPlugin,
     NotificationPlugin,
   ],
   providers: [

@@ -475,4 +475,18 @@ export const globalSettingsCustomFields: CustomFields['GlobalSettings'] = [
     defaultValue: 30,
     nullable: false,
   },
+  {
+    name: 'customerNotificationsEnabled',
+    type: 'boolean',
+    label: [{ languageCode: LanguageCode.en, value: 'Customer notifications enabled' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value:
+          'Master switch for customer-facing WhatsApp/SMS/email notifications. Off by default.',
+      },
+    ],
+    defaultValue: false,
+    nullable: false,
+  },
 ];

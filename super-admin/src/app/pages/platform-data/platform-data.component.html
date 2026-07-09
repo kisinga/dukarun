@@ -71,6 +71,139 @@
 
       <section class="card card-border bg-base-100 shadow">
         <div class="card-body">
+          <h2 class="card-title text-lg">Customer notifications</h2>
+          <p class="text-sm text-base-content/70 mb-4">
+            Master switch for WhatsApp/SMS/email notifications sent to customers. Off by default.
+          </p>
+          <form (ngSubmit)="updateCustomerNotificationsEnabled()" class="flex flex-wrap items-end gap-4">
+            <label class="form-control w-full max-w-xs">
+              <span class="label"><span class="label-text">Enable customer notifications</span></span>
+              <input
+                type="checkbox"
+                class="toggle toggle-primary"
+                [ngModel]="customerNotificationsEnabled()"
+                (ngModelChange)="customerNotificationsEnabled.set($event)"
+                name="customerNotificationsEnabled"
+              />
+            </label>
+            <button type="submit" class="btn btn-primary" [disabled]="savingCustomerNotifications()">
+              @if (savingCustomerNotifications()) {
+                <span class="loading loading-spinner loading-sm"></span>
+              }
+              Save
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <section class="card card-border bg-base-100 shadow">
+        <div class="card-body">
+          <h2 class="card-title text-lg">Test WhatsApp</h2>
+          <p class="text-sm text-base-content/70 mb-4">
+            Send a one-off WhatsApp message to any valid number.
+          </p>
+          <div class="space-y-4">
+            <label class="form-control w-full max-w-md">
+              <span class="label"><span class="label-text">Phone number</span></span>
+              <input
+                type="tel"
+                class="input input-bordered w-full"
+                [ngModel]="testPhoneNumber()"
+                (ngModelChange)="testPhoneNumber.set($event)"
+                name="testPhoneNumber"
+                placeholder="0712345678"
+              />
+            </label>
+            <label class="form-control w-full max-w-md">
+              <span class="label"><span class="label-text">Message</span></span>
+              <textarea
+                class="textarea textarea-bordered w-full"
+                [ngModel]="testMessage()"
+                (ngModelChange)="testMessage.set($event)"
+                name="testMessage"
+                rows="3"
+                placeholder="Hi, this is a test message from DukaRun."
+              ></textarea>
+            </label>
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="sendingTestWhatsApp()"
+              (click)="sendTestWhatsApp()"
+            >
+              @if (sendingTestWhatsApp()) {
+                <span class="loading loading-spinner loading-sm"></span>
+              }
+              Send test WhatsApp
+            </button>
+            @if (testWhatsAppResult(); as result) {
+              <div role="alert" class="alert" [class.alert-success]="result.success" [class.alert-error]="!result.success">
+                <span>{{ result.message }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="card card-border bg-base-100 shadow">
+        <div class="card-body">
+          <h2 class="card-title text-lg">Test customer notification</h2>
+          <p class="text-sm text-base-content/70 mb-4">
+            Trigger a real outbound notification for a customer. Respects the master switch and per-customer preference.
+          </p>
+          <div class="space-y-4">
+            <label class="form-control w-full max-w-md">
+              <span class="label"><span class="label-text">Channel ID</span></span>
+              <input
+                type="text"
+                class="input input-bordered w-full"
+                [ngModel]="testChannelId()"
+                (ngModelChange)="testChannelId.set($event)"
+                name="testChannelId"
+              />
+            </label>
+            <label class="form-control w-full max-w-md">
+              <span class="label"><span class="label-text">Customer ID</span></span>
+              <input
+                type="text"
+                class="input input-bordered w-full"
+                [ngModel]="testCustomerId()"
+                (ngModelChange)="testCustomerId.set($event)"
+                name="testCustomerId"
+              />
+            </label>
+            <label class="form-control w-full max-w-md">
+              <span class="label"><span class="label-text">Trigger key</span></span>
+              <input
+                type="text"
+                class="input input-bordered w-full"
+                [ngModel]="testTriggerKey()"
+                (ngModelChange)="testTriggerKey.set($event)"
+                name="testTriggerKey"
+              />
+            </label>
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="sendingTestCustomerNotification()"
+              (click)="sendTestCustomerNotification()"
+            >
+              @if (sendingTestCustomerNotification()) {
+                <span class="loading loading-spinner loading-sm"></span>
+              }
+              Trigger test notification
+            </button>
+            @if (testCustomerNotificationResult(); as result) {
+              <div role="alert" class="alert" [class.alert-success]="result.success" [class.alert-error]="!result.success">
+                <span>{{ result.message }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="card card-border bg-base-100 shadow">
+        <div class="card-body">
           <h2 class="card-title text-lg">Registration tax rate</h2>
           <p class="text-sm text-base-content/70 mb-4">
             Applies to all channels using this zone.

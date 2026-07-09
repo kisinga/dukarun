@@ -63,6 +63,14 @@ export const SUPER_ADMIN_SCHEMA = gql`
   """
   type PlatformSettings {
     trialDays: Int!
+    customerNotificationsEnabled: Boolean!
+  }
+
+  type SendTestNotificationResult {
+    success: Boolean!
+    channel: String
+    error: String
+    info: String
   }
 
   type ChannelsByStatus {
@@ -344,5 +352,15 @@ export const SUPER_ADMIN_SCHEMA = gql`
       permissions: [String!]!
     ): PlatformAdministratorDetail!
     updatePlatformSettings(trialDays: Int!): PlatformSettings!
+    updateCustomerNotificationsEnabled(enabled: Boolean!): PlatformSettings!
+    sendTestWhatsAppNotification(
+      phoneNumber: String!
+      message: String!
+    ): SendTestNotificationResult!
+    sendTestCustomerNotification(
+      channelId: ID!
+      customerId: ID!
+      triggerKey: String!
+    ): SendTestNotificationResult!
   }
 `;

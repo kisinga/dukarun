@@ -1,39 +1,76 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { RequestContext } from '@vendure/core';
+import { RequestContext, GlobalSettingsService, TransactionalConnection } from '@vendure/core';
 import { OutboundDeliveryService } from '../../../src/services/notifications/outbound-delivery.service';
+import { NotificationService } from '../../../src/services/notifications/notification.service';
+import { CommunicationService } from '../../../src/infrastructure/communication/communication.service';
+import { ChannelUserService } from '../../../src/services/auth/channel-user.service';
+import { SendRequest } from '../../../src/infrastructure/communication/send-request.types';
+
+function createMockGlobalSettingsService(enabled: boolean): Partial<GlobalSettingsService> {
+  return {
+    getSettings: jest.fn().mockImplementation(() =>
+      Promise.resolve({
+        customFields: { customerNotificationsEnabled: enabled },
+      })
+    ),
+  } as Partial<GlobalSettingsService>;
+}
 
 describe('OutboundDeliveryService notification categories', () => {
   const ctx = { channelId: 1 } as RequestContext;
-  let notificationService: any;
-  let communicationService: any;
-  let channelUserService: any;
+  let notificationService: Partial<NotificationService>;
+  let communicationService: Partial<CommunicationService>;
+  let channelUserService: Partial<ChannelUserService>;
+  let globalSettingsService: Partial<GlobalSettingsService>;
   let service: OutboundDeliveryService;
 
   beforeEach(() => {
     notificationService = {
-      isChannelNotificationCategoryEnabled: jest.fn(),
-      createNotificationIfEnabled: jest.fn().mockImplementation(() => Promise.resolve()),
-      isShiftNotificationEnabled: jest.fn().mockImplementation(() => Promise.resolve(true)),
+      isChannelNotificationCategoryEnabled: jest.fn() as jest.MockedFunction<
+        NotificationService['isChannelNotificationCategoryEnabled']
+      >,
+      createNotificationIfEnabled: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(null)) as jest.MockedFunction<
+        NotificationService['createNotificationIfEnabled']
+      >,
+      isShiftNotificationEnabled: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(true)) as jest.MockedFunction<
+        NotificationService['isShiftNotificationEnabled']
+      >,
     };
     communicationService = {
-      send: jest.fn(),
+      send: jest.fn() as jest.MockedFunction<CommunicationService['send']>,
     };
     channelUserService = {
-      getChannelAdminUserIds: jest.fn().mockImplementation(() => Promise.resolve(['admin-user'])),
+      getChannelAdminUserIds: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(['admin-user'])) as jest.MockedFunction<
+        ChannelUserService['getChannelAdminUserIds']
+      >,
       getChannelFinancialAdminUserIds: jest
         .fn()
-        .mockImplementation(() => Promise.resolve(['admin-user'])),
+        .mockImplementation(() => Promise.resolve(['admin-user'])) as jest.MockedFunction<
+        ChannelUserService['getChannelFinancialAdminUserIds']
+      >,
     };
+    globalSettingsService = createMockGlobalSettingsService(false);
     service = new OutboundDeliveryService(
-      notificationService,
-      communicationService,
-      channelUserService,
-      {} as any
+      notificationService as unknown as NotificationService,
+      communicationService as unknown as CommunicationService,
+      channelUserService as unknown as ChannelUserService,
+      {} as unknown as TransactionalConnection,
+      globalSettingsService as unknown as GlobalSettingsService
     );
   });
 
   it('skips every delivery channel when the category is disabled', async () => {
-    notificationService.isChannelNotificationCategoryEnabled.mockResolvedValue(false);
+    (
+      notificationService.isChannelNotificationCategoryEnabled as jest.MockedFunction<
+        NotificationService['isChannelNotificationCategoryEnabled']
+      >
+    ).mockResolvedValue(false);
 
     await service.deliver(ctx, 'balance_changed', {
       channelId: '1',
@@ -51,7 +88,11 @@ describe('OutboundDeliveryService notification categories', () => {
   });
 
   it('continues normal delivery when the category is enabled', async () => {
-    notificationService.isChannelNotificationCategoryEnabled.mockResolvedValue(true);
+    (
+      notificationService.isChannelNotificationCategoryEnabled as jest.MockedFunction<
+        NotificationService['isChannelNotificationCategoryEnabled']
+      >
+    ).mockResolvedValue(true);
 
     await service.deliver(ctx, 'order_fulfilled', {
       channelId: '1',
@@ -69,36 +110,56 @@ describe('OutboundDeliveryService notification categories', () => {
 
 describe('OutboundDeliveryService shift WhatsApp delivery', () => {
   const ctx = { channelId: 1 } as RequestContext;
-  let notificationService: any;
-  let communicationService: any;
-  let channelUserService: any;
-  let connection: any;
+  let notificationService: Partial<NotificationService>;
+  let communicationService: Partial<CommunicationService>;
+  let channelUserService: Partial<ChannelUserService>;
+  let connection: unknown;
+  let globalSettingsService: Partial<GlobalSettingsService>;
   let service: OutboundDeliveryService;
 
   beforeEach(() => {
     notificationService = {
       isChannelNotificationCategoryEnabled: jest
         .fn()
-        .mockImplementation(() => Promise.resolve(true)),
-      createNotificationIfEnabled: jest.fn().mockImplementation(() => Promise.resolve()),
-      isShiftNotificationEnabled: jest.fn().mockImplementation(() => Promise.resolve(true)),
+        .mockImplementation(() => Promise.resolve(true)) as jest.MockedFunction<
+        NotificationService['isChannelNotificationCategoryEnabled']
+      >,
+      createNotificationIfEnabled: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(null)) as jest.MockedFunction<
+        NotificationService['createNotificationIfEnabled']
+      >,
+      isShiftNotificationEnabled: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(true)) as jest.MockedFunction<
+        NotificationService['isShiftNotificationEnabled']
+      >,
     };
     communicationService = {
       send: jest
         .fn()
-        .mockImplementation(() => Promise.resolve({ success: true, channel: 'whatsapp' })),
+        .mockImplementation(() =>
+          Promise.resolve({ success: true, channel: 'whatsapp' })
+        ) as jest.MockedFunction<CommunicationService['send']>,
     };
     channelUserService = {
-      getChannelAdminUserIds: jest.fn().mockImplementation(() => Promise.resolve([])),
+      getChannelAdminUserIds: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve([])) as jest.MockedFunction<
+        ChannelUserService['getChannelAdminUserIds']
+      >,
       getChannelFinancialAdminUserIds: jest
         .fn()
-        .mockImplementation(() => Promise.resolve(['admin-1'])),
+        .mockImplementation(() => Promise.resolve(['admin-1'])) as jest.MockedFunction<
+        ChannelUserService['getChannelFinancialAdminUserIds']
+      >,
     };
     connection = {
       rawConnection: {
         getRepository: jest.fn().mockImplementation(() => ({
-          findOne: jest.fn().mockImplementation((query: any) => {
-            if (query?.where?.id === 'admin-1') {
+          findOne: jest.fn().mockImplementation((query: unknown) => {
+            const q = query as { where?: { id?: string } };
+            if (q?.where?.id === 'admin-1') {
               return Promise.resolve({
                 id: 'admin-1',
                 customFields: { phoneNumber: '0712345678' },
@@ -109,11 +170,13 @@ describe('OutboundDeliveryService shift WhatsApp delivery', () => {
         })),
       },
     };
+    globalSettingsService = createMockGlobalSettingsService(false);
     service = new OutboundDeliveryService(
-      notificationService,
-      communicationService,
-      channelUserService,
-      connection
+      notificationService as unknown as NotificationService,
+      communicationService as unknown as CommunicationService,
+      channelUserService as unknown as ChannelUserService,
+      connection as TransactionalConnection,
+      globalSettingsService as unknown as GlobalSettingsService
     );
   });
 
@@ -145,15 +208,21 @@ describe('OutboundDeliveryService shift WhatsApp delivery', () => {
         recipient: '0712345678',
       })
     );
-    const body = communicationService.send.mock.calls[0][0].body as string;
+    const body = (
+      (communicationService.send as jest.MockedFunction<CommunicationService['send']>).mock
+        .calls[0][0] as SendRequest
+    ).body as string;
     expect(body).toContain('Shift Closed — ABC Store');
     expect(body).toContain('https://dukarun.com/dashboard/accounting?sessionId=session-1');
   });
 
   it('skips admins who have disabled shift WhatsApp notifications', async () => {
-    notificationService.isShiftNotificationEnabled.mockImplementation(
-      (_ctx: any, _userId: string, _channelId: string, _trigger: string, channel: string) =>
-        Promise.resolve(channel !== 'whatsapp')
+    (
+      notificationService.isShiftNotificationEnabled as jest.MockedFunction<
+        NotificationService['isShiftNotificationEnabled']
+      >
+    ).mockImplementation((_ctx, _userId, _channelId, _trigger, channel) =>
+      Promise.resolve(channel !== 'whatsapp')
     );
 
     await service.deliver(ctx, 'shift_closed', {
@@ -175,5 +244,121 @@ describe('OutboundDeliveryService shift WhatsApp delivery', () => {
     });
 
     expect(communicationService.send).not.toHaveBeenCalled();
+  });
+});
+
+describe('OutboundDeliveryService customer notification gating', () => {
+  const ctx = { channelId: 1 } as RequestContext;
+
+  function buildService(globalEnabled: boolean, customerEnabled: boolean) {
+    const notificationService: Partial<NotificationService> = {
+      isChannelNotificationCategoryEnabled: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(true)) as jest.MockedFunction<
+        NotificationService['isChannelNotificationCategoryEnabled']
+      >,
+      createNotificationIfEnabled: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(null)) as jest.MockedFunction<
+        NotificationService['createNotificationIfEnabled']
+      >,
+      isShiftNotificationEnabled: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(true)) as jest.MockedFunction<
+        NotificationService['isShiftNotificationEnabled']
+      >,
+    };
+    const communicationService: Partial<CommunicationService> = {
+      send: jest
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve({ success: true, channel: 'whatsapp' })
+        ) as jest.MockedFunction<CommunicationService['send']>,
+    };
+    const channelUserService: Partial<ChannelUserService> = {
+      getChannelAdminUserIds: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve([])) as jest.MockedFunction<
+        ChannelUserService['getChannelAdminUserIds']
+      >,
+      getChannelFinancialAdminUserIds: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve([])) as jest.MockedFunction<
+        ChannelUserService['getChannelFinancialAdminUserIds']
+      >,
+    };
+    const connection: unknown = {
+      getRepository: jest.fn().mockImplementation((_ctx, entity) => {
+        if ((entity as { name?: string }).name === 'Customer') {
+          return {
+            findOne: jest.fn().mockImplementation(() =>
+              Promise.resolve({
+                id: 'customer-1',
+                customFields: {
+                  notificationsEnabled: customerEnabled,
+                  phoneNumber: '0712345678',
+                },
+              })
+            ),
+          };
+        }
+        return { findOne: jest.fn().mockImplementation(() => Promise.resolve(null)) };
+      }),
+    };
+    const globalSettingsService = createMockGlobalSettingsService(globalEnabled);
+
+    return {
+      service: new OutboundDeliveryService(
+        notificationService as unknown as NotificationService,
+        communicationService as unknown as CommunicationService,
+        channelUserService as unknown as ChannelUserService,
+        connection as TransactionalConnection,
+        globalSettingsService as unknown as GlobalSettingsService
+      ),
+      notificationService,
+      communicationService,
+      globalSettingsService,
+    };
+  }
+
+  it('skips customer sends when the global master switch is off', async () => {
+    const { service, communicationService } = buildService(false, true);
+
+    await service.deliver(ctx, 'balance_changed', {
+      channelId: '1',
+      customerId: 'customer-1',
+      newBalanceCents: 50000,
+    });
+
+    expect(communicationService.send).not.toHaveBeenCalled();
+  });
+
+  it('skips customer sends when the customer preference is off', async () => {
+    const { service, communicationService } = buildService(true, false);
+
+    await service.deliver(ctx, 'balance_changed', {
+      channelId: '1',
+      customerId: 'customer-1',
+      newBalanceCents: 50000,
+    });
+
+    expect(communicationService.send).not.toHaveBeenCalled();
+  });
+
+  it('sends customer notifications when global and customer toggles are on', async () => {
+    const { service, communicationService } = buildService(true, true);
+
+    await service.deliver(ctx, 'balance_changed', {
+      channelId: '1',
+      customerId: 'customer-1',
+      newBalanceCents: 50000,
+    });
+
+    expect(communicationService.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: 'whatsapp',
+        recipient: '0712345678',
+      })
+    );
   });
 });

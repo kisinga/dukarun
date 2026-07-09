@@ -86,6 +86,30 @@ import { PersonEditFormComponent } from '../shared/components/person-edit-form.c
               </div>
             </div>
 
+            <!-- Notification preference -->
+            <div class="card bg-base-100 border border-base-300 shadow-sm">
+              <div class="card-body p-5">
+                <h2 class="text-lg font-semibold mb-1">Notifications</h2>
+                <p class="text-sm text-base-content/70 mb-4">
+                  Allow WhatsApp/SMS/email notifications for this customer
+                </p>
+                <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+                  <div class="flex-1 pr-3">
+                    <div class="font-semibold text-sm">Enable notifications</div>
+                    <div class="text-xs text-base-content/70 mt-0.5">
+                      Also requires the platform master switch to be on
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-primary"
+                    [checked]="pendingNotificationsEnabled()"
+                    (change)="onNotificationsToggle($event)"
+                  />
+                </div>
+              </div>
+            </div>
+
             <!-- Credit Management (same card style as supplier) -->
             @if (hasCreditPermission()) {
               <div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -372,14 +396,20 @@ export class CustomerEditComponent {
   readonly pendingCreditDuration = signal<number>(30);
   readonly creditDirty = signal<boolean>(false);
 
+  /** Pending notification preference (batch-saved with Update Customer) */
+  readonly pendingNotificationsEnabled = signal<boolean>(false);
+  readonly notificationsDirty = signal<boolean>(false);
+
   readonly isPersonFormValid = computed(() => {
     const comp = this.personFormRef();
     return comp?.form?.valid ?? false;
   });
 
-  /** Update button enabled when person form valid or credit section has unsaved changes */
+  /** Update button enabled when person form valid or any section has unsaved changes */
   readonly canSubmit = computed(
-    () => (this.isPersonFormValid() || this.creditDirty()) && !this.customerService.isCreating(),
+    () =>
+      (this.isPersonFormValid() || this.creditDirty() || this.notificationsDirty()) &&
+      !this.customerService.isCreating(),
   );
 
   constructor() {
@@ -435,6 +465,9 @@ export class CustomerEditComponent {
           emailAddress: customer.emailAddress || '',
           phoneNumber: customer.phoneNumber || '',
         });
+
+        this.pendingNotificationsEnabled.set(customer.customFields?.notificationsEnabled ?? false);
+        this.notificationsDirty.set(false);
 
         // Load credit summary if user has permission
         if (this.hasCreditPermission()) {
@@ -516,12 +549,16 @@ export class CustomerEditComponent {
       }
 
       // Map form data to backend format
-      const updateData = {
+      const updateData: Partial<import('../../../core/services/customer.service').CustomerInput> = {
         firstName: formData.businessName, // Business Name -> firstName
         lastName: formData.contactPerson, // Contact Person -> lastName
         emailAddress: formData.emailAddress || '', // Required by Vendure, use empty string if not provided
         phoneNumber: formData.phoneNumber,
       };
+
+      if (this.notificationsDirty()) {
+        updateData.notificationsEnabled = this.pendingNotificationsEnabled();
+      }
 
       const success = await this.customerService.updateCustomer(customerId, updateData);
 
@@ -543,6 +580,7 @@ export class CustomerEditComponent {
             );
           }
         }
+        this.notificationsDirty.set(false);
         this.router.navigate(['/dashboard/customers']);
       } else {
         this.error.set(this.customerService.error() || 'Failed to update customer');
@@ -603,6 +641,13 @@ export class CustomerEditComponent {
     const target = event.target as HTMLInputElement;
     this.pendingCreditApproved.set(target.checked);
     this.creditDirty.set(true);
+  }
+
+  /** Toggle customer notifications: update pending state only; saved on Update Customer */
+  onNotificationsToggle(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    this.pendingNotificationsEnabled.set(target.checked);
+    this.notificationsDirty.set(true);
   }
 
   /** Apply limit edit to pending state; saved on Update Customer */

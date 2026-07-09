@@ -93,6 +93,24 @@ export const customerCustomFields: CustomFields['Customer'] = [
     ui: { tab: 'Supplier Info' },
   },
 
+  // ─── Notifications ─────────────────────────────────────────
+  {
+    name: 'notificationsEnabled',
+    type: 'boolean',
+    label: [{ languageCode: LanguageCode.en, value: 'Notifications Enabled' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value:
+          'Allow WhatsApp/SMS/email notifications for this customer. The platform master switch must also be on.',
+      },
+    ],
+    defaultValue: false,
+    public: false,
+    nullable: false,
+    ui: { tab: 'Notifications' },
+  },
+
   // ─── Customer Financial ────────────────────────────────────
   {
     name: 'isCreditApproved',

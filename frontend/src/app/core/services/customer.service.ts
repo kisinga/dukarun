@@ -19,6 +19,7 @@ export interface CustomerInput {
   isCreditApproved?: boolean;
   creditLimit?: number;
   creditDuration?: number;
+  notificationsEnabled?: boolean;
 }
 
 /**
@@ -81,6 +82,7 @@ export interface CustomerRecord {
     lastRepaymentDate?: string | null;
     lastRepaymentAmount?: number | null;
     creditDuration?: number | null;
+    notificationsEnabled?: boolean | null;
   } | null;
 }
 
