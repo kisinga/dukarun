@@ -80,8 +80,8 @@ export class OpenWaService {
     return `${baseUrl}${path}`;
   }
 
-  private buildRequestBody(to: string, text: string): Record<string, string> {
-    return { to, text };
+  private buildRequestBody(chatId: string, text: string): Record<string, string> {
+    return { chatId, text };
   }
 
   private toWhatsAppChatId(phoneNumber: string): string {

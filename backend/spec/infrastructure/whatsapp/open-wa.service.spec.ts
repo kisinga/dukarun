@@ -69,7 +69,7 @@ describe('OpenWaService', () => {
       await service.sendText('0712345678', 'Hello');
       expect(mockedAxios.post).toHaveBeenCalledWith(
         'https://openwa.example.com/api/sessions/default/messages/send-text',
-        { to: '254712345678@s.whatsapp.net', text: 'Hello' },
+        { chatId: '254712345678@s.whatsapp.net', text: 'Hello' },
         expect.objectContaining({
           headers: {
             'Content-Type': 'application/json',
@@ -85,8 +85,11 @@ describe('OpenWaService', () => {
       async phone => {
         mockedAxios.post.mockResolvedValue({ data: { messageId: 'msg-1' } });
         await service.sendText(phone, 'Hello');
-        const [, body] = mockedAxios.post.mock.calls[0] as [string, { to: string; text: string }];
-        expect(body.to).toBe('254712345678@s.whatsapp.net');
+        const [, body] = mockedAxios.post.mock.calls[0] as [
+          string,
+          { chatId: string; text: string },
+        ];
+        expect(body.chatId).toBe('254712345678@s.whatsapp.net');
       }
     );
 
