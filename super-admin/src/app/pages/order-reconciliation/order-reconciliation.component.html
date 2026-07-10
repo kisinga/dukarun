@@ -1,16 +1,4 @@
-<app-page-header title="Order reconciliation" subtitle="Orders where the order model and ledger balances disagree. Ledger is the source of truth for payments." class="mb-6" />
-
-@if (loading()) {
-  <div class="flex items-center gap-2 text-base-content/70">
-    <span class="loading loading-spinner loading-md"></span>
-    <span>Loading…</span>
-  </div>
-}
-@if (error()) {
-  <div role="alert" class="alert alert-error mb-4">
-    <span>{{ error() }}</span>
-  </div>
-}
+<app-page-header title="Reconciliation" subtitle="Repair divergences between operational models and the ledger." class="mb-6" />
 
 <div class="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-base-300 bg-base-100 shadow mb-6">
   <label class="form-control w-56">
@@ -21,98 +9,98 @@
       }
     </select>
   </label>
-  <label class="form-control w-40">
-    <span class="label"><span class="label-text">Tolerance (cents)</span></span>
-    <input type="number" class="input input-bordered input-sm" [ngModel]="toleranceCents()" (ngModelChange)="toleranceCents.set($event)" min="0" />
-  </label>
-  <button type="button" class="btn btn-primary btn-sm" (click)="load()">Refresh</button>
 </div>
 
-@if (items().length) {
-  <div class="overflow-x-auto rounded-xl border border-base-300 bg-base-100 shadow">
-    <table class="table table-zebra">
-      <thead>
-        <tr>
-          <th>Order</th>
-          <th>Customer</th>
-          <th class="text-right">Order model owing</th>
-          <th class="text-right">Ledger owing</th>
-          <th class="text-right">Difference</th>
-          <th class="text-right">Order total</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (item of items(); track item.orderId) {
-          <tr>
-            <td class="font-medium">{{ item.orderCode }}</td>
-            <td class="text-sm">{{ item.customerId || '—' }}</td>
-            <td class="text-right font-mono">{{ formatMoney(item.orderModelOwing) }}</td>
-            <td class="text-right font-mono">{{ formatMoney(item.ledgerOwing) }}</td>
-            <td class="text-right font-mono"><span class="badge badge-sm" [class]="badgeClass(item.difference)">{{ formatMoney(item.difference) }}</span></td>
-            <td class="text-right font-mono">{{ formatMoney(item.orderTotal) }}</td>
-            <td>
-              <button type="button" class="btn btn-ghost btn-sm" (click)="openReconcile(item)">Reconcile</button>
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
+<div role="tablist" class="tabs tabs-bordered mb-6">
+  <button type="button" role="tab" class="tab" [class.tab-active]="activeTab() === 'orders'" (click)="setTab('orders')">
+    Orders
+  </button>
+  <button type="button" role="tab" class="tab" [class.tab-active]="activeTab() === 'inventory'" (click)="setTab('inventory')">
+    Inventory
+  </button>
+</div>
+
+@if (activeTab() === 'orders') {
+  <div class="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-base-300 bg-base-100 shadow mb-6">
+    <label class="form-control w-40">
+      <span class="label"><span class="label-text">Tolerance (cents)</span></span>
+      <input type="number" class="input input-bordered input-sm" [ngModel]="toleranceCents()" (ngModelChange)="toleranceCents.set($event)" min="0" />
+    </label>
+    <button type="button" class="btn btn-primary btn-sm" (click)="loadOrders()">Refresh</button>
   </div>
-  <p class="text-sm text-base-content/60 mt-2">{{ totalItems() }} divergent order(s)</p>
-} @else if (!loading()) {
-  <div class="p-6 rounded-xl border border-base-300 bg-base-100 text-base-content/70">
-    No divergent orders found within the tolerance.
+
+  <app-divergence-table
+    [loading]="loading()"
+    [error]="error()"
+    [items]="items()"
+    [columns]="orderColumns"
+    emptyMessage="No divergent orders found within the tolerance."
+    [countLabel]="totalItems() + ' divergent order(s)'"
+    [trackBy]="orderTrackBy"
+    (reconcile)="openReconcile($event)"
+  />
+}
+
+@if (activeTab() === 'inventory') {
+  <div class="flex flex-wrap items-end gap-4 p-4 rounded-xl border border-base-300 bg-base-100 shadow mb-6">
+    <label class="form-control w-40">
+      <span class="label"><span class="label-text">Tolerance (cents)</span></span>
+      <input type="number" class="input input-bordered input-sm" [ngModel]="inventoryToleranceCents()" (ngModelChange)="inventoryToleranceCents.set($event)" min="0" />
+    </label>
+    <button type="button" class="btn btn-primary btn-sm" (click)="loadInventory()">Refresh</button>
   </div>
+
+  <app-divergence-table
+    [loading]="inventoryLoading()"
+    [error]="inventoryError()"
+    [items]="inventoryItems()"
+    [columns]="inventoryColumns"
+    emptyMessage="Inventory valuation is in sync with the ledger."
+    [countLabel]="inventoryItems().length + ' inventory divergence(s)'"
+    [trackBy]="inventoryTrackBy"
+    (reconcile)="openInventoryReconcile($event)"
+  />
 }
 
 @if (selectedOrder(); as order) {
-  <dialog class="modal modal-open" (click)="$event.target === $event.currentTarget && closeReconcile()">
-    <div class="modal-box max-w-lg max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
-      <h3 class="font-bold text-lg mb-2">Reconcile {{ order.orderCode }}</h3>
-      <p class="text-sm text-base-content/70 mb-4">
-        Order model: {{ formatMoney(order.orderModelOwing) }} · Ledger: {{ formatMoney(order.ledgerOwing) }}
-      </p>
-
-      @if (reconcileSuccess()) {
-        <div class="alert alert-success mb-4">
-          <span>{{ reconcileSuccess() }}</span>
-        </div>
-      }
-      @if (reconcileError()) {
-        <div class="alert alert-error mb-4">
-          <span>{{ reconcileError() }}</span>
-        </div>
-      }
-
-      <div class="space-y-4">
-        <label class="form-control w-full">
-          <span class="label"><span class="label-text">Strategy</span></span>
-          <select class="select select-bordered select-sm w-full" [ngModel]="strategy()" (ngModelChange)="strategy.set($event)">
-            @for (s of strategies; track s.value) {
-              <option [value]="s.value">{{ s.label }}</option>
-            }
-          </select>
-        </label>
-
-        <label class="form-control w-full">
-          <span class="label"><span class="label-text">Note</span></span>
-          <textarea class="textarea textarea-bordered textarea-sm w-full" rows="3" [ngModel]="note()" (ngModelChange)="note.set($event)" placeholder="Reason for reconciliation…"></textarea>
-        </label>
-      </div>
-
-      <div class="modal-action">
-        <button type="button" class="btn btn-ghost" (click)="closeReconcile()">Cancel</button>
-        <button type="button" class="btn btn-primary" (click)="confirmReconcile()" [disabled]="reconciling()">
-          @if (reconciling()) {
-            <span class="loading loading-spinner loading-sm"></span>
+  <app-reconcile-modal
+    [title]="'Reconcile ' + order.orderCode"
+    [detail]="'Order model: ' + formatMoney(order.orderModelOwing) + ' · Ledger: ' + formatMoney(order.ledgerOwing)"
+    [reason]="note()"
+    [confirming]="reconciling()"
+    [error]="reconcileError()"
+    [success]="reconcileSuccess()"
+    (reasonChange)="note.set($event)"
+    (confirm)="confirmReconcile()"
+    (cancel)="closeReconcile()"
+  >
+    <div extraFields>
+      <label class="form-control w-full">
+        <span class="label"><span class="label-text">Strategy</span></span>
+        <select class="select select-bordered select-sm w-full" [ngModel]="strategy()" (ngModelChange)="strategy.set($event)">
+          @for (s of strategies; track s.value) {
+            <option [value]="s.value">{{ s.label }}</option>
           }
-          Confirm
-        </button>
-      </div>
+        </select>
+      </label>
     </div>
-    <form method="dialog" class="modal-backdrop">
-      <button type="button" (click)="closeReconcile()">close</button>
-    </form>
-  </dialog>
+  </app-reconcile-modal>
+}
+
+@if (selectedInventory(); as item) {
+  <app-reconcile-modal
+    title="Reconcile inventory"
+    [detail]="'Batch valuation: ' + formatMoney(item.entityValue) + ' · Ledger: ' + formatMoney(item.ledgerValue) + ' · Difference: ' + formatMoney(item.difference)"
+    [reason]="inventoryReason()"
+    [confirming]="inventoryReconciling()"
+    [error]="inventoryReconcileError()"
+    [success]="inventoryReconcileSuccess()"
+    (reasonChange)="inventoryReason.set($event)"
+    (confirm)="confirmInventoryReconcile()"
+    (cancel)="closeInventoryReconcile()"
+  >
+    <p extraFields class="text-sm text-base-content/70">
+      This posts a ledger adjustment so the INVENTORY account matches the batch valuation.
+    </p>
+  </app-reconcile-modal>
 }
