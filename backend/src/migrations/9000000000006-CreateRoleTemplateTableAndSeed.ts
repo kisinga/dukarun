@@ -4,7 +4,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Create role_template table and seed the five channel admin templates.
  *
  * Standalone table (not Vendure config.customFields — Role is not in CustomFields).
- * Follows docs/VENDURE_CUSTOM_FIELDS.md: idempotent, guarded, build-before-run.
+ * Follows archived VENDURE_CUSTOM_FIELDS.md (archive/docs/2026-07-10/): idempotent, guarded, build-before-run.
  * - Table: guarded with IF NOT EXISTS so replays and different env states are safe.
  * - Seed: ON CONFLICT (code) DO NOTHING so seed is idempotent.
  */

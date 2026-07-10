@@ -97,7 +97,7 @@ A component is "core" (trunk) if:
 3. **Data Integrity**: Handles critical data flows (provisioning, financial)
 4. **Transaction Safety**: Must maintain consistency across operations
 
-See [Provisioning Principles](./docs/PROVISIONING_PRINCIPLES.md) for detailed provisioning architecture.
+See `backend/src/services/provisioning/` and archived `PROVISIONING_PRINCIPLES.md` for provisioning details.
 
 ### Component Diagram
 
@@ -178,7 +178,7 @@ Dukarun implements a unified customer and supplier management system using Vendu
 4. **Flexible**: Easy to extend with additional fields
 5. **Vendure Native**: Uses framework's built-in features
 
-**See [Customer & Supplier Implementation Guide](./docs/technical/CUSTOMER_SUPPLIER_IMPLEMENTATION.md) for complete technical details**
+**See `backend/src/plugins/customers/` and archived `CUSTOMER_SUPPLIER_INTEGRATION.md` for implementation details.**
 
 ## Financial Ledger System
 
@@ -213,7 +213,7 @@ The system uses a layered architecture:
 - **Frontend**: No local calculations - always query backend for financial data
 - **GraphQL**: All queries include ledger-based `outstandingAmount` fields
 
-**See [Ledger Architecture Documentation](./docs/LEDGER_ARCHITECTURE.md) for complete technical details**
+**See `backend/src/services/financial/` and `backend/src/plugins/ledger/` for the ledger implementation; archived `LEDGER_ARCHITECTURE.md` has historical context.**
 
 ## Cashier Flow - Location-Based Two-Step Payment
 
@@ -304,7 +304,7 @@ When creating a new business, manually provision:
 3. ✅ Roles (required for user access)
 4. ✅ Assign Users (link users to roles)
 
-**See [GAPS.md](./GAPS.md) for known limitations**
+**Known limitations are tracked in the codebase and archived docs.**
 
 ## Data Flow
 
@@ -368,7 +368,7 @@ flow, or `ml-trainer` microservice in the active architecture.
 - **Embedder versioning** guards incompatible fingerprints
 - **Client-side product caching** supports offline matching
 
-**See [ML_PRODUCT_RECOGNITION.md](./docs/ML_PRODUCT_RECOGNITION.md) for implementation details**
+**See `frontend/src/app/core/services/ml-model/` (embedder, matcher, enrollment) and archived `ML_PRODUCT_RECOGNITION.md` for historical context.**
 
 ## Testing & Coverage
 
@@ -533,7 +533,7 @@ Dukarun uses platform-agnostic container images for flexible deployment.
 - **Docker Containers**: Self-contained images with all dependencies
 - **Manual Local Dev**: Run services directly on host for fast iteration
 
-**See [INFRASTRUCTURE.md](./INFRASTRUCTURE.md) for complete deployment guide and environment variables**
+**See [INFRASTRUCTURE.md](./docs/INFRASTRUCTURE.md) for complete deployment guide and environment variables.**
 
 ## Migration from V1
 
@@ -551,7 +551,7 @@ Dukarun uses platform-agnostic container images for flexible deployment.
 - **Auth**: JWT tokens
 - **DB**: PostgreSQL (scalable)
 
-**Complete migration documentation: [docs/v1-migration/MIGRATION_SUMMARY.md](./docs/v1-migration/MIGRATION_SUMMARY.md)**
+**Complete migration documentation: [archive/v1-migration/MIGRATION_SUMMARY.md](./archive/v1-migration/MIGRATION_SUMMARY.md)**
 
 ## Performance Considerations
 
@@ -598,7 +598,7 @@ Dukarun uses **SigNoz** as a unified observability platform providing traces, me
 - **Backend**: `SIGNOZ_ENABLED`, `SIGNOZ_HOST`, `SIGNOZ_OTLP_GRPC_PORT`
 - **Frontend**: `ENABLE_TRACING`, `SIGNOZ_ENDPOINT` (runtime config via `window.__APP_CONFIG__`)
 
-See [OBSERVABILITY.md](./docs/OBSERVABILITY.md) for setup and usage guide.
+See `docs/INFRASTRUCTURE.md` for observability setup and archived `INFRASTRUCTURE_PATTERNS.md` for historical context.
 
 ## Product Creation Flow (Transactional)
 

@@ -14,7 +14,7 @@ export interface SeoPage {
  * Per-page SEO for the storefront: title, meta description, Open Graph / Twitter tags, canonical,
  * and JSON-LD. Canonical/og:url are built from the current origin, so each merchant subdomain is
  * self-canonical. (Note: because the app is client-rendered, social scrapers won't execute this —
- * an accepted Phase-1 limitation documented in docs/PUBLIC_STOREFRONT_PLAN.md.)
+ * an accepted Phase-1 limitation documented in archive/docs/2026-07-10/PUBLIC_STOREFRONT_PLAN.md.)
  */
 @Injectable({ providedIn: 'root' })
 export class SeoService {

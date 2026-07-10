@@ -26,6 +26,20 @@ import { SaleCogs } from './entities/sale-cogs.entity';
 import { InventoryStoreService } from './inventory-store.service';
 
 /**
+ * InventoryService — FIFO/COGS inventory framework.
+ *
+ * Source of truth for stock availability and cost is `inventory_batch` + inventory_movement`,
+ * not Vendure's `stock_level`. Stock levels are written back to Vendure only for compatibility.
+ *
+ * - Purchases create batches with unit cost and optional expiry.
+ * - Sales allocate cost using the configured CostingStrategy (default FIFO).
+ * - Consumption is validated against batch stock under per-SKU/location locks.
+ *
+ * See `CostingStrategy` to add new allocation strategies and `ExpiryPolicy` to add
+ * expiry rules.
+ */
+
+/**
  * Input for recording a purchase
  */
 export interface RecordPurchaseInput {

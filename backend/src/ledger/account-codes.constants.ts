@@ -14,13 +14,13 @@
  */
 export const ASSET_ACCOUNTS = {
   CASH: 'CASH', // Parent account for cash-based payment methods
-  CASH_ON_HAND: 'CASH_ON_HAND',
-  BANK_MAIN: 'BANK_MAIN',
-  CLEARING_MPESA: 'CLEARING_MPESA',
-  CLEARING_CREDIT: 'CLEARING_CREDIT',
-  CLEARING_GENERIC: 'CLEARING_GENERIC',
-  ACCOUNTS_RECEIVABLE: 'ACCOUNTS_RECEIVABLE',
-  INVENTORY: 'INVENTORY',
+  CASH_ON_HAND: 'CASH_ON_HAND', // Physical cash in a location
+  BANK_MAIN: 'BANK_MAIN', // Primary bank account
+  CLEARING_MPESA: 'CLEARING_MPESA', // M-Pesa clearing account
+  CLEARING_CREDIT: 'CLEARING_CREDIT', // Credit payments clearing
+  CLEARING_GENERIC: 'CLEARING_GENERIC', // Generic clearing for other methods
+  ACCOUNTS_RECEIVABLE: 'ACCOUNTS_RECEIVABLE', // Customer outstanding balances
+  INVENTORY: 'INVENTORY', // Current inventory value (FIFO/COGS)
 } as const;
 
 /**
@@ -50,6 +50,7 @@ export const EXPENSE_ACCOUNTS = {
   COGS: 'COGS',
   INVENTORY_WRITE_OFF: 'INVENTORY_WRITE_OFF',
   EXPIRY_LOSS: 'EXPIRY_LOSS',
+  INVENTORY_ADJUSTMENT: 'INVENTORY_ADJUSTMENT',
 } as const;
 
 /**

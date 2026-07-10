@@ -4,7 +4,7 @@
 // network on first run. Run for offline / production:  npm run ml:fetch-model
 //
 // Only the three files the vision-only embedder requests are downloaded (no text encoder /
-// tokenizer). See the ONNX expert notes in docs/ML_PRODUCT_RECOGNITION_IMPLEMENTATION.md.
+// tokenizer). See the ONNX expert notes in archive/docs/2026-07-10/ML_PRODUCT_RECOGNITION_IMPLEMENTATION.md.
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

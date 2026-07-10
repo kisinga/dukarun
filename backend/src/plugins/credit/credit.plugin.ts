@@ -492,7 +492,7 @@ const COMBINED_SCHEMA = gql`
     debitAccountCode: String
   }
 
-  # purchaseId is String! so UUIDs are passed through (see docs/GRAPHQL_IDS_AND_UUIDS.md)
+  # purchaseId is String! so UUIDs are passed through (see archive/docs/2026-07-10/GRAPHQL_IDS_AND_UUIDS.md)
   input PaySinglePurchaseInput {
     purchaseId: String!
     paymentAmount: Float

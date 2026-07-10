@@ -9,7 +9,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - Administrator customFieldsProfilepictureid -> asset(id) FK
  *
  * This migration creates the exact index and FK names TypeORM expects, idempotently.
- * See docs/VENDURE_CUSTOM_FIELDS.md §5 (Troubleshooting) and MIGRATION_PATTERNS.md.
+ * See archived VENDURE_CUSTOM_FIELDS.md §5 (Troubleshooting) and MIGRATION_PATTERNS.md.
  */
 export class AlignChannelIdIndexesAndAdministratorProfilePicture9000000000009 implements MigrationInterface {
   name = 'AlignChannelIdIndexesAndAdministratorProfilePicture9000000000009';

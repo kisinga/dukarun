@@ -5,7 +5,7 @@ Standalone, throwaway harness that answers the one question the design can't set
 do we need MobileCLIP or is MobileNet enough?**
 
 It touches no app code. Delete the `spikes/` folder when the decision is made.
-See `docs/ML_PRODUCT_RECOGNITION.md` §9 for why this is the gate.
+See `archive/docs/2026-07-10/ML_PRODUCT_RECOGNITION.md` §9 for why this is the gate.
 
 ## What it does
 

@@ -38,14 +38,6 @@ Dukarun uses a shared Docker network to enable service discovery and secure comm
    - Joins `dukarun_services_network` as an external network
    - All application services connect to this network
 
-**Why this matters:**
-
-- Consistent network naming for both local development and production
-- Enables service discovery via service names (not IPs)
-- Allows services to communicate securely within the network
-- Required for proper service-to-service communication
-- Works identically in local Docker and Coolify deployments
-
 ### Service Communication
 
 All services communicate using Docker service names (not `localhost`):
@@ -92,11 +84,9 @@ All services communicate using Docker service names (not `localhost`):
     └───────────────────────┘
 ```
 
-**Key Points:**
-
-- Apps send telemetry to `signoz-otel-collector` (not `signoz`)
-- Frontend proxies through nginx: `/signoz/` → `signoz-otel-collector:4318`
-- SigNoz UI available at `http://localhost:8080` (configurable via `SIGNOZ_UI_PORT`)
+- Apps send telemetry to `signoz-otel-collector` (not `signoz`).
+- Frontend proxies through nginx: `/signoz/` → `signoz-otel-collector:4318`.
+- SigNoz UI is available at `http://localhost:8080` (configurable via `SIGNOZ_UI_PORT`).
 
 ### Network Setup (Required for All Deployments)
 
@@ -122,7 +112,7 @@ docker compose up -d
 
 ### Docker workspace builds
 
-Backend, frontend, and super-admin images are built **from the repository root** using the root `package-lock.json`. This keeps installs deterministic and avoids lockfile sync issues in CI. See **[DOCKER_WORKSPACE_BUILDS.md](./DOCKER_WORKSPACE_BUILDS.md)** for the pattern, why we use it, and what to do when changing dependencies.
+Backend, frontend, and super-admin images are built **from the repository root** using the root `package-lock.json`. This keeps installs deterministic and avoids lockfile sync issues in CI. See archived `DOCKER_WORKSPACE_BUILDS.md` in `archive/docs/2026-07-10/` for the workspace-build pattern and dependency-lock notes.
 
 **For Coolify Deployments:** Follow the same network setup steps above. Create the network via SSH or Coolify terminal before deploying services. If using Coolify's "Connect to Predefined Network" feature, change the network name from `dukarun_services_network` to `coolify` in both compose files.
 
@@ -264,7 +254,7 @@ The nginx configuration supports both Docker internal DNS and public DNS resolut
 3. For test mode, use keys starting with `sk_test_` and `pk_test_`
 4. For production, use keys starting with `sk_live_` and `pk_live_`
 
-**See also:** [Paystack Integration Setup](../SUBSCRIPTION_INTEGRATION.md#paystack-integration) for webhook configuration and payment flow details.
+**See also:** Archived `SUBSCRIPTION_INTEGRATION.md` in `archive/docs/2026-07-10/` for historical Paystack flow details.
 
 ### Email Configuration (Optional)
 
@@ -360,74 +350,13 @@ Always use service names (not `localhost`):
 
 ## Fresh Setup (Production Docker)
 
-This section covers setting up a completely fresh **production Docker** installation of Dukarun, including the database initialization process.
+On first run the backend container detects an empty database, populates the base Vendure schema + sample data, runs pending migrations, and starts the server. No manual flags are required.
 
-### The Problem
-
-When setting up a fresh production Docker installation, you might encounter this error:
-
-```
-ERROR: relation "channel" does not exist
-STATEMENT: ALTER TABLE "channel" DROP CONSTRAINT IF EXISTS "FK_94e272d93bd32e4930f534bf1f9"
-```
-
-This happens because migrations try to run before the database schema is properly initialized.
-
-### The Solution
-
-The issue has been fixed by implementing **automatic database detection and initialization**. The system now automatically:
-
-1. **Detects if the database is empty** (no tables exist)
-2. **Populates the database** if empty (creates base Vendure schema + sample data)
-3. **Runs migrations** (adds custom fields to existing tables)
-4. **Starts the application** normally
-
-**No manual flags or restarts required!**
-
-### What Happens During Automatic Initialization
-
-1. **Database Detection:**
-
-   - System checks if database is completely empty (no tables)
-   - Waits for database to be available (with retries)
-   - Only proceeds with population if database is empty
-
-2. **Database Population (if empty):**
-
-   - PostgreSQL starts and creates the database
-   - Vendure creates the base schema using `synchronize: true`
-   - Sample data is populated (channels, products, etc.)
-
-3. **Migration Application:**
-
-   - Custom fields are added to existing tables
-   - Channel custom fields are added or pruned by migrations
-   - Customer/Supplier fields are added to Customer
-   - Only pending migrations are executed (idempotent)
-
-4. **Application Startup:**
-   - Application starts normally with all data and custom fields
-   - All initialization happens automatically on first run
-
-### Expected Behavior
-
-**On First Run (Empty Database):**
-
-- Container detects empty database
-- Automatically runs populate + migrations
-- Starts Vendure server with all data and custom fields
-- No manual intervention required
-
-**On Subsequent Runs (Existing Database):**
-
-- Container detects existing database
-- Skips population (database already has data)
-- Runs any pending migrations
-- Starts Vendure server normally
+If you previously saw `relation "channel" does not exist` during migrations, this auto-initialization resolves it.
 
 ### Verification
 
-After setup, verify everything is working:
+After the containers are up:
 
 1. **Check backend health:**
 
@@ -447,57 +376,15 @@ After setup, verify everything is working:
 
 ### Required Database State
 
-For user registration and core functionality to work, the following database state must be present:
+Registration requires a Kenya zone/country, a "Standard Tax" category with a 16% "Kenya VAT" rate, and the default channel configured with Kenya as the shipping/tax zone and `KES` as currency.
 
-#### 1. Zones & Countries
+These are seeded automatically during bootstrap by `ensureKenyaContext`. Set `AUTO_SEED_KENYA=false` to skip automatic seeding and create the entities manually.
 
-Registration requires a specific zone for setting default shipping and tax configurations for new channels.
+Validation:
+- `getKenyaZone()` checks the Kenya zone exists.
+- `validateDefaultZones()` checks the default channel zones.
 
-- **Country**: Kenya (`KE`)
-- **Zone**: "Kenya"
-- **Zone Members**: Kenya (`KE`) must be a member of the "Kenya" zone.
-
-#### 2. Tax Configuration
-
-A default tax structure is required for accurate pricing and tax calculations.
-
-- **Tax Category**: "Standard Tax"
-- **Tax Rate**: "Kenya VAT" (16%)
-  - **Category**: Standard Tax
-  - **Zone**: Kenya
-  - **Value**: 16%
-
-#### 3. Default Channel
-
-The default channel serves as the template for creating new channels during registration.
-
-- **Default Shipping Zone**: Must be set to "Kenya".
-- **Default Tax Zone**: Must be set to "Kenya".
-- **Default Currency**: Must be set to `KES` (Kenya Shilling).
-- **Currency Code**: Must be set to `KES`.
-
-#### Automatic Seeding
-
-These requirements are automatically provisioned during bootstrap by the Kenya seeding utility (`ensureKenyaContext`) which reuses Vendure's official `Populator` flow.
-
-> **Bootstrap safeguard:** `initializeVendureBootstrap()` verifies Vendure core tables before running migrations. Once migrations finish, `ensureKenyaContext` bootstraps a lightweight Vendure instance, seeds the Kenya country/zone/tax configuration via Vendure services, and updates the default channel currency to `KES`.
-
-If seeding needs to be skipped (e.g., for alternative regions), set `AUTO_SEED_KENYA=false` in the environment and create the required entities manually.
-
-#### Validation
-
-The `RegistrationValidatorService` checks for these requirements before allowing a new user to register:
-
-- `getKenyaZone()` ensures the "Kenya" zone exists.
-- `validateDefaultZones()` ensures the default channel has shipping and tax zones configured.
-
-#### Platform data (Super-admin)
-
-Super-admin exposes a **Platform data** page to view and update some seeded data:
-
-- **Registration zone**: Read-only view of the zone used for new channel registration (name, member countries). The zone name must remain **"Kenya"** unless registration is updated to use a configurable zone name; changing it would break `getKenyaZone()` and registration.
-- **Registration tax rate**: View and update the tax percentage for the Kenya zone. Changing the percentage applies to **all channels** that use this zone.
-- **Role templates**: Managed via the linked **Permission templates** page. Edits to a template (name, description, permissions) apply only to **new** roles created from that template; existing channel roles keep their current permissions snapshot.
+Super-admin **Platform data** exposes the registration zone and tax rate (changing the rate applies to all channels) and role templates (edits apply only to new roles).
 
 ### Fresh Setup Troubleshooting
 

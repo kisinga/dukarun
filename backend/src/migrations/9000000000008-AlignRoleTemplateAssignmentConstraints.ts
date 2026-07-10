@@ -8,7 +8,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * (@ManyToOne to RoleTemplate). This migration drops legacy names and adds the hashed FK
  * so "schema does not match" no longer appears at startup.
  *
- * See docs/VENDURE_CUSTOM_FIELDS.md §3.2 and troubleshooting; docs/COMPANY_ADMINS.md.
+ * See archived VENDURE_CUSTOM_FIELDS.md §3.2 and troubleshooting; archived COMPANY_ADMINS.md.
  */
 export class AlignRoleTemplateAssignmentConstraints9000000000008 implements MigrationInterface {
   name = 'AlignRoleTemplateAssignmentConstraints9000000000008';

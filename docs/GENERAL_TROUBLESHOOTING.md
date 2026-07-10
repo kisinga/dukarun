@@ -1,33 +1,25 @@
-- OBSERVABILITY: `ssh -L 3301:localhost:3301 user@server`
-- VENDURE: `ssh -L 3000:localhost:3000 user@server`
+# General Troubleshooting
 
-# Backend: EACCES permission denied, mkdir '.../static/assets'
+## SSH tunnels
 
-If the backend entrypoint fails with:
+- Observability: `ssh -L 3301:localhost:3301 user@server`
+- Vendure admin: `ssh -L 3000:localhost:3000 user@server`
 
-```text
-Entrypoint failed: Error: EACCES: permission denied, mkdir '/app/static/assets'
-```
+## Backend: `EACCES permission denied, mkdir '/app/static/assets'`
 
-- **Cause:** The app runs as a non-root user; the asset directory is created by Docker (or a volume) as root-owned, so Vendure’s AssetServerPlugin cannot create or write to it.
-- **Fix (this repo):** The backend image includes a `docker-entrypoint.sh` that runs as root, creates `ASSET_UPLOAD_DIR` (and uploads dir), chowns them to the app user, then starts the app. Rebuild the backend image so the new entrypoint is used.
-- **Path:** Use `ASSET_UPLOAD_DIR=/usr/src/app/static/assets` when running the standard backend Dockerfile (WORKDIR is `/usr/src/app`). If your platform uses a different WORKDIR (e.g. `/app`), set `ASSET_UPLOAD_DIR` to that path (e.g. `/app/static/assets`) and ensure the volume is mounted at the same path; the entrypoint will create and chown that path.
+The app runs as a non-root user but the asset directory was created as root.
 
-# Manually Reset vendure superadmin password
+The backend image's `docker-entrypoint.sh` creates `ASSET_UPLOAD_DIR`, chowns it, then starts the app. Rebuild the backend image to pick up the entrypoint.
+
+Use `ASSET_UPLOAD_DIR=/usr/src/app/static/assets` for the standard backend Dockerfile. If your platform uses a different `WORKDIR` (e.g. `/app`), set `ASSET_UPLOAD_DIR` to match and mount the volume at the same path.
+
+## Reset Vendure superadmin password
 
 ```bash
 psql -U vendure -d vendure
+```
 
-
-SELECT
-  a.id           AS admin_id,
-  u.id           AS user_id,
-  u.identifier   AS login_identifier,
-  a."emailAddress"
-FROM public.administrator a
-JOIN public."user" u ON a."userId" = u.id
-ORDER BY a.id;
-
+```sql
 BEGIN;
 DELETE FROM public.session WHERE "userId" = 1;
 DELETE FROM public.authentication_method WHERE "userId" = 1;
@@ -36,37 +28,20 @@ DELETE FROM public.history_entry WHERE "administratorId" = 1;
 DELETE FROM public.administrator WHERE id = 1;
 DELETE FROM public."user" WHERE id = 1;
 COMMIT;
-`
 ```
 
-Start afresh
+## Start fresh (destroys all data)
 
 ```bash
-
-# Stop and remove everything including volumes
 docker compose down -v
 docker compose -f docker-compose.services.yml down -v
-# Remove any stopped containers that might still reference volumes
 docker container prune -f
 
-# If volumes are still in use, check which containers are using them
-# docker ps -a | grep <container_name>
-# docker rm -f <container_id>
-
-# Remove all volumes (WARNING: This deletes ALL data)
-# This is the safest option as it removes unused volumes
-# Remove all volumes (WARNING: This deletes ALL data)
+# Remove specific volumes, or all unused volumes:
 docker volume prune -f
+# docker volume rm dukarun_postgres_data dukarun_timescaledb_audit_data \
+#   dukarun_redis_data dukarun_backend_assets dukarun_backend_uploads \
+#   dukarun_signoz_data dukarun_clickhouse_data
 
-# Or remove specific volumes if you want to keep others
-docker volume rm dukarun_postgres_data
-docker volume rm dukarun_timescaledb_audit_data
-docker volume rm dukarun_redis_data
-docker volume rm dukarun_backend_assets
-docker volume rm dukarun_backend_uploads
-docker volume rm dukarun_signoz_data
-docker volume rm dukarun_clickhouse_data
-
-# Clean up networks
 docker network prune -f
 ```

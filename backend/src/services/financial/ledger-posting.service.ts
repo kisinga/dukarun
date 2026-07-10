@@ -34,6 +34,19 @@ import {
   createSupplierPurchaseEntry,
 } from './posting-policy';
 
+/**
+ * LedgerPostingService — maps domain events to balanced double-entry journal entries.
+ *
+ * Posting policy functions (see posting-policy.ts) turn a business event into a set
+ * of debit/credit lines. PostingService (in backend/src/ledger/posting.service.ts)
+ * then validates that debits equal credits, enforces idempotency, checks period locks,
+ * and writes the journal entry atomically.
+ *
+ * Every public method here expects the Chart of Accounts to exist for the channel.
+ * Call `ChartOfAccountsService.initializeChannelAccounts(channelId)` if a channel
+ * is missing required accounts.
+ */
+
 /** Context for posting an order reversal entry (date, memo, meta for lines). */
 export interface OrderReversalPostingContext {
   orderId: string;
