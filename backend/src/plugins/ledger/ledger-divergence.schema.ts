@@ -21,7 +21,20 @@ export const LEDGER_DIVERGENCE_SCHEMA = gql`
     count: Int!
   }
 
+  type InventoryReconciliationResult {
+    channelId: Int!
+    stockLocationId: Int
+    periodEndDate: String!
+    ledgerBalance: Int!
+    inventoryValuation: Int!
+    variance: Int!
+  }
+
   extend type Query {
     ledgerDivergences(toleranceCents: Int): LedgerDivergenceSummary!
+  }
+
+  extend type Mutation {
+    reconcileInventory(reason: String!, stockLocationId: Int): InventoryReconciliationResult!
   }
 `;

@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from '@jest/globals';
 import {
+  createInventoryAdjustmentEntry,
   createInventoryPurchaseEntry,
   createInventorySaleCogsEntry,
   createInventoryWriteOffEntry,
@@ -159,6 +160,54 @@ describe('Inventory Posting Policies', () => {
 
       expect(entry.lines[0].meta?.batchCount).toBe(2);
       expect(entry.lines[0].meta?.batchAllocations).toHaveLength(2);
+    });
+  });
+
+  describe('createInventoryAdjustmentEntry', () => {
+    it('should debit INVENTORY for a positive value change', () => {
+      const entry = createInventoryAdjustmentEntry({
+        valueChangeCents: 50000,
+        reason: 'found stock',
+        adjustmentId: 'adj-1',
+        productVariantId: 3,
+        stockLocationId: 2,
+      });
+
+      expect(entry.lines).toHaveLength(2);
+      expect(entry.lines[0]).toEqual(
+        expect.objectContaining({
+          accountCode: ACCOUNT_CODES.INVENTORY,
+          debit: 50000,
+          meta: expect.objectContaining({ adjustmentId: 'adj-1', reason: 'found stock' }),
+        })
+      );
+      expect(entry.lines[1]).toEqual(
+        expect.objectContaining({
+          accountCode: ACCOUNT_CODES.INVENTORY_ADJUSTMENT,
+          credit: 50000,
+        })
+      );
+    });
+
+    it('should credit INVENTORY for a negative value change', () => {
+      const entry = createInventoryAdjustmentEntry({
+        valueChangeCents: -30000,
+        reason: 'lost stock',
+        adjustmentId: 'adj-2',
+      });
+
+      expect(entry.lines[0]).toEqual(
+        expect.objectContaining({
+          accountCode: ACCOUNT_CODES.INVENTORY_ADJUSTMENT,
+          debit: 30000,
+        })
+      );
+      expect(entry.lines[1]).toEqual(
+        expect.objectContaining({
+          accountCode: ACCOUNT_CODES.INVENTORY,
+          credit: 30000,
+        })
+      );
     });
   });
 });

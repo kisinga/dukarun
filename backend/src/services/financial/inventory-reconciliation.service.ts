@@ -3,6 +3,7 @@ import { RequestContext, TransactionalConnection } from '@vendure/core';
 import { Reconciliation } from '../../domain/recon/reconciliation.entity';
 import { InventoryBatch } from '../inventory/entities/inventory-batch.entity';
 import { AccountBalanceService } from './account-balance.service';
+import { LedgerPostingService } from './ledger-posting.service';
 import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import {
   InventoryReconciliationResult,
@@ -29,7 +30,8 @@ export interface CreateInventoryReconciliationInput {
 export class InventoryReconciliationService {
   constructor(
     private readonly connection: TransactionalConnection,
-    private readonly accountBalanceService: AccountBalanceService
+    private readonly accountBalanceService: AccountBalanceService,
+    private readonly ledgerPostingService: LedgerPostingService
   ) {}
 
   /**
@@ -118,6 +120,40 @@ export class InventoryReconciliationService {
       inventoryValuation: inventoryValuationStr,
       variance,
     };
+  }
+
+  /**
+   * Repair ledger INVENTORY account so it matches the batch valuation.
+   * Batches are the operational SSOT for stock; this posts an adjustment to make
+   * the ledger follow the model.
+   */
+  async reconcileToModel(
+    ctx: RequestContext,
+    channelId: number,
+    reason: string,
+    stockLocationId?: number
+  ): Promise<InventoryReconciliationResult> {
+    const periodEndDate = new Date().toISOString().slice(0, 10);
+    const result = await this.reconcileInventoryVsLedger(
+      ctx,
+      channelId,
+      periodEndDate,
+      stockLocationId
+    );
+
+    const valueChangeCents = Number(
+      BigInt(result.inventoryValuation) - BigInt(result.ledgerBalance)
+    );
+    if (valueChangeCents !== 0) {
+      const sourceId = `inventory-reconciliation:${channelId}:${stockLocationId ?? 'ALL'}:${Date.now()}`;
+      await this.ledgerPostingService.postInventoryAdjustment(ctx, sourceId, {
+        valueChangeCents,
+        reason,
+        adjustmentId: sourceId,
+      });
+    }
+
+    return result;
   }
 
   /**

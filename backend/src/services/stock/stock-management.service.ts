@@ -437,46 +437,35 @@ export class StockManagementService {
         }> = [];
         const uuid = randomUUID();
 
-        if (this.inventoryService) {
-          for (const line of input.lines) {
-            const result = await this.inventoryService.applyAdjustmentToBatches(transactionCtx, {
-              channelId,
-              stockLocationId: line.stockLocationId,
-              productVariantId: line.variantId,
-              quantityChange: line.quantityChange,
-              adjustmentId: uuid,
-              batchId: line.batchId ?? undefined,
-            });
-            stockMovements.push({
-              variantId: line.variantId,
-              locationId: line.stockLocationId,
-              previousStock: result.previousStock,
-              newStock: result.newStock,
-              batchId: result.batchId ?? null,
-            });
-            await this.stockMovementService.setStockLevelFromBatchSum(
-              transactionCtx,
-              line.variantId,
-              line.stockLocationId,
-              result.newStock
-            );
-          }
-        } else {
-          for (const line of input.lines) {
-            const movement = await this.stockMovementService.adjustStockLevel(
-              transactionCtx,
-              line.variantId,
-              line.stockLocationId,
-              line.quantityChange,
-              `Stock adjustment: ${input.reason}`
-            );
-            stockMovements.push({
-              variantId: movement.variantId,
-              locationId: movement.locationId,
-              previousStock: movement.previousStock,
-              newStock: movement.newStock,
-            });
-          }
+        if (!this.inventoryService) {
+          throw new UserInputError(
+            'Stock adjustments require the batch inventory service to keep the ledger in sync.'
+          );
+        }
+
+        for (const line of input.lines) {
+          const result = await this.inventoryService.applyAdjustmentToBatches(transactionCtx, {
+            channelId,
+            stockLocationId: line.stockLocationId,
+            productVariantId: line.variantId,
+            quantityChange: line.quantityChange,
+            adjustmentId: uuid,
+            batchId: line.batchId ?? undefined,
+            reason: input.reason,
+          });
+          stockMovements.push({
+            variantId: line.variantId,
+            locationId: line.stockLocationId,
+            previousStock: result.previousStock,
+            newStock: result.newStock,
+            batchId: result.batchId ?? null,
+          });
+          await this.stockMovementService.setStockLevelFromBatchSum(
+            transactionCtx,
+            line.variantId,
+            line.stockLocationId,
+            result.newStock
+          );
         }
 
         const adjustment = await this.stockAdjustmentService.createAdjustmentRecord(

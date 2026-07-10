@@ -73,6 +73,7 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
       postInventoryPurchase: jest.fn(),
       postInventorySaleCogs: jest.fn(),
       postInventoryWriteOff: jest.fn(),
+      postInventoryAdjustment: jest.fn(),
     } as unknown as LedgerPostingService;
 
     const stockValuationService = {
@@ -108,7 +109,7 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
       inventoryValuationProjection
     );
 
-    return { service, inventoryStore, connection };
+    return { service, inventoryStore, ledgerPostingService, connection };
   };
 
   beforeEach(() => {
@@ -124,7 +125,7 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
 
   describe('single batch', () => {
     it('increase: applies to the single batch', async () => {
-      const { service, inventoryStore } = buildService();
+      const { service, inventoryStore, ledgerPostingService } = buildService();
       const batch = makeBatch();
 
       (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([batch]);
@@ -148,10 +149,21 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
           batchId: 'batch-1',
         })
       );
+      expect(ledgerPostingService.postInventoryAdjustment).toHaveBeenCalledWith(
+        ctx,
+        'StockAdjustment:adj-1:3:2',
+        expect.objectContaining({
+          valueChangeCents: 10000,
+          reason: 'Stock adjustment',
+          adjustmentId: 'adj-1',
+          productVariantId: 3,
+          stockLocationId: 2,
+        })
+      );
     });
 
     it('decrease: applies to the single batch via FIFO', async () => {
-      const { service, inventoryStore } = buildService();
+      const { service, inventoryStore, ledgerPostingService } = buildService();
       const batch = makeBatch({ quantity: 50 });
 
       (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([batch]);
@@ -166,6 +178,17 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
       expect(result.previousStock).toBe(50);
       expect(result.newStock).toBe(40);
       expect(inventoryStore.updateBatchQuantity).toHaveBeenCalledWith(ctx, 'batch-1', -10);
+      expect(ledgerPostingService.postInventoryAdjustment).toHaveBeenCalledWith(
+        ctx,
+        'StockAdjustment:adj-1:3:2',
+        expect.objectContaining({
+          valueChangeCents: -10000,
+          reason: 'Stock adjustment',
+          adjustmentId: 'adj-1',
+          productVariantId: 3,
+          stockLocationId: 2,
+        })
+      );
     });
   });
 
@@ -211,7 +234,7 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
 
   describe('multiple batches without batchId', () => {
     it('increase: auto-selects most recent batch (last in createdAt order)', async () => {
-      const { service, inventoryStore } = buildService();
+      const { service, inventoryStore, ledgerPostingService } = buildService();
       const batchOlder = makeBatch({
         id: 'batch-old',
         quantity: 30,
@@ -251,10 +274,15 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
           metadata: { reason: 'adjustment', autoSelectedBatch: true },
         })
       );
+      expect(ledgerPostingService.postInventoryAdjustment).toHaveBeenCalledWith(
+        ctx,
+        'StockAdjustment:adj-1:3:2',
+        expect.objectContaining({ valueChangeCents: 15000 })
+      );
     });
 
     it('decrease: uses FIFO across batches (oldest first)', async () => {
-      const { service, inventoryStore } = buildService();
+      const { service, inventoryStore, ledgerPostingService } = buildService();
       const batchOlder = makeBatch({
         id: 'batch-old',
         quantity: 10,
@@ -284,12 +312,17 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
       expect(inventoryStore.updateBatchQuantity).toHaveBeenCalledTimes(2);
       expect(inventoryStore.updateBatchQuantity).toHaveBeenCalledWith(ctx, 'batch-old', -10);
       expect(inventoryStore.updateBatchQuantity).toHaveBeenCalledWith(ctx, 'batch-new', -15);
+      expect(ledgerPostingService.postInventoryAdjustment).toHaveBeenCalledWith(
+        ctx,
+        'StockAdjustment:adj-1:3:2',
+        expect.objectContaining({ valueChangeCents: -25000 })
+      );
     });
   });
 
   describe('no batches', () => {
     it('increase: creates a zero-cost batch', async () => {
-      const { service, inventoryStore } = buildService();
+      const { service, inventoryStore, ledgerPostingService } = buildService();
       const newBatch = makeBatch({ id: 'new-batch', unitCost: 0, sourceType: 'StockAdjustment' });
 
       (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([]);
@@ -310,6 +343,11 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
           unitCost: 0,
           sourceType: 'StockAdjustment',
         })
+      );
+      expect(ledgerPostingService.postInventoryAdjustment).toHaveBeenCalledWith(
+        ctx,
+        'StockAdjustment:adj-1:3:2',
+        expect.objectContaining({ valueChangeCents: 0 })
       );
     });
   });

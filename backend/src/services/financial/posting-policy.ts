@@ -590,3 +590,57 @@ export function createSupplierBalanceAdjustmentEntry(
     };
   }
 }
+
+/**
+ * Context for posting a stock-adjustment value change to the ledger.
+ */
+export interface InventoryAdjustmentPostingContext {
+  /** Signed value change in cents. Positive = inventory value increased, negative = decreased. */
+  valueChangeCents: number;
+  reason: string;
+  adjustmentId: string;
+  productVariantId?: string | number;
+  stockLocationId?: string | number;
+}
+
+/**
+ * Generate journal entry template for a stock adjustment.
+ *
+ * Inventory is an asset account: debit increases, credit decreases.
+ * Inventory value increased (found stock):  Debit INVENTORY, Credit INVENTORY_ADJUSTMENT
+ * Inventory value decreased (lost stock):   Debit INVENTORY_ADJUSTMENT, Credit INVENTORY
+ */
+export function createInventoryAdjustmentEntry(
+  context: InventoryAdjustmentPostingContext
+): JournalEntryTemplate {
+  const meta: Record<string, unknown> = {
+    adjustmentId: context.adjustmentId,
+    reason: context.reason,
+  };
+  if (context.productVariantId != null) {
+    meta.productVariantId = context.productVariantId;
+  }
+  if (context.stockLocationId != null) {
+    meta.stockLocationId = context.stockLocationId;
+  }
+
+  const amount = Math.abs(context.valueChangeCents);
+
+  if (context.valueChangeCents > 0) {
+    return {
+      lines: [
+        { accountCode: ACCOUNT_CODES.INVENTORY, debit: amount, meta },
+        { accountCode: ACCOUNT_CODES.INVENTORY_ADJUSTMENT, credit: amount, meta },
+      ],
+      memo: `Inventory adjustment ${context.adjustmentId}: ${context.reason}`,
+    };
+  }
+
+  return {
+    lines: [
+      { accountCode: ACCOUNT_CODES.INVENTORY_ADJUSTMENT, debit: amount, meta },
+      { accountCode: ACCOUNT_CODES.INVENTORY, credit: amount, meta },
+    ],
+    memo: `Inventory adjustment ${context.adjustmentId}: ${context.reason}`,
+  };
+}
