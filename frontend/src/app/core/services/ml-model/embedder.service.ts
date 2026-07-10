@@ -30,7 +30,7 @@ export interface EmbedderStatus {
  * Why fp32 only: int8 of this model is degenerate on both WebGPU and WASM, and fp16 needs the
  * shader-f16 GPU feature (often missing). fp32 is the only weight that is correct everywhere — on
  * WebGPU (fast) with a WASM/CPU fallback (correct, slower). The 45 MB download is one-time and
- * cached. See docs/ML_PRODUCT_RECOGNITION.md §7.
+ * cached. See archive/docs/2026-07-10/ML_PRODUCT_RECOGNITION.md §7 for historical context.
  */
 @Injectable({ providedIn: 'root' })
 export class EmbedderService {

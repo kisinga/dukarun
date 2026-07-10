@@ -75,6 +75,23 @@ import {
   ViewFinancialsPermission,
 } from './permissions';
 
+/**
+ * LedgerPlugin — double-entry ledger, reconciliation, period management, and cashier sessions.
+ *
+ * This plugin wires together the core financial services. The ledger is the single
+ * source of truth; reconciliation mutations align operational records with ledger
+ * balances when they diverge.
+ *
+ * Key services:
+ * - FinancialService          → business-facing facade
+ * - LedgerPostingService      → domain event → journal entry mapping
+ * - LedgerQueryService        → balance and total queries
+ * - PostingService            → atomic, idempotent journal entry creation
+ * - ReconciliationService     → manual reconciliation and SSOT consolidation
+ * - LedgerDivergenceService   → scans for ledger/operational mismatches
+ * - PeriodLockService         → period locking for audits
+ */
+
 // Merge schemas
 const COMBINED_SCHEMA = gql`
   ${DASHBOARD_STATS_SCHEMA}

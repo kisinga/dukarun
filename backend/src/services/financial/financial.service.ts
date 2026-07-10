@@ -21,11 +21,22 @@ import {
 } from './posting-policy';
 
 /**
- * FinancialService - Clean Facade for Financial Operations
+ * FinancialService — clean facade for all ledger-backed financial operations.
  *
- * This service abstracts all accounting terminology and provides
- * business-friendly methods. The ledger is the single source of truth
- * for all financial data.
+ * The ledger is the single source of truth for every financial figure in Dukarun.
+ * Domain code MUST read balances here instead of computing from orders, payments,
+ * or custom-field snapshots. All amounts are in the smallest currency unit (cents).
+ *
+ * Posting flows:
+ * - Cash sale        → debit CASH_ON_HAND / credit SALES
+ * - Credit sale      → debit ACCOUNTS_RECEIVABLE / credit SALES
+ * - Customer payment → debit CASH_ON_HAND / credit ACCOUNTS_RECEIVABLE
+ * - Supplier payment → debit ACCOUNTS_PAYABLE / credit CASH_ON_HAND
+ * - Inventory purchase → debit INVENTORY / credit ACCOUNTS_PAYABLE or CASH_ON_HAND
+ * - Inventory sale COGS → debit COGS / credit INVENTORY
+ *
+ * Each posting is idempotent (keyed by sourceType + sourceId) and wrapped in the
+ * same database transaction as the domain change.
  */
 @Injectable()
 export class FinancialService {

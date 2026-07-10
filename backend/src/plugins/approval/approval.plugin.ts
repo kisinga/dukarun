@@ -17,6 +17,15 @@ import {
   ReviewApprovalRequestInput,
 } from '../../services/approval/approval.service';
 
+/**
+ * ApprovalPlugin — internal approval request workflow.
+ *
+ * Domain code creates approval requests (e.g., price override, credit limit change)
+ * via ApprovalService. Users with ManageApprovals permission review them through
+ * `reviewApprovalRequest`. The handler registry dispatches approved requests to
+ * the correct business action.
+ */
+
 // Custom permission for reviewing approval requests
 export const ManageApprovalsPermission = new PermissionDefinition({
   name: 'ManageApprovals',

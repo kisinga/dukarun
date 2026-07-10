@@ -183,6 +183,11 @@ export class ChartOfAccountsService {
         type: 'expense' as const,
       },
       { code: ACCOUNT_CODES.EXPIRY_LOSS, name: 'Expiry Loss', type: 'expense' as const },
+      {
+        code: ACCOUNT_CODES.INVENTORY_ADJUSTMENT,
+        name: 'Inventory Adjustment',
+        type: 'expense' as const,
+      },
       // Equity Accounts - Manual adjustments
       {
         code: ACCOUNT_CODES.BALANCE_ADJUSTMENT,
@@ -295,6 +300,7 @@ export class ChartOfAccountsService {
       ACCOUNT_CODES.COGS,
       ACCOUNT_CODES.INVENTORY_WRITE_OFF,
       ACCOUNT_CODES.EXPIRY_LOSS,
+      ACCOUNT_CODES.INVENTORY_ADJUSTMENT,
     ];
 
     // Query accounts individually to ensure we see uncommitted changes within the transaction.

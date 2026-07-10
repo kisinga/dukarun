@@ -26,6 +26,35 @@ import {
   getSubscriptionAccess,
 } from '../../plugins/subscriptions/subscription.context';
 
+/**
+ * Subscription lifecycle management: tiers, purchases, Paystack payments, trial/grace periods,
+ * and read/write access decisions.
+ *
+ * Tiers are created via createSubscriptionTier (SuperAdmin). To seed the canonical Pro/Business
+ * tiers directly in SQL, run an upsert like:
+ *
+ * ```sql
+ * INSERT INTO "subscription_tier" (
+ *   "code", "name", "description", "priceMonthly", "priceYearly", "features", "isActive"
+ * ) VALUES
+ * (
+ *   'pro', 'Pro', 'Essential Shop Operations...', 150000, 1440000,
+ *   '{"features":["Sell with camera..."]}', true
+ * ),
+ * (
+ *   'business', 'Business', 'Financial Control & Growth...', 250000, 2400000,
+ *   '{"features":["Everything in Pro..."]}', true
+ * )
+ * ON CONFLICT ("code") DO UPDATE SET
+ *   "name" = EXCLUDED."name",
+ *   "description" = EXCLUDED."description",
+ *   "priceMonthly" = EXCLUDED."priceMonthly",
+ *   "priceYearly" = EXCLUDED."priceYearly",
+ *   "features" = EXCLUDED."features",
+ *   "isActive" = EXCLUDED."isActive";
+ * ```
+ */
+
 export interface SubscriptionStatus {
   isValid: boolean;
   access: SubscriptionAccess;

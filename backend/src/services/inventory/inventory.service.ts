@@ -26,6 +26,20 @@ import { SaleCogs } from './entities/sale-cogs.entity';
 import { InventoryStoreService } from './inventory-store.service';
 
 /**
+ * InventoryService — FIFO/COGS inventory framework.
+ *
+ * Source of truth for stock availability and cost is `inventory_batch` + inventory_movement`,
+ * not Vendure's `stock_level`. Stock levels are written back to Vendure only for compatibility.
+ *
+ * - Purchases create batches with unit cost and optional expiry.
+ * - Sales allocate cost using the configured CostingStrategy (default FIFO).
+ * - Consumption is validated against batch stock under per-SKU/location locks.
+ *
+ * See `CostingStrategy` to add new allocation strategies and `ExpiryPolicy` to add
+ * expiry rules.
+ */
+
+/**
  * Input for recording a purchase
  */
 export interface RecordPurchaseInput {
@@ -142,6 +156,8 @@ export interface ApplyAdjustmentToBatchesInput {
   adjustmentId: string;
   /** When multiple batches exist, required to select which batch to apply to. */
   batchId?: ID;
+  /** Optional human-readable reason, passed through to the ledger entry memo. */
+  reason?: string;
 }
 
 /**
@@ -679,6 +695,7 @@ export class InventoryService {
     }
 
     let batchIdUsed: string | null = null;
+    let valueChangeCents = 0;
 
     if (quantityChange > 0) {
       if (batchId) {
@@ -690,6 +707,7 @@ export class InventoryService {
         }
         await this.inventoryStore.updateBatchQuantity(ctx, batch.id, quantityChange);
         batchIdUsed = String(batch.id);
+        valueChangeCents = quantityChange * batch.unitCost;
         await this.inventoryStore.createMovement(ctx, {
           channelId: input.channelId,
           stockLocationId: input.stockLocationId,
@@ -705,6 +723,7 @@ export class InventoryService {
         const batch = batches[0];
         await this.inventoryStore.updateBatchQuantity(ctx, batch.id, quantityChange);
         batchIdUsed = String(batch.id);
+        valueChangeCents = quantityChange * batch.unitCost;
         await this.inventoryStore.createMovement(ctx, {
           channelId: input.channelId,
           stockLocationId: input.stockLocationId,
@@ -725,6 +744,7 @@ export class InventoryService {
         );
         await this.inventoryStore.updateBatchQuantity(ctx, mostRecent.id, quantityChange);
         batchIdUsed = String(mostRecent.id);
+        valueChangeCents = quantityChange * mostRecent.unitCost;
         await this.inventoryStore.createMovement(ctx, {
           channelId: input.channelId,
           stockLocationId: input.stockLocationId,
@@ -757,6 +777,7 @@ export class InventoryService {
           sourceId,
         });
         batchIdUsed = String(batch.id);
+        valueChangeCents = 0;
         await this.inventoryStore.createMovement(ctx, {
           channelId: input.channelId,
           stockLocationId: input.stockLocationId,
@@ -782,6 +803,7 @@ export class InventoryService {
         }
         await this.inventoryStore.updateBatchQuantity(ctx, batch.id, -toDeduct);
         batchIdUsed = String(batch.id);
+        valueChangeCents = -toDeduct * batch.unitCost;
         await this.inventoryStore.createMovement(ctx, {
           channelId: input.channelId,
           stockLocationId: input.stockLocationId,
@@ -800,6 +822,7 @@ export class InventoryService {
           const deduct = Math.min(remaining, batch.quantity);
           await this.inventoryStore.updateBatchQuantity(ctx, batch.id, -deduct);
           if (!batchIdUsed) batchIdUsed = String(batch.id);
+          valueChangeCents += -deduct * batch.unitCost;
           await this.inventoryStore.createMovement(ctx, {
             channelId: input.channelId,
             stockLocationId: input.stockLocationId,
@@ -815,6 +838,16 @@ export class InventoryService {
         }
       }
     }
+
+    // Keep the ledger INVENTORY account in sync with the batch valuation.
+    const ledgerSourceId = `StockAdjustment:${adjustmentId}:${variantId}:${locationId}`;
+    await this.ledgerPostingService.postInventoryAdjustment(ctx, ledgerSourceId, {
+      valueChangeCents,
+      reason: input.reason || 'Stock adjustment',
+      adjustmentId,
+      productVariantId: variantId,
+      stockLocationId: locationId,
+    });
 
     return { previousStock, newStock, batchId: batchIdUsed ?? undefined };
   }

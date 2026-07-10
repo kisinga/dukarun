@@ -11,6 +11,7 @@ import { LedgerQueryService } from './ledger-query.service';
 import {
   BalanceAdjustmentPostingContext,
   ExpensePostingContext,
+  InventoryAdjustmentPostingContext,
   InventoryPurchasePostingContext,
   InventorySalePostingContext,
   InventoryWriteOffPostingContext,
@@ -23,6 +24,7 @@ import {
   createBalanceAdjustmentEntry,
   createCreditSaleEntry,
   createExpenseEntry,
+  createInventoryAdjustmentEntry,
   createInventoryPurchaseEntry,
   createInventorySaleCogsEntry,
   createInventoryWriteOffEntry,
@@ -33,6 +35,19 @@ import {
   createSupplierPaymentEntry,
   createSupplierPurchaseEntry,
 } from './posting-policy';
+
+/**
+ * LedgerPostingService — maps domain events to balanced double-entry journal entries.
+ *
+ * Posting policy functions (see posting-policy.ts) turn a business event into a set
+ * of debit/credit lines. PostingService (in backend/src/ledger/posting.service.ts)
+ * then validates that debits equal credits, enforces idempotency, checks period locks,
+ * and writes the journal entry atomically.
+ *
+ * Every public method here expects the Chart of Accounts to exist for the channel.
+ * Call `ChartOfAccountsService.initializeChannelAccounts(channelId)` if a channel
+ * is missing required accounts.
+ */
 
 /** Context for posting an order reversal entry (date, memo, meta for lines). */
 export interface OrderReversalPostingContext {
@@ -508,6 +523,67 @@ export class LedgerPostingService {
   }
 
   /**
+   * Post a stock-adjustment value change to the ledger.
+   * No-op when the value change is zero.
+   */
+  async postInventoryAdjustment(
+    ctx: RequestContext,
+    sourceId: string,
+    context: InventoryAdjustmentPostingContext
+  ): Promise<void> {
+    if (context.valueChangeCents === 0) {
+      return;
+    }
+
+    const span = this.tracingService?.startSpan('ledger.postInventoryAdjustment', {
+      'ledger.type': 'InventoryAdjustment',
+      'ledger.source_id': sourceId,
+      'ledger.channel_id': ctx.channelId?.toString() || '',
+      'ledger.adjustment_id': context.adjustmentId,
+    });
+
+    try {
+      const template = createInventoryAdjustmentEntry(context);
+      const accountCodes = template.lines.map(l => l.accountCode);
+
+      await this.ensureAccountsExist(ctx, accountCodes);
+
+      const payload: PostingPayload = {
+        channelId: ctx.channelId as number,
+        entryDate: new Date().toISOString().slice(0, 10),
+        memo: template.memo,
+        lines: template.lines,
+      };
+
+      await this.postingService.post(ctx, 'InventoryAdjustment', sourceId, payload);
+
+      for (const code of accountCodes) {
+        this.ledgerQueryService.invalidateCache(ctx.channelId as number, code);
+      }
+
+      this.metricsService?.recordLedgerPosting(
+        'InventoryAdjustment',
+        ctx.channelId?.toString() || ''
+      );
+      this.tracingService?.addEvent(span!, 'ledger.posted', {
+        'ledger.source_id': sourceId,
+      });
+
+      this.logger.log(
+        `Posted inventory adjustment entry ${sourceId}, value change: ${context.valueChangeCents}, reason: ${context.reason}`
+      );
+      this.tracingService?.endSpan(span!, true);
+    } catch (error) {
+      this.tracingService?.endSpan(
+        span!,
+        false,
+        error instanceof Error ? error : new Error(String(error))
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Post a variance adjustment (short/over) so the ledger balances.
    * Shortage: debit CASH_SHORT_OVER, credit account (e.g. CASH_ON_HAND).
    * Overage: debit account, credit CASH_SHORT_OVER.
@@ -552,6 +628,10 @@ export class LedgerPostingService {
     };
 
     await this.postingService.post(ctx, 'variance-adjustment', sourceId, payload);
+
+    this.ledgerQueryService.invalidateCache(channelId, accountCode);
+    this.ledgerQueryService.invalidateCache(channelId, ACCOUNT_CODES.CASH_SHORT_OVER);
+
     this.logger.log(
       `Posted variance adjustment for session ${sessionId}, account ${accountCode}, amount ${varianceCents}`
     );

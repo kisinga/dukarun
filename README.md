@@ -33,7 +33,7 @@ npm run setup
 - 🚀 **[Setup & Deployment](./docs/INFRASTRUCTURE.md)** - Get started, deploy anywhere
 - 🆕 **[Fresh Setup](./docs/INFRASTRUCTURE.md#fresh-setup)** - First-time installation guide
 - 🏗️ **[Architecture](./ARCHITECTURE.md)** - System design and decisions
-- 🤖 **[ML Guide](./docs/ML_PRODUCT_RECOGNITION.md)** - On-device product recognition
+- 📚 **[All Docs](./docs/README.md)** - Topic index and source-code entry points
 - 🗺️ **[Roadmap](./ROADMAP.md)** - Planned features
 
 - **[Frontend Architecture](./frontend/ARCHITECTURE.md)** - Angular app structure
@@ -44,7 +44,7 @@ npm run setup
 
 **Version:** 2.0 (Active Development)  
 **Stack:** Angular + Vendure + PostgreSQL  
-**V1 Archive:** See [V1 Migration](./docs/v1-migration/MIGRATION_SUMMARY.md)
+**V1 Archive:** See [V1 Migration](./archive/v1-migration/MIGRATION_SUMMARY.md)
 
 ## Core Features
 

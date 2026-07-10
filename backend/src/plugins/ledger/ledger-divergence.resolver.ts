@@ -1,6 +1,7 @@
-import { Args, Query, Resolver } from '@nestjs/graphql';
+import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, RequestContext } from '@vendure/core';
 import { LedgerDivergenceService } from '../../services/financial/ledger-divergence.service';
+import { InventoryReconciliationService } from '../../services/financial/inventory-reconciliation.service';
 import { ManageReconciliationPermission, ViewFinancialsPermission } from './permissions';
 
 export interface LedgerDivergenceGraphQLSummary {
@@ -18,7 +19,10 @@ export interface LedgerDivergenceGraphQLSummary {
 
 @Resolver()
 export class LedgerDivergenceResolver {
-  constructor(private readonly ledgerDivergenceService: LedgerDivergenceService) {}
+  constructor(
+    private readonly ledgerDivergenceService: LedgerDivergenceService,
+    private readonly inventoryReconciliationService: InventoryReconciliationService
+  ) {}
 
   @Query()
   @Allow(ViewFinancialsPermission.Permission)
@@ -34,6 +38,36 @@ export class LedgerDivergenceResolver {
         count,
       })),
       items: summary.items,
+    };
+  }
+
+  @Mutation()
+  @Allow(ManageReconciliationPermission.Permission)
+  async reconcileInventory(
+    @Ctx() ctx: RequestContext,
+    @Args('reason') reason: string,
+    @Args('stockLocationId', { nullable: true }) stockLocationId?: number
+  ): Promise<{
+    channelId: number;
+    stockLocationId?: number;
+    periodEndDate: string;
+    ledgerBalance: number;
+    inventoryValuation: number;
+    variance: number;
+  }> {
+    const result = await this.inventoryReconciliationService.reconcileToModel(
+      ctx,
+      ctx.channelId as number,
+      reason,
+      stockLocationId
+    );
+    return {
+      channelId: result.channelId,
+      stockLocationId: result.stockLocationId,
+      periodEndDate: result.periodEndDate,
+      ledgerBalance: Number(result.ledgerBalance),
+      inventoryValuation: Number(result.inventoryValuation),
+      variance: Number(result.variance),
     };
   }
 }

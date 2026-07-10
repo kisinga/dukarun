@@ -1,0 +1,139 @@
+<app-navbar />
+
+<main class="bg-base-100 text-base-content">
+  <section class="section scroll-mt-28 bg-base-100 py-16">
+    <div class="container-app space-y-4 text-center">
+      <span class="mkt-eyebrow">Simple pricing</span>
+      <h1 class="mkt-h1">Choose a plan that fits your shop</h1>
+      <p class="mx-auto max-w-2xl text-base text-base-content/70">
+        Start with a free trial. Pause anytime and keep your data.
+      </p>
+    </div>
+
+    <div class="container-app mt-10 flex justify-center">
+      <label
+        class="flex cursor-pointer items-center gap-3 rounded-full border border-base-300 bg-base-200/50 p-1"
+      >
+        <span class="px-3 py-1 text-sm" [class.font-semibold]="!isYearly()">Monthly</span>
+        <input
+          type="checkbox"
+          class="toggle toggle-primary"
+          [checked]="isYearly()"
+          (change)="toggleBilling()"
+        />
+        <span class="px-3 py-1 text-sm" [class.font-semibold]="isYearly()">Yearly</span>
+      </label>
+    </div>
+
+    <div class="container-app mt-10 grid gap-6 lg:grid-cols-3 lg:items-start">
+      @if (pricingLoading()) {
+        <div class="grid gap-6 lg:grid-cols-3 lg:items-stretch w-full">
+          @for (s of [1, 2, 3]; track s) {
+            <div class="rounded-3xl border border-base-300 bg-base-200/50 p-8 flex flex-col">
+              <div class="skeleton h-7 w-24 mb-4"></div>
+              <div class="skeleton h-9 w-28 mb-2"></div>
+              <div class="skeleton h-4 w-full mb-4"></div>
+              <div class="skeleton h-4 w-full mb-2"></div>
+              <div class="skeleton h-4 w-full mb-8 flex-1 max-w-[85%]"></div>
+              <div class="skeleton h-12 w-full rounded-lg"></div>
+            </div>
+          }
+        </div>
+      } @else {
+        @for (plan of pricingPlans(); track plan.name) {
+          <div
+            class="group relative flex flex-col rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+            [class.border-primary]="plan.popular"
+            [class.bg-base-100]="!plan.popular"
+            [class.bg-base-200/30]="plan.popular"
+            [class.shadow-lg]="plan.popular"
+            [class.border-base-300]="!plan.popular"
+          >
+            @if (plan.popular) {
+              <div class="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span class="badge badge-primary badge-sm font-semibold uppercase tracking-wider">
+                  Most Popular
+                </span>
+              </div>
+            }
+
+            <div class="mb-6 space-y-2">
+              <h3 class="text-xl font-bold">{{ plan.name }}</h3>
+              <div class="flex items-baseline gap-1">
+                <span class="text-3xl font-bold">
+                  {{ isYearly() ? plan.yearlyPrice : plan.monthlyPrice }}
+                </span>
+                @if (plan.monthlyPrice !== 'Custom') {
+                  <span class="text-base md:text-sm text-base-content/70">/month</span>
+                }
+              </div>
+              <p class="text-base md:text-sm text-base-content/70">{{ plan.description }}</p>
+            </div>
+
+            <ul class="mb-8 flex-1 space-y-3 text-base md:text-sm">
+              @for (feature of plan.features; track feature.text) {
+                <li class="flex items-start gap-3">
+                  <span class="text-success text-lg leading-none">✓</span>
+                  <span [class.text-base-content]="feature.included" class="text-base-content/80">
+                    {{ feature.text }}
+                  </span>
+                </li>
+              }
+            </ul>
+
+            <a
+              [routerLink]="plan.ctaLink.split('?')[0]"
+              [queryParams]="
+                plan.ctaLink.includes('?')
+                  ? { plan: plan.ctaLink.split('=')[1].split('&')[0], trial: 'true' }
+                  : null
+              "
+              class="btn w-full transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              [class.btn-primary]="plan.popular"
+              [class.btn-outline]="!plan.popular"
+            >
+              {{ plan.ctaText }}
+            </a>
+          </div>
+        }
+      }
+    </div>
+
+    <div class="container-app mt-10 text-center">
+      <p class="text-base text-base-content/70">
+        All plans include guided onboarding. Need help choosing?
+        <a
+          href="https://wa.me/254788922222"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="link link-primary"
+        >
+          WhatsApp us
+        </a>
+        .
+      </p>
+    </div>
+  </section>
+
+  <section class="section scroll-mt-28 bg-base-200/40 py-16">
+    <div class="container-app">
+      <div class="mx-auto max-w-2xl space-y-6 text-center">
+        <h2 class="text-2xl font-bold sm:text-3xl">Setup and training</h2>
+        <p class="text-base text-base-content/70">
+          We offer optional installation and staff training. Pricing depends on your location,
+          number of locations, and team size. Contact us for a quote.
+        </p>
+        <a
+          href="https://wa.me/254788922222"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn btn-primary btn-lg"
+        >
+          Get a setup quote
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<app-footer />

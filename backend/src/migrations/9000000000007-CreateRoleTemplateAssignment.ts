@@ -6,7 +6,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * One-to-one: each role has at most one template (custom/override roles have no row).
  *
  * Standalone table (not Vendure config.customFields — Role has no custom fields).
- * Follows docs/VENDURE_CUSTOM_FIELDS.md: idempotent, guarded, build-before-run.
+ * Follows archived VENDURE_CUSTOM_FIELDS.md (archive/docs/2026-07-10/): idempotent, guarded, build-before-run.
  * FK actions: CASCADE on role (assignment goes with role); RESTRICT on template.
  */
 export class CreateRoleTemplateAssignment9000000000007 implements MigrationInterface {
