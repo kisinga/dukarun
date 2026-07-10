@@ -550,6 +550,8 @@ export interface SupplierBalanceAdjustmentPostingContext {
   direction: 'increase' | 'decrease'; // increase = we owe supplier more, decrease = we owe less
   supplierId: string;
   reason: string;
+  /** Optional purchase-scoped AP adjustment. When provided, the journal line meta includes purchaseId. */
+  purchaseId?: string;
 }
 
 /**
@@ -562,10 +564,13 @@ export interface SupplierBalanceAdjustmentPostingContext {
 export function createSupplierBalanceAdjustmentEntry(
   context: SupplierBalanceAdjustmentPostingContext
 ): JournalEntryTemplate {
-  const meta = {
+  const meta: Record<string, unknown> = {
     supplierId: context.supplierId,
     reason: context.reason,
   };
+  if (context.purchaseId) {
+    meta.purchaseId = context.purchaseId;
+  }
 
   if (context.direction === 'increase') {
     return {

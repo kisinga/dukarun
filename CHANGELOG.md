@@ -67,6 +67,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streamlined docs/README.md
 - Updated root README.md
 
+### Recent additions (July 2026)
+
+#### WhatsApp and outbound communication
+
+- WhatsApp integration via OpenWA Gateway for business notifications.
+- Platform toggles for SMS, email, and WhatsApp channels in Global Settings.
+- Test WhatsApp sends that bypass channel gates so operators can verify setup before going live.
+- Message templates for shift opened, shift closed, and balance changed triggers.
+- WhatsApp shift open/close alerts sent to financial admins.
+- Customer notification kill switch and per-customer notification preference.
+
+#### Ledger and SSOT consolidation
+
+- Order and purchase reconciliation to consolidate operational records into the ledger.
+- Trust ledger or trust model options when reconciling partially paid orders.
+- Customer and supplier balance alignment tools that keep the ledger as the source of truth.
+- Ledger divergence scanner and audit script to confirm inventory, AP, and AR match the ledger.
+- Shift reconciliation backfill to keep cashier session records consolidated with the ledger.
+
 ### Preserved from V1
 
 - Multi-tenancy business model

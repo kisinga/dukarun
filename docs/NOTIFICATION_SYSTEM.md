@@ -95,6 +95,16 @@ NotificationService.getChannelUsers (Admins + SuperAdmins)
 2. Push Handler → PushNotificationService.sendPushNotification → DB Lookup → Web Push API → Service Worker
 ```
 
+## 📤 Outbound channels (WhatsApp, SMS, email)
+
+Beyond in-app and push, Dukarun can send notifications through external channels. See `OUTBOUND_COMMUNICATION.md` for the full flow.
+
+- **WhatsApp**: sent through the OpenWA Gateway for triggers such as balance changed, shift opened, and shift closed.
+- **SMS and email**: available for administrative and platform alerts.
+- **Platform toggles**: super-admins enable or disable SMS, email, and WhatsApp globally from Platform Data.
+- **Customer control**: a global kill switch and per-customer preference decide whether customer-facing messages are sent.
+- **Test sends**: super-admins can send test WhatsApp messages without enabling the channel for live traffic.
+
 ## 🧪 Testing the Notification System
 
 ### **Quick Test Commands**

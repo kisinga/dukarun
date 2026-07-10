@@ -162,6 +162,62 @@ For administrators:
 
 ---
 
+## WhatsApp Business Alerts
+
+### 1. What It Is
+
+Dukarun can send business notifications through WhatsApp when the channel is enabled. This is useful for alerts that need to reach admins or customers quickly, such as shift changes or balance updates.
+
+### 2. What Triggers WhatsApp Messages
+
+Current WhatsApp triggers include:
+
+- **Shift opened / closed** – sent to financial admins so they know when cashier sessions start and end.
+- **Balance changed** – sent to customers when their outstanding balance changes, if customer notifications are enabled.
+
+### 3. How It Is Controlled
+
+- Super-admins enable or disable WhatsApp globally from **Platform Data**.
+- A global customer notification switch and per-customer preference control whether customers receive messages.
+- Super-admins can send test messages to verify the WhatsApp setup before enabling live traffic.
+
+### 4. Operational Notes
+
+- WhatsApp is delivered through the OpenWA Gateway.
+- It is for notifications only, not OTP or authentication.
+- Message content uses templates defined in the outbound notification system.
+
+**Origin:** Dukarun-Exclusive.
+
+---
+
+## Customer notifications
+
+### 1. What it is
+
+Dukarun can automatically update your customers through WhatsApp or SMS when certain events happen. This keeps them informed without manual follow-up.
+
+### 2. What triggers customer messages
+
+Current customer triggers include:
+
+- **Balance changed** – sent when a customer's outstanding balance changes, such as after a credit sale or payment.
+- Other lifecycle events (e.g. order status, credit approval) can be added through the outbound notification system.
+
+### 3. How it is controlled
+
+- A global customer notification switch in Platform Data turns customer messages on or off.
+- Each customer record has a per-customer preference, so you can opt individual customers in or out.
+- The channel used (WhatsApp or SMS) depends on which channels are enabled platform-wide.
+
+### 4. Why it matters
+
+For businesses that sell on credit, automatic balance updates reduce back-and-forth and help customers stay on top of what they owe.
+
+**Origin:** Dukarun-Exclusive.
+
+---
+
 ## Recognition Enrollment Data
 
 Dukarun no longer exposes the old external training pipeline. Recognition is driven by product

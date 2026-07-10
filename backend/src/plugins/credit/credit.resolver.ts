@@ -3,7 +3,10 @@ import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Allow, Ctx, Permission, RequestContext, Order } from '@vendure/core';
 
 import { ChannelCommunicationService } from '../../services/channels/channel-communication.service';
-import { CreditService } from '../../services/credit/credit.service';
+import {
+  CreditService,
+  CustomerSupplierDivergenceResult,
+} from '../../services/credit/credit.service';
 import { CreditSummary } from '../../services/credit/credit-party.types';
 import { CreditValidatorService } from '../../services/credit/credit-validator.service';
 import {
@@ -15,6 +18,7 @@ import {
   ManageCustomerCreditLimitPermission,
   OverrideCustomerBalancePermission,
 } from './permissions';
+import { ManageReconciliationPermission } from '../ledger/permissions';
 import { ManageSupplierCreditPurchasesPermission } from './supplier-credit.permissions';
 
 interface ApproveCustomerCreditInput {
@@ -247,6 +251,58 @@ export class CreditResolver {
     );
     return {
       customerId: supplierId,
+      ...result,
+    };
+  }
+
+  @Query()
+  @Allow(ManageReconciliationPermission.Permission)
+  async divergentCustomers(
+    @Ctx() ctx: RequestContext,
+    @Args('toleranceCents') toleranceCents?: number
+  ): Promise<CustomerSupplierDivergenceResult> {
+    return this.creditService.findCustomerSupplierDivergences(ctx, 'customer', toleranceCents);
+  }
+
+  @Query()
+  @Allow(ManageReconciliationPermission.Permission)
+  async divergentSuppliers(
+    @Ctx() ctx: RequestContext,
+    @Args('toleranceCents') toleranceCents?: number
+  ): Promise<CustomerSupplierDivergenceResult> {
+    return this.creditService.findCustomerSupplierDivergences(ctx, 'supplier', toleranceCents);
+  }
+
+  @Mutation()
+  @Allow(OverrideCustomerBalancePermission.Permission)
+  async adjustCustomerBalanceToModel(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { entityId: string; partyType: string; note?: string }
+  ) {
+    const result = await this.creditService.adjustCustomerBalanceToModel(
+      ctx,
+      input.entityId,
+      input.note
+    );
+    return {
+      customerId: input.entityId,
+      ...result,
+    };
+  }
+
+  @Mutation()
+  @Allow(ManageSupplierCreditPurchasesPermission.Permission)
+  async adjustSupplierBalanceToModel(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { entityId: string; partyType: string; note?: string }
+  ) {
+    const result = await this.creditService.adjustSupplierBalanceToModel(
+      ctx,
+      input.entityId,
+      input.note
+    );
+    return {
+      customerId: input.entityId,
       ...result,
     };
   }

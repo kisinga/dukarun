@@ -185,6 +185,28 @@ While Dukarun ships with pragmatic dashboards, it intentionally keeps the underl
 
 ---
 
+## Reconciliation and SSOT consolidation
+
+Because the ledger is the single source of truth, reconciliation makes sure operational records consolidate into it cleanly.
+
+### What consolidation means
+
+- Every sale, payment, purchase, and adjustment posts to the ledger.
+- Customer and supplier balances, cash accounts, and reconciliation expected values are all read from the ledger.
+- If an operational record and the ledger disagree, reconciliation picks the authoritative side and posts the adjustment needed to create one consistent view.
+
+### Common reconciliation tasks
+
+- **Order reconciliation**: choose to trust the ledger or trust the order model. Dukarun posts the adjustment needed to bring them into agreement.
+- **Purchase reconciliation**: same choice for supplier purchases and accounts payable.
+- **Balance alignment**: post a ledger adjustment to keep a customer or supplier balance consistent with the ledger.
+- **Shift reconciliation backfill**: safely create a missing closing reconciliation for a cashier session. Running it again returns the existing record.
+- **Divergence scans**: super-admin tools confirm inventory, accounts receivable, and accounts payable match the ledger and list any mismatch for consolidation.
+
+These tools are meant for finance users, support staff, and operators. Daily users do not need them unless something looks wrong.
+
+---
+
 ## How to Use & Configure (Workflows)
 
 ### A. Onboarding a Channel’s Ledger
@@ -246,6 +268,9 @@ From then on:
 3. Reconcile with:
    - External bank statements.
    - Paystack and M‑Pesa reports.
+4. If an order, purchase, or balance no longer matches the ledger:
+   - Use the reconciliation tools in the super-admin reconciliation UI.
+   - Choose to trust the ledger or the operational record, then apply the adjustment so the ledger stays the single source of truth.
 
 Because all movements go through the ledger, reconciling is a matter of matching journal entries to external statements.
 

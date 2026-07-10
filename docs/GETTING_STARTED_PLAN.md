@@ -173,7 +173,7 @@ Add or edit the options that appear at checkout — Cash, M-Pesa, bank transfer,
 | **Expenses** | Record and view business expenses | `/dashboard/accounting/expenses` |
 | **Transfers** | Move money between accounts (e.g. Cash → Bank) | `/dashboard/accounting/transfers` |
 
-**Tip for users:** "You don't need to be an accountant to use this — the system records everything automatically as you sell and buy. The Accounting section is where you (or your accountant) can review and reconcile."
+**Tip for users:** "You don't need to be an accountant to use this. The system records everything automatically as you sell and buy. The Accounting section is where you (or your accountant) can review and reconcile. If a number ever looks wrong, support staff have tools to consolidate it back to the ledger."
 
 ### 2.7 Product features worth knowing
 
@@ -219,7 +219,7 @@ A quick overview of Dukarun-specific features on the Sell page and product setup
 ### 3.4 Audit trail and notifications
 
 - **Audit trail:** **Admin** → **Audit Trail** (`/dashboard/admin/audit-trail`). See a log of important actions — who changed what and when. Useful for owners who want oversight and accountability.
-- **Notifications:** **Settings** → **Notifications** (`/dashboard/settings/notifications`). Configure alerts for things like low stock, payments, or team activity. Check the in-app notification bell for real-time updates.
+- **Notifications:** **Settings** → **Notifications** (`/dashboard/settings/notifications`). Configure alerts for things like low stock, payments, or team activity. Check the in-app notification bell for real-time updates. If WhatsApp alerts are enabled, financial admins may also receive shift open/close messages on WhatsApp.
 - **Screenshot:** Audit trail list with filters; notification settings.
 
 ### 3.5 Multiple locations and cashier flow

@@ -260,6 +260,14 @@ export class FeaturesComponent implements OnInit, AfterViewInit, OnDestroy {
           origin: 'dukarun-Exclusive',
           useCase: 'Essential for managing cash flow and collections',
         },
+        {
+          title: 'Customer Balance Alerts',
+          description:
+            'Automatically notify customers via WhatsApp or SMS when their balance changes. Reduce follow-up and keep credit customers informed.',
+          icon: 'bell',
+          origin: 'dukarun-Exclusive',
+          useCase: 'Perfect for businesses that sell on credit and want fewer manual reminders',
+        },
       ],
     },
     {
@@ -285,10 +293,18 @@ export class FeaturesComponent implements OnInit, AfterViewInit, OnDestroy {
         {
           title: 'Built-in Accounting',
           description:
-            'Every sale, payment, and purchase is automatically recorded in a double-entry ledger. No need for separate accounting software.',
+            'Every sale, payment, and purchase is automatically recorded in a double-entry ledger that acts as the single source of truth. Reconcile operational records with the ledger when needed. No separate accounting software required.',
           icon: 'book',
           origin: 'dukarun-Exclusive',
           useCase: 'Perfect for businesses that want integrated accounting',
+        },
+        {
+          title: 'WhatsApp Business Alerts',
+          description:
+            'Get WhatsApp notifications for shift changes, balance updates, and other important events. Stay informed even when you are away from the dashboard.',
+          icon: 'mobile',
+          origin: 'dukarun-Exclusive',
+          useCase: 'Ideal for owners and finance staff who need alerts on the go',
         },
         {
           title: 'Performance Dashboards',
@@ -374,10 +390,10 @@ export class FeaturesComponent implements OnInit, AfterViewInit, OnDestroy {
     dukarun: [
       'Point phone to sell (no barcode needed)',
       'Works without internet',
-      'Built-in accounting',
+      'Built-in accounting with ledger as single source of truth',
       'Track customers and suppliers together',
       'M-Pesa integration',
-      'Automatic payment reminders',
+      'WhatsApp and SMS alerts for shifts and customer balances',
       'Multi-shop support',
     ],
     manual: [
