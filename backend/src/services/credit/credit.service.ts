@@ -21,6 +21,7 @@ import { AR_OWING_ORDER_STATES } from '../../constants/order-states.constants';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { ChannelCommunicationService } from '../channels/channel-communication.service';
 import { FinancialService } from '../financial/financial.service';
+import { LedgerQueryService } from '../financial/ledger-query.service';
 import { StockPurchase } from '../stock/entities/purchase.entity';
 import { PurchasePayment } from '../stock/entities/purchase-payment.entity';
 import {
@@ -30,6 +31,20 @@ import {
   CREDIT_FIELD_MAPS,
 } from './credit-party.types';
 
+export interface CustomerSupplierDivergenceItem {
+  entityId: string;
+  partyType: CreditPartyType;
+  modelBalance: number;
+  ledgerBalance: number;
+  signedLedgerBalance: number;
+  residual: number;
+}
+
+export interface CustomerSupplierDivergenceResult {
+  items: CustomerSupplierDivergenceItem[];
+  totalItems: number;
+}
+
 @Injectable()
 export class CreditService {
   private readonly logger = new Logger('CreditService');
@@ -37,6 +52,7 @@ export class CreditService {
   constructor(
     private readonly connection: TransactionalConnection,
     private readonly financialService: FinancialService,
+    @Optional() private readonly ledgerQueryService?: LedgerQueryService,
     @Optional() private readonly communicationService?: ChannelCommunicationService,
     @Optional() private readonly auditService?: AuditService
   ) {}
@@ -305,6 +321,212 @@ export class CreditService {
     return result;
   }
 
+  // ── Customer / supplier residual divergence ──────────────────────
+
+  /**
+   * Scan customers or suppliers for residual divergence between their model-derived
+   * balance (sum of orders/purchases) and the ledger balance.
+   *
+   * Residual divergence means the aggregate ledger balance does not match the sum of
+   * the underlying orders/purchases. Fix order/purchase-level drift first; this
+   * surface only catches aggregate-level drift from untracked payments, credits,
+   * channel leaks, or failed reversals.
+   */
+  async findCustomerSupplierDivergences(
+    ctx: RequestContext,
+    partyType: CreditPartyType,
+    toleranceCents = 0
+  ): Promise<CustomerSupplierDivergenceResult> {
+    const entityIds =
+      partyType === 'supplier'
+        ? await this.findSupplierIdsInChannel(ctx)
+        : await this.findCustomerIdsInChannel(ctx);
+
+    const items: CustomerSupplierDivergenceItem[] = [];
+    for (const entityId of entityIds) {
+      const modelBalance =
+        partyType === 'supplier'
+          ? await this.getSupplierModelBalance(ctx, entityId)
+          : await this.getCustomerModelBalance(ctx, entityId);
+
+      const signedLedgerBalance =
+        partyType === 'supplier'
+          ? await this.getSignedSupplierBalance(ctx, entityId)
+          : await this.getSignedCustomerBalance(ctx, entityId);
+
+      // For suppliers: modelBalance - (-signedLedgerBalance) = modelBalance + signedLedgerBalance
+      // For customers: modelBalance - signedLedgerBalance
+      const residual =
+        partyType === 'supplier'
+          ? modelBalance + signedLedgerBalance
+          : modelBalance - signedLedgerBalance;
+
+      if (Math.abs(residual) > toleranceCents) {
+        items.push({
+          entityId: entityId.toString(),
+          partyType,
+          modelBalance,
+          ledgerBalance: Math.max(
+            0,
+            partyType === 'supplier' ? -signedLedgerBalance : signedLedgerBalance
+          ),
+          signedLedgerBalance,
+          residual,
+        });
+      }
+    }
+
+    return { items, totalItems: items.length };
+  }
+
+  /**
+   * Trust the order/purchase model: post a ledger adjustment so the customer's AR
+   * balance matches the model-derived balance.
+   *
+   * Use only after order-level drift has been repaired. The scanner shows whether a
+   * residual is a ledger credit (negative residual) or missing debt (positive residual).
+   */
+  async adjustCustomerBalanceToModel(
+    ctx: RequestContext,
+    entityId: ID,
+    note?: string
+  ): Promise<{ previousBalance: number; newBalance: number; adjustmentAmount: number }> {
+    await this.getEntityOrThrow(ctx, entityId, 'customer');
+    const modelBalance = await this.getCustomerModelBalance(ctx, entityId);
+    const signedLedgerBalance = await this.getSignedCustomerBalance(ctx, entityId);
+    const residual = modelBalance - signedLedgerBalance;
+
+    if (residual === 0) {
+      return {
+        previousBalance: Math.max(0, signedLedgerBalance),
+        newBalance: modelBalance,
+        adjustmentAmount: 0,
+      };
+    }
+
+    const reason = note?.trim()
+      ? `Customer residual reconciliation: ${note.trim()}`
+      : 'Customer residual reconciliation: trust model';
+
+    const result = await this.financialService.adjustCustomerBalance(
+      ctx,
+      entityId.toString(),
+      modelBalance,
+      reason
+    );
+
+    if (this.auditService) {
+      await this.auditService.log(ctx, 'customer.balance.residual_adjustment', {
+        entityType: 'Customer',
+        entityId: entityId.toString(),
+        data: {
+          modelBalance,
+          previousSignedBalance: signedLedgerBalance,
+          residual,
+          reason,
+          performedBy: ctx.activeUserId,
+        },
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Trust the purchase model: post a ledger adjustment so the supplier's AP
+   * balance matches the model-derived balance.
+   */
+  async adjustSupplierBalanceToModel(
+    ctx: RequestContext,
+    entityId: ID,
+    note?: string
+  ): Promise<{ previousBalance: number; newBalance: number; adjustmentAmount: number }> {
+    await this.getEntityOrThrow(ctx, entityId, 'supplier');
+    const modelBalance = await this.getSupplierModelBalance(ctx, entityId);
+    const signedLedgerBalance = await this.getSignedSupplierBalance(ctx, entityId);
+    const residual = modelBalance + signedLedgerBalance;
+
+    if (residual === 0) {
+      return {
+        previousBalance: Math.max(0, -signedLedgerBalance),
+        newBalance: modelBalance,
+        adjustmentAmount: 0,
+      };
+    }
+
+    const reason = note?.trim()
+      ? `Supplier residual reconciliation: ${note.trim()}`
+      : 'Supplier residual reconciliation: trust model';
+
+    const result = await this.financialService.adjustSupplierBalance(
+      ctx,
+      entityId.toString(),
+      modelBalance,
+      reason
+    );
+
+    if (this.auditService) {
+      await this.auditService.log(ctx, 'supplier.balance.residual_adjustment', {
+        entityType: 'Customer',
+        entityId: entityId.toString(),
+        data: {
+          modelBalance,
+          previousSignedBalance: signedLedgerBalance,
+          residual,
+          reason,
+          performedBy: ctx.activeUserId,
+        },
+      });
+    }
+
+    return result;
+  }
+
+  private async getSignedCustomerBalance(ctx: RequestContext, customerId: ID): Promise<number> {
+    if (!this.ledgerQueryService) {
+      throw new Error('LedgerQueryService is required for signed balance lookups');
+    }
+    const balance = await this.ledgerQueryService.getAccountBalance({
+      channelId: ctx.channelId as number,
+      accountCode: 'ACCOUNTS_RECEIVABLE',
+      customerId: customerId.toString(),
+    });
+    return balance.balance;
+  }
+
+  private async getSignedSupplierBalance(ctx: RequestContext, supplierId: ID): Promise<number> {
+    if (!this.ledgerQueryService) {
+      throw new Error('LedgerQueryService is required for signed balance lookups');
+    }
+    const balance = await this.ledgerQueryService.getAccountBalance({
+      channelId: ctx.channelId as number,
+      accountCode: 'ACCOUNTS_PAYABLE',
+      supplierId: supplierId.toString(),
+    });
+    return balance.balance;
+  }
+
+  private async findCustomerIdsInChannel(ctx: RequestContext): Promise<ID[]> {
+    const orderRepo = this.connection.getRepository(ctx, Order);
+    const rows = (await orderRepo
+      .createQueryBuilder('order')
+      .select('DISTINCT order.customerId', 'customerId')
+      .where('order.channelId = :channelId', { channelId: ctx.channelId as number })
+      .getRawMany()) as Array<{ customerId: string | number }>;
+    return rows.map(r => Number(r.customerId));
+  }
+
+  private async findSupplierIdsInChannel(ctx: RequestContext): Promise<ID[]> {
+    const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
+    const rows = (await purchaseRepo
+      .createQueryBuilder('purchase')
+      .select('DISTINCT purchase.supplierId', 'supplierId')
+      .where('purchase.channelId = :channelId', { channelId: ctx.channelId as number })
+      .andWhere('purchase.isCreditPurchase = :isCreditPurchase', { isCreditPurchase: true })
+      .getRawMany()) as Array<{ supplierId: string | number }>;
+    return rows.map(r => Number(r.supplierId));
+  }
+
   // ── Private helpers ──────────────────────────────────────────────
 
   private async getEntityOrThrow(
@@ -366,8 +588,9 @@ export class CreditService {
   }
 
   /**
-   * Compute the supplier's model-derived balance from its purchases.
-   * Includes pending/partial purchases and subtracts recorded PurchasePayments.
+   * Compute the supplier's model-derived balance from its credit purchases.
+   * Includes all credit purchases and subtracts recorded PurchasePayments.
+   * Ignores paymentStatus because that field itself can drift from the ledger.
    */
   private async getSupplierModelBalance(ctx: RequestContext, supplierId: ID): Promise<number> {
     const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
@@ -375,7 +598,7 @@ export class CreditService {
       where: {
         supplierId: Number(supplierId),
         channelId: ctx.channelId as number,
-        paymentStatus: In(['pending', 'partial']),
+        isCreditPurchase: true,
       },
       relations: ['payments'],
     });

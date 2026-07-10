@@ -27,6 +27,7 @@ import { OrderStateService } from '../../services/orders/order-state.service';
 import { PriceOverrideService } from '../../services/orders/price-override.service';
 import { OrderReconciliationService } from '../../services/payments/order-reconciliation.service';
 import { PaymentAllocationService } from '../../services/payments/payment-allocation.service';
+import { PurchaseReconciliationService } from '../../services/payments/purchase-reconciliation.service';
 import { PaymentEventsAdapter } from '../../services/payments/payment-events.adapter';
 import { CustomerStatementService } from '../../services/customers/customer-statement.service';
 import { createCreditPaymentHandler } from '../../services/payments/payment-handlers';
@@ -138,6 +139,55 @@ const COMBINED_SCHEMA = gql`
   type OrderReconciliationResult {
     items: [OrderReconciliationItem!]!
     totalItems: Int!
+  }
+
+  type PurchaseReconciliationItem {
+    purchaseId: ID!
+    purchaseReference: String
+    supplierId: ID!
+    purchaseModelOwing: Int!
+    ledgerOwing: Int!
+    difference: Int!
+    purchaseTotal: Int!
+    purchaseModelPaid: Int!
+    ledgerPaid: Int!
+  }
+
+  type PurchaseReconciliationResult {
+    items: [PurchaseReconciliationItem!]!
+    totalItems: Int!
+  }
+
+  input ReconcilePurchaseInput {
+    purchaseId: ID!
+    strategy: String!
+    note: String
+  }
+
+  type ReconcilePurchaseResult {
+    purchaseId: ID!
+    success: Boolean!
+    message: String!
+  }
+
+  type CustomerSupplierDivergenceItem {
+    entityId: ID!
+    partyType: String!
+    modelBalance: Int!
+    ledgerBalance: Int!
+    signedLedgerBalance: Int!
+    residual: Int!
+  }
+
+  type CustomerSupplierDivergenceResult {
+    items: [CustomerSupplierDivergenceItem!]!
+    totalItems: Int!
+  }
+
+  input ReconcileCustomerSupplierInput {
+    entityId: ID!
+    partyType: String!
+    note: String
   }
 
   input ReconcileOrderInput {
@@ -284,6 +334,18 @@ const COMBINED_SCHEMA = gql`
     Superadmin diagnostic: orders whose order-model outstanding differs from the ledger.
     """
     divergentOrders(toleranceCents: Int): OrderReconciliationResult!
+    """
+    Superadmin diagnostic: credit purchases whose purchase-model AP differs from the ledger.
+    """
+    divergentPurchases(toleranceCents: Int): PurchaseReconciliationResult!
+    """
+    Superadmin diagnostic: customers whose order-model AR sum differs from the ledger.
+    """
+    divergentCustomers(toleranceCents: Int): CustomerSupplierDivergenceResult!
+    """
+    Superadmin diagnostic: suppliers whose purchase-model AP sum differs from the ledger.
+    """
+    divergentSuppliers(toleranceCents: Int): CustomerSupplierDivergenceResult!
   }
 
   type OrderReversalResult {
@@ -358,6 +420,18 @@ const COMBINED_SCHEMA = gql`
     Superadmin action: repair a Cancelled order whose ledger reversal was never posted.
     """
     repairCancelledOrder(orderId: ID!, note: String): ReconcileOrderResult!
+    """
+    Superadmin action: mark a divergent credit purchase as reconciled with a chosen strategy.
+    """
+    reconcilePurchase(input: ReconcilePurchaseInput!): ReconcilePurchaseResult!
+    """
+    Superadmin action: adjust a customer's AR balance to match the order-model sum.
+    """
+    adjustCustomerBalanceToModel(input: ReconcileCustomerSupplierInput!): BalanceOverrideResult!
+    """
+    Superadmin action: adjust a supplier's AP balance to match the purchase-model sum.
+    """
+    adjustSupplierBalanceToModel(input: ReconcileCustomerSupplierInput!): BalanceOverrideResult!
   }
 
   """
@@ -478,6 +552,7 @@ const COMBINED_SCHEMA = gql`
     OrderReconciliationService,
     PaymentAllocationService,
     PaymentReversalService,
+    PurchaseReconciliationService,
     SupplierPaymentAllocationService,
     // Resolvers and subscribers
     CreditResolver,
@@ -499,6 +574,7 @@ const COMBINED_SCHEMA = gql`
     CreditService,
     CreditValidatorService,
     OrderReconciliationService,
+    PurchaseReconciliationService,
   ],
   configuration: config => {
     // Register custom permissions

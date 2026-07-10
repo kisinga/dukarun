@@ -2,9 +2,10 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { RequestContext } from '@vendure/core';
 import { CreditService } from '../../src/services/credit/credit.service';
 import { FinancialService } from '../../src/services/financial/financial.service';
+import { LedgerQueryService } from '../../src/services/financial/ledger-query.service';
 
 describe('CreditService', () => {
-  const ctx = {} as RequestContext;
+  const ctx = { channelId: 1, activeUserId: '1' } as RequestContext;
 
   const createFinancialService = (
     customerBalance: number,
@@ -26,7 +27,21 @@ describe('CreditService', () => {
     } as unknown as FinancialService;
   };
 
-  const createConnection = (customFields: Record<string, unknown> = {}) => {
+  const createConnection = (
+    customFields: Record<string, unknown> = {},
+    options: {
+      orders?: Array<{ id: string; total: number; totalWithTax: number; payments: any[] }>;
+      purchases?: Array<{
+        id: string;
+        totalCost: number;
+        isCreditPurchase: boolean;
+        paymentStatus?: string;
+        payments: any[];
+      }>;
+      customerIds?: number[];
+      supplierIds?: number[];
+    } = {}
+  ) => {
     const defaultCustomFields = {
       isCreditApproved: true,
       creditLimit: 1000,
@@ -40,14 +55,52 @@ describe('CreditService', () => {
 
     const saveMock = jest.fn();
 
-    const connection = {
-      getRepository: jest.fn().mockReturnValue({
-        findOne: findOneMock,
-        save: saveMock,
+    const repo: any = {
+      findOne: findOneMock,
+      save: saveMock,
+      find: jest.fn().mockImplementation(async () => {
+        // In these tests we only provide orders OR purchases, never both.
+        return (options.purchases || []).length > 0 ? options.purchases : options.orders || [];
       }),
+      createQueryBuilder: jest.fn().mockImplementation(() => {
+        const rawRows =
+          (options.purchases || []).length > 0
+            ? (options.supplierIds || []).map(id => ({ supplierId: id }))
+            : (options.customerIds || []).map(id => ({ customerId: id }));
+        return {
+          select: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getRawMany: (jest.fn() as any).mockResolvedValue(rawRows as any),
+        };
+      }),
+    };
+
+    const connection = {
+      getRepository: jest.fn().mockImplementation((entity: any) => {
+        const entityName = String(entity?.name ?? entity ?? '');
+        const isPurchase = entityName === 'StockPurchase' || entityName.includes('Purchase');
+        repo.__entityType = isPurchase ? 'purchase' : 'order';
+        return repo;
+      }),
+      withTransaction: jest.fn(async (_ctx: any, fn: any) => fn(_ctx)),
     } as any;
 
-    return { connection, findOneMock, saveMock };
+    return { connection, findOneMock, saveMock, repo };
+  };
+
+  const createLedgerQueryService = (
+    signedCustomerBalance = 0,
+    signedSupplierBalance = 0
+  ): LedgerQueryService => {
+    return {
+      getAccountBalance: jest.fn().mockImplementation(async (query: any) => {
+        if (query.accountCode === 'ACCOUNTS_RECEIVABLE') {
+          return { balance: signedCustomerBalance };
+        }
+        return { balance: signedSupplierBalance };
+      }),
+    } as unknown as LedgerQueryService;
   };
 
   describe('customer credit', () => {
@@ -183,6 +236,133 @@ describe('CreditService', () => {
         supplierLastRepaymentDate: expect.any(Date),
         supplierLastRepaymentAmount: 500,
       });
+    });
+  });
+
+  describe('residual divergence', () => {
+    it('detects customer residual divergence', async () => {
+      const { connection } = createConnection(
+        {},
+        {
+          customerIds: [1],
+          orders: [
+            {
+              id: 'order-1',
+              total: 10000,
+              totalWithTax: 10000,
+              payments: [{ state: 'Settled', amount: 0 }],
+            },
+          ],
+        }
+      );
+      const financialService = createFinancialService(0);
+      const ledgerQueryService = createLedgerQueryService(8000); // ledger says 8000 owed
+      const service = new CreditService(connection, financialService, ledgerQueryService);
+
+      const result = await service.findCustomerSupplierDivergences(ctx, 'customer');
+
+      expect(result.totalItems).toBe(1);
+      expect(result.items[0]).toMatchObject({
+        entityId: '1',
+        modelBalance: 10000,
+        signedLedgerBalance: 8000,
+        residual: 2000,
+      });
+    });
+
+    it('detects supplier residual divergence including paid purchases', async () => {
+      const { connection, repo } = createConnection(
+        { isSupplier: true },
+        {
+          supplierIds: [1],
+          purchases: [
+            {
+              id: 'purchase-1',
+              totalCost: 10000,
+              isCreditPurchase: true,
+              paymentStatus: 'paid',
+              payments: [{ amount: 5000 }],
+            },
+          ],
+        }
+      );
+      const financialService = createFinancialService(0, 0);
+      const ledgerQueryService = createLedgerQueryService(0, -3000); // ledger says 3000 owed
+      const service = new CreditService(connection, financialService, ledgerQueryService);
+
+      const result = await service.findCustomerSupplierDivergences(ctx, 'supplier');
+
+      expect(repo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ isCreditPurchase: true }),
+        })
+      );
+      expect(result.totalItems).toBe(1);
+      expect(result.items[0]).toMatchObject({
+        entityId: '1',
+        modelBalance: 5000,
+        signedLedgerBalance: -3000,
+        residual: 2000,
+      });
+    });
+
+    it('adjusts customer balance to model', async () => {
+      const { connection } = createConnection(
+        {},
+        {
+          customerIds: [1],
+          orders: [
+            {
+              id: 'order-1',
+              total: 10000,
+              totalWithTax: 10000,
+              payments: [{ state: 'Settled', amount: 0 }],
+            },
+          ],
+        }
+      );
+      const financialService = createFinancialService(0);
+      const ledgerQueryService = createLedgerQueryService(8000);
+      const service = new CreditService(connection, financialService, ledgerQueryService);
+
+      await service.adjustCustomerBalanceToModel(ctx, '1');
+
+      expect(financialService.adjustCustomerBalance).toHaveBeenCalledWith(
+        ctx,
+        '1',
+        10000,
+        expect.stringContaining('trust model')
+      );
+    });
+
+    it('adjusts supplier balance to model', async () => {
+      const { connection } = createConnection(
+        { isSupplier: true },
+        {
+          supplierIds: [1],
+          purchases: [
+            {
+              id: 'purchase-1',
+              totalCost: 10000,
+              isCreditPurchase: true,
+              paymentStatus: 'paid',
+              payments: [{ amount: 5000 }],
+            },
+          ],
+        }
+      );
+      const financialService = createFinancialService(0, 0);
+      const ledgerQueryService = createLedgerQueryService(0, -3000);
+      const service = new CreditService(connection, financialService, ledgerQueryService);
+
+      await service.adjustSupplierBalanceToModel(ctx, '1');
+
+      expect(financialService.adjustSupplierBalance).toHaveBeenCalledWith(
+        ctx,
+        '1',
+        5000,
+        expect.stringContaining('trust model')
+      );
     });
   });
 });

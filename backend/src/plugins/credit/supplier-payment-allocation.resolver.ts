@@ -8,13 +8,18 @@ import {
   SupplierPaymentAllocationInput,
   SupplierPaymentAllocationResult,
 } from '../../services/payments/supplier-payment-allocation.service';
+import {
+  PurchaseReconciliationService,
+  PurchaseReconciliationResult,
+} from '../../services/payments/purchase-reconciliation.service';
 import { StockPurchase } from '../../services/stock/entities/purchase.entity';
 import { ManageSupplierCreditPurchasesPermission } from './supplier-credit.permissions';
 
 @Resolver()
 export class SupplierPaymentAllocationResolver {
   constructor(
-    private readonly supplierPaymentAllocationService: SupplierPaymentAllocationService
+    private readonly supplierPaymentAllocationService: SupplierPaymentAllocationService,
+    private readonly purchaseReconciliationService: PurchaseReconciliationService
   ) {}
 
   @Query()
@@ -56,6 +61,29 @@ export class SupplierPaymentAllocationResolver {
       input.paymentAmount,
       input.debitAccountCode
     );
+  }
+
+  @Query()
+  @Allow(ManageReconciliationPermission.Permission)
+  async divergentPurchases(
+    @Ctx() ctx: RequestContext,
+    @Args('toleranceCents') toleranceCents?: number
+  ): Promise<PurchaseReconciliationResult> {
+    return this.purchaseReconciliationService.findDivergentPurchases(ctx, toleranceCents);
+  }
+
+  @Mutation()
+  @Allow(ManageReconciliationPermission.Permission)
+  async reconcilePurchase(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { purchaseId: string; strategy: string; note?: string }
+  ): Promise<{ purchaseId: string; success: boolean; message: string }> {
+    await this.purchaseReconciliationService.reconcilePurchase(ctx, input);
+    return {
+      purchaseId: input.purchaseId,
+      success: true,
+      message: `Purchase ${input.purchaseId} reconciled with strategy ${input.strategy}`,
+    };
   }
 
   @Mutation()
