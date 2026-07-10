@@ -36,6 +36,37 @@ All reconciliation "expected" balance must come from a single API so that ledger
 - **Use `LedgerQueryService.getExpectedBalanceForReconciliation(channelId, scope, scopeRefId, accountCode, asOfDate?)`** for any reconciliation expected balance. For `scope === 'cash-session'` this returns the session-scoped ledger balance; for `scope === 'manual'` it returns the full ledger balance as of `asOfDate`.
 - **Do not compute expected** as "value from reconciliation/session table + ledger value." That pattern causes double-counting (e.g. session balance already includes opening variance, so adding opening float again is wrong).
 
+## SSOT consolidation and reconciliation
+
+The ledger is the single source of truth for all financial data. Reconciliation is the process of making sure operational records (orders, purchases, balances, sessions) consolidate cleanly into the ledger.
+
+### How consolidation works
+
+- Every sale, payment, purchase, and adjustment posts balanced ledger entries in the same transaction.
+- Customer and supplier balances, account balances, and reconciliation expected values are all read from the ledger.
+- If an operational record and the ledger disagree, reconciliation chooses which side is authoritative and posts the adjustment needed to make them one consistent view.
+
+### Order and purchase reconciliation
+
+Super-admin reconciliation mutations align an order or purchase with the ledger:
+
+- **Trust ledger**: create a synthetic payment or adjustment so the order model matches the ledger.
+- **Trust model**: post a ledger adjustment so the ledger matches the order model.
+
+This handles partially paid orders, cancelled orders, and purchases whose posted totals no longer match their model totals. Use `reconcileOrder` and `reconcilePurchase`.
+
+### Customer and supplier balance alignment
+
+Customer and supplier outstanding balances are read from the ledger. If a snapshot ever diverges, `adjustCustomerBalanceToModel` and `adjustSupplierBalanceToModel` post a ledger adjustment to restore the ledger as the source of truth.
+
+### Divergence scanning
+
+`LedgerDivergenceService` scans inventory, accounts receivable, and accounts payable to confirm the ledger and operational records agree. The super-admin reconciliation UI runs these scans per channel and surfaces any mismatch for consolidation.
+
+### Shift reconciliation backfill
+
+Missing closing reconciliations for cashier sessions can be backfilled with `createCashierSessionReconciliation`. This is idempotent: running it again returns the existing record instead of creating a duplicate. See `SHIFT_RECONCILIATION.md`.
+
 ## Architecture Layers
 
 ```

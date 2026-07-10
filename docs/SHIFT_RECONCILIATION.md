@@ -29,6 +29,10 @@ query ClosedSessionsMissingReconciliation($channelId: Int!, $startDate: DateTime
 
 Requires `ManageReconciliation` permission. Returns closed sessions that have no closing reconciliation record (optional `startDate`/`endDate` filter by session `openedAt`; `take`/`skip` for paging).
 
+## WhatsApp alerts
+
+When WhatsApp is enabled in Platform Data, financial admins receive WhatsApp alerts for `shift_opened` and `shift_closed` events. These alerts are notification-only and do not replace the reconciliation record.
+
 ## Repairing missing reconciliations
 
 For each session returned by `closedSessionsMissingReconciliation`:

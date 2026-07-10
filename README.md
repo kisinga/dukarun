@@ -53,10 +53,11 @@ npm run setup
 - 📦 **Products & stock** - Catalog, variants, stock adjustments
 - 📊 **Sales, orders, payments** - Orders, payments, credit
 - 👥 **Customers & suppliers** - Unified people, statements, purchases
-- 📒 **Accounting** - Ledger, expenses, transfers
+- 📒 **Accounting** - Ledger, expenses, transfers, reconciliation
 - ✅ **Approvals** - User and channel approval flows
 - 🏪 **Multi-location** - Stock locations, channel-scoped data
 - 📱 **Mobile-first** - Responsive dashboard
+- 💬 **WhatsApp alerts** - Shift and balance notifications to admins and customers
 
 ## Tech Stack
 

@@ -109,6 +109,7 @@ Dukarun’s **unified people model** for customers, suppliers and credit account
 | Mobile-first customer/supplier forms | Single-step customer and two-step supplier forms optimized for mobile keyboards and Kenyan phone formats. | Cashiers, admins                 | Dukarun-Exclusive                       | [Customers & Onboarding](./customers-and-onboarding.md#mobile-first-forms)       |
 | Credit approvals & limits            | Mark customers as credit-approved, set limits, and let the POS enforce credit rules at checkout.          | Back-office credit team, finance | Dukarun-Exclusive                       | [Analytics & Ledger](./analytics-and-ledger.md#customer-credit-management)       |
 | Outstanding balances per party       | Track how much each customer owes you and how much you owe each supplier, sourced from the ledger.        | Finance, owners                  | Dukarun-Exclusive (ledger integration)  | [Analytics & Ledger](./analytics-and-ledger.md#balances-and-outstanding-amounts) |
+| Automated customer notifications     | Send customers WhatsApp or SMS updates for balance changes and other trigger events, with per-customer and global controls. | Finance, credit control, customers | Dukarun-Exclusive                    | [Integrations & Automation](./integrations-and-automation.md#customer-notifications) |
 
 ---
 
@@ -123,6 +124,7 @@ How Dukarun **connects with the outside world** and automates processes.
 | Paystack payments and webhooks               | Receive subscription and payment updates via Paystack webhooks and map them to channel state.                       | Dukarun back-office, finance | Dukarun-Exclusive | [Integrations & Automation](./integrations-and-automation.md#paystack-integration)      |
 | Notification system (events → toasts & push) | Event-driven notifications for orders, stock, recognition workflows, and payments; surfaced in-app and as push notifications. | All dashboard users          | Dukarun-Exclusive | [Integrations & Automation](./integrations-and-automation.md#notification-system)       |
 | Observability hooks (traces, metrics)        | Instrumented traces and metrics via SigNoz/OpenTelemetry for troubleshooting and SLOs.                              | Dukarun engineering & ops    | Dukarun-Exclusive | [Integrations & Automation](./integrations-and-automation.md#observability--monitoring) |
+| WhatsApp business alerts                     | Send shift and balance notifications to admins and customers via WhatsApp when enabled.                             | Owners, finance, admins      | Dukarun-Exclusive | [Integrations & Automation](./integrations-and-automation.md#whatsapp-business-alerts)   |
 
 ---
 
@@ -138,6 +140,7 @@ Financial features that turn Dukarun into a **lightweight accounting layer**.
 | Credit limit enforcement at POS          | Checkout validates credit headroom before allowing “sell on credit” flows.                               | Cashiers, credit control         | Dukarun-Exclusive | [Analytics & Ledger](./analytics-and-ledger.md#customer-credit-management)                      |
 | Accounting (ledger, expenses, transfers) | Dashboard accounting section: ledger view (overview, accounts, transactions, reconciliation), expenses, inter-account transfers.                                 | Finance, owners                  | Dukarun-Exclusive | [Analytics & Ledger](./analytics-and-ledger.md#double-entry-ledger)                             |
 | Basic performance dashboards             | Channel-level dashboards for sales and inventory KPIs (designed for small shops, not full BI).           | Owners, managers                 | Dukarun-Enhanced  | [Analytics & Ledger](./analytics-and-ledger.md#kpi-dashboards)                                  |
+| Ledger reconciliation and SSOT consolidation | Reconcile orders, purchases, and balances so operational records consolidate into the ledger as the single source of truth. | Finance, accountants, support | Dukarun-Exclusive | [Analytics & Ledger](./analytics-and-ledger.md#reconciliation-and-ssot-consolidation) |
 
 ---
 

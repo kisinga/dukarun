@@ -359,6 +359,7 @@ Internally, webhooks from Paystack are processed by Dukarun’s subscription ser
 - **Refund flows** – The underlying Vendure platform supports refunds, but Dukarun’s customer-facing refund UI may be simplified or limited depending on your version.
 - **Multi-step cashier integration** – The current public build may not yet expose a full cashier station UI; customer documentation will evolve as this solidifies.
 - **Paystack-specific** – Subscription automation is currently built around Paystack; other payment gateways would require integration work.
+- **Reconciliation** – If an order or purchase total ever disagrees with the ledger, super-admin reconciliation tools consolidate them so the ledger remains the single source of truth.
 
 ---
 
