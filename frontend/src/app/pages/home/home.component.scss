@@ -1,15 +1,14 @@
-// Homepage - Mobile-first, condensed, high-impact design
 :host {
   display: block;
   overflow-x: hidden;
   width: 100%;
 }
 
-// Skip link: off-screen until focused (a11y)
 .skip-link {
   position: absolute;
   left: -9999px;
   z-index: 9999;
+
   &:focus-visible {
     left: 1rem;
     top: 1rem;
@@ -17,13 +16,7 @@
   }
 }
 
-// ============================================
-// MOBILE-FIRST: Condensed, punchy layouts
-// ============================================
-
-// Global section overrides for mobile
 .section {
-  // Tighter section padding on mobile
   padding-top: 2rem;
   padding-bottom: 2rem;
 
@@ -38,7 +31,6 @@
   }
 }
 
-// Hero section - punchy and condensed
 #hero {
   overflow-x: hidden;
   padding-bottom: 1.5rem;
@@ -48,7 +40,7 @@
   }
 
   h1 {
-    font-size: 1.875rem; // 30px on mobile
+    font-size: 1.875rem;
     line-height: 1.1;
 
     @media (min-width: 640px) {
@@ -57,7 +49,7 @@
   }
 
   p {
-    font-size: 0.9375rem; // 15px - slightly smaller for mobile
+    font-size: 0.9375rem;
     line-height: 1.5;
   }
 
@@ -67,37 +59,21 @@
   }
 }
 
-// Proof section - tight stats grid
-#proof {
-  h2 {
-    font-size: 1.5rem; // Smaller on mobile
-    line-height: 1.2;
+#walkthrough {
+  article.rounded-2xl {
+    padding: 1.25rem;
 
     @media (min-width: 640px) {
-      font-size: 2rem;
+      padding: 1.5rem;
+    }
+
+    h3 {
+      font-size: 1rem;
     }
   }
+}
 
-  // Stats cards - horizontal scroll on mobile
-  .grid.gap-6 {
-    gap: 0.75rem;
-
-    @media (min-width: 640px) {
-      gap: 1rem;
-    }
-  }
-
-  // Compact stat cards
-  .rounded-2xl.border {
-    padding: 1rem;
-    border-radius: 1rem;
-
-    @media (min-width: 640px) {
-      padding: 1.25rem;
-    }
-  }
-
-  // Testimonials - stack tighter
+#testimonials {
   figure.rounded-2xl {
     padding: 1rem;
 
@@ -111,280 +87,6 @@
     }
   }
 }
-
-// Pillars section - compact cards
-#pillars {
-  article.rounded-2xl {
-    padding: 1.25rem;
-
-    @media (min-width: 640px) {
-      padding: 1.5rem;
-    }
-
-    h3 {
-      font-size: 1rem;
-    }
-
-    ul {
-      font-size: 0.8125rem;
-      margin-top: 0.75rem;
-    }
-  }
-}
-
-// Ease of use section
-#ease-of-use {
-  h2 {
-    font-size: 1.375rem;
-
-    @media (min-width: 640px) {
-      font-size: 1.75rem;
-    }
-  }
-
-  article {
-    padding: 1rem;
-
-    @media (min-width: 640px) {
-      padding: 1.25rem;
-    }
-  }
-}
-
-// Journey section - streamlined steps
-#journey {
-  h2 {
-    font-size: 1.5rem;
-
-    @media (min-width: 640px) {
-      font-size: 2rem;
-    }
-  }
-
-  // Smaller step numbers on mobile
-  .journey-step span.grid {
-    width: 3.5rem;
-    height: 3.5rem;
-    font-size: 1.25rem;
-
-    @media (min-width: 640px) {
-      width: 5rem;
-      height: 5rem;
-      font-size: 1.5rem;
-    }
-  }
-
-  article {
-    padding: 1rem;
-
-    @media (min-width: 640px) {
-      padding: 1.5rem;
-    }
-  }
-}
-
-// Pricing section - compact cards
-#pricing-preview {
-  .rounded-3xl {
-    padding: 1.25rem;
-    border-radius: 1.25rem;
-
-    @media (min-width: 640px) {
-      padding: 1.75rem;
-      border-radius: 1.5rem;
-    }
-  }
-
-  h3 {
-    font-size: 1.125rem;
-  }
-
-  ul {
-    font-size: 0.8125rem;
-    gap: 0.5rem;
-  }
-}
-
-// FAQ section - tighter collapse
-#faq {
-  .collapse {
-    padding: 0;
-
-    .collapse-title {
-      padding: 0.875rem 1rem;
-      min-height: 0;
-      font-size: 0.875rem;
-    }
-
-    .collapse-content {
-      padding: 0 1rem 0.875rem;
-      font-size: 0.8125rem;
-    }
-  }
-}
-
-// ============================================
-// MOCKUP-PHONE - Scale correctly, no overflow
-// ============================================
-
-.home-hero-visual .mockup-phone,
-#proof .mockup-phone,
-#pillars .mockup-phone,
-.journey-screenshot .mockup-phone {
-  // Let phone scale with container; prevent overflow
-  min-width: 0;
-}
-
-.home-hero-visual .mockup-browser {
-  min-width: 0;
-}
-
-.mockup-phone-display {
-  img,
-  video {
-    max-width: 100%;
-    height: auto;
-    display: block;
-  }
-}
-
-.home-hero-visual .mockup-browser img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-}
-
-// ============================================
-// CAROUSEL - Touch-optimized
-// ============================================
-
-.carousel {
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-
-  // Smaller on mobile
-  border-radius: 1rem;
-
-  @media (min-width: 640px) {
-    border-radius: 1rem;
-  }
-}
-
-.carousel-item {
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-}
-
-// Hide scrollbar for carousels
-#barcode-carousel {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
-
-  &::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
-  }
-}
-
-// ============================================
-// PHONE SLIDESHOW - images fade inside fixed frame
-// ============================================
-
-// Grid stacking: all images occupy the same cell so the tallest drives height.
-// Opacity transition handles the fade — no absolute positioning needed.
-.phone-slideshow {
-  display: grid;
-}
-
-.phone-screenshot {
-  grid-area: 1 / 1;
-  width: 100%;
-  height: auto;
-  display: block;
-  opacity: 0;
-  transition: opacity 0.65s ease-in-out;
-
-  &.phone-screenshot--active {
-    opacity: 1;
-  }
-}
-
-// Prev / next arrow buttons
-.phone-nav-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 9999px;
-  border: 1px solid oklch(var(--b3));
-  background-color: oklch(var(--b1));
-  color: oklch(var(--bc) / 0.7);
-  cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    transform 0.15s ease;
-
-  &:hover {
-    background-color: oklch(var(--b2));
-    border-color: oklch(var(--p) / 0.6);
-    color: oklch(var(--p));
-    transform: scale(1.08);
-  }
-
-  &:active {
-    transform: scale(0.94);
-  }
-
-  &:focus-visible {
-    outline: 2px solid oklch(var(--p));
-    outline-offset: 2px;
-  }
-
-  @media (min-width: 768px) {
-    width: 3rem;
-    height: 3rem;
-  }
-}
-
-// Dot indicators
-.phone-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 9999px;
-  background-color: oklch(var(--b3));
-  border: none;
-  cursor: pointer;
-  transition:
-    background-color 0.3s ease,
-    transform 0.3s ease,
-    width 0.3s ease;
-
-  &.phone-dot--active {
-    background-color: oklch(var(--p));
-    width: 1.25rem;
-    border-radius: 9999px;
-  }
-
-  &:focus-visible {
-    outline: 2px solid oklch(var(--p));
-    outline-offset: 2px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .phone-screenshot,
-  .phone-nav-btn,
-  .phone-dot {
-    transition: none;
-  }
-}
-
-// ============================================
-// DIVIDERS - Minimal
-// ============================================
 
 .divider {
   margin: 0;
@@ -400,51 +102,19 @@
   }
 }
 
-// ============================================
-// DESKTOP ENHANCEMENTS
-// ============================================
-
-@media (min-width: 768px) {
-  .journey-step {
-    position: relative;
-
-    &:hover {
-      transform: translateY(-2px);
-    }
-  }
-
-  .journey-connector {
-    left: calc(-50% - 2rem);
-    right: calc(-50% - 2rem);
-    width: calc(100% + 4rem);
-  }
-}
-
-// ============================================
-// PERFORMANCE
-// ============================================
-
 @media (max-width: 767px) {
-  // Disable expensive effects on mobile
   * {
     transition-duration: 0.15s !important;
   }
 
-  // Remove hover transforms (touch devices)
   .hover\:-translate-y-1:hover,
   .hover\:-translate-y-0\.5:hover {
     transform: none;
   }
 }
 
-// ============================================
-// REDUCED MOTION (a11y)
-// ============================================
-
 @media (prefers-reduced-motion: reduce) {
   .section *,
-  .carousel,
-  .journey-step,
   article {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
