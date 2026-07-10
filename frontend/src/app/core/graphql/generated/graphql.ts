@@ -1105,6 +1105,20 @@ export type CollectionTranslation = {
   updatedAt: Scalars['DateTime']['output'];
 };
 
+/** Globally enabled outbound communication channels. */
+export type CommunicationChannels = {
+  __typename?: 'CommunicationChannels';
+  email: Scalars['Boolean']['output'];
+  sms: Scalars['Boolean']['output'];
+  whatsapp: Scalars['Boolean']['output'];
+};
+
+export type CommunicationChannelsInput = {
+  email: Scalars['Boolean']['input'];
+  sms: Scalars['Boolean']['input'];
+  whatsapp: Scalars['Boolean']['input'];
+};
+
 export type ConfigArg = {
   __typename?: 'ConfigArg';
   name: Scalars['String']['output'];
@@ -2835,6 +2849,7 @@ export type GlobalSettings = {
 
 export type GlobalSettingsCustomFields = {
   __typename?: 'GlobalSettingsCustomFields';
+  communicationChannels?: Maybe<Scalars['String']['output']>;
   customerNotificationsEnabled?: Maybe<Scalars['Boolean']['output']>;
   trialDays?: Maybe<Scalars['Int']['output']>;
 };
@@ -4121,6 +4136,8 @@ export type Mutation = {
   removeShippingMethodsFromChannel: Array<ShippingMethod>;
   /** Removes StockLocations from the specified Channel */
   removeStockLocationsFromChannel: Array<StockLocation>;
+  /** Superadmin action: repair a Cancelled order whose ledger reversal was never posted. */
+  repairCancelledOrder: ReconcileOrderResult;
   requestEmailRegistrationOTP: OtpResponse;
   requestLoginOTP: OtpResponse;
   requestRegistrationOTP: OtpResponse;
@@ -4194,6 +4211,7 @@ export type Mutation = {
   updateChannelZonesPlatform: Channel;
   /** Update an existing Collection */
   updateCollection: Collection;
+  updateCommunicationChannels: PlatformSettings;
   /** Update an existing Country */
   updateCountry: Country;
   updateCreditDuration: CreditSummary;
@@ -4977,6 +4995,11 @@ export type MutationRemoveStockLocationsFromChannelArgs = {
   input: RemoveStockLocationsFromChannelInput;
 };
 
+export type MutationRepairCancelledOrderArgs = {
+  note?: InputMaybe<Scalars['String']['input']>;
+  orderId: Scalars['ID']['input'];
+};
+
 export type MutationRequestEmailRegistrationOtpArgs = {
   email: Scalars['String']['input'];
   registrationData: RegistrationInput;
@@ -5033,6 +5056,7 @@ export type MutationSendTestCustomerNotificationArgs = {
 export type MutationSendTestWhatsAppNotificationArgs = {
   message: Scalars['String']['input'];
   phoneNumber: Scalars['String']['input'];
+  templateKey?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type MutationSetCustomerForDraftOrderArgs = {
@@ -5199,6 +5223,10 @@ export type MutationUpdateChannelZonesPlatformArgs = {
 
 export type MutationUpdateCollectionArgs = {
   input: UpdateCollectionInput;
+};
+
+export type MutationUpdateCommunicationChannelsArgs = {
+  input: CommunicationChannelsInput;
 };
 
 export type MutationUpdateCountryArgs = {
@@ -5846,9 +5874,13 @@ export type OrderReconciliationItem = {
   customerId?: Maybe<Scalars['ID']['output']>;
   difference: Scalars['Int']['output'];
   ledgerOwing: Scalars['Int']['output'];
+  ledgerPaid: Scalars['Int']['output'];
+  ledgerTotalOwed: Scalars['Int']['output'];
   orderCode: Scalars['String']['output'];
   orderId: Scalars['ID']['output'];
   orderModelOwing: Scalars['Int']['output'];
+  orderModelPaid: Scalars['Int']['output'];
+  orderModelTotal: Scalars['Int']['output'];
   orderTotal: Scalars['Int']['output'];
 };
 
@@ -6594,6 +6626,7 @@ export type PlatformRoleTemplate = {
 /** Platform-wide settings (e.g. default trial length for new channels). */
 export type PlatformSettings = {
   __typename?: 'PlatformSettings';
+  communicationChannels: CommunicationChannels;
   customerNotificationsEnabled: Scalars['Boolean']['output'];
   trialDays: Scalars['Int']['output'];
 };
@@ -9697,6 +9730,7 @@ export type UpdateFacetValueInput = {
 };
 
 export type UpdateGlobalSettingsCustomFieldsInput = {
+  communicationChannels?: InputMaybe<Scalars['String']['input']>;
   customerNotificationsEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   trialDays?: InputMaybe<Scalars['Int']['input']>;
 };

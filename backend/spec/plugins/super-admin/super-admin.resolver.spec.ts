@@ -75,7 +75,7 @@ describe('SuperAdminResolver notification controls', () => {
       expect(
         (connection as { rawConnection: { query: jest.Mock } }).rawConnection.query
       ).toHaveBeenCalledWith(
-        `UPDATE global_settings SET "customFieldsCustomernotificationsenabled" = $1`,
+        `UPDATE global_settings SET "customFieldsCustomernotificationsenabled" = $1 WHERE id = (SELECT id FROM global_settings ORDER BY id LIMIT 1)`,
         [true]
       );
       expect(platformAuditService.log).toHaveBeenCalled();

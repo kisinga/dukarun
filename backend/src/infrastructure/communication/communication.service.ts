@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventBus, RequestContext } from '@vendure/core';
+import { EventBus, GlobalSettingsService, RequestContext } from '@vendure/core';
 import { env } from '../config/environment.config';
+import {
+  CommunicationChannels,
+  DEFAULT_COMMUNICATION_CHANNELS,
+  parseCommunicationChannels,
+} from '../../utils/communication-channels.utils';
 import { SmsService } from '../sms/sms.service';
 import { OpenWaService } from '../whatsapp/open-wa.service';
 import { SmsUsageService } from '../../services/sms/sms-usage.service';
@@ -23,12 +28,16 @@ const SMS_MAX_LENGTH = 160;
 @Injectable()
 export class CommunicationService {
   private readonly logger = new Logger(CommunicationService.name);
+  private cachedChannels: CommunicationChannels | null = null;
+  private cachedAt = 0;
+  private readonly cacheTtlMs = 30_000;
 
   constructor(
     private readonly smsService: SmsService,
     private readonly openWaService: OpenWaService,
     private readonly eventBus: EventBus,
-    private readonly smsUsageService: SmsUsageService
+    private readonly smsUsageService: SmsUsageService,
+    private readonly globalSettingsService: GlobalSettingsService
   ) {}
 
   /**
@@ -39,10 +48,43 @@ export class CommunicationService {
   }
 
   /**
-   * Check if a channel is enabled (for transport availability).
+   * Clear the in-memory channel cache. Call after updating platform settings
+   * so the next send() picks up the new toggles immediately.
    */
-  isChannelEnabled(channel: CommunicationChannel): boolean {
-    return env.communication.channels[channel];
+  clearChannelCache(): void {
+    this.cachedChannels = null;
+    this.cachedAt = 0;
+  }
+
+  /**
+   * Check if a channel is enabled (for transport availability).
+   * Reads from GlobalSettings so super-admins can toggle channels at runtime.
+   * Falls back to the COMMUNICATION_CHANNELS env default if no setting exists.
+   * Caches for 30s to avoid a DB round-trip on every message.
+   */
+  async isChannelEnabled(channel: CommunicationChannel, ctx?: RequestContext): Promise<boolean> {
+    const channels = await this.getChannels(ctx);
+    return channels[channel];
+  }
+
+  private async getChannels(ctx?: RequestContext): Promise<CommunicationChannels> {
+    const now = Date.now();
+    if (this.cachedChannels && now - this.cachedAt < this.cacheTtlMs) {
+      return this.cachedChannels;
+    }
+    try {
+      const settings = await this.globalSettingsService.getSettings(ctx ?? RequestContext.empty());
+      this.cachedChannels = parseCommunicationChannels(
+        (settings as any)?.customFields?.communicationChannels
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to read communication channel settings: ${error instanceof Error ? error.message : String(error)}`
+      );
+      this.cachedChannels = { ...DEFAULT_COMMUNICATION_CHANNELS };
+    }
+    this.cachedAt = now;
+    return this.cachedChannels;
   }
 
   /**
@@ -81,8 +123,12 @@ export class CommunicationService {
     }
 
     const bypassEnabledCheck = metadata?.bypassEnabledCheck === true;
-    if (metadata?.purpose !== 'otp' && !bypassEnabledCheck && !this.isChannelEnabled(channel)) {
-      const errMsg = `Communication channel "${channel}" is disabled by COMMUNICATION_CHANNELS`;
+    if (
+      metadata?.purpose !== 'otp' &&
+      !bypassEnabledCheck &&
+      !(await this.isChannelEnabled(channel, ctx))
+    ) {
+      const errMsg = `Communication channel "${channel}" is disabled by platform settings`;
       this.logger.warn(errMsg);
       return { success: false, channel, error: errMsg };
     }

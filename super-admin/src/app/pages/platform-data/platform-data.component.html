@@ -98,6 +98,53 @@
 
       <section class="card card-border bg-base-100 shadow">
         <div class="card-body">
+          <h2 class="card-title text-lg">Communication channels</h2>
+          <p class="text-sm text-base-content/70 mb-4">
+            Globally enable or disable outbound channels. In-app notifications are unaffected.
+          </p>
+          <form (ngSubmit)="updateCommunicationChannels()" class="space-y-4">
+            <label class="form-control w-full max-w-xs flex flex-row items-center gap-3">
+              <input
+                type="checkbox"
+                class="toggle toggle-primary"
+                [ngModel]="communicationChannels().sms"
+                (ngModelChange)="communicationChannels.update(c => ({ ...c, sms: $event }))"
+                name="smsEnabled"
+              />
+              <span class="label-text">SMS</span>
+            </label>
+            <label class="form-control w-full max-w-xs flex flex-row items-center gap-3">
+              <input
+                type="checkbox"
+                class="toggle toggle-primary"
+                [ngModel]="communicationChannels().email"
+                (ngModelChange)="communicationChannels.update(c => ({ ...c, email: $event }))"
+                name="emailEnabled"
+              />
+              <span class="label-text">Email</span>
+            </label>
+            <label class="form-control w-full max-w-xs flex flex-row items-center gap-3">
+              <input
+                type="checkbox"
+                class="toggle toggle-primary"
+                [ngModel]="communicationChannels().whatsapp"
+                (ngModelChange)="communicationChannels.update(c => ({ ...c, whatsapp: $event }))"
+                name="whatsappEnabled"
+              />
+              <span class="label-text">WhatsApp</span>
+            </label>
+            <button type="submit" class="btn btn-primary" [disabled]="savingCommunicationChannels()">
+              @if (savingCommunicationChannels()) {
+                <span class="loading loading-spinner loading-sm"></span>
+              }
+              Save channels
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <section class="card card-border bg-base-100 shadow">
+        <div class="card-body">
           <h2 class="card-title text-lg">Test WhatsApp</h2>
           <p class="text-sm text-base-content/70 mb-4">
             Send a one-off WhatsApp message to any valid number. Pick a template to preview real

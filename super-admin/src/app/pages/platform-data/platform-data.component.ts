@@ -10,6 +10,7 @@ import {
   UPDATE_PLATFORM_SETTINGS,
   UPDATE_REGISTRATION_TAX_RATE,
   UPDATE_CUSTOMER_NOTIFICATIONS_ENABLED,
+  UPDATE_COMMUNICATION_CHANNELS,
   SEND_TEST_WHATSAPP_NOTIFICATION,
   SEND_TEST_CUSTOMER_NOTIFICATION,
 } from '../../core/graphql/operations.graphql';
@@ -57,6 +58,12 @@ export class PlatformDataComponent implements OnInit {
   savingTrialDays = signal(false);
   customerNotificationsEnabled = signal<boolean>(false);
   savingCustomerNotifications = signal(false);
+  communicationChannels = signal<{ sms: boolean; email: boolean; whatsapp: boolean }>({
+    sms: true,
+    email: true,
+    whatsapp: true,
+  });
+  savingCommunicationChannels = signal(false);
   testPhoneNumber = signal<string>('');
   testMessage = signal<string>('');
   testWhatsAppTemplateKey = signal<string>('');
@@ -82,7 +89,11 @@ export class PlatformDataComponent implements OnInit {
           fetchPolicy: 'network-only',
         }),
         this.apollo.getClient().query<{
-          platformSettings: { trialDays: number; customerNotificationsEnabled: boolean };
+          platformSettings: {
+            trialDays: number;
+            customerNotificationsEnabled: boolean;
+            communicationChannels: { sms: boolean; email: boolean; whatsapp: boolean };
+          };
         }>({
           query: PLATFORM_SETTINGS as DocumentNode,
           fetchPolicy: 'network-only',
@@ -101,6 +112,11 @@ export class PlatformDataComponent implements OnInit {
         settingsResult.data?.platformSettings?.customerNotificationsEnabled;
       if (typeof customerNotificationsEnabled === 'boolean') {
         this.customerNotificationsEnabled.set(customerNotificationsEnabled);
+      }
+      const communicationChannels =
+        settingsResult.data?.platformSettings?.communicationChannels;
+      if (communicationChannels) {
+        this.communicationChannels.set(communicationChannels);
       }
     } catch (err: unknown) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load platform data');
@@ -159,6 +175,24 @@ export class PlatformDataComponent implements OnInit {
       );
     } finally {
       this.savingCustomerNotifications.set(false);
+    }
+  }
+
+  async updateCommunicationChannels(): Promise<void> {
+    const channels = this.communicationChannels();
+    this.savingCommunicationChannels.set(true);
+    this.error.set(null);
+    try {
+      await this.apollo.getClient().mutate({
+        mutation: UPDATE_COMMUNICATION_CHANNELS as DocumentNode,
+        variables: { input: channels },
+      });
+    } catch (err: unknown) {
+      this.error.set(
+        err instanceof Error ? err.message : 'Failed to update communication channels'
+      );
+    } finally {
+      this.savingCommunicationChannels.set(false);
     }
   }
 

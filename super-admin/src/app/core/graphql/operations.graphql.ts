@@ -417,6 +417,11 @@ export const PLATFORM_SETTINGS = graphql(`
     platformSettings {
       trialDays
       customerNotificationsEnabled
+      communicationChannels {
+        sms
+        email
+        whatsapp
+      }
     }
   }
 `);
@@ -426,6 +431,11 @@ export const UPDATE_PLATFORM_SETTINGS = graphql(`
     updatePlatformSettings(trialDays: $trialDays) {
       trialDays
       customerNotificationsEnabled
+      communicationChannels {
+        sms
+        email
+        whatsapp
+      }
     }
   }
 `);
@@ -435,6 +445,25 @@ export const UPDATE_CUSTOMER_NOTIFICATIONS_ENABLED = graphql(`
     updateCustomerNotificationsEnabled(enabled: $enabled) {
       trialDays
       customerNotificationsEnabled
+      communicationChannels {
+        sms
+        email
+        whatsapp
+      }
+    }
+  }
+`);
+
+export const UPDATE_COMMUNICATION_CHANNELS = graphql(`
+  mutation UpdateCommunicationChannels($input: CommunicationChannelsInput!) {
+    updateCommunicationChannels(input: $input) {
+      trialDays
+      customerNotificationsEnabled
+      communicationChannels {
+        sms
+        email
+        whatsapp
+      }
     }
   }
 `);

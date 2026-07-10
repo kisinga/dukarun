@@ -19,6 +19,11 @@ import {
 import { CommunicationService } from '../../infrastructure/communication/communication.service';
 import { OutboundDeliveryService } from '../../services/notifications/outbound-delivery.service';
 import { validatePhoneNumber } from '../../utils/phone.utils';
+import {
+  CommunicationChannels,
+  DEFAULT_COMMUNICATION_CHANNELS,
+  parseCommunicationChannels,
+} from '../../utils/communication-channels.utils';
 import { getChannelStatus } from '../../domain/channel-custom-fields';
 import { ChannelAdminService } from '../../services/channels/channel-admin.service';
 import { AdminLoginAttemptService } from '../../infrastructure/audit/admin-login-attempt.service';
@@ -303,16 +308,25 @@ export class SuperAdminResolver {
 
   @Query()
   @Allow(Permission.SuperAdmin)
-  async platformSettings(
-    @Ctx() ctx: RequestContext
-  ): Promise<{ trialDays: number; customerNotificationsEnabled: boolean }> {
+  async platformSettings(@Ctx() ctx: RequestContext): Promise<{
+    trialDays: number;
+    customerNotificationsEnabled: boolean;
+    communicationChannels: CommunicationChannels;
+  }> {
     const settings = await this.globalSettingsService.getSettings(ctx);
     const raw = (settings as { customFields?: { trialDays?: number } }).customFields?.trialDays;
     const trialDays = typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : 30;
     const customerNotificationsEnabled =
       (settings as { customFields?: { customerNotificationsEnabled?: boolean } }).customFields
         ?.customerNotificationsEnabled === true;
-    return { trialDays, customerNotificationsEnabled };
+    return {
+      trialDays,
+      customerNotificationsEnabled,
+      communicationChannels: parseCommunicationChannels(
+        (settings as { customFields?: { communicationChannels?: unknown } }).customFields
+          ?.communicationChannels
+      ),
+    };
   }
 
   @Query()
@@ -667,16 +681,20 @@ export class SuperAdminResolver {
   async updatePlatformSettings(
     @Ctx() ctx: RequestContext,
     @Args('trialDays') trialDays: number
-  ): Promise<{ trialDays: number }> {
+  ): Promise<{
+    trialDays: number;
+    customerNotificationsEnabled: boolean;
+    communicationChannels: CommunicationChannels;
+  }> {
     const value = Math.max(0, Math.floor(Number(trialDays)));
     await this.connection.rawConnection.query(
-      `UPDATE global_settings SET "customFieldsTrialdays" = $1`,
+      `UPDATE global_settings SET "customFieldsTrialdays" = $1 WHERE id = (SELECT id FROM global_settings ORDER BY id LIMIT 1)`,
       [value]
     );
     await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.PLATFORM_SETTINGS_UPDATED, {
       data: { trialDays: value },
     });
-    return { trialDays: value };
+    return this.platformSettings(ctx);
   }
 
   @Mutation()
@@ -684,14 +702,44 @@ export class SuperAdminResolver {
   async updateCustomerNotificationsEnabled(
     @Ctx() ctx: RequestContext,
     @Args('enabled') enabled: boolean
-  ): Promise<{ trialDays: number; customerNotificationsEnabled: boolean }> {
+  ): Promise<{
+    trialDays: number;
+    customerNotificationsEnabled: boolean;
+    communicationChannels: CommunicationChannels;
+  }> {
     const value = enabled === true;
     await this.connection.rawConnection.query(
-      `UPDATE global_settings SET "customFieldsCustomernotificationsenabled" = $1`,
+      `UPDATE global_settings SET "customFieldsCustomernotificationsenabled" = $1 WHERE id = (SELECT id FROM global_settings ORDER BY id LIMIT 1)`,
       [value]
     );
     await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.PLATFORM_SETTINGS_UPDATED, {
       data: { customerNotificationsEnabled: value },
+    });
+    return this.platformSettings(ctx);
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async updateCommunicationChannels(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: { sms: boolean; email: boolean; whatsapp: boolean }
+  ): Promise<{
+    trialDays: number;
+    customerNotificationsEnabled: boolean;
+    communicationChannels: CommunicationChannels;
+  }> {
+    const next = {
+      sms: input.sms === true,
+      email: input.email === true,
+      whatsapp: input.whatsapp === true,
+    };
+    await this.connection.rawConnection.query(
+      `UPDATE global_settings SET "customFieldsCommunicationchannels" = $1 WHERE id = (SELECT id FROM global_settings ORDER BY id LIMIT 1)`,
+      [JSON.stringify(next)]
+    );
+    this.communicationService.clearChannelCache();
+    await this.platformAuditService.log(ctx, PLATFORM_AUDIT_EVENTS.PLATFORM_SETTINGS_UPDATED, {
+      data: { communicationChannels: next },
     });
     return this.platformSettings(ctx);
   }
