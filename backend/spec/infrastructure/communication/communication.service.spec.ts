@@ -1,5 +1,5 @@
 import { expect, jest, it, describe, beforeEach } from '@jest/globals';
-import { EventBus } from '@vendure/core';
+import { EventBus, GlobalSettingsService, RequestContext } from '@vendure/core';
 import { CommunicationService } from '../../../src/infrastructure/communication/communication.service';
 import { SmsService } from '../../../src/infrastructure/sms/sms.service';
 import { OpenWaService } from '../../../src/infrastructure/whatsapp/open-wa.service';
@@ -30,6 +30,7 @@ describe('CommunicationService channel gating', () => {
   let openWaService: OpenWaService;
   let eventBus: EventBus;
   let smsUsageService: SmsUsageService;
+  let globalSettingsService: GlobalSettingsService;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -56,8 +57,19 @@ describe('CommunicationService channel gating', () => {
         }),
       recordSmsSent: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
     } as unknown as SmsUsageService;
+    globalSettingsService = {
+      getSettings: jest.fn<() => Promise<any>>().mockResolvedValue({
+        customFields: { communicationChannels: '{"sms":true,"email":true,"whatsapp":false}' },
+      }),
+    } as unknown as GlobalSettingsService;
 
-    service = new CommunicationService(smsService, openWaService, eventBus, smsUsageService);
+    service = new CommunicationService(
+      smsService,
+      openWaService,
+      eventBus,
+      smsUsageService,
+      globalSettingsService
+    );
   });
 
   it('blocks whatsapp when disabled and no bypass flag is set', async () => {
@@ -69,7 +81,7 @@ describe('CommunicationService channel gating', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('disabled by COMMUNICATION_CHANNELS');
+    expect(result.error).toContain('disabled by platform settings');
     expect(openWaService.sendText).not.toHaveBeenCalled();
   });
 
@@ -79,6 +91,22 @@ describe('CommunicationService channel gating', () => {
       recipient: '0712345678',
       body: 'Test',
       metadata: { purpose: 'admin_notification', bypassEnabledCheck: true },
+    });
+
+    expect(result.success).toBe(true);
+    expect(openWaService.sendText).toHaveBeenCalledWith('0712345678', 'Test');
+  });
+
+  it('allows whatsapp when enabled in global settings', async () => {
+    (globalSettingsService.getSettings as jest.MockedFunction<any>).mockResolvedValue({
+      customFields: { communicationChannels: '{"sms":true,"email":true,"whatsapp":true}' },
+    });
+
+    const result = await service.send({
+      channel: 'whatsapp',
+      recipient: '0712345678',
+      body: 'Test',
+      metadata: { purpose: 'admin_notification' },
     });
 
     expect(result.success).toBe(true);

@@ -1083,6 +1083,20 @@ export type CollectionTranslation = {
   updatedAt: Scalars['DateTime']['output'];
 };
 
+/** Globally enabled outbound communication channels. */
+export type CommunicationChannels = {
+  __typename?: 'CommunicationChannels';
+  email: Scalars['Boolean']['output'];
+  sms: Scalars['Boolean']['output'];
+  whatsapp: Scalars['Boolean']['output'];
+};
+
+export type CommunicationChannelsInput = {
+  email: Scalars['Boolean']['input'];
+  sms: Scalars['Boolean']['input'];
+  whatsapp: Scalars['Boolean']['input'];
+};
+
 export type ConfigArg = {
   __typename?: 'ConfigArg';
   name: Scalars['String']['output'];
@@ -2806,6 +2820,7 @@ export type GlobalSettings = {
 
 export type GlobalSettingsCustomFields = {
   __typename?: 'GlobalSettingsCustomFields';
+  communicationChannels?: Maybe<Scalars['String']['output']>;
   customerNotificationsEnabled?: Maybe<Scalars['Boolean']['output']>;
   trialDays?: Maybe<Scalars['Int']['output']>;
 };
@@ -4080,6 +4095,8 @@ export type Mutation = {
   removeShippingMethodsFromChannel: Array<ShippingMethod>;
   /** Removes StockLocations from the specified Channel */
   removeStockLocationsFromChannel: Array<StockLocation>;
+  /** Superadmin action: repair a Cancelled order whose ledger reversal was never posted. */
+  repairCancelledOrder: ReconcileOrderResult;
   requestEmailRegistrationOTP: OtpResponse;
   requestLoginOTP: OtpResponse;
   requestRegistrationOTP: OtpResponse;
@@ -4153,6 +4170,7 @@ export type Mutation = {
   updateChannelZonesPlatform: Channel;
   /** Update an existing Collection */
   updateCollection: Collection;
+  updateCommunicationChannels: PlatformSettings;
   /** Update an existing Country */
   updateCountry: Country;
   updateCreditDuration: CreditSummary;
@@ -5104,6 +5122,12 @@ export type MutationRemoveStockLocationsFromChannelArgs = {
 };
 
 
+export type MutationRepairCancelledOrderArgs = {
+  note?: InputMaybe<Scalars['String']['input']>;
+  orderId: Scalars['ID']['input'];
+};
+
+
 export type MutationRequestEmailRegistrationOtpArgs = {
   email: Scalars['String']['input'];
   registrationData: RegistrationInput;
@@ -5172,6 +5196,7 @@ export type MutationSendTestCustomerNotificationArgs = {
 export type MutationSendTestWhatsAppNotificationArgs = {
   message: Scalars['String']['input'];
   phoneNumber: Scalars['String']['input'];
+  templateKey?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -5376,6 +5401,11 @@ export type MutationUpdateChannelZonesPlatformArgs = {
 
 export type MutationUpdateCollectionArgs = {
   input: UpdateCollectionInput;
+};
+
+
+export type MutationUpdateCommunicationChannelsArgs = {
+  input: CommunicationChannelsInput;
 };
 
 
@@ -6069,9 +6099,13 @@ export type OrderReconciliationItem = {
   customerId?: Maybe<Scalars['ID']['output']>;
   difference: Scalars['Int']['output'];
   ledgerOwing: Scalars['Int']['output'];
+  ledgerPaid: Scalars['Int']['output'];
+  ledgerTotalOwed: Scalars['Int']['output'];
   orderCode: Scalars['String']['output'];
   orderId: Scalars['ID']['output'];
   orderModelOwing: Scalars['Int']['output'];
+  orderModelPaid: Scalars['Int']['output'];
+  orderModelTotal: Scalars['Int']['output'];
   orderTotal: Scalars['Int']['output'];
 };
 
@@ -6817,6 +6851,7 @@ export type PlatformRoleTemplate = {
 /** Platform-wide settings (e.g. default trial length for new channels). */
 export type PlatformSettings = {
   __typename?: 'PlatformSettings';
+  communicationChannels: CommunicationChannels;
   customerNotificationsEnabled: Scalars['Boolean']['output'];
   trialDays: Scalars['Int']['output'];
 };
@@ -10009,6 +10044,7 @@ export type UpdateFacetValueInput = {
 };
 
 export type UpdateGlobalSettingsCustomFieldsInput = {
+  communicationChannels?: InputMaybe<Scalars['String']['input']>;
   customerNotificationsEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   trialDays?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -10553,21 +10589,28 @@ export type UpdateRegistrationTaxRateMutation = { __typename?: 'Mutation', updat
 export type PlatformSettingsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type PlatformSettingsQuery = { __typename?: 'Query', platformSettings: { __typename?: 'PlatformSettings', trialDays: number, customerNotificationsEnabled: boolean } };
+export type PlatformSettingsQuery = { __typename?: 'Query', platformSettings: { __typename?: 'PlatformSettings', trialDays: number, customerNotificationsEnabled: boolean, communicationChannels: { __typename?: 'CommunicationChannels', sms: boolean, email: boolean, whatsapp: boolean } } };
 
 export type UpdatePlatformSettingsMutationVariables = Exact<{
   trialDays: Scalars['Int']['input'];
 }>;
 
 
-export type UpdatePlatformSettingsMutation = { __typename?: 'Mutation', updatePlatformSettings: { __typename?: 'PlatformSettings', trialDays: number, customerNotificationsEnabled: boolean } };
+export type UpdatePlatformSettingsMutation = { __typename?: 'Mutation', updatePlatformSettings: { __typename?: 'PlatformSettings', trialDays: number, customerNotificationsEnabled: boolean, communicationChannels: { __typename?: 'CommunicationChannels', sms: boolean, email: boolean, whatsapp: boolean } } };
 
 export type UpdateCustomerNotificationsEnabledMutationVariables = Exact<{
   enabled: Scalars['Boolean']['input'];
 }>;
 
 
-export type UpdateCustomerNotificationsEnabledMutation = { __typename?: 'Mutation', updateCustomerNotificationsEnabled: { __typename?: 'PlatformSettings', trialDays: number, customerNotificationsEnabled: boolean } };
+export type UpdateCustomerNotificationsEnabledMutation = { __typename?: 'Mutation', updateCustomerNotificationsEnabled: { __typename?: 'PlatformSettings', trialDays: number, customerNotificationsEnabled: boolean, communicationChannels: { __typename?: 'CommunicationChannels', sms: boolean, email: boolean, whatsapp: boolean } } };
+
+export type UpdateCommunicationChannelsMutationVariables = Exact<{
+  input: CommunicationChannelsInput;
+}>;
+
+
+export type UpdateCommunicationChannelsMutation = { __typename?: 'Mutation', updateCommunicationChannels: { __typename?: 'PlatformSettings', trialDays: number, customerNotificationsEnabled: boolean, communicationChannels: { __typename?: 'CommunicationChannels', sms: boolean, email: boolean, whatsapp: boolean } } };
 
 export type SendTestWhatsAppNotificationMutationVariables = Exact<{
   phoneNumber: Scalars['String']['input'];
@@ -10699,9 +10742,10 @@ export const ApproveUserDocument = {"kind":"Document","definitions":[{"kind":"Op
 export const RejectUserDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RejectUser"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"userId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"reason"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"rejectUser"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"userId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"userId"}}},{"kind":"Argument","name":{"kind":"Name","value":"reason"},"value":{"kind":"Variable","name":{"kind":"Name","value":"reason"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"identifier"}},{"kind":"Field","name":{"kind":"Name","value":"authorizationStatus"}}]}}]}}]} as unknown as DocumentNode<RejectUserMutation, RejectUserMutationVariables>;
 export const RegistrationSeedContextDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"RegistrationSeedContext"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"registrationSeedContext"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"zone"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"members"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"code"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"taxRate"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"categoryName"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}}]}}]} as unknown as DocumentNode<RegistrationSeedContextQuery, RegistrationSeedContextQueryVariables>;
 export const UpdateRegistrationTaxRateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateRegistrationTaxRate"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateRegistrationTaxRateInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateRegistrationTaxRate"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"categoryName"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}}]} as unknown as DocumentNode<UpdateRegistrationTaxRateMutation, UpdateRegistrationTaxRateMutationVariables>;
-export const PlatformSettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformSettings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformSettings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"trialDays"}},{"kind":"Field","name":{"kind":"Name","value":"customerNotificationsEnabled"}}]}}]}}]} as unknown as DocumentNode<PlatformSettingsQuery, PlatformSettingsQueryVariables>;
-export const UpdatePlatformSettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdatePlatformSettings"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"trialDays"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updatePlatformSettings"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"trialDays"},"value":{"kind":"Variable","name":{"kind":"Name","value":"trialDays"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"trialDays"}},{"kind":"Field","name":{"kind":"Name","value":"customerNotificationsEnabled"}}]}}]}}]} as unknown as DocumentNode<UpdatePlatformSettingsMutation, UpdatePlatformSettingsMutationVariables>;
-export const UpdateCustomerNotificationsEnabledDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateCustomerNotificationsEnabled"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"enabled"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateCustomerNotificationsEnabled"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"enabled"},"value":{"kind":"Variable","name":{"kind":"Name","value":"enabled"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"trialDays"}},{"kind":"Field","name":{"kind":"Name","value":"customerNotificationsEnabled"}}]}}]}}]} as unknown as DocumentNode<UpdateCustomerNotificationsEnabledMutation, UpdateCustomerNotificationsEnabledMutationVariables>;
+export const PlatformSettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformSettings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformSettings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"trialDays"}},{"kind":"Field","name":{"kind":"Name","value":"customerNotificationsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"communicationChannels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sms"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"whatsapp"}}]}}]}}]}}]} as unknown as DocumentNode<PlatformSettingsQuery, PlatformSettingsQueryVariables>;
+export const UpdatePlatformSettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdatePlatformSettings"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"trialDays"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updatePlatformSettings"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"trialDays"},"value":{"kind":"Variable","name":{"kind":"Name","value":"trialDays"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"trialDays"}},{"kind":"Field","name":{"kind":"Name","value":"customerNotificationsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"communicationChannels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sms"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"whatsapp"}}]}}]}}]}}]} as unknown as DocumentNode<UpdatePlatformSettingsMutation, UpdatePlatformSettingsMutationVariables>;
+export const UpdateCustomerNotificationsEnabledDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateCustomerNotificationsEnabled"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"enabled"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateCustomerNotificationsEnabled"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"enabled"},"value":{"kind":"Variable","name":{"kind":"Name","value":"enabled"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"trialDays"}},{"kind":"Field","name":{"kind":"Name","value":"customerNotificationsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"communicationChannels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sms"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"whatsapp"}}]}}]}}]}}]} as unknown as DocumentNode<UpdateCustomerNotificationsEnabledMutation, UpdateCustomerNotificationsEnabledMutationVariables>;
+export const UpdateCommunicationChannelsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateCommunicationChannels"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CommunicationChannelsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateCommunicationChannels"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"trialDays"}},{"kind":"Field","name":{"kind":"Name","value":"customerNotificationsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"communicationChannels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sms"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"whatsapp"}}]}}]}}]}}]} as unknown as DocumentNode<UpdateCommunicationChannelsMutation, UpdateCommunicationChannelsMutationVariables>;
 export const SendTestWhatsAppNotificationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SendTestWhatsAppNotification"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"phoneNumber"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"message"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"templateKey"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sendTestWhatsAppNotification"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"phoneNumber"},"value":{"kind":"Variable","name":{"kind":"Name","value":"phoneNumber"}}},{"kind":"Argument","name":{"kind":"Name","value":"message"},"value":{"kind":"Variable","name":{"kind":"Name","value":"message"}}},{"kind":"Argument","name":{"kind":"Name","value":"templateKey"},"value":{"kind":"Variable","name":{"kind":"Name","value":"templateKey"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"success"}},{"kind":"Field","name":{"kind":"Name","value":"channel"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"info"}}]}}]}}]} as unknown as DocumentNode<SendTestWhatsAppNotificationMutation, SendTestWhatsAppNotificationMutationVariables>;
 export const SendTestCustomerNotificationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SendTestCustomerNotification"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"customerId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"triggerKey"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sendTestCustomerNotification"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}},{"kind":"Argument","name":{"kind":"Name","value":"customerId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"customerId"}}},{"kind":"Argument","name":{"kind":"Name","value":"triggerKey"},"value":{"kind":"Variable","name":{"kind":"Name","value":"triggerKey"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"success"}},{"kind":"Field","name":{"kind":"Name","value":"channel"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"info"}}]}}]}}]} as unknown as DocumentNode<SendTestCustomerNotificationMutation, SendTestCustomerNotificationMutationVariables>;
 export const PlatformRoleTemplatesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformRoleTemplates"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformRoleTemplates"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"permissions"}}]}}]}}]} as unknown as DocumentNode<PlatformRoleTemplatesQuery, PlatformRoleTemplatesQueryVariables>;

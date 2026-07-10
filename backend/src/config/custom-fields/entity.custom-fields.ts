@@ -170,7 +170,7 @@ export const orderCustomFields: CustomFields['Order'] = [
   },
   {
     name: 'reconciliationNote',
-    type: 'string',
+    type: 'text',
     label: [{ languageCode: LanguageCode.en, value: 'Reconciliation Note' }],
     description: [
       {
@@ -488,5 +488,18 @@ export const globalSettingsCustomFields: CustomFields['GlobalSettings'] = [
     ],
     defaultValue: false,
     nullable: false,
+  },
+  {
+    name: 'communicationChannels',
+    type: 'text',
+    label: [{ languageCode: LanguageCode.en, value: 'Enabled communication channels' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value:
+          'JSON object {sms, email, whatsapp} controlling which outbound channels are globally active. Defaults to all enabled.',
+      },
+    ],
+    nullable: true,
   },
 ];

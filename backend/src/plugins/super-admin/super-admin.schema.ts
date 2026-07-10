@@ -64,6 +64,22 @@ export const SUPER_ADMIN_SCHEMA = gql`
   type PlatformSettings {
     trialDays: Int!
     customerNotificationsEnabled: Boolean!
+    communicationChannels: CommunicationChannels!
+  }
+
+  """
+  Globally enabled outbound communication channels.
+  """
+  type CommunicationChannels {
+    sms: Boolean!
+    email: Boolean!
+    whatsapp: Boolean!
+  }
+
+  input CommunicationChannelsInput {
+    sms: Boolean!
+    email: Boolean!
+    whatsapp: Boolean!
   }
 
   type SendTestNotificationResult {
@@ -353,6 +369,7 @@ export const SUPER_ADMIN_SCHEMA = gql`
     ): PlatformAdministratorDetail!
     updatePlatformSettings(trialDays: Int!): PlatformSettings!
     updateCustomerNotificationsEnabled(enabled: Boolean!): PlatformSettings!
+    updateCommunicationChannels(input: CommunicationChannelsInput!): PlatformSettings!
     sendTestWhatsAppNotification(
       phoneNumber: String!
       message: String!
