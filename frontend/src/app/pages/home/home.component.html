@@ -119,6 +119,34 @@
 
   <div class="divider divider-primary opacity-20 my-0"></div>
 
+  <section class="section scroll-mt-28 bg-base-200/40" id="relief">
+    <div class="container-app">
+      <div class="mkt-section-head">
+        <span class="mkt-eyebrow">We handle the hard parts</span>
+        <h2 class="mkt-h2">So you can focus on selling</h2>
+      </div>
+      <div class="container-app mt-10 grid gap-6 md:grid-cols-3">
+        @for (relief of reliefSteps; track relief.title) {
+          <article
+            class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-7 text-left shadow-lg transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+          >
+            <div class="flex flex-col gap-4 flex-1">
+              <div
+                class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
+              >
+                <span class="text-2xl">{{ relief.icon }}</span>
+              </div>
+              <h3 class="text-lg font-semibold">{{ relief.title }}</h3>
+              <p class="text-base-content/80">{{ relief.description }}</p>
+            </div>
+          </article>
+        }
+      </div>
+    </div>
+  </section>
+
+  <div class="divider opacity-10 my-0"></div>
+
   <section class="section scroll-mt-28 bg-base-200" id="walkthrough">
     <div class="container-app">
       <div class="mkt-section-head">

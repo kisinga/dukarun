@@ -20,7 +20,11 @@ export class OrderAmountOwingLoader {
     @Inject(REQUEST) request: Request,
     private readonly financialService: FinancialService
   ) {
-    const ctx = getRequestContextFromReq(request);
+    // In GraphQL, Nest's REQUEST token is the Apollo integration context object
+    // ({ req, res }), not the Express request itself. Vendure stores the
+    // RequestContext on req.vendureRequestContext, so unwrap .req when present.
+    const req = ((request as unknown as { req?: Request }).req ?? request) as Request;
+    const ctx = getRequestContextFromReq(req);
 
     this.loader = new DataLoader<string, number>(async orderIds => {
       if (!ctx) {
