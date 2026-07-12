@@ -37,6 +37,7 @@ export class LayoutComponent {
         { label: 'Pending', icon: 'pending', route: '/pending-registrations' },
         { label: 'Subscription Tiers', icon: 'subscription-tiers', route: '/subscription-tiers' },
         { label: 'Audit log', icon: 'audit-log', route: '/audit-log' },
+        { label: 'Broadcast', icon: 'broadcast', route: '/broadcast' },
         { label: 'Reconciliation', icon: 'order-reconciliation', route: '/order-reconciliation' },
       ],
     },

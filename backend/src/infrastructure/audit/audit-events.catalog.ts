@@ -85,6 +85,8 @@ export const PLATFORM_AUDIT_EVENTS = {
   ROLE_TEMPLATE_UPDATED: 'platform.role_template.updated',
   ROLE_TEMPLATE_DELETED: 'platform.role_template.deleted',
   ADMINISTRATOR_PERMISSIONS_UPDATED: 'platform.administrator.permissions_updated',
+  BATCH_MESSAGE_CREATED: 'platform.batch_message.created',
+  BATCH_MESSAGE_SENT: 'platform.batch_message.sent',
 } as const;
 
 export type PlatformAuditEventType =

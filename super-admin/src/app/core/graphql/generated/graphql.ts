@@ -573,6 +573,61 @@ export type BalanceOverrideResult = {
   previousBalance: Scalars['Float']['output'];
 };
 
+export type BatchMessage = {
+  __typename?: 'BatchMessage';
+  audience: BatchMessageAudience;
+  channelIds?: Maybe<Array<Scalars['ID']['output']>>;
+  channels: BatchMessageChannels;
+  content: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  createdByUserId?: Maybe<Scalars['String']['output']>;
+  failedCount: Scalars['Int']['output'];
+  failureLog?: Maybe<Array<BatchMessageFailureEntry>>;
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  recipientCount: Scalars['Int']['output'];
+  sentAt?: Maybe<Scalars['DateTime']['output']>;
+  sentCount: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+};
+
+export enum BatchMessageAudience {
+  ALL_ADMINS = 'ALL_ADMINS',
+  CHANNEL_ADMINS = 'CHANNEL_ADMINS',
+  CUSTOM_USER_IDS = 'CUSTOM_USER_IDS',
+  FINANCIAL_ADMINS = 'FINANCIAL_ADMINS',
+  SUPER_ADMINS = 'SUPER_ADMINS'
+}
+
+export type BatchMessageChannels = {
+  __typename?: 'BatchMessageChannels';
+  sms: Scalars['Boolean']['output'];
+  whatsapp: Scalars['Boolean']['output'];
+};
+
+export type BatchMessageChannelsInput = {
+  sms: Scalars['Boolean']['input'];
+  whatsapp: Scalars['Boolean']['input'];
+};
+
+export type BatchMessageFailureEntry = {
+  __typename?: 'BatchMessageFailureEntry';
+  channel: Scalars['String']['output'];
+  error: Scalars['String']['output'];
+  userId: Scalars['String']['output'];
+};
+
+export type BatchMessageList = {
+  __typename?: 'BatchMessageList';
+  items: Array<BatchMessage>;
+  totalItems: Scalars['Int']['output'];
+};
+
+export type BatchMessageListOptions = {
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type BooleanCustomFieldConfig = CustomField & {
   __typename?: 'BooleanCustomFieldConfig';
   deprecated?: Maybe<Scalars['Boolean']['output']>;
@@ -1327,6 +1382,15 @@ export type CreateAssetInput = {
 };
 
 export type CreateAssetResult = Asset | MimeTypeError;
+
+export type CreateBatchMessageInput = {
+  audience: BatchMessageAudience;
+  channelIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+  channels: BatchMessageChannelsInput;
+  content: Scalars['String']['input'];
+  customUserIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+  name: Scalars['String']['input'];
+};
 
 export type CreateChannelAdminInput = {
   emailAddress?: InputMaybe<Scalars['String']['input']>;
@@ -2317,6 +2381,22 @@ export type CustomerSortParameter = {
   updatedAt?: InputMaybe<SortOrder>;
 };
 
+export type CustomerSupplierDivergenceItem = {
+  __typename?: 'CustomerSupplierDivergenceItem';
+  entityId: Scalars['ID']['output'];
+  ledgerBalance: Scalars['Int']['output'];
+  modelBalance: Scalars['Int']['output'];
+  partyType: Scalars['String']['output'];
+  residual: Scalars['Int']['output'];
+  signedLedgerBalance: Scalars['Int']['output'];
+};
+
+export type CustomerSupplierDivergenceResult = {
+  __typename?: 'CustomerSupplierDivergenceResult';
+  items: Array<CustomerSupplierDivergenceItem>;
+  totalItems: Scalars['Int']['output'];
+};
+
 export type DashboardStats = {
   __typename?: 'DashboardStats';
   expenses: PeriodStats;
@@ -3030,6 +3110,16 @@ export type InvalidFulfillmentHandlerError = ErrorResult & {
   __typename?: 'InvalidFulfillmentHandlerError';
   errorCode: ErrorCode;
   message: Scalars['String']['output'];
+};
+
+export type InventoryReconciliationResult = {
+  __typename?: 'InventoryReconciliationResult';
+  channelId: Scalars['Int']['output'];
+  inventoryValuation: Scalars['Int']['output'];
+  ledgerBalance: Scalars['Int']['output'];
+  periodEndDate: Scalars['String']['output'];
+  stockLocationId?: Maybe<Scalars['Int']['output']>;
+  variance: Scalars['Int']['output'];
 };
 
 export type InventoryStockAdjustment = {
@@ -3795,8 +3885,12 @@ export type Mutation = {
   addNoteToOrder: Order;
   /** Add an OptionGroup to a Product */
   addOptionGroupToProduct: Product;
+  /** Superadmin action: adjust a customer's AR balance to match the order-model sum. */
+  adjustCustomerBalanceToModel: BalanceOverrideResult;
   /** Adjusts a draft OrderLine. If custom fields are defined on the OrderLine entity, a third argument 'customFields' of type `OrderLineCustomFieldsInput` will be available. */
   adjustDraftOrderLine: UpdateOrderItemsResult;
+  /** Superadmin action: adjust a supplier's AP balance to match the purchase-model sum. */
+  adjustSupplierBalanceToModel: BalanceOverrideResult;
   allocateBulkPayment: PaymentAllocationResult;
   allocateBulkSupplierPayment: SupplierPaymentAllocationResult;
   /** Applies the given coupon code to the draft Order */
@@ -4049,8 +4143,11 @@ export type Mutation = {
   rebuildPurchaseFromLedger: StockPurchase;
   /** Superadmin action: rebuild the ledger AP balance from the supplier's purchase model. */
   rebuildSupplierBalanceFromModel: BalanceOverrideResult;
+  reconcileInventory: InventoryReconciliationResult;
   /** Superadmin action: mark a divergent order as reconciled with a chosen strategy. */
   reconcileOrder: ReconcileOrderResult;
+  /** Superadmin action: mark a divergent credit purchase as reconciled with a chosen strategy. */
+  reconcilePurchase: ReconcilePurchaseResult;
   recordCashCount: CashCountResult;
   recordExpense: RecordExpenseResult;
   recordPayment: PaymentAllocationResult;
@@ -4113,6 +4210,7 @@ export type Mutation = {
   rotateApiKey: RotateApiKeyResult;
   runPendingSearchIndexUpdates: Success;
   runScheduledTask: Success;
+  sendBatchMessage: BatchMessage;
   sendCustomerStatementEmail: Scalars['Boolean']['output'];
   sendTestCustomerNotification: SendTestNotificationResult;
   sendTestWhatsAppNotification: SendTestNotificationResult;
@@ -4290,9 +4388,19 @@ export type MutationAddOptionGroupToProductArgs = {
 };
 
 
+export type MutationAdjustCustomerBalanceToModelArgs = {
+  input: ReconcileCustomerSupplierInput;
+};
+
+
 export type MutationAdjustDraftOrderLineArgs = {
   input: AdjustDraftOrderLineInput;
   orderId: Scalars['ID']['input'];
+};
+
+
+export type MutationAdjustSupplierBalanceToModelArgs = {
+  input: ReconcileCustomerSupplierInput;
 };
 
 
@@ -4999,8 +5107,19 @@ export type MutationRebuildSupplierBalanceFromModelArgs = {
 };
 
 
+export type MutationReconcileInventoryArgs = {
+  reason: Scalars['String']['input'];
+  stockLocationId?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type MutationReconcileOrderArgs = {
   input: ReconcileOrderInput;
+};
+
+
+export type MutationReconcilePurchaseArgs = {
+  input: ReconcilePurchaseInput;
 };
 
 
@@ -5178,6 +5297,11 @@ export type MutationRotateApiKeyArgs = {
 
 export type MutationRunScheduledTaskArgs = {
   id: Scalars['String']['input'];
+};
+
+
+export type MutationSendBatchMessageArgs = {
+  input: CreateBatchMessageInput;
 };
 
 
@@ -6790,6 +6914,7 @@ export type PlatformChannel = {
   code: Scalars['String']['output'];
   customFields: PlatformChannelCustomFields;
   id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
   token: Scalars['String']['output'];
 };
 
@@ -7475,6 +7600,25 @@ export type PurchaseListOptions = {
   take?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type PurchaseReconciliationItem = {
+  __typename?: 'PurchaseReconciliationItem';
+  difference: Scalars['Int']['output'];
+  ledgerOwing: Scalars['Int']['output'];
+  ledgerPaid: Scalars['Int']['output'];
+  purchaseId: Scalars['ID']['output'];
+  purchaseModelOwing: Scalars['Int']['output'];
+  purchaseModelPaid: Scalars['Int']['output'];
+  purchaseReference?: Maybe<Scalars['String']['output']>;
+  purchaseTotal: Scalars['Int']['output'];
+  supplierId: Scalars['ID']['output'];
+};
+
+export type PurchaseReconciliationResult = {
+  __typename?: 'PurchaseReconciliationResult';
+  items: Array<PurchaseReconciliationItem>;
+  totalItems: Scalars['Int']['output'];
+};
+
 export type PurchaseSortInput = {
   createdAt?: InputMaybe<SortOrder>;
   purchaseDate?: InputMaybe<SortOrder>;
@@ -7514,6 +7658,8 @@ export type Query = {
   assignablePermissions: Array<Scalars['String']['output']>;
   auditLogs: Array<AuditLog>;
   auditLogsForChannel: Array<AuditLog>;
+  batchMessage?: Maybe<BatchMessage>;
+  batchMessages: BatchMessageList;
   cashierSession?: Maybe<CashierSessionSummary>;
   cashierSessions: CashierSessionList;
   channel?: Maybe<Channel>;
@@ -7542,8 +7688,14 @@ export type Query = {
   customerGroups: CustomerGroupList;
   customers: CustomerList;
   dashboardStats: DashboardStats;
+  /** Superadmin diagnostic: customers whose order-model AR sum differs from the ledger. */
+  divergentCustomers: CustomerSupplierDivergenceResult;
   /** Superadmin diagnostic: orders whose order-model outstanding differs from the ledger. */
   divergentOrders: OrderReconciliationResult;
+  /** Superadmin diagnostic: credit purchases whose purchase-model AP differs from the ledger. */
+  divergentPurchases: PurchaseReconciliationResult;
+  /** Superadmin diagnostic: suppliers whose purchase-model AP sum differs from the ledger. */
+  divergentSuppliers: CustomerSupplierDivergenceResult;
   /** Ledger accounts eligible as payment/debit sources (asset, leaf, excluding AR and inventory). */
   eligibleDebitAccounts: LedgerAccountsResult;
   /** Returns a list of eligible shipping methods for the draft Order */
@@ -7759,6 +7911,16 @@ export type QueryAuditLogsForChannelArgs = {
 };
 
 
+export type QueryBatchMessageArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryBatchMessagesArgs = {
+  options?: InputMaybe<BatchMessageListOptions>;
+};
+
+
 export type QueryCashierSessionArgs = {
   sessionId: Scalars['String']['input'];
 };
@@ -7888,7 +8050,22 @@ export type QueryDashboardStatsArgs = {
 };
 
 
+export type QueryDivergentCustomersArgs = {
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type QueryDivergentOrdersArgs = {
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryDivergentPurchasesArgs = {
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
+export type QueryDivergentSuppliersArgs = {
   toleranceCents?: InputMaybe<Scalars['Int']['input']>;
 };
 
@@ -8327,6 +8504,12 @@ export type QueryZonesArgs = {
   options?: InputMaybe<ZoneListOptions>;
 };
 
+export type ReconcileCustomerSupplierInput = {
+  entityId: Scalars['ID']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
+  partyType: Scalars['String']['input'];
+};
+
 export type ReconcileOrderInput = {
   note?: InputMaybe<Scalars['String']['input']>;
   orderId: Scalars['ID']['input'];
@@ -8337,6 +8520,19 @@ export type ReconcileOrderResult = {
   __typename?: 'ReconcileOrderResult';
   message: Scalars['String']['output'];
   orderId: Scalars['ID']['output'];
+  success: Scalars['Boolean']['output'];
+};
+
+export type ReconcilePurchaseInput = {
+  note?: InputMaybe<Scalars['String']['input']>;
+  purchaseId: Scalars['ID']['input'];
+  strategy: Scalars['String']['input'];
+};
+
+export type ReconcilePurchaseResult = {
+  __typename?: 'ReconcilePurchaseResult';
+  message: Scalars['String']['output'];
+  purchaseId: Scalars['ID']['output'];
   success: Scalars['Boolean']['output'];
 };
 
@@ -10431,7 +10627,7 @@ export type UpdateChannelZonesPlatformMutation = { __typename?: 'Mutation', upda
 export type PlatformChannelsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type PlatformChannelsQuery = { __typename?: 'Query', platformChannels: Array<{ __typename?: 'PlatformChannel', id: string, code: string, token: string, customFields: { __typename?: 'PlatformChannelCustomFields', status: string, trialEndsAt?: any | null, subscriptionStatus?: string | null, maxAdminCount: number, cashierFlowEnabled: boolean, cashControlEnabled: boolean, enablePrinter: boolean, smsUsedThisPeriod?: number | null, smsPeriodEnd?: any | null, smsLimitFromTier?: number | null } }> };
+export type PlatformChannelsQuery = { __typename?: 'Query', platformChannels: Array<{ __typename?: 'PlatformChannel', id: string, code: string, name: string, token: string, customFields: { __typename?: 'PlatformChannelCustomFields', status: string, trialEndsAt?: any | null, subscriptionStatus?: string | null, maxAdminCount: number, cashierFlowEnabled: boolean, cashControlEnabled: boolean, enablePrinter: boolean, smsUsedThisPeriod?: number | null, smsPeriodEnd?: any | null, smsLimitFromTier?: number | null } }> };
 
 export type PlatformStatsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -10630,6 +10826,20 @@ export type SendTestCustomerNotificationMutationVariables = Exact<{
 
 export type SendTestCustomerNotificationMutation = { __typename?: 'Mutation', sendTestCustomerNotification: { __typename?: 'SendTestNotificationResult', success: boolean, channel?: string | null, error?: string | null, info?: string | null } };
 
+export type BatchMessagesQueryVariables = Exact<{
+  options?: InputMaybe<BatchMessageListOptions>;
+}>;
+
+
+export type BatchMessagesQuery = { __typename?: 'Query', batchMessages: { __typename?: 'BatchMessageList', totalItems: number, items: Array<{ __typename?: 'BatchMessage', id: string, name: string, content: string, audience: BatchMessageAudience, channelIds?: Array<string> | null, status: string, recipientCount: number, sentCount: number, failedCount: number, createdAt: any, sentAt?: any | null, channels: { __typename?: 'BatchMessageChannels', sms: boolean, whatsapp: boolean } }> } };
+
+export type SendBatchMessageMutationVariables = Exact<{
+  input: CreateBatchMessageInput;
+}>;
+
+
+export type SendBatchMessageMutation = { __typename?: 'Mutation', sendBatchMessage: { __typename?: 'BatchMessage', id: string, name: string, status: string, recipientCount: number, createdAt: any } };
+
 export type PlatformRoleTemplatesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -10692,6 +10902,21 @@ export type ReconcileOrderMutationVariables = Exact<{
 
 export type ReconcileOrderMutation = { __typename?: 'Mutation', reconcileOrder: { __typename?: 'ReconcileOrderResult', orderId: string, success: boolean, message: string } };
 
+export type LedgerDivergencesQueryVariables = Exact<{
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type LedgerDivergencesQuery = { __typename?: 'Query', ledgerDivergences: { __typename?: 'LedgerDivergenceSummary', totalDivergences: number, byEntityType: Array<{ __typename?: 'LedgerDivergenceCount', entityType: string, count: number }>, items: Array<{ __typename?: 'LedgerDivergenceItem', entityType: string, entityId: string, descriptor: string, entityValue: number, ledgerValue: number, difference: number }> } };
+
+export type ReconcileInventoryMutationVariables = Exact<{
+  reason: Scalars['String']['input'];
+  stockLocationId?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type ReconcileInventoryMutation = { __typename?: 'Mutation', reconcileInventory: { __typename?: 'InventoryReconciliationResult', channelId: number, stockLocationId?: number | null, periodEndDate: string, ledgerBalance: number, inventoryValuation: number, variance: number } };
+
 export type PlatformAuditLogsQueryVariables = Exact<{
   options?: InputMaybe<PlatformAuditLogOptions>;
 }>;
@@ -10719,7 +10944,7 @@ export const AuthenticateDocument = {"kind":"Document","definitions":[{"kind":"O
 export const PlatformZonesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformZones"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformZones"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<PlatformZonesQuery, PlatformZonesQueryVariables>;
 export const ChannelDetailPlatformDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ChannelDetailPlatform"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"channelDetailPlatform"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"customFields"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"trialEndsAt"}},{"kind":"Field","name":{"kind":"Name","value":"subscriptionStatus"}},{"kind":"Field","name":{"kind":"Name","value":"subscriptionExpiresAt"}},{"kind":"Field","name":{"kind":"Name","value":"subscriptionExemptUntil"}},{"kind":"Field","name":{"kind":"Name","value":"subscriptionExemptReason"}},{"kind":"Field","name":{"kind":"Name","value":"maxAdminCount"}},{"kind":"Field","name":{"kind":"Name","value":"cashierFlowEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"cashControlEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"enablePrinter"}},{"kind":"Field","name":{"kind":"Name","value":"smsUsedThisPeriod"}},{"kind":"Field","name":{"kind":"Name","value":"smsPeriodEnd"}},{"kind":"Field","name":{"kind":"Name","value":"smsLimitFromTier"}},{"kind":"Field","name":{"kind":"Name","value":"publicStorefrontEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"publicSlug"}},{"kind":"Field","name":{"kind":"Name","value":"publicWhatsAppNumber"}}]}},{"kind":"Field","name":{"kind":"Name","value":"defaultShippingZone"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"defaultTaxZone"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<ChannelDetailPlatformQuery, ChannelDetailPlatformQueryVariables>;
 export const UpdateChannelZonesPlatformDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateChannelZonesPlatform"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateChannelZonesInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateChannelZonesPlatform"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateChannelZonesPlatformMutation, UpdateChannelZonesPlatformMutationVariables>;
-export const PlatformChannelsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformChannels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformChannels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"customFields"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"trialEndsAt"}},{"kind":"Field","name":{"kind":"Name","value":"subscriptionStatus"}},{"kind":"Field","name":{"kind":"Name","value":"maxAdminCount"}},{"kind":"Field","name":{"kind":"Name","value":"cashierFlowEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"cashControlEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"enablePrinter"}},{"kind":"Field","name":{"kind":"Name","value":"smsUsedThisPeriod"}},{"kind":"Field","name":{"kind":"Name","value":"smsPeriodEnd"}},{"kind":"Field","name":{"kind":"Name","value":"smsLimitFromTier"}}]}}]}}]}}]} as unknown as DocumentNode<PlatformChannelsQuery, PlatformChannelsQueryVariables>;
+export const PlatformChannelsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformChannels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformChannels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"token"}},{"kind":"Field","name":{"kind":"Name","value":"customFields"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"trialEndsAt"}},{"kind":"Field","name":{"kind":"Name","value":"subscriptionStatus"}},{"kind":"Field","name":{"kind":"Name","value":"maxAdminCount"}},{"kind":"Field","name":{"kind":"Name","value":"cashierFlowEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"cashControlEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"enablePrinter"}},{"kind":"Field","name":{"kind":"Name","value":"smsUsedThisPeriod"}},{"kind":"Field","name":{"kind":"Name","value":"smsPeriodEnd"}},{"kind":"Field","name":{"kind":"Name","value":"smsLimitFromTier"}}]}}]}}]}}]} as unknown as DocumentNode<PlatformChannelsQuery, PlatformChannelsQueryVariables>;
 export const PlatformStatsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformStats"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformStats"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalChannels"}},{"kind":"Field","name":{"kind":"Name","value":"channelsByStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"UNAPPROVED"}},{"kind":"Field","name":{"kind":"Name","value":"APPROVED"}},{"kind":"Field","name":{"kind":"Name","value":"DISABLED"}},{"kind":"Field","name":{"kind":"Name","value":"BANNED"}}]}},{"kind":"Field","name":{"kind":"Name","value":"trialExpiringSoonCount"}},{"kind":"Field","name":{"kind":"Name","value":"activeSubscriptionsCount"}}]}}]}}]} as unknown as DocumentNode<PlatformStatsQuery, PlatformStatsQueryVariables>;
 export const PlatformMonitoringDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformMonitoring"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformMonitoring"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"processMemory"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"heapUsedMB"}},{"kind":"Field","name":{"kind":"Name","value":"heapTotalMB"}},{"kind":"Field","name":{"kind":"Name","value":"rssMB"}}]}},{"kind":"Field","name":{"kind":"Name","value":"systemMemory"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalMB"}},{"kind":"Field","name":{"kind":"Name","value":"freeMB"}},{"kind":"Field","name":{"kind":"Name","value":"usedMB"}}]}},{"kind":"Field","name":{"kind":"Name","value":"uptimeSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"loadAvg"}},{"kind":"Field","name":{"kind":"Name","value":"services"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]}}]} as unknown as DocumentNode<PlatformMonitoringQuery, PlatformMonitoringQueryVariables>;
 export const AdministratorsForChannelDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AdministratorsForChannel"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"administratorsForChannel"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"firstName"}},{"kind":"Field","name":{"kind":"Name","value":"lastName"}},{"kind":"Field","name":{"kind":"Name","value":"emailAddress"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"identifier"}},{"kind":"Field","name":{"kind":"Name","value":"authorizationStatus"}},{"kind":"Field","name":{"kind":"Name","value":"roleCodes"}}]}}]}}]} as unknown as DocumentNode<AdministratorsForChannelQuery, AdministratorsForChannelQueryVariables>;
@@ -10748,6 +10973,8 @@ export const UpdateCustomerNotificationsEnabledDocument = {"kind":"Document","de
 export const UpdateCommunicationChannelsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateCommunicationChannels"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CommunicationChannelsInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateCommunicationChannels"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"trialDays"}},{"kind":"Field","name":{"kind":"Name","value":"customerNotificationsEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"communicationChannels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sms"}},{"kind":"Field","name":{"kind":"Name","value":"email"}},{"kind":"Field","name":{"kind":"Name","value":"whatsapp"}}]}}]}}]}}]} as unknown as DocumentNode<UpdateCommunicationChannelsMutation, UpdateCommunicationChannelsMutationVariables>;
 export const SendTestWhatsAppNotificationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SendTestWhatsAppNotification"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"phoneNumber"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"message"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"templateKey"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sendTestWhatsAppNotification"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"phoneNumber"},"value":{"kind":"Variable","name":{"kind":"Name","value":"phoneNumber"}}},{"kind":"Argument","name":{"kind":"Name","value":"message"},"value":{"kind":"Variable","name":{"kind":"Name","value":"message"}}},{"kind":"Argument","name":{"kind":"Name","value":"templateKey"},"value":{"kind":"Variable","name":{"kind":"Name","value":"templateKey"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"success"}},{"kind":"Field","name":{"kind":"Name","value":"channel"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"info"}}]}}]}}]} as unknown as DocumentNode<SendTestWhatsAppNotificationMutation, SendTestWhatsAppNotificationMutationVariables>;
 export const SendTestCustomerNotificationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SendTestCustomerNotification"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"customerId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"triggerKey"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sendTestCustomerNotification"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}},{"kind":"Argument","name":{"kind":"Name","value":"customerId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"customerId"}}},{"kind":"Argument","name":{"kind":"Name","value":"triggerKey"},"value":{"kind":"Variable","name":{"kind":"Name","value":"triggerKey"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"success"}},{"kind":"Field","name":{"kind":"Name","value":"channel"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"info"}}]}}]}}]} as unknown as DocumentNode<SendTestCustomerNotificationMutation, SendTestCustomerNotificationMutationVariables>;
+export const BatchMessagesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"BatchMessages"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"options"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"BatchMessageListOptions"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"batchMessages"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"options"},"value":{"kind":"Variable","name":{"kind":"Name","value":"options"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"audience"}},{"kind":"Field","name":{"kind":"Name","value":"channelIds"}},{"kind":"Field","name":{"kind":"Name","value":"channels"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sms"}},{"kind":"Field","name":{"kind":"Name","value":"whatsapp"}}]}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"recipientCount"}},{"kind":"Field","name":{"kind":"Name","value":"sentCount"}},{"kind":"Field","name":{"kind":"Name","value":"failedCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"sentAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalItems"}}]}}]}}]} as unknown as DocumentNode<BatchMessagesQuery, BatchMessagesQueryVariables>;
+export const SendBatchMessageDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SendBatchMessage"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateBatchMessageInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sendBatchMessage"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"recipientCount"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<SendBatchMessageMutation, SendBatchMessageMutationVariables>;
 export const PlatformRoleTemplatesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformRoleTemplates"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformRoleTemplates"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"permissions"}}]}}]}}]} as unknown as DocumentNode<PlatformRoleTemplatesQuery, PlatformRoleTemplatesQueryVariables>;
 export const AssignablePermissionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AssignablePermissions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"assignablePermissions"}}]}}]} as unknown as DocumentNode<AssignablePermissionsQuery, AssignablePermissionsQueryVariables>;
 export const CreateRoleTemplateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateRoleTemplate"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateRoleTemplateInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createRoleTemplate"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"permissions"}}]}}]}}]} as unknown as DocumentNode<CreateRoleTemplateMutation, CreateRoleTemplateMutationVariables>;
@@ -10757,6 +10984,8 @@ export const AdministratorDetailDocument = {"kind":"Document","definitions":[{"k
 export const UpdateAdministratorPermissionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateAdministratorPermissions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"administratorId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"permissions"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateAdministratorPermissions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"administratorId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"administratorId"}}},{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}},{"kind":"Argument","name":{"kind":"Name","value":"permissions"},"value":{"kind":"Variable","name":{"kind":"Name","value":"permissions"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"roles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"code"}},{"kind":"Field","name":{"kind":"Name","value":"channelIds"}},{"kind":"Field","name":{"kind":"Name","value":"permissions"}}]}}]}}]}}]} as unknown as DocumentNode<UpdateAdministratorPermissionsMutation, UpdateAdministratorPermissionsMutationVariables>;
 export const DivergentOrdersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"DivergentOrders"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"toleranceCents"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"divergentOrders"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"toleranceCents"},"value":{"kind":"Variable","name":{"kind":"Name","value":"toleranceCents"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"orderId"}},{"kind":"Field","name":{"kind":"Name","value":"orderCode"}},{"kind":"Field","name":{"kind":"Name","value":"customerId"}},{"kind":"Field","name":{"kind":"Name","value":"orderModelOwing"}},{"kind":"Field","name":{"kind":"Name","value":"ledgerOwing"}},{"kind":"Field","name":{"kind":"Name","value":"difference"}},{"kind":"Field","name":{"kind":"Name","value":"orderTotal"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalItems"}}]}}]}}]} as unknown as DocumentNode<DivergentOrdersQuery, DivergentOrdersQueryVariables>;
 export const ReconcileOrderDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ReconcileOrder"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ReconcileOrderInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reconcileOrder"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"orderId"}},{"kind":"Field","name":{"kind":"Name","value":"success"}},{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]} as unknown as DocumentNode<ReconcileOrderMutation, ReconcileOrderMutationVariables>;
+export const LedgerDivergencesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"LedgerDivergences"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"toleranceCents"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ledgerDivergences"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"toleranceCents"},"value":{"kind":"Variable","name":{"kind":"Name","value":"toleranceCents"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"totalDivergences"}},{"kind":"Field","name":{"kind":"Name","value":"byEntityType"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"entityType"}},{"kind":"Field","name":{"kind":"Name","value":"count"}}]}},{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"entityType"}},{"kind":"Field","name":{"kind":"Name","value":"entityId"}},{"kind":"Field","name":{"kind":"Name","value":"descriptor"}},{"kind":"Field","name":{"kind":"Name","value":"entityValue"}},{"kind":"Field","name":{"kind":"Name","value":"ledgerValue"}},{"kind":"Field","name":{"kind":"Name","value":"difference"}}]}}]}}]}}]} as unknown as DocumentNode<LedgerDivergencesQuery, LedgerDivergencesQueryVariables>;
+export const ReconcileInventoryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ReconcileInventory"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"reason"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"stockLocationId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reconcileInventory"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"reason"},"value":{"kind":"Variable","name":{"kind":"Name","value":"reason"}}},{"kind":"Argument","name":{"kind":"Name","value":"stockLocationId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"stockLocationId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"channelId"}},{"kind":"Field","name":{"kind":"Name","value":"stockLocationId"}},{"kind":"Field","name":{"kind":"Name","value":"periodEndDate"}},{"kind":"Field","name":{"kind":"Name","value":"ledgerBalance"}},{"kind":"Field","name":{"kind":"Name","value":"inventoryValuation"}},{"kind":"Field","name":{"kind":"Name","value":"variance"}}]}}]}}]} as unknown as DocumentNode<ReconcileInventoryMutation, ReconcileInventoryMutationVariables>;
 export const PlatformAuditLogsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PlatformAuditLogs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"options"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"PlatformAuditLogOptions"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platformAuditLogs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"options"},"value":{"kind":"Variable","name":{"kind":"Name","value":"options"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}},{"kind":"Field","name":{"kind":"Name","value":"eventType"}},{"kind":"Field","name":{"kind":"Name","value":"entityType"}},{"kind":"Field","name":{"kind":"Name","value":"entityId"}},{"kind":"Field","name":{"kind":"Name","value":"userId"}},{"kind":"Field","name":{"kind":"Name","value":"ipAddress"}},{"kind":"Field","name":{"kind":"Name","value":"data"}},{"kind":"Field","name":{"kind":"Name","value":"source"}}]}}]}}]} as unknown as DocumentNode<PlatformAuditLogsQuery, PlatformAuditLogsQueryVariables>;
 export const NotificationPreferencesForChannelDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"NotificationPreferencesForChannel"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"notificationPreferencesForChannel"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"customer"}},{"kind":"Field","name":{"kind":"Name","value":"orders"}},{"kind":"Field","name":{"kind":"Name","value":"stock"}},{"kind":"Field","name":{"kind":"Name","value":"finance"}},{"kind":"Field","name":{"kind":"Name","value":"operations"}}]}}]}}]} as unknown as DocumentNode<NotificationPreferencesForChannelQuery, NotificationPreferencesForChannelQueryVariables>;
 export const UpdateNotificationPreferencesForChannelDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateNotificationPreferencesForChannel"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ChannelNotificationPreferencesInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateNotificationPreferencesForChannel"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"channelId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"channelId"}}},{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"customer"}},{"kind":"Field","name":{"kind":"Name","value":"orders"}},{"kind":"Field","name":{"kind":"Name","value":"stock"}},{"kind":"Field","name":{"kind":"Name","value":"finance"}},{"kind":"Field","name":{"kind":"Name","value":"operations"}}]}}]}}]} as unknown as DocumentNode<UpdateNotificationPreferencesForChannelMutation, UpdateNotificationPreferencesForChannelMutationVariables>;

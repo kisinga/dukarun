@@ -589,6 +589,61 @@ export type BalanceOverrideResult = {
   previousBalance: Scalars['Float']['output'];
 };
 
+export type BatchMessage = {
+  __typename?: 'BatchMessage';
+  audience: BatchMessageAudience;
+  channelIds?: Maybe<Array<Scalars['ID']['output']>>;
+  channels: BatchMessageChannels;
+  content: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  createdByUserId?: Maybe<Scalars['String']['output']>;
+  failedCount: Scalars['Int']['output'];
+  failureLog?: Maybe<Array<BatchMessageFailureEntry>>;
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  recipientCount: Scalars['Int']['output'];
+  sentAt?: Maybe<Scalars['DateTime']['output']>;
+  sentCount: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+};
+
+export enum BatchMessageAudience {
+  ALL_ADMINS = 'ALL_ADMINS',
+  CHANNEL_ADMINS = 'CHANNEL_ADMINS',
+  CUSTOM_USER_IDS = 'CUSTOM_USER_IDS',
+  FINANCIAL_ADMINS = 'FINANCIAL_ADMINS',
+  SUPER_ADMINS = 'SUPER_ADMINS',
+}
+
+export type BatchMessageChannels = {
+  __typename?: 'BatchMessageChannels';
+  sms: Scalars['Boolean']['output'];
+  whatsapp: Scalars['Boolean']['output'];
+};
+
+export type BatchMessageChannelsInput = {
+  sms: Scalars['Boolean']['input'];
+  whatsapp: Scalars['Boolean']['input'];
+};
+
+export type BatchMessageFailureEntry = {
+  __typename?: 'BatchMessageFailureEntry';
+  channel: Scalars['String']['output'];
+  error: Scalars['String']['output'];
+  userId: Scalars['String']['output'];
+};
+
+export type BatchMessageList = {
+  __typename?: 'BatchMessageList';
+  items: Array<BatchMessage>;
+  totalItems: Scalars['Int']['output'];
+};
+
+export type BatchMessageListOptions = {
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type BooleanCustomFieldConfig = CustomField & {
   __typename?: 'BooleanCustomFieldConfig';
   deprecated?: Maybe<Scalars['Boolean']['output']>;
@@ -1350,6 +1405,15 @@ export type CreateAssetInput = {
 };
 
 export type CreateAssetResult = Asset | MimeTypeError;
+
+export type CreateBatchMessageInput = {
+  audience: BatchMessageAudience;
+  channelIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+  channels: BatchMessageChannelsInput;
+  content: Scalars['String']['input'];
+  customUserIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+  name: Scalars['String']['input'];
+};
 
 export type CreateChannelAdminInput = {
   emailAddress?: InputMaybe<Scalars['String']['input']>;
@@ -2347,6 +2411,22 @@ export type CustomerSortParameter = {
   updatedAt?: InputMaybe<SortOrder>;
 };
 
+export type CustomerSupplierDivergenceItem = {
+  __typename?: 'CustomerSupplierDivergenceItem';
+  entityId: Scalars['ID']['output'];
+  ledgerBalance: Scalars['Int']['output'];
+  modelBalance: Scalars['Int']['output'];
+  partyType: Scalars['String']['output'];
+  residual: Scalars['Int']['output'];
+  signedLedgerBalance: Scalars['Int']['output'];
+};
+
+export type CustomerSupplierDivergenceResult = {
+  __typename?: 'CustomerSupplierDivergenceResult';
+  items: Array<CustomerSupplierDivergenceItem>;
+  totalItems: Scalars['Int']['output'];
+};
+
 export type DashboardStats = {
   __typename?: 'DashboardStats';
   expenses: PeriodStats;
@@ -3059,6 +3139,16 @@ export type InvalidFulfillmentHandlerError = ErrorResult & {
   __typename?: 'InvalidFulfillmentHandlerError';
   errorCode: ErrorCode;
   message: Scalars['String']['output'];
+};
+
+export type InventoryReconciliationResult = {
+  __typename?: 'InventoryReconciliationResult';
+  channelId: Scalars['Int']['output'];
+  inventoryValuation: Scalars['Int']['output'];
+  ledgerBalance: Scalars['Int']['output'];
+  periodEndDate: Scalars['String']['output'];
+  stockLocationId?: Maybe<Scalars['Int']['output']>;
+  variance: Scalars['Int']['output'];
 };
 
 export type InventoryStockAdjustment = {
@@ -3836,8 +3926,12 @@ export type Mutation = {
   addNoteToOrder: Order;
   /** Add an OptionGroup to a Product */
   addOptionGroupToProduct: Product;
+  /** Superadmin action: adjust a customer's AR balance to match the order-model sum. */
+  adjustCustomerBalanceToModel: BalanceOverrideResult;
   /** Adjusts a draft OrderLine. If custom fields are defined on the OrderLine entity, a third argument 'customFields' of type `OrderLineCustomFieldsInput` will be available. */
   adjustDraftOrderLine: UpdateOrderItemsResult;
+  /** Superadmin action: adjust a supplier's AP balance to match the purchase-model sum. */
+  adjustSupplierBalanceToModel: BalanceOverrideResult;
   allocateBulkPayment: PaymentAllocationResult;
   allocateBulkSupplierPayment: SupplierPaymentAllocationResult;
   /** Applies the given coupon code to the draft Order */
@@ -4090,8 +4184,11 @@ export type Mutation = {
   rebuildPurchaseFromLedger: StockPurchase;
   /** Superadmin action: rebuild the ledger AP balance from the supplier's purchase model. */
   rebuildSupplierBalanceFromModel: BalanceOverrideResult;
+  reconcileInventory: InventoryReconciliationResult;
   /** Superadmin action: mark a divergent order as reconciled with a chosen strategy. */
   reconcileOrder: ReconcileOrderResult;
+  /** Superadmin action: mark a divergent credit purchase as reconciled with a chosen strategy. */
+  reconcilePurchase: ReconcilePurchaseResult;
   recordCashCount: CashCountResult;
   recordExpense: RecordExpenseResult;
   recordPayment: PaymentAllocationResult;
@@ -4154,6 +4251,7 @@ export type Mutation = {
   rotateApiKey: RotateApiKeyResult;
   runPendingSearchIndexUpdates: Success;
   runScheduledTask: Success;
+  sendBatchMessage: BatchMessage;
   sendCustomerStatementEmail: Scalars['Boolean']['output'];
   sendTestCustomerNotification: SendTestNotificationResult;
   sendTestWhatsAppNotification: SendTestNotificationResult;
@@ -4322,9 +4420,17 @@ export type MutationAddOptionGroupToProductArgs = {
   productId: Scalars['ID']['input'];
 };
 
+export type MutationAdjustCustomerBalanceToModelArgs = {
+  input: ReconcileCustomerSupplierInput;
+};
+
 export type MutationAdjustDraftOrderLineArgs = {
   input: AdjustDraftOrderLineInput;
   orderId: Scalars['ID']['input'];
+};
+
+export type MutationAdjustSupplierBalanceToModelArgs = {
+  input: ReconcileCustomerSupplierInput;
 };
 
 export type MutationAllocateBulkPaymentArgs = {
@@ -4895,8 +5001,17 @@ export type MutationRebuildSupplierBalanceFromModelArgs = {
   supplierId: Scalars['ID']['input'];
 };
 
+export type MutationReconcileInventoryArgs = {
+  reason: Scalars['String']['input'];
+  stockLocationId?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type MutationReconcileOrderArgs = {
   input: ReconcileOrderInput;
+};
+
+export type MutationReconcilePurchaseArgs = {
+  input: ReconcilePurchaseInput;
 };
 
 export type MutationRecordCashCountArgs = {
@@ -5041,6 +5156,10 @@ export type MutationRotateApiKeyArgs = {
 
 export type MutationRunScheduledTaskArgs = {
   id: Scalars['String']['input'];
+};
+
+export type MutationSendBatchMessageArgs = {
+  input: CreateBatchMessageInput;
 };
 
 export type MutationSendCustomerStatementEmailArgs = {
@@ -6565,6 +6684,7 @@ export type PlatformChannel = {
   code: Scalars['String']['output'];
   customFields: PlatformChannelCustomFields;
   id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
   token: Scalars['String']['output'];
 };
 
@@ -7249,6 +7369,25 @@ export type PurchaseListOptions = {
   take?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type PurchaseReconciliationItem = {
+  __typename?: 'PurchaseReconciliationItem';
+  difference: Scalars['Int']['output'];
+  ledgerOwing: Scalars['Int']['output'];
+  ledgerPaid: Scalars['Int']['output'];
+  purchaseId: Scalars['ID']['output'];
+  purchaseModelOwing: Scalars['Int']['output'];
+  purchaseModelPaid: Scalars['Int']['output'];
+  purchaseReference?: Maybe<Scalars['String']['output']>;
+  purchaseTotal: Scalars['Int']['output'];
+  supplierId: Scalars['ID']['output'];
+};
+
+export type PurchaseReconciliationResult = {
+  __typename?: 'PurchaseReconciliationResult';
+  items: Array<PurchaseReconciliationItem>;
+  totalItems: Scalars['Int']['output'];
+};
+
 export type PurchaseSortInput = {
   createdAt?: InputMaybe<SortOrder>;
   purchaseDate?: InputMaybe<SortOrder>;
@@ -7288,6 +7427,8 @@ export type Query = {
   assignablePermissions: Array<Scalars['String']['output']>;
   auditLogs: Array<AuditLog>;
   auditLogsForChannel: Array<AuditLog>;
+  batchMessage?: Maybe<BatchMessage>;
+  batchMessages: BatchMessageList;
   cashierSession?: Maybe<CashierSessionSummary>;
   cashierSessions: CashierSessionList;
   channel?: Maybe<Channel>;
@@ -7316,8 +7457,14 @@ export type Query = {
   customerGroups: CustomerGroupList;
   customers: CustomerList;
   dashboardStats: DashboardStats;
+  /** Superadmin diagnostic: customers whose order-model AR sum differs from the ledger. */
+  divergentCustomers: CustomerSupplierDivergenceResult;
   /** Superadmin diagnostic: orders whose order-model outstanding differs from the ledger. */
   divergentOrders: OrderReconciliationResult;
+  /** Superadmin diagnostic: credit purchases whose purchase-model AP differs from the ledger. */
+  divergentPurchases: PurchaseReconciliationResult;
+  /** Superadmin diagnostic: suppliers whose purchase-model AP sum differs from the ledger. */
+  divergentSuppliers: CustomerSupplierDivergenceResult;
   /** Ledger accounts eligible as payment/debit sources (asset, leaf, excluding AR and inventory). */
   eligibleDebitAccounts: LedgerAccountsResult;
   /** Returns a list of eligible shipping methods for the draft Order */
@@ -7517,6 +7664,14 @@ export type QueryAuditLogsForChannelArgs = {
   options?: InputMaybe<AuditLogOptions>;
 };
 
+export type QueryBatchMessageArgs = {
+  id: Scalars['ID']['input'];
+};
+
+export type QueryBatchMessagesArgs = {
+  options?: InputMaybe<BatchMessageListOptions>;
+};
+
 export type QueryCashierSessionArgs = {
   sessionId: Scalars['String']['input'];
 };
@@ -7622,7 +7777,19 @@ export type QueryDashboardStatsArgs = {
   startDate?: InputMaybe<Scalars['DateTime']['input']>;
 };
 
+export type QueryDivergentCustomersArgs = {
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type QueryDivergentOrdersArgs = {
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryDivergentPurchasesArgs = {
+  toleranceCents?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryDivergentSuppliersArgs = {
   toleranceCents?: InputMaybe<Scalars['Int']['input']>;
 };
 
@@ -7977,6 +8144,12 @@ export type QueryZonesArgs = {
   options?: InputMaybe<ZoneListOptions>;
 };
 
+export type ReconcileCustomerSupplierInput = {
+  entityId: Scalars['ID']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
+  partyType: Scalars['String']['input'];
+};
+
 export type ReconcileOrderInput = {
   note?: InputMaybe<Scalars['String']['input']>;
   orderId: Scalars['ID']['input'];
@@ -7987,6 +8160,19 @@ export type ReconcileOrderResult = {
   __typename?: 'ReconcileOrderResult';
   message: Scalars['String']['output'];
   orderId: Scalars['ID']['output'];
+  success: Scalars['Boolean']['output'];
+};
+
+export type ReconcilePurchaseInput = {
+  note?: InputMaybe<Scalars['String']['input']>;
+  purchaseId: Scalars['ID']['input'];
+  strategy: Scalars['String']['input'];
+};
+
+export type ReconcilePurchaseResult = {
+  __typename?: 'ReconcilePurchaseResult';
+  message: Scalars['String']['output'];
+  purchaseId: Scalars['ID']['output'];
   success: Scalars['Boolean']['output'];
 };
 

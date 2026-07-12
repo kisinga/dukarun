@@ -1598,6 +1598,16 @@ export type InvalidCredentialsError = ErrorResult & {
   message: Scalars['String']['output'];
 };
 
+export type InventoryReconciliationResult = {
+  __typename?: 'InventoryReconciliationResult';
+  channelId: Scalars['Int']['output'];
+  inventoryValuation: Scalars['Int']['output'];
+  ledgerBalance: Scalars['Int']['output'];
+  periodEndDate: Scalars['String']['output'];
+  stockLocationId?: Maybe<Scalars['Int']['output']>;
+  variance: Scalars['Int']['output'];
+};
+
 export type InventoryValuation = {
   __typename?: 'InventoryValuation';
   asOfDate: Scalars['DateTime']['output'];
@@ -2136,6 +2146,7 @@ export type Mutation = {
   logout: Success;
   openAccountingPeriod: AccountingPeriod;
   openCashierSession: CashierSession;
+  reconcileInventory: InventoryReconciliationResult;
   recordCashCount: CashCountResult;
   recordExpense: RecordExpenseResult;
   /** Regenerate and send a verification token for a new Customer registration. Only applicable if `authOptions.requireVerification` is set to true. */
@@ -2332,6 +2343,12 @@ export type MutationOpenAccountingPeriodArgs = {
 
 export type MutationOpenCashierSessionArgs = {
   input: OpenCashierSessionInput;
+};
+
+
+export type MutationReconcileInventoryArgs = {
+  reason: Scalars['String']['input'];
+  stockLocationId?: InputMaybe<Scalars['Int']['input']>;
 };
 
 

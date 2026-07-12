@@ -191,6 +191,8 @@ export class OrderReconciliationService {
         order = await this.applyLedgerTrustStrategy(txCtx, order, note);
       } else if (strategy === 'order') {
         await this.applyOrderTrustStrategy(txCtx, order, note);
+      } else if (strategy === 'note-only') {
+        // Human-approved note-only reconciliation. No financial mutation.
       } else {
         throw new UserInputError(`Unsupported reconciliation strategy: ${input.strategy}`);
       }

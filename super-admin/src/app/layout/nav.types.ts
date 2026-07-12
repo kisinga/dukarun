@@ -8,7 +8,8 @@ export type NavIcon =
   | 'role-templates'
   | 'pending'
   | 'subscription-tiers'
-  | 'order-reconciliation';
+  | 'order-reconciliation'
+  | 'broadcast';
 
 export interface NavItem {
   label: string;

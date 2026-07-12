@@ -30,7 +30,7 @@ interface PlatformChannel {
   token: string;
 }
 
-type ReconcileStrategy = 'ledger' | 'order-model' | 'note-only';
+type ReconcileStrategy = 'ledger' | 'order' | 'note-only';
 type Tab = 'orders' | 'inventory';
 
 function formatMoney(cents: number): string {
@@ -77,7 +77,7 @@ export class OrderReconciliationComponent implements OnInit {
 
   readonly strategies: { value: ReconcileStrategy; label: string }[] = [
     { value: 'ledger', label: 'Trust ledger (adjust order state)' },
-    { value: 'order-model', label: 'Trust order model (flag only)' },
+    { value: 'order', label: 'Trust order model (adjust ledger)' },
     { value: 'note-only', label: 'Note only' },
   ];
 

@@ -73,6 +73,7 @@ export const PLATFORM_CHANNELS = graphql(`
     platformChannels {
       id
       code
+      name
       token
       customFields {
         status
@@ -502,6 +503,43 @@ export const SEND_TEST_CUSTOMER_NOTIFICATION = graphql(`
       channel
       error
       info
+    }
+  }
+`);
+
+export const BATCH_MESSAGES = graphql(`
+  query BatchMessages($options: BatchMessageListOptions) {
+    batchMessages(options: $options) {
+      items {
+        id
+        name
+        content
+        audience
+        channelIds
+        channels {
+          sms
+          whatsapp
+        }
+        status
+        recipientCount
+        sentCount
+        failedCount
+        createdAt
+        sentAt
+      }
+      totalItems
+    }
+  }
+`);
+
+export const SEND_BATCH_MESSAGE = graphql(`
+  mutation SendBatchMessage($input: CreateBatchMessageInput!) {
+    sendBatchMessage(input: $input) {
+      id
+      name
+      status
+      recipientCount
+      createdAt
     }
   }
 `);

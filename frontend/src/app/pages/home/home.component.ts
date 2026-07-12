@@ -33,6 +33,12 @@ interface WalkthroughStep {
   description: string;
 }
 
+interface ReliefStep {
+  icon: string;
+  title: string;
+  description: string;
+}
+
 @Component({
   selector: 'app-home',
   imports: [RouterLink, NavbarComponent, FooterComponent],
@@ -63,6 +69,27 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     { icon: '📱', text: 'Works on phone or desktop' },
     { icon: '🏪', text: 'Built for Kenyan shops' },
     { icon: '🔒', text: 'Your data stays safe' },
+  ];
+
+  protected readonly reliefSteps: ReliefStep[] = [
+    {
+      icon: '🛠️',
+      title: 'Setup that sticks',
+      description:
+        'We help you add products, payment methods, and users before your first sale. You are not left figuring it out alone.',
+    },
+    {
+      icon: '📡',
+      title: 'Offline peace of mind',
+      description:
+        'Keep selling when the internet drops. Your sales save locally and sync automatically when connection returns.',
+    },
+    {
+      icon: '📒',
+      title: 'Books that stay correct',
+      description:
+        'Every sale and purchase posts to your ledger automatically. Reconciliation becomes matching entries, not rebuilding them.',
+    },
   ];
 
   protected readonly walkthroughSteps: WalkthroughStep[] = [
@@ -133,7 +160,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private setupScrollSpy(): void {
-    const sectionIds = ['hero', 'walkthrough', 'testimonials'];
+    const sectionIds = ['hero', 'relief', 'walkthrough', 'testimonials'];
 
     const options: IntersectionObserverInit = {
       root: null,

@@ -8,6 +8,7 @@ export const SUPER_ADMIN_SCHEMA = gql`
   type PlatformChannel {
     id: ID!
     code: String!
+    name: String!
     token: String!
     customFields: PlatformChannelCustomFields!
   }
@@ -87,6 +88,66 @@ export const SUPER_ADMIN_SCHEMA = gql`
     channel: String
     error: String
     info: String
+  }
+
+  enum BatchMessageAudience {
+    ALL_ADMINS
+    SUPER_ADMINS
+    CHANNEL_ADMINS
+    FINANCIAL_ADMINS
+    CUSTOM_USER_IDS
+  }
+
+  type BatchMessageChannels {
+    sms: Boolean!
+    whatsapp: Boolean!
+  }
+
+  input BatchMessageChannelsInput {
+    sms: Boolean!
+    whatsapp: Boolean!
+  }
+
+  input CreateBatchMessageInput {
+    name: String!
+    content: String!
+    audience: BatchMessageAudience!
+    channelIds: [ID!]
+    customUserIds: [ID!]
+    channels: BatchMessageChannelsInput!
+  }
+
+  type BatchMessageFailureEntry {
+    userId: String!
+    channel: String!
+    error: String!
+  }
+
+  type BatchMessage {
+    id: ID!
+    name: String!
+    content: String!
+    audience: BatchMessageAudience!
+    channelIds: [ID!]
+    channels: BatchMessageChannels!
+    status: String!
+    recipientCount: Int!
+    sentCount: Int!
+    failedCount: Int!
+    failureLog: [BatchMessageFailureEntry!]
+    createdByUserId: String
+    createdAt: DateTime!
+    sentAt: DateTime
+  }
+
+  type BatchMessageList {
+    items: [BatchMessage!]!
+    totalItems: Int!
+  }
+
+  input BatchMessageListOptions {
+    skip: Int
+    take: Int
   }
 
   type ChannelsByStatus {
@@ -343,6 +404,8 @@ export const SUPER_ADMIN_SCHEMA = gql`
     administratorDetail(administratorId: ID!): PlatformAdministratorDetail
     platformSettings: PlatformSettings!
     platformMonitoring: PlatformMonitoring!
+    batchMessages(options: BatchMessageListOptions): BatchMessageList!
+    batchMessage(id: ID!): BatchMessage
   }
 
   extend type Mutation {
@@ -380,5 +443,6 @@ export const SUPER_ADMIN_SCHEMA = gql`
       customerId: ID!
       triggerKey: String!
     ): SendTestNotificationResult!
+    sendBatchMessage(input: CreateBatchMessageInput!): BatchMessage!
   }
 `;
