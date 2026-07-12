@@ -19,6 +19,7 @@ export const routes: Routes = [
       { path: 'pending-registrations', loadComponent: () => import('./pages/pending-registrations/pending-registrations.component').then(m => m.PendingRegistrationsComponent) },
       { path: 'subscription-tiers', loadComponent: () => import('./pages/subscription-tiers/subscription-tiers.component').then(m => m.SubscriptionTiersComponent) },
       { path: 'audit-log', loadComponent: () => import('./pages/audit-log/audit-log.component').then(m => m.AuditLogComponent) },
+      { path: 'broadcast', loadComponent: () => import('./pages/batch-messaging/batch-messaging.component').then(m => m.BatchMessagingComponent) },
       { path: 'order-reconciliation', loadComponent: () => import('./pages/order-reconciliation/order-reconciliation.component').then(m => m.OrderReconciliationComponent) },
     ],
   },

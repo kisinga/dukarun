@@ -14,6 +14,7 @@ export interface PlatformStatsResult {
 export interface PlatformChannelResult {
   id: string;
   code: string;
+  name: string;
   token: string;
   customFields: {
     status: string;
@@ -102,6 +103,7 @@ export class PlatformStatsService {
     return {
       id: String(ch.id),
       code: ch.code ?? '',
+      name: ch.name ?? ch.code ?? '',
       token: ch.token ?? '',
       customFields: {
         status,

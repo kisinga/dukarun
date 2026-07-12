@@ -10,6 +10,8 @@ import { PlatformAdminService } from './platform-admin.service';
 import { PlatformStatsService } from './platform-stats.service';
 import { SuperAdminResolver } from './super-admin.resolver';
 import { SUPER_ADMIN_SCHEMA } from './super-admin.schema';
+import { BatchMessagingService } from '../../services/batch-messaging/batch-messaging.service';
+import { BatchMessage } from '../../services/batch-messaging/batch-message.entity';
 
 @VendurePlugin({
   imports: [
@@ -25,7 +27,9 @@ import { SUPER_ADMIN_SCHEMA } from './super-admin.schema';
     PlatformAdminService,
     PendingRegistrationsService,
     SuperAdminResolver,
+    BatchMessagingService,
   ],
+  entities: [BatchMessage],
   adminApiExtensions: {
     schema: SUPER_ADMIN_SCHEMA,
     resolvers: [SuperAdminResolver],

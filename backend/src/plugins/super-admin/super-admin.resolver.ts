@@ -46,6 +46,11 @@ import { renderOutbound } from '../../services/notifications/outbound.render';
 import { PendingRegistrationsService } from './pending-registrations.service';
 import { PlatformAdminService } from './platform-admin.service';
 import { PlatformStatsService } from './platform-stats.service';
+import { BatchMessagingService } from '../../services/batch-messaging/batch-messaging.service';
+import {
+  BatchMessageAudience,
+  CreateBatchMessageInput,
+} from '../../services/batch-messaging/batch-message.types';
 import { SubscriptionTier } from '../subscriptions/subscription.entity';
 import {
   normalizeStorefrontSlug,
@@ -77,7 +82,8 @@ export class SuperAdminResolver {
     private readonly taxRateService: TaxRateService,
     private readonly globalSettingsService: GlobalSettingsService,
     private readonly communicationService: CommunicationService,
-    private readonly outboundDeliveryService: OutboundDeliveryService
+    private readonly outboundDeliveryService: OutboundDeliveryService,
+    private readonly batchMessagingService: BatchMessagingService
   ) {}
 
   @Query()
@@ -1161,5 +1167,43 @@ export class SuperAdminResolver {
       }
     );
     return detail;
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async batchMessages(
+    @Args('options', { nullable: true })
+    options?: {
+      skip?: number;
+      take?: number;
+    }
+  ) {
+    return this.batchMessagingService.list(options ?? {});
+  }
+
+  @Query()
+  @Allow(Permission.SuperAdmin)
+  async batchMessage(@Args('id') id: string) {
+    return this.batchMessagingService.findById(id);
+  }
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  async sendBatchMessage(
+    @Ctx() ctx: RequestContext,
+    @Args('input')
+    input: CreateBatchMessageInput
+  ) {
+    return this.batchMessagingService.create(ctx, {
+      name: input.name,
+      content: input.content,
+      audience: input.audience as BatchMessageAudience,
+      channelIds: input.channelIds,
+      customUserIds: input.customUserIds,
+      channels: {
+        sms: input.channels.sms === true,
+        whatsapp: input.channels.whatsapp === true,
+      },
+    });
   }
 }

@@ -4,6 +4,7 @@ import { SuperAdminResolver } from '../../../src/plugins/super-admin/super-admin
 import { PlatformAuditService } from '../../../src/infrastructure/audit/platform-audit.service';
 import { CommunicationService } from '../../../src/infrastructure/communication/communication.service';
 import { OutboundDeliveryService } from '../../../src/services/notifications/outbound-delivery.service';
+import { BatchMessagingService } from '../../../src/services/batch-messaging/batch-messaging.service';
 
 describe('SuperAdminResolver notification controls', () => {
   const ctx = {} as RequestContext;
@@ -13,6 +14,7 @@ describe('SuperAdminResolver notification controls', () => {
   let globalSettingsService: Partial<GlobalSettingsService>;
   let communicationService: Partial<CommunicationService>;
   let outboundDeliveryService: Partial<OutboundDeliveryService>;
+  let batchMessagingService: Partial<BatchMessagingService>;
 
   beforeEach(() => {
     connection = {
@@ -44,6 +46,21 @@ describe('SuperAdminResolver notification controls', () => {
         OutboundDeliveryService['deliver']
       >,
     };
+    batchMessagingService = {
+      create: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve({ id: 'batch-1' })) as jest.MockedFunction<
+        BatchMessagingService['create']
+      >,
+      list: jest
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve({ items: [], totalItems: 0 })
+        ) as jest.MockedFunction<BatchMessagingService['list']>,
+      findById: jest.fn().mockImplementation(() => Promise.resolve(null)) as jest.MockedFunction<
+        BatchMessagingService['findById']
+      >,
+    };
 
     resolver = new SuperAdminResolver(
       {} as unknown as ConstructorParameters<typeof SuperAdminResolver>[0],
@@ -64,7 +81,8 @@ describe('SuperAdminResolver notification controls', () => {
       {} as unknown as ConstructorParameters<typeof SuperAdminResolver>[15],
       globalSettingsService as unknown as GlobalSettingsService,
       communicationService as unknown as CommunicationService,
-      outboundDeliveryService as unknown as OutboundDeliveryService
+      outboundDeliveryService as unknown as OutboundDeliveryService,
+      batchMessagingService as unknown as BatchMessagingService
     );
   });
 

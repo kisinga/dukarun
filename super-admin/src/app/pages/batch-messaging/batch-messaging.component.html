@@ -1,0 +1,210 @@
+<app-page-header title="Broadcast" subtitle="Send personalized batch messages to administrators" class="mb-6" />
+
+@if (error()) {
+  <div role="alert" class="alert alert-error mb-6">
+    <span>{{ error() }}</span>
+  </div>
+}
+
+@if (success()) {
+  <div role="alert" class="alert alert-success mb-6">
+    <span>{{ success() }}</span>
+  </div>
+}
+
+@if (loading()) {
+  <div class="flex items-center gap-2 text-base-content/70">
+    <span class="loading loading-spinner loading-md"></span>
+    <span>Loading…</span>
+  </div>
+} @else {
+  <div class="space-y-8">
+    <section class="card card-border bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-lg">Compose campaign</h2>
+        <p class="text-sm text-base-content/70 mb-4">
+          Use variables to personalize each message. Recipients will see their own first name and shop name.
+        </p>
+
+        <div class="space-y-4">
+          <label class="form-control w-full max-w-md">
+            <span class="label"><span class="label-text">Campaign name</span></span>
+            <input
+              type="text"
+              class="input input-bordered w-full"
+              [ngModel]="name()"
+              (ngModelChange)="name.set($event)"
+              name="campaignName"
+              placeholder="Launch announcement"
+            />
+          </label>
+
+          <label class="form-control w-full max-w-md">
+            <span class="label"><span class="label-text">Audience</span></span>
+            <select
+              class="select select-bordered w-full"
+              [ngModel]="audience()"
+              (ngModelChange)="audience.set($event)"
+              name="audience"
+            >
+              @for (option of audienceOptions; track option[0]) {
+                <option [value]="option[0]">{{ option[1] }}</option>
+              }
+            </select>
+          </label>
+
+          @if (isChannelScoped()) {
+            <div class="form-control w-full max-w-md">
+              <span class="label"><span class="label-text">Channels</span></span>
+              <div class="flex flex-wrap gap-2">
+                @for (channel of channels(); track channel.id) {
+                  <label class="badge badge-outline cursor-pointer gap-1 p-3">
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm"
+                      [checked]="selectedChannelIds().has(channel.id)"
+                      (change)="toggleChannel(channel.id)"
+                    />
+                    {{ channel.code }}
+                  </label>
+                }
+              </div>
+            </div>
+          }
+
+          @if (isCustomUsers()) {
+            <label class="form-control w-full max-w-md">
+              <span class="label"><span class="label-text">User IDs</span></span>
+              <textarea
+                class="textarea textarea-bordered w-full"
+                [ngModel]="customUserIds()"
+                (ngModelChange)="customUserIds.set($event)"
+                name="customUserIds"
+                rows="2"
+                placeholder="user-1, user-2"
+              ></textarea>
+              <span class="label"><span class="label-text-alt">Separate IDs with commas or spaces</span></span>
+            </label>
+          }
+
+          <div class="form-control w-full max-w-md">
+            <span class="label"><span class="label-text">Channels</span></span>
+            <div class="flex flex-wrap gap-4">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-primary"
+                  [ngModel]="sendSms()"
+                  (ngModelChange)="sendSms.set($event)"
+                  name="sendSms"
+                />
+                <span class="label-text">SMS</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-primary"
+                  [ngModel]="sendWhatsApp()"
+                  (ngModelChange)="sendWhatsApp.set($event)"
+                  name="sendWhatsApp"
+                />
+                <span class="label-text">WhatsApp</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-control w-full">
+            <span class="label">
+              <span class="label-text">Message</span>
+              <span class="label-text-alt">Insert variable:</span>
+            </span>
+            <div class="flex flex-wrap gap-2 mb-2">
+              @for (variable of variables; track variable) {
+                <button
+                  type="button"
+                  class="btn btn-xs btn-outline"
+                  (click)="insertVariable(variable)"
+                >
+                  {{ variable }}
+                </button>
+              }
+            </div>
+            <textarea
+              #messageInput
+              class="textarea textarea-bordered w-full"
+              [ngModel]="content()"
+              (ngModelChange)="content.set($event)"
+              name="messageContent"
+              rows="5"
+              [attr.placeholder]="'Hi {{firstName}}, your shop {{shopName}} is now live.'"
+            ></textarea>
+          </div>
+
+          <div class="card bg-base-200">
+            <div class="card-body py-3">
+              <h3 class="text-sm font-medium">Preview</h3>
+              <p class="text-sm whitespace-pre-wrap text-base-content/80">{{ preview() }}</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="saving()"
+            (click)="send()"
+          >
+            @if (saving()) {
+              <span class="loading loading-spinner loading-sm"></span>
+            }
+            Send campaign
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card card-border bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-lg">History</h2>
+        <p class="text-sm text-base-content/70 mb-4">{{ historyTotal() }} campaigns</p>
+
+        @if (history().length === 0) {
+          <p class="text-base-content/60">No campaigns yet.</p>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="table table-zebra">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Audience</th>
+                  <th>Channels</th>
+                  <th>Status</th>
+                  <th>Recipients</th>
+                  <th>Sent</th>
+                  <th>Failed</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of history(); track item.id) {
+                  <tr>
+                    <td>{{ item.name }}</td>
+                    <td>{{ formatAudience(item.audience) }}</td>
+                    <td>
+                      @if (item.channels.sms) { <span class="badge badge-sm badge-outline mr-1">SMS</span> }
+                      @if (item.channels.whatsapp) { <span class="badge badge-sm badge-outline">WhatsApp</span> }
+                    </td>
+                    <td><span class="badge badge-sm {{ statusClass(item.status) }}">{{ item.status }}</span></td>
+                    <td>{{ item.recipientCount }}</td>
+                    <td>{{ item.sentCount }}</td>
+                    <td>{{ item.failedCount }}</td>
+                    <td>{{ formatDate(item.createdAt) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </section>
+  </div>
+}

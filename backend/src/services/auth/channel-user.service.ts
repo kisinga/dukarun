@@ -5,7 +5,7 @@ import {
   ViewFinancialsPermission,
 } from '../../plugins/ledger/permissions';
 
-const FINANCIAL_PERMISSIONS = [
+export const FINANCIAL_PERMISSIONS = [
   ViewFinancialsPermission.Permission,
   ManageReconciliationPermission.Permission,
 ];
