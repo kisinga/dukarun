@@ -321,14 +321,42 @@ export class OutboundDeliveryService {
         const user = await this.connection.rawConnection
           .getRepository(User)
           .findOne({ where: { id: userId } });
-        const phone = (user?.customFields as Record<string, unknown> | undefined)?.phoneNumber;
-        if (typeof phone === 'string' && phone.trim() && validatePhoneNumber(phone.trim())) {
-          recipients.push({ phone: phone.trim(), userId });
+        const phone = this.resolveAdminPhone(user);
+        if (phone) {
+          recipients.push({ phone, userId });
         }
       }
       return recipients;
     }
     return [];
+  }
+
+  /**
+   * Resolve an admin user's phone number for WhatsApp/SMS delivery.
+   * Prefers the dedicated custom field, then falls back to the user's identifier
+   * (which is the OTP/login phone number for admin accounts).
+   */
+  private resolveAdminPhone(user: User | null | undefined): string | null {
+    if (!user) {
+      return null;
+    }
+    const customPhone = (user.customFields as Record<string, unknown> | undefined)?.phoneNumber;
+    if (
+      typeof customPhone === 'string' &&
+      customPhone.trim() &&
+      validatePhoneNumber(customPhone.trim())
+    ) {
+      return customPhone.trim();
+    }
+    const identifier = user.identifier;
+    if (
+      typeof identifier === 'string' &&
+      identifier.trim() &&
+      validatePhoneNumber(identifier.trim())
+    ) {
+      return identifier.trim();
+    }
+    return null;
   }
 
   private async resolveEmailRecipients(

@@ -258,6 +258,59 @@ describe('OutboundDeliveryService shift WhatsApp delivery', () => {
 
     expect(communicationService.send).not.toHaveBeenCalled();
   });
+
+  it('falls back to User.identifier when customFields.phoneNumber is missing', async () => {
+    connection = {
+      rawConnection: {
+        getRepository: jest.fn().mockImplementation(() => ({
+          findOne: jest.fn().mockImplementation((query: unknown) => {
+            const q = query as { where?: { id?: string } };
+            if (q?.where?.id === 'admin-1') {
+              return Promise.resolve({
+                id: 'admin-1',
+                identifier: '0712345678',
+                customFields: {},
+              });
+            }
+            return Promise.resolve(null);
+          }),
+        })),
+      },
+    };
+    service = new OutboundDeliveryService(
+      notificationService as unknown as NotificationService,
+      communicationService as unknown as CommunicationService,
+      channelUserService as unknown as ChannelUserService,
+      connection as TransactionalConnection,
+      globalSettingsService as unknown as GlobalSettingsService,
+      notificationSchedulingService as unknown as NotificationSchedulingService
+    );
+
+    await service.deliver(ctx, 'shift_closed', {
+      channelId: '1',
+      sessionId: 'session-1',
+      storeName: 'ABC Store',
+      cashierName: 'John Doe',
+      openedAt: '2026-07-09T08:23:00.000Z',
+      closedAt: '2026-07-09T17:45:00.000Z',
+      cashSales: 0,
+      creditSales: 0,
+      purchases: 0,
+      cashTotal: 0,
+      mpesaTotal: 0,
+      totalCollected: 0,
+      closingDeclared: 0,
+      variance: 0,
+      varianceThresholdCents: 100,
+    });
+
+    expect(communicationService.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: 'whatsapp',
+        recipient: '0712345678',
+      })
+    );
+  });
 });
 
 describe('OutboundDeliveryService customer notification gating', () => {

@@ -20,7 +20,10 @@ describe('BatchMessagingService', () => {
   let savedBatchMessages: BatchMessage[];
   let queuedJobs: Array<{ data: { batchMessageId: string } }>;
 
-  function createAdmin() {
+  function createAdmin(overrides?: {
+    identifier?: string;
+    customFields?: Record<string, unknown>;
+  }) {
     return {
       id: 1,
       firstName: 'Jane',
@@ -28,8 +31,8 @@ describe('BatchMessagingService', () => {
       emailAddress: 'jane@example.com',
       user: {
         id: 'user-1',
-        identifier: 'jane@example.com',
-        customFields: { phoneNumber: '0712345678' },
+        identifier: overrides?.identifier ?? 'jane@example.com',
+        customFields: overrides?.customFields ?? { phoneNumber: '0712345678' },
         roles: [],
       },
     };
@@ -268,6 +271,39 @@ describe('BatchMessagingService', () => {
       expect(final?.sentCount).toBe(0);
       expect(final?.failedCount).toBe(0);
       expect(communicationService.send).not.toHaveBeenCalled();
+    });
+
+    it('falls back to User.identifier when customFields.phoneNumber is missing', async () => {
+      const admin = createAdmin({ identifier: '0712345678', customFields: {} });
+      setupConnection([admin], [admin.user]);
+      service = new BatchMessagingService(
+        connection as unknown as TransactionalConnection,
+        communicationService as unknown as CommunicationService,
+        channelService as unknown as ChannelService,
+        channelUserService as unknown as ChannelUserService,
+        platformAuditService as unknown as PlatformAuditService,
+        jobQueueService as unknown as JobQueueService
+      );
+      await service.onModuleInit();
+
+      const created = await service.create(ctx, {
+        name: 'Identifier fallback',
+        content: 'Hi {{firstName}}',
+        audience: 'ALL_ADMINS',
+        channels: { sms: false, whatsapp: true },
+      });
+
+      await service.process(created.id);
+
+      const final = savedBatchMessages.find(m => m.id === created.id);
+      expect(final?.status).toBe('SENT');
+      expect(final?.sentCount).toBe(1);
+      expect(communicationService.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'whatsapp',
+          recipient: '0712345678',
+        })
+      );
     });
   });
 });
