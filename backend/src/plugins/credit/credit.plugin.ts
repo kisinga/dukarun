@@ -4,6 +4,7 @@ import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.c
 import { ApprovalPlugin } from '../approval/approval.plugin';
 import { CommunicationPlugin } from '../communication/communication.plugin';
 import { LedgerPlugin } from '../ledger/ledger.plugin';
+import { NotificationCoreModule } from '../../services/notifications/notification-core.module';
 import { gql } from 'graphql-tag';
 
 import { CreditService } from '../../services/credit/credit.service';
@@ -529,7 +530,13 @@ const COMBINED_SCHEMA = gql`
 `;
 
 @VendurePlugin({
-  imports: [PluginCommonModule, LedgerPlugin, ApprovalPlugin, CommunicationPlugin],
+  imports: [
+    PluginCommonModule,
+    LedgerPlugin,
+    ApprovalPlugin,
+    CommunicationPlugin,
+    NotificationCoreModule,
+  ],
   providers: [
     // Financial services (ledger infrastructure)
     LedgerQueryService,

@@ -21,7 +21,7 @@ export class AddPendingNotification9990000000005 implements MigrationInterface {
         "scheduledAt" timestamptz NOT NULL,
         "sentAt" timestamptz,
         "attempts" integer NOT NULL DEFAULT 0,
-        "error" character varying,
+        "error" text,
         "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
         CONSTRAINT "PK_pending_notification" PRIMARY KEY ("id")
       );

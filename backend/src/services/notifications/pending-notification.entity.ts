@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
 /**
  * WhatsApp messages that were generated outside the allowed send window.
@@ -7,6 +7,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeor
  * system-generated messages.
  */
 @Entity()
+@Index('IDX_pending_notification_scheduled', ['sentAt', 'scheduledAt'])
 export class PendingNotification {
   @PrimaryGeneratedColumn('uuid')
   id: string;

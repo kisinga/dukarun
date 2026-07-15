@@ -42,22 +42,17 @@ export function getNextWhatsAppFlushTime(date: Date = new Date()): Date {
 
   const currentEatHour = getEatHour(date);
 
-  // 08:00 EAT = 05:00 UTC on the same calendar day (UTC).
-  const targetUtc = Date.UTC(
-    date.getUTCFullYear(),
-    date.getUTCMonth(),
-    date.getUTCDate(),
-    QUIET_HOURS_START_EAT - EAT_OFFSET_HOURS,
-    0,
-    0,
-    0
-  );
+  // Treat the timestamp as EAT by shifting it +3h. The UTC calendar fields of
+  // the shifted date then represent the EAT calendar day.
+  const eatTimestamp = date.getTime() + EAT_OFFSET_HOURS * 60 * 60 * 1000;
+  const target = new Date(eatTimestamp);
 
   if (currentEatHour >= QUIET_HOURS_END_EAT) {
-    // After 19:00 EAT: flush tomorrow morning.
-    return new Date(targetUtc + 24 * 60 * 60 * 1000);
+    // After 19:00 EAT: flush tomorrow morning (EAT calendar day).
+    target.setUTCDate(target.getUTCDate() + 1);
   }
 
-  // Before 08:00 EAT: flush this morning.
-  return new Date(targetUtc);
+  // 08:00 EAT = 05:00 UTC on the same EAT calendar day.
+  target.setUTCHours(QUIET_HOURS_START_EAT - EAT_OFFSET_HOURS, 0, 0, 0);
+  return target;
 }

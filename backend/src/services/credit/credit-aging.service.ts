@@ -32,9 +32,11 @@ export interface CustomerCreditAging {
 /**
  * Computes order-based credit aging for customers.
  *
- * - Due date = order placedAt (or createdAt fallback) + customer creditDuration.
+ * - Due date = order orderPlacedAt (or createdAt fallback) + customer creditDuration.
  * - Days overdue = floor(now - dueDate) for the oldest unpaid order.
  * - Utilization = outstanding / creditLimit (0 if no limit).
+ *
+ * PaymentSettled orders are ignored; they are not expected to carry AR.
  */
 @Injectable()
 export class CreditAgingService {
@@ -83,6 +85,8 @@ export class CreditAgingService {
       .select('DISTINCT order.customerId', 'customerId')
       .where('order.channelId = :channelId', { channelId: ctx.channelId as number })
       .andWhere('order.state IN (:...states)', { states: AR_OWING_ORDER_STATES })
+      .andWhere('order.state != :settledState', { settledState: 'PaymentSettled' })
+      .andWhere('order.totalWithTax > 0')
       .getRawMany()) as Array<{ customerId: string | number }>;
 
     return rows.map(r => String(r.customerId));
@@ -115,7 +119,7 @@ export class CreditAgingService {
       const amountOwing = Math.max(0, totalOwed - settledPayments);
       if (amountOwing <= 0) continue;
 
-      const orderDate = order.createdAt;
+      const orderDate = order.orderPlacedAt ?? order.createdAt;
       if (!orderDate) continue;
 
       const dueDate = this.addDays(new Date(orderDate), creditDurationDays);
@@ -153,7 +157,7 @@ export class CreditAgingService {
 
   private customerPhone(customer: Customer): string | null {
     const cf = (customer.customFields || {}) as Record<string, unknown>;
-    const phone = cf.phoneNumber ?? (customer as any).user?.identifier ?? null;
+    const phone = cf.phoneNumber;
     return typeof phone === 'string' && phone.trim() ? phone.trim() : null;
   }
 

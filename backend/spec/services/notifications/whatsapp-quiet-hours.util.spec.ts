@@ -61,5 +61,12 @@ describe('WhatsApp quiet hours', () => {
       const expected = utcForEat('2026-07-16T08:00:00'); // 05:00 UTC next day
       expect(getNextWhatsAppFlushTime(now).toISOString()).toBe(expected.toISOString());
     });
+
+    it('flushes this morning when before the window across a UTC day boundary', () => {
+      // 02:00 EAT on 16th = 23:00 UTC on 15th. Should still flush at 08:00 EAT on the 16th.
+      const now = utcForEat('2026-07-16T02:00:00'); // 2026-07-15T23:00:00 UTC
+      const expected = utcForEat('2026-07-16T08:00:00'); // 2026-07-16T05:00:00 UTC
+      expect(getNextWhatsAppFlushTime(now).toISOString()).toBe(expected.toISOString());
+    });
   });
 });

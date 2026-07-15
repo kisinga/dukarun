@@ -72,6 +72,10 @@ export class PendingNotificationService {
     await this.repo(ctx).increment({ id }, 'attempts', 1);
   }
 
+  async delete(ctx: RequestContext, id: string): Promise<void> {
+    await this.repo(ctx).delete(id);
+  }
+
   async deleteOldSent(ctx: RequestContext, olderThanDays: number = 7): Promise<number> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - olderThanDays);
