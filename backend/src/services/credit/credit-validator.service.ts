@@ -83,7 +83,7 @@ export class CreditValidatorService {
     reason: 'not_approved_or_frozen' | 'limit_exceeded',
     extra: Record<string, unknown> = {}
   ): void {
-    const key = `${ctx.channelId}:${entityId}:${reason}`;
+    const key = `${ctx.channelId}:${partyType}:${entityId}:${reason}`;
     const last = lastBlockEventByCustomer.get(key) ?? 0;
     const now = Date.now();
     if (now - last < BLOCK_EVENT_THROTTLE_MS) {
@@ -91,18 +91,15 @@ export class CreditValidatorService {
     }
     lastBlockEventByCustomer.set(key, now);
 
+    const eventType =
+      partyType === 'supplier' ? 'supplier_credit_purchase_blocked' : 'credit_sale_blocked';
+
     this.eventBus.publish(
-      new CustomerNotificationEvent(
-        ctx,
-        ctx.channelId?.toString() ?? '',
-        'credit_sale_blocked',
-        entityId,
-        {
-          partyType,
-          reason,
-          ...extra,
-        }
-      )
+      new CustomerNotificationEvent(ctx, ctx.channelId?.toString() ?? '', eventType, entityId, {
+        partyType,
+        reason,
+        ...extra,
+      })
     );
   }
 }

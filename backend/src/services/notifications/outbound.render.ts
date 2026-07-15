@@ -111,6 +111,17 @@ function renderCreditAdminReminder(p: Record<string, unknown>, summary: string):
   };
 }
 
+function renderSupplierApReminder(p: Record<string, unknown>, summary: string): RenderedOutbound {
+  const supplier = p.supplierName ? String(p.supplierName) : 'A supplier';
+  const formatted = formatCentsKes(Number(p.outstandingAmount ?? 0));
+  const reference = p.referenceNumber ? ` (ref: ${p.referenceNumber})` : '';
+  const dueDate = p.dueDate ? ` due ${formatDate(p.dueDate)}` : '';
+  return {
+    inAppTitle: 'Supplier AP Reminder',
+    inAppMessage: `${supplier}: ${summary}${reference}${dueDate}. Outstanding balance ${formatted}.`,
+  };
+}
+
 function renderCreditLimitReached(p: Record<string, unknown>): RenderedOutbound {
   const customer = p.customerName ? String(p.customerName) : 'there';
   const formattedOutstanding = formatCentsKes(Number(p.outstandingAmount ?? 0));
@@ -315,6 +326,29 @@ const RENDERERS: Record<string, RenderFn> = {
       inAppMessage: p.customerName
         ? `Credit sale blocked for ${p.customerName}: ${reason}.`
         : `A credit sale was blocked: ${reason}.`,
+    };
+  },
+  supplier_ap_3_days: p => renderSupplierApReminder(p, 'AP payment due: 3 days overdue'),
+  supplier_ap_7_days: p => renderSupplierApReminder(p, 'AP payment due: 7 days overdue'),
+  supplier_ap_10_days: p => renderSupplierApReminder(p, 'AP payment urgent: 10 days overdue'),
+  supplier_limit_reached: p => ({
+    inAppTitle: 'Supplier Credit Limit Reached',
+    inAppMessage: p.supplierName
+      ? `${p.supplierName} has reached ${p.utilizationPercent ?? 90}% of their credit limit.`
+      : 'A supplier has reached their credit limit.',
+  }),
+  supplier_credit_purchase_blocked: p => {
+    const reasonLabels: Record<string, string> = {
+      not_approved_or_frozen: 'supplier credit not approved or paused',
+      limit_exceeded: 'supplier credit limit exceeded',
+    };
+    const reason =
+      reasonLabels[String(p.reason)] ?? String(p.reason ?? 'supplier credit not available');
+    return {
+      inAppTitle: 'Supplier Credit Purchase Blocked',
+      inAppMessage: p.supplierName
+        ? `Credit purchase blocked for ${p.supplierName}: ${reason}.`
+        : `A supplier credit purchase was blocked: ${reason}.`,
     };
   },
   channel_approved: () => ({

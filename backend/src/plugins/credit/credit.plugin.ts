@@ -10,6 +10,8 @@ import { CreditService } from '../../services/credit/credit.service';
 import { CreditValidatorService } from '../../services/credit/credit-validator.service';
 import { CreditAgingService } from '../../services/credit/credit-aging.service';
 import { CreditNotificationService } from '../../services/credit/credit-notification.service';
+import { SupplierCreditAgingService } from '../../services/credit/supplier-credit-aging.service';
+import { SupplierCreditNotificationService } from '../../services/credit/supplier-credit-notification.service';
 import { CreditNotificationCheckpoint } from '../../services/credit/credit-notification-checkpoint.entity';
 import { ChartOfAccountsService } from '../../services/financial/chart-of-accounts.service';
 import { FinancialService } from '../../services/financial/financial.service';
@@ -543,6 +545,8 @@ const COMBINED_SCHEMA = gql`
     CreditValidatorService,
     CreditAgingService,
     CreditNotificationService,
+    SupplierCreditAgingService,
+    SupplierCreditNotificationService,
     // Order services
     OrderCreationService,
     PriceOverrideService,

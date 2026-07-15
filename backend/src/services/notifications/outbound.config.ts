@@ -176,6 +176,37 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
     channels: { inApp: true, sms: false, email: false, whatsapp: false },
     inAppType: NotificationType.PAYMENT,
   },
+  // Supplier AP reminders: internal only (channel admins, in-app)
+  supplier_ap_3_days: {
+    audience: 'channel_admins',
+    category: 'finance',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
+  supplier_ap_7_days: {
+    audience: 'channel_admins',
+    category: 'finance',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
+  supplier_ap_10_days: {
+    audience: 'channel_admins',
+    category: 'finance',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
+  supplier_limit_reached: {
+    audience: 'channel_admins',
+    category: 'finance',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
+  supplier_credit_purchase_blocked: {
+    audience: 'channel_admins',
+    category: 'finance',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
   // Channel status (channel admins, in-app)
   channel_approved: {
     audience: 'channel_admins',
