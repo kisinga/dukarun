@@ -9,6 +9,8 @@ import {
   VendureConfig,
 } from '@vendure/core';
 import { OrderCancellationProcess } from './services/orders/order-cancellation-process';
+import { creditReminderTask } from './scheduled-tasks/credit-reminder.task';
+import { whatsappFlushTask } from './scheduled-tasks/whatsapp-flush.task';
 import { defaultEmailHandlers, EmailPlugin, FileBasedTemplateLoader } from '@vendure/email-plugin';
 import { otpEmailHandler } from './config/email/otp-email-handler';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
@@ -238,6 +240,9 @@ export const config: VendureConfig = {
   },
   shippingOptions: {
     fulfillmentHandlers: [manualFulfillmentHandler],
+  },
+  schedulerOptions: {
+    tasks: [creditReminderTask, whatsappFlushTask],
   },
   plugins: [
     EnvironmentPlugin, // Must be first to ensure env config is available

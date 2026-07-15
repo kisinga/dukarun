@@ -8,6 +8,9 @@ import { gql } from 'graphql-tag';
 
 import { CreditService } from '../../services/credit/credit.service';
 import { CreditValidatorService } from '../../services/credit/credit-validator.service';
+import { CreditAgingService } from '../../services/credit/credit-aging.service';
+import { CreditNotificationService } from '../../services/credit/credit-notification.service';
+import { CreditNotificationCheckpoint } from '../../services/credit/credit-notification-checkpoint.entity';
 import { ChartOfAccountsService } from '../../services/financial/chart-of-accounts.service';
 import { FinancialService } from '../../services/financial/financial.service';
 import { LedgerPostingService } from '../../services/financial/ledger-posting.service';
@@ -538,6 +541,8 @@ const COMBINED_SCHEMA = gql`
     // Credit services
     CreditService,
     CreditValidatorService,
+    CreditAgingService,
+    CreditNotificationService,
     // Order services
     OrderCreationService,
     PriceOverrideService,
@@ -576,6 +581,7 @@ const COMBINED_SCHEMA = gql`
     OrderReconciliationService,
     PurchaseReconciliationService,
   ],
+  entities: [CreditNotificationCheckpoint],
   configuration: config => {
     // Register custom permissions
     config.authOptions.customPermissions = [
