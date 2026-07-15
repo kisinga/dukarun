@@ -2,10 +2,7 @@ import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
 import { LedgerPlugin } from '../ledger/ledger.plugin';
 import { CommunicationPlugin } from '../communication/communication.plugin';
-import { NotificationService } from '../../services/notifications/notification.service';
-import { OutboundDeliveryService } from '../../services/notifications/outbound-delivery.service';
-import { PushNotificationService } from '../../services/notifications/push-notification.service';
-import { AdminNotificationService } from '../../services/notifications/admin-notification.service';
+import { NotificationCoreModule } from '../../services/notifications/notification-core.module';
 import { ChannelCommunicationService } from '../../services/channels/channel-communication.service';
 import { AccountNotificationDeliveryService } from '../../services/channels/account-notification-delivery.service';
 import { NotificationSubscriber } from '../../infrastructure/events/notification.subscriber';
@@ -28,7 +25,7 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
  * - NotificationService handles user preferences
  */
 @VendurePlugin({
-  imports: [PluginCommonModule, LedgerPlugin, CommunicationPlugin],
+  imports: [PluginCommonModule, LedgerPlugin, CommunicationPlugin, NotificationCoreModule],
   providers: [
     // Worker context service (required for background tasks)
     WorkerContextService,
@@ -40,12 +37,6 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
 
     // Core services
     ChannelUserService,
-
-    // Notification services
-    NotificationService,
-    OutboundDeliveryService,
-    PushNotificationService,
-    AdminNotificationService,
 
     // Account balance notifications to customer (SMS/email; composable for supplier later)
     AccountNotificationDeliveryService,

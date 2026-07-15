@@ -4,12 +4,15 @@ import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.c
 import { ApprovalPlugin } from '../approval/approval.plugin';
 import { CommunicationPlugin } from '../communication/communication.plugin';
 import { LedgerPlugin } from '../ledger/ledger.plugin';
+import { NotificationCoreModule } from '../../services/notifications/notification-core.module';
 import { gql } from 'graphql-tag';
 
 import { CreditService } from '../../services/credit/credit.service';
 import { CreditValidatorService } from '../../services/credit/credit-validator.service';
 import { CreditAgingService } from '../../services/credit/credit-aging.service';
 import { CreditNotificationService } from '../../services/credit/credit-notification.service';
+import { SupplierCreditAgingService } from '../../services/credit/supplier-credit-aging.service';
+import { SupplierCreditNotificationService } from '../../services/credit/supplier-credit-notification.service';
 import { CreditNotificationCheckpoint } from '../../services/credit/credit-notification-checkpoint.entity';
 import { ChartOfAccountsService } from '../../services/financial/chart-of-accounts.service';
 import { FinancialService } from '../../services/financial/financial.service';
@@ -527,7 +530,13 @@ const COMBINED_SCHEMA = gql`
 `;
 
 @VendurePlugin({
-  imports: [PluginCommonModule, LedgerPlugin, ApprovalPlugin, CommunicationPlugin],
+  imports: [
+    PluginCommonModule,
+    LedgerPlugin,
+    ApprovalPlugin,
+    CommunicationPlugin,
+    NotificationCoreModule,
+  ],
   providers: [
     // Financial services (ledger infrastructure)
     LedgerQueryService,
@@ -543,6 +552,8 @@ const COMBINED_SCHEMA = gql`
     CreditValidatorService,
     CreditAgingService,
     CreditNotificationService,
+    SupplierCreditAgingService,
+    SupplierCreditNotificationService,
     // Order services
     OrderCreationService,
     PriceOverrideService,

@@ -12,12 +12,15 @@ export interface WhatsAppSendRequest {
   metadata?: Record<string, unknown>;
 }
 
+const MAX_WHATSAPP_ATTEMPTS = 3;
+
 /**
  * Centralizes scheduling decisions for system-generated WhatsApp messages.
  *
  * - Messages generated outside 08:00–19:00 EAT are persisted and flushed the
  *   next morning.
  * - Messages generated inside the window are sent immediately.
+ * - Persistent failures are dropped after MAX_WHATSAPP_ATTEMPTS attempts.
  */
 @Injectable()
 export class NotificationSchedulingService {
@@ -64,6 +67,7 @@ export class NotificationSchedulingService {
     let failed = 0;
 
     for (const pending of due) {
+      const attemptsAfterThis = pending.attempts + 1;
       await this.pendingNotificationService.incrementAttempts(ctx, pending.id);
       const result = await this.communicationService.send({
         channel: 'whatsapp',
@@ -78,15 +82,22 @@ export class NotificationSchedulingService {
         await this.pendingNotificationService.markSent(ctx, pending.id);
         sent++;
       } else {
-        await this.pendingNotificationService.markError(
-          ctx,
-          pending.id,
-          result.error ?? 'unknown error'
-        );
         failed++;
-        this.logger.warn(
-          `Failed to flush pending WhatsApp ${pending.triggerKey} to ${pending.recipient}: ${result.error}`
-        );
+        if (attemptsAfterThis >= MAX_WHATSAPP_ATTEMPTS) {
+          await this.pendingNotificationService.delete(ctx, pending.id);
+          this.logger.warn(
+            `Giving up on pending WhatsApp ${pending.triggerKey} to ${pending.recipient} after ${MAX_WHATSAPP_ATTEMPTS} attempts: ${result.error}`
+          );
+        } else {
+          await this.pendingNotificationService.markError(
+            ctx,
+            pending.id,
+            result.error ?? 'unknown error'
+          );
+          this.logger.warn(
+            `Failed to flush pending WhatsApp ${pending.triggerKey} to ${pending.recipient}: ${result.error}`
+          );
+        }
       }
     }
 

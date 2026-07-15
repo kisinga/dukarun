@@ -7,7 +7,9 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 
  * more than once.
  */
 @Entity()
-@Index(['customerId', 'triggerKey', 'bucket'], { unique: true })
+@Index('IDX_credit_notification_checkpoint_lookup', ['customerId', 'triggerKey', 'bucket'], {
+  unique: true,
+})
 export class CreditNotificationCheckpoint {
   @PrimaryGeneratedColumn('uuid')
   id: string;

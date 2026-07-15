@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { ChannelService, RequestContext, ScheduledTask } from '@vendure/core';
 import { CreditNotificationService } from '../services/credit/credit-notification.service';
+import { SupplierCreditNotificationService } from '../services/credit/supplier-credit-notification.service';
 
 const logger = new Logger('CreditReminderTask');
 
@@ -8,7 +9,8 @@ const logger = new Logger('CreditReminderTask');
  * Daily credit-reminder scan.
  *
  * Runs at 09:00 EAT (06:00 UTC). Iterates over all channels and sends
- * period-elapsed / limit-reached reminders for customers with outstanding AR.
+ * period-elapsed / limit-reached reminders for customers with outstanding AR
+ * and internal AP reminders for suppliers.
  */
 export const creditReminderTask = new ScheduledTask({
   id: 'credit-reminder',
@@ -19,6 +21,7 @@ export const creditReminderTask = new ScheduledTask({
 
     const channelService = injector.get(ChannelService);
     const creditNotificationService = injector.get(CreditNotificationService);
+    const supplierCreditNotificationService = injector.get(SupplierCreditNotificationService);
 
     const emptyCtx = RequestContext.empty();
     const channels = await channelService.findAll(emptyCtx);
@@ -32,13 +35,24 @@ export const creditReminderTask = new ScheduledTask({
       });
 
       try {
-        const result = await creditNotificationService.runDailyScan(ctx);
+        const customerResult = await creditNotificationService.runDailyScan(ctx);
         logger.log(
-          `Credit reminder scan completed for channel ${channel.id}: ${JSON.stringify(result)}`
+          `Credit reminder scan completed for channel ${channel.id}: ${JSON.stringify(customerResult)}`
         );
       } catch (error) {
         logger.error(
           `Credit reminder scan failed for channel ${channel.id}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+
+      try {
+        const supplierResult = await supplierCreditNotificationService.runDailyScan(ctx);
+        logger.log(
+          `Supplier AP reminder scan completed for channel ${channel.id}: ${JSON.stringify(supplierResult)}`
+        );
+      } catch (error) {
+        logger.error(
+          `Supplier AP reminder scan failed for channel ${channel.id}: ${error instanceof Error ? error.message : String(error)}`
         );
       }
     }

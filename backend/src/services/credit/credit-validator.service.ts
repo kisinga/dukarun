@@ -9,6 +9,7 @@ import { CreditPartyType } from './credit-party.types';
  * events for the same customer in the same process.
  */
 const BLOCK_EVENT_THROTTLE_MS = 60 * 60 * 1000; // 1 hour
+const MAX_THROTTLE_ENTRIES = 10_000;
 const lastBlockEventByCustomer = new Map<string, number>();
 
 /**
@@ -83,26 +84,30 @@ export class CreditValidatorService {
     reason: 'not_approved_or_frozen' | 'limit_exceeded',
     extra: Record<string, unknown> = {}
   ): void {
-    const key = `${ctx.channelId}:${entityId}:${reason}`;
-    const last = lastBlockEventByCustomer.get(key) ?? 0;
+    const key = `${ctx.channelId}:${partyType}:${entityId}:${reason}`;
     const now = Date.now();
-    if (now - last < BLOCK_EVENT_THROTTLE_MS) {
+    const last = lastBlockEventByCustomer.get(key);
+    if (last !== undefined && now - last < BLOCK_EVENT_THROTTLE_MS) {
       return;
+    }
+
+    if (lastBlockEventByCustomer.size >= MAX_THROTTLE_ENTRIES) {
+      const oldest = lastBlockEventByCustomer.keys().next().value as string | undefined;
+      if (oldest !== undefined) {
+        lastBlockEventByCustomer.delete(oldest);
+      }
     }
     lastBlockEventByCustomer.set(key, now);
 
+    const eventType =
+      partyType === 'supplier' ? 'supplier_credit_purchase_blocked' : 'credit_sale_blocked';
+
     this.eventBus.publish(
-      new CustomerNotificationEvent(
-        ctx,
-        ctx.channelId?.toString() ?? '',
-        'credit_sale_blocked',
-        entityId,
-        {
-          partyType,
-          reason,
-          ...extra,
-        }
-      )
+      new CustomerNotificationEvent(ctx, ctx.channelId?.toString() ?? '', eventType, entityId, {
+        partyType,
+        reason,
+        ...extra,
+      })
     );
   }
 }

@@ -99,7 +99,12 @@ export class CreditNotificationService {
   }
 
   private selectBucket(aging: CustomerCreditAging): BucketResult | null {
-    // Limit reached takes precedence over period reminders when utilization is high.
+    // 10+ days overdue always freezes, even if utilization is also high.
+    if (aging.daysOverdue >= 10) {
+      return { bucket: 'period_10_days_frozen', shouldFreeze: true };
+    }
+
+    // Limit reached takes precedence over the gentler period reminders.
     if (aging.utilizationPercent >= LIMIT_REACHED_THRESHOLD) {
       return { bucket: 'limit_reached', shouldFreeze: false };
     }
@@ -114,7 +119,7 @@ export class CreditNotificationService {
         ) {
           continue;
         }
-        return { bucket, shouldFreeze: bucket === 'period_10_days_frozen' };
+        return { bucket, shouldFreeze: false };
       }
     }
 

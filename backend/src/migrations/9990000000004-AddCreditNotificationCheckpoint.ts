@@ -21,22 +21,8 @@ export class AddCreditNotificationCheckpoint9990000000004 implements MigrationIn
     `);
 
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS "IDX_credit_notification_checkpoint_lookup"
+      CREATE UNIQUE INDEX IF NOT EXISTS "IDX_credit_notification_checkpoint_lookup"
       ON "credit_notification_checkpoint" ("customerId", "triggerKey", "bucket");
-    `);
-
-    await queryRunner.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_constraint
-          WHERE conname = 'UQ_credit_notification_checkpoint_lookup'
-        ) THEN
-          ALTER TABLE "credit_notification_checkpoint"
-          ADD CONSTRAINT "UQ_credit_notification_checkpoint_lookup"
-          UNIQUE ("customerId", "triggerKey", "bucket");
-        END IF;
-      END $$;
     `);
   }
 

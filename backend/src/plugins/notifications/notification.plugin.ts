@@ -1,34 +1,15 @@
 import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
-import { CommunicationPlugin } from '../communication/communication.plugin';
+import { NotificationCoreModule } from '../../services/notifications/notification-core.module';
 import { NotificationResolver, notificationSchema } from './notification.resolver';
-import {
-  NotificationService,
-  Notification,
-  PushSubscription,
-} from '../../services/notifications/notification.service';
+import { Notification, PushSubscription } from '../../services/notifications/notification.service';
 import { NotificationTestController } from './notification-test.controller';
-import { PushNotificationService } from '../../services/notifications/push-notification.service';
-import { AdminNotificationService } from '../../services/notifications/admin-notification.service';
-import { OutboundDeliveryService } from '../../services/notifications/outbound-delivery.service';
-import { ChannelUserService } from '../../services/auth/channel-user.service';
 import { PendingNotification } from '../../services/notifications/pending-notification.entity';
-import { PendingNotificationService } from '../../services/notifications/pending-notification.service';
-import { NotificationSchedulingService } from '../../services/notifications/notification-scheduling.service';
 
 @VendurePlugin({
-  imports: [PluginCommonModule, CommunicationPlugin],
-  providers: [
-    NotificationResolver,
-    NotificationService,
-    PushNotificationService,
-    OutboundDeliveryService,
-    AdminNotificationService,
-    ChannelUserService,
-    PendingNotificationService,
-    NotificationSchedulingService,
-  ],
-  exports: [NotificationService, OutboundDeliveryService, NotificationSchedulingService],
+  imports: [PluginCommonModule, NotificationCoreModule],
+  providers: [NotificationResolver],
+  exports: [NotificationResolver],
   controllers: [NotificationTestController],
   entities: [Notification, PushSubscription, PendingNotification],
   adminApiExtensions: {

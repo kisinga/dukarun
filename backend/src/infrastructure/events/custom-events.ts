@@ -103,7 +103,9 @@ export class CustomerNotificationEvent extends DukaHubEvent {
       | 'balance_changed'
       | 'repayment_deadline'
       | 'credit_reminder'
-      | 'credit_sale_blocked',
+      | 'credit_sale_blocked'
+      | 'supplier_credit_reminder'
+      | 'supplier_credit_purchase_blocked',
     public readonly customerId: string,
     data: Record<string, any> = {}
   ) {
