@@ -81,6 +81,13 @@ export class BatchMessagingComponent implements OnInit {
 
   isCustomUsers = computed(() => this.audience() === 'CUSTOM_USER_IDS');
 
+  allChannelsSelected = computed(() => {
+    const channels = this.channels();
+    if (channels.length === 0) return false;
+    const selected = this.selectedChannelIds();
+    return channels.every(c => selected.has(c.id));
+  });
+
   previewContext = computed(() => {
     const channelId = Array.from(this.selectedChannelIds())[0];
     const channel = this.channels().find(c => c.id === channelId);
@@ -130,6 +137,14 @@ export class BatchMessagingComponent implements OnInit {
       next.add(channelId);
     }
     this.selectedChannelIds.set(next);
+  }
+
+  toggleSelectAll(): void {
+    if (this.allChannelsSelected()) {
+      this.selectedChannelIds.set(new Set());
+    } else {
+      this.selectedChannelIds.set(new Set(this.channels().map(c => c.id)));
+    }
   }
 
   insertVariable(variable: string): void {

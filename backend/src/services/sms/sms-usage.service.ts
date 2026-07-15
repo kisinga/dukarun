@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ChannelService, RequestContext, TransactionalConnection } from '@vendure/core';
-import { SubscriptionTier } from '../../plugins/subscriptions/subscription.entity';
+import { EntitlementService } from '../subscriptions/entitlement.service';
 import {
   type SmsCategory,
   type SmsUsageByCategory,
@@ -51,7 +51,8 @@ export class SmsUsageService {
 
   constructor(
     private readonly connection: TransactionalConnection,
-    private readonly channelService: ChannelService
+    private readonly channelService: ChannelService,
+    private readonly entitlementService: EntitlementService
   ) {}
 
   /**
@@ -65,15 +66,7 @@ export class SmsUsageService {
     }
 
     const customFields = (channel as any).customFields || {};
-    const tierId = customFields.subscriptionTierId ?? customFields.subscriptiontierid;
-    let limit = 0;
-    if (tierId) {
-      const tierRepo = this.connection.rawConnection.getRepository(SubscriptionTier);
-      const tier = await tierRepo.findOne({ where: { id: tierId } });
-      if (tier && tier.smsLimit != null && tier.smsLimit > 0) {
-        limit = tier.smsLimit;
-      }
-    }
+    const limit = (await this.entitlementService.getLimit(ctx, channelId, 'smsPerPeriod')) ?? 0;
 
     const now = new Date();
     const byCategory = parseUsageByCategory(customFields.smsUsageByCategory);

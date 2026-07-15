@@ -9,6 +9,7 @@ import {
   SUBSCRIPTION_PUBLIC_SCHEMA,
 } from './subscription-public.resolver';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
+import { EntitlementService } from '../../services/subscriptions/entitlement.service';
 import { PaystackService } from '../../services/payments/paystack.service';
 import { SubscriptionWebhookController } from './subscription-webhook.controller';
 import { SubscriptionTier } from './subscription.entity';
@@ -36,6 +37,7 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
     WorkerContextService,
     // SubscriptionResolver is only in adminApiExtensions.resolvers so it is not discovered for shop API
     SubscriptionService,
+    EntitlementService,
     PaystackService,
     RedisCacheService,
     SubscriptionGuard,
@@ -48,6 +50,7 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
   ],
   exports: [
     SubscriptionService, // Export for use by ChannelEventRouterService
+    EntitlementService,
   ],
   controllers: [SubscriptionWebhookController],
   adminApiExtensions: {

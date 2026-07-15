@@ -667,15 +667,38 @@ export class PaymentAllocationService {
           lastModifiedByUserId: transactionCtx.activeUserId || undefined,
         });
 
+        // Vendure's default payment process already auto-transitions an order to
+        // PaymentSettled once the settled payment total covers order.totalWithTax.
+        // That happens inside each tender's settlement above, so the order may already
+        // be PaymentSettled by the time we get here. Re-load the order to see the true
+        // current state before deciding whether to advance manually.
+        const settledOrder = await this.orderService.findOne(transactionCtx, input.orderId, [
+          'payments',
+        ]);
+        if (!settledOrder) {
+          throw new UserInputError(`Order ${input.orderId} disappeared during settlement`);
+        }
+
+        const settledTotal = (settledOrder.payments || [])
+          .filter(p => p.state === 'Settled')
+          .reduce((sum, p) => sum + p.amount, 0);
+        const isFullyPaid = settledTotal >= settledOrder.totalWithTax;
+
         // Only advance out of pre-payment states. Fulfilled/Shipped/Delivered are terminal
         // lifecycle states and must not be rewound to PaymentSettled.
         let advanced = false;
-        if (txOrder.state === 'ArrangingPayment' || txOrder.state === 'PaymentAuthorized') {
+        if (
+          isFullyPaid &&
+          (settledOrder.state === 'ArrangingPayment' || settledOrder.state === 'PaymentAuthorized')
+        ) {
           await this.transitionOrderToState(
             transactionCtx,
-            txOrder.id.toString(),
+            settledOrder.id.toString(),
             'PaymentSettled'
           );
+          advanced = true;
+        } else if (settledOrder.state === 'PaymentSettled') {
+          // Default payment process already advanced the order.
           advanced = true;
         }
 
