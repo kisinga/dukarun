@@ -10,6 +10,30 @@ import {
 } from '@vendure/core';
 import type { SelectQueryBuilder } from 'typeorm';
 import { InventoryBatch } from './entities/inventory-batch.entity';
+<<<<<<< HEAD
+
+/**
+ * Return a Date representing the start of the given date (00:00:00.000).
+ * Expiry dates are stored without a meaningful time component; treating them
+ * as date-only avoids marking stock expired in the middle of its use-by day.
+ */
+function startOfDay(date: Date): Date {
+  const result = new Date(date);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+/**
+ * Return a Date representing the end of the given date (23:59:59.999).
+ */
+function endOfDay(date: Date): Date {
+  const result = new Date(date);
+  result.setHours(23, 59, 59, 999);
+  return result;
+}
+=======
+import { endOfDay, startOfDay } from './utils/expiry-date.util';
+>>>>>>> 37ecfc59 (fix(inventory): date-only expiry rule for alerts, sales, and UI)
 
 export type InventoryAlertFilter = 'LOW_STOCK' | 'EXPIRING_SOON' | 'EXPIRED';
 
@@ -172,7 +196,7 @@ export class InventoryAlertService {
       .createQueryBuilder('variant')
       .select('variant.productId', 'productId')
       .innerJoin(Product, 'product', 'product.id = variant.productId')
-      .innerJoin('product.channels', 'channel', 'channel.id = :channelId_alert')
+      .innerJoin('variant.channels', 'channel', 'channel.id = :channelId_alert')
       .leftJoin(
         InventoryBatch,
         'batch',
@@ -193,10 +217,8 @@ export class InventoryAlertService {
     channelId: number,
     days: number
   ): SelectQueryBuilder<ProductVariant> {
-    const now = new Date();
-    const thresholdDate = new Date(now);
-    thresholdDate.setDate(thresholdDate.getDate() + days);
-    thresholdDate.setHours(23, 59, 59, 999);
+    const today = startOfDay(new Date());
+    const thresholdDate = endOfDay(new Date(today.getTime() + days * 24 * 60 * 60 * 1000));
 
     return this.connection
       .getRepository(ctx, ProductVariant)
@@ -207,7 +229,7 @@ export class InventoryAlertService {
       .where('batch.channelId = :channelId_alert', { channelId_alert: channelId })
       .andWhere('batch.quantity > 0')
       .andWhere('batch.expiryDate IS NOT NULL')
-      .andWhere('batch.expiryDate >= :now_alert', { now_alert: now })
+      .andWhere('batch.expiryDate >= :today_alert', { today_alert: today })
       .andWhere('batch.expiryDate <= :thresholdDate_alert', { thresholdDate_alert: thresholdDate })
       .andWhere('product.deletedAt IS NULL')
       .andWhere('variant.deletedAt IS NULL')
@@ -219,7 +241,7 @@ export class InventoryAlertService {
     ctx: RequestContext,
     channelId: number
   ): SelectQueryBuilder<ProductVariant> {
-    const now = new Date();
+    const today = startOfDay(new Date());
 
     return this.connection
       .getRepository(ctx, ProductVariant)
@@ -230,7 +252,7 @@ export class InventoryAlertService {
       .where('batch.channelId = :channelId_alert', { channelId_alert: channelId })
       .andWhere('batch.quantity > 0')
       .andWhere('batch.expiryDate IS NOT NULL')
-      .andWhere('batch.expiryDate < :now_alert', { now_alert: now })
+      .andWhere('batch.expiryDate < :today_alert', { today_alert: today })
       .andWhere('product.deletedAt IS NULL')
       .andWhere('variant.deletedAt IS NULL')
       .groupBy('variant.id')

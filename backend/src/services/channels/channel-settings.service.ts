@@ -7,6 +7,7 @@ import {
   EventBus,
   RequestContext,
   TransactionalConnection,
+  UserInputError,
 } from '@vendure/core';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { ChannelStatusEvent } from '../../infrastructure/events/custom-events';
@@ -110,6 +111,10 @@ export class ChannelSettingsService {
     lowStockThreshold?: number
   ): Promise<ChannelSettings> {
     const channelId = ctx.channelId!;
+
+    if (lowStockThreshold !== undefined && lowStockThreshold < 0) {
+      throw new UserInputError('lowStockThreshold must be non-negative');
+    }
 
     const updates: any = {};
     if (batchExpiryEnabled !== undefined) updates.batchExpiryEnabled = batchExpiryEnabled;

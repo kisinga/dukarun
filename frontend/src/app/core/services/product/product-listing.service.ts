@@ -46,6 +46,9 @@ export class ProductListingService {
   ): Promise<void> {
     const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
 
+    this.stateService.setIsLoading(true);
+    this.stateService.setError(null);
+
     try {
       const client = this.apolloService.getClient();
       const result = await client.query({
@@ -77,6 +80,9 @@ export class ProductListingService {
   ): Promise<void> {
     const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
 
+    this.stateService.setIsLoading(true);
+    this.stateService.setError(null);
+
     try {
       const client = this.apolloService.getClient();
       const result = await client.query({
@@ -99,9 +105,6 @@ export class ProductListingService {
   }
 
   private applyResult(items: any[], total: number): void {
-    this.stateService.setIsLoading(true);
-    this.stateService.setError(null);
-
     const processedItems = items.map((product: any) => {
       const base = this.mapper.toProductSearchResult(product);
       return {

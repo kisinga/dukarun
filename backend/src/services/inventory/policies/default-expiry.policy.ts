@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RequestContext } from '@vendure/core';
 import { ExpiryPolicy, ExpiryValidationResult } from '../interfaces/expiry-policy.interface';
 import { InventoryBatch, MovementType } from '../interfaces/inventory-store.interface';
+import { isExpired } from '../utils/expiry-date.util';
 
 /**
  * DefaultExpiryPolicy
@@ -41,10 +42,7 @@ export class DefaultExpiryPolicy implements ExpiryPolicy {
       return { allowed: true };
     }
 
-    const now = new Date();
-    const isExpired = batch.expiryDate < now;
-
-    if (!isExpired) {
+    if (!isExpired(batch.expiryDate)) {
       return { allowed: true };
     }
 

@@ -35,6 +35,7 @@ import { PageHeaderComponent } from '../../components/shared/page-header.compone
 import { ListSearchBarComponent } from '../../components/shared/list-search-bar.component';
 import { MoneyComponent } from '../../../core/components/money.component';
 import { stockBadgeClass, stockDisplay } from './utils/product-presentation';
+import { getNearestExpiryDays } from '../../../core/utils/expiry-days.util';
 
 /**
  * Products list page - refactored with composable components
@@ -205,14 +206,7 @@ export class ProductsComponent implements OnInit {
 
   /** Days until the nearest expiry date among open batches. Null if no expiry. */
   getBatchExpiryDays(batches?: Array<{ expiryDate?: string | null }> | null): number | null {
-    if (!batches?.length) return null;
-    const now = new Date().getTime();
-    const daysList = batches
-      .map((b) => (b.expiryDate ? new Date(b.expiryDate).getTime() : null))
-      .filter((t): t is number => t !== null);
-    if (!daysList.length) return null;
-    const nearest = Math.min(...daysList);
-    return Math.floor((nearest - now) / (1000 * 60 * 60 * 24));
+    return getNearestExpiryDays(batches);
   }
 
   /** Human-readable expiry label for a variant's batches. */

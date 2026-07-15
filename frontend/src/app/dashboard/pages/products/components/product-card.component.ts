@@ -14,6 +14,7 @@ import {
   stockTextClass,
   totalStock,
 } from '../utils/product-presentation';
+import { getNearestExpiryDays } from '../../../../core/utils/expiry-days.util';
 
 export interface ProductCardData {
   id: string;
@@ -82,14 +83,7 @@ export class ProductCardComponent {
   variantExpiryDays(
     v: { inventoryBatches?: Array<{ expiryDate?: string | null }> } | undefined,
   ): number | null {
-    const batches = v?.inventoryBatches;
-    if (!batches?.length) return null;
-    const now = new Date().getTime();
-    const times = batches
-      .map((b) => (b.expiryDate ? new Date(b.expiryDate).getTime() : null))
-      .filter((t): t is number => t !== null);
-    if (!times.length) return null;
-    return Math.floor((Math.min(...times) - now) / (1000 * 60 * 60 * 24));
+    return getNearestExpiryDays(v?.inventoryBatches);
   }
 
   variantExpiryLabel(

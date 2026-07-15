@@ -153,7 +153,7 @@ describe('InventoryAlertService', () => {
     await service.getAlertCounts(ctx);
 
     const innerJoinCalls = variantQb.innerJoin.mock.calls;
-    expect(innerJoinCalls.some((call: any[]) => call[0] === 'product.channels')).toBe(true);
+    expect(innerJoinCalls.some((call: any[]) => call[0] === 'variant.channels')).toBe(true);
   });
 
   describe('findAlertProducts', () => {
