@@ -55,7 +55,16 @@
 
           @if (isChannelScoped()) {
             <div class="form-control w-full max-w-md">
-              <span class="label"><span class="label-text">Channels</span></span>
+              <span class="label"><span class="label-text">Shops</span></span>
+              <label class="badge badge-outline cursor-pointer gap-1 p-3 mb-2">
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-sm"
+                  [checked]="allChannelsSelected()"
+                  (change)="toggleSelectAll()"
+                />
+                Select all
+              </label>
               <div class="flex flex-wrap gap-2">
                 @for (channel of channels(); track channel.id) {
                   <label class="badge badge-outline cursor-pointer gap-1 p-3">

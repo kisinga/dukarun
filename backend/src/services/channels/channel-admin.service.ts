@@ -21,6 +21,7 @@ import { RoleTemplateAssignment } from '../../domain/role-template/role-template
 import { RoleTemplate } from '../../domain/role-template/role-template.entity';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { CommunicationService } from '../../infrastructure/communication/communication.service';
+import { EntitlementService } from '../subscriptions/entitlement.service';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 import { RoleTemplateService } from './role-template.service';
 
@@ -60,7 +61,8 @@ export class ChannelAdminService {
     private readonly channelService: ChannelService,
     private readonly roleTemplateService: RoleTemplateService,
     private readonly passwordCipher: PasswordCipher,
-    private readonly eventBus: EventBus
+    private readonly eventBus: EventBus,
+    private readonly entitlementService: EntitlementService
   ) {}
 
   /**
@@ -563,22 +565,16 @@ export class ChannelAdminService {
   }
 
   private async checkAdminCountLimit(ctx: RequestContext): Promise<void> {
-    const channelId = ctx.channelId!;
-    const channel = await this.channelService.findOne(ctx, channelId);
-    if (!channel) {
-      throw new Error('Channel not found');
-    }
-
-    const customFields = (channel.customFields ?? {}) as {
-      maxAdminCount?: number;
-    };
-
-    const maxAdminCount = customFields.maxAdminCount ?? 5;
+    const channelId = String(ctx.channelId!);
     const count = await this.getChannelAdminCount(ctx, channelId);
+    const limit = await this.entitlementService.getLimit(ctx, channelId, 'maxAdmins');
 
-    if (count >= maxAdminCount) {
+    // Preserve legacy default of 5 when no tier or channel limit is configured.
+    // A limit of 0 means unlimited.
+    const effectiveLimit = limit === undefined ? 5 : limit;
+    if (effectiveLimit > 0 && count >= effectiveLimit) {
       throw new BadRequestException(
-        `Maximum admin count (${maxAdminCount}) reached for this channel.`
+        `Maximum admin count (${effectiveLimit}) reached for this channel.`
       );
     }
   }

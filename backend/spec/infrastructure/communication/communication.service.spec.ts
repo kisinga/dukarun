@@ -14,6 +14,13 @@ jest.mock('../../../src/infrastructure/config/environment.config', () => ({
       devMode: false,
       channels: { sms: true, email: true, whatsapp: false },
     },
+    auditDb: {
+      host: 'localhost',
+      port: 5432,
+      name: 'audit_logs',
+      username: 'audit_user',
+      password: 'audit_password',
+    },
   },
 }));
 

@@ -11,6 +11,7 @@ import { RedisCacheService } from '../../infrastructure/storage/redis-cache.serv
 import {
   SubscriptionTier,
   SubscriptionTierFeatures,
+  SubscriptionTierLimits,
 } from '../../plugins/subscriptions/subscription.entity';
 import { generatePaystackEmailFromPhone } from '../../utils/email.utils';
 import { PaystackService } from '../payments/paystack.service';
@@ -981,6 +982,23 @@ export class SubscriptionService {
   }
 
   /**
+   * Normalize tier limits to a clean object with positive integers only.
+   */
+  private normalizeTierLimits(limits: any): SubscriptionTierLimits | null {
+    if (limits == null) return null;
+    if (typeof limits !== 'object' || Array.isArray(limits)) return null;
+
+    const result: SubscriptionTierLimits = {};
+    for (const key of Object.keys(limits) as Array<keyof SubscriptionTierLimits>) {
+      const value = limits[key];
+      if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+        result[key] = value;
+      }
+    }
+    return Object.keys(result).length > 0 ? result : null;
+  }
+
+  /**
    * Normalize tier features to { features: string[] }.
    * Accepts: { features: ["a","b"] } or { features: [ { text: "a", included: true }, ... ] }.
    * Stored and public API use string[] only.
@@ -1010,6 +1028,7 @@ export class SubscriptionService {
       priceYearly: number;
       features?: any;
       smsLimit?: number | null;
+      limits?: SubscriptionTierLimits | null;
       isActive?: boolean;
     }
   ): Promise<SubscriptionTier> {
@@ -1021,6 +1040,7 @@ export class SubscriptionService {
       throw new Error(`Subscription tier with code "${input.code}" already exists`);
     }
 
+    const limits = this.normalizeTierLimits(input.limits);
     const tier = tierRepo.create({
       code: input.code,
       name: input.name,
@@ -1029,6 +1049,7 @@ export class SubscriptionService {
       priceYearly: input.priceYearly,
       features: this.normalizeTierFeatures(input.features),
       smsLimit: input.smsLimit ?? 0,
+      limits,
       isActive: input.isActive !== undefined ? input.isActive : true,
     });
 
@@ -1051,6 +1072,7 @@ export class SubscriptionService {
       priceYearly?: number;
       features?: any;
       smsLimit?: number | null;
+      limits?: SubscriptionTierLimits | null;
       isActive?: boolean;
     }
   ): Promise<SubscriptionTier> {
@@ -1087,6 +1109,21 @@ export class SubscriptionService {
     }
     if (input.smsLimit !== undefined) {
       tier.smsLimit = input.smsLimit;
+      // Keep the new limits object in sync for code that reads limits.smsPerPeriod.
+      if (input.limits === undefined) {
+        tier.limits = {
+          ...(tier.limits ?? {}),
+          smsPerPeriod: input.smsLimit ?? 0,
+        };
+      }
+    }
+    if (input.limits !== undefined) {
+      tier.limits = this.normalizeTierLimits(input.limits);
+      // Keep the legacy smsLimit column in sync when limits.smsPerPeriod is provided.
+      const inputSmsPerPeriod = (input.limits as any)?.smsPerPeriod;
+      if (typeof inputSmsPerPeriod === 'number') {
+        tier.smsLimit = inputSmsPerPeriod;
+      }
     }
     if (input.isActive !== undefined) {
       tier.isActive = input.isActive;

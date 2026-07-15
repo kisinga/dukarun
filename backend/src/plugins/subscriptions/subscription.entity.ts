@@ -10,6 +10,19 @@ export interface SubscriptionTierFeatures {
   features: string[];
 }
 
+export interface SubscriptionTierLimits {
+  /** Maximum administrators allowed per channel. */
+  maxAdmins?: number;
+  /** Maximum products allowed per channel. Not enforced yet. */
+  maxProducts?: number;
+  /** Maximum stock locations allowed per channel. Not enforced yet. */
+  maxStockLocations?: number;
+  /** Maximum orders allowed per 30-day period. Not enforced yet. */
+  maxOrdersPerMonth?: number;
+  /** SMS credits per channel per 30-day period. Null/0 = no limit. */
+  smsPerPeriod?: number;
+}
+
 @Entity()
 export class SubscriptionTier {
   @PrimaryGeneratedColumn('uuid')
@@ -33,9 +46,13 @@ export class SubscriptionTier {
   @Column('jsonb', { nullable: true })
   features: SubscriptionTierFeatures;
 
-  /** SMS credits per channel per 30-day period (synced with subscription expiry). Null/0 = no limit. */
+  /** @deprecated Use limits.smsPerPeriod instead. Kept for migration fallback. */
   @Column('int', { default: 0, nullable: true })
   smsLimit: number | null;
+
+  /** Numeric entitlement limits for this tier. */
+  @Column('jsonb', { nullable: true })
+  limits: SubscriptionTierLimits | null;
 
   @Column({ default: true })
   isActive: boolean;

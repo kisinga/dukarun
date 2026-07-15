@@ -53,6 +53,10 @@ describe('ChannelAdminService', () => {
     update: jest.fn(),
   };
 
+  const mockEntitlementService = {
+    getLimit: jest.fn().mockResolvedValue(undefined as never),
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     service = new ChannelAdminService(
@@ -64,7 +68,8 @@ describe('ChannelAdminService', () => {
       mockChannelService as any,
       mockRoleTemplateService as any,
       mockPasswordCipher as any,
-      mockEventBus as any
+      mockEventBus as any,
+      mockEntitlementService as any
     );
   });
 
