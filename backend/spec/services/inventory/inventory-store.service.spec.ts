@@ -9,6 +9,23 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ID, RequestContext, TransactionalConnection, UserInputError } from '@vendure/core';
 import { InventoryStoreService } from '../../../src/services/inventory/inventory-store.service';
 import { InventoryBatch } from '../../../src/services/inventory/interfaces/inventory-store.interface';
+
+const mockBatchBase: InventoryBatch = {
+  id: 'batch-1',
+  channelId: 1,
+  stockLocationId: 2,
+  productVariantId: 3,
+  quantity: 100,
+  unitCost: 5000,
+  expiryDate: null,
+  sourceType: 'Purchase',
+  sourceId: 'purchase-123',
+  batchNumber: null,
+  consumePriority: false,
+  metadata: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 import {
   InventoryMovement,
   MovementType,
@@ -346,6 +363,122 @@ describe('InventoryStoreService', () => {
 
       expect(queryBuilder.orderBy).toHaveBeenCalledWith('batch.createdAt', 'ASC');
       expect(queryBuilder.addOrderBy).not.toHaveBeenCalled();
+    });
+
+    it('orders by expiryDate then createdAt by default', async () => {
+      const { service, batchRepo } = buildService();
+
+      const queryBuilder = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: (jest.fn() as any).mockResolvedValue([mockBatch]),
+      };
+
+      (batchRepo.createQueryBuilder as any).mockReturnValue(queryBuilder);
+
+      const filters: ConsumptionFilters = {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+      };
+
+      await service.getOpenBatchesForConsumption(ctx, filters);
+
+      expect(queryBuilder.orderBy).toHaveBeenCalledWith('batch.expiryDate', 'ASC', 'NULLS LAST');
+      expect(queryBuilder.addOrderBy).toHaveBeenCalledWith('batch.createdAt', 'ASC');
+    });
+  });
+
+  describe('createBatch consumePriority', () => {
+    it('sets consumePriority when new batch expires sooner than existing stock', async () => {
+      const { service, batchRepo, movementRepo } = buildService();
+
+      const existingExpiry = new Date('2026-12-31');
+      const newExpiry = new Date('2026-06-30');
+
+      const savedBatch: any = {
+        id: 'batch-new',
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 50,
+        unitCost: 5000,
+        expiryDate: newExpiry,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-new',
+        consumePriority: false,
+      };
+
+      (movementRepo.findOne as any).mockResolvedValue(null);
+      (batchRepo.create as any).mockReturnValue(savedBatch);
+      (batchRepo.save as any).mockResolvedValue(savedBatch);
+
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getCount: (jest.fn() as any).mockResolvedValue(1),
+      };
+      (batchRepo.createQueryBuilder as any).mockReturnValue(queryBuilder);
+
+      await service.createBatch(ctx, {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 50,
+        unitCost: 5000,
+        expiryDate: newExpiry,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-new',
+      });
+
+      expect(savedBatch.consumePriority).toBe(true);
+      expect(batchRepo.save).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not set consumePriority when new batch is the latest expiry', async () => {
+      const { service, batchRepo, movementRepo } = buildService();
+
+      const newExpiry = new Date('2026-12-31');
+
+      const savedBatch: any = {
+        id: 'batch-new',
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 50,
+        unitCost: 5000,
+        expiryDate: newExpiry,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-new',
+        consumePriority: false,
+      };
+
+      (movementRepo.findOne as any).mockResolvedValue(null);
+      (batchRepo.create as any).mockReturnValue(savedBatch);
+      (batchRepo.save as any).mockResolvedValue(savedBatch);
+
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getCount: (jest.fn() as any).mockResolvedValue(0),
+      };
+      (batchRepo.createQueryBuilder as any).mockReturnValue(queryBuilder);
+
+      await service.createBatch(ctx, {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 50,
+        unitCost: 5000,
+        expiryDate: newExpiry,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-new',
+      });
+
+      expect(savedBatch.consumePriority).toBe(false);
     });
   });
 

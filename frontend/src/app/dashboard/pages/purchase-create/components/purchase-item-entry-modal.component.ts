@@ -245,35 +245,37 @@ import { CurrencyService } from '../../../../core/services/currency.service';
                 </div>
               </div>
 
-              <div
-                class="flex flex-wrap items-end gap-3 rounded-lg bg-base-100 p-3 border border-base-300"
-              >
-                <div class="flex flex-col gap-1 min-w-0 flex-1">
-                  <label class="text-xs font-medium text-base-content/70" for="batch-number">
-                    Batch / lot number
-                  </label>
-                  <input
-                    id="batch-number"
-                    type="text"
-                    [value]="batchNumber()"
-                    placeholder="Optional (auto-generated on save if blank)"
-                    class="input input-sm input-bordered w-full"
-                    (input)="batchNumber.set($any($event.target).value)"
-                  />
+              @if (batchExpiryEnabled()) {
+                <div
+                  class="flex flex-wrap items-end gap-3 rounded-lg bg-base-100 p-3 border border-base-300"
+                >
+                  <div class="flex flex-col gap-1 min-w-0 flex-1">
+                    <label class="text-xs font-medium text-base-content/70" for="batch-number">
+                      Batch / lot number
+                    </label>
+                    <input
+                      id="batch-number"
+                      type="text"
+                      [value]="batchNumber()"
+                      placeholder="Optional (auto-generated on save if blank)"
+                      class="input input-sm input-bordered w-full"
+                      (input)="batchNumber.set($any($event.target).value)"
+                    />
+                  </div>
+                  <div class="flex flex-col gap-1 min-w-0 flex-1">
+                    <label class="text-xs font-medium text-base-content/70" for="expiry-date">
+                      Expiry / use-by date
+                    </label>
+                    <input
+                      id="expiry-date"
+                      type="date"
+                      [value]="expiryDate()"
+                      class="input input-sm input-bordered w-full"
+                      (input)="expiryDate.set($any($event.target).value)"
+                    />
+                  </div>
                 </div>
-                <div class="flex flex-col gap-1 min-w-0 flex-1">
-                  <label class="text-xs font-medium text-base-content/70" for="expiry-date">
-                    Expiry / use-by date
-                  </label>
-                  <input
-                    id="expiry-date"
-                    type="date"
-                    [value]="expiryDate()"
-                    class="input input-sm input-bordered w-full"
-                    (input)="expiryDate.set($any($event.target).value)"
-                  />
-                </div>
-              </div>
+              }
 
               <button
                 class="btn btn-primary btn-block min-h-[3rem] hover:scale-[1.02] active:scale-95 transition-transform"
@@ -319,6 +321,7 @@ export class PurchaseItemEntryModalComponent {
   readonly isOpen = input.required<boolean>();
   readonly product = input.required<ProductSearchResult | null>();
   readonly variant = input<ProductVariant | null>(null);
+  readonly batchExpiryEnabled = input<boolean>(false);
 
   readonly itemAdded = output<{
     variant: ProductVariant;

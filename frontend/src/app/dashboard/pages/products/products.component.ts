@@ -12,6 +12,7 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { AuthService } from '../../../core/services/auth.service';
+import { CompanyService } from '../../../core/services/company.service';
 import {
   buildProductListOptions,
   type ProductListFilterState,
@@ -19,7 +20,8 @@ import {
 import { FacetService } from '../../../core/services/product/facet.service';
 import { FACET_CODES, type FacetCode } from '../../../core/services/product/facet.types';
 import { ProductService } from '../../../core/services/product.service';
-import { calculateProductStats, isLowStock } from '../../../core/services/stats/product-stats.util';
+import { InventoryAlertFilter } from '../../../core/graphql/generated/graphql';
+import { calculateProductStats } from '../../../core/services/stats/product-stats.util';
 import {
   DeleteConfirmationData,
   DeleteConfirmationModalComponent,
@@ -33,6 +35,7 @@ import { PageHeaderComponent } from '../../components/shared/page-header.compone
 import { ListSearchBarComponent } from '../../components/shared/list-search-bar.component';
 import { MoneyComponent } from '../../../core/components/money.component';
 import { stockBadgeClass, stockDisplay } from './utils/product-presentation';
+import { getNearestExpiryDays } from '../../../core/utils/expiry-days.util';
 
 /**
  * Products list page - refactored with composable components
@@ -66,10 +69,12 @@ export class ProductsComponent implements OnInit {
   private readonly productService = inject(ProductService);
   private readonly facetService = inject(FacetService);
   private readonly authService = inject(AuthService);
+  private readonly companyService = inject(CompanyService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
   readonly canEditProduct = this.authService.hasUpdateProductPermission;
+  readonly batchExpiryEnabled = this.companyService.batchExpiryEnabled;
 
   // View references
   readonly deleteModal = viewChild<DeleteConfirmationModalComponent>('deleteModal');
@@ -80,12 +85,23 @@ export class ProductsComponent implements OnInit {
   readonly error = this.productService.error;
   readonly totalItems = this.productService.totalItems;
 
-  // Local UI state: filters (server-side) + low stock (client-side on current page)
+  // Local UI state: filters (server-side) + inventory alerts (client-side on current page)
   readonly searchQuery = signal('');
   readonly selectedFacetValueIds = signal<Partial<Record<FacetCode, string[]>>>({});
   readonly enabledFilter = signal<'all' | 'active' | 'disabled'>('all');
   readonly sortBy = signal<'name_asc' | 'name_desc' | null>(null);
   readonly showLowStockOnly = signal(false);
+  readonly showExpiringSoonOnly = signal(false);
+  readonly showExpiredOnly = signal(false);
+
+  /** Maps the active UI alert filter to the server-side enum. Only one is active at a time. */
+  private readonly activeAlertFilter = computed(() => {
+    if (this.showLowStockOnly()) return InventoryAlertFilter.LOW_STOCK;
+    if (this.showExpiringSoonOnly()) return InventoryAlertFilter.EXPIRING_SOON;
+    if (this.showExpiredOnly()) return InventoryAlertFilter.EXPIRED;
+    return null;
+  });
+
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
   readonly pageOptions = [10, 25, 50, 100];
@@ -113,14 +129,8 @@ export class ProductsComponent implements OnInit {
     }),
   );
 
-  // Server returns current page; apply low-stock filter client-side only to that page
-  readonly displayedProducts = computed(() => {
-    const list = this.products();
-    if (!this.showLowStockOnly()) return list;
-    return list.filter((product) =>
-      product.variants?.some((v: { stockOnHand?: number }) => isLowStock(v.stockOnHand ?? 0)),
-    );
-  });
+  // Inventory-alert filters are applied server-side so pagination is correct.
+  readonly displayedProducts = computed(() => this.products());
 
   readonly totalPages = computed(() => {
     const total = this.totalItems();
@@ -129,7 +139,7 @@ export class ProductsComponent implements OnInit {
   });
 
   readonly stats = computed((): ProductStats => {
-    return calculateProductStats(this.products());
+    return calculateProductStats(this.products(), this.companyService.lowStockThreshold());
   });
 
   readonly endItem = computed(() => {
@@ -180,7 +190,11 @@ export class ProductsComponent implements OnInit {
 
   /** Stock badge tone for a single expanded variant row (shared with the card/row). */
   variantBadgeClass(v: { stockOnHand?: number; trackInventory?: boolean }): string {
-    return stockBadgeClass(v.stockOnHand ?? 0, v.trackInventory === false);
+    return stockBadgeClass(
+      v.stockOnHand ?? 0,
+      v.trackInventory === false,
+      this.lowStockThreshold(),
+    );
   }
 
   /** Stock label for a single expanded variant row. */
@@ -188,17 +202,45 @@ export class ProductsComponent implements OnInit {
     return stockDisplay(v.stockOnHand ?? 0, v.trackInventory === false);
   }
 
+  readonly lowStockThreshold = this.companyService.lowStockThreshold;
+
+  /** Days until the nearest expiry date among open batches. Null if no expiry. */
+  getBatchExpiryDays(batches?: Array<{ expiryDate?: string | null }> | null): number | null {
+    return getNearestExpiryDays(batches);
+  }
+
+  /** Human-readable expiry label for a variant's batches. */
+  variantExpiryLabel(batches?: Array<{ expiryDate?: string | null }> | null): string | null {
+    const days = this.getBatchExpiryDays(batches);
+    if (days === null) return null;
+    if (days < 0) return `Expired ${Math.abs(days)}d ago`;
+    if (days === 0) return 'Expires today';
+    if (days <= 30) return `Expires in ${days}d`;
+    return `Expires in ${days}d`;
+  }
+
   ngOnInit(): void {
     this.route.queryParams.subscribe((params) => {
       const lowStockParam = params['lowStock'] === 'true';
+      const expiringSoonParam = params['expiringSoon'] === 'true';
+      const expiredParam = params['expired'] === 'true';
       if (lowStockParam !== this.showLowStockOnly()) {
         this.showLowStockOnly.set(lowStockParam);
+      }
+      if (expiringSoonParam !== this.showExpiringSoonOnly()) {
+        this.showExpiringSoonOnly.set(expiringSoonParam);
+      }
+      if (expiredParam !== this.showExpiredOnly()) {
+        this.showExpiredOnly.set(expiredParam);
       }
     });
   }
 
   /**
    * Load product list. Uses cache-first unless forceRefresh or route has ?refresh=1 (e.g. after create/edit).
+   *
+   * When an inventory-alert filter is active the query is routed to the server-side
+   * alert endpoint so pagination covers the full matching result set.
    */
   async loadProducts(forceRefresh?: boolean): Promise<void> {
     const state = this.filterState();
@@ -218,11 +260,14 @@ export class ProductsComponent implements OnInit {
 
     const refreshParam = this.route.snapshot.queryParams['refresh'] === '1';
     const useNetworkOnly = forceRefresh === true || refreshParam;
+    const queryOptions = useNetworkOnly ? { fetchPolicy: 'network-only' as const } : undefined;
 
-    await this.productService.fetchProducts(
-      options,
-      useNetworkOnly ? { fetchPolicy: 'network-only' } : undefined,
-    );
+    const alertFilter = this.activeAlertFilter();
+    if (alertFilter) {
+      await this.productService.fetchProductsByInventoryAlert(alertFilter, options, queryOptions);
+    } else {
+      await this.productService.fetchProducts(options, queryOptions);
+    }
 
     if (refreshParam) {
       await this.router.navigate([], {
@@ -374,9 +419,6 @@ export class ProductsComponent implements OnInit {
   }
 
   /**
-   * Toggle low stock filter and sync with query params
-   */
-  /**
    * Handle low stock filter click from stats component
    */
   onLowStockStatsClick(): void {
@@ -384,13 +426,40 @@ export class ProductsComponent implements OnInit {
   }
 
   toggleLowStockFilter(enabled: boolean): void {
-    this.showLowStockOnly.set(enabled);
+    this.setInventoryAlertFilter('lowStock', enabled);
+  }
+
+  toggleExpiringSoonFilter(enabled: boolean): void {
+    this.setInventoryAlertFilter('expiringSoon', enabled);
+  }
+
+  toggleExpiredFilter(enabled: boolean): void {
+    this.setInventoryAlertFilter('expired', enabled);
+  }
+
+  private setInventoryAlertFilter(
+    type: 'lowStock' | 'expiringSoon' | 'expired',
+    enabled: boolean,
+  ): void {
+    if (type === 'lowStock') this.showLowStockOnly.set(enabled);
+    if (type === 'expiringSoon') this.showExpiringSoonOnly.set(enabled);
+    if (type === 'expired') this.showExpiredOnly.set(enabled);
     this.currentPage.set(1); // Reset to first page when filter changes
 
-    // Update query params without navigation
+    const queryParams: Record<string, string | null> = {};
+    if (enabled) {
+      queryParams[type] = 'true';
+      // Mutually exclusive alert filters for clarity
+      if (type !== 'lowStock') queryParams['lowStock'] = null;
+      if (type !== 'expiringSoon') queryParams['expiringSoon'] = null;
+      if (type !== 'expired') queryParams['expired'] = null;
+    } else {
+      queryParams[type] = null;
+    }
+
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: enabled ? { lowStock: 'true' } : {},
+      queryParams,
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });

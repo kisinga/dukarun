@@ -84,6 +84,15 @@
             >
               {{ variantStock(v) }}
             </span>
+            @if (batchExpiryEnabled() && variantExpiryLabel(v); as label) {
+              <span
+                class="badge badge-sm shrink-0 justify-center px-1"
+                [class.badge-warning]="variantExpiryDays(v)! >= 0"
+                [class.badge-error]="variantExpiryDays(v)! < 0"
+              >
+                {{ label }}
+              </span>
+            }
           </li>
         }
       </ul>

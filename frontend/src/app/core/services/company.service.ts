@@ -73,6 +73,12 @@ export class CompanyService {
   readonly cashierFlowEnabled = computed(
     () => this.activeChannelDataSignal()?.customFields?.cashierFlowEnabled ?? false,
   );
+  readonly batchExpiryEnabled = computed(
+    () => this.activeChannelDataSignal()?.customFields?.batchExpiryEnabled ?? false,
+  );
+  readonly lowStockThreshold = computed(
+    () => this.activeChannelDataSignal()?.customFields?.lowStockThreshold ?? 10,
+  );
   readonly enablePrinter = computed(
     () => this.activeChannelDataSignal()?.customFields?.enablePrinter ?? true,
   );
@@ -180,7 +186,7 @@ export class CompanyService {
         query: GET_ACTIVE_CHANNEL,
         fetchPolicy: 'network-only',
       });
-      const channel = result.data?.activeChannel ?? null;
+      const channel = (result.data as GetActiveChannelQuery | undefined)?.activeChannel ?? null;
       this.activeChannelDataSignal.set(channel);
       if (channel) await this.persistAndSync();
     } catch {

@@ -31,6 +31,12 @@ import {
 ])
 @Index('IDX_inventory_batch_channel_source', ['channelId', 'sourceType', 'sourceId'])
 @Index('IDX_inventory_batch_expiry', ['expiryDate'])
+@Index('IDX_inventory_batch_priority', [
+  'channelId',
+  'stockLocationId',
+  'productVariantId',
+  'consumePriority',
+])
 @Index('UQ_inventory_batch_channel_batchNumber', ['channelId', 'batchNumber'], { unique: true })
 export class InventoryBatch {
   @PrimaryGeneratedColumn('uuid')
@@ -72,6 +78,14 @@ export class InventoryBatch {
   /** Optional supplier lot or batch number for traceability */
   @Column({ type: 'varchar', length: 128, nullable: true })
   batchNumber!: string | null;
+
+  /**
+   * When true, this batch should be consumed before other open batches,
+   * even if they were received earlier. Set when a batch arrives with an
+   * expiry date sooner than existing open stock for the same variant/location.
+   */
+  @Column({ type: 'boolean', default: false })
+  consumePriority!: boolean;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata!: Record<string, any> | null;

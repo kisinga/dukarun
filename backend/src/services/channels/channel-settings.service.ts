@@ -7,6 +7,7 @@ import {
   EventBus,
   RequestContext,
   TransactionalConnection,
+  UserInputError,
 } from '@vendure/core';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { ChannelStatusEvent } from '../../infrastructure/events/custom-events';
@@ -14,12 +15,16 @@ import { getChannelStatus } from '../../domain/channel-custom-fields';
 
 export interface ChannelSettings {
   cashierFlowEnabled: boolean;
+  batchExpiryEnabled: boolean;
+  lowStockThreshold: number;
   enablePrinter: boolean;
   companyLogoAsset?: Asset | null;
 }
 
 export interface UpdateChannelSettingsInput {
   cashierFlowEnabled?: boolean;
+  batchExpiryEnabled?: boolean;
+  lowStockThreshold?: number;
   enablePrinter?: boolean;
   companyLogoAssetId?: string | null;
 }
@@ -85,6 +90,37 @@ export class ChannelSettingsService {
 
     if (Object.keys(updates).length > 0) {
       // Use channelService.update for scalar fields (handles column mapping correctly)
+      await this.channelService.update(ctx, {
+        id: channelId,
+        customFields: updates,
+      });
+
+      await this.auditService.log(ctx, 'channel.settings.updated', {
+        entityType: 'Channel',
+        entityId: channelId.toString(),
+        data: { fields: Object.keys(updates) },
+      });
+    }
+
+    return this.getSettings(ctx);
+  }
+
+  async updateBatchExpirySettings(
+    ctx: RequestContext,
+    batchExpiryEnabled?: boolean,
+    lowStockThreshold?: number
+  ): Promise<ChannelSettings> {
+    const channelId = ctx.channelId!;
+
+    if (lowStockThreshold !== undefined && lowStockThreshold < 0) {
+      throw new UserInputError('lowStockThreshold must be non-negative');
+    }
+
+    const updates: any = {};
+    if (batchExpiryEnabled !== undefined) updates.batchExpiryEnabled = batchExpiryEnabled;
+    if (lowStockThreshold !== undefined) updates.lowStockThreshold = lowStockThreshold;
+
+    if (Object.keys(updates).length > 0) {
       await this.channelService.update(ctx, {
         id: channelId,
         customFields: updates,
@@ -290,12 +326,16 @@ export class ChannelSettingsService {
   private mapChannelSettings(channel: Channel): ChannelSettings {
     const customFields = (channel.customFields ?? {}) as {
       cashierFlowEnabled?: boolean;
+      batchExpiryEnabled?: boolean;
+      lowStockThreshold?: number;
       enablePrinter?: boolean;
       companyLogoAsset?: Asset | null;
     };
 
     return {
       cashierFlowEnabled: customFields.cashierFlowEnabled ?? false,
+      batchExpiryEnabled: customFields.batchExpiryEnabled ?? false,
+      lowStockThreshold: customFields.lowStockThreshold ?? 10,
       enablePrinter: customFields.enablePrinter ?? true,
       companyLogoAsset: customFields.companyLogoAsset ?? null,
     };

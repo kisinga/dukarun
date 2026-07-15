@@ -151,6 +151,26 @@ export const STOCK_ADMIN_SCHEMA = gql`
     createdAt: SortOrder
   }
 
+  type InventoryBatch {
+    id: ID!
+    channelId: ID!
+    stockLocationId: ID!
+    productVariantId: ID!
+    quantity: Float!
+    unitCost: Int!
+    expiryDate: DateTime
+    sourceType: String!
+    sourceId: ID!
+    batchNumber: String
+    consumePriority: Boolean!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+
+  extend type ProductVariant {
+    inventoryBatches: [InventoryBatch!]!
+  }
+
   extend type Query {
     purchases(options: PurchaseListOptions): StockPurchaseList!
     purchase(id: ID!): StockPurchase

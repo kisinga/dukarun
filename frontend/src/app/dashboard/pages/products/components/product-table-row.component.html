@@ -76,6 +76,15 @@
 <!-- Total Stock -->
 <td class="text-center">
   <span class="badge badge-sm" [class]="stockBadge()">{{ stockLabel() }}</span>
+  @if (batchExpiryEnabled() && expiryLabel(); as label) {
+    <span
+      class="badge badge-sm ml-1"
+      [class.badge-warning]="nearestExpiryDays()! >= 0"
+      [class.badge-error]="nearestExpiryDays()! < 0"
+    >
+      {{ label }}
+    </span>
+  }
 </td>
 
 <!-- Status -->

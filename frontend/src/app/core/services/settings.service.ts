@@ -1,12 +1,19 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, from } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import type { GetAuditLogsQueryVariables } from '../graphql/generated/graphql';
+import type {
+  GetAuditLogsQueryVariables,
+  UpdateBatchExpirySettingsMutation,
+  UpdateCashierSettingsMutation,
+  UpdateChannelLogoMutation,
+  UpdatePrinterSettingsMutation,
+} from '../graphql/generated/graphql';
 import { LanguageCode } from '../graphql/generated/graphql';
 import {
   CREATE_CHANNEL_PAYMENT_METHOD,
   GET_AUDIT_LOGS,
   INVITE_CHANNEL_ADMINISTRATOR,
+  UPDATE_BATCH_EXPIRY_SETTINGS,
   UPDATE_CHANNEL_LOGO,
   UPDATE_CASHIER_SETTINGS,
   UPDATE_PRINTER_SETTINGS,
@@ -18,6 +25,8 @@ import { CompanyService } from './company.service';
 
 export interface ChannelSettings {
   cashierFlowEnabled: boolean;
+  batchExpiryEnabled: boolean;
+  lowStockThreshold: number;
   enablePrinter: boolean;
   companyLogoAsset?: {
     id: string;
@@ -124,20 +133,20 @@ export class SettingsService {
   // Signals for reactive state
   readonly channelSettings = computed<ChannelSettings | null>(() => {
     const channel = this.companyService.activeChannel();
-    const customFields = channel?.customFields;
-
-    if (!customFields) {
-      return null;
-    }
+    const customFields = (channel?.customFields ?? {}) as any;
 
     return {
       cashierFlowEnabled: customFields.cashierFlowEnabled ?? false,
+      batchExpiryEnabled: customFields.batchExpiryEnabled ?? false,
+      lowStockThreshold: customFields.lowStockThreshold ?? 10,
       enablePrinter: customFields.enablePrinter ?? true,
       companyLogoAsset: customFields.companyLogoAsset ?? null,
     };
   });
 
   readonly cashierFlowEnabled = this.companyService.cashierFlowEnabled;
+  readonly batchExpiryEnabled = this.companyService.batchExpiryEnabled;
+  readonly lowStockThreshold = this.companyService.lowStockThreshold;
   readonly enablePrinter = this.companyService.enablePrinter;
   readonly companyLogoAsset = this.companyService.companyLogoAsset;
 
@@ -158,7 +167,7 @@ export class SettingsService {
         variables: { logoAssetId },
       });
 
-      if (result.data?.updateChannelLogo) {
+      if ((result.data as UpdateChannelLogoMutation | undefined)?.updateChannelLogo) {
         await this.companyService.fetchActiveChannel();
       }
     } catch (err) {
@@ -183,12 +192,42 @@ export class SettingsService {
         variables: { cashierFlowEnabled },
       });
 
-      if (result.data?.updateCashierSettings) {
+      if ((result.data as UpdateCashierSettingsMutation | undefined)?.updateCashierSettings) {
         await this.companyService.fetchActiveChannel();
       }
     } catch (err) {
       console.error('Failed to update cashier settings:', err);
       this.error.set('Failed to update cashier settings');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  /**
+   * Update batch expiry / low-stock threshold settings
+   */
+  async updateBatchExpirySettings(
+    batchExpiryEnabled?: boolean,
+    lowStockThreshold?: number,
+  ): Promise<void> {
+    this.loading.set(true);
+    this.error.set(null);
+
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.mutate({
+        mutation: UPDATE_BATCH_EXPIRY_SETTINGS,
+        variables: { batchExpiryEnabled, lowStockThreshold },
+      });
+
+      if (
+        (result.data as UpdateBatchExpirySettingsMutation | undefined)?.updateBatchExpirySettings
+      ) {
+        await this.companyService.fetchActiveChannel();
+      }
+    } catch (err) {
+      console.error('Failed to update batch expiry settings:', err);
+      this.error.set('Failed to update batch expiry settings');
     } finally {
       this.loading.set(false);
     }
@@ -208,7 +247,7 @@ export class SettingsService {
         variables: { enablePrinter },
       });
 
-      if (result.data?.updatePrinterSettings) {
+      if ((result.data as UpdatePrinterSettingsMutation | undefined)?.updatePrinterSettings) {
         await this.companyService.fetchActiveChannel();
       }
     } catch (err) {

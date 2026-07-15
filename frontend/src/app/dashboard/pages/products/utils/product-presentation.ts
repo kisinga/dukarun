@@ -17,10 +17,14 @@ export interface PresentationVariant {
 export type StockTone = 'success' | 'warning' | 'error' | 'info';
 
 /** Tone for one stock quantity. Untracked (service) items are always `info` (∞). */
-export function stockTone(qty: number, isService: boolean): StockTone {
+export function stockTone(
+  qty: number,
+  isService: boolean,
+  lowStockThreshold = LOW_STOCK_THRESHOLD,
+): StockTone {
   if (isService) return 'info';
   if (qty <= 0) return 'error';
-  if (qty <= LOW_STOCK_THRESHOLD) return 'warning';
+  if (qty <= lowStockThreshold) return 'warning';
   return 'success';
 }
 
@@ -39,12 +43,20 @@ const TEXT_CLASS: Record<StockTone, string> = {
   info: 'text-info',
 };
 
-export function stockBadgeClass(qty: number, isService: boolean): string {
-  return BADGE_CLASS[stockTone(qty, isService)];
+export function stockBadgeClass(
+  qty: number,
+  isService: boolean,
+  lowStockThreshold = LOW_STOCK_THRESHOLD,
+): string {
+  return BADGE_CLASS[stockTone(qty, isService, lowStockThreshold)];
 }
 
-export function stockTextClass(qty: number, isService: boolean): string {
-  return TEXT_CLASS[stockTone(qty, isService)];
+export function stockTextClass(
+  qty: number,
+  isService: boolean,
+  lowStockThreshold = LOW_STOCK_THRESHOLD,
+): string {
+  return TEXT_CLASS[stockTone(qty, isService, lowStockThreshold)];
 }
 
 /** '∞' for services, else the integer with thousands separators. */

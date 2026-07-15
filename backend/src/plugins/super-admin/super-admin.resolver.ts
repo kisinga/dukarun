@@ -176,6 +176,8 @@ export class SuperAdminResolver {
         trialEndsAt: cf.trialEndsAt ?? null,
         subscriptionStatus: cf.subscriptionStatus ?? 'trial',
         cashierFlowEnabled: cf.cashierFlowEnabled === true,
+        batchExpiryEnabled: cf.batchExpiryEnabled === true,
+        lowStockThreshold: typeof cf.lowStockThreshold === 'number' ? cf.lowStockThreshold : 10,
         cashControlEnabled: cf.cashControlEnabled !== false,
         enablePrinter: cf.enablePrinter !== false,
         smsUsedThisPeriod: typeof cf.smsUsedThisPeriod === 'number' ? cf.smsUsedThisPeriod : 0,
@@ -877,6 +879,8 @@ export class SuperAdminResolver {
     input: {
       channelId: string;
       cashierFlowEnabled?: boolean;
+      batchExpiryEnabled?: boolean;
+      lowStockThreshold?: number;
       cashControlEnabled?: boolean;
       enablePrinter?: boolean;
     }
@@ -890,6 +894,9 @@ export class SuperAdminResolver {
     const updates: Record<string, unknown> = {};
     if (input.cashierFlowEnabled !== undefined)
       updates.cashierFlowEnabled = input.cashierFlowEnabled;
+    if (input.batchExpiryEnabled !== undefined)
+      updates.batchExpiryEnabled = input.batchExpiryEnabled;
+    if (input.lowStockThreshold !== undefined) updates.lowStockThreshold = input.lowStockThreshold;
     if (input.cashControlEnabled !== undefined)
       updates.cashControlEnabled = input.cashControlEnabled;
     if (input.enablePrinter !== undefined) updates.enablePrinter = input.enablePrinter;

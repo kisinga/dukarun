@@ -66,6 +66,8 @@ export class GeneralSettingsComponent {
   private areSettingsEqual(a: ChannelSettings, b: ChannelSettings): boolean {
     return (
       a.cashierFlowEnabled === b.cashierFlowEnabled &&
+      a.batchExpiryEnabled === b.batchExpiryEnabled &&
+      a.lowStockThreshold === b.lowStockThreshold &&
       a.enablePrinter === b.enablePrinter &&
       (a.companyLogoAsset?.id ?? null) === (b.companyLogoAsset?.id ?? null)
     );
@@ -74,6 +76,18 @@ export class GeneralSettingsComponent {
   toggleCashierFlow(event: Event): void {
     const checked = (event.target as HTMLInputElement).checked;
     this.settingsState.update((s) => (s ? { ...s, cashierFlowEnabled: checked } : s));
+  }
+
+  toggleBatchExpiry(event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    this.settingsState.update((s) => (s ? { ...s, batchExpiryEnabled: checked } : s));
+  }
+
+  updateLowStockThreshold(event: Event): void {
+    const value = parseInt((event.target as HTMLInputElement).value, 10);
+    this.settingsState.update((s) =>
+      s ? { ...s, lowStockThreshold: Number.isNaN(value) ? 0 : value } : s,
+    );
   }
 
   togglePrinter(event: Event): void {
@@ -147,6 +161,16 @@ export class GeneralSettingsComponent {
 
     if (currentSettings.cashierFlowEnabled !== original?.cashierFlowEnabled) {
       await this.settingsService.updateCashierSettings(currentSettings.cashierFlowEnabled);
+    }
+
+    if (
+      currentSettings.batchExpiryEnabled !== original?.batchExpiryEnabled ||
+      currentSettings.lowStockThreshold !== original?.lowStockThreshold
+    ) {
+      await this.settingsService.updateBatchExpirySettings(
+        currentSettings.batchExpiryEnabled,
+        currentSettings.lowStockThreshold,
+      );
     }
 
     if (currentSettings.enablePrinter !== original?.enablePrinter) {

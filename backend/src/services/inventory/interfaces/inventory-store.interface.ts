@@ -15,6 +15,8 @@ export interface InventoryBatch {
   sourceId: string;
   /** Optional supplier lot or batch number */
   batchNumber?: string | null;
+  /** True when this batch should be consumed before older, later-expiring batches. */
+  consumePriority?: boolean;
   metadata: Record<string, any> | null;
   createdAt: Date;
   updatedAt: Date;
@@ -79,17 +81,20 @@ export interface BatchFilters {
 }
 
 /**
- * Sort order for consumption: FIFO = oldest first by createdAt only; FEFO = expiry then createdAt
+ * Sort order for consumption:
+ * - 'createdAt' = strict FIFO
+ * - 'expiryThenCreatedAt' = strict FEFO
+ * - undefined = FEFO then FIFO (expiryDate ASC NULLS LAST, then createdAt ASC)
  */
 export type ConsumptionOrderBy = 'createdAt' | 'expiryThenCreatedAt';
 
 /**
- * Filters for querying batches for consumption (FIFO/FEFO)
+ * Filters for querying batches for consumption
  */
 export interface ConsumptionFilters extends BatchFilters {
   maxQuantity?: number;
   excludeExpired?: boolean;
-  /** Default 'expiryThenCreatedAt'. Use 'createdAt' for strict FIFO (oldest first by creation only). */
+  /** 'createdAt' for strict FIFO, 'expiryThenCreatedAt' for strict FEFO, omit for FEFO then FIFO. */
   orderBy?: ConsumptionOrderBy;
   /** When set, only batches with this id are returned (for single-batch consumption under lock). */
   batchId?: ID;

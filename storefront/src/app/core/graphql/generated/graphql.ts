@@ -301,6 +301,7 @@ export type Channel = Node & {
 
 export type ChannelCustomFields = {
   __typename?: 'ChannelCustomFields';
+  batchExpiryEnabled?: Maybe<Scalars['Boolean']['output']>;
   billingCycle?: Maybe<Scalars['String']['output']>;
   cashControlEnabled?: Maybe<Scalars['Boolean']['output']>;
   cashierFlowEnabled?: Maybe<Scalars['Boolean']['output']>;
@@ -308,6 +309,7 @@ export type ChannelCustomFields = {
   enablePrinter?: Maybe<Scalars['Boolean']['output']>;
   lastPaymentAmount?: Maybe<Scalars['Int']['output']>;
   lastPaymentDate?: Maybe<Scalars['DateTime']['output']>;
+  lowStockThreshold?: Maybe<Scalars['Int']['output']>;
   publicSlug?: Maybe<Scalars['String']['output']>;
   publicStorefrontEnabled?: Maybe<Scalars['Boolean']['output']>;
   publicWhatsAppNumber?: Maybe<Scalars['String']['output']>;
@@ -1596,6 +1598,13 @@ export type InvalidCredentialsError = ErrorResult & {
   authenticationError: Scalars['String']['output'];
   errorCode: ErrorCode;
   message: Scalars['String']['output'];
+};
+
+export type InventoryAlertCounts = {
+  __typename?: 'InventoryAlertCounts';
+  expiredCount: Scalars['Int']['output'];
+  expiringSoonCount: Scalars['Int']['output'];
+  lowStockCount: Scalars['Int']['output'];
 };
 
 export type InventoryReconciliationResult = {
@@ -3686,6 +3695,7 @@ export type Query = {
   getPublicPlatformConfig: PublicPlatformConfig;
   /** Get active subscription tiers for marketing (pricing section). Public, no auth required. */
   getPublicSubscriptionTiers: Array<PublicSubscriptionTier>;
+  inventoryAlerts: InventoryAlertCounts;
   inventoryValuation: InventoryValuation;
   journalEntries: JournalEntriesResult;
   journalEntry?: Maybe<JournalEntry>;
@@ -3833,6 +3843,11 @@ export type QueryFacetArgs = {
 
 export type QueryFacetsArgs = {
   options?: InputMaybe<FacetListOptions>;
+};
+
+
+export type QueryInventoryAlertsArgs = {
+  expiryThresholdDays?: InputMaybe<Scalars['Int']['input']>;
 };
 
 

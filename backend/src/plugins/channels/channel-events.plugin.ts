@@ -9,7 +9,6 @@ import { NotificationSubscriber } from '../../infrastructure/events/notification
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { AuditDbConnection } from '../../infrastructure/audit/audit-db.connection';
 import { UserContextResolver } from '../../infrastructure/audit/user-context.resolver';
-import { ChannelUserService } from '../../services/auth/channel-user.service';
 
 import { WorkerContextService } from '../../infrastructure/utils/worker-context.service';
 
@@ -34,9 +33,6 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
     AuditDbConnection,
     UserContextResolver,
     AuditService,
-
-    // Core services
-    ChannelUserService,
 
     // Account balance notifications to customer (SMS/email; composable for supplier later)
     AccountNotificationDeliveryService,

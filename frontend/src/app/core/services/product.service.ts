@@ -1,4 +1,6 @@
 import { inject, Injectable } from '@angular/core';
+import type { InventoryAlertFilter } from '../graphql/generated/graphql';
+
 import { ProductApiService } from './product/product-api.service';
 import { ProductAssetService } from './product/product-asset.service';
 import { ProductListingService, ProductQueryOptions } from './product/product-listing.service';
@@ -339,5 +341,17 @@ export class ProductService {
    */
   async fetchProducts(options?: any, queryOptions?: ProductQueryOptions): Promise<void> {
     return this.listingService.fetchProducts(options, queryOptions);
+  }
+
+  /**
+   * Fetch products matching an inventory alert filter.
+   * Server-side filtering and pagination so dashboard links show the full result set.
+   */
+  async fetchProductsByInventoryAlert(
+    filter: InventoryAlertFilter,
+    options?: any,
+    queryOptions?: ProductQueryOptions,
+  ): Promise<void> {
+    return this.listingService.fetchProductsByInventoryAlert(filter, options, queryOptions);
   }
 }

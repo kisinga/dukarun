@@ -36,13 +36,14 @@ export class FifoCostingStrategy implements CostingStrategy {
     ctx: RequestContext,
     request: CostAllocationRequest
   ): Promise<CostAllocationResult> {
-    // Get open batches ordered by creation date only (strict FIFO - oldest first)
+    // Get open batches ordered strictly by createdAt ASC for FIFO cost allocation.
+    // Expiry blocking is handled separately by DefaultExpiryPolicy.
     const batches = await this.inventoryStore.getOpenBatchesForConsumption(ctx, {
       channelId: request.channelId,
       stockLocationId: request.stockLocationId,
       productVariantId: request.productVariantId,
       maxQuantity: request.quantity,
-      excludeExpired: false, // FIFO doesn't exclude expired, FEFO would
+      excludeExpired: false, // Expiry blocking is handled by DefaultExpiryPolicy
       orderBy: 'createdAt',
     });
 

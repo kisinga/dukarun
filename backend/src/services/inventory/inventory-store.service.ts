@@ -77,10 +77,38 @@ export class InventoryStoreService implements InventoryStore {
       sourceType: input.sourceType,
       sourceId: String(input.sourceId),
       batchNumber: input.batchNumber ?? null,
+      consumePriority: false,
       metadata: input.metadata || null,
     });
 
     const saved = await batchRepo.save(batch);
+
+    // If the new batch has an expiry date, check whether it expires sooner than
+    // existing open stock for the same variant/location. If so, prioritize it.
+    if (saved.expiryDate) {
+      const hasLaterExpiringStock = await batchRepo
+        .createQueryBuilder('batch')
+        .where('batch.channelId = :channelId', { channelId: saved.channelId })
+        .andWhere('batch.stockLocationId = :stockLocationId', {
+          stockLocationId: saved.stockLocationId,
+        })
+        .andWhere('batch.productVariantId = :productVariantId', {
+          productVariantId: saved.productVariantId,
+        })
+        .andWhere('batch.id != :batchId', { batchId: saved.id })
+        .andWhere('batch.quantity > 0')
+        .andWhere('batch.expiryDate IS NOT NULL')
+        .andWhere('batch.expiryDate > :expiryDate', { expiryDate: saved.expiryDate })
+        .getCount();
+
+      if (hasLaterExpiringStock > 0) {
+        saved.consumePriority = true;
+        await batchRepo.save(saved);
+        this.logger.log(
+          `Marked batch ${saved.id} as consumePriority because it expires sooner than existing stock`
+        );
+      }
+    }
 
     this.logger.log(`Created inventory batch ${saved.id} for variant ${input.productVariantId}`);
     return saved;
@@ -166,11 +194,13 @@ export class InventoryStoreService implements InventoryStore {
       });
     }
 
-    // Order: strict FIFO = createdAt only; otherwise FEFO = expiry then createdAt
+    // Order: strict FIFO = createdAt only; FEFO/smart priority = expiry then createdAt.
+    // Sorting by expiryDate directly preserves FEFO across any number of batches,
+    // unlike the previous boolean consumePriority flag.
     if (filters.orderBy === 'createdAt') {
       query.orderBy('batch.createdAt', 'ASC');
     } else {
-      query.orderBy('batch.expiryDate', 'ASC', 'NULLS FIRST').addOrderBy('batch.createdAt', 'ASC');
+      query.orderBy('batch.expiryDate', 'ASC', 'NULLS LAST').addOrderBy('batch.createdAt', 'ASC');
     }
 
     if (filters.maxQuantity !== undefined) {

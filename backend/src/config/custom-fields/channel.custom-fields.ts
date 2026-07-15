@@ -48,6 +48,38 @@ export const channelCustomFields: CustomFields['Channel'] = [
     ui: { tab: 'Settings' },
   },
   {
+    name: 'batchExpiryEnabled',
+    type: 'boolean',
+    label: [{ languageCode: LanguageCode.en, value: 'Enable Batch Expiry Tracking' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value:
+          'When enabled, purchases and stock adjustments can record batch numbers and expiry dates, and expiring batches are surfaced on the dashboard',
+      },
+    ],
+    defaultValue: false,
+    public: true,
+    nullable: false,
+    ui: { tab: 'Settings' },
+  },
+  {
+    name: 'lowStockThreshold',
+    type: 'int',
+    label: [{ languageCode: LanguageCode.en, value: 'Low Stock Threshold' }],
+    description: [
+      {
+        languageCode: LanguageCode.en,
+        value:
+          'Stock level at or below which a product variant is flagged as low stock. Default is 10.',
+      },
+    ],
+    defaultValue: 10,
+    public: true,
+    nullable: false,
+    ui: { tab: 'Settings' },
+  },
+  {
     name: 'cashControlEnabled',
     type: 'boolean',
     label: [{ languageCode: LanguageCode.en, value: 'Enable Cash Control' }],

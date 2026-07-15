@@ -6,6 +6,7 @@ import {
   SEARCH_BY_BARCODE,
   SEARCH_PRODUCTS,
 } from '../../graphql/operations.graphql';
+import type { GetProductsQuery } from '../../graphql/generated/graphql';
 import { ApolloService } from '../apollo.service';
 import { isBarcodeIgnored } from './barcode.util';
 import { FacetService } from './facet.service';
@@ -146,9 +147,8 @@ export class ProductSearchService {
         fetchPolicy,
       });
 
-      return (
-        result.data?.products?.items.map((p: any) => this.mapper.toProductSearchResult(p)) || []
-      );
+      const data = result.data as GetProductsQuery | undefined;
+      return data?.products?.items.map((p) => this.mapper.toProductSearchResult(p)) || [];
     } catch (error) {
       console.error('Product search failed:', error);
       return [];
@@ -262,8 +262,9 @@ export class ProductSearchService {
         },
         fetchPolicy,
       });
-      const items = result.data?.products?.items ?? [];
-      return items.map((p: any) => this.mapper.toProductSearchResult(p));
+      const data = result.data as GetProductsQuery | undefined;
+      const items = data?.products?.items ?? [];
+      return items.map((p) => this.mapper.toProductSearchResult(p));
     } catch (error) {
       console.error('Failed to load recent products:', error);
       return [];

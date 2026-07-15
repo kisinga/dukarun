@@ -193,7 +193,7 @@
       Everyone: Products, Variants, Low stock. Admin: Stock value (retail hero,
       wholesale/cost as a subline).
     -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-5 px-4 py-4">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-5 px-4 py-4">
       <div class="min-w-0">
         <span class="stat-label">Products</span>
         <p class="stat-value">{{ productCount() }}</p>
@@ -208,9 +208,38 @@
           <button
             type="button"
             class="stat-value text-left text-warning hover:opacity-80"
-            (click)="navigateToInventory()"
+            (click)="navigateToLowStock()"
           >
             {{ lowStockCount() }} <span class="text-sm font-normal text-base-content/40">→</span>
+          </button>
+        } @else {
+          <p class="stat-value text-success">0</p>
+        }
+      </div>
+      <div class="min-w-0">
+        <span class="stat-label">Expiring soon</span>
+        @if (expiringSoonCount() > 0) {
+          <button
+            type="button"
+            class="stat-value text-left text-warning hover:opacity-80"
+            (click)="navigateToExpiringSoon()"
+          >
+            {{ expiringSoonCount() }}
+            <span class="text-sm font-normal text-base-content/40">→</span>
+          </button>
+        } @else {
+          <p class="stat-value text-success">0</p>
+        }
+      </div>
+      <div class="min-w-0">
+        <span class="stat-label">Expired</span>
+        @if (expiredCount() > 0) {
+          <button
+            type="button"
+            class="stat-value text-left text-error hover:opacity-80"
+            (click)="navigateToExpired()"
+          >
+            {{ expiredCount() }} <span class="text-sm font-normal text-base-content/40">→</span>
           </button>
         } @else {
           <p class="stat-value text-success">0</p>

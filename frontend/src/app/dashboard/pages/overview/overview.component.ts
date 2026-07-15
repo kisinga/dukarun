@@ -73,6 +73,8 @@ export class OverviewComponent {
   protected readonly isLoading = this.dashboardService.isLoading;
   protected readonly error = this.dashboardService.error;
   protected readonly lowStockCount = this.dashboardService.lowStockCount;
+  protected readonly expiringSoonCount = this.dashboardService.expiringSoonCount;
+  protected readonly expiredCount = this.dashboardService.expiredCount;
 
   protected readonly periods: { key: Period; label: string }[] = [
     { key: 'today', label: 'Today' },
@@ -265,9 +267,21 @@ export class OverviewComponent {
     }
   }
 
-  navigateToInventory(): void {
+  navigateToLowStock(): void {
     this.router.navigate(['/dashboard/products'], {
       queryParams: { lowStock: 'true' },
+    });
+  }
+
+  navigateToExpiringSoon(): void {
+    this.router.navigate(['/dashboard/products'], {
+      queryParams: { expiringSoon: 'true' },
+    });
+  }
+
+  navigateToExpired(): void {
+    this.router.navigate(['/dashboard/products'], {
+      queryParams: { expired: 'true' },
     });
   }
 

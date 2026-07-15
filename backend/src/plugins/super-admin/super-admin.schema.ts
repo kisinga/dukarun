@@ -41,6 +41,8 @@ export const SUPER_ADMIN_SCHEMA = gql`
     subscriptionExemptUntil: DateTime
     subscriptionExemptReason: String
     cashierFlowEnabled: Boolean!
+    batchExpiryEnabled: Boolean!
+    lowStockThreshold: Int!
     cashControlEnabled: Boolean!
     enablePrinter: Boolean!
     smsUsedThisPeriod: Int
@@ -159,6 +161,8 @@ export const SUPER_ADMIN_SCHEMA = gql`
   input UpdateChannelFeatureFlagsInput {
     channelId: ID!
     cashierFlowEnabled: Boolean
+    batchExpiryEnabled: Boolean
+    lowStockThreshold: Int
     cashControlEnabled: Boolean
     enablePrinter: Boolean
   }
