@@ -37,7 +37,6 @@ export const CHANNEL_DETAIL_PLATFORM = graphql(`
         subscriptionExpiresAt
         subscriptionExemptUntil
         subscriptionExemptReason
-        maxAdminCount
         cashierFlowEnabled
         cashControlEnabled
         enablePrinter
@@ -79,7 +78,6 @@ export const PLATFORM_CHANNELS = graphql(`
         status
         trialEndsAt
         subscriptionStatus
-        maxAdminCount
         cashierFlowEnabled
         cashControlEnabled
         enablePrinter
@@ -270,7 +268,6 @@ export const UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM = graphql(`
     updateChannelFeatureFlagsPlatform(input: $input) {
       id
       customFields {
-        maxAdminCount
         cashierFlowEnabled
         cashControlEnabled
         enablePrinter
@@ -302,7 +299,7 @@ export const GET_SUBSCRIPTION_TIERS = graphql(`
       priceMonthly
       priceYearly
       features
-      smsLimit
+      limits
       isActive
       createdAt
       updatedAt
@@ -318,7 +315,7 @@ export const CREATE_SUBSCRIPTION_TIER = graphql(`
       name
       priceMonthly
       priceYearly
-      smsLimit
+      limits
       isActive
     }
   }
@@ -332,7 +329,7 @@ export const UPDATE_SUBSCRIPTION_TIER = graphql(`
       name
       priceMonthly
       priceYearly
-      smsLimit
+      limits
       isActive
     }
   }

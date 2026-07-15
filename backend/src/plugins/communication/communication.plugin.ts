@@ -5,6 +5,7 @@ import { SmsProviderFactory } from '../../infrastructure/sms/sms-provider.factor
 import { SmsService } from '../../infrastructure/sms/sms.service';
 import { OpenWaService } from '../../infrastructure/whatsapp/open-wa.service';
 import { SmsUsageService } from '../../services/sms/sms-usage.service';
+import { EntitlementsPlugin } from '../entitlements/entitlements.plugin';
 
 /**
  * Communication Plugin
@@ -14,7 +15,7 @@ import { SmsUsageService } from '../../services/sms/sms-usage.service';
  * SmsService / OpenWA / EventBus. Channel-scoped SMS is subject to per-tier limits via SmsUsageService.
  */
 @VendurePlugin({
-  imports: [PluginCommonModule],
+  imports: [PluginCommonModule, EntitlementsPlugin],
   providers: [SmsProviderFactory, SmsService, OpenWaService, SmsUsageService, CommunicationService],
   exports: [CommunicationService, SmsService, SmsUsageService],
   compatibility: VENDURE_COMPATIBILITY_VERSION,

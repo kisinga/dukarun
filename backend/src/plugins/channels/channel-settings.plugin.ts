@@ -13,9 +13,10 @@ import { ChannelAdminService } from '../../services/channels/channel-admin.servi
 import { ChannelPaymentService } from '../../services/channels/channel-payment.service';
 import { RoleTemplateService } from '../../services/channels/role-template.service';
 import { CommunicationPlugin } from '../communication/communication.plugin';
+import { EntitlementsPlugin } from '../entitlements/entitlements.plugin';
 
 @VendurePlugin({
-  imports: [PluginCommonModule, ChannelEventsPlugin, CommunicationPlugin],
+  imports: [PluginCommonModule, ChannelEventsPlugin, CommunicationPlugin, EntitlementsPlugin],
   entities: [RoleTemplate, RoleTemplateAssignment],
   providers: [
     RoleTemplateService,

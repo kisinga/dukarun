@@ -162,8 +162,9 @@ export class SuperAdminResolver {
     if (tierId) {
       const tierRepo = this.connection.rawConnection.getRepository(SubscriptionTier);
       const tier = await tierRepo.findOne({ where: { id: tierId as string } });
-      if (tier?.smsLimit != null && tier.smsLimit > 0) {
-        smsLimitFromTier = tier.smsLimit;
+      const smsPerPeriod = tier?.limits?.smsPerPeriod;
+      if (typeof smsPerPeriod === 'number' && smsPerPeriod > 0) {
+        smsLimitFromTier = smsPerPeriod;
       }
     }
     return {
@@ -174,7 +175,6 @@ export class SuperAdminResolver {
         status,
         trialEndsAt: cf.trialEndsAt ?? null,
         subscriptionStatus: cf.subscriptionStatus ?? 'trial',
-        maxAdminCount: typeof cf.maxAdminCount === 'number' ? cf.maxAdminCount : 5,
         cashierFlowEnabled: cf.cashierFlowEnabled === true,
         cashControlEnabled: cf.cashControlEnabled !== false,
         enablePrinter: cf.enablePrinter !== false,
@@ -876,7 +876,6 @@ export class SuperAdminResolver {
     @Args('input')
     input: {
       channelId: string;
-      maxAdminCount?: number;
       cashierFlowEnabled?: boolean;
       cashControlEnabled?: boolean;
       enablePrinter?: boolean;
@@ -889,7 +888,6 @@ export class SuperAdminResolver {
     }
     const cf = (channel.customFields ?? {}) as Record<string, unknown>;
     const updates: Record<string, unknown> = {};
-    if (input.maxAdminCount !== undefined) updates.maxAdminCount = input.maxAdminCount;
     if (input.cashierFlowEnabled !== undefined)
       updates.cashierFlowEnabled = input.cashierFlowEnabled;
     if (input.cashControlEnabled !== undefined)

@@ -18,7 +18,7 @@ interface Tier {
   priceMonthly: number;
   priceYearly: number;
   features: unknown;
-  smsLimit: number | null;
+  limits: { smsPerPeriod?: number | null } | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -46,12 +46,12 @@ export class SubscriptionTiersComponent implements OnInit {
     priceMonthly: 0,
     priceYearly: 0,
     featuresJson: '',
-    smsLimit: 0 as number | null,
+    smsPerPeriod: 0 as number | null,
     isActive: true,
   };
 
   editingTier = signal<Tier | null>(null);
-  editSmsLimit = signal<number | ''>('');
+  editSmsPerPeriod = signal<number | ''>('');
 
   /** Full edit modal: tier being edited (null = modal closed) */
   editingTierFull = signal<Tier | null>(null);
@@ -62,9 +62,13 @@ export class SubscriptionTiersComponent implements OnInit {
     priceMonthly: 0,
     priceYearly: 0,
     featuresJson: '',
-    smsLimit: 0 as number | null,
+    smsPerPeriod: 0 as number | null,
     isActive: true,
   };
+
+  smsPerPeriodFromTier(tier: Tier | null): number {
+    return tier?.limits?.smsPerPeriod ?? 0;
+  }
 
   async ngOnInit(): Promise<void> {
     await this.loadTiers();
@@ -123,12 +127,12 @@ export class SubscriptionTiersComponent implements OnInit {
             priceMonthly: this.shToCents(f.priceMonthly),
             priceYearly: this.shToCents(f.priceYearly),
             features: this.parseFeaturesJson(f.featuresJson),
-            smsLimit: f.smsLimit != null && f.smsLimit > 0 ? f.smsLimit : undefined,
+            limits: { smsPerPeriod: f.smsPerPeriod ?? 0 },
             isActive: f.isActive,
           },
         },
       });
-      this.formModel = { code: '', name: '', description: '', priceMonthly: 0, priceYearly: 0, featuresJson: '', smsLimit: 0, isActive: true };
+      this.formModel = { code: '', name: '', description: '', priceMonthly: 0, priceYearly: 0, featuresJson: '', smsPerPeriod: 0, isActive: true };
       await this.loadTiers();
     } catch (err: any) {
       this.error.set(err?.message ?? 'Create failed');
@@ -151,22 +155,22 @@ export class SubscriptionTiersComponent implements OnInit {
     }
   }
 
-  openEditSmsLimit(tier: Tier): void {
+  openEditSmsPerPeriod(tier: Tier): void {
     this.editingTier.set(tier);
-    this.editSmsLimit.set(tier.smsLimit ?? '');
+    this.editSmsPerPeriod.set(this.smsPerPeriodFromTier(tier) || '');
   }
 
   cancelEdit(): void {
     this.editingTier.set(null);
-    this.editSmsLimit.set('');
+    this.editSmsPerPeriod.set('');
   }
 
-  async saveEditSmsLimit(): Promise<void> {
+  async saveEditSmsPerPeriod(): Promise<void> {
     const tier = this.editingTier();
-    const val = this.editSmsLimit();
+    const val = this.editSmsPerPeriod();
     if (!tier) return;
-    const smsLimit = val === '' ? null : Number(val);
-    if (smsLimit !== null && (isNaN(smsLimit) || smsLimit < 0)) return;
+    const smsPerPeriod = val === '' ? null : Number(val);
+    if (smsPerPeriod !== null && (isNaN(smsPerPeriod) || smsPerPeriod < 0)) return;
     this.saving.set(true);
     try {
       await this.apollo.getClient().mutate({
@@ -174,7 +178,7 @@ export class SubscriptionTiersComponent implements OnInit {
         variables: {
           input: {
             id: tier.id,
-            smsLimit: smsLimit ?? 0,
+            limits: { smsPerPeriod: smsPerPeriod ?? 0 },
           },
         },
       });
@@ -203,7 +207,7 @@ export class SubscriptionTiersComponent implements OnInit {
             ? tier.features
             : JSON.stringify(tier.features, null, 2)
           : '',
-      smsLimit: tier.smsLimit ?? 0,
+      smsPerPeriod: this.smsPerPeriodFromTier(tier),
       isActive: tier.isActive,
     };
   }
@@ -231,7 +235,7 @@ export class SubscriptionTiersComponent implements OnInit {
             priceMonthly: this.shToCents(f.priceMonthly),
             priceYearly: this.shToCents(f.priceYearly),
             features: this.parseFeaturesJson(f.featuresJson),
-            smsLimit: f.smsLimit != null && f.smsLimit > 0 ? f.smsLimit : 0,
+            limits: { smsPerPeriod: f.smsPerPeriod ?? 0 },
             isActive: f.isActive,
           },
         },

@@ -46,10 +46,6 @@ export class SubscriptionTier {
   @Column('jsonb', { nullable: true })
   features: SubscriptionTierFeatures;
 
-  /** @deprecated Use limits.smsPerPeriod instead. Kept for migration fallback. */
-  @Column('int', { default: 0, nullable: true })
-  smsLimit: number | null;
-
   /** Numeric entitlement limits for this tier. */
   @Column('jsonb', { nullable: true })
   limits: SubscriptionTierLimits | null;

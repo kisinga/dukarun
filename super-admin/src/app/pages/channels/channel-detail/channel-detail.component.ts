@@ -35,7 +35,6 @@ interface PlatformChannel {
     subscriptionExpiresAt: string | null;
     subscriptionExemptUntil: string | null;
     subscriptionExemptReason: string | null;
-    maxAdminCount: number;
     cashierFlowEnabled: boolean;
     cashControlEnabled: boolean;
     enablePrinter: boolean;
@@ -141,7 +140,6 @@ export class ChannelDetailComponent implements OnInit {
   newSubscriptionExpiresAt = signal('');
   newSubscriptionExemptUntil = signal('');
   newSubscriptionExemptReason = signal('');
-  newMaxAdminCount = signal<number>(5);
   selectedShippingZoneId = signal('');
   selectedTaxZoneId = signal('');
   cashierFlowEnabled = signal(false);
@@ -271,8 +269,6 @@ export class ChannelDetailComponent implements OnInit {
         }
         this.newSubscriptionExemptReason.set(ch.customFields.subscriptionExemptReason ?? '');
 
-        const max = ch.customFields.maxAdminCount;
-        this.newMaxAdminCount.set(typeof max === 'number' && max > 0 ? max : 5);
         this.selectedShippingZoneId.set(ch.defaultShippingZone?.id ?? '');
         this.selectedTaxZoneId.set(ch.defaultTaxZone?.id ?? '');
         this.cashierFlowEnabled.set(ch.customFields.cashierFlowEnabled);
@@ -465,23 +461,6 @@ export class ChannelDetailComponent implements OnInit {
           },
         });
       }
-    } finally {
-      this.saving.set(false);
-    }
-  }
-
-  async updateMaxAdminCount(): Promise<void> {
-    const id = this.id();
-    const value = Math.max(1, Number(this.newMaxAdminCount()) || 1);
-    if (!id) return;
-    this.saving.set(true);
-    try {
-      await this.apollo.getClient().mutate({
-        mutation: UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM,
-        variables: { input: { channelId: id, maxAdminCount: value } },
-      });
-      const ch = this.channel();
-      if (ch) this.channel.set({ ...ch, customFields: { ...ch.customFields, maxAdminCount: value } });
     } finally {
       this.saving.set(false);
     }

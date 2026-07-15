@@ -48,21 +48,6 @@ export const channelCustomFields: CustomFields['Channel'] = [
     ui: { tab: 'Settings' },
   },
   {
-    name: 'maxAdminCount',
-    type: 'int',
-    label: [{ languageCode: LanguageCode.en, value: 'Maximum Admin Count' }],
-    description: [
-      {
-        languageCode: LanguageCode.en,
-        value: 'Maximum number of administrators allowed for this channel',
-      },
-    ],
-    defaultValue: 5,
-    public: false,
-    nullable: false,
-    ui: { tab: 'Settings' },
-  },
-  {
     name: 'cashControlEnabled',
     type: 'boolean',
     label: [{ languageCode: LanguageCode.en, value: 'Enable Cash Control' }],

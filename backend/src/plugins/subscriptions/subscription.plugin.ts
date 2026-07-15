@@ -9,7 +9,6 @@ import {
   SUBSCRIPTION_PUBLIC_SCHEMA,
 } from './subscription-public.resolver';
 import { SubscriptionService } from '../../services/subscriptions/subscription.service';
-import { EntitlementService } from '../../services/subscriptions/entitlement.service';
 import { PaystackService } from '../../services/payments/paystack.service';
 import { SubscriptionWebhookController } from './subscription-webhook.controller';
 import { SubscriptionTier } from './subscription.entity';
@@ -17,6 +16,7 @@ import { SubscriptionGuard } from './subscription.guard';
 import { SubscriptionExpirySubscriber } from './subscription-expiry.subscriber';
 import { ChannelEventsPlugin } from '../channels/channel-events.plugin';
 import { PhoneAuthPlugin } from '../auth/phone-auth.plugin';
+import { EntitlementsPlugin } from '../entitlements/entitlements.plugin';
 import { WorkerContextService } from '../../infrastructure/utils/worker-context.service';
 
 /**
@@ -30,14 +30,19 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
  * - Read-only mode enforcement for expired subscriptions
  */
 @VendurePlugin({
-  imports: [PluginCommonModule, ChannelEventsPlugin, PhoneAuthPlugin, AuditCorePlugin],
+  imports: [
+    PluginCommonModule,
+    ChannelEventsPlugin,
+    PhoneAuthPlugin,
+    AuditCorePlugin,
+    EntitlementsPlugin,
+  ],
   entities: [SubscriptionTier],
   providers: [
     // Worker context service (required for background tasks)
     WorkerContextService,
     // SubscriptionResolver is only in adminApiExtensions.resolvers so it is not discovered for shop API
     SubscriptionService,
-    EntitlementService,
     PaystackService,
     RedisCacheService,
     SubscriptionGuard,
@@ -50,7 +55,6 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
   ],
   exports: [
     SubscriptionService, // Export for use by ChannelEventRouterService
-    EntitlementService,
   ],
   controllers: [SubscriptionWebhookController],
   adminApiExtensions: {

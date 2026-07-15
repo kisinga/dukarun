@@ -20,7 +20,6 @@ export interface PlatformChannelResult {
     status: string;
     trialEndsAt: Date | null;
     subscriptionStatus: string;
-    maxAdminCount: number;
     cashierFlowEnabled: boolean;
     cashControlEnabled: boolean;
     enablePrinter: boolean;
@@ -96,8 +95,9 @@ export class PlatformStatsService {
     if (tierId) {
       const tierRepo = this.connection.rawConnection.getRepository(SubscriptionTier);
       const tier = await tierRepo.findOne({ where: { id: tierId } });
-      if (tier?.smsLimit != null && tier.smsLimit > 0) {
-        smsLimitFromTier = tier.smsLimit;
+      const smsPerPeriod = tier?.limits?.smsPerPeriod;
+      if (typeof smsPerPeriod === 'number' && smsPerPeriod > 0) {
+        smsLimitFromTier = smsPerPeriod;
       }
     }
     return {
@@ -109,7 +109,6 @@ export class PlatformStatsService {
         status,
         trialEndsAt: cf.trialEndsAt ? new Date(cf.trialEndsAt) : null,
         subscriptionStatus: cf.subscriptionStatus ?? 'trial',
-        maxAdminCount: typeof cf.maxAdminCount === 'number' ? cf.maxAdminCount : 5,
         cashierFlowEnabled: cf.cashierFlowEnabled === true,
         cashControlEnabled: cf.cashControlEnabled !== false,
         enablePrinter: cf.enablePrinter !== false,

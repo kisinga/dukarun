@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ChannelService, RequestContext } from '@vendure/core';
-import { SubscriptionTierLimits } from '../../plugins/subscriptions/subscription.entity';
-import { SubscriptionService } from './subscription.service';
+import { ChannelService, RequestContext, TransactionalConnection } from '@vendure/core';
+import {
+  SubscriptionTier,
+  SubscriptionTierLimits,
+} from '../../plugins/subscriptions/subscription.entity';
 
 export type SubscriptionLimitKey = keyof SubscriptionTierLimits;
 
@@ -22,12 +24,11 @@ export interface LimitCheckResult {
 export class EntitlementService {
   constructor(
     private readonly channelService: ChannelService,
-    private readonly subscriptionService: SubscriptionService
+    private readonly connection: TransactionalConnection
   ) {}
 
   /**
-   * Get the effective limits for a channel, merged from the active subscription tier.
-   * Falls back to legacy fields where present.
+   * Get the effective limits for a channel from its active subscription tier.
    */
   async getLimits(ctx: RequestContext, channelId: string): Promise<SubscriptionTierLimits> {
     const channel = await this.channelService.findOne(ctx, channelId);
@@ -36,27 +37,19 @@ export class EntitlementService {
     }
 
     const customFields = (channel as any).customFields || {};
-    const tier = await this.subscriptionService.getSubscriptionTier(
-      customFields.subscriptionTierId ?? customFields.subscriptiontierid
-    );
+    const tierId = customFields.subscriptionTierId ?? customFields.subscriptiontierid;
+    const tier =
+      tierId && tierId !== '-1'
+        ? await this.connection.getRepository(ctx, SubscriptionTier).findOne({
+            where: { id: tierId },
+          })
+        : null;
 
     if (!tier) {
       return {};
     }
 
-    const limits: SubscriptionTierLimits = { ...(tier.limits ?? {}) };
-
-    // Legacy fallback: old smsLimit column.
-    if (limits.smsPerPeriod == null && tier.smsLimit != null && tier.smsLimit > 0) {
-      limits.smsPerPeriod = tier.smsLimit;
-    }
-
-    // Legacy fallback: channel-level maxAdminCount.
-    if (limits.maxAdmins == null && customFields.maxAdminCount != null) {
-      limits.maxAdmins = Number(customFields.maxAdminCount);
-    }
-
-    return limits;
+    return { ...(tier.limits ?? {}) };
   }
 
   /**

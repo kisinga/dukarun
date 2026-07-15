@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ChannelService, RequestContext, TransactionalConnection } from '@vendure/core';
-import { EntitlementService } from '../subscriptions/entitlement.service';
+import { EntitlementService } from '../entitlements/entitlement.service';
 import {
   type SmsCategory,
   type SmsUsageByCategory,
