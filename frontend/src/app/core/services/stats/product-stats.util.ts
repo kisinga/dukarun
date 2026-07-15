@@ -40,14 +40,6 @@ export interface Product {
 
 function getBatchExpiryDays(batches?: InventoryBatch[]): number | null {
   if (!batches?.length) return null;
-<<<<<<< HEAD
-  const now = new Date().getTime();
-  const times = batches
-    .map((b) => (b.expiryDate ? new Date(b.expiryDate).getTime() : null))
-    .filter((t): t is number => t !== null);
-  if (!times.length) return null;
-  return Math.floor((Math.min(...times) - now) / (1000 * 60 * 60 * 24));
-=======
 
   const today = startOfLocalDay(new Date());
   const daysList = batches
@@ -61,7 +53,6 @@ function getBatchExpiryDays(batches?: InventoryBatch[]): number | null {
 
 function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
->>>>>>> 37ecfc59 (fix(inventory): date-only expiry rule for alerts, sales, and UI)
 }
 
 /**
