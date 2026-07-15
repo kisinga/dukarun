@@ -6,7 +6,7 @@ import { SubscriptionAccess } from './subscription-access.decorator';
 
 /**
  * Display-safe subscription tier for public/marketing (shop API).
- * No id, isActive, smsLimit, or timestamps.
+ * No id, isActive, limits, or timestamps.
  */
 export const SUBSCRIPTION_PUBLIC_SCHEMA = gql`
   type PublicSubscriptionTier {

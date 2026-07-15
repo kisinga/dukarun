@@ -941,7 +941,7 @@ export class SubscriptionService {
 
   /**
    * Get active subscription tiers for public/marketing use (shop API).
-   * Returns only display-safe fields; no id, isActive, smsLimit, or timestamps.
+   * Returns only display-safe fields; no id, isActive, limits, or timestamps.
    */
   async getActiveSubscriptionTiersForPublic(): Promise<
     {
@@ -982,16 +982,18 @@ export class SubscriptionService {
   }
 
   /**
-   * Normalize tier limits to a clean object with positive integers only.
+   * Normalize tier limits to a clean object with non-negative integers.
+   * Zero means unlimited; it is stored explicitly so the UI can distinguish
+   * "no limit" from "limit not configured".
    */
-  private normalizeTierLimits(limits: any): SubscriptionTierLimits | null {
+  private normalizeTierLimits(limits: unknown): SubscriptionTierLimits | null {
     if (limits == null) return null;
     if (typeof limits !== 'object' || Array.isArray(limits)) return null;
 
     const result: SubscriptionTierLimits = {};
     for (const key of Object.keys(limits) as Array<keyof SubscriptionTierLimits>) {
-      const value = limits[key];
-      if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+      const value = (limits as Record<string, unknown>)[key];
+      if (typeof value === 'number' && Number.isInteger(value) && value >= 0) {
         result[key] = value;
       }
     }
@@ -1027,7 +1029,6 @@ export class SubscriptionService {
       priceMonthly: number;
       priceYearly: number;
       features?: any;
-      smsLimit?: number | null;
       limits?: SubscriptionTierLimits | null;
       isActive?: boolean;
     }
@@ -1048,7 +1049,6 @@ export class SubscriptionService {
       priceMonthly: input.priceMonthly,
       priceYearly: input.priceYearly,
       features: this.normalizeTierFeatures(input.features),
-      smsLimit: input.smsLimit ?? 0,
       limits,
       isActive: input.isActive !== undefined ? input.isActive : true,
     });
@@ -1071,7 +1071,6 @@ export class SubscriptionService {
       priceMonthly?: number;
       priceYearly?: number;
       features?: any;
-      smsLimit?: number | null;
       limits?: SubscriptionTierLimits | null;
       isActive?: boolean;
     }
@@ -1107,23 +1106,8 @@ export class SubscriptionService {
     if (input.features !== undefined) {
       tier.features = this.normalizeTierFeatures(input.features);
     }
-    if (input.smsLimit !== undefined) {
-      tier.smsLimit = input.smsLimit;
-      // Keep the new limits object in sync for code that reads limits.smsPerPeriod.
-      if (input.limits === undefined) {
-        tier.limits = {
-          ...(tier.limits ?? {}),
-          smsPerPeriod: input.smsLimit ?? 0,
-        };
-      }
-    }
     if (input.limits !== undefined) {
       tier.limits = this.normalizeTierLimits(input.limits);
-      // Keep the legacy smsLimit column in sync when limits.smsPerPeriod is provided.
-      const inputSmsPerPeriod = (input.limits as any)?.smsPerPeriod;
-      if (typeof inputSmsPerPeriod === 'number') {
-        tier.smsLimit = inputSmsPerPeriod;
-      }
     }
     if (input.isActive !== undefined) {
       tier.isActive = input.isActive;

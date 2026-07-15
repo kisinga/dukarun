@@ -21,7 +21,7 @@ import { RoleTemplateAssignment } from '../../domain/role-template/role-template
 import { RoleTemplate } from '../../domain/role-template/role-template.entity';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { CommunicationService } from '../../infrastructure/communication/communication.service';
-import { EntitlementService } from '../subscriptions/entitlement.service';
+import { EntitlementService } from '../entitlements/entitlement.service';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 import { RoleTemplateService } from './role-template.service';
 
@@ -569,7 +569,7 @@ export class ChannelAdminService {
     const count = await this.getChannelAdminCount(ctx, channelId);
     const limit = await this.entitlementService.getLimit(ctx, channelId, 'maxAdmins');
 
-    // Preserve legacy default of 5 when no tier or channel limit is configured.
+    // Default to 5 admins when the tier does not configure a limit.
     // A limit of 0 means unlimited.
     const effectiveLimit = limit === undefined ? 5 : limit;
     if (effectiveLimit > 0 && count >= effectiveLimit) {

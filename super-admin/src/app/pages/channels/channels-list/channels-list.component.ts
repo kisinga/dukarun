@@ -12,7 +12,6 @@ interface PlatformChannel {
     status: string;
     trialEndsAt: string | null;
     subscriptionStatus: string;
-    maxAdminCount: number;
     cashierFlowEnabled: boolean;
     cashControlEnabled: boolean;
     enablePrinter: boolean;

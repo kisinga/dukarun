@@ -848,7 +848,6 @@ export type ChannelCustomFields = {
   eventConfig?: Maybe<Scalars['String']['output']>;
   lastPaymentAmount?: Maybe<Scalars['Int']['output']>;
   lastPaymentDate?: Maybe<Scalars['DateTime']['output']>;
-  maxAdminCount?: Maybe<Scalars['Int']['output']>;
   notificationCategoryPreferences?: Maybe<Scalars['String']['output']>;
   paystackCustomerCode?: Maybe<Scalars['String']['output']>;
   paystackSubscriptionCode?: Maybe<Scalars['String']['output']>;
@@ -901,7 +900,6 @@ export type ChannelFilterParameter = {
   id?: InputMaybe<IdOperators>;
   lastPaymentAmount?: InputMaybe<NumberOperators>;
   lastPaymentDate?: InputMaybe<DateOperators>;
-  maxAdminCount?: InputMaybe<NumberOperators>;
   notificationCategoryPreferences?: InputMaybe<StringOperators>;
   outOfStockThreshold?: InputMaybe<NumberOperators>;
   paystackCustomerCode?: InputMaybe<StringOperators>;
@@ -985,7 +983,6 @@ export type ChannelSortParameter = {
   id?: InputMaybe<SortOrder>;
   lastPaymentAmount?: InputMaybe<SortOrder>;
   lastPaymentDate?: InputMaybe<SortOrder>;
-  maxAdminCount?: InputMaybe<SortOrder>;
   notificationCategoryPreferences?: InputMaybe<SortOrder>;
   outOfStockThreshold?: InputMaybe<SortOrder>;
   paystackCustomerCode?: InputMaybe<SortOrder>;
@@ -1433,7 +1430,6 @@ export type CreateChannelCustomFieldsInput = {
   eventConfig?: InputMaybe<Scalars['String']['input']>;
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
-  maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
   notificationCategoryPreferences?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
@@ -1760,10 +1756,10 @@ export type CreateSubscriptionTierInput = {
   description?: InputMaybe<Scalars['String']['input']>;
   features?: InputMaybe<Scalars['JSON']['input']>;
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  limits?: InputMaybe<Scalars['JSON']['input']>;
   name: Scalars['String']['input'];
   priceMonthly: Scalars['Int']['input'];
   priceYearly: Scalars['Int']['input'];
-  smsLimit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type CreateTagInput = {
@@ -6693,7 +6689,6 @@ export type PlatformChannelCustomFields = {
   cashControlEnabled: Scalars['Boolean']['output'];
   cashierFlowEnabled: Scalars['Boolean']['output'];
   enablePrinter: Scalars['Boolean']['output'];
-  maxAdminCount: Scalars['Int']['output'];
   publicSlug?: Maybe<Scalars['String']['output']>;
   publicStorefrontEnabled: Scalars['Boolean']['output'];
   publicWhatsAppNumber?: Maybe<Scalars['String']['output']>;
@@ -9340,10 +9335,10 @@ export type SubscriptionTier = {
   features?: Maybe<Scalars['JSON']['output']>;
   id: Scalars['String']['output'];
   isActive: Scalars['Boolean']['output'];
+  limits?: Maybe<Scalars['JSON']['output']>;
   name: Scalars['String']['output'];
   priceMonthly: Scalars['Int']['output'];
   priceYearly: Scalars['Int']['output'];
-  smsLimit?: Maybe<Scalars['Int']['output']>;
   updatedAt: Scalars['DateTime']['output'];
 };
 
@@ -9726,7 +9721,6 @@ export type UpdateChannelCustomFieldsInput = {
   eventConfig?: InputMaybe<Scalars['String']['input']>;
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
-  maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
   notificationCategoryPreferences?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
@@ -9756,7 +9750,6 @@ export type UpdateChannelFeatureFlagsInput = {
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   channelId: Scalars['ID']['input'];
   enablePrinter?: InputMaybe<Scalars['Boolean']['input']>;
-  maxAdminCount?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateChannelInput = {
@@ -10145,10 +10138,10 @@ export type UpdateSubscriptionTierInput = {
   features?: InputMaybe<Scalars['JSON']['input']>;
   id: Scalars['String']['input'];
   isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  limits?: InputMaybe<Scalars['JSON']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   priceMonthly?: InputMaybe<Scalars['Int']['input']>;
   priceYearly?: InputMaybe<Scalars['Int']['input']>;
-  smsLimit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateSupplierCreditDurationInput = {

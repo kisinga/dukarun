@@ -270,7 +270,6 @@ describe('ChannelAdminService', () => {
       };
       mockChannelService.findOne.mockResolvedValue({
         id: 2,
-        customFields: { maxAdminCount: 5 },
       } as never);
       mockRoleTemplateService.getTemplateByCode.mockResolvedValue({
         id: 'tpl-1',
@@ -345,7 +344,6 @@ describe('ChannelAdminService', () => {
       } as unknown as Administrator;
       mockChannelService.findOne.mockResolvedValue({
         id: 2,
-        customFields: { maxAdminCount: 5 },
       } as never);
       mockRoleTemplateService.getTemplateByCode.mockResolvedValue({
         id: 'tpl-1',
