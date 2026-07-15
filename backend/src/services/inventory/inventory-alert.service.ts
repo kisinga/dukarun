@@ -10,30 +10,7 @@ import {
 } from '@vendure/core';
 import type { SelectQueryBuilder } from 'typeorm';
 import { InventoryBatch } from './entities/inventory-batch.entity';
-<<<<<<< HEAD
-
-/**
- * Return a Date representing the start of the given date (00:00:00.000).
- * Expiry dates are stored without a meaningful time component; treating them
- * as date-only avoids marking stock expired in the middle of its use-by day.
- */
-function startOfDay(date: Date): Date {
-  const result = new Date(date);
-  result.setHours(0, 0, 0, 0);
-  return result;
-}
-
-/**
- * Return a Date representing the end of the given date (23:59:59.999).
- */
-function endOfDay(date: Date): Date {
-  const result = new Date(date);
-  result.setHours(23, 59, 59, 999);
-  return result;
-}
-=======
 import { endOfDay, startOfDay } from './utils/expiry-date.util';
->>>>>>> 37ecfc59 (fix(inventory): date-only expiry rule for alerts, sales, and UI)
 
 export type InventoryAlertFilter = 'LOW_STOCK' | 'EXPIRING_SOON' | 'EXPIRED';
 
