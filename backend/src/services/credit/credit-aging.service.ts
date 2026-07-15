@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Customer, Order, RequestContext, TransactionalConnection } from '@vendure/core';
-import { In, MoreThan, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { AR_OWING_ORDER_STATES } from '../../constants/order-states.constants';
 import { addDays, diffCalendarDays } from '../../utils/date.utils';
+import { FinancialService } from '../financial/financial.service';
 
 export interface AgedOrder {
   orderId: string;
@@ -39,7 +40,10 @@ export interface CustomerCreditAging {
  */
 @Injectable()
 export class CreditAgingService {
-  constructor(private readonly connection: TransactionalConnection) {}
+  constructor(
+    private readonly connection: TransactionalConnection,
+    private readonly financialService: FinancialService
+  ) {}
 
   async getCustomerAging(
     ctx: RequestContext,
@@ -81,14 +85,25 @@ export class CreditAgingService {
   async findCustomersWithOutstanding(ctx: RequestContext): Promise<string[]> {
     const rows = (await this.orderRepo(ctx)
       .createQueryBuilder('order')
-      .select('DISTINCT order.customerId', 'customerId')
+      .select(['order.id AS id', 'order.customerId AS customerId'])
       .where('order.channelId = :channelId', { channelId: ctx.channelId as number })
       .andWhere('order.state IN (:...states)', { states: AR_OWING_ORDER_STATES })
-      .andWhere('order.state != :settledState', { settledState: 'PaymentSettled' })
-      .andWhere('order.totalWithTax > 0')
-      .getRawMany()) as Array<{ customerId: string | number }>;
+      .getRawMany()) as Array<{ id: string; customerId: string | number }>;
 
-    return rows.map(r => String(r.customerId));
+    const statuses = await this.financialService.getOrderPaymentStatuses(
+      ctx,
+      rows.map(r => r.id)
+    );
+
+    const owingByCustomer = new Map<string, number>();
+    for (const row of rows) {
+      const amountOwing = statuses.get(row.id)?.amountOwing ?? 0;
+      if (amountOwing <= 0) continue;
+      const customerId = String(row.customerId);
+      owingByCustomer.set(customerId, (owingByCustomer.get(customerId) ?? 0) + amountOwing);
+    }
+
+    return Array.from(owingByCustomer.keys());
   }
 
   private async getOldestUnpaidOrder(
@@ -102,20 +117,20 @@ export class CreditAgingService {
         customer: { id: customerId },
         channelId: ctx.channelId as number,
         state: In(AR_OWING_ORDER_STATES),
-        totalWithTax: MoreThan(0),
       } as any,
-      relations: ['payments'],
       order: { createdAt: 'ASC' },
     });
+
+    const statuses = await this.financialService.getOrderPaymentStatuses(
+      ctx,
+      orders.map(o => o.id.toString())
+    );
 
     let oldest: AgedOrder | null = null;
 
     for (const order of orders) {
-      const totalOwed = order.totalWithTax || order.total || 0;
-      const settledPayments = (order.payments || [])
-        .filter(p => p.state === 'Settled')
-        .reduce((paid, p) => paid + Number(p.amount), 0);
-      const amountOwing = Math.max(0, totalOwed - settledPayments);
+      const status = statuses.get(order.id.toString());
+      const amountOwing = status?.amountOwing ?? 0;
       if (amountOwing <= 0) continue;
 
       const orderDate = order.orderPlacedAt ?? order.createdAt;
@@ -128,7 +143,7 @@ export class CreditAgingService {
         oldest = {
           orderId: order.id.toString(),
           orderCode: order.code,
-          orderTotal: totalOwed,
+          orderTotal: status?.totalOwed ?? order.totalWithTax ?? order.total ?? 0,
           amountOwing,
           orderDate: new Date(orderDate),
           dueDate,

@@ -69,23 +69,38 @@ export class PaymentAllocationResolver {
   ): Promise<{ items: Order[]; totalItems: number }> {
     const orderRepo = this.connection.getRepository(ctx, Order);
 
-    const orders = await orderRepo.find({
-      where: {
-        state: In(PAYABLE_ORDER_STATES),
-      },
-      relations: ['customer'],
-      order: { orderPlacedAt: 'DESC' },
-    });
+    const orders = await orderRepo
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.customer', 'customer')
+      .where('order.channelId = :channelId', { channelId: ctx.channelId as number })
+      .andWhere('order.state IN (:...states)', { states: PAYABLE_ORDER_STATES })
+      .getMany();
 
     const now = Date.now();
-    const overdue: Order[] = [];
-    for (const order of orders) {
+    const dueCandidates = orders.filter(order => {
       const dueDate = this.computeDueDate(order);
-      if (!dueDate || dueDate.getTime() > now) continue;
-      const status = await this.financialService.getOrderPaymentStatus(ctx, order.id.toString());
-      if (status.amountOwing > 0) {
-        overdue.push(order);
-      }
+      return dueDate && dueDate.getTime() <= now;
+    });
+
+    const statuses = await this.financialService.getOrderPaymentStatuses(
+      ctx,
+      dueCandidates.map(o => o.id.toString())
+    );
+
+    const overdue = dueCandidates.filter(
+      order => (statuses.get(order.id.toString())?.amountOwing ?? 0) > 0
+    );
+
+    // Apply caller sort, default to most recently placed first.
+    const sort = options?.sort;
+    if (sort?.orderPlacedAt) {
+      overdue.sort((a, b) =>
+        sort.orderPlacedAt === 'ASC'
+          ? (a.orderPlacedAt?.getTime() ?? 0) - (b.orderPlacedAt?.getTime() ?? 0)
+          : (b.orderPlacedAt?.getTime() ?? 0) - (a.orderPlacedAt?.getTime() ?? 0)
+      );
+    } else {
+      overdue.sort((a, b) => (b.orderPlacedAt?.getTime() ?? 0) - (a.orderPlacedAt?.getTime() ?? 0));
     }
 
     const skip = options?.skip ?? 0;

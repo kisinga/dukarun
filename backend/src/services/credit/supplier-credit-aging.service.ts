@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Customer, RequestContext, TransactionalConnection } from '@vendure/core';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { addDays, diffCalendarDays } from '../../utils/date.utils';
+import { FinancialService } from '../financial/financial.service';
 import { StockPurchase } from '../stock/entities/purchase.entity';
 
 export interface AgedPurchase {
@@ -36,7 +37,10 @@ export interface SupplierCreditAging {
  */
 @Injectable()
 export class SupplierCreditAgingService {
-  constructor(private readonly connection: TransactionalConnection) {}
+  constructor(
+    private readonly connection: TransactionalConnection,
+    private readonly financialService: FinancialService
+  ) {}
 
   async getSupplierAging(
     ctx: RequestContext,
@@ -79,13 +83,25 @@ export class SupplierCreditAgingService {
   async findSuppliersWithOutstanding(ctx: RequestContext): Promise<string[]> {
     const rows = (await this.purchaseRepo(ctx)
       .createQueryBuilder('purchase')
-      .select('DISTINCT purchase.supplierId', 'supplierId')
+      .select(['purchase.id AS id', 'purchase.supplierId AS supplierId'])
       .where('purchase.channelId = :channelId', { channelId: ctx.channelId as number })
       .andWhere('purchase.isCreditPurchase = :isCreditPurchase', { isCreditPurchase: true })
-      .andWhere('purchase.paymentStatus IN (:...statuses)', { statuses: ['pending', 'partial'] })
-      .getRawMany()) as Array<{ supplierId: string | number }>;
+      .getRawMany()) as Array<{ id: string; supplierId: string | number }>;
 
-    return rows.map(r => String(r.supplierId));
+    const statuses = await this.financialService.getPurchasePaymentStatuses(
+      ctx,
+      rows.map(r => r.id)
+    );
+
+    const owingBySupplier = new Map<string, number>();
+    for (const row of rows) {
+      const amountOwing = statuses.get(row.id)?.amountOwing ?? 0;
+      if (amountOwing <= 0) continue;
+      const supplierId = String(row.supplierId);
+      owingBySupplier.set(supplierId, (owingBySupplier.get(supplierId) ?? 0) + amountOwing);
+    }
+
+    return Array.from(owingBySupplier.keys());
   }
 
   private async getOldestUnpaidPurchase(
@@ -99,21 +115,20 @@ export class SupplierCreditAgingService {
         supplierId: Number(supplierId),
         channelId: ctx.channelId as number,
         isCreditPurchase: true,
-        paymentStatus: In(['pending', 'partial']),
       },
-      relations: ['payments'],
       order: { createdAt: 'ASC' },
     });
+
+    const statuses = await this.financialService.getPurchasePaymentStatuses(
+      ctx,
+      purchases.map(p => p.id)
+    );
 
     let oldest: AgedPurchase | null = null;
 
     for (const purchase of purchases) {
-      const totalOwed = purchase.totalCost || 0;
-      const paid = (purchase.payments || []).reduce(
-        (sum, payment) => sum + Number(payment.amount),
-        0
-      );
-      const amountOwing = Math.max(0, totalOwed - paid);
+      const status = statuses.get(purchase.id);
+      const amountOwing = status?.amountOwing ?? 0;
       if (amountOwing <= 0) continue;
 
       const purchaseDate = purchase.createdAt;
@@ -126,7 +141,7 @@ export class SupplierCreditAgingService {
         oldest = {
           purchaseId: purchase.id,
           referenceNumber: purchase.referenceNumber,
-          purchaseTotal: totalOwed,
+          purchaseTotal: status?.totalOwed ?? purchase.totalCost ?? 0,
           amountOwing,
           purchaseDate: new Date(purchaseDate),
           dueDate,

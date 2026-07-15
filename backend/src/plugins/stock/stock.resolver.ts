@@ -111,10 +111,11 @@ export class StockResolver {
   @ResolveField()
   @Allow(Permission.ReadProduct)
   async isOverdue(@Root() purchase: StockPurchase, @Ctx() ctx: RequestContext): Promise<boolean> {
-    if (!purchase.isCreditPurchase || purchase.paymentStatus === 'paid') return false;
+    if (!purchase.isCreditPurchase) return false;
     const due = await this.dueDate(purchase, ctx);
-    if (!due) return false;
-    return diffCalendarDays(new Date(), due) > 0;
+    if (!due || diffCalendarDays(new Date(), due) <= 0) return false;
+    const status = await this.financialService.getPurchasePaymentStatus(ctx, purchase.id);
+    return status.amountOwing > 0;
   }
 
   private async loadSupplier(ctx: RequestContext, supplierId: number): Promise<Customer | null> {
