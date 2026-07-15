@@ -5,18 +5,32 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Customer, RequestContext } from '@vendure/core';
 import { CustomerFieldResolver } from '../../../src/plugins/credit/customer.resolver';
+import { CreditAgingService } from '../../../src/services/credit/credit-aging.service';
 import { CreditService } from '../../../src/services/credit/credit.service';
+import { SupplierCreditAgingService } from '../../../src/services/credit/supplier-credit-aging.service';
 
 describe('CustomerFieldResolver', () => {
   const ctx = { channelId: 1 } as RequestContext;
   let resolver: CustomerFieldResolver;
   let mockCreditService: jest.Mocked<CreditService>;
+  let mockCreditAgingService: jest.Mocked<CreditAgingService>;
+  let mockSupplierAgingService: jest.Mocked<SupplierCreditAgingService>;
 
   beforeEach(() => {
     mockCreditService = {
       getCreditSummary: jest.fn(),
     } as any;
-    resolver = new CustomerFieldResolver(mockCreditService);
+    mockCreditAgingService = {
+      getCustomerAging: jest.fn(),
+    } as any;
+    mockSupplierAgingService = {
+      getSupplierAging: jest.fn(),
+    } as any;
+    resolver = new CustomerFieldResolver(
+      mockCreditService,
+      mockCreditAgingService,
+      mockSupplierAgingService
+    );
   });
 
   it('returns outstandingAmount from credit summary', async () => {

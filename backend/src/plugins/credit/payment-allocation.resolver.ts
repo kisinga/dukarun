@@ -1,5 +1,16 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { Allow, Ctx, Permission, RequestContext, Order } from '@vendure/core';
+import {
+  Allow,
+  Ctx,
+  Customer,
+  Permission,
+  RequestContext,
+  Order,
+  TransactionalConnection,
+} from '@vendure/core';
+import { In } from 'typeorm';
+import { addDays } from '../../utils/date.utils';
+import { PAYABLE_ORDER_STATES } from '../../constants/order-states.constants';
 import { AuditLog as AuditLogDecorator } from '../../infrastructure/audit/audit-log.decorator';
 import { AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
 import { FinancialService } from '../../services/financial/financial.service';
@@ -28,7 +39,8 @@ export class PaymentAllocationResolver {
   constructor(
     private readonly paymentAllocationService: PaymentAllocationService,
     private readonly financialService: FinancialService,
-    private readonly orderReconciliationService: OrderReconciliationService
+    private readonly orderReconciliationService: OrderReconciliationService,
+    private readonly connection: TransactionalConnection
   ) {}
 
   @Query()
@@ -47,6 +59,50 @@ export class PaymentAllocationResolver {
     @Args('customerId') customerId: string
   ): Promise<Order[]> {
     return this.paymentAllocationService.getUnpaidOrdersForCustomer(ctx, customerId);
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async overdueOrders(
+    @Ctx() ctx: RequestContext,
+    @Args('options') options?: { take?: number; skip?: number; sort?: any }
+  ): Promise<{ items: Order[]; totalItems: number }> {
+    const orderRepo = this.connection.getRepository(ctx, Order);
+
+    const orders = await orderRepo.find({
+      where: {
+        state: In(PAYABLE_ORDER_STATES),
+      },
+      relations: ['customer'],
+      order: { orderPlacedAt: 'DESC' },
+    });
+
+    const now = Date.now();
+    const overdue: Order[] = [];
+    for (const order of orders) {
+      const dueDate = this.computeDueDate(order);
+      if (!dueDate || dueDate.getTime() > now) continue;
+      const status = await this.financialService.getOrderPaymentStatus(ctx, order.id.toString());
+      if (status.amountOwing > 0) {
+        overdue.push(order);
+      }
+    }
+
+    const skip = options?.skip ?? 0;
+    const take = options?.take ?? 100;
+    const items = overdue.slice(skip, skip + take);
+    return { items, totalItems: overdue.length };
+  }
+
+  private computeDueDate(order: Order): Date | null {
+    const customer = order.customer as Customer | undefined;
+    if (!customer) return null;
+    const anchorDate = order.orderPlacedAt || order.createdAt;
+    if (!anchorDate) return null;
+    const customFields = (customer.customFields || {}) as { creditDuration?: number };
+    const duration = Number(customFields.creditDuration ?? 30);
+    if (!Number.isFinite(duration) || duration <= 0) return null;
+    return addDays(new Date(anchorDate), duration);
   }
 
   @Query()

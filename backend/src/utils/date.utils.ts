@@ -25,3 +25,12 @@ export function endOfDay(date: Date): Date {
 export function diffCalendarDays(end: Date, start: Date): number {
   return Math.floor((startOfDay(end).getTime() - startOfDay(start).getTime()) / MS_PER_DAY);
 }
+
+/**
+ * Return a new date `days` calendar days after `date`.
+ */
+export function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}

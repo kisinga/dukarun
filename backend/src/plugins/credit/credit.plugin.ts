@@ -305,10 +305,28 @@ const COMBINED_SCHEMA = gql`
     """
     outstandingAmount: Float
     """
+    Number of whole days the oldest unpaid order is past its due date. 0 if not overdue.
+    """
+    daysOverdue: Int!
+    """
+    True when at least one unpaid order has passed its due date.
+    """
+    isOverdue: Boolean!
+    """
     Supplier balance (AP). Only non-zero when customer is a supplier. Cents.
     Null when the ledger balance cannot be computed.
     """
     supplierOutstandingAmount: Float
+    """
+    Number of whole days the oldest unpaid purchase is past its due date. 0 if not overdue.
+    Only meaningful when the customer is a supplier.
+    """
+    supplierDaysOverdue: Int!
+    """
+    True when at least one unpaid purchase has passed its due date.
+    Only meaningful when the customer is a supplier.
+    """
+    supplierIsOverdue: Boolean!
   }
 
   extend type Order {
@@ -317,6 +335,15 @@ const COMBINED_SCHEMA = gql`
     Computed from the ledger (Accounts Receivable) and is the single source of truth.
     """
     amountOwing: Int!
+    """
+    Date by which this order is expected to be paid. Computed from orderPlacedAt
+    plus the customer's creditDuration. Null when the order has no customer.
+    """
+    dueDate: DateTime
+    """
+    True when the order is unpaid, has a dueDate, and that date has passed.
+    """
+    isOverdue: Boolean!
   }
 
   """
@@ -331,6 +358,11 @@ const COMBINED_SCHEMA = gql`
   extend type Query {
     creditSummary(customerId: ID!): CreditSummary!
     unpaidOrdersForCustomer(customerId: ID!): [Order!]!
+    """
+    Orders whose due date has passed and which still owe money.
+    Uses the same options shape as the built-in orders query.
+    """
+    overdueOrders(options: OrderListOptions): OrderList!
     orderPaymentStatus(orderId: ID!): OrderPaymentStatus
     validateCredit(input: ValidateCreditInput!): CreditValidationResult!
     """

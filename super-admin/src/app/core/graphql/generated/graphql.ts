@@ -3125,6 +3125,12 @@ export type InventoryAlertCounts = {
   lowStockCount: Scalars['Int']['output'];
 };
 
+export enum InventoryAlertFilter {
+  EXPIRED = 'EXPIRED',
+  EXPIRING_SOON = 'EXPIRING_SOON',
+  LOW_STOCK = 'LOW_STOCK'
+}
+
 export type InventoryBatch = {
   __typename?: 'InventoryBatch';
   batchNumber?: Maybe<Scalars['String']['output']>;
@@ -7618,6 +7624,7 @@ export type ProvinceTranslationInput = {
 
 export type PurchaseFilterInput = {
   endDate?: InputMaybe<Scalars['DateTime']['input']>;
+  overdueOnly?: InputMaybe<Scalars['Boolean']['input']>;
   startDate?: InputMaybe<Scalars['DateTime']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   supplierId?: InputMaybe<Scalars['ID']['input']>;
@@ -7816,6 +7823,7 @@ export type Query = {
   productVariants: ProductVariantList;
   /** List Products */
   products: ProductList;
+  productsByInventoryAlert: ProductList;
   promotion?: Maybe<Promotion>;
   promotionActions: Array<ConfigurableOperationDefinition>;
   promotionConditions: Array<ConfigurableOperationDefinition>;
@@ -8340,6 +8348,12 @@ export type QueryProductVariantsArgs = {
 
 
 export type QueryProductsArgs = {
+  options?: InputMaybe<ProductListOptions>;
+};
+
+
+export type QueryProductsByInventoryAlertArgs = {
+  filter: InventoryAlertFilter;
   options?: InputMaybe<ProductListOptions>;
 };
 
@@ -9539,8 +9553,10 @@ export type StockPurchase = {
   __typename?: 'StockPurchase';
   amountOwing?: Maybe<Scalars['Int']['output']>;
   createdAt: Scalars['DateTime']['output'];
+  dueDate?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['ID']['output'];
   isCreditPurchase: Scalars['Boolean']['output'];
+  isOverdue: Scalars['Boolean']['output'];
   lines: Array<StockPurchaseLine>;
   notes?: Maybe<Scalars['String']['output']>;
   paymentStatus: Scalars['String']['output'];

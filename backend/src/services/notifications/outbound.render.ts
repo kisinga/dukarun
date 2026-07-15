@@ -32,15 +32,30 @@ function getVarianceEmoji(varianceCents: number, thresholdCents: number): string
   return Math.abs(varianceCents) > thresholdCents ? '🔴' : '🟡';
 }
 
+const EAT_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+/**
+ * Return a new Date shifted into EAT (UTC+3) so that UTC calendar methods
+ * display the EAT wall-clock time. Used instead of Intl to keep behaviour
+ * deterministic across runtimes.
+ */
+function toEatTime(date: Date): Date {
+  return new Date(date.getTime() + EAT_OFFSET_MS);
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
 function formatShiftDate(iso: unknown): string {
   if (!iso || typeof iso !== 'string') return '';
   try {
-    return new Date(iso).toLocaleDateString('en-KE', {
+    const eat = toEatTime(new Date(iso));
+    const weekday = eat.toLocaleDateString('en-KE', {
       weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+      timeZone: 'UTC',
     });
+    return `${weekday}, ${eat.getUTCFullYear()}-${pad(eat.getUTCMonth() + 1)}-${pad(eat.getUTCDate())}`;
   } catch {
     return '';
   }
@@ -49,10 +64,8 @@ function formatShiftDate(iso: unknown): string {
 function formatShiftTime(iso: unknown): string | null {
   if (!iso || typeof iso !== 'string') return null;
   try {
-    return new Date(iso).toLocaleTimeString('en-KE', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const eat = toEatTime(new Date(iso));
+    return `${pad(eat.getUTCHours())}:${pad(eat.getUTCMinutes())}`;
   } catch {
     return null;
   }

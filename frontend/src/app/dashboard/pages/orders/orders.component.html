@@ -11,6 +11,7 @@
       header-stats
       [stats]="stats()"
       [activeStateFilter]="filterService.stateFilter()"
+      [overdueOnlyActive]="filterService.overdueOnly()"
       (filterClick)="onStatsFilterClick($event)"
     />
   </app-page-header>
@@ -147,6 +148,19 @@
               (click)="filterService.productVariantId.set(null)"
               type="button"
               aria-label="Clear product filter"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (filterService.overdueOnly()) {
+          <span class="badge badge-error gap-1.5">
+            Overdue
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="clearOverdueFilter()"
+              type="button"
+              aria-label="Clear overdue filter"
             >
               &times;
             </button>

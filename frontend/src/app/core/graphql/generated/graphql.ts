@@ -2235,16 +2235,30 @@ export type Customer = Node & {
   addresses?: Maybe<Array<Address>>;
   createdAt: Scalars['DateTime']['output'];
   customFields?: Maybe<CustomerCustomFields>;
+  /** Number of whole days the oldest unpaid order is past its due date. 0 if not overdue. */
+  daysOverdue: Scalars['Int']['output'];
   emailAddress: Scalars['String']['output'];
   firstName: Scalars['String']['output'];
   groups: Array<CustomerGroup>;
   history: HistoryEntryList;
   id: Scalars['ID']['output'];
+  /** True when at least one unpaid order has passed its due date. */
+  isOverdue: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
   orders: OrderList;
   /** Customer balance (AR). Cents. Null when the ledger balance cannot be computed. */
   outstandingAmount?: Maybe<Scalars['Float']['output']>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
+  /**
+   * Number of whole days the oldest unpaid purchase is past its due date. 0 if not overdue.
+   * Only meaningful when the customer is a supplier.
+   */
+  supplierDaysOverdue: Scalars['Int']['output'];
+  /**
+   * True when at least one unpaid purchase has passed its due date.
+   * Only meaningful when the customer is a supplier.
+   */
+  supplierIsOverdue: Scalars['Boolean']['output'];
   /**
    * Supplier balance (AP). Only non-zero when customer is a supplier. Cents.
    * Null when the ledger balance cannot be computed.
@@ -2292,10 +2306,12 @@ export type CustomerFilterParameter = {
   createdAt?: InputMaybe<DateOperators>;
   creditDuration?: InputMaybe<NumberOperators>;
   creditLimit?: InputMaybe<NumberOperators>;
+  daysOverdue?: InputMaybe<NumberOperators>;
   emailAddress?: InputMaybe<StringOperators>;
   firstName?: InputMaybe<StringOperators>;
   id?: InputMaybe<IdOperators>;
   isCreditApproved?: InputMaybe<BooleanOperators>;
+  isOverdue?: InputMaybe<BooleanOperators>;
   isSupplier?: InputMaybe<BooleanOperators>;
   isSupplierCreditApproved?: InputMaybe<BooleanOperators>;
   lastName?: InputMaybe<StringOperators>;
@@ -2309,6 +2325,8 @@ export type CustomerFilterParameter = {
   postalCode?: InputMaybe<StringOperators>;
   supplierCreditDuration?: InputMaybe<NumberOperators>;
   supplierCreditLimit?: InputMaybe<NumberOperators>;
+  supplierDaysOverdue?: InputMaybe<NumberOperators>;
+  supplierIsOverdue?: InputMaybe<BooleanOperators>;
   supplierLastRepaymentAmount?: InputMaybe<NumberOperators>;
   supplierLastRepaymentDate?: InputMaybe<DateOperators>;
   supplierOutstandingAmount?: InputMaybe<NumberOperators>;
@@ -2392,6 +2410,7 @@ export type CustomerSortParameter = {
   creditApprovedByUserId?: InputMaybe<SortOrder>;
   creditDuration?: InputMaybe<SortOrder>;
   creditLimit?: InputMaybe<SortOrder>;
+  daysOverdue?: InputMaybe<SortOrder>;
   emailAddress?: InputMaybe<SortOrder>;
   firstName?: InputMaybe<SortOrder>;
   id?: InputMaybe<SortOrder>;
@@ -2408,6 +2427,7 @@ export type CustomerSortParameter = {
   phoneNumber?: InputMaybe<SortOrder>;
   supplierCreditDuration?: InputMaybe<SortOrder>;
   supplierCreditLimit?: InputMaybe<SortOrder>;
+  supplierDaysOverdue?: InputMaybe<SortOrder>;
   supplierLastRepaymentAmount?: InputMaybe<SortOrder>;
   supplierLastRepaymentDate?: InputMaybe<SortOrder>;
   supplierOutstandingAmount?: InputMaybe<SortOrder>;
@@ -5744,9 +5764,16 @@ export type Order = Node & {
   customFields?: Maybe<OrderCustomFields>;
   customer?: Maybe<Customer>;
   discounts: Array<Discount>;
+  /**
+   * Date by which this order is expected to be paid. Computed from orderPlacedAt
+   * plus the customer's creditDuration. Null when the order has no customer.
+   */
+  dueDate?: Maybe<Scalars['DateTime']['output']>;
   fulfillments?: Maybe<Array<Fulfillment>>;
   history: HistoryEntryList;
   id: Scalars['ID']['output'];
+  /** True when the order is unpaid, has a dueDate, and that date has passed. */
+  isOverdue: Scalars['Boolean']['output'];
   lines: Array<OrderLine>;
   modifications: Array<OrderModification>;
   nextStates: Array<Scalars['String']['output']>;
@@ -5837,7 +5864,9 @@ export type OrderFilterParameter = {
   createdAt?: InputMaybe<DateOperators>;
   currencyCode?: InputMaybe<StringOperators>;
   customerLastName?: InputMaybe<StringOperators>;
+  dueDate?: InputMaybe<DateOperators>;
   id?: InputMaybe<IdOperators>;
+  isOverdue?: InputMaybe<BooleanOperators>;
   orderPlacedAt?: InputMaybe<DateOperators>;
   reconciledAt?: InputMaybe<DateOperators>;
   reconciliationNote?: InputMaybe<StringOperators>;
@@ -6068,6 +6097,7 @@ export type OrderSortParameter = {
   createdAt?: InputMaybe<SortOrder>;
   createdByUserId?: InputMaybe<SortOrder>;
   customerLastName?: InputMaybe<SortOrder>;
+  dueDate?: InputMaybe<SortOrder>;
   id?: InputMaybe<SortOrder>;
   lastModifiedByUserId?: InputMaybe<SortOrder>;
   orderPlacedAt?: InputMaybe<SortOrder>;
@@ -7392,6 +7422,7 @@ export type ProvinceTranslationInput = {
 
 export type PurchaseFilterInput = {
   endDate?: InputMaybe<Scalars['DateTime']['input']>;
+  overdueOnly?: InputMaybe<Scalars['Boolean']['input']>;
   startDate?: InputMaybe<Scalars['DateTime']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   supplierId?: InputMaybe<Scalars['ID']['input']>;
@@ -7557,6 +7588,11 @@ export type Query = {
   order?: Maybe<Order>;
   orderPaymentStatus?: Maybe<OrderPaymentStatus>;
   orders: OrderList;
+  /**
+   * Orders whose due date has passed and which still owe money.
+   * Uses the same options shape as the built-in orders query.
+   */
+  overdueOrders: OrderList;
   paymentMethod?: Maybe<PaymentMethod>;
   paymentMethodEligibilityCheckers: Array<ConfigurableOperationDefinition>;
   paymentMethodHandlers: Array<ConfigurableOperationDefinition>;
@@ -7960,6 +7996,10 @@ export type QueryOrderPaymentStatusArgs = {
 };
 
 export type QueryOrdersArgs = {
+  options?: InputMaybe<OrderListOptions>;
+};
+
+export type QueryOverdueOrdersArgs = {
   options?: InputMaybe<OrderListOptions>;
 };
 
@@ -9219,8 +9259,10 @@ export type StockPurchase = {
   __typename?: 'StockPurchase';
   amountOwing?: Maybe<Scalars['Int']['output']>;
   createdAt: Scalars['DateTime']['output'];
+  dueDate?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['ID']['output'];
   isCreditPurchase: Scalars['Boolean']['output'];
+  isOverdue: Scalars['Boolean']['output'];
   lines: Array<StockPurchaseLine>;
   notes?: Maybe<Scalars['String']['output']>;
   paymentStatus: Scalars['String']['output'];
@@ -11936,6 +11978,59 @@ export type GetOrdersQuery = {
       totalWithTax: number;
       currencyCode: CurrencyCode;
       amountOwing: number;
+      dueDate?: any | null;
+      isOverdue: boolean;
+      customer?: {
+        __typename?: 'Customer';
+        id: string;
+        firstName: string;
+        lastName: string;
+        emailAddress: string;
+      } | null;
+      lines: Array<{
+        __typename?: 'OrderLine';
+        id: string;
+        quantity: number;
+        linePrice: number;
+        linePriceWithTax: number;
+        productVariant: { __typename?: 'ProductVariant'; id: string; name: string; sku: string };
+      }>;
+      payments?: Array<{
+        __typename?: 'Payment';
+        id: string;
+        state: string;
+        amount: number;
+        method: string;
+        createdAt: any;
+      }> | null;
+      customFields?: { __typename?: 'OrderCustomFields'; reversedAt?: any | null } | null;
+    }>;
+  };
+};
+
+export type GetOverdueOrdersQueryVariables = Exact<{
+  options?: InputMaybe<OrderListOptions>;
+}>;
+
+export type GetOverdueOrdersQuery = {
+  __typename?: 'Query';
+  overdueOrders: {
+    __typename?: 'OrderList';
+    totalItems: number;
+    items: Array<{
+      __typename?: 'Order';
+      id: string;
+      code: string;
+      state: string;
+      createdAt: any;
+      updatedAt: any;
+      orderPlacedAt?: any | null;
+      total: number;
+      totalWithTax: number;
+      currencyCode: CurrencyCode;
+      amountOwing: number;
+      dueDate?: any | null;
+      isOverdue: boolean;
       customer?: {
         __typename?: 'Customer';
         id: string;
@@ -12198,6 +12293,11 @@ export type GetCustomersQuery = {
       createdAt: any;
       updatedAt: any;
       outstandingAmount?: number | null;
+      daysOverdue: number;
+      isOverdue: boolean;
+      supplierOutstandingAmount?: number | null;
+      supplierDaysOverdue: number;
+      supplierIsOverdue: boolean;
       customFields?: {
         __typename?: 'CustomerCustomFields';
         isSupplier?: boolean | null;
@@ -12264,6 +12364,11 @@ export type GetCustomerQuery = {
     createdAt: any;
     updatedAt: any;
     outstandingAmount?: number | null;
+    daysOverdue: number;
+    isOverdue: boolean;
+    supplierOutstandingAmount?: number | null;
+    supplierDaysOverdue: number;
+    supplierIsOverdue: boolean;
     customFields?: {
       __typename?: 'CustomerCustomFields';
       isSupplier?: boolean | null;
@@ -13496,6 +13601,8 @@ export type GetPurchasesQuery = {
       referenceNumber?: string | null;
       totalCost: number;
       paymentStatus: string;
+      dueDate?: any | null;
+      isOverdue: boolean;
       isCreditPurchase: boolean;
       notes?: string | null;
       createdAt: any;
@@ -20062,6 +20169,8 @@ export const GetOrdersDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'totalWithTax' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'currencyCode' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'amountOwing' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'dueDate' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isOverdue' } },
                       {
                         kind: 'Field',
                         name: { kind: 'Name', value: 'customer' },
@@ -20136,6 +20245,128 @@ export const GetOrdersDocument = {
     },
   ],
 } as unknown as DocumentNode<GetOrdersQuery, GetOrdersQueryVariables>;
+export const GetOverdueOrdersDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetOverdueOrders' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'OrderListOptions' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'overdueOrders' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'options' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'items' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'state' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'orderPlacedAt' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'total' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'totalWithTax' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'currencyCode' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'amountOwing' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'dueDate' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isOverdue' } },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'customer' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'lines' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'quantity' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'linePrice' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'linePriceWithTax' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'productVariant' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'sku' } },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'payments' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'state' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'amount' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'method' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'customFields' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'reversedAt' } },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+                { kind: 'Field', name: { kind: 'Name', value: 'totalItems' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetOverdueOrdersQuery, GetOverdueOrdersQueryVariables>;
 export const GetPaymentsDocument = {
   kind: 'Document',
   definitions: [
@@ -20646,6 +20877,11 @@ export const GetCustomersDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'outstandingAmount' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'daysOverdue' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isOverdue' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'supplierOutstandingAmount' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'supplierDaysOverdue' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'supplierIsOverdue' } },
                       {
                         kind: 'Field',
                         name: { kind: 'Name', value: 'customFields' },
@@ -20813,6 +21049,11 @@ export const GetCustomerDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'outstandingAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'daysOverdue' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'isOverdue' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierOutstandingAmount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierDaysOverdue' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'supplierIsOverdue' } },
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'customFields' },
@@ -24378,6 +24619,8 @@ export const GetPurchasesDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'referenceNumber' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'totalCost' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'paymentStatus' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'dueDate' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isOverdue' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'isCreditPurchase' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
                       {

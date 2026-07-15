@@ -1490,6 +1490,57 @@ export const GET_ORDERS = graphql(`
         totalWithTax
         currencyCode
         amountOwing
+        dueDate
+        isOverdue
+        customer {
+          id
+          firstName
+          lastName
+          emailAddress
+        }
+        lines {
+          id
+          quantity
+          linePrice
+          linePriceWithTax
+          productVariant {
+            id
+            name
+            sku
+          }
+        }
+        payments {
+          id
+          state
+          amount
+          method
+          createdAt
+        }
+        customFields {
+          reversedAt
+        }
+      }
+      totalItems
+    }
+  }
+`);
+
+export const GET_OVERDUE_ORDERS = graphql(`
+  query GetOverdueOrders($options: OrderListOptions) {
+    overdueOrders(options: $options) {
+      items {
+        id
+        code
+        state
+        createdAt
+        updatedAt
+        orderPlacedAt
+        total
+        totalWithTax
+        currencyCode
+        amountOwing
+        dueDate
+        isOverdue
         customer {
           id
           firstName
@@ -1733,6 +1784,11 @@ export const GET_CUSTOMERS = graphql(`
         createdAt
         updatedAt
         outstandingAmount
+        daysOverdue
+        isOverdue
+        supplierOutstandingAmount
+        supplierDaysOverdue
+        supplierIsOverdue
         customFields {
           isSupplier
           supplierType
@@ -1795,6 +1851,11 @@ export const GET_CUSTOMER = graphql(`
       createdAt
       updatedAt
       outstandingAmount
+      daysOverdue
+      isOverdue
+      supplierOutstandingAmount
+      supplierDaysOverdue
+      supplierIsOverdue
       customFields {
         isSupplier
         supplierType
@@ -2891,6 +2952,8 @@ export const GET_PURCHASES = graphql(`
         referenceNumber
         totalCost
         paymentStatus
+        dueDate
+        isOverdue
         isCreditPurchase
         notes
         lines {

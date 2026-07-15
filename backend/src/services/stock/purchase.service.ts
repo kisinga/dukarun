@@ -10,6 +10,7 @@ import { FinancialService } from '../financial/financial.service';
 import { LedgerTransactionService } from '../financial/ledger-transaction.service';
 import { PurchaseTransactionData } from '../financial/strategies/purchase-posting.strategy';
 import { AuditService } from '../../infrastructure/audit/audit.service';
+import { addDays } from '../../utils/date.utils';
 import { StockPurchase, StockPurchaseLine } from './entities/purchase.entity';
 import { StockValidationService } from './stock-validation.service';
 
@@ -104,6 +105,7 @@ export class PurchaseService {
     purchase.notes = input.notes || null;
     purchase.isCreditPurchase = input.isCreditPurchase ?? false;
     purchase.status = 'draft';
+    purchase.dueDate = this.computeDueDate(purchase, customFields);
 
     const savedPurchase = await purchaseRepo.save(purchase);
 
@@ -171,6 +173,7 @@ export class PurchaseService {
     purchase.notes = input.notes || null;
     purchase.isCreditPurchase = input.isCreditPurchase ?? false;
     purchase.status = 'confirmed';
+    purchase.dueDate = this.computeDueDate(purchase, customFields);
 
     const savedPurchase = await purchaseRepo.save(purchase);
 
@@ -333,6 +336,10 @@ export class PurchaseService {
     }
 
     purchase.status = 'confirmed';
+    if (purchase.isCreditPurchase && !purchase.dueDate) {
+      const supplierFields = (purchase.supplier?.customFields || {}) as any;
+      purchase.dueDate = this.computeDueDate(purchase, supplierFields);
+    }
     await purchaseRepo.save(purchase);
 
     const transactionData: PurchaseTransactionData = {
@@ -353,5 +360,11 @@ export class PurchaseService {
 
     this.logger.log(`Confirmed purchase: ${id}`);
     return purchase;
+  }
+
+  private computeDueDate(purchase: StockPurchase, supplierCustomFields: any): Date | null {
+    if (!purchase.isCreditPurchase) return null;
+    const duration = Number(supplierCustomFields?.supplierCreditDuration ?? 30);
+    return addDays(new Date(purchase.purchaseDate || purchase.createdAt), duration);
   }
 }

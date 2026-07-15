@@ -1,11 +1,20 @@
 import { Args, Mutation, Query, ResolveField, Resolver, Root } from '@nestjs/graphql';
-import { Allow, Ctx, Logger, Permission, RequestContext } from '@vendure/core';
+import {
+  Allow,
+  Ctx,
+  Customer,
+  Logger,
+  Permission,
+  RequestContext,
+  TransactionalConnection,
+} from '@vendure/core';
 import { ManageStockAdjustmentsPermission } from './permissions';
 import { ManageSupplierCreditPurchasesPermission } from '../credit/supplier-credit.permissions';
 import { StockManagementService } from '../../services/stock/stock-management.service';
 import { StockQueryService } from '../../services/stock/stock-query.service';
 import { PurchaseService } from '../../services/stock/purchase.service';
 import { FinancialService } from '../../services/financial/financial.service';
+import { addDays, diffCalendarDays } from '../../utils/date.utils';
 import { StockPurchase } from '../../services/stock/entities/purchase.entity';
 import { InventoryStockAdjustment } from '../../services/stock/entities/stock-adjustment.entity';
 
@@ -66,7 +75,8 @@ export class StockResolver {
     private readonly stockManagementService: StockManagementService,
     private readonly stockQueryService: StockQueryService,
     private readonly purchaseService: PurchaseService,
-    private readonly financialService: FinancialService
+    private readonly financialService: FinancialService,
+    private readonly connection: TransactionalConnection
   ) {}
 
   @ResolveField()
@@ -86,6 +96,32 @@ export class StockResolver {
       // Return null so a ledger failure never falsely shows an unpaid purchase as paid.
       return null;
     }
+  }
+
+  @ResolveField()
+  @Allow(Permission.ReadProduct)
+  async dueDate(@Root() purchase: StockPurchase, @Ctx() ctx: RequestContext): Promise<Date | null> {
+    if (!purchase.isCreditPurchase) return null;
+    if (purchase.dueDate) return purchase.dueDate;
+    const supplier = await this.loadSupplier(ctx, purchase.supplierId);
+    const duration = Number((supplier?.customFields as any)?.supplierCreditDuration ?? 30);
+    return addDays(new Date(purchase.purchaseDate || purchase.createdAt), duration);
+  }
+
+  @ResolveField()
+  @Allow(Permission.ReadProduct)
+  async isOverdue(@Root() purchase: StockPurchase, @Ctx() ctx: RequestContext): Promise<boolean> {
+    if (!purchase.isCreditPurchase || purchase.paymentStatus === 'paid') return false;
+    const due = await this.dueDate(purchase, ctx);
+    if (!due) return false;
+    return diffCalendarDays(new Date(), due) > 0;
+  }
+
+  private async loadSupplier(ctx: RequestContext, supplierId: number): Promise<Customer | null> {
+    if (!supplierId) return null;
+    return this.connection.getRepository(ctx, Customer).findOne({
+      where: { id: supplierId },
+    });
   }
 
   @Query()

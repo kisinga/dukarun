@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RequestContext } from '@vendure/core';
 import { CommunicationService } from '../../infrastructure/communication/communication.service';
-import { getNextWhatsAppFlushTime, isWithinWhatsAppWindow } from './whatsapp-quiet-hours.util';
+import { NotificationCalendarService } from './notification-calendar.service';
 import { PendingNotificationService } from './pending-notification.service';
 
 export interface WhatsAppSendRequest {
@@ -21,6 +21,9 @@ const MAX_WHATSAPP_ATTEMPTS = 3;
  *   next morning.
  * - Messages generated inside the window are sent immediately.
  * - Persistent failures are dropped after MAX_WHATSAPP_ATTEMPTS attempts.
+ *
+ * Calendar rules live in NotificationCalendarService; this class handles
+ * persistence, retry policy, and delivery orchestration.
  */
 @Injectable()
 export class NotificationSchedulingService {
@@ -28,7 +31,8 @@ export class NotificationSchedulingService {
 
   constructor(
     private readonly pendingNotificationService: PendingNotificationService,
-    private readonly communicationService: CommunicationService
+    private readonly communicationService: CommunicationService,
+    private readonly notificationCalendarService: NotificationCalendarService
   ) {}
 
   /**
@@ -37,12 +41,12 @@ export class NotificationSchedulingService {
    */
   async deferOrSendWhatsApp(ctx: RequestContext, request: WhatsAppSendRequest): Promise<void> {
     const now = new Date();
-    if (isWithinWhatsAppWindow(now)) {
+    if (this.notificationCalendarService.isWhatsAppWindowOpen(now)) {
       await this.sendWhatsAppNow(ctx, request);
       return;
     }
 
-    const scheduledAt = getNextWhatsAppFlushTime(now);
+    const scheduledAt = this.notificationCalendarService.nextWhatsAppFlushTime(now);
     await this.pendingNotificationService.create(ctx, {
       channelId: request.channelId ?? '',
       triggerKey: request.triggerKey,
@@ -53,7 +57,7 @@ export class NotificationSchedulingService {
     });
 
     this.logger.log(
-      `Deferred WhatsApp ${request.triggerKey} to ${scheduledAt.toISOString()} for ${request.recipient}`
+      `Deferred WhatsApp ${request.triggerKey} to ${scheduledAt.toISOString()} for ${request.recipient} (${this.notificationCalendarService.whatsAppWindowDescription(now)})`
     );
   }
 

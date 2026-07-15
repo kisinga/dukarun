@@ -190,8 +190,9 @@ export class OrdersComponent implements OnInit {
     const paidOrders = allOrders.filter(
       (o) => o.state === 'PaymentSettled' || o.state === 'Fulfilled',
     ).length;
+    const overdueOrders = allOrders.filter((o) => o.isOverdue).length;
 
-    return { totalOrders, draftOrders, unpaidOrders, paidOrders };
+    return { totalOrders, draftOrders, unpaidOrders, paidOrders, overdueOrders };
   });
 
   // Computed: end item for pagination display
@@ -208,6 +209,7 @@ export class OrdersComponent implements OnInit {
       this.filterService.orderCode();
       this.filterService.amountMin();
       this.filterService.amountMax();
+      this.filterService.overdueOnly();
       this.loadOrdersWithFilter();
     });
 
@@ -260,11 +262,13 @@ export class OrdersComponent implements OnInit {
     const orderCode = this.filterService.orderCode().trim();
     const amountMin = this.filterService.amountMin();
     const amountMax = this.filterService.amountMax();
+    const overdueOnly = this.filterService.overdueOnly();
     const hasDateFilter = dateFrom != null || dateTo != null;
     const hasStateFilter = stateFilter !== '';
     const hasCodeFilter = orderCode !== '';
     const hasAmountFilter = amountMin != null || amountMax != null;
-    const hasAnyFilter = hasDateFilter || hasStateFilter || hasCodeFilter || hasAmountFilter;
+    const hasAnyFilter =
+      hasDateFilter || hasStateFilter || hasCodeFilter || hasAmountFilter || overdueOnly;
 
     const filter: OrderListOptions['filter'] = {};
     if (dateFrom != null || dateTo != null) {
@@ -294,7 +298,10 @@ export class OrdersComponent implements OnInit {
   }
 
   async loadOrdersWithFilter(): Promise<void> {
-    await this.ordersService.fetchOrders(this.buildOrderListOptions());
+    await this.ordersService.fetchOrders(
+      this.buildOrderListOptions(),
+      this.filterService.overdueOnly(),
+    );
   }
 
   async loadOrdersForStats(): Promise<void> {
@@ -437,6 +444,11 @@ export class OrdersComponent implements OnInit {
   }
 
   onStatsFilterClick(event: { type: string; value: string; color: string }): void {
+    if (event.type === 'overdue') {
+      this.filterService.overdueOnly.set(!this.filterService.overdueOnly());
+      this.currentPage.set(1);
+      return;
+    }
     if (event.type === 'state') {
       if (this.filterService.stateFilter() === event.value) {
         this.filterService.stateFilter.set('');
@@ -452,6 +464,11 @@ export class OrdersComponent implements OnInit {
   clearStateFilter(): void {
     this.filterService.stateFilter.set('');
     this.filterService.stateFilterColor.set('primary');
+    this.currentPage.set(1);
+  }
+
+  clearOverdueFilter(): void {
+    this.filterService.overdueOnly.set(false);
     this.currentPage.set(1);
   }
 

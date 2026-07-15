@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ID, RequestContext, TransactionalConnection } from '@vendure/core';
+import { startOfDay } from '../../utils/date.utils';
 import { StockPurchase } from './entities/purchase.entity';
 import { InventoryStockAdjustment } from './entities/stock-adjustment.entity';
 
@@ -11,6 +12,7 @@ export interface PurchaseListOptions {
     status?: string;
     startDate?: Date;
     endDate?: Date;
+    overdueOnly?: boolean;
   };
 }
 
@@ -66,6 +68,18 @@ export class StockQueryService {
       qb.andWhere(`${alias}.purchaseDate <= :endDate`, {
         endDate: filter.endDate,
       });
+    }
+
+    if (filter?.overdueOnly) {
+      qb.andWhere(`${alias}.isCreditPurchase = :isCreditPurchase`, {
+        isCreditPurchase: true,
+      })
+        .andWhere(`${alias}.paymentStatus IN (:...overdueStatuses)`, {
+          overdueStatuses: ['pending', 'partial'],
+        })
+        .andWhere(`${alias}.dueDate < :startOfToday`, {
+          startOfToday: startOfDay(new Date()),
+        });
     }
   }
 

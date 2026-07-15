@@ -1,6 +1,6 @@
 import { inject, Injectable, signal } from '@angular/core';
 import type { OrderListOptions } from '../graphql/generated/graphql';
-import { GetOrderFullDocument } from '../graphql/generated/graphql';
+import { GetOrderFullDocument, GetOverdueOrdersDocument } from '../graphql/generated/graphql';
 import { GET_ORDERS, ORDER_PAYMENT_STATUS } from '../graphql/operations.graphql';
 import { ApolloService } from './apollo.service';
 import { OrderCacheService } from './order-cache.service';
@@ -56,8 +56,9 @@ export class OrdersService {
   /**
    * Fetch orders with optional filtering and pagination
    * @param options - Order list options (pagination, filtering, sorting)
+   * @param overdueOnly - When true, use the dedicated overdueOrders query
    */
-  async fetchOrders(options?: OrderListOptions): Promise<void> {
+  async fetchOrders(options?: OrderListOptions, overdueOnly = false): Promise<void> {
     this.isLoadingSignal.set(true);
     this.errorSignal.set(null);
 
@@ -71,19 +72,31 @@ export class OrdersService {
 
     try {
       const client = this.apolloService.getClient();
-      const result = await client.query({
-        query: GET_ORDERS,
-        variables: {
-          options: resolved,
-        },
-        fetchPolicy: 'network-only',
-      });
+      if (overdueOnly) {
+        const result = await client.query({
+          query: GetOverdueOrdersDocument,
+          variables: { options: resolved },
+          fetchPolicy: 'network-only',
+        });
+        const items = (result.data?.overdueOrders?.items as any[]) || [];
+        const total = result.data?.overdueOrders?.totalItems || 0;
+        this.ordersSignal.set(items);
+        this.totalItemsSignal.set(total);
+      } else {
+        const result = await client.query({
+          query: GET_ORDERS,
+          variables: {
+            options: resolved,
+          },
+          fetchPolicy: 'network-only',
+        });
 
-      const items = result.data?.orders?.items || [];
-      const total = result.data?.orders?.totalItems || 0;
+        const items = result.data?.orders?.items || [];
+        const total = result.data?.orders?.totalItems || 0;
 
-      this.ordersSignal.set(items);
-      this.totalItemsSignal.set(total);
+        this.ordersSignal.set(items);
+        this.totalItemsSignal.set(total);
+      }
     } catch (error: any) {
       console.error('❌ Failed to fetch orders:', error);
       this.errorSignal.set(error.message || 'Failed to fetch orders');

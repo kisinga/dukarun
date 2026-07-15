@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Customer, RequestContext, TransactionalConnection } from '@vendure/core';
 import { In, Repository } from 'typeorm';
-import { diffCalendarDays } from '../../utils/date.utils';
+import { addDays, diffCalendarDays } from '../../utils/date.utils';
 import { StockPurchase } from '../stock/entities/purchase.entity';
 
 export interface AgedPurchase {
@@ -119,7 +119,7 @@ export class SupplierCreditAgingService {
       const purchaseDate = purchase.createdAt;
       if (!purchaseDate) continue;
 
-      const dueDate = this.addDays(new Date(purchaseDate), creditDurationDays);
+      const dueDate = addDays(new Date(purchaseDate), creditDurationDays);
       const daysOverdue = Math.max(0, diffCalendarDays(now, dueDate));
 
       if (!oldest || dueDate.getTime() < oldest.dueDate.getTime()) {
@@ -136,13 +136,6 @@ export class SupplierCreditAgingService {
     }
 
     return oldest;
-  }
-
-  private addDays(date: Date, days: number): Date {
-    const result = new Date(date);
-    result.setDate(result.getDate() + days);
-    result.setHours(0, 0, 0, 0);
-    return result;
   }
 
   private supplierName(supplier: Customer): string {

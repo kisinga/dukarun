@@ -7,24 +7,27 @@ export interface PurchaseStats {
   totalValue: number;
   thisMonth: number;
   pendingPayments: number;
+  overdue: number;
 }
 
 /**
- * Purchase summary — a compact inline stat line. Only "pending" is an interactive
- * (single-toggle) filter and the sole meaningful state, so it alone is coloured.
+ * Purchase summary — a compact inline stat line. "Pending" and "overdue" are
+ * interactive (single-toggle) filters and are coloured when active.
  */
 @Component({
   selector: 'app-purchase-stats',
   standalone: true,
   imports: [StatBarComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<app-stat-bar [stats]="items()" (select)="onPendingPaymentsClick()" />`,
+  template: `<app-stat-bar [stats]="items()" (select)="onSelect($event)" />`,
 })
 export class PurchaseStatsComponent {
   private readonly currencyService = inject(CurrencyService);
   readonly stats = input.required<PurchaseStats>();
   readonly pendingPaymentsActive = input<boolean>(false);
+  readonly overdueActive = input<boolean>(false);
   readonly pendingPaymentsClick = output<void>();
+  readonly overdueClick = output<void>();
 
   readonly items = computed<StatItem[]>(() => {
     const s = this.stats();
@@ -39,6 +42,13 @@ export class PurchaseStatsComponent {
         filter: 'pending',
         active: this.pendingPaymentsActive(),
       },
+      {
+        label: 'overdue',
+        value: s.overdue,
+        tone: s.overdue > 0 ? 'error' : 'neutral',
+        filter: 'overdue',
+        active: this.overdueActive(),
+      },
     ];
   });
 
@@ -47,7 +57,12 @@ export class PurchaseStatsComponent {
     return this.currencyService.format(amount);
   }
 
-  onPendingPaymentsClick(): void {
-    this.pendingPaymentsClick.emit();
+  onSelect(filter: string): void {
+    if (filter === 'overdue') {
+      this.overdueClick.emit();
+    } else {
+      // Existing pending filter behaviour for any other selection
+      this.pendingPaymentsClick.emit();
+    }
   }
 }
