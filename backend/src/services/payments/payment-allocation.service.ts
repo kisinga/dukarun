@@ -797,6 +797,14 @@ export class PaymentAllocationService {
   ): Promise<void> {
     const result = await this.orderService.transitionToState(ctx, orderId, state as any);
     if (isGraphQlErrorResult(result)) {
+      // Under concurrent split payments another request may have already advanced
+      // the order. Reaching the target state is success; only fail for other errors.
+      if (result.errorCode === 'ORDER_STATE_TRANSITION_ERROR') {
+        const order = await this.orderService.findOne(ctx, orderId);
+        if (order?.state === state) {
+          return;
+        }
+      }
       throw new UserInputError(
         `Cannot transition order to ${state}: ${result.message || result.errorCode || 'Unknown error'}`
       );
