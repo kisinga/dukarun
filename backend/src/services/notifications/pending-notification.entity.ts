@@ -35,7 +35,7 @@ export class PendingNotification {
   @Column({ default: 0 })
   attempts: number;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   error: string | null;
 
   @CreateDateColumn()
