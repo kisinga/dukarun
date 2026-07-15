@@ -2,8 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Customer, Order, RequestContext, TransactionalConnection } from '@vendure/core';
 import { In, MoreThan, Repository } from 'typeorm';
 import { AR_OWING_ORDER_STATES } from '../../constants/order-states.constants';
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+import { diffCalendarDays } from '../../utils/date.utils';
 
 export interface AgedOrder {
   orderId: string;
@@ -123,7 +122,7 @@ export class CreditAgingService {
       if (!orderDate) continue;
 
       const dueDate = this.addDays(new Date(orderDate), creditDurationDays);
-      const daysOverdue = Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / MS_PER_DAY));
+      const daysOverdue = Math.max(0, diffCalendarDays(now, dueDate));
 
       if (!oldest || dueDate.getTime() < oldest.dueDate.getTime()) {
         oldest = {

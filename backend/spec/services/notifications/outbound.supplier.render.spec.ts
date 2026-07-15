@@ -16,7 +16,7 @@ describe('Outbound supplier renderers', () => {
     expect(rendered.inAppMessage).toContain('KES 2,500.00');
   });
 
-  it('renders the 10-day internal AP reminder', () => {
+  it('renders the 10-day internal AP reminder with email', () => {
     const rendered = renderOutbound('supplier_ap_10_days', {
       supplierName: 'Acme Supplies',
       outstandingAmount: 500000,
@@ -25,17 +25,32 @@ describe('Outbound supplier renderers', () => {
     expect(rendered.inAppTitle).toBe('Supplier AP Reminder');
     expect(rendered.inAppMessage).toContain('10 days overdue');
     expect(rendered.inAppMessage).toContain('KES 5,000.00');
+    expect(rendered.emailSubject).toBe('AP payment urgent: 10 days overdue');
+    expect(rendered.emailBody).toContain('Acme Supplies');
   });
 
-  it('renders the supplier limit reached alert', () => {
-    const rendered = renderOutbound('supplier_limit_reached', {
+  it('renders the supplier limit warning alert', () => {
+    const rendered = renderOutbound('supplier_limit_warning', {
+      supplierName: 'Acme Supplies',
+      outstandingAmount: 800000,
+      creditLimit: 1000000,
+      utilizationPercent: 80,
+    });
+
+    expect(rendered.inAppTitle).toBe('Supplier Credit Limit Warning');
+    expect(rendered.inAppMessage).toContain('Acme Supplies');
+    expect(rendered.inAppMessage).toContain('80%');
+  });
+
+  it('renders the supplier limit near alert', () => {
+    const rendered = renderOutbound('supplier_limit_near', {
       supplierName: 'Acme Supplies',
       outstandingAmount: 900000,
       creditLimit: 1000000,
       utilizationPercent: 90,
     });
 
-    expect(rendered.inAppTitle).toBe('Supplier Credit Limit Reached');
+    expect(rendered.inAppTitle).toBe('Supplier Credit Limit Almost Reached');
     expect(rendered.inAppMessage).toContain('Acme Supplies');
     expect(rendered.inAppMessage).toContain('90%');
   });

@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Customer, RequestContext, TransactionalConnection } from '@vendure/core';
 import { In, Repository } from 'typeorm';
+import { diffCalendarDays } from '../../utils/date.utils';
 import { StockPurchase } from '../stock/entities/purchase.entity';
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export interface AgedPurchase {
   purchaseId: string;
@@ -121,7 +120,7 @@ export class SupplierCreditAgingService {
       if (!purchaseDate) continue;
 
       const dueDate = this.addDays(new Date(purchaseDate), creditDurationDays);
-      const daysOverdue = Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / MS_PER_DAY));
+      const daysOverdue = Math.max(0, diffCalendarDays(now, dueDate));
 
       if (!oldest || dueDate.getTime() < oldest.dueDate.getTime()) {
         oldest = {

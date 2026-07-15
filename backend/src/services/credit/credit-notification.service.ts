@@ -1,31 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventBus, RequestContext, TransactionalConnection } from '@vendure/core';
-import { Repository } from 'typeorm';
+import { EventBus, RequestContext } from '@vendure/core';
 import { CustomerNotificationEvent } from '../../infrastructure/events/custom-events';
 import { OutboundDeliveryService } from '../notifications/outbound-delivery.service';
-import { CreditNotificationCheckpoint } from './credit-notification-checkpoint.entity';
 import { CreditAgingService, CustomerCreditAging } from './credit-aging.service';
+import { CreditNotificationCheckpointService } from './credit-notification-checkpoint.service';
 import { CreditService } from './credit.service';
 
 export type CreditReminderBucket =
   | 'period_3_days'
   | 'period_7_days'
   | 'period_10_days_frozen'
-  | 'limit_reached';
+  | 'limit_warning'
+  | 'limit_near';
 
 interface BucketResult {
   bucket: CreditReminderBucket;
   shouldFreeze: boolean;
 }
 
-const PERIOD_BUCKETS: { thresholdDays: number; bucket: CreditReminderBucket }[] = [
-  { thresholdDays: 10, bucket: 'period_10_days_frozen' },
-  { thresholdDays: 7, bucket: 'period_7_days' },
-  { thresholdDays: 3, bucket: 'period_3_days' },
-];
-
-const LIMIT_REACHED_THRESHOLD = 0.9; // 90% utilization = effectively reached
+const LIMIT_WARNING_THRESHOLD = 0.8; // 80% utilization: heads-up
+const LIMIT_NEAR_THRESHOLD = 0.9; // 90% utilization: effectively at limit
 const RECENT_REPAYMENT_SUPPRESS_DAYS = 3; // skip gentle 3-day nudge if paid very recently
+const CHECKPOINT_TTL_DAYS = 90;
+const CUSTOMER_TRIGGER_KEY = 'credit_reminder';
 
 /**
  * Daily credit-reminder scanner.
@@ -33,22 +30,24 @@ const RECENT_REPAYMENT_SUPPRESS_DAYS = 3; // skip gentle 3-day nudge if paid ver
  * For every customer with outstanding AR, computes aging and sends exactly one
  * reminder per bucket using CreditNotificationCheckpoint for deduplication.
  *
- * - 3 days overdue: gentle reminder
- * - 7 days overdue: urgent reminder
+ * Severity order (most urgent first):
  * - 10 days overdue: freeze credit and final notice
- * - Utilization >= 90%: limit reached notice
+ * - 7 days overdue: urgent reminder
+ * - 90% utilization: limit near notice
+ * - 3 days overdue: gentle reminder (suppressed if repaid very recently)
+ * - 80% utilization: limit warning notice
  *
- * Customer-facing WhatsApp messages are marked systemGenerated so they respect
- * quiet hours. Admin copies are delivered in-app immediately.
+ * Customer-facing WhatsApp messages are deferred outside quiet hours.
+ * Admin copies are delivered in-app immediately.
  */
 @Injectable()
 export class CreditNotificationService {
   private readonly logger = new Logger(CreditNotificationService.name);
 
   constructor(
-    private readonly connection: TransactionalConnection,
     private readonly creditAgingService: CreditAgingService,
     private readonly creditService: CreditService,
+    private readonly checkpointService: CreditNotificationCheckpointService,
     private readonly outboundDelivery: OutboundDeliveryService,
     private readonly eventBus: EventBus
   ) {}
@@ -61,6 +60,12 @@ export class CreditNotificationService {
     notificationsSent: number;
     customersFrozen: number;
   }> {
+    await this.checkpointService.clearOldCheckpoints(
+      ctx,
+      CUSTOMER_TRIGGER_KEY,
+      CHECKPOINT_TTL_DAYS
+    );
+
     const customerIds = await this.creditAgingService.findCustomersWithOutstanding(ctx);
     let notificationsSent = 0;
     let customersFrozen = 0;
@@ -68,7 +73,11 @@ export class CreditNotificationService {
     for (const customerId of customerIds) {
       try {
         const outstanding = await this.creditService.getBalance(ctx, customerId, 'customer');
-        if (outstanding <= 0) continue;
+        if (outstanding <= 0) {
+          // Balance cleared: re-arm reminders for future credit cycles.
+          await this.checkpointService.clearCheckpoints(ctx, CUSTOMER_TRIGGER_KEY, customerId);
+          continue;
+        }
 
         const aging = await this.creditAgingService.getCustomerAging(ctx, customerId, outstanding);
         if (!aging) continue;
@@ -77,7 +86,12 @@ export class CreditNotificationService {
         if (!selectedBucket) continue;
         const { bucket, shouldFreeze } = selectedBucket;
 
-        const alreadySent = await this.hasCheckpoint(ctx, customerId, bucket);
+        const alreadySent = await this.checkpointService.hasCheckpoint(
+          ctx,
+          CUSTOMER_TRIGGER_KEY,
+          customerId,
+          bucket
+        );
         if (alreadySent) continue;
 
         if (shouldFreeze) {
@@ -86,7 +100,12 @@ export class CreditNotificationService {
         }
 
         await this.sendReminder(ctx, aging, bucket);
-        await this.createCheckpoint(ctx, customerId, bucket);
+        await this.checkpointService.createCheckpoint(
+          ctx,
+          CUSTOMER_TRIGGER_KEY,
+          customerId,
+          bucket
+        );
         notificationsSent++;
       } catch (error) {
         this.logger.error(
@@ -104,23 +123,31 @@ export class CreditNotificationService {
       return { bucket: 'period_10_days_frozen', shouldFreeze: true };
     }
 
-    // Limit reached takes precedence over the gentler period reminders.
-    if (aging.utilizationPercent >= LIMIT_REACHED_THRESHOLD) {
-      return { bucket: 'limit_reached', shouldFreeze: false };
+    // 7 days overdue is more urgent than a limit warning.
+    if (aging.daysOverdue >= 7) {
+      return { bucket: 'period_7_days', shouldFreeze: false };
     }
 
-    for (const { thresholdDays, bucket } of PERIOD_BUCKETS) {
-      if (aging.daysOverdue >= thresholdDays) {
-        // Skip the gentle 3-day nudge if the customer paid very recently.
-        if (
-          bucket === 'period_3_days' &&
-          aging.lastRepaymentDate &&
-          this.daysSince(aging.lastRepaymentDate) < RECENT_REPAYMENT_SUPPRESS_DAYS
-        ) {
-          continue;
-        }
-        return { bucket, shouldFreeze: false };
+    // 90% utilization: approaching the hard limit.
+    if (aging.utilizationPercent >= LIMIT_NEAR_THRESHOLD) {
+      return { bucket: 'limit_near', shouldFreeze: false };
+    }
+
+    // Gentle 3-day nudge (skip if the customer paid very recently).
+    if (aging.daysOverdue >= 3) {
+      if (
+        aging.lastRepaymentDate &&
+        this.daysSince(aging.lastRepaymentDate) < RECENT_REPAYMENT_SUPPRESS_DAYS
+      ) {
+        // fall through to limit_warning if utilization is high enough
+      } else {
+        return { bucket: 'period_3_days', shouldFreeze: false };
       }
+    }
+
+    // 80% utilization: early heads-up.
+    if (aging.utilizationPercent >= LIMIT_WARNING_THRESHOLD) {
+      return { bucket: 'limit_warning', shouldFreeze: false };
     }
 
     return null;
@@ -156,7 +183,7 @@ export class CreditNotificationService {
         new CustomerNotificationEvent(
           ctx,
           basePayload.channelId,
-          'credit_reminder',
+          CUSTOMER_TRIGGER_KEY,
           aging.customerId,
           { bucket, ...basePayload }
         )
@@ -170,38 +197,6 @@ export class CreditNotificationService {
 
   private async freezeCustomer(ctx: RequestContext, customerId: string): Promise<void> {
     await this.creditService.freezeCustomerCredit(ctx, customerId, 'customer', '10 days overdue');
-  }
-
-  private async hasCheckpoint(
-    ctx: RequestContext,
-    customerId: string,
-    bucket: CreditReminderBucket
-  ): Promise<boolean> {
-    const count = await this.checkpointRepo(ctx).count({
-      where: {
-        customerId,
-        triggerKey: 'credit_reminder',
-        bucket,
-      },
-    });
-    return count > 0;
-  }
-
-  private async createCheckpoint(
-    ctx: RequestContext,
-    customerId: string,
-    bucket: CreditReminderBucket
-  ): Promise<void> {
-    const checkpoint = new CreditNotificationCheckpoint();
-    checkpoint.customerId = customerId;
-    checkpoint.triggerKey = 'credit_reminder';
-    checkpoint.bucket = bucket;
-    checkpoint.sentAt = new Date();
-    await this.checkpointRepo(ctx).save(checkpoint);
-  }
-
-  private checkpointRepo(ctx: RequestContext): Repository<CreditNotificationCheckpoint> {
-    return this.connection.getRepository(ctx, CreditNotificationCheckpoint);
   }
 
   private daysSince(date: Date): number {
