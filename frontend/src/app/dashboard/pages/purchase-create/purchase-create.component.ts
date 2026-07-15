@@ -23,6 +23,7 @@ import { PurchaseDraft, PurchaseLineItem } from '../../../core/services/purchase
 import { StockLocationService } from '../../../core/services/stock-location.service';
 import { SupplierService } from '../../../core/services/supplier.service';
 import { CurrencyService } from '../../../core/services/currency.service';
+import { CompanyService } from '../../../core/services/company.service';
 import { PageHeaderComponent } from '../../components/shared/page-header.component';
 import { CompanySearchSelectComponent } from '../shared/components/company-search-select.component';
 import { ProductSearchViewComponent } from '../shared/components/product-search-view.component';
@@ -170,6 +171,7 @@ import { PurchasePaymentSectionComponent } from './components/purchase-payment-s
           <div class="mt-2">
             <app-purchase-line-items-table
               [lineItems]="draft.lines"
+              [batchExpiryEnabled]="batchExpiryEnabled()"
               (lineItemUpdate)="updateLineItem($event.index, $event.field, $event.value)"
               (lineItemRemove)="removeLineItem($event)"
             />
@@ -243,6 +245,7 @@ import { PurchasePaymentSectionComponent } from './components/purchase-payment-s
         [isOpen]="showItemEntryModal()"
         [product]="itemEntryProduct()"
         [variant]="itemEntryVariant()"
+        [batchExpiryEnabled]="batchExpiryEnabled()"
         (itemAdded)="onItemAddedFromModal($event)"
         (closeModal)="closeItemEntryModal()"
       />
@@ -261,6 +264,9 @@ export class PurchaseCreateComponent extends ApprovableFormBase implements OnIni
   readonly productSearchService = inject(ProductSearchService);
   readonly stockLocationService = inject(StockLocationService);
   private readonly ledgerService = inject(LedgerService);
+  private readonly companyService = inject(CompanyService);
+
+  readonly batchExpiryEnabled = this.companyService.batchExpiryEnabled;
 
   // Service signals
   readonly purchaseDraft = this.purchaseService.purchaseDraft;

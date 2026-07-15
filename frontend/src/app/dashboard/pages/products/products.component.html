@@ -22,7 +22,11 @@
       header-stats
       [stats]="stats()"
       [lowStockActive]="showLowStockOnly()"
+      [expiringSoonActive]="showExpiringSoonOnly()"
+      [expiredActive]="showExpiredOnly()"
       (lowStockClick)="onLowStockStatsClick()"
+      (expiringSoonClick)="toggleExpiringSoonFilter(!showExpiringSoonOnly())"
+      (expiredClick)="toggleExpiredFilter(!showExpiredOnly())"
     />
   </app-page-header>
 
@@ -40,7 +44,9 @@
       (selectedFacetValueIds()['tags']?.length ?? 0) > 0 ||
       enabledFilter() !== 'all' ||
       sortBy() ||
-      showLowStockOnly()
+      showLowStockOnly() ||
+      showExpiringSoonOnly() ||
+      showExpiredOnly()
     ) {
       <div badges class="flex flex-wrap gap-1.5 items-center">
         @for (code of facetCodes; track code) {
@@ -93,10 +99,39 @@
             </button>
           </span>
         }
+        @if (showExpiringSoonOnly()) {
+          <span class="badge badge-sm badge-warning gap-1.5">
+            Expiring Soon
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
+              (click)="toggleExpiringSoonFilter(false)"
+              type="button"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (showExpiredOnly()) {
+          <span class="badge badge-sm badge-error gap-1.5">
+            Expired
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-3.5 w-3.5 min-h-0"
+              (click)="toggleExpiredFilter(false)"
+              type="button"
+            >
+              &times;
+            </button>
+          </span>
+        }
         <button
           type="button"
           class="btn btn-ghost btn-xs ml-auto"
-          (click)="clearAllFilters(); toggleLowStockFilter(false)"
+          (click)="
+            clearAllFilters();
+            toggleLowStockFilter(false);
+            toggleExpiringSoonFilter(false);
+            toggleExpiredFilter(false)
+          "
         >
           Clear all
         </button>
@@ -104,7 +139,7 @@
     }
 
     <!-- Filters — 2-up on phones (no truncation), one row on desktop -->
-    <div filters class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+    <div filters class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
       @for (code of facetCodes; track code) {
         <app-product-list-facet-selector
           [facetCode]="code"
@@ -144,6 +179,34 @@
         <ng-icon name="heroExclamationTriangle" size="0.9rem" />
         <span class="whitespace-nowrap">Low stock</span>
       </button>
+      <button
+        type="button"
+        class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border px-3 text-sm transition-colors"
+        [class]="
+          showExpiringSoonOnly()
+            ? 'border-warning bg-warning/10 text-warning'
+            : 'border-base-300 bg-base-100 text-base-content/70 hover:bg-base-200'
+        "
+        [attr.aria-pressed]="showExpiringSoonOnly()"
+        (click)="toggleExpiringSoonFilter(!showExpiringSoonOnly())"
+      >
+        <ng-icon name="heroClock" size="0.9rem" />
+        <span class="whitespace-nowrap">Expiring soon</span>
+      </button>
+      <button
+        type="button"
+        class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border px-3 text-sm transition-colors"
+        [class]="
+          showExpiredOnly()
+            ? 'border-error bg-error/10 text-error'
+            : 'border-base-300 bg-base-100 text-base-content/70 hover:bg-base-200'
+        "
+        [attr.aria-pressed]="showExpiredOnly()"
+        (click)="toggleExpiredFilter(!showExpiredOnly())"
+      >
+        <ng-icon name="heroCalendar" size="0.9rem" />
+        <span class="whitespace-nowrap">Expired</span>
+      </button>
     </div>
   </app-list-search-bar>
 
@@ -179,15 +242,17 @@
             <ng-icon name="heroCube" size="2.5rem" class="text-base-content/30" />
           </div>
           <h3 class="text-lg font-semibold">No products found</h3>
-          @if (searchQuery() || showLowStockOnly()) {
+          @if (searchQuery() || showLowStockOnly() || showExpiringSoonOnly() || showExpiredOnly()) {
             <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
-              @if (searchQuery() && showLowStockOnly()) {
-                No products match "{{ searchQuery() }}" with low stock filter. Try adjusting your
+              @if (searchQuery()) {
+                No products match "{{ searchQuery() }}" with the current filters. Try adjusting your
                 filters.
-              } @else if (searchQuery()) {
-                No products match "{{ searchQuery() }}". Try a different search term.
-              } @else {
+              } @else if (showLowStockOnly()) {
                 No products found with low stock. All products are above the threshold.
+              } @else if (showExpiringSoonOnly()) {
+                No products have batches expiring soon.
+              } @else {
+                No products have expired batches.
               }
             </p>
             <div class="flex gap-2 justify-center mt-6">
@@ -197,6 +262,16 @@
               @if (showLowStockOnly()) {
                 <button (click)="toggleLowStockFilter(false)" class="btn btn-outline btn-sm">
                   Clear Low Stock
+                </button>
+              }
+              @if (showExpiringSoonOnly()) {
+                <button (click)="toggleExpiringSoonFilter(false)" class="btn btn-outline btn-sm">
+                  Clear Expiring Soon
+                </button>
+              }
+              @if (showExpiredOnly()) {
+                <button (click)="toggleExpiredFilter(false)" class="btn btn-outline btn-sm">
+                  Clear Expired
                 </button>
               }
             </div>
@@ -224,6 +299,7 @@
         <app-product-card
           [product]="product"
           [canEdit]="canEditProduct()"
+          [batchExpiryEnabled]="batchExpiryEnabled()"
           (action)="onProductAction($event)"
         />
       }
@@ -250,6 +326,7 @@
                 app-product-table-row
                 [product]="product"
                 [canEdit]="canEditProduct()"
+                [batchExpiryEnabled]="batchExpiryEnabled()"
                 [expanded]="isExpanded(product.id)"
                 (toggleExpand)="toggleExpand(product.id)"
                 (action)="onProductAction($event)"
@@ -275,6 +352,18 @@
                       <span class="badge badge-sm" [class]="variantBadgeClass(v)">
                         {{ variantStock(v) }}
                       </span>
+                      @if (
+                        batchExpiryEnabled() && variantExpiryLabel(v.inventoryBatches);
+                        as label
+                      ) {
+                        <span
+                          class="badge badge-sm ml-1"
+                          [class.badge-warning]="getBatchExpiryDays(v.inventoryBatches)! >= 0"
+                          [class.badge-error]="getBatchExpiryDays(v.inventoryBatches)! < 0"
+                        >
+                          {{ label }}
+                        </span>
+                      }
                     </td>
                     <td></td>
                     <td></td>

@@ -29,6 +29,13 @@ export interface ProductCardData {
     priceWithTax: number;
     stockOnHand: number;
     trackInventory?: boolean;
+    inventoryBatches?: Array<{
+      id: string;
+      quantity: number;
+      expiryDate?: string | null;
+      batchNumber?: string | null;
+      consumePriority: boolean;
+    }>;
   }>;
 }
 
@@ -49,6 +56,7 @@ export type ProductAction = 'view' | 'edit' | 'purchase' | 'delete';
 export class ProductCardComponent {
   readonly product = input.required<ProductCardData>();
   readonly canEdit = input<boolean>(true);
+  readonly batchExpiryEnabled = input<boolean>(false);
   readonly action = output<{ action: ProductAction; productId: string }>();
 
   readonly variants = computed(() => this.product().variants ?? []);
@@ -69,6 +77,29 @@ export class ProductCardComponent {
 
   variantStock(v: { stockOnHand?: number; trackInventory?: boolean }): string {
     return stockDisplay(v.stockOnHand ?? 0, v.trackInventory === false);
+  }
+
+  variantExpiryDays(
+    v: { inventoryBatches?: Array<{ expiryDate?: string | null }> } | undefined,
+  ): number | null {
+    const batches = v?.inventoryBatches;
+    if (!batches?.length) return null;
+    const now = new Date().getTime();
+    const times = batches
+      .map((b) => (b.expiryDate ? new Date(b.expiryDate).getTime() : null))
+      .filter((t): t is number => t !== null);
+    if (!times.length) return null;
+    return Math.floor((Math.min(...times) - now) / (1000 * 60 * 60 * 24));
+  }
+
+  variantExpiryLabel(
+    v: { inventoryBatches?: Array<{ expiryDate?: string | null }> } | undefined,
+  ): string | null {
+    const days = this.variantExpiryDays(v);
+    if (days === null) return null;
+    if (days < 0) return `Expired ${Math.abs(days)}d ago`;
+    if (days === 0) return 'Expires today';
+    return `Expires in ${days}d`;
   }
 
   onAction(actionType: ProductAction): void {

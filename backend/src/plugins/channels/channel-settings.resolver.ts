@@ -21,6 +21,7 @@ export const channelSettingsSchema = gql`
   extend type Mutation {
     updateChannelLogo(logoAssetId: ID): ChannelSettings!
     updateCashierSettings(cashierFlowEnabled: Boolean): ChannelSettings!
+    updateBatchExpirySettings(batchExpiryEnabled: Boolean, lowStockThreshold: Int): ChannelSettings!
     updatePrinterSettings(enablePrinter: Boolean!): ChannelSettings!
     updateChannelStatus(channelId: ID!, status: String!): Channel!
     inviteChannelAdministrator(input: InviteAdministratorInput!): Administrator!
@@ -33,6 +34,8 @@ export const channelSettingsSchema = gql`
 
   type ChannelSettings {
     cashierFlowEnabled: Boolean!
+    batchExpiryEnabled: Boolean!
+    lowStockThreshold: Int!
     enablePrinter: Boolean!
     companyLogoAsset: Asset
   }
@@ -107,6 +110,20 @@ export class ChannelSettingsResolver {
     @Args('cashierFlowEnabled', { nullable: true }) cashierFlowEnabled?: boolean
   ) {
     return this.channelSettingsService.updateCashierSettings(ctx, cashierFlowEnabled);
+  }
+
+  @Mutation()
+  @Allow(Permission.UpdateSettings)
+  async updateBatchExpirySettings(
+    @Ctx() ctx: RequestContext,
+    @Args('batchExpiryEnabled', { nullable: true }) batchExpiryEnabled?: boolean,
+    @Args('lowStockThreshold', { nullable: true }) lowStockThreshold?: number
+  ) {
+    return this.channelSettingsService.updateBatchExpirySettings(
+      ctx,
+      batchExpiryEnabled,
+      lowStockThreshold
+    );
   }
 
   @Mutation()

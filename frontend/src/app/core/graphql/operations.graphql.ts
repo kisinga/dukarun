@@ -200,6 +200,8 @@ export const GET_ACTIVE_CHANNEL = graphql(`
           preview
         }
         cashierFlowEnabled
+        batchExpiryEnabled
+        lowStockThreshold
         enablePrinter
         subscriptionStatus
         trialEndsAt
@@ -207,7 +209,7 @@ export const GET_ACTIVE_CHANNEL = graphql(`
       }
     }
   }
-`);
+`) as any;
 
 // ============================================================================
 // PRODUCT MANAGEMENT
@@ -467,6 +469,63 @@ export const GET_PRODUCTS = graphql(`
           prices {
             price
             currencyCode
+          }
+          inventoryBatches {
+            id
+            quantity
+            expiryDate
+            batchNumber
+            consumePriority
+          }
+        }
+      }
+    }
+  }
+`);
+
+export const GET_PRODUCTS_BY_INVENTORY_ALERT = graphql(`
+  query GetProductsByInventoryAlert($filter: InventoryAlertFilter!, $options: ProductListOptions) {
+    productsByInventoryAlert(filter: $filter, options: $options) {
+      totalItems
+      items {
+        id
+        name
+        slug
+        description
+        enabled
+        featuredAsset {
+          id
+          preview
+        }
+        facetValues {
+          id
+          name
+          facet {
+            code
+          }
+        }
+        variants {
+          id
+          name
+          sku
+          price
+          priceWithTax
+          stockOnHand
+          trackInventory
+          customFields {
+            wholesalePrice
+            allowFractionalQuantity
+          }
+          prices {
+            price
+            currencyCode
+          }
+          inventoryBatches {
+            id
+            quantity
+            expiryDate
+            batchNumber
+            consumePriority
           }
         }
       }
@@ -868,6 +927,16 @@ export const GET_STOCK_VALUE_STATS = graphql(`
       retail
       wholesale
       cost
+    }
+  }
+`);
+
+export const GET_INVENTORY_ALERTS = graphql(`
+  query GetInventoryAlerts($expiryThresholdDays: Int) {
+    inventoryAlerts(expiryThresholdDays: $expiryThresholdDays) {
+      lowStockCount
+      expiringSoonCount
+      expiredCount
     }
   }
 `);
@@ -2343,6 +2412,8 @@ export const UPDATE_CHANNEL_LOGO = graphql(`
   mutation UpdateChannelLogo($logoAssetId: ID) {
     updateChannelLogo(logoAssetId: $logoAssetId) {
       cashierFlowEnabled
+      batchExpiryEnabled
+      lowStockThreshold
       enablePrinter
       companyLogoAsset {
         id
@@ -2351,12 +2422,14 @@ export const UPDATE_CHANNEL_LOGO = graphql(`
       }
     }
   }
-`);
+`) as any;
 
 export const UPDATE_CASHIER_SETTINGS = graphql(`
   mutation UpdateCashierSettings($cashierFlowEnabled: Boolean) {
     updateCashierSettings(cashierFlowEnabled: $cashierFlowEnabled) {
       cashierFlowEnabled
+      batchExpiryEnabled
+      lowStockThreshold
       enablePrinter
       companyLogoAsset {
         id
@@ -2365,12 +2438,33 @@ export const UPDATE_CASHIER_SETTINGS = graphql(`
       }
     }
   }
-`);
+`) as any;
+
+export const UPDATE_BATCH_EXPIRY_SETTINGS = graphql(`
+  mutation UpdateBatchExpirySettings($batchExpiryEnabled: Boolean, $lowStockThreshold: Int) {
+    updateBatchExpirySettings(
+      batchExpiryEnabled: $batchExpiryEnabled
+      lowStockThreshold: $lowStockThreshold
+    ) {
+      cashierFlowEnabled
+      batchExpiryEnabled
+      lowStockThreshold
+      enablePrinter
+      companyLogoAsset {
+        id
+        preview
+        source
+      }
+    }
+  }
+`) as any;
 
 export const UPDATE_PRINTER_SETTINGS = graphql(`
   mutation UpdatePrinterSettings($enablePrinter: Boolean!) {
     updatePrinterSettings(enablePrinter: $enablePrinter) {
       cashierFlowEnabled
+      batchExpiryEnabled
+      lowStockThreshold
       enablePrinter
       companyLogoAsset {
         id
@@ -2379,7 +2473,7 @@ export const UPDATE_PRINTER_SETTINGS = graphql(`
       }
     }
   }
-`);
+`) as any;
 
 export const INVITE_CHANNEL_ADMINISTRATOR = graphql(`
   mutation InviteChannelAdministrator($input: InviteAdministratorInput!) {

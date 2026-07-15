@@ -110,6 +110,40 @@
         />
       </label>
 
+      <!-- Batch Expiry Tracking -->
+      <label class="flex items-center justify-between bg-base-200 rounded-lg p-3 cursor-pointer">
+        <div class="flex-1 min-w-0 pr-4">
+          <div class="text-sm font-medium">Batch Expiry Tracking</div>
+          <div class="text-xs opacity-60">
+            Record batch numbers and expiry dates; surface expiring batches
+          </div>
+        </div>
+        <input
+          type="checkbox"
+          class="toggle toggle-primary toggle-sm"
+          [checked]="settings()?.batchExpiryEnabled"
+          (change)="toggleBatchExpiry($event)"
+        />
+      </label>
+
+      <!-- Low Stock Threshold -->
+      <label class="flex items-center justify-between bg-base-200 rounded-lg p-3">
+        <div class="flex-1 min-w-0 pr-4">
+          <div class="text-sm font-medium">Low Stock Threshold</div>
+          <div class="text-xs opacity-60">
+            Stock level at or below which a variant is flagged as low stock
+          </div>
+        </div>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          class="input input-bordered input-sm w-24 text-right"
+          [value]="settings()?.lowStockThreshold"
+          (input)="updateLowStockThreshold($event)"
+        />
+      </label>
+
       <!-- Printer -->
       <label class="flex items-center justify-between bg-base-200 rounded-lg p-3 cursor-pointer">
         <div class="flex-1 min-w-0 pr-4">

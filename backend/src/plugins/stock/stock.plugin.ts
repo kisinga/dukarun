@@ -2,6 +2,7 @@ import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
 import { STOCK_ADMIN_SCHEMA } from './stock.schema';
 import { StockResolver } from './stock.resolver';
+import { ProductVariantBatchResolver } from './product-variant-batch.resolver';
 import { ManageStockAdjustmentsPermission } from './permissions';
 import { StockManagementService } from '../../services/stock/stock-management.service';
 import { StockMovementService } from '../../services/stock/stock-movement.service';
@@ -30,6 +31,7 @@ import { LedgerPlugin } from '../ledger/ledger.plugin';
     StockManagementService,
     StockQueryService,
     StockResolver,
+    ProductVariantBatchResolver,
   ],
   configuration: config => {
     // Register custom permission
@@ -41,7 +43,7 @@ import { LedgerPlugin } from '../ledger/ledger.plugin';
   },
   adminApiExtensions: {
     schema: STOCK_ADMIN_SCHEMA,
-    resolvers: [StockResolver],
+    resolvers: [StockResolver, ProductVariantBatchResolver],
   },
   entities: [
     StockPurchase,

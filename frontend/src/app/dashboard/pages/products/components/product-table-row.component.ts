@@ -30,6 +30,7 @@ import {
 export class ProductTableRowComponent {
   readonly product = input.required<ProductCardData>();
   readonly canEdit = input<boolean>(true);
+  readonly batchExpiryEnabled = input<boolean>(false);
   readonly expanded = input<boolean>(false);
   readonly action = output<{ action: ProductAction; productId: string }>();
   readonly toggleExpand = output<void>();
@@ -44,6 +45,24 @@ export class ProductTableRowComponent {
 
   getThumbnail(): string | null {
     return this.product().featuredAsset?.preview || null;
+  }
+
+  nearestExpiryDays(): number | null {
+    const batches = this.variants()
+      .flatMap((v) => v.inventoryBatches ?? [])
+      .filter((b) => b.expiryDate);
+    if (!batches.length) return null;
+    const now = new Date().getTime();
+    const times = batches.map((b) => new Date(b.expiryDate!).getTime());
+    return Math.floor((Math.min(...times) - now) / (1000 * 60 * 60 * 24));
+  }
+
+  expiryLabel(): string | null {
+    const days = this.nearestExpiryDays();
+    if (days === null) return null;
+    if (days < 0) return `Expired ${Math.abs(days)}d ago`;
+    if (days === 0) return 'Expires today';
+    return `Expires in ${days}d`;
   }
 
   onAction(actionType: ProductAction): void {

@@ -817,6 +817,7 @@ export type Channel = Node & {
 
 export type ChannelCustomFields = {
   __typename?: 'ChannelCustomFields';
+  batchExpiryEnabled?: Maybe<Scalars['Boolean']['output']>;
   billingCycle?: Maybe<Scalars['String']['output']>;
   cashControlEnabled?: Maybe<Scalars['Boolean']['output']>;
   cashierFlowEnabled?: Maybe<Scalars['Boolean']['output']>;
@@ -825,6 +826,7 @@ export type ChannelCustomFields = {
   eventConfig?: Maybe<Scalars['String']['output']>;
   lastPaymentAmount?: Maybe<Scalars['Int']['output']>;
   lastPaymentDate?: Maybe<Scalars['DateTime']['output']>;
+  lowStockThreshold?: Maybe<Scalars['Int']['output']>;
   notificationCategoryPreferences?: Maybe<Scalars['String']['output']>;
   paystackCustomerCode?: Maybe<Scalars['String']['output']>;
   paystackSubscriptionCode?: Maybe<Scalars['String']['output']>;
@@ -864,6 +866,7 @@ export type ChannelDefaultLanguageError = ErrorResult & {
 export type ChannelFilterParameter = {
   _and?: InputMaybe<Array<ChannelFilterParameter>>;
   _or?: InputMaybe<Array<ChannelFilterParameter>>;
+  batchExpiryEnabled?: InputMaybe<BooleanOperators>;
   billingCycle?: InputMaybe<StringOperators>;
   cashControlEnabled?: InputMaybe<BooleanOperators>;
   cashierFlowEnabled?: InputMaybe<BooleanOperators>;
@@ -877,6 +880,7 @@ export type ChannelFilterParameter = {
   id?: InputMaybe<IdOperators>;
   lastPaymentAmount?: InputMaybe<NumberOperators>;
   lastPaymentDate?: InputMaybe<DateOperators>;
+  lowStockThreshold?: InputMaybe<NumberOperators>;
   notificationCategoryPreferences?: InputMaybe<StringOperators>;
   outOfStockThreshold?: InputMaybe<NumberOperators>;
   paystackCustomerCode?: InputMaybe<StringOperators>;
@@ -943,12 +947,15 @@ export type ChannelNotificationPreferencesInput = {
 
 export type ChannelSettings = {
   __typename?: 'ChannelSettings';
+  batchExpiryEnabled: Scalars['Boolean']['output'];
   cashierFlowEnabled: Scalars['Boolean']['output'];
   companyLogoAsset?: Maybe<Asset>;
   enablePrinter: Scalars['Boolean']['output'];
+  lowStockThreshold: Scalars['Int']['output'];
 };
 
 export type ChannelSortParameter = {
+  batchExpiryEnabled?: InputMaybe<SortOrder>;
   billingCycle?: InputMaybe<SortOrder>;
   cashControlEnabled?: InputMaybe<SortOrder>;
   cashierFlowEnabled?: InputMaybe<SortOrder>;
@@ -960,6 +967,7 @@ export type ChannelSortParameter = {
   id?: InputMaybe<SortOrder>;
   lastPaymentAmount?: InputMaybe<SortOrder>;
   lastPaymentDate?: InputMaybe<SortOrder>;
+  lowStockThreshold?: InputMaybe<SortOrder>;
   notificationCategoryPreferences?: InputMaybe<SortOrder>;
   outOfStockThreshold?: InputMaybe<SortOrder>;
   paystackCustomerCode?: InputMaybe<SortOrder>;
@@ -1399,6 +1407,7 @@ export type CreateChannelAdminInput = {
 };
 
 export type CreateChannelCustomFieldsInput = {
+  batchExpiryEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   billingCycle?: InputMaybe<Scalars['String']['input']>;
   cashControlEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -1407,6 +1416,7 @@ export type CreateChannelCustomFieldsInput = {
   eventConfig?: InputMaybe<Scalars['String']['input']>;
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
   notificationCategoryPreferences?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
@@ -3108,6 +3118,30 @@ export type InvalidFulfillmentHandlerError = ErrorResult & {
   message: Scalars['String']['output'];
 };
 
+export type InventoryAlertCounts = {
+  __typename?: 'InventoryAlertCounts';
+  expiredCount: Scalars['Int']['output'];
+  expiringSoonCount: Scalars['Int']['output'];
+  lowStockCount: Scalars['Int']['output'];
+};
+
+export type InventoryBatch = {
+  __typename?: 'InventoryBatch';
+  batchNumber?: Maybe<Scalars['String']['output']>;
+  channelId: Scalars['ID']['output'];
+  consumePriority: Scalars['Boolean']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  expiryDate?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['ID']['output'];
+  productVariantId: Scalars['ID']['output'];
+  quantity: Scalars['Float']['output'];
+  sourceId: Scalars['ID']['output'];
+  sourceType: Scalars['String']['output'];
+  stockLocationId: Scalars['ID']['output'];
+  unitCost: Scalars['Int']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
 export type InventoryReconciliationResult = {
   __typename?: 'InventoryReconciliationResult';
   channelId: Scalars['Int']['output'];
@@ -4249,6 +4283,7 @@ export type Mutation = {
   updateApiKey: ApiKey;
   /** Update an existing Asset */
   updateAsset: Asset;
+  updateBatchExpirySettings: ChannelSettings;
   updateCashierSettings: ChannelSettings;
   /** Update an existing Channel */
   updateChannel: UpdateChannelResult;
@@ -5453,6 +5488,12 @@ export type MutationUpdateApiKeyArgs = {
 
 export type MutationUpdateAssetArgs = {
   input: UpdateAssetInput;
+};
+
+
+export type MutationUpdateBatchExpirySettingsArgs = {
+  batchExpiryEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -6916,9 +6957,11 @@ export type PlatformChannel = {
 
 export type PlatformChannelCustomFields = {
   __typename?: 'PlatformChannelCustomFields';
+  batchExpiryEnabled: Scalars['Boolean']['output'];
   cashControlEnabled: Scalars['Boolean']['output'];
   cashierFlowEnabled: Scalars['Boolean']['output'];
   enablePrinter: Scalars['Boolean']['output'];
+  lowStockThreshold: Scalars['Int']['output'];
   publicSlug?: Maybe<Scalars['String']['output']>;
   publicStorefrontEnabled: Scalars['Boolean']['output'];
   publicWhatsAppNumber?: Maybe<Scalars['String']['output']>;
@@ -7301,6 +7344,7 @@ export type ProductVariant = Node & {
   facetValues: Array<FacetValue>;
   featuredAsset?: Maybe<Asset>;
   id: Scalars['ID']['output'];
+  inventoryBatches: Array<InventoryBatch>;
   languageCode: LanguageCode;
   name: Scalars['String']['output'];
   options: Array<ProductOption>;
@@ -7717,6 +7761,7 @@ export type Query = {
   getUnreadCount: Scalars['Int']['output'];
   getUserNotifications: NotificationList;
   globalSettings: GlobalSettings;
+  inventoryAlerts: InventoryAlertCounts;
   inventoryValuation: InventoryValuation;
   job?: Maybe<Job>;
   jobBufferSize: Array<JobBufferSize>;
@@ -8127,6 +8172,11 @@ export type QueryGetSettingsStoreValuesArgs = {
 
 export type QueryGetUserNotificationsArgs = {
   options?: InputMaybe<NotificationListOptions>;
+};
+
+
+export type QueryInventoryAlertsArgs = {
+  expiryThresholdDays?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -10037,6 +10087,7 @@ export type UpdateAssetInput = {
 };
 
 export type UpdateChannelCustomFieldsInput = {
+  batchExpiryEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   billingCycle?: InputMaybe<Scalars['String']['input']>;
   cashControlEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -10045,6 +10096,7 @@ export type UpdateChannelCustomFieldsInput = {
   eventConfig?: InputMaybe<Scalars['String']['input']>;
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
   notificationCategoryPreferences?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
@@ -10070,10 +10122,12 @@ export type UpdateChannelCustomFieldsInput = {
 };
 
 export type UpdateChannelFeatureFlagsInput = {
+  batchExpiryEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashControlEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   channelId: Scalars['ID']['input'];
   enablePrinter?: InputMaybe<Scalars['Boolean']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateChannelInput = {

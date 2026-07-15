@@ -4,7 +4,7 @@ import { AuditCorePlugin } from '../audit/audit-core.plugin';
 import { AnalyticsPlugin } from '../analytics/analytics.plugin';
 import { ChannelSettingsPlugin } from '../channels/channel-settings.plugin';
 import { CommunicationPlugin } from '../communication/communication.plugin';
-import { NotificationPlugin } from '../notifications/notification.plugin';
+import { NotificationCoreModule } from '../../services/notifications/notification-core.module';
 import { PendingRegistrationsService } from './pending-registrations.service';
 import { PlatformAdminService } from './platform-admin.service';
 import { PlatformStatsService } from './platform-stats.service';
@@ -20,7 +20,7 @@ import { BatchMessage } from '../../services/batch-messaging/batch-message.entit
     AuditCorePlugin,
     ChannelSettingsPlugin,
     CommunicationPlugin,
-    NotificationPlugin,
+    NotificationCoreModule,
   ],
   providers: [
     PlatformStatsService,

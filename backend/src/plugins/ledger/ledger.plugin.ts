@@ -46,6 +46,7 @@ import { ReconciliationService } from '../../services/financial/reconciliation.s
 import { InventoryBatch } from '../../services/inventory/entities/inventory-batch.entity';
 import { InventoryMovement } from '../../services/inventory/entities/inventory-movement.entity';
 import { SaleCogs } from '../../services/inventory/entities/sale-cogs.entity';
+import { InventoryAlertService } from '../../services/inventory/inventory-alert.service';
 import { InventoryService } from '../../services/inventory/inventory.service';
 import { InventoryStoreService } from '../../services/inventory/inventory-store.service';
 import { InventoryStore } from '../../services/inventory/interfaces/inventory-store.interface';
@@ -54,6 +55,8 @@ import { FifoCostingStrategy } from '../../services/inventory/strategies/fifo-co
 import { PurchasePayment } from '../../services/stock/entities/purchase-payment.entity';
 import { DashboardStatsResolver } from './dashboard-stats.resolver';
 import { DASHBOARD_STATS_SCHEMA } from './dashboard-stats.schema';
+import { InventoryAlertResolver } from './inventory-alert.resolver';
+import { INVENTORY_ALERT_SCHEMA } from './inventory-alert.schema';
 import { LedgerViewerResolver } from './ledger-viewer.resolver';
 import { LEDGER_VIEWER_SCHEMA } from './ledger-viewer.schema';
 import { LedgerDivergenceResolver } from './ledger-divergence.resolver';
@@ -95,6 +98,7 @@ import {
 // Merge schemas
 const COMBINED_SCHEMA = gql`
   ${DASHBOARD_STATS_SCHEMA}
+  ${INVENTORY_ALERT_SCHEMA}
   ${LEDGER_VIEWER_SCHEMA}
   ${PERIOD_MANAGEMENT_SCHEMA}
   ${LEDGER_DIVERGENCE_SCHEMA}
@@ -129,9 +133,11 @@ const COMBINED_SCHEMA = gql`
     FifoCostingStrategy,
     DefaultExpiryPolicy,
     InventoryService,
+    InventoryAlertService,
     ChartOfAccountsService,
     ChannelPaymentMethodService,
     DashboardStatsResolver,
+    InventoryAlertResolver,
     LedgerViewerResolver,
     LedgerDivergenceResolver,
     ReconciliationResolver,
@@ -188,6 +194,7 @@ const COMBINED_SCHEMA = gql`
     schema: COMBINED_SCHEMA,
     resolvers: [
       DashboardStatsResolver,
+      InventoryAlertResolver,
       LedgerViewerResolver,
       LedgerDivergenceResolver,
       ReconciliationResolver,
@@ -199,6 +206,7 @@ const COMBINED_SCHEMA = gql`
     schema: COMBINED_SCHEMA,
     resolvers: [
       DashboardStatsResolver,
+      InventoryAlertResolver,
       LedgerViewerResolver,
       LedgerDivergenceResolver,
       ReconciliationResolver,

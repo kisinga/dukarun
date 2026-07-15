@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PluginCommonModule } from '@vendure/core';
 import { CommunicationPlugin } from '../../plugins/communication/communication.plugin';
 import { ChannelUserService } from '../auth/channel-user.service';
 import { AdminNotificationService } from './admin-notification.service';
@@ -16,7 +17,7 @@ import { PushNotificationService } from './push-notification.service';
  * NotificationPlugin is not pulled into their plugin context.
  */
 @Module({
-  imports: [CommunicationPlugin],
+  imports: [PluginCommonModule, CommunicationPlugin],
   providers: [
     ChannelUserService,
     NotificationService,
@@ -27,6 +28,7 @@ import { PushNotificationService } from './push-notification.service';
     NotificationSchedulingService,
   ],
   exports: [
+    ChannelUserService,
     NotificationService,
     PushNotificationService,
     OutboundDeliveryService,

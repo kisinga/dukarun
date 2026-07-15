@@ -3,6 +3,7 @@ import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
 import { AuditCorePlugin } from '../audit/audit-core.plugin';
 import { RedisCacheService } from '../../infrastructure/storage/redis-cache.service';
+import { NotificationCoreModule } from '../../services/notifications/notification-core.module';
 import { SubscriptionResolver, SUBSCRIPTION_SCHEMA } from './subscription.resolver';
 import {
   SubscriptionPublicResolver,
@@ -36,6 +37,7 @@ import { WorkerContextService } from '../../infrastructure/utils/worker-context.
     PhoneAuthPlugin,
     AuditCorePlugin,
     EntitlementsPlugin,
+    NotificationCoreModule,
   ],
   entities: [SubscriptionTier],
   providers: [

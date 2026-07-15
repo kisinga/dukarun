@@ -840,6 +840,7 @@ export type Channel = Node & {
 
 export type ChannelCustomFields = {
   __typename?: 'ChannelCustomFields';
+  batchExpiryEnabled?: Maybe<Scalars['Boolean']['output']>;
   billingCycle?: Maybe<Scalars['String']['output']>;
   cashControlEnabled?: Maybe<Scalars['Boolean']['output']>;
   cashierFlowEnabled?: Maybe<Scalars['Boolean']['output']>;
@@ -848,6 +849,7 @@ export type ChannelCustomFields = {
   eventConfig?: Maybe<Scalars['String']['output']>;
   lastPaymentAmount?: Maybe<Scalars['Int']['output']>;
   lastPaymentDate?: Maybe<Scalars['DateTime']['output']>;
+  lowStockThreshold?: Maybe<Scalars['Int']['output']>;
   notificationCategoryPreferences?: Maybe<Scalars['String']['output']>;
   paystackCustomerCode?: Maybe<Scalars['String']['output']>;
   paystackSubscriptionCode?: Maybe<Scalars['String']['output']>;
@@ -887,6 +889,7 @@ export type ChannelDefaultLanguageError = ErrorResult & {
 export type ChannelFilterParameter = {
   _and?: InputMaybe<Array<ChannelFilterParameter>>;
   _or?: InputMaybe<Array<ChannelFilterParameter>>;
+  batchExpiryEnabled?: InputMaybe<BooleanOperators>;
   billingCycle?: InputMaybe<StringOperators>;
   cashControlEnabled?: InputMaybe<BooleanOperators>;
   cashierFlowEnabled?: InputMaybe<BooleanOperators>;
@@ -900,6 +903,7 @@ export type ChannelFilterParameter = {
   id?: InputMaybe<IdOperators>;
   lastPaymentAmount?: InputMaybe<NumberOperators>;
   lastPaymentDate?: InputMaybe<DateOperators>;
+  lowStockThreshold?: InputMaybe<NumberOperators>;
   notificationCategoryPreferences?: InputMaybe<StringOperators>;
   outOfStockThreshold?: InputMaybe<NumberOperators>;
   paystackCustomerCode?: InputMaybe<StringOperators>;
@@ -966,12 +970,15 @@ export type ChannelNotificationPreferencesInput = {
 
 export type ChannelSettings = {
   __typename?: 'ChannelSettings';
+  batchExpiryEnabled: Scalars['Boolean']['output'];
   cashierFlowEnabled: Scalars['Boolean']['output'];
   companyLogoAsset?: Maybe<Asset>;
   enablePrinter: Scalars['Boolean']['output'];
+  lowStockThreshold: Scalars['Int']['output'];
 };
 
 export type ChannelSortParameter = {
+  batchExpiryEnabled?: InputMaybe<SortOrder>;
   billingCycle?: InputMaybe<SortOrder>;
   cashControlEnabled?: InputMaybe<SortOrder>;
   cashierFlowEnabled?: InputMaybe<SortOrder>;
@@ -983,6 +990,7 @@ export type ChannelSortParameter = {
   id?: InputMaybe<SortOrder>;
   lastPaymentAmount?: InputMaybe<SortOrder>;
   lastPaymentDate?: InputMaybe<SortOrder>;
+  lowStockThreshold?: InputMaybe<SortOrder>;
   notificationCategoryPreferences?: InputMaybe<SortOrder>;
   outOfStockThreshold?: InputMaybe<SortOrder>;
   paystackCustomerCode?: InputMaybe<SortOrder>;
@@ -1422,6 +1430,7 @@ export type CreateChannelAdminInput = {
 };
 
 export type CreateChannelCustomFieldsInput = {
+  batchExpiryEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   billingCycle?: InputMaybe<Scalars['String']['input']>;
   cashControlEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -1430,6 +1439,7 @@ export type CreateChannelCustomFieldsInput = {
   eventConfig?: InputMaybe<Scalars['String']['input']>;
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
   notificationCategoryPreferences?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
@@ -3137,6 +3147,36 @@ export type InvalidFulfillmentHandlerError = ErrorResult & {
   message: Scalars['String']['output'];
 };
 
+export type InventoryAlertCounts = {
+  __typename?: 'InventoryAlertCounts';
+  expiredCount: Scalars['Int']['output'];
+  expiringSoonCount: Scalars['Int']['output'];
+  lowStockCount: Scalars['Int']['output'];
+};
+
+export enum InventoryAlertFilter {
+  EXPIRED = 'EXPIRED',
+  EXPIRING_SOON = 'EXPIRING_SOON',
+  LOW_STOCK = 'LOW_STOCK',
+}
+
+export type InventoryBatch = {
+  __typename?: 'InventoryBatch';
+  batchNumber?: Maybe<Scalars['String']['output']>;
+  channelId: Scalars['ID']['output'];
+  consumePriority: Scalars['Boolean']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  expiryDate?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['ID']['output'];
+  productVariantId: Scalars['ID']['output'];
+  quantity: Scalars['Float']['output'];
+  sourceId: Scalars['ID']['output'];
+  sourceType: Scalars['String']['output'];
+  stockLocationId: Scalars['ID']['output'];
+  unitCost: Scalars['Int']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
 export type InventoryReconciliationResult = {
   __typename?: 'InventoryReconciliationResult';
   channelId: Scalars['Int']['output'];
@@ -4290,6 +4330,7 @@ export type Mutation = {
   updateApiKey: ApiKey;
   /** Update an existing Asset */
   updateAsset: Asset;
+  updateBatchExpirySettings: ChannelSettings;
   updateCashierSettings: ChannelSettings;
   /** Update an existing Channel */
   updateChannel: UpdateChannelResult;
@@ -5283,6 +5324,11 @@ export type MutationUpdateApiKeyArgs = {
 
 export type MutationUpdateAssetArgs = {
   input: UpdateAssetInput;
+};
+
+export type MutationUpdateBatchExpirySettingsArgs = {
+  batchExpiryEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type MutationUpdateCashierSettingsArgs = {
@@ -6686,9 +6732,11 @@ export type PlatformChannel = {
 
 export type PlatformChannelCustomFields = {
   __typename?: 'PlatformChannelCustomFields';
+  batchExpiryEnabled: Scalars['Boolean']['output'];
   cashControlEnabled: Scalars['Boolean']['output'];
   cashierFlowEnabled: Scalars['Boolean']['output'];
   enablePrinter: Scalars['Boolean']['output'];
+  lowStockThreshold: Scalars['Int']['output'];
   publicSlug?: Maybe<Scalars['String']['output']>;
   publicStorefrontEnabled: Scalars['Boolean']['output'];
   publicWhatsAppNumber?: Maybe<Scalars['String']['output']>;
@@ -7070,6 +7118,7 @@ export type ProductVariant = Node & {
   facetValues: Array<FacetValue>;
   featuredAsset?: Maybe<Asset>;
   id: Scalars['ID']['output'];
+  inventoryBatches: Array<InventoryBatch>;
   languageCode: LanguageCode;
   name: Scalars['String']['output'];
   options: Array<ProductOption>;
@@ -7486,6 +7535,7 @@ export type Query = {
   getUnreadCount: Scalars['Int']['output'];
   getUserNotifications: NotificationList;
   globalSettings: GlobalSettings;
+  inventoryAlerts: InventoryAlertCounts;
   inventoryValuation: InventoryValuation;
   job?: Maybe<Job>;
   jobBufferSize: Array<JobBufferSize>;
@@ -7540,6 +7590,7 @@ export type Query = {
   productVariants: ProductVariantList;
   /** List Products */
   products: ProductList;
+  productsByInventoryAlert: ProductList;
   promotion?: Maybe<Promotion>;
   promotionActions: Array<ConfigurableOperationDefinition>;
   promotionConditions: Array<ConfigurableOperationDefinition>;
@@ -7840,6 +7891,10 @@ export type QueryGetUserNotificationsArgs = {
   options?: InputMaybe<NotificationListOptions>;
 };
 
+export type QueryInventoryAlertsArgs = {
+  expiryThresholdDays?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type QueryInventoryValuationArgs = {
   asOfDate: Scalars['DateTime']['input'];
   channelId: Scalars['Int']['input'];
@@ -7970,6 +8025,11 @@ export type QueryProductVariantsArgs = {
 };
 
 export type QueryProductsArgs = {
+  options?: InputMaybe<ProductListOptions>;
+};
+
+export type QueryProductsByInventoryAlertArgs = {
+  filter: InventoryAlertFilter;
   options?: InputMaybe<ProductListOptions>;
 };
 
@@ -9713,6 +9773,7 @@ export type UpdateAssetInput = {
 };
 
 export type UpdateChannelCustomFieldsInput = {
+  batchExpiryEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   billingCycle?: InputMaybe<Scalars['String']['input']>;
   cashControlEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
@@ -9721,6 +9782,7 @@ export type UpdateChannelCustomFieldsInput = {
   eventConfig?: InputMaybe<Scalars['String']['input']>;
   lastPaymentAmount?: InputMaybe<Scalars['Int']['input']>;
   lastPaymentDate?: InputMaybe<Scalars['DateTime']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
   notificationCategoryPreferences?: InputMaybe<Scalars['String']['input']>;
   paystackCustomerCode?: InputMaybe<Scalars['String']['input']>;
   paystackSubscriptionCode?: InputMaybe<Scalars['String']['input']>;
@@ -9746,10 +9808,12 @@ export type UpdateChannelCustomFieldsInput = {
 };
 
 export type UpdateChannelFeatureFlagsInput = {
+  batchExpiryEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashControlEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   cashierFlowEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   channelId: Scalars['ID']['input'];
   enablePrinter?: InputMaybe<Scalars['Boolean']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type UpdateChannelInput = {
@@ -10504,6 +10568,8 @@ export type GetActiveChannelQuery = {
     customFields?: {
       __typename?: 'ChannelCustomFields';
       cashierFlowEnabled?: boolean | null;
+      batchExpiryEnabled?: boolean | null;
+      lowStockThreshold?: number | null;
       enablePrinter?: boolean | null;
       subscriptionStatus?: string | null;
       trialEndsAt?: any | null;
@@ -10786,6 +10852,70 @@ export type GetProductsQuery = {
           __typename?: 'ProductVariantPrice';
           price: number;
           currencyCode: CurrencyCode;
+        }>;
+        inventoryBatches: Array<{
+          __typename?: 'InventoryBatch';
+          id: string;
+          quantity: number;
+          expiryDate?: any | null;
+          batchNumber?: string | null;
+          consumePriority: boolean;
+        }>;
+      }>;
+    }>;
+  };
+};
+
+export type GetProductsByInventoryAlertQueryVariables = Exact<{
+  filter: InventoryAlertFilter;
+  options?: InputMaybe<ProductListOptions>;
+}>;
+
+export type GetProductsByInventoryAlertQuery = {
+  __typename?: 'Query';
+  productsByInventoryAlert: {
+    __typename?: 'ProductList';
+    totalItems: number;
+    items: Array<{
+      __typename?: 'Product';
+      id: string;
+      name: string;
+      slug: string;
+      description: string;
+      enabled: boolean;
+      featuredAsset?: { __typename?: 'Asset'; id: string; preview: string } | null;
+      facetValues: Array<{
+        __typename?: 'FacetValue';
+        id: string;
+        name: string;
+        facet: { __typename?: 'Facet'; code: string };
+      }>;
+      variants: Array<{
+        __typename?: 'ProductVariant';
+        id: string;
+        name: string;
+        sku: string;
+        price: number;
+        priceWithTax: number;
+        stockOnHand: number;
+        trackInventory: GlobalFlag;
+        customFields?: {
+          __typename?: 'ProductVariantCustomFields';
+          wholesalePrice?: number | null;
+          allowFractionalQuantity?: boolean | null;
+        } | null;
+        prices: Array<{
+          __typename?: 'ProductVariantPrice';
+          price: number;
+          currencyCode: CurrencyCode;
+        }>;
+        inventoryBatches: Array<{
+          __typename?: 'InventoryBatch';
+          id: string;
+          quantity: number;
+          expiryDate?: any | null;
+          batchNumber?: string | null;
+          consumePriority: boolean;
         }>;
       }>;
     }>;
@@ -11227,6 +11357,20 @@ export type GetStockValueStatsQuery = {
     retail: number;
     wholesale: number;
     cost: number;
+  };
+};
+
+export type GetInventoryAlertsQueryVariables = Exact<{
+  expiryThresholdDays?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type GetInventoryAlertsQuery = {
+  __typename?: 'Query';
+  inventoryAlerts: {
+    __typename?: 'InventoryAlertCounts';
+    lowStockCount: number;
+    expiringSoonCount: number;
+    expiredCount: number;
   };
 };
 
@@ -12830,6 +12974,8 @@ export type UpdateChannelLogoMutation = {
   updateChannelLogo: {
     __typename?: 'ChannelSettings';
     cashierFlowEnabled: boolean;
+    batchExpiryEnabled: boolean;
+    lowStockThreshold: number;
     enablePrinter: boolean;
     companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
   };
@@ -12844,6 +12990,25 @@ export type UpdateCashierSettingsMutation = {
   updateCashierSettings: {
     __typename?: 'ChannelSettings';
     cashierFlowEnabled: boolean;
+    batchExpiryEnabled: boolean;
+    lowStockThreshold: number;
+    enablePrinter: boolean;
+    companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
+  };
+};
+
+export type UpdateBatchExpirySettingsMutationVariables = Exact<{
+  batchExpiryEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  lowStockThreshold?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+export type UpdateBatchExpirySettingsMutation = {
+  __typename?: 'Mutation';
+  updateBatchExpirySettings: {
+    __typename?: 'ChannelSettings';
+    cashierFlowEnabled: boolean;
+    batchExpiryEnabled: boolean;
+    lowStockThreshold: number;
     enablePrinter: boolean;
     companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
   };
@@ -12858,6 +13023,8 @@ export type UpdatePrinterSettingsMutation = {
   updatePrinterSettings: {
     __typename?: 'ChannelSettings';
     cashierFlowEnabled: boolean;
+    batchExpiryEnabled: boolean;
+    lowStockThreshold: number;
     enablePrinter: boolean;
     companyLogoAsset?: { __typename?: 'Asset'; id: string; preview: string; source: string } | null;
   };
@@ -15205,6 +15372,8 @@ export const GetActiveChannelDocument = {
                         },
                       },
                       { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'batchExpiryEnabled' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'lowStockThreshold' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'subscriptionStatus' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'trialEndsAt' } },
@@ -16301,6 +16470,23 @@ export const GetProductsDocument = {
                                 ],
                               },
                             },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'inventoryBatches' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'quantity' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'expiryDate' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'batchNumber' } },
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: 'consumePriority' },
+                                  },
+                                ],
+                              },
+                            },
                           ],
                         },
                       },
@@ -16315,6 +16501,168 @@ export const GetProductsDocument = {
     },
   ],
 } as unknown as DocumentNode<GetProductsQuery, GetProductsQueryVariables>;
+export const GetProductsByInventoryAlertDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetProductsByInventoryAlert' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'filter' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'InventoryAlertFilter' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'ProductListOptions' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'productsByInventoryAlert' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'filter' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'filter' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'options' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'totalItems' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'items' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'slug' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'description' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'enabled' } },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'featuredAsset' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'preview' } },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'facetValues' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'facet' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'code' } },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'variants' },
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
+                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'sku' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'price' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'priceWithTax' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'stockOnHand' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'trackInventory' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'customFields' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: 'wholesalePrice' },
+                                  },
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: 'allowFractionalQuantity' },
+                                  },
+                                ],
+                              },
+                            },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'prices' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'price' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'currencyCode' } },
+                                ],
+                              },
+                            },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'inventoryBatches' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'quantity' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'expiryDate' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'batchNumber' } },
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: 'consumePriority' },
+                                  },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  GetProductsByInventoryAlertQuery,
+  GetProductsByInventoryAlertQueryVariables
+>;
 export const DeleteProductDocument = {
   kind: 'Document',
   definitions: [
@@ -17897,6 +18245,47 @@ export const GetStockValueStatsDocument = {
     },
   ],
 } as unknown as DocumentNode<GetStockValueStatsQuery, GetStockValueStatsQueryVariables>;
+export const GetInventoryAlertsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetInventoryAlerts' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'expiryThresholdDays' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'inventoryAlerts' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'expiryThresholdDays' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'expiryThresholdDays' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'lowStockCount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'expiringSoonCount' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'expiredCount' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetInventoryAlertsQuery, GetInventoryAlertsQueryVariables>;
 export const GetStockValueRankingDocument = {
   kind: 'Document',
   definitions: [
@@ -22427,6 +22816,8 @@ export const UpdateChannelLogoDocument = {
               kind: 'SelectionSet',
               selections: [
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'batchExpiryEnabled' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lowStockThreshold' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                 {
                   kind: 'Field',
@@ -22479,6 +22870,8 @@ export const UpdateCashierSettingsDocument = {
               kind: 'SelectionSet',
               selections: [
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'batchExpiryEnabled' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lowStockThreshold' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                 {
                   kind: 'Field',
@@ -22500,6 +22893,73 @@ export const UpdateCashierSettingsDocument = {
     },
   ],
 } as unknown as DocumentNode<UpdateCashierSettingsMutation, UpdateCashierSettingsMutationVariables>;
+export const UpdateBatchExpirySettingsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateBatchExpirySettings' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'batchExpiryEnabled' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Boolean' } },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'lowStockThreshold' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Int' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateBatchExpirySettings' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'batchExpiryEnabled' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'batchExpiryEnabled' } },
+              },
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'lowStockThreshold' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'lowStockThreshold' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'batchExpiryEnabled' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lowStockThreshold' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'companyLogoAsset' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'preview' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'source' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  UpdateBatchExpirySettingsMutation,
+  UpdateBatchExpirySettingsMutationVariables
+>;
 export const UpdatePrinterSettingsDocument = {
   kind: 'Document',
   definitions: [
@@ -22534,6 +22994,8 @@ export const UpdatePrinterSettingsDocument = {
               kind: 'SelectionSet',
               selections: [
                 { kind: 'Field', name: { kind: 'Name', value: 'cashierFlowEnabled' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'batchExpiryEnabled' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lowStockThreshold' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'enablePrinter' } },
                 {
                   kind: 'Field',

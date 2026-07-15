@@ -1,14 +1,17 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import {
   GET_DASHBOARD_STATS,
+  GET_INVENTORY_ALERTS,
   GET_PLATFORM_METRICS,
   GET_PRODUCT_STATS,
-  GET_PRODUCTS,
   GET_RECENT_ORDERS,
   GET_STOCK_VALUE_RANKING,
   GET_STOCK_VALUE_STATS,
 } from '../graphql/operations.graphql';
-import { StockValuationType as GqlStockValuationType } from '../graphql/generated/graphql';
+import {
+  StockValuationType as GqlStockValuationType,
+  type GetInventoryAlertsQuery,
+} from '../graphql/generated/graphql';
 import { OrderCacheService } from './order-cache.service';
 import { ApolloService } from './apollo.service';
 import { CompanyService } from './company.service';
@@ -166,6 +169,8 @@ export class DashboardService {
   private readonly recentActivitySignal = signal<RecentActivity[]>([]);
   private readonly recentOrdersSignal = signal<any[]>([]);
   private readonly lowStockCountSignal = signal<number>(0);
+  private readonly expiringSoonCountSignal = signal<number>(0);
+  private readonly expiredCountSignal = signal<number>(0);
   private readonly stockValueStatsSignal = signal<StockValueStats | null>(null);
   private readonly stockValueLoadingSignal = signal(false);
   private readonly platformMetricsSignal = signal<PlatformMetrics | null>(null);
@@ -177,6 +182,8 @@ export class DashboardService {
   readonly recentActivity = this.recentActivitySignal.asReadonly();
   readonly recentOrders = this.recentOrdersSignal.asReadonly();
   readonly lowStockCount = this.lowStockCountSignal.asReadonly();
+  readonly expiringSoonCount = this.expiringSoonCountSignal.asReadonly();
+  readonly expiredCount = this.expiredCountSignal.asReadonly();
   readonly stockValueStats = this.stockValueStatsSignal.asReadonly();
   readonly stockValueLoading = this.stockValueLoadingSignal.asReadonly();
   readonly platformMetrics = this.platformMetricsSignal.asReadonly();
@@ -203,11 +210,11 @@ export class DashboardService {
     this.errorSignal.set(null);
 
     try {
-      const [ledgerStats, products, recentOrders, lowStockCount] = await Promise.all([
+      const [ledgerStats, products, recentOrders, inventoryAlerts] = await Promise.all([
         this.fetchDashboardStats(),
         this.fetchProductStats(),
         this.fetchRecentOrders(),
-        this.fetchLowStockCount(),
+        this.fetchInventoryAlerts(),
       ]);
 
       const stats: DashboardStats = {
@@ -240,7 +247,9 @@ export class DashboardService {
           (d) => this.getTimeDifference(d),
         ),
       );
-      this.lowStockCountSignal.set(lowStockCount);
+      this.lowStockCountSignal.set(inventoryAlerts?.lowStockCount ?? 0);
+      this.expiringSoonCountSignal.set(inventoryAlerts?.expiringSoonCount ?? 0);
+      this.expiredCountSignal.set(inventoryAlerts?.expiredCount ?? 0);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
       this.errorSignal.set('Failed to load dashboard data. Please try again.');
@@ -409,35 +418,27 @@ export class DashboardService {
   }
 
   /**
-   * Fetch low stock count
-   * Products with any variant having stockOnHand < 10
+   * Fetch inventory alert counts from the backend.
+   * Includes low-stock, expiring-soon, and expired counts.
    */
-  private async fetchLowStockCount(): Promise<number> {
+  private async fetchInventoryAlerts(): Promise<{
+    lowStockCount: number;
+    expiringSoonCount: number;
+    expiredCount: number;
+  } | null> {
     const client = this.apolloService.getClient();
-    const LOW_STOCK_THRESHOLD = 10;
 
     try {
-      // Fetch all products with their variants and stock levels
       const result = await client.query({
-        query: GET_PRODUCTS,
-        variables: {
-          options: {
-            take: 100, // Limited to prevent list-query-limit-exceeded errors
-          },
-        },
+        query: GET_INVENTORY_ALERTS,
+        variables: { expiryThresholdDays: 30 },
+        fetchPolicy: 'network-only',
       });
 
-      const products = result.data?.products?.items || [];
-
-      // Count products with at least one variant below threshold
-      const lowStockProducts = products.filter((product) =>
-        product.variants?.some((variant) => (variant.stockOnHand || 0) < LOW_STOCK_THRESHOLD),
-      );
-
-      return lowStockProducts.length;
+      return (result.data as GetInventoryAlertsQuery | undefined)?.inventoryAlerts ?? null;
     } catch (error) {
-      console.error('Failed to fetch low stock count:', error);
-      return 0;
+      console.error('Failed to fetch inventory alerts:', error);
+      return null;
     }
   }
 

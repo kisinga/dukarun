@@ -108,32 +108,34 @@ import { CurrencyService } from '../../../../core/services/currency.service';
               </div>
             </div>
 
-            <!-- Optional: Batch number & Expiry date -->
-            <div class="flex flex-wrap items-end gap-2 mt-2 pt-2 border-t border-base-300">
-              <div class="flex flex-col gap-0.5 min-w-0 flex-1 max-w-[140px]">
-                <label class="text-xs opacity-60">Batch / lot</label>
-                <input
-                  type="text"
-                  class="input input-bordered input-xs w-full"
-                  [value]="line.batchNumber ?? ''"
-                  placeholder="Optional"
-                  (change)="
-                    onLineItemUpdate($index, 'batchNumber', $any($event.target).value || null)
-                  "
-                />
+            <!-- Batch number & Expiry date (only when batch expiry tracking is enabled) -->
+            @if (batchExpiryEnabled()) {
+              <div class="flex flex-wrap items-end gap-2 mt-2 pt-2 border-t border-base-300">
+                <div class="flex flex-col gap-0.5 min-w-0 flex-1 max-w-[140px]">
+                  <label class="text-xs opacity-60">Batch / lot</label>
+                  <input
+                    type="text"
+                    class="input input-bordered input-xs w-full"
+                    [value]="line.batchNumber ?? ''"
+                    placeholder="Optional"
+                    (change)="
+                      onLineItemUpdate($index, 'batchNumber', $any($event.target).value || null)
+                    "
+                  />
+                </div>
+                <div class="flex flex-col gap-0.5 min-w-0 flex-1 max-w-[120px]">
+                  <label class="text-xs opacity-60">Expiry date</label>
+                  <input
+                    type="date"
+                    class="input input-bordered input-xs w-full"
+                    [value]="line.expiryDate ?? ''"
+                    (change)="
+                      onLineItemUpdate($index, 'expiryDate', $any($event.target).value || null)
+                    "
+                  />
+                </div>
               </div>
-              <div class="flex flex-col gap-0.5 min-w-0 flex-1 max-w-[120px]">
-                <label class="text-xs opacity-60">Expiry date</label>
-                <input
-                  type="date"
-                  class="input input-bordered input-xs w-full"
-                  [value]="line.expiryDate ?? ''"
-                  (change)="
-                    onLineItemUpdate($index, 'expiryDate', $any($event.target).value || null)
-                  "
-                />
-              </div>
-            </div>
+            }
 
             <!-- Pricing comparison -->
             @if (line.variant && line.unitCost > 0) {
@@ -181,6 +183,7 @@ import { CurrencyService } from '../../../../core/services/currency.service';
 })
 export class PurchaseLineItemsTableComponent {
   readonly lineItems = input.required<PurchaseLineItem[]>();
+  readonly batchExpiryEnabled = input<boolean>(false);
 
   readonly lineItemUpdate = output<{ index: number; field: keyof PurchaseLineItem; value: any }>();
   readonly lineItemRemove = output<number>();
