@@ -12,6 +12,9 @@ import { PushNotificationService } from '../../services/notifications/push-notif
 import { AdminNotificationService } from '../../services/notifications/admin-notification.service';
 import { OutboundDeliveryService } from '../../services/notifications/outbound-delivery.service';
 import { ChannelUserService } from '../../services/auth/channel-user.service';
+import { PendingNotification } from '../../services/notifications/pending-notification.entity';
+import { PendingNotificationService } from '../../services/notifications/pending-notification.service';
+import { NotificationSchedulingService } from '../../services/notifications/notification-scheduling.service';
 
 @VendurePlugin({
   imports: [PluginCommonModule, CommunicationPlugin],
@@ -22,10 +25,12 @@ import { ChannelUserService } from '../../services/auth/channel-user.service';
     OutboundDeliveryService,
     AdminNotificationService,
     ChannelUserService,
+    PendingNotificationService,
+    NotificationSchedulingService,
   ],
-  exports: [NotificationService, OutboundDeliveryService],
+  exports: [NotificationService, OutboundDeliveryService, NotificationSchedulingService],
   controllers: [NotificationTestController],
-  entities: [Notification, PushSubscription],
+  entities: [Notification, PushSubscription, PendingNotification],
   adminApiExtensions: {
     resolvers: [NotificationResolver],
     schema: notificationSchema,

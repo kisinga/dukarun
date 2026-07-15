@@ -321,6 +321,57 @@ export class CreditService {
     return result;
   }
 
+  // ── Public balance / freeze helpers ──────────────────────────────
+
+  /**
+   * Get the ledger balance for a customer or supplier.
+   */
+  async getBalance(ctx: RequestContext, entityId: ID, partyType: CreditPartyType): Promise<number> {
+    return partyType === 'supplier'
+      ? this.financialService.getSupplierBalance(ctx, entityId.toString())
+      : this.financialService.getCustomerBalance(ctx, entityId.toString());
+  }
+
+  /**
+   * Freeze credit for an entity by disabling credit approval.
+   * Payments can still be recorded; new credit transactions are blocked.
+   */
+  async freezeCustomerCredit(
+    ctx: RequestContext,
+    entityId: ID,
+    partyType: CreditPartyType,
+    reason: string
+  ): Promise<CreditSummary> {
+    const customer = await this.getEntityOrThrow(ctx, entityId, partyType);
+    const fields = CREDIT_FIELD_MAPS[partyType];
+    const customFields = customer.customFields as any;
+
+    if (customFields?.[fields.isApproved] === false) {
+      // Already frozen; just return summary.
+      const outstandingAmount = await this.getBalance(ctx, entityId, partyType);
+      return this.mapToSummary(customer, outstandingAmount, partyType);
+    }
+
+    customer.customFields = {
+      ...customFields,
+      [fields.isApproved]: false,
+    } as any;
+
+    await this.connection.getRepository(ctx, Customer).save(customer);
+    this.logger.log(`Frozen ${partyType} credit for ${entityId}. Reason: ${reason}`);
+
+    if (this.auditService) {
+      await this.auditService.log(ctx, `${partyType}.credit.frozen`, {
+        entityType: 'Customer',
+        entityId: entityId.toString(),
+        data: { reason },
+      });
+    }
+
+    const outstandingAmount = await this.getBalance(ctx, entityId, partyType);
+    return this.mapToSummary(customer, outstandingAmount, partyType);
+  }
+
   // ── Customer / supplier residual divergence ──────────────────────
 
   /**
@@ -551,16 +602,6 @@ export class CreditService {
     }
 
     return customer;
-  }
-
-  private async getBalance(
-    ctx: RequestContext,
-    entityId: ID,
-    partyType: CreditPartyType
-  ): Promise<number> {
-    return partyType === 'supplier'
-      ? this.financialService.getSupplierBalance(ctx, entityId.toString())
-      : this.financialService.getCustomerBalance(ctx, entityId.toString());
   }
 
   /**

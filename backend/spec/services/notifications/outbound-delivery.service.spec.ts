@@ -4,7 +4,14 @@ import { OutboundDeliveryService } from '../../../src/services/notifications/out
 import { NotificationService } from '../../../src/services/notifications/notification.service';
 import { CommunicationService } from '../../../src/infrastructure/communication/communication.service';
 import { ChannelUserService } from '../../../src/services/auth/channel-user.service';
+import { NotificationSchedulingService } from '../../../src/services/notifications/notification-scheduling.service';
 import { SendRequest } from '../../../src/infrastructure/communication/send-request.types';
+
+function createMockNotificationSchedulingService(): Partial<NotificationSchedulingService> {
+  return {
+    deferOrSendWhatsApp: jest.fn().mockImplementation(() => Promise.resolve()),
+  } as Partial<NotificationSchedulingService>;
+}
 
 function createMockGlobalSettingsService(enabled: boolean): Partial<GlobalSettingsService> {
   return {
@@ -21,6 +28,7 @@ describe('OutboundDeliveryService notification categories', () => {
   let notificationService: Partial<NotificationService>;
   let communicationService: Partial<CommunicationService>;
   let channelUserService: Partial<ChannelUserService>;
+  let notificationSchedulingService: Partial<NotificationSchedulingService>;
   let globalSettingsService: Partial<GlobalSettingsService>;
   let service: OutboundDeliveryService;
 
@@ -55,13 +63,15 @@ describe('OutboundDeliveryService notification categories', () => {
         ChannelUserService['getChannelFinancialAdminUserIds']
       >,
     };
+    notificationSchedulingService = createMockNotificationSchedulingService();
     globalSettingsService = createMockGlobalSettingsService(false);
     service = new OutboundDeliveryService(
       notificationService as unknown as NotificationService,
       communicationService as unknown as CommunicationService,
       channelUserService as unknown as ChannelUserService,
       {} as unknown as TransactionalConnection,
-      globalSettingsService as unknown as GlobalSettingsService
+      globalSettingsService as unknown as GlobalSettingsService,
+      notificationSchedulingService as unknown as NotificationSchedulingService
     );
   });
 
@@ -113,6 +123,7 @@ describe('OutboundDeliveryService shift WhatsApp delivery', () => {
   let notificationService: Partial<NotificationService>;
   let communicationService: Partial<CommunicationService>;
   let channelUserService: Partial<ChannelUserService>;
+  let notificationSchedulingService: Partial<NotificationSchedulingService>;
   let connection: unknown;
   let globalSettingsService: Partial<GlobalSettingsService>;
   let service: OutboundDeliveryService;
@@ -170,13 +181,15 @@ describe('OutboundDeliveryService shift WhatsApp delivery', () => {
         })),
       },
     };
+    notificationSchedulingService = createMockNotificationSchedulingService();
     globalSettingsService = createMockGlobalSettingsService(false);
     service = new OutboundDeliveryService(
       notificationService as unknown as NotificationService,
       communicationService as unknown as CommunicationService,
       channelUserService as unknown as ChannelUserService,
       connection as TransactionalConnection,
-      globalSettingsService as unknown as GlobalSettingsService
+      globalSettingsService as unknown as GlobalSettingsService,
+      notificationSchedulingService as unknown as NotificationSchedulingService
     );
   });
 
@@ -245,6 +258,59 @@ describe('OutboundDeliveryService shift WhatsApp delivery', () => {
 
     expect(communicationService.send).not.toHaveBeenCalled();
   });
+
+  it('falls back to User.identifier when customFields.phoneNumber is missing', async () => {
+    connection = {
+      rawConnection: {
+        getRepository: jest.fn().mockImplementation(() => ({
+          findOne: jest.fn().mockImplementation((query: unknown) => {
+            const q = query as { where?: { id?: string } };
+            if (q?.where?.id === 'admin-1') {
+              return Promise.resolve({
+                id: 'admin-1',
+                identifier: '0712345678',
+                customFields: {},
+              });
+            }
+            return Promise.resolve(null);
+          }),
+        })),
+      },
+    };
+    service = new OutboundDeliveryService(
+      notificationService as unknown as NotificationService,
+      communicationService as unknown as CommunicationService,
+      channelUserService as unknown as ChannelUserService,
+      connection as TransactionalConnection,
+      globalSettingsService as unknown as GlobalSettingsService,
+      notificationSchedulingService as unknown as NotificationSchedulingService
+    );
+
+    await service.deliver(ctx, 'shift_closed', {
+      channelId: '1',
+      sessionId: 'session-1',
+      storeName: 'ABC Store',
+      cashierName: 'John Doe',
+      openedAt: '2026-07-09T08:23:00.000Z',
+      closedAt: '2026-07-09T17:45:00.000Z',
+      cashSales: 0,
+      creditSales: 0,
+      purchases: 0,
+      cashTotal: 0,
+      mpesaTotal: 0,
+      totalCollected: 0,
+      closingDeclared: 0,
+      variance: 0,
+      varianceThresholdCents: 100,
+    });
+
+    expect(communicationService.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: 'whatsapp',
+        recipient: '0712345678',
+      })
+    );
+  });
 });
 
 describe('OutboundDeliveryService customer notification gating', () => {
@@ -306,6 +372,7 @@ describe('OutboundDeliveryService customer notification gating', () => {
       }),
     };
     const globalSettingsService = createMockGlobalSettingsService(globalEnabled);
+    const notificationSchedulingService = createMockNotificationSchedulingService();
 
     return {
       service: new OutboundDeliveryService(
@@ -313,11 +380,13 @@ describe('OutboundDeliveryService customer notification gating', () => {
         communicationService as unknown as CommunicationService,
         channelUserService as unknown as ChannelUserService,
         connection as TransactionalConnection,
-        globalSettingsService as unknown as GlobalSettingsService
+        globalSettingsService as unknown as GlobalSettingsService,
+        notificationSchedulingService as unknown as NotificationSchedulingService
       ),
       notificationService,
       communicationService,
       globalSettingsService,
+      notificationSchedulingService,
     };
   }
 
@@ -357,6 +426,30 @@ describe('OutboundDeliveryService customer notification gating', () => {
     expect(communicationService.send).toHaveBeenCalledWith(
       expect.objectContaining({
         channel: 'whatsapp',
+        recipient: '0712345678',
+      })
+    );
+  });
+
+  it('defers system-generated WhatsApp messages to the scheduling service', async () => {
+    const { service, communicationService, notificationSchedulingService } = buildService(
+      true,
+      true
+    );
+
+    await service.deliver(ctx, 'credit_period_3_days', {
+      channelId: '1',
+      customerId: 'customer-1',
+      outstandingAmount: 50000,
+      systemGenerated: true,
+    });
+
+    expect(communicationService.send).not.toHaveBeenCalled();
+    expect(notificationSchedulingService.deferOrSendWhatsApp).toHaveBeenCalledWith(
+      ctx,
+      expect.objectContaining({
+        channelId: '1',
+        triggerKey: 'credit_period_3_days',
         recipient: '0712345678',
       })
     );

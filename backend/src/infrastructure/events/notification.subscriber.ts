@@ -145,6 +145,32 @@ export class NotificationSubscriber implements OnModuleInit {
         return;
       }
 
+      if (event.eventType === 'credit_sale_blocked') {
+        await this.outboundDelivery.deliver(event.ctx, 'credit_sale_blocked', {
+          ...basePayload,
+          reason: event.data.reason,
+          requestedAmount: event.data.requestedAmount,
+          availableCredit: event.data.availableCredit,
+          navigateTo: customerNav,
+        });
+        return;
+      }
+
+      if (event.eventType === 'credit_reminder') {
+        const bucket = event.data.bucket as string;
+        await this.outboundDelivery.deliver(event.ctx, `credit_${bucket}`, {
+          ...basePayload,
+          ...event.data,
+          navigateTo: customerNav,
+        });
+        await this.outboundDelivery.deliver(event.ctx, `credit_${bucket}_admin`, {
+          ...basePayload,
+          ...event.data,
+          navigateTo: customerNav,
+        });
+        return;
+      }
+
       const triggerKey =
         event.eventType === 'created'
           ? 'customer_created'

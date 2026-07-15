@@ -495,9 +495,21 @@ export class BatchMessagingService implements OnModuleInit {
   }
 
   private extractPhoneNumber(user: User): string | undefined {
-    const phone = (user.customFields as Record<string, unknown>)?.phoneNumber;
-    if (typeof phone === 'string' && phone.trim()) {
-      return phone.trim();
+    const customPhone = (user.customFields as Record<string, unknown>)?.phoneNumber;
+    if (
+      typeof customPhone === 'string' &&
+      customPhone.trim() &&
+      validatePhoneNumber(customPhone.trim())
+    ) {
+      return customPhone.trim();
+    }
+    const identifier = user.identifier;
+    if (
+      typeof identifier === 'string' &&
+      identifier.trim() &&
+      validatePhoneNumber(identifier.trim())
+    ) {
+      return identifier.trim();
     }
     return undefined;
   }

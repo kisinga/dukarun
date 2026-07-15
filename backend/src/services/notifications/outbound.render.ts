@@ -58,6 +58,78 @@ function formatShiftTime(iso: unknown): string | null {
   }
 }
 
+function formatDate(iso: unknown): string {
+  if (!iso || typeof iso !== 'string') return '';
+  try {
+    return new Date(iso).toLocaleDateString('en-KE', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return String(iso);
+  }
+}
+
+function renderCreditReminder(
+  p: Record<string, unknown>,
+  tone: 'gentle' | 'urgent' | 'final'
+): RenderedOutbound {
+  const customer = p.customerName ? String(p.customerName) : 'there';
+  const formatted = formatCentsKes(Number(p.outstandingAmount ?? 0));
+  const orderCode = p.orderCode ? ` (order ${p.orderCode})` : '';
+  const dueDate = p.dueDate ? ` due ${formatDate(p.dueDate)}` : '';
+
+  const headings: Record<string, string> = {
+    gentle: 'Friendly payment reminder',
+    urgent: 'Payment reminder: 7 days overdue',
+    final: 'Credit account frozen: final notice',
+  };
+
+  const bodies: Record<string, string> = {
+    gentle: `Hi ${customer},\n\nJust a friendly reminder that your outstanding balance is ${formatted}${orderCode}${dueDate}. Please settle it at your earliest convenience.`,
+    urgent: `Hi ${customer},\n\nYour balance of ${formatted}${orderCode} is now 7 days overdue${dueDate}. Please make payment as soon as possible to avoid further action.`,
+    final: `Hi ${customer},\n\nYour balance of ${formatted}${orderCode} is 10 or more days overdue. Your credit account has been frozen and no further credit sales are allowed until payment is made.`,
+  };
+
+  return {
+    inAppTitle: '',
+    inAppMessage: '',
+    whatsappBody: `${headings[tone]}\n\n${bodies[tone]}\n\n— DukaRun`,
+    emailSubject: headings[tone],
+    emailBody: `${bodies[tone]}\n\n— DukaRun`,
+  };
+}
+
+function renderCreditAdminReminder(p: Record<string, unknown>, summary: string): RenderedOutbound {
+  const customer = p.customerName ? String(p.customerName) : 'A customer';
+  const formatted = formatCentsKes(Number(p.outstandingAmount ?? 0));
+  return {
+    inAppTitle: 'Credit Reminder',
+    inAppMessage: `${customer}: ${summary}. Outstanding balance ${formatted}.`,
+  };
+}
+
+function renderCreditLimitReached(p: Record<string, unknown>): RenderedOutbound {
+  const customer = p.customerName ? String(p.customerName) : 'there';
+  const formattedOutstanding = formatCentsKes(Number(p.outstandingAmount ?? 0));
+  const formattedLimit = formatCentsKes(Number(p.creditLimit ?? 0));
+  const amount = Number(p.outstandingAmount ?? 0);
+  const limit = Number(p.creditLimit ?? 0);
+  const pct = p.utilizationPercent ?? Math.round(limit > 0 ? (amount / limit) * 100 : 0);
+
+  const body = `Hi ${customer},\n\nYou have used ${pct}% of your credit limit. Outstanding: ${formattedOutstanding} / Limit: ${formattedLimit}. Further credit sales may be blocked once the limit is reached.`;
+
+  return {
+    inAppTitle: '',
+    inAppMessage: '',
+    whatsappBody: `Credit limit alert\n\n${body}\n\n— DukaRun`,
+    emailSubject: 'Credit limit alert',
+    emailBody: `${body}\n\n— DukaRun`,
+  };
+}
+
 type RenderFn = (payload: Record<string, unknown>) => RenderedOutbound;
 
 const RENDERERS: Record<string, RenderFn> = {
@@ -215,6 +287,34 @@ const RENDERERS: Record<string, RenderFn> = {
       inAppMessage: p.customerName
         ? `${p.customerName}: ${reason}${amount}`
         : `Customer repayment deadline.${amount}`,
+    };
+  },
+  credit_period_3_days: p => renderCreditReminder(p, 'gentle'),
+  credit_period_3_days_admin: p => renderCreditAdminReminder(p, '3 days overdue'),
+  credit_period_7_days: p => renderCreditReminder(p, 'urgent'),
+  credit_period_7_days_admin: p => renderCreditAdminReminder(p, '7 days overdue'),
+  credit_period_10_days_frozen: p => renderCreditReminder(p, 'final'),
+  credit_period_10_days_frozen_admin: p =>
+    renderCreditAdminReminder(p, '10 days overdue — credit frozen'),
+  credit_limit_reached: p => renderCreditLimitReached(p),
+  credit_limit_reached_admin: p => ({
+    inAppTitle: 'Credit Limit Reached',
+    inAppMessage: p.customerName
+      ? `${p.customerName} has reached ${p.utilizationPercent ?? 90}% of their credit limit.`
+      : 'A customer has reached their credit limit.',
+  }),
+  credit_sale_blocked: p => {
+    const reasonLabels: Record<string, string> = {
+      not_approved_or_frozen: 'account not approved or frozen',
+      limit_exceeded: 'credit limit exceeded',
+    };
+    const reason =
+      reasonLabels[String(p.reason)] ?? String(p.reason ?? 'limit exceeded or account frozen');
+    return {
+      inAppTitle: 'Credit Sale Blocked',
+      inAppMessage: p.customerName
+        ? `Credit sale blocked for ${p.customerName}: ${reason}.`
+        : `A credit sale was blocked: ${reason}.`,
     };
   },
   channel_approved: () => ({

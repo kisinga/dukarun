@@ -121,6 +121,61 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
     channels: { inApp: false, sms: false, email: true, whatsapp: true },
     inAppType: NotificationType.PAYMENT,
   },
+  // Credit reminders: customer (WhatsApp/email) + admin (in-app)
+  credit_period_3_days: {
+    audience: 'customer',
+    category: 'customer',
+    channels: { inApp: false, sms: false, email: true, whatsapp: true },
+    inAppType: NotificationType.PAYMENT,
+  },
+  credit_period_3_days_admin: {
+    audience: 'channel_admins',
+    category: 'customer',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
+  credit_period_7_days: {
+    audience: 'customer',
+    category: 'customer',
+    channels: { inApp: false, sms: false, email: true, whatsapp: true },
+    inAppType: NotificationType.PAYMENT,
+  },
+  credit_period_7_days_admin: {
+    audience: 'channel_admins',
+    category: 'customer',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
+  credit_period_10_days_frozen: {
+    audience: 'customer',
+    category: 'customer',
+    channels: { inApp: false, sms: false, email: true, whatsapp: true },
+    inAppType: NotificationType.PAYMENT,
+  },
+  credit_period_10_days_frozen_admin: {
+    audience: 'channel_admins',
+    category: 'customer',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
+  credit_limit_reached: {
+    audience: 'customer',
+    category: 'customer',
+    channels: { inApp: false, sms: false, email: true, whatsapp: true },
+    inAppType: NotificationType.PAYMENT,
+  },
+  credit_limit_reached_admin: {
+    audience: 'channel_admins',
+    category: 'customer',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
+  credit_sale_blocked: {
+    audience: 'channel_admins',
+    category: 'customer',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
   // Channel status (channel admins, in-app)
   channel_approved: {
     audience: 'channel_admins',
