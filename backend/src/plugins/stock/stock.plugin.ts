@@ -3,6 +3,7 @@ import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.c
 import { STOCK_ADMIN_SCHEMA } from './stock.schema';
 import { StockResolver } from './stock.resolver';
 import { ProductVariantBatchResolver } from './product-variant-batch.resolver';
+import { PurchaseAmountOwingLoader } from './purchase-amount-owing.loader';
 import { ManageStockAdjustmentsPermission } from './permissions';
 import { StockManagementService } from '../../services/stock/stock-management.service';
 import { StockMovementService } from '../../services/stock/stock-movement.service';
@@ -32,6 +33,7 @@ import { LedgerPlugin } from '../ledger/ledger.plugin';
     StockQueryService,
     StockResolver,
     ProductVariantBatchResolver,
+    PurchaseAmountOwingLoader,
   ],
   configuration: config => {
     // Register custom permission

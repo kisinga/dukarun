@@ -93,15 +93,14 @@ export class SupplierCreditAgingService {
       rows.map(r => r.id)
     );
 
-    const owingBySupplier = new Map<string, number>();
+    const owingSuppliers = new Set<string>();
     for (const row of rows) {
       const amountOwing = statuses.get(row.id)?.amountOwing ?? 0;
       if (amountOwing <= 0) continue;
-      const supplierId = String(row.supplierId);
-      owingBySupplier.set(supplierId, (owingBySupplier.get(supplierId) ?? 0) + amountOwing);
+      owingSuppliers.add(String(row.supplierId));
     }
 
-    return Array.from(owingBySupplier.keys());
+    return Array.from(owingSuppliers);
   }
 
   private async getOldestUnpaidPurchase(

@@ -15,6 +15,7 @@ import { StockQueryService } from '../../services/stock/stock-query.service';
 import { PurchaseService } from '../../services/stock/purchase.service';
 import { FinancialService } from '../../services/financial/financial.service';
 import { addDays, diffCalendarDays } from '../../utils/date.utils';
+import { PurchaseAmountOwingLoader } from './purchase-amount-owing.loader';
 import { StockPurchase } from '../../services/stock/entities/purchase.entity';
 import { InventoryStockAdjustment } from '../../services/stock/entities/stock-adjustment.entity';
 
@@ -76,6 +77,7 @@ export class StockResolver {
     private readonly stockQueryService: StockQueryService,
     private readonly purchaseService: PurchaseService,
     private readonly financialService: FinancialService,
+    private readonly purchaseAmountOwingLoader: PurchaseAmountOwingLoader,
     private readonly connection: TransactionalConnection
   ) {}
 
@@ -86,8 +88,7 @@ export class StockResolver {
     @Ctx() ctx: RequestContext
   ): Promise<number | null> {
     try {
-      const status = await this.financialService.getPurchasePaymentStatus(ctx, purchase.id);
-      return status.amountOwing;
+      return await this.purchaseAmountOwingLoader.load(purchase.id);
     } catch (e) {
       Logger.error(
         `Failed to compute amountOwing for purchase ${purchase.id}: ${e instanceof Error ? e.message : String(e)}`,
@@ -114,8 +115,16 @@ export class StockResolver {
     if (!purchase.isCreditPurchase) return false;
     const due = await this.dueDate(purchase, ctx);
     if (!due || diffCalendarDays(new Date(), due) <= 0) return false;
-    const status = await this.financialService.getPurchasePaymentStatus(ctx, purchase.id);
-    return status.amountOwing > 0;
+    try {
+      const amountOwing = await this.purchaseAmountOwingLoader.load(purchase.id);
+      return amountOwing > 0;
+    } catch (e) {
+      Logger.error(
+        `Failed to compute isOverdue for purchase ${purchase.id}: ${e instanceof Error ? e.message : String(e)}`,
+        StockResolver.loggerCtx
+      );
+      return false;
+    }
   }
 
   private async loadSupplier(ctx: RequestContext, supplierId: number): Promise<Customer | null> {

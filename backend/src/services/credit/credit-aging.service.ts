@@ -95,15 +95,14 @@ export class CreditAgingService {
       rows.map(r => r.id)
     );
 
-    const owingByCustomer = new Map<string, number>();
+    const owingCustomers = new Set<string>();
     for (const row of rows) {
       const amountOwing = statuses.get(row.id)?.amountOwing ?? 0;
       if (amountOwing <= 0) continue;
-      const customerId = String(row.customerId);
-      owingByCustomer.set(customerId, (owingByCustomer.get(customerId) ?? 0) + amountOwing);
+      owingCustomers.add(String(row.customerId));
     }
 
-    return Array.from(owingByCustomer.keys());
+    return Array.from(owingCustomers);
   }
 
   private async getOldestUnpaidOrder(

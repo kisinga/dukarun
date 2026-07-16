@@ -9,7 +9,7 @@ import {
   TransactionalConnection,
 } from '@vendure/core';
 import { In } from 'typeorm';
-import { addDays } from '../../utils/date.utils';
+import { addDays, diffCalendarDays } from '../../utils/date.utils';
 import { PAYABLE_ORDER_STATES } from '../../constants/order-states.constants';
 import { AuditLog as AuditLogDecorator } from '../../infrastructure/audit/audit-log.decorator';
 import { AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
@@ -76,10 +76,9 @@ export class PaymentAllocationResolver {
       .andWhere('order.state IN (:...states)', { states: PAYABLE_ORDER_STATES })
       .getMany();
 
-    const now = Date.now();
     const dueCandidates = orders.filter(order => {
       const dueDate = this.computeDueDate(order);
-      return dueDate && dueDate.getTime() <= now;
+      return dueDate && diffCalendarDays(new Date(), dueDate) > 0;
     });
 
     const statuses = await this.financialService.getOrderPaymentStatuses(
