@@ -9,6 +9,10 @@ import {
 import { SubscriptionAlertEvent } from '../../infrastructure/events/custom-events';
 import { RedisCacheService } from '../../infrastructure/storage/redis-cache.service';
 import {
+  clearSubscriptionAccess,
+  getSubscriptionAccess,
+} from '../../plugins/subscriptions/subscription.context';
+import {
   SubscriptionTier,
   SubscriptionTierFeatures,
   SubscriptionTierLimits,
@@ -22,10 +26,6 @@ import {
   SubscriptionPolicyReason,
   SubscriptionPolicyStatus,
 } from './subscription-access.policy';
-import {
-  clearSubscriptionAccess,
-  getSubscriptionAccess,
-} from '../../plugins/subscriptions/subscription.context';
 
 /**
  * Subscription lifecycle management: tiers, purchases, Paystack payments, trial/grace periods,

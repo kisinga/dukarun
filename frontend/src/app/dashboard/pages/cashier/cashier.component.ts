@@ -9,6 +9,8 @@ import {
 } from '@angular/core';
 import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../core/services/currency.service';
+import { OrderService } from '../../../core/services/order.service';
+import { ToastService } from '../../../core/services/toast.service';
 import {
   CashierPendingOrderView,
   CashierSettlementService,
@@ -19,9 +21,10 @@ import { SettleOrderModalComponent } from './components/settle-order-modal.compo
 /**
  * Cashier Queue
  *
- * The cashier's worklist: orders a salesperson sent over for payment. Each row shows
- * what is owed; "Collect payment" opens the split-tender settlement modal. Gated by the
- * SettleOrder permission (see cashierGuard).
+ * The cashier's worklist: orders a salesperson sent over for payment. Each card shows
+ * who created the order, when it was sent, customer details, line items, and the amount
+ * due. The cashier can collect payment or void the order.
+ * Gated by the SettleOrder permission (see cashierGuard).
  */
 @Component({
   selector: 'app-cashier',
@@ -74,21 +77,21 @@ import { SettleOrderModalComponent } from './components/settle-order-modal.compo
         </div>
       } @else {
         <!-- Queue -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
           @for (item of orders(); track item.order.id) {
             <div class="card bg-base-100 border border-base-300">
               <div class="card-body p-4">
-                <div class="flex items-start justify-between gap-2">
+                <!-- Code + due -->
+                <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
                     <div class="font-semibold truncate">{{ item.order.code }}</div>
-                    <div class="text-xs text-base-content/60 truncate">
-                      {{ customerName(item) }}
-                    </div>
                     <div class="text-xs text-base-content/50 mt-0.5">
-                      {{ itemCount(item) }} item{{ itemCount(item) === 1 ? '' : 's' }}
-                      @if (item.pendingSince) {
-                        · {{ item.pendingSince | date: 'shortTime' }}
-                      }
+                      Sent
+                      {{
+                        formatDateTime(
+                          item.pendingSince ?? item.order.orderPlacedAt ?? item.order.createdAt
+                        )
+                      }}
                     </div>
                   </div>
                   <div class="text-right shrink-0">
@@ -99,8 +102,54 @@ import { SettleOrderModalComponent } from './components/settle-order-modal.compo
                   </div>
                 </div>
 
-                <div class="card-actions mt-2">
-                  <button class="btn btn-primary btn-sm w-full gap-1" (click)="collect(item)">
+                <!-- Customer -->
+                <div class="mt-2 text-sm">
+                  <span class="text-base-content/60">Customer:</span>
+                  <span class="font-medium ml-1">{{ customerName(item) }}</span>
+                  @if (customerContact(item); as contact) {
+                    <span class="text-xs text-base-content/50 block truncate">{{ contact }}</span>
+                  }
+                </div>
+
+                <!-- Created by -->
+                @if (item.createdBy) {
+                  <div class="mt-1 text-sm">
+                    <span class="text-base-content/60">Sent by:</span>
+                    <span class="font-medium ml-1">{{ item.createdBy.identifier }}</span>
+                  </div>
+                }
+
+                <!-- Items -->
+                <div class="mt-2 text-sm">
+                  <span class="text-base-content/60"
+                    >{{ itemCount(item) }} item{{ itemCount(item) === 1 ? '' : 's' }}</span
+                  >
+                  <span class="text-xs text-base-content/50 truncate block">
+                    {{ itemSummary(item) }}
+                  </span>
+                </div>
+
+                <!-- Actions -->
+                <div class="card-actions mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-error btn-sm flex-1 gap-1"
+                    (click)="voidOrder(item)"
+                    [disabled]="voidingOrderId() === item.order.id"
+                  >
+                    @if (voidingOrderId() === item.order.id) {
+                      <span class="loading loading-spinner loading-xs"></span>
+                      Voiding...
+                    } @else {
+                      <ng-icon name="heroXMark" size="1.125rem" />
+                      Void
+                    }
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm flex-[2] gap-1"
+                    (click)="collect(item)"
+                  >
                     <ng-icon name="heroBanknotes" size="1.125rem" />
                     Collect payment
                   </button>
@@ -122,13 +171,16 @@ import { SettleOrderModalComponent } from './components/settle-order-modal.compo
 })
 export class CashierComponent implements OnInit {
   private readonly settlementService = inject(CashierSettlementService);
+  private readonly orderService = inject(OrderService);
   private readonly currencyService = inject(CurrencyService);
+  private readonly toastService = inject(ToastService);
 
   private readonly settleModal = viewChild<SettleOrderModalComponent>('settleModal');
 
   readonly orders = signal<CashierPendingOrderView[]>([]);
   readonly isLoading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly voidingOrderId = signal<string | null>(null);
   private readonly selectedItem = signal<CashierPendingOrderView | null>(null);
 
   ngOnInit(): void {
@@ -154,6 +206,28 @@ export class CashierComponent implements OnInit {
       orderCode: item.order.code,
       customerName: this.customerName(item),
     });
+  }
+
+  async voidOrder(item: CashierPendingOrderView): Promise<void> {
+    if (
+      !confirm(
+        `Void order ${item.order.code}?\n\nThis cancels the sale and returns the items to stock.`,
+      )
+    ) {
+      return;
+    }
+
+    this.voidingOrderId.set(item.order.id);
+    try {
+      await this.orderService.voidOrder(item.order.id);
+      this.toastService.show('Order voided', `${item.order.code} has been voided.`, 'success');
+      await this.refresh();
+    } catch (err: any) {
+      const message = err instanceof Error ? err.message : 'Failed to void order';
+      this.toastService.show('Void failed', message, 'error');
+    } finally {
+      this.voidingOrderId.set(null);
+    }
   }
 
   async onConfirm(tenders: OrderTenderInput[]): Promise<void> {
@@ -182,11 +256,28 @@ export class CashierComponent implements OnInit {
     return name || 'Walk-in customer';
   }
 
+  customerContact(item: CashierPendingOrderView): string | null {
+    const c = item.order.customer;
+    if (!c) return null;
+    const parts = [c.phoneNumber, c.emailAddress].filter(Boolean);
+    return parts.join(' · ') || null;
+  }
+
   itemCount(item: CashierPendingOrderView): number {
     return item.order.lines.reduce((sum, line) => sum + line.quantity, 0);
   }
 
+  itemSummary(item: CashierPendingOrderView): string {
+    const names = item.order.lines.map((line) => `${line.quantity}× ${line.productVariant.name}`);
+    return names.join(', ');
+  }
+
   formatCurrency(cents: number): string {
     return this.currencyService.format(cents, false);
+  }
+
+  formatDateTime(dateString: string | null | undefined): string {
+    if (!dateString) return 'unknown time';
+    return new Date(dateString).toLocaleString();
   }
 }

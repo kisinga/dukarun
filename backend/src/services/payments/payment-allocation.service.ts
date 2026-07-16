@@ -7,6 +7,7 @@ import {
   OrderService,
   Payment,
   PaymentService,
+  User,
   ID,
   idsAreEqual,
   isGraphQlErrorResult,
@@ -89,6 +90,7 @@ export interface CashierPendingOrder {
   order: Order;
   amountOwing: number; // In smallest currency unit (cents)
   pendingSince: Date | null;
+  createdBy: User | null;
 }
 
 @Injectable()
@@ -765,7 +767,7 @@ export class PaymentAllocationService {
         state: In(PAYABLE_ORDER_STATES),
         customFields: { cashierPendingAt: Not(IsNull()) } as any,
       },
-      relations: ['customer'],
+      relations: ['customer', 'createdByUserId'],
       order: { createdAt: 'ASC' }, // Oldest first
     });
 
@@ -777,10 +779,12 @@ export class PaymentAllocationService {
     for (const order of orders) {
       const status = await this.financialService.getOrderPaymentStatus(ctx, order.id.toString());
       if (status.amountOwing > 0) {
+        const customFields = order.customFields ?? {};
         pending.push({
           order,
           amountOwing: status.amountOwing,
-          pendingSince: (order.customFields as any)?.cashierPendingAt ?? null,
+          pendingSince: customFields.cashierPendingAt ?? null,
+          createdBy: order.createdByUserId ?? null,
         });
       }
     }
