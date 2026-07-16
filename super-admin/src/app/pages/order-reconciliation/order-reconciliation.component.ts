@@ -2,7 +2,8 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PageHeaderComponent } from '../../shared/components/page-header';
 import { ApolloService } from '../../core/services/apollo.service';
-import { DIVERGENT_ORDERS, PLATFORM_CHANNELS, RECONCILE_ORDER } from '../../core/graphql/operations.graphql';
+import { PLATFORM_CHANNELS } from '@dukarun-sa/channel';
+import { DIVERGENT_ORDERS, RECONCILE_ORDER } from '@dukarun-sa/reconciliation';
 import {
   LEDGER_DIVERGENCES,
   RECONCILE_INVENTORY,

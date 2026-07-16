@@ -3,7 +3,7 @@
 // 1) defaultOptions registration: ApolloService sets `errorPolicy: 'all'` as the
 //    default for watchQuery/query/mutate. AC 4.2 brands undeclared default-option
 //    values, so they must be registered in `DeclareDefaultOptions` for the config
-//    in core/services/apollo.service.ts to type-check. They are declared OPTIONAL
+//    in shared/services/apollo.service.ts to type-check. They are declared OPTIONAL
 //    so `defaultOptions` stays optional on `new ApolloClient` (the test mock omits
 //    it) while still removing the brand.
 //

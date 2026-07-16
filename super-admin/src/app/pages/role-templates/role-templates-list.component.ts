@@ -7,7 +7,7 @@ import {
   CREATE_ROLE_TEMPLATE,
   UPDATE_ROLE_TEMPLATE,
   DELETE_ROLE_TEMPLATE,
-} from '../../core/graphql/operations.graphql';
+} from '@dukarun-sa/role-template';
 import { PageHeaderComponent } from '../../shared/components/page-header';
 import { groupPermissions, formatPermissionName } from '../../core/utils/permission-grouping';
 

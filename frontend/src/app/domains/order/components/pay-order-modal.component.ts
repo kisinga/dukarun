@@ -1,0 +1,554 @@
+import { CommonModule } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
+import { firstValueFrom } from 'rxjs';
+import { CashierSessionService } from '@dukarun/cashier-session';
+import { CompanyService } from '@dukarun/company';
+import { CustomerPaymentService, CustomerStateService } from '@dukarun/customer';
+import { CurrencyService } from '../../../shared/services/currency.service';
+import { OrdersService } from '../services/orders.service';
+import {
+  PaymentMethod,
+  PaymentMethodService,
+} from '@dukarun/payments';
+
+/**
+ * Data for the unified Record Payment modal. When orderId is set, pays that order; when omitted, allocates across customer's unpaid orders (bulk).
+ */
+export interface PayOrderModalData {
+  /** Required for recordPayment API */
+  customerId: string;
+  customerName: string;
+  /** Outstanding amount in smallest currency unit (cents). Used for partial payment cap. */
+  outstandingAmount: number;
+  totalAmount?: number;
+  /** When set, pay this order only; when omitted, bulk allocate. */
+  orderId?: string;
+  orderCode?: string;
+}
+
+/**
+ * Record Payment Modal Component
+ *
+ * Single modal for recording a payment: with orderId (single order) or without (bulk for customer).
+ * Uses recordPayment API. Payment method required; no separate "receive into" dropdown.
+ */
+@Component({
+  selector: 'app-pay-order-modal',
+  imports: [CommonModule, FormsModule, NgIcon],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <dialog #modal class="modal modal-bottom sm:modal-middle" (click)="onBackdropClick($event)">
+      <div
+        class="modal-box max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto p-4 sm:p-6"
+        (click)="$event.stopPropagation()"
+      >
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-4 pb-3 border-b border-base-300">
+          <h3 class="text-lg font-bold text-base-content">
+            {{ orderData()?.orderId ? 'Pay Order' : 'Record Payment' }}
+          </h3>
+          <form method="dialog">
+            <button
+              class="btn btn-sm btn-circle btn-ghost"
+              type="submit"
+              [disabled]="isProcessing()"
+              aria-label="Close"
+            >
+              <ng-icon name="heroXMark" size="1.25rem" />
+            </button>
+          </form>
+        </div>
+
+        <!-- Context: order or customer -->
+        <div class="mb-4 p-3 sm:p-4 bg-base-200 rounded-lg">
+          @if (orderData()?.orderId) {
+            <div class="text-sm sm:text-base font-semibold text-base-content mb-1">
+              {{ orderData()?.orderCode }}
+            </div>
+          }
+          <div class="text-xs text-base-content/70">{{ orderData()?.customerName }}</div>
+          <div class="text-xs text-base-content/60 mt-1">
+            Outstanding: {{ formatCurrency(orderData()?.outstandingAmount ?? 0) }}
+          </div>
+        </div>
+
+        <!-- Success Message -->
+        @if (successResult()) {
+          <div class="alert alert-success mb-4">
+            <ng-icon name="heroCheckCircle" size="1.25rem" />
+            <div class="flex-1">
+              <div class="font-semibold">Payment recorded successfully!</div>
+              <div class="text-xs mt-1">
+                Total allocated: {{ formatCurrency(successResult()!.totalAllocated) }}
+              </div>
+              <div class="text-xs mt-1">
+                Remaining balance: {{ formatCurrency(successResult()!.remainingBalance) }}
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Error Message -->
+        @if (error()) {
+          <div class="alert alert-error mb-4">
+            <ng-icon name="heroXCircle" size="1.25rem" />
+            <span class="text-sm">{{ error() }}</span>
+          </div>
+        }
+
+        <!-- No session message -->
+        @if (!successResult() && !cashierSessionService.hasActiveSession()) {
+          <div class="alert alert-warning mb-4">
+            <ng-icon name="heroExclamationTriangle" size="1.25rem" />
+            <span
+              >Open a session to record payments. Go to the Dashboard and click "Open shift"
+              first.</span
+            >
+          </div>
+        }
+
+        <!-- Payment Form -->
+        @if (!successResult()) {
+          <form (ngSubmit)="onConfirmPayment()" class="space-y-4">
+            <!-- Amount to Pay (main currency; empty = full outstanding) -->
+            <div class="form-control">
+              <label class="label" for="paymentAmount">
+                <span class="label-text font-semibold">Amount to Pay</span>
+                <span class="label-text-alt text-base-content/60">
+                  Outstanding: {{ formatCurrency(orderData()?.outstandingAmount ?? 0) }}
+                </span>
+              </label>
+              <input
+                id="paymentAmount"
+                type="text"
+                inputmode="decimal"
+                placeholder="Leave empty for full amount"
+                [value]="paymentAmountDisplay()"
+                (input)="onPaymentAmountInput($any($event.target).value)"
+                name="paymentAmount"
+                class="input input-bordered w-full"
+                [disabled]="isProcessing()"
+              />
+              <label class="label">
+                <span class="label-text-alt text-base-content/60">
+                  Enter amount in {{ currencyService.currency() }} (e.g. 500.00) or leave empty for
+                  full
+                </span>
+              </label>
+            </div>
+
+            <!-- Payment Method Selection -->
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-semibold">Payment Method</span>
+                <span class="label-text-alt text-error">Required</span>
+              </label>
+
+              @if (isLoadingPaymentMethods()) {
+                <div class="flex items-center justify-center py-8">
+                  <span class="loading loading-spinner loading-md"></span>
+                  <span class="ml-2 text-sm text-base-content/60">Loading payment methods...</span>
+                </div>
+              } @else if (paymentMethodsError()) {
+                <div class="alert alert-error">
+                  <ng-icon name="heroXCircle" size="1.25rem" />
+                  <span class="text-sm">{{ paymentMethodsError() }}</span>
+                </div>
+              } @else if (paymentMethods().length === 0) {
+                <div class="alert alert-warning">
+                  <ng-icon name="heroExclamationTriangle" size="1.25rem" />
+                  <span class="text-sm">No payment methods available</span>
+                </div>
+              } @else {
+                <!-- Payment Method Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  @for (method of paymentMethods(); track method.id; let i = $index) {
+                    <button
+                      type="button"
+                      class="card hover:bg-base-200 border-2 transition-all duration-200 p-4 hover:scale-105 active:scale-95"
+                      [class.border-primary]="selectedPaymentMethod() === method.code"
+                      [class.bg-primary/10]="selectedPaymentMethod() === method.code"
+                      [class.border-base-300]="selectedPaymentMethod() !== method.code"
+                      [disabled]="isProcessing()"
+                      (click)="selectedPaymentMethod.set(method.code)"
+                    >
+                      <div class="flex flex-col items-center gap-2">
+                        <div
+                          class="w-10 h-10 rounded-full flex items-center justify-center"
+                          [class.bg-primary/20]="selectedPaymentMethod() === method.code"
+                          [class.bg-base-200]="selectedPaymentMethod() !== method.code"
+                        >
+                          @if (method.customFields?.imageAsset?.preview) {
+                            <img
+                              [src]="method.customFields!.imageAsset!.preview"
+                              [alt]="method.name"
+                              class="w-8 h-8 object-contain"
+                            />
+                          } @else {
+                            <ng-icon
+                              name="heroCreditCard"
+                              size="1.5rem"
+                              [class.text-primary]="selectedPaymentMethod() === method.code"
+                              [class.text-base-content/60]="selectedPaymentMethod() !== method.code"
+                            />
+                          }
+                        </div>
+                        <span class="font-semibold text-xs text-center">{{ method.name }}</span>
+                      </div>
+                    </button>
+                  }
+                </div>
+              }
+
+              @if (
+                error() &&
+                !selectedPaymentMethod() &&
+                !isLoadingPaymentMethods() &&
+                paymentMethods().length > 0
+              ) {
+                <label class="label">
+                  <span class="label-text-alt text-error">Please select a payment method</span>
+                </label>
+              }
+            </div>
+
+            <!-- Reference Code Input -->
+            <div class="form-control">
+              <label class="label" for="referenceCode">
+                <span class="label-text font-semibold">Payment Reference Code</span>
+                <span class="label-text-alt text-error">Required</span>
+              </label>
+              <input
+                id="referenceCode"
+                type="text"
+                placeholder="Enter payment reference/transaction code"
+                [value]="referenceCode()"
+                (input)="referenceCode.set($any($event.target).value)"
+                name="referenceCode"
+                class="input input-bordered w-full"
+                [class.input-error]="
+                  error() && (!referenceCode() || referenceCode().trim().length === 0)
+                "
+                [disabled]="isProcessing()"
+                required
+                autofocus
+              />
+              <label class="label">
+                <span class="label-text-alt text-base-content/60">
+                  Enter the transaction or reference code for this payment
+                </span>
+              </label>
+            </div>
+
+            <!-- Loading State -->
+            @if (isProcessing()) {
+              <div class="flex items-center justify-center py-4">
+                <span class="loading loading-spinner loading-lg"></span>
+                <span class="ml-2 text-sm sm:text-base text-base-content/60"
+                  >Processing payment...</span
+                >
+              </div>
+            }
+
+            <!-- Actions -->
+            <div class="modal-action pt-4 flex-col gap-2">
+              <button
+                type="submit"
+                class="btn btn-primary w-full"
+                [class.loading]="isProcessing()"
+                [disabled]="
+                  isProcessing() ||
+                  !cashierSessionService.hasActiveSession() ||
+                  !selectedPaymentMethod() ||
+                  !referenceCode() ||
+                  referenceCode().trim().length === 0 ||
+                  getEffectivePaymentAmountCents() <= 0
+                "
+              >
+                @if (!isProcessing()) {
+                  Confirm Payment
+                } @else {
+                  Processing...
+                }
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost w-full"
+                (click)="onCancel()"
+                [disabled]="isProcessing()"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        } @else {
+          <!-- Success State Actions -->
+          <div class="modal-action pt-4 flex-col gap-2">
+            <button type="button" class="btn btn-primary w-full" (click)="onClose()">Close</button>
+          </div>
+        }
+      </div>
+
+      <!-- Backdrop -->
+      <form method="dialog" class="modal-backdrop">
+        <button type="submit" (click)="onCancel()">close</button>
+      </form>
+    </dialog>
+  `,
+})
+export class PayOrderModalComponent {
+  private readonly paymentService = inject(CustomerPaymentService);
+  private readonly stateService = inject(CustomerStateService);
+  readonly currencyService = inject(CurrencyService);
+  private readonly ordersService = inject(OrdersService);
+  private readonly paymentMethodService = inject(PaymentMethodService);
+  protected readonly cashierSessionService = inject(CashierSessionService);
+  private readonly companyService = inject(CompanyService);
+
+  // Inputs
+  readonly orderData = input<PayOrderModalData | null>(null);
+
+  // Outputs
+  readonly paymentRecorded = output<void>();
+  readonly cancelled = output<void>();
+
+  // Modal reference
+  readonly modalRef = viewChild<ElementRef<HTMLDialogElement>>('modal');
+
+  // State
+  readonly isProcessing = signal(false);
+  readonly error = signal<string | null>(null);
+  readonly referenceCode = signal<string>('');
+  readonly selectedPaymentMethod = signal<string | null>(null);
+  readonly paymentMethods = signal<PaymentMethod[]>([]);
+  readonly isLoadingPaymentMethods = signal(false);
+  readonly paymentMethodsError = signal<string | null>(null);
+  readonly paymentAmountInput = signal<string>('');
+  readonly successResult = signal<{
+    ordersPaid: Array<{ orderId: string; orderCode: string; amountPaid: number }>;
+    remainingBalance: number;
+    totalAllocated: number;
+  } | null>(null);
+
+  paymentAmountDisplay(): string {
+    return this.paymentAmountInput();
+  }
+
+  onPaymentAmountInput(value: string): void {
+    this.paymentAmountInput.set(value ?? '');
+  }
+
+  getEffectivePaymentAmountCents(): number {
+    const data = this.orderData();
+    if (!data) return 0;
+    const outstandingCents = data.outstandingAmount ?? data.totalAmount;
+    const raw = this.paymentAmountInput().trim();
+    if (!raw) return outstandingCents;
+    const parsed = parseFloat(raw.replace(/,/g, ''));
+    if (Number.isNaN(parsed) || parsed <= 0) return 0;
+    const cents = Math.round(parsed * 100);
+    return Math.min(cents, outstandingCents);
+  }
+
+  /**
+   * Show the modal
+   */
+  async show(): Promise<void> {
+    this.error.set(null);
+    this.successResult.set(null);
+    this.isProcessing.set(false);
+    this.referenceCode.set('');
+    this.selectedPaymentMethod.set(null);
+    this.paymentMethodsError.set(null);
+    this.paymentAmountInput.set('');
+
+    const companyId = this.companyService.activeCompanyId();
+    if (companyId) {
+      const channelId = parseInt(companyId, 10);
+      if (!isNaN(channelId)) {
+        await firstValueFrom(this.cashierSessionService.getCurrentSession(channelId));
+      }
+    }
+
+    await this.loadPaymentMethods();
+
+    const modal = this.modalRef()?.nativeElement;
+    modal?.showModal();
+  }
+
+  /**
+   * Load payment methods
+   */
+  async loadPaymentMethods(): Promise<void> {
+    this.isLoadingPaymentMethods.set(true);
+    this.paymentMethodsError.set(null);
+
+    try {
+      const methods = await this.paymentMethodService.getPaymentMethods();
+      // Filter to only enabled/active methods
+      const activeMethods = methods.filter((m) => m.enabled && m.customFields?.isActive !== false);
+      this.paymentMethods.set(activeMethods);
+    } catch (error: any) {
+      console.error('Failed to load payment methods:', error);
+      this.paymentMethodsError.set(
+        error.message || 'Failed to load payment methods. Please try again.',
+      );
+      this.paymentMethods.set([]);
+    } finally {
+      this.isLoadingPaymentMethods.set(false);
+    }
+  }
+
+  /**
+   * Get selected payment method name
+   */
+  getSelectedPaymentMethodName(): string {
+    const code = this.selectedPaymentMethod();
+    if (!code) return '';
+    const method = this.paymentMethods().find((m) => m.code === code);
+    return method?.name || code;
+  }
+
+  /**
+   * Hide the modal
+   */
+  hide(): void {
+    const modal = this.modalRef()?.nativeElement;
+    modal?.close();
+  }
+
+  /**
+   * Handle payment confirmation
+   */
+  async onConfirmPayment(): Promise<void> {
+    const data = this.orderData();
+    if (!data) return;
+
+    const paymentMethodCode = this.selectedPaymentMethod();
+    if (!paymentMethodCode) {
+      this.error.set('Please select a payment method');
+      return;
+    }
+
+    const refCode = this.referenceCode().trim();
+    if (!refCode || refCode.length === 0) {
+      this.error.set('Please enter a payment reference code');
+      return;
+    }
+
+    const amountCents = this.getEffectivePaymentAmountCents();
+    this.isProcessing.set(true);
+    this.error.set(null);
+
+    try {
+      const result = await this.paymentService.recordPayment({
+        customerId: data.customerId,
+        paymentAmount: amountCents,
+        paymentMethodCode,
+        referenceNumber: refCode,
+        orderId: data.orderId,
+      });
+
+      if (result) {
+        this.successResult.set(result);
+        // Auto-close after 2 seconds and refresh orders
+        setTimeout(async () => {
+          await this.ordersService.refreshOrders();
+          this.paymentRecorded.emit();
+          this.hide();
+        }, 2000);
+      } else {
+        const serviceError = this.stateService.error();
+        // Improve error message for common cases
+        let errorMessage = serviceError || 'Failed to record payment. Please try again.';
+
+        // Check for specific error patterns and provide better messages
+        if (serviceError) {
+          const lowerError = serviceError.toLowerCase();
+          if (
+            lowerError.includes('no unpaid orders') ||
+            lowerError.includes('unpaid orders found')
+          ) {
+            errorMessage =
+              'This order cannot be paid using this method. It may already be fully paid, is not a credit order, or does not have outstanding balance. Please check the order details.';
+          } else if (lowerError.includes('pending') || lowerError.includes('unpaid')) {
+            errorMessage =
+              'This order does not have any outstanding payment. It may already be paid or is not a credit order.';
+          } else if (lowerError.includes('customer')) {
+            errorMessage =
+              'Unable to process payment. Please ensure this is a credit order for a valid customer.';
+          } else if (lowerError.includes('not found')) {
+            errorMessage = 'Order not found. Please refresh the page and try again.';
+          }
+        }
+
+        this.error.set(errorMessage);
+      }
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      let errorMessage = error.message || 'An unexpected error occurred. Please try again.';
+
+      // Improve error message for common cases
+      if (error.message) {
+        const lowerError = error.message.toLowerCase();
+        if (lowerError.includes('no unpaid orders') || lowerError.includes('unpaid orders found')) {
+          errorMessage =
+            'This order cannot be paid using this method. It may already be fully paid, is not a credit order, or does not have outstanding balance. Please check the order details.';
+        } else if (lowerError.includes('pending') || lowerError.includes('unpaid')) {
+          errorMessage =
+            'This order does not have any outstanding payment. It may already be paid or is not a credit order.';
+        } else if (lowerError.includes('not found')) {
+          errorMessage = 'Order not found. Please refresh the page and try again.';
+        }
+      }
+
+      this.error.set(errorMessage);
+    } finally {
+      this.isProcessing.set(false);
+    }
+  }
+
+  /**
+   * Handle cancel
+   */
+  onCancel(): void {
+    this.hide();
+    this.cancelled.emit();
+  }
+
+  /**
+   * Handle close after success
+   */
+  onClose(): void {
+    this.hide();
+    this.paymentRecorded.emit();
+  }
+
+  /**
+   * Handle backdrop click
+   */
+  onBackdropClick(event: MouseEvent): void {
+    const modal = this.modalRef()?.nativeElement;
+    if (modal && event.target === modal && !this.isProcessing()) {
+      this.onCancel();
+    }
+  }
+
+  /**
+   * Format currency for display
+   */
+  formatCurrency(amount: number): string {
+    return this.currencyService.format(amount, false);
+  }
+}

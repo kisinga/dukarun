@@ -4,16 +4,14 @@ import { RouterLink } from '@angular/router';
 import type { DocumentNode } from 'graphql';
 import { PageHeaderComponent } from '../../shared/components/page-header';
 import { ApolloService } from '../../core/services/apollo.service';
+import { PLATFORM_SETTINGS, UPDATE_PLATFORM_SETTINGS } from '@dukarun-sa/platform';
+import { REGISTRATION_SEED_CONTEXT, UPDATE_REGISTRATION_TAX_RATE } from '@dukarun-sa/registration';
+import { UPDATE_CUSTOMER_NOTIFICATIONS_ENABLED } from '@dukarun-sa/notification';
+import { UPDATE_COMMUNICATION_CHANNELS } from '@dukarun-sa/communication';
 import {
-  PLATFORM_SETTINGS,
-  REGISTRATION_SEED_CONTEXT,
-  UPDATE_PLATFORM_SETTINGS,
-  UPDATE_REGISTRATION_TAX_RATE,
-  UPDATE_CUSTOMER_NOTIFICATIONS_ENABLED,
-  UPDATE_COMMUNICATION_CHANNELS,
   SEND_TEST_WHATSAPP_NOTIFICATION,
   SEND_TEST_CUSTOMER_NOTIFICATION,
-} from '../../core/graphql/operations.graphql';
+} from '@dukarun-sa/messaging';
 
 interface ZoneMember {
   id: string;

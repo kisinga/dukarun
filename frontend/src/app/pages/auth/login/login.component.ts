@@ -8,8 +8,8 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../../core/services/auth.service';
-import { formatPhoneNumber, validatePhoneNumber } from '../../../core/utils/phone.utils';
+import { AuthService } from '@dukarun/auth';
+import { formatPhoneNumber, validatePhoneNumber } from '../../../shared/utils/phone.utils';
 
 type LoginStep = 'phone' | 'otp';
 

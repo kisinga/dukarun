@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 
-import { STOREFRONT } from '../graphql/operations.graphql';
+import { STOREFRONT } from '@dukarun-st/storefront';
 import { isLocalHost, slugFromHost } from '../utils/storefront-host.util';
 import { ApolloService } from './apollo.service';
 import { ChannelTokenHolder } from './channel-token.holder';

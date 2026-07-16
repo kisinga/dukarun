@@ -19,8 +19,8 @@ const config: CodegenConfig = {
     'src/app/core/graphql/generated/': {
       preset: 'client',
       documents: [
-        'src/app/**/*.ts',
-        'src/app/**/*.graphql.ts',
+        'src/app/domains/**/*.graphql.ts',
+        'src/app/core/**/*.graphql.ts',
         '!src/app/core/graphql/generated/**/*',
       ],
       presetConfig: {

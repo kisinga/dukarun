@@ -1,7 +1,8 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { ApolloService } from './apollo.service';
-import { AUTHENTICATE, PLATFORM_STATS } from '../graphql/operations.graphql';
+import { AUTHENTICATE } from '@dukarun-sa/auth';
+import { PLATFORM_STATS } from '@dukarun-sa/platform';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {

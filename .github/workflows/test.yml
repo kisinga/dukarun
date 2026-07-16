@@ -75,6 +75,9 @@ jobs:
         env:
           onnxruntime-node-install-cuda: skip
 
+      - name: Enforce frontend layer boundaries
+        run: npm run boundary-check -w @dukarun/frontend
+
       - name: Production build (catches budget errors)
         run: npm run build -w @dukarun/frontend -- --configuration production
 

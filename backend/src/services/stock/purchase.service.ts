@@ -35,7 +35,7 @@ export interface RecordPurchaseInput {
   isCreditPurchase?: boolean;
   payment?: {
     amount: number; // In smallest currency unit (cents)
-    debitAccountCode?: string;
+    debitAccountCode: string;
     reference?: string;
   };
   approvalId?: string;

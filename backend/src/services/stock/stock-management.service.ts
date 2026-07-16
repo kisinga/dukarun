@@ -7,7 +7,6 @@ import { InventoryReconciliationService } from '../inventory/inventory-reconcili
 import { InventoryConfigurationService } from '../inventory/inventory-configuration.service';
 import { FinancialService } from '../financial/financial.service';
 import { PAYMENT_METHOD_CODES } from '../payments/payment-method-codes.constants';
-import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
 import { ApprovalService } from '../approval/approval.service';
 import { StockPurchase } from './entities/purchase.entity';
 import { PurchasePayment } from './entities/purchase-payment.entity';
@@ -131,7 +130,10 @@ export class StockManagementService {
 
         // 4. Check account balance for overdraft (when payment provided)
         if (input.payment && input.payment.amount > 0) {
-          const accountCode = input.payment.debitAccountCode?.trim() || ACCOUNT_CODES.CASH_ON_HAND;
+          const accountCode = input.payment.debitAccountCode?.trim();
+          if (!accountCode) {
+            throw new UserInputError('Payment source account is required');
+          }
           const accountBalance = await this.financialService.getAccountBalance(
             transactionCtx,
             accountCode
@@ -278,6 +280,10 @@ export class StockManagementService {
 
           // Post payment to ledger (debit AP, credit payment source)
           const paymentId = `supplier-payment-${purchase.id}-${Date.now()}`;
+          const debitAccountCode = input.payment.debitAccountCode?.trim();
+          if (!debitAccountCode) {
+            throw new UserInputError('Payment source account is required');
+          }
           await this.financialService.recordSupplierPayment(
             transactionCtx,
             paymentId,
@@ -286,7 +292,7 @@ export class StockManagementService {
             String(input.supplierId),
             paymentAmount,
             PAYMENT_METHOD_CODES.CASH,
-            input.payment.debitAccountCode?.trim() || undefined
+            debitAccountCode
           );
 
           // Update paymentStatus based on amount vs totalCost

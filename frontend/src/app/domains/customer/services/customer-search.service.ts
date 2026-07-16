@@ -1,0 +1,318 @@
+import type { FetchPolicy } from '@apollo/client/core';
+import { inject, Injectable } from '@angular/core';
+import { GET_CUSTOMERS } from '../operations.graphql';
+import { AppCacheService } from '../../../shared/services/cache/app-cache.service';
+import { CacheSyncService } from '../../../shared/services/cache/cache-sync.service';
+import type { CacheSyncEntityHandler } from '../../../shared/services/cache/cache-sync-handler.interface';
+import { CompanyService } from '@dukarun/company';
+import { ApolloService } from '../../../shared/services/apollo.service';
+import { CustomerInput } from './customer.service';
+import { CustomerApiService } from './customer-api.service';
+import { CustomerCreditService } from './customer-credit.service';
+import { CustomerStateService } from './customer-state.service';
+import { formatPhoneNumber } from '../../../shared/utils/phone.utils';
+
+const CUSTOMERS_CACHE_KEY = 'customers_list';
+const CUSTOMERS_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+
+/** Threshold (ms) after which cached customer data is considered stale for transaction-related fields (e.g. credit). */
+export const CUSTOMER_CACHE_STALE_MS = 60_000;
+
+interface CustomersCachePayload {
+  items: any[];
+  lastSync?: number;
+}
+
+/** By-id cache entry for customer (preview/detail). Transaction fields may be stale when updatedAt is old. */
+export interface CustomerCacheEntry {
+  customer: any;
+  creditSummary?: any;
+  updatedAt: number;
+}
+
+/** Fetch policy for customer list/search; default cache-first for resilience; network-only after mutations. */
+export interface CustomerQueryOptions {
+  fetchPolicy?: 'cache-first' | 'network-only';
+}
+
+/**
+ * Customer Search Service
+ *
+ * Handles customer search and listing operations.
+ * Manages customer list state. Uses AppCacheService for offline-first (stale-while-revalidate).
+ * Implements CacheSyncEntityHandler for 'customer'.
+ */
+@Injectable({
+  providedIn: 'root',
+})
+export class CustomerSearchService implements CacheSyncEntityHandler {
+  readonly entityType = 'customer' as const;
+
+  private readonly apolloService = inject(ApolloService);
+  private readonly appCache = inject(AppCacheService);
+  private readonly companyService = inject(CompanyService);
+  private readonly stateService = inject(CustomerStateService);
+  private readonly apiService = inject(CustomerApiService);
+  private readonly creditService = inject(CustomerCreditService);
+  private readonly cacheSyncService = inject(CacheSyncService);
+
+  /** By-id cache for preview/detail; hydrated on fetch and on SSE. */
+  private readonly customersById = new Map<string, CustomerCacheEntry>();
+
+  constructor() {
+    this.cacheSyncService.registerHandler(this);
+  }
+
+  /**
+   * Fetch all customers with optional pagination.
+   * Tries cache first (24h TTL); on hit hydrates state and revalidates in background.
+   */
+  async fetchCustomers(options?: any, queryOptions?: CustomerQueryOptions): Promise<void> {
+    this.stateService.setIsLoading(true);
+    this.stateService.setError(null);
+
+    const channelId = this.companyService.activeCompanyId();
+    if (channelId) {
+      const scope = `channel:${channelId}` as const;
+      const stored = await this.appCache.getKV<CustomersCachePayload>(scope, CUSTOMERS_CACHE_KEY);
+      const now = Date.now();
+      const valid =
+        stored?.items && stored.lastSync != null && now - stored.lastSync < CUSTOMERS_TTL_MS;
+
+      if (valid && stored.items.length >= 0) {
+        this.stateService.setCustomers(stored.items);
+        this.stateService.setTotalItems(stored.items.length);
+        this.stateService.setIsLoading(false);
+        this.fetchCustomersFromNetwork(options, scope).catch(() => {});
+        return;
+      }
+    }
+
+    try {
+      await this.fetchCustomersFromNetwork(
+        options,
+        channelId ? (`channel:${channelId}` as const) : undefined,
+      );
+    } finally {
+      this.stateService.setIsLoading(false);
+    }
+  }
+
+  private async fetchCustomersFromNetwork(
+    options?: any,
+    scope?: `channel:${string}`,
+  ): Promise<void> {
+    const fetchPolicy = 'network-only' as FetchPolicy;
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.query({
+        query: GET_CUSTOMERS,
+        variables: {
+          options: options || {
+            take: 100,
+            skip: 0,
+          },
+        },
+        fetchPolicy,
+      });
+
+      const allItems = result.data?.customers?.items || [];
+      const customersOnly = allItems.filter((customer: any) => !customer.customFields?.isSupplier);
+
+      this.stateService.setCustomers(customersOnly);
+      this.stateService.setTotalItems(customersOnly.length);
+
+      if (scope) {
+        await this.appCache.setKV(scope, CUSTOMERS_CACHE_KEY, {
+          items: customersOnly,
+          lastSync: Date.now(),
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to fetch customers:', error);
+      this.stateService.setError(error.message || 'Failed to fetch customers');
+      this.stateService.setCustomers([]);
+      this.stateService.setTotalItems(0);
+    }
+  }
+
+  /**
+   * Search for customers (excludes suppliers).
+   * @param queryOptions - Optional fetch policy; default cache-first
+   */
+  async searchCustomers(
+    term: string,
+    take = 50,
+    queryOptions?: CustomerQueryOptions,
+  ): Promise<any[]> {
+    const trimmed = term.trim();
+    if (trimmed.length === 0) {
+      return [];
+    }
+
+    const fetchPolicy = (queryOptions?.fetchPolicy ?? 'cache-first') as FetchPolicy;
+
+    try {
+      const client = this.apolloService.getClient();
+      const result = await client.query({
+        query: GET_CUSTOMERS,
+        variables: {
+          options: {
+            take,
+            skip: 0,
+            filter: {
+              firstName: { contains: trimmed },
+            },
+          },
+        },
+        fetchPolicy,
+      });
+
+      const items = result.data?.customers?.items || [];
+      return items.filter((customer: any) => !customer.customFields?.isSupplier);
+    } catch (error) {
+      console.error('Failed to search customers:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Find a customer by phone number
+   *
+   * @param phone - Phone number (will be normalized)
+   * @returns Customer if found, null otherwise
+   */
+  async findCustomerByPhone(phone: string): Promise<any | null> {
+    if (!phone || typeof phone !== 'string') {
+      return null;
+    }
+
+    try {
+      // Normalize phone number for consistent lookup
+      const normalizedPhone = formatPhoneNumber(phone);
+
+      const client = this.apolloService.getClient();
+      const result = await client.query({
+        query: GET_CUSTOMERS,
+        variables: {
+          options: {
+            take: 1,
+            skip: 0,
+            filter: {
+              phoneNumber: { eq: normalizedPhone },
+            },
+          },
+        },
+        fetchPolicy: 'cache-first' as FetchPolicy,
+      });
+
+      const items = result.data?.customers?.items || [];
+      return items.length > 0 ? items[0] : null;
+    } catch (error) {
+      console.error('Failed to find customer by phone:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Quickly create a customer record for checkout flows.
+   *
+   * Checks for existing customer by phone number first to prevent duplicates.
+   * If no email is provided, generates one from the phone number.
+   */
+  async quickCreateCustomer(input: {
+    name: string;
+    phone: string;
+    email?: string;
+  }): Promise<string | null> {
+    // Normalize phone number
+    const normalizedPhone = formatPhoneNumber(input.phone);
+
+    // Check if customer with this phone number already exists
+    const existingCustomer = await this.findCustomerByPhone(normalizedPhone);
+    if (existingCustomer) {
+      console.log('✅ Found existing customer by phone:', existingCustomer.id);
+      return existingCustomer.id;
+    }
+
+    // Use provided email or empty string (let backend generate sentinel)
+    const emailAddress = input.email?.trim() || '';
+
+    const { firstName, lastName } = this.splitName(input.name);
+    return this.apiService.createCustomer({
+      firstName,
+      lastName,
+      emailAddress,
+      phoneNumber: normalizedPhone,
+    });
+  }
+
+  /**
+   * Get customer by id from by-id cache (for preview/detail). Returns null if not cached.
+   */
+  getCustomerById(id: string): CustomerCacheEntry | null {
+    return this.customersById.get(id) ?? null;
+  }
+
+  /**
+   * Write customer (and optional credit summary) into by-id cache. Call after fetch from detail or preview.
+   */
+  hydrateCustomer(customer: any, creditSummary?: any): void {
+    if (!customer?.id) return;
+    this.customersById.set(customer.id, {
+      customer,
+      creditSummary,
+      updatedAt: Date.now(),
+    });
+  }
+
+  /** CacheSyncEntityHandler: fetch one customer and update by-id cache; also invalidate list. */
+  async hydrateOne(channelId: string, id: string): Promise<void> {
+    try {
+      const customer = await this.apiService.getCustomerById(id);
+      if (!customer) return;
+      let creditSummary: any;
+      try {
+        creditSummary = await this.creditService.getCreditSummary(id);
+      } catch {
+        // optional; cache customer without credit
+      }
+      this.hydrateCustomer(customer, creditSummary);
+    } catch (err) {
+      console.warn('[CustomerSearch] hydrateOne failed', { channelId, id }, err);
+    }
+  }
+
+  /**
+   * Invalidate customers cache and clear list state for the given (or current) channel.
+   * Called when the backend signals a customer change (e.g. via SSE).
+   */
+  async invalidateCache(channelId?: string): Promise<void> {
+    console.log('[CustomerSearch] invalidateCache', { channelId });
+    const id = channelId ?? this.companyService.activeCompanyId();
+    if (!id) return;
+    const scope = `channel:${id}` as const;
+    await this.appCache.removeKV(scope, CUSTOMERS_CACHE_KEY);
+    this.stateService.setCustomers([]);
+    this.stateService.setTotalItems(0);
+  }
+
+  /** CacheSyncEntityHandler: remove from by-id cache and invalidate list. */
+  invalidateOne(channelId: string, id: string): void {
+    this.customersById.delete(id);
+    void this.invalidateCache(channelId);
+  }
+
+  private splitName(name: string): { firstName: string; lastName: string } {
+    const trimmed = name.trim();
+    if (!trimmed.includes(' ')) {
+      return { firstName: trimmed, lastName: 'POS' };
+    }
+
+    const [firstName, ...rest] = trimmed.split(' ');
+    return {
+      firstName,
+      lastName: rest.join(' ') || 'POS',
+    };
+  }
+}

@@ -1,16 +1,39 @@
 import { AfterViewInit, Component, effect, inject, PLATFORM_ID, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
-import { BRAND_CONFIG } from './core/constants/brand.constants';
-import { ToastComponent } from './core/layout/toast/toast.component';
-import { NetworkService } from './core/services/network.service';
-import { ToastService } from './core/services/toast.service';
+import { BRAND_CONFIG } from './shared/constants/brand.constants';
+import { ToastComponent } from './shell/layout/toast/toast.component';
+import { NetworkService } from './shell/services/network.service';
+import { ToastService } from './shared/services/toast.service';
 
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet, ToastComponent],
-  templateUrl: './app.html',
-  styleUrl: './app.scss',
+  template: `
+    <router-outlet />
+
+    <!-- Toast Container -->
+    <app-toast [toasts]="toastService.toasts()" />
+  `,
+  styles: [
+    `
+      :host {
+        display: block;
+        min-height: 100vh;
+      }
+
+      /* Apply grayscale filter when offline */
+      html.offline-mode {
+        filter: grayscale(100%);
+        transition: filter 0.3s ease-in-out;
+      }
+
+      /* Apply to all elements within offline mode */
+      html.offline-mode * {
+        filter: grayscale(100%);
+      }
+    `,
+  ],
 })
 export class App implements AfterViewInit {
   protected readonly title = signal(`${BRAND_CONFIG.servicePrefix}-frontend`);

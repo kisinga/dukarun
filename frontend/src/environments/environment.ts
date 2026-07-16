@@ -23,7 +23,7 @@ const getRuntimeConfig = () => {
 
 const runtimeConfig = getRuntimeConfig();
 
-import { BRAND_CONFIG } from '../app/core/constants/brand.constants';
+import { BRAND_CONFIG } from '../app/shared/constants/brand.constants';
 
 export const environment = {
   production: false,

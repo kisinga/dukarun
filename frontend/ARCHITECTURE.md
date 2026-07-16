@@ -439,12 +439,52 @@ Login → Auto-select Channel → Select Shop → Scoped Operations
 
 ```
 src/app/
-├── core/              # Shared (services, guards)
-├── pages/             # Marketing (home, auth)
-└── dashboard/         # Admin area
-    ├── layout/        # Dashboard layout
-    └── pages/         # Feature pages
+├── app.ts             # Root standalone component
+├── shell/             # App wiring consumed by main.ts and the router
+│   ├── app.config.ts
+│   ├── app.config.server.ts
+│   ├── app.routes.ts
+│   ├── app.routes.server.ts
+│   ├── guards/        # Route guards (import domains via @dukarun/*)
+│   ├── interceptors/  # HTTP interceptors
+│   ├── layout/        # Root/layout shell components
+│   │   ├── dashboard-layout.component.ts
+│   │   ├── footer/
+│   │   ├── navbar/
+│   │   └── toast/
+│   └── services/      # App-lifecycle services (app-init, network)
+├── shared/            # App-wide reusable code
+│   ├── components/    # Shared UI components (money, dashboard widgets)
+│   ├── constants/
+│   ├── graphql/       # Generated types + fractional-quantity docs
+│   ├── icons/
+│   ├── models/
+│   ├── pipes/
+│   ├── services/      # Infrastructure services (apollo, cache, currency, toast, etc.)
+│   ├── testing/       # Test helpers, mocks, smoke/critical specs
+│   └── utils/
+├── domains/           # Domain data-access (operations, services, models, owned components)
+│   └── <domain>/
+│       ├── index.ts
+│       ├── operations.graphql.ts
+│       ├── services/
+│       └── components/  # optional secondary entry point
+└── pages/             # Routed screens (lazy-loaded via shell/app.routes.ts)
+    └── <page>/
 ```
+
+Dependency rules (enforced):
+
+- `shell/` may import `domains/` and `shared/`.
+- `shared/` may import only other `shared/` code (no `domains`, `pages`, or `shell`).
+- `domains/` may import `shared/` and other `domains/` (via `@dukarun/<domain>` aliases). They may never import `pages/` or `shell/`.
+- `pages/` may import `domains/`, `shared/`, and `shell/`. A page folder may not import another page folder.
+
+Route pages are lazy-loaded from `pages/<page>/...` via `shell/app.routes.ts`.
+Each domain exposes services and operations through its barrel (`@dukarun/<domain>`);
+UI components needed by other domains are exposed via secondary component barrels
+(e.g. `@dukarun/order/components`) to keep page code out of the eagerly-loaded
+services barrels.
 
 ## Mobile-First
 
@@ -744,15 +784,15 @@ Manual entry: SKU1=50, SKU2=25
 
 **Services:**
 
-- `core/services/stock-location.service.ts` - Removed active location state, added getDefaultLocation()
-- `core/services/dashboard.service.ts` - Removed location parameter from fetchDashboardData()
-- `core/services/order.service.ts` - NEW: Order creation and payment processing
-- `core/graphql/order.graphql.ts` - NEW: Order mutations
+- `domains/stock/services/stock-location.service.ts` - Removed active location state, added getDefaultLocation()
+- `domains/analytics/services/dashboard.service.ts` - Removed location parameter from fetchDashboardData()
+- `domains/order/services/order.service.ts` - NEW: Order creation and payment processing
+- `domains/order/operations.graphql.ts` - NEW: Order mutations
 
 **Components:**
 
-- `dashboard/layout/dashboard-layout.component.ts` - Removed location switcher logic
-- `dashboard/layout/dashboard-layout.component.html` - Removed location dropdown UI
+- `shell/layout/dashboard-layout.component.ts` - Removed location switcher logic
+- `shell/layout/dashboard-layout.component.html` - Removed location dropdown UI
 - `dashboard/pages/overview/overview.component.ts` - Simplified to company-only effects
 - `dashboard/pages/sell/sell.component.ts` - Integrated OrderService for checkout
 - `dashboard/pages/sell/components/checkout-modal.component.ts` - Simplified payment methods
@@ -1565,8 +1605,8 @@ localStorage.setItem('company_session', JSON.stringify({
 
 **Frontend:**
 
-- `frontend/src/app/core/services/stock-location.service.ts` - Added cashier fields
-- `frontend/src/app/core/graphql/product.graphql.ts` - Query both fields
+- `frontend/src/app/domains/stock/services/stock-location.service.ts` - Added cashier fields
+- `frontend/src/app/domains/product/operations.graphql.ts` - Query both fields
 - `frontend/src/app/dashboard/pages/sell/sell.component.ts` - Use location setting
 - `frontend/src/app/dashboard/pages/overview/overview.component.ts` - Status badge
 

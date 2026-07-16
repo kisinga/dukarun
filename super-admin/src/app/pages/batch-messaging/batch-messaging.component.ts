@@ -2,11 +2,8 @@ import { Component, computed, inject, OnInit, signal, viewChild } from '@angular
 import { FormsModule } from '@angular/forms';
 import { ApolloService } from '../../core/services/apollo.service';
 import { PageHeaderComponent } from '../../shared/components/page-header';
-import {
-  BATCH_MESSAGES,
-  PLATFORM_CHANNELS,
-  SEND_BATCH_MESSAGE,
-} from '../../core/graphql/operations.graphql';
+import { PLATFORM_CHANNELS } from '@dukarun-sa/channel';
+import { BATCH_MESSAGES, SEND_BATCH_MESSAGE } from '@dukarun-sa/messaging';
 import type { DocumentNode } from 'graphql';
 import { renderBatchMessage } from './batch-message-template.util';
 

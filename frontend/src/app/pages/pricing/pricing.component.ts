@@ -1,12 +1,12 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { FooterComponent } from '../../core/layout/footer/footer.component';
-import { NavbarComponent } from '../../core/layout/navbar/navbar.component';
+import { FooterComponent } from '../../shell/layout/footer/footer.component';
+import { NavbarComponent } from '../../shell/layout/navbar/navbar.component';
 import {
   PublicPricingService,
   PublicSubscriptionTier,
   PublicPlatformConfig,
-} from '../../core/services/public-pricing.service';
+} from '../../shared/services/public-pricing.service';
 
 interface PricingPlan {
   name: string;

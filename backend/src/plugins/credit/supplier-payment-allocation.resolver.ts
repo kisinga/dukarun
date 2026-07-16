@@ -53,13 +53,13 @@ export class SupplierPaymentAllocationResolver {
   })
   async paySinglePurchase(
     @Ctx() ctx: RequestContext,
-    @Args('input') input: { purchaseId: string; paymentAmount?: number; debitAccountCode?: string }
+    @Args('input') input: { purchaseId: string; debitAccountCode: string; paymentAmount?: number }
   ): Promise<SupplierPaymentAllocationResult> {
     return this.supplierPaymentAllocationService.paySinglePurchase(
       ctx,
       input.purchaseId,
-      input.paymentAmount,
-      input.debitAccountCode
+      input.debitAccountCode,
+      input.paymentAmount
     );
   }
 

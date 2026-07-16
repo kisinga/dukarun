@@ -1,0 +1,75 @@
+import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
+import type { Administrator } from '@dukarun/company';
+
+@Component({
+  selector: 'tr[appTeamMemberRow]',
+  imports: [CommonModule, NgIcon],
+  template: `
+    <td class="align-middle">
+      <div class="font-medium truncate" [title]="member.firstName + ' ' + member.lastName">
+        {{ member.firstName }} {{ member.lastName }}
+      </div>
+    </td>
+    <td class="align-middle">
+      <div class="text-sm min-w-0">
+        @if (member.emailAddress) {
+          <div class="truncate" [title]="member.emailAddress">{{ member.emailAddress }}</div>
+        }
+        @if (member.user?.identifier) {
+          <div class="text-base-content/70 truncate" [title]="member.user?.identifier">
+            {{ member.user?.identifier }}
+          </div>
+        }
+      </div>
+    </td>
+    <td class="align-middle">
+      <span class="badge badge-outline">
+        {{ getRoleName() }}
+      </span>
+    </td>
+    <td class="align-middle">
+      @if (member.user?.verified) {
+        <span class="badge badge-success">Verified</span>
+      } @else {
+        <span class="badge badge-warning">Pending</span>
+      }
+    </td>
+    <td class="align-middle text-right">
+      <div class="flex gap-2 justify-end">
+        <button class="btn btn-sm btn-ghost" (click)="onEdit()" title="Edit permissions">
+          <ng-icon name="heroPencilSquare" size="1rem" />
+        </button>
+        <button class="btn btn-sm btn-ghost text-error" (click)="onDelete()" title="Remove">
+          <ng-icon name="heroTrash" size="1rem" />
+        </button>
+      </div>
+    </td>
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class TeamMemberRowComponent {
+  @Input({ required: true }) member!: Administrator;
+  @Output() edit = new EventEmitter<Administrator>();
+  @Output() delete = new EventEmitter<Administrator>();
+
+  getRoleName(): string {
+    const roleCode = this.member.user?.roles?.[0]?.code ?? '';
+    // Extract role name from code (e.g., "channel-cashier-123" -> "Cashier")
+    if (roleCode.includes('cashier')) return 'Cashier';
+    if (roleCode.includes('accountant')) return 'Accountant';
+    if (roleCode.includes('salesperson')) return 'Salesperson';
+    if (roleCode.includes('stockkeeper')) return 'Stockkeeper';
+    if (roleCode.includes('admin')) return 'Admin';
+    return 'Unknown';
+  }
+
+  onEdit(): void {
+    this.edit.emit(this.member);
+  }
+
+  onDelete(): void {
+    this.delete.emit(this.member);
+  }
+}

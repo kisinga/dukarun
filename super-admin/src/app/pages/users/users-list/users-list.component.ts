@@ -3,14 +3,13 @@ import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ApolloService } from '../../../core/services/apollo.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header';
+import { PLATFORM_ADMINISTRATORS } from '@dukarun-sa/platform';
+import { PLATFORM_CHANNELS } from '@dukarun-sa/channel';
 import {
-  PLATFORM_CHANNELS,
-  PLATFORM_ADMINISTRATORS,
   ADMINISTRATOR_DETAIL,
-  ASSIGNABLE_PERMISSIONS,
-  ROLE_TEMPLATES,
   UPDATE_ADMINISTRATOR_PERMISSIONS,
-} from '../../../core/graphql/operations.graphql';
+} from '@dukarun-sa/user';
+import { ASSIGNABLE_PERMISSIONS, ROLE_TEMPLATES } from '@dukarun-sa/role-template';
 import { groupPermissions, formatPermissionName } from '../../../core/utils/permission-grouping';
 
 interface PlatformAdministratorItem {

@@ -22,7 +22,13 @@
     "lib": [
       "ES2022",
       "dom"
-    ]
+    ],
+    "baseUrl": "./",
+    "paths": {
+      "@dukarun-st/storefront": ["src/app/domains/storefront/index.ts"],
+      "@dukarun-st/product": ["src/app/domains/product/index.ts"],
+      "@dukarun-st/collection": ["src/app/domains/collection/index.ts"]
+    }
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

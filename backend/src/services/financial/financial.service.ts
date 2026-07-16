@@ -364,12 +364,17 @@ export class FinancialService {
     supplierId: string,
     amount: number,
     paymentMethod: string,
-    debitAccountCode?: string
+    debitAccountCode: string
   ): Promise<void> {
     if (amount <= 0) {
       throw new Error(
         `Supplier payment ${paymentId} has non-positive amount (${amount}) and cannot be posted to ledger`
       );
+    }
+
+    const resolvedAccountCode = debitAccountCode.trim();
+    if (!resolvedAccountCode) {
+      throw new Error(`Supplier payment ${paymentId} requires a debitAccountCode`);
     }
 
     const context: SupplierPaymentPostingContext = {
@@ -378,15 +383,14 @@ export class FinancialService {
       purchaseReference,
       supplierId,
       method: paymentMethod,
-      resolvedAccountCode: debitAccountCode?.trim() || undefined,
+      resolvedAccountCode,
     };
 
     await this.postingService.postSupplierPayment(ctx, paymentId, context);
 
     // Invalidate cache (cash account = debit account used)
     this.queryService.invalidateCache(ctx.channelId as number, ACCOUNT_CODES.ACCOUNTS_PAYABLE);
-    const cashAccount = debitAccountCode?.trim() || this.mapMethodToAccount(paymentMethod);
-    this.queryService.invalidateCache(ctx.channelId as number, cashAccount);
+    this.queryService.invalidateCache(ctx.channelId as number, resolvedAccountCode);
   }
 
   /**

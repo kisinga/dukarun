@@ -13,7 +13,13 @@
     "experimentalDecorators": true,
     "importHelpers": true,
     "target": "ES2022",
-    "module": "preserve"
+    "module": "preserve",
+    "baseUrl": "./",
+    "paths": {
+      "@dukarun/shell": ["src/app/shell/index.ts"],
+      "@dukarun/shared": ["src/app/shared/index.ts"],
+      "@dukarun/*": ["src/app/domains/*/index.ts"]
+    }
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

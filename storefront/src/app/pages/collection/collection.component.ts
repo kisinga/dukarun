@@ -4,7 +4,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { ProductCardComponent, ProductCardVM } from '../../core/components/product-card.component';
 import { SkeletonGridComponent } from '../../core/components/skeleton-grid.component';
-import { COLLECTION_DETAIL, SEARCH_PRODUCTS } from '../../core/graphql/operations.graphql';
+import { COLLECTION_DETAIL } from '@dukarun-st/collection';
+import { SEARCH_PRODUCTS } from '@dukarun-st/product';
 import { ApolloService } from '../../core/services/apollo.service';
 import { CurrencyService } from '../../core/services/currency.service';
 import { SeoService } from '../../core/services/seo.service';

@@ -67,7 +67,7 @@ export const STOCK_ADMIN_SCHEMA = gql`
 
   input InlinePaymentInput {
     amount: Int!
-    debitAccountCode: String
+    debitAccountCode: String!
     reference: String
   }
 

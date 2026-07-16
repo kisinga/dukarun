@@ -2,7 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '../../../shared/components/page-header';
 import { ApolloService } from '../../../core/services/apollo.service';
-import { PLATFORM_CHANNELS } from '../../../core/graphql/operations.graphql';
+import { PLATFORM_CHANNELS } from '@dukarun-sa/channel';
 
 interface PlatformChannel {
   id: string;
