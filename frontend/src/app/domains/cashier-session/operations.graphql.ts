@@ -229,4 +229,3 @@ export const GET_EXPECTED_SESSION_CLOSING_BALANCES = graphql(`
     }
   }
 `);
-

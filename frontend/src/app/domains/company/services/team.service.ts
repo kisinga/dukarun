@@ -1,5 +1,11 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { GET_ADMINISTRATORS, GET_ROLE_TEMPLATES, CREATE_CHANNEL_ADMIN, UPDATE_CHANNEL_ADMIN, DISABLE_CHANNEL_ADMIN } from '../operations.graphql';
+import {
+  GET_ADMINISTRATORS,
+  GET_ROLE_TEMPLATES,
+  CREATE_CHANNEL_ADMIN,
+  UPDATE_CHANNEL_ADMIN,
+  DISABLE_CHANNEL_ADMIN,
+} from '../operations.graphql';
 import { ApolloService } from '../../../shared/services/apollo.service';
 import { CompanyService } from './company.service';
 

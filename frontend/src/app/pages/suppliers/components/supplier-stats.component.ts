@@ -1,5 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
-import { StatBarComponent, type StatItem } from '../../../shared/components/dashboard/stat-bar.component';
+import {
+  StatBarComponent,
+  type StatItem,
+} from '../../../shared/components/dashboard/stat-bar.component';
 
 export interface SupplierStats {
   totalSuppliers: number;

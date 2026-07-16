@@ -12,7 +12,12 @@ import {
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CurrencyService } from '../../../shared/services/currency.service';
 import { toDisplayDate } from '../../../shared/utils/date.util';
-import { CustomerService, CustomerCreditService, CustomerSearchService, type CreditCustomerSummary } from '@dukarun/customer';
+import {
+  CustomerService,
+  CustomerCreditService,
+  CustomerSearchService,
+  type CreditCustomerSummary,
+} from '@dukarun/customer';
 import { AuthPermissionsService } from '@dukarun/auth';
 import type { OrderListOptions } from '../../../shared/graphql/generated/graphql';
 import { GET_CUSTOMER_ORDERS } from '@dukarun/order';

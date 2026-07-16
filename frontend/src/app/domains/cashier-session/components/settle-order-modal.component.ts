@@ -17,10 +17,7 @@ import { CashierSessionService } from '../services/cashier-session.service';
 import { OrderTenderInput } from '../services/cashier-settlement.service';
 import { CompanyService } from '@dukarun/company';
 import { CurrencyService } from '../../../shared/services/currency.service';
-import {
-  PaymentMethod,
-  PaymentMethodService,
-} from '@dukarun/payments';
+import { PaymentMethod, PaymentMethodService } from '@dukarun/payments';
 
 /** Context for a collection: the total to collect and who/what it's for. */
 export interface SettleOrderModalData {

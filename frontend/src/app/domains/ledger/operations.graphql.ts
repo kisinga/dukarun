@@ -99,4 +99,3 @@ export const GET_JOURNAL_ENTRY = graphql(`
     }
   }
 `);
-

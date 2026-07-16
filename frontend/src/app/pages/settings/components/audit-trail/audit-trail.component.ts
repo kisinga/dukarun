@@ -9,11 +9,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { CompanyService } from '@dukarun/company';
-import {
-  AuditLog,
-  AuditLogOptions,
-  SettingsService,
-} from '@dukarun/company';
+import { AuditLog, AuditLogOptions, SettingsService } from '@dukarun/company';
 import { ToastService } from '../../../../shared/services/toast.service';
 import { toDisplayDate } from '../../../../shared/utils/date.util';
 import { PaginationComponent } from '../../../../shared/components/dashboard/pagination.component';

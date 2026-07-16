@@ -7,7 +7,11 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-menu-toggle-button',
   template: `
-    <label [attr.for]="for()" class="btn btn-ghost btn-square btn-md" [attr.aria-label]="ariaLabel()">
+    <label
+      [attr.for]="for()"
+      class="btn btn-ghost btn-square btn-md"
+      [attr.aria-label]="ariaLabel()"
+    >
       <svg
         xmlns="http://www.w3.org/2000/svg"
         class="h-6 w-6"
@@ -29,4 +33,3 @@ export class MenuToggleButtonComponent {
   /** Accessibility label for the button */
   ariaLabel = input<string>('Open navigation menu');
 }
-

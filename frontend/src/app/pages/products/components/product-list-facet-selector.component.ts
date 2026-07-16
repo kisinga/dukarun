@@ -10,7 +10,12 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { FacetService, FACET_DISPLAY_NAMES, type FacetCode, type FacetValueSummary } from '@dukarun/product';
+import {
+  FacetService,
+  FACET_DISPLAY_NAMES,
+  type FacetCode,
+  type FacetValueSummary,
+} from '@dukarun/product';
 
 /**
  * Facet selector for product list (and reusable on sell browse). Multi-select by ID.

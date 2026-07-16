@@ -10,10 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import {
-  SubscriptionService,
-  type SubscriptionTier,
-} from '@dukarun/subscription';
+import { SubscriptionService, type SubscriptionTier } from '@dukarun/subscription';
 import { AuthService } from '@dukarun/auth';
 import { CompanyService } from '@dukarun/company';
 

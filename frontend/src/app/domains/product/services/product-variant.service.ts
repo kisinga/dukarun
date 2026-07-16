@@ -1,5 +1,9 @@
 import { inject, Injectable } from '@angular/core';
-import { CREATE_PRODUCT_VARIANTS, DELETE_PRODUCT_VARIANTS, UPDATE_PRODUCT_VARIANT } from '../operations.graphql';
+import {
+  CREATE_PRODUCT_VARIANTS,
+  DELETE_PRODUCT_VARIANTS,
+  UPDATE_PRODUCT_VARIANT,
+} from '../operations.graphql';
 import { ApolloService } from '../../../shared/services/apollo.service';
 import { VariantInput } from './product.service';
 import { ProductStateService } from './product-state.service';

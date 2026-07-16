@@ -12,10 +12,7 @@ import {
 } from '@angular/core';
 import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../shared/services/currency.service';
-import {
-  PaymentMethod,
-  PaymentMethodService,
-} from '@dukarun/payments';
+import { PaymentMethod, PaymentMethodService } from '@dukarun/payments';
 import { Customer } from './customer-selector.component';
 import { CheckoutCashComponent, SelectedPaymentMethod } from './checkout/checkout-cash.component';
 import { CheckoutCashierComponent } from './checkout/checkout-cashier.component';

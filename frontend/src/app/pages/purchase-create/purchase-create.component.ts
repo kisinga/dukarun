@@ -13,11 +13,7 @@ import { firstValueFrom } from 'rxjs';
 import { ApprovalService } from '@dukarun/approval';
 import { DeepLinkService } from '../../shared/services/deep-link.service';
 import { LedgerService } from '@dukarun/ledger';
-import {
-  ProductSearchResult,
-  ProductSearchService,
-  ProductVariant,
-} from '@dukarun/product';
+import { ProductSearchResult, ProductSearchService, ProductVariant } from '@dukarun/product';
 import { PurchaseService, PurchaseDraft, PurchaseLineItem } from '@dukarun/purchases';
 import { StockLocationService } from '@dukarun/stock';
 import { SupplierService } from '@dukarun/supplier';

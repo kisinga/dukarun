@@ -57,7 +57,11 @@ export * from './services/link-preview/link-preview.types';
 export * from './services/ml-model/embedder.service';
 export * from './services/ml-model/embedding-match';
 export * from './services/ml-model/frame-roi';
-export { calculateProductStats, isLowStock, LOW_STOCK_THRESHOLD } from './services/stats/product-stats.util';
+export {
+  calculateProductStats,
+  isLowStock,
+  LOW_STOCK_THRESHOLD,
+} from './services/stats/product-stats.util';
 
 // Utils
 export * from './utils/beep.utils';

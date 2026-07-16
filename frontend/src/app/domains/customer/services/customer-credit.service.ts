@@ -1,6 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import { SortOrder } from '../../../shared/graphql/generated/graphql';
-import { APPROVE_CUSTOMER_CREDIT, GET_CREDIT_SUMMARY, UPDATE_CREDIT_DURATION, UPDATE_CUSTOMER_CREDIT_LIMIT, VALIDATE_CREDIT } from '@dukarun/credit';
+import {
+  APPROVE_CUSTOMER_CREDIT,
+  GET_CREDIT_SUMMARY,
+  UPDATE_CREDIT_DURATION,
+  UPDATE_CUSTOMER_CREDIT_LIMIT,
+  VALIDATE_CREDIT,
+} from '@dukarun/credit';
 import { GET_CUSTOMERS } from '../operations.graphql';
 import { ApolloService } from '../../../shared/services/apollo.service';
 import { CreditCustomerSummary } from './customer.service';

@@ -13,7 +13,10 @@ import { CurrencyService } from '../../shared/services/currency.service';
 import { CustomerService, CreditCustomerSummary } from '@dukarun/customer';
 import { SupplierService } from '@dukarun/supplier';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
-import { StatBarComponent, type StatItem } from '../../shared/components/dashboard/stat-bar.component';
+import {
+  StatBarComponent,
+  type StatItem,
+} from '../../shared/components/dashboard/stat-bar.component';
 
 type CreditMode = 'receivables' | 'payables';
 

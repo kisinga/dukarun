@@ -1,6 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { PAY_SINGLE_PURCHASE, ALLOCATE_BULK_SUPPLIER_PAYMENT } from '../operations.graphql';
-import { GET_SUPPLIER_CREDIT_SUMMARY, APPROVE_SUPPLIER_CREDIT, UPDATE_SUPPLIER_CREDIT_LIMIT, UPDATE_SUPPLIER_CREDIT_DURATION } from '@dukarun/credit';
+import {
+  GET_SUPPLIER_CREDIT_SUMMARY,
+  APPROVE_SUPPLIER_CREDIT,
+  UPDATE_SUPPLIER_CREDIT_LIMIT,
+  UPDATE_SUPPLIER_CREDIT_DURATION,
+} from '@dukarun/credit';
 import type {
   ApproveSupplierCreditInput,
   PaySinglePurchaseInput,

@@ -45,4 +45,3 @@ export const CREATE_FACET_VALUE = graphql(`
     }
   }
 `);
-

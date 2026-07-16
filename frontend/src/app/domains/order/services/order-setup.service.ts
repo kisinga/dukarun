@@ -1,7 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { CREATE_CUSTOMER, GET_CUSTOMERS } from '@dukarun/customer';
 import { GET_COUNTRIES } from '@dukarun/company';
-import { SET_CUSTOMER_FOR_DRAFT_ORDER, SET_DRAFT_ORDER_BILLING_ADDRESS, SET_DRAFT_ORDER_SHIPPING_ADDRESS } from '../operations.graphql';
+import {
+  SET_CUSTOMER_FOR_DRAFT_ORDER,
+  SET_DRAFT_ORDER_BILLING_ADDRESS,
+  SET_DRAFT_ORDER_SHIPPING_ADDRESS,
+} from '../operations.graphql';
 import { ApolloService } from '../../../shared/services/apollo.service';
 
 export interface Customer {

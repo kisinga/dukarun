@@ -1,5 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
-import { StatBarComponent, type StatItem } from '../../../shared/components/dashboard/stat-bar.component';
+import {
+  StatBarComponent,
+  type StatItem,
+} from '../../../shared/components/dashboard/stat-bar.component';
 import { CurrencyService } from '../../../shared/services/currency.service';
 
 export interface PurchaseStats {

@@ -61,4 +61,3 @@ export const GET_STOCK_ADJUSTMENTS = graphql(`
     }
   }
 `);
-

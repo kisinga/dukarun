@@ -8,10 +8,10 @@ import { RouterLink } from '@angular/router';
  * Shows icon, title, description, and optional CTA.
  */
 @Component({
-    selector: 'app-empty-state',
-    imports: [RouterLink],
-    changeDetection: ChangeDetectionStrategy.OnPush,
-    template: `
+  selector: 'app-empty-state',
+  imports: [RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
     <div class="card bg-base-100 shadow">
       <div class="card-body">
         <div class="text-center py-12 lg:py-16 px-4">
@@ -78,12 +78,11 @@ import { RouterLink } from '@angular/router';
   `,
 })
 export class EmptyStateComponent {
-    readonly title = input.required<string>();
-    readonly description = input<string>();
-    readonly ctaLabel = input<string>();
-    readonly ctaLink = input<string | string[]>();
-    readonly showCtaIcon = input(true);
+  readonly title = input.required<string>();
+  readonly description = input<string>();
+  readonly ctaLabel = input<string>();
+  readonly ctaLink = input<string | string[]>();
+  readonly showCtaIcon = input(true);
 
-    readonly ctaClick = output<void>();
+  readonly ctaClick = output<void>();
 }
-

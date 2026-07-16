@@ -7,48 +7,48 @@
   <td class="font-mono" [style.padding-left.px]="level() * 24">
     <div class="flex items-center gap-2">
       @if (account().children.length > 0) {
-      <button
-        (click)="toggleExpanded(); $event.stopPropagation()"
-        class="btn btn-ghost btn-xs btn-square"
-      >
-        @if (isExpanded()) {
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
+        <button
+          (click)="toggleExpanded(); $event.stopPropagation()"
+          class="btn btn-ghost btn-xs btn-square"
         >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
-        } @else {
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 5l7 7-7 7"
-          />
-        </svg>
-        }
-      </button>
+          @if (isExpanded()) {
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          } @else {
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          }
+        </button>
       } @else {
-      <span class="w-6"></span>
+        <span class="w-6"></span>
       }
       <span>{{ account().code }}</span>
       @if (account().isParent) {
-      <span class="badge badge-xs badge-primary">Parent</span>
+        <span class="badge badge-xs badge-primary">Parent</span>
       }
     </div>
   </td>
@@ -63,26 +63,22 @@
     </span>
   </td>
   <td class="text-right">
-    <button
-      class="btn btn-sm btn-ghost"
-      (click)="onViewTransactions(account(), $event)"
-    >
+    <button class="btn btn-sm btn-ghost" (click)="onViewTransactions(account(), $event)">
       View Transactions
     </button>
   </td>
 </tr>
 <!-- Child Rows (when expanded) -->
 @if (isExpanded() && account().children.length > 0) {
-@for (child of account().children; track child.id) {
-<app-account-row
-  [account]="child"
-  [selectedAccount]="selectedAccount()"
-  [formatCurrency]="formatCurrency()"
-  [getDisplayBalance]="getDisplayBalance()"
-  [level]="level() + 1"
-  (accountSelect)="onAccountClick($event)"
-  (viewTransactions)="onViewTransactions($event, $any($event))"
-/>
+  @for (child of account().children; track child.id) {
+    <app-account-row
+      [account]="child"
+      [selectedAccount]="selectedAccount()"
+      [formatCurrency]="formatCurrency()"
+      [getDisplayBalance]="getDisplayBalance()"
+      [level]="level() + 1"
+      (accountSelect)="onAccountClick($event)"
+      (viewTransactions)="onViewTransactions($event, $any($event))"
+    />
+  }
 }
-}
-

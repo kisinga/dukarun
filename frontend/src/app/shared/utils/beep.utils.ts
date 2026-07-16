@@ -41,10 +41,7 @@ export async function playBeep(frequency: number = 2400, duration: number = 50):
     // Configure gain: moderate volume with smooth fade-out
     gainNode.gain.setValueAtTime(VOLUME, audioContext.currentTime);
     // Fade out slightly at the end for smoother sound
-    gainNode.gain.exponentialRampToValueAtTime(
-      0.01,
-      audioContext.currentTime + duration / 1000,
-    );
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration / 1000);
 
     // Connect nodes: oscillator -> gain -> destination (speakers)
     oscillator.connect(gainNode);

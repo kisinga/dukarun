@@ -212,4 +212,3 @@ export const DELETE_CUSTOMER_ADDRESS = graphql(`
     }
   }
 `);
-

@@ -1,5 +1,9 @@
 import { inject, Injectable } from '@angular/core';
-import { CREATE_CUSTOMER_ADDRESS, DELETE_CUSTOMER_ADDRESS, UPDATE_CUSTOMER_ADDRESS } from '../operations.graphql';
+import {
+  CREATE_CUSTOMER_ADDRESS,
+  DELETE_CUSTOMER_ADDRESS,
+  UPDATE_CUSTOMER_ADDRESS,
+} from '../operations.graphql';
 import { ApolloService } from '../../../shared/services/apollo.service';
 import { CustomerAddressInput } from './customer.service';
 

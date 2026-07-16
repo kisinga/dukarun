@@ -46,4 +46,3 @@ export class NotificationListComponent {
   /** Emitted when a notification item is clicked */
   itemClicked = output<string>();
 }
-

@@ -1,5 +1,10 @@
 import { inject, Injectable } from '@angular/core';
-import { REQUEST_LOGIN_OTP, REQUEST_REGISTRATION_OTP, VERIFY_LOGIN_OTP, VERIFY_REGISTRATION_OTP } from '../operations.graphql';
+import {
+  REQUEST_LOGIN_OTP,
+  REQUEST_REGISTRATION_OTP,
+  VERIFY_LOGIN_OTP,
+  VERIFY_REGISTRATION_OTP,
+} from '../operations.graphql';
 import { formatPhoneNumber } from '../../../shared/utils/phone.utils';
 import { ApolloService } from '../../../shared/services/apollo.service';
 

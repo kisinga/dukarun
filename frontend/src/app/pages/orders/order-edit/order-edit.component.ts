@@ -4,11 +4,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { OrderService, OrdersService } from '@dukarun/order';
 import { CurrencyService } from '../../../shared/services/currency.service';
 import { ToastService } from '../../../shared/services/toast.service';
-import {
-  ProductSearchService,
-  ProductSearchResult,
-  ProductVariant,
-} from '@dukarun/product';
+import { ProductSearchService, ProductSearchResult, ProductVariant } from '@dukarun/product';
 import { PageHeaderComponent } from '../../../shared/components/dashboard/page-header.component';
 import { ProductSearchViewComponent } from '../../../shared/components/dashboard-shared/components/product-search-view.component';
 

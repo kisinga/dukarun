@@ -11,12 +11,12 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
+import { ProductSearchService, ProductSearchResult, ProductVariant } from '@dukarun/product';
 import {
-  ProductSearchService,
-  ProductSearchResult,
-  ProductVariant,
-} from '@dukarun/product';
-import { StockAdjustmentService, StockAdjustmentLineItem, StockLocationService } from '@dukarun/stock';
+  StockAdjustmentService,
+  StockAdjustmentLineItem,
+  StockLocationService,
+} from '@dukarun/stock';
 import { StockAdjustmentFormFieldsComponent } from '../components/stock-adjustment-form-fields.component';
 import { StockAdjustmentLineItemFormComponent } from '../components/stock-adjustment-line-item-form.component';
 import {

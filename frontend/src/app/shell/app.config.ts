@@ -18,7 +18,11 @@ import { TracingService } from '../shared/services/tracing.service';
 import { AuthService } from '@dukarun/auth';
 import { CompanyService } from '@dukarun/company';
 import { AppInitService } from './services/app-init.service';
-import { APP_CACHE_RESET, COMPANY_CONTEXT, FINANCIAL_ACCESS } from '../shared/services/app-context.tokens';
+import {
+  APP_CACHE_RESET,
+  COMPANY_CONTEXT,
+  FINANCIAL_ACCESS,
+} from '../shared/services/app-context.tokens';
 import { LINK_PREVIEW_DATA_PROVIDER } from '../shared/services/link-preview/link-preview-data-provider.token';
 import { LinkPreviewDataProviderService } from './services/link-preview-data-provider.service';
 

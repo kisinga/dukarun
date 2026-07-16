@@ -8,10 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { CompanyService } from '@dukarun/company';
-import {
-  SubscriptionService,
-  type SubscriptionTier,
-} from '@dukarun/subscription';
+import { SubscriptionService, type SubscriptionTier } from '@dukarun/subscription';
 import { PaymentModalComponent } from '../payment-modal/payment-modal.component';
 import { ToastService } from '../../../../shared/services/toast.service';
 

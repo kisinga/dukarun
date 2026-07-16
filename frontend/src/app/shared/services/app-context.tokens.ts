@@ -28,7 +28,9 @@ class DefaultCompanyContext implements CompanyContext {
   readonly activeCompany = signal<Company | null>(null);
   // Test fallback only; the real app overrides this token with CompanyService.
   readonly channelCurrency = signal<string>(FALLBACK_CURRENCY);
-  readonly companyLogoAsset = signal<{ preview?: string | null; source?: string | null } | null>(null);
+  readonly companyLogoAsset = signal<{ preview?: string | null; source?: string | null } | null>(
+    null,
+  );
 
   getChannelToken(): string | null {
     return null;

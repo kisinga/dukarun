@@ -186,4 +186,3 @@ export const GET_ACTIVE_CHANNEL = graphql(`
     }
   }
 `) as any;
-

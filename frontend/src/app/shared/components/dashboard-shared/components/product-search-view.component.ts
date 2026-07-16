@@ -11,10 +11,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import type {
-  ProductSearchResult,
-  ProductVariant,
-} from '@dukarun/product';
+import type { ProductSearchResult, ProductVariant } from '@dukarun/product';
 import { CurrencyService } from '../../../services/currency.service';
 import { ProductLabelComponent } from './product-label.component';
 import type { VariantListItem } from './variant-list.component';

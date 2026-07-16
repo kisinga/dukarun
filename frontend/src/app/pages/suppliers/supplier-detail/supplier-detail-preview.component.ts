@@ -75,10 +75,7 @@ export class SupplierDetailPreviewComponent implements OnInit {
       this.supplierSearchService.hydrateSupplier(supplier);
 
       const purchasePreview = await this.supplierSearchService.getSupplierPurchasePreview(id);
-      const data = this.payloadService.buildSupplierPayload(
-        supplier,
-        purchasePreview ?? undefined,
-      );
+      const data = this.payloadService.buildSupplierPayload(supplier, purchasePreview ?? undefined);
       this.name.set(data.line1);
       this.line2.set(data.line2 ?? null);
       this.line3.set(data.line3 ?? '—');

@@ -25,11 +25,7 @@ import { CustomerService } from '@dukarun/customer';
 import { OrderService, OrdersService } from '@dukarun/order';
 import { PrintPreferencesService } from '../../shared/services/print-preferences.service';
 import { PrintService } from '../../shared/services/print.service';
-import {
-  ProductSearchResult,
-  ProductSearchService,
-  ProductVariant,
-} from '@dukarun/product';
+import { ProductSearchResult, ProductSearchService, ProductVariant } from '@dukarun/product';
 import { SalesSyncGuardService } from '../../shared/services/sales-sync-guard.service';
 import { StockLocationService } from '@dukarun/stock';
 import { SettleOrderModalComponent } from '@dukarun/cashier-session/components';

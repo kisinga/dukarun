@@ -9,7 +9,10 @@ import {
   signal,
 } from '@angular/core';
 import { CashierSessionService } from '../../services/cashier-session.service';
-import { type Reconciliation, type ReconciliationAccountDetail } from '../../services/cashier-session.service';
+import {
+  type Reconciliation,
+  type ReconciliationAccountDetail,
+} from '../../services/cashier-session.service';
 
 /** Context for the shared reconciliation history table (list + pagination only). */
 export interface ReconciliationHistoryContext {

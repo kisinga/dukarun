@@ -1,5 +1,11 @@
 import { inject, Injectable } from '@angular/core';
-import { CREATE_CUSTOMER, DELETE_CUSTOMER, GET_CUSTOMER, UPDATE_CUSTOMER, GET_CUSTOMERS } from '../operations.graphql';
+import {
+  CREATE_CUSTOMER,
+  DELETE_CUSTOMER,
+  GET_CUSTOMER,
+  UPDATE_CUSTOMER,
+  GET_CUSTOMERS,
+} from '../operations.graphql';
 import { formatPhoneNumber } from '../../../shared/utils/phone.utils';
 import { mergeCustomerFields } from '../../../shared/utils/customer-merge.utils';
 import { ApolloService } from '../../../shared/services/apollo.service';

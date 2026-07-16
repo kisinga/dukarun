@@ -17,10 +17,7 @@ import {
   calculateCustomerStats,
   isCustomerCreditFrozen,
 } from '../../shared/services/stats/customer-stats.util';
-import {
-  PayOrderModalComponent,
-  PayOrderModalData,
-} from '@dukarun/order/components';
+import { PayOrderModalComponent, PayOrderModalData } from '@dukarun/order/components';
 import { CustomerAction, CustomerCardComponent } from './components/customer-card.component';
 import type { CustomerStats } from '../../shared/services/stats/customer-stats.util';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';

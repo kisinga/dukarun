@@ -1,6 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, OnInit, signal } from '@angular/core';
-import { CustomerService, CustomerCreditService, CustomerSearchService, type CreditCustomerSummary } from '@dukarun/customer';
+import {
+  CustomerService,
+  CustomerCreditService,
+  CustomerSearchService,
+  type CreditCustomerSummary,
+} from '@dukarun/customer';
 import {
   LINK_PREVIEW_DATA_PROVIDER,
   type LinkPreviewDataProvider,

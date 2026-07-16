@@ -15,10 +15,7 @@ import { CashierSessionService } from '@dukarun/cashier-session';
 import { CompanyService } from '@dukarun/company';
 import { CurrencyService } from '../../../shared/services/currency.service';
 import { EXPENSE_CATEGORIES } from '../../../shared/constants/expense-categories';
-import {
-  ExpenseService,
-  RecordExpenseResult,
-} from '@dukarun/expense';
+import { ExpenseService, RecordExpenseResult } from '@dukarun/expense';
 import { LedgerService } from '@dukarun/ledger';
 
 /**

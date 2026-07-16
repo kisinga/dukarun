@@ -1,5 +1,13 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { GET_DASHBOARD_STATS, GET_INVENTORY_ALERTS, GET_PLATFORM_METRICS, GET_PRODUCT_STATS, GET_RECENT_ORDERS, GET_STOCK_VALUE_RANKING, GET_STOCK_VALUE_STATS } from '../operations.graphql';
+import {
+  GET_DASHBOARD_STATS,
+  GET_INVENTORY_ALERTS,
+  GET_PLATFORM_METRICS,
+  GET_PRODUCT_STATS,
+  GET_RECENT_ORDERS,
+  GET_STOCK_VALUE_RANKING,
+  GET_STOCK_VALUE_STATS,
+} from '../operations.graphql';
 import {
   StockValuationType as GqlStockValuationType,
   type GetInventoryAlertsQuery,

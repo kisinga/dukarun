@@ -11,11 +11,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { DeepLinkService } from '../../shared/services/deep-link.service';
 import { LedgerService } from '@dukarun/ledger';
-import {
-  ProductSearchResult,
-  ProductSearchService,
-  ProductVariant,
-} from '@dukarun/product';
+import { ProductSearchResult, ProductSearchService, ProductVariant } from '@dukarun/product';
 import { PurchaseService } from '@dukarun/purchases';
 import { StockLocationService } from '@dukarun/stock';
 import { SupplierService } from '@dukarun/supplier';

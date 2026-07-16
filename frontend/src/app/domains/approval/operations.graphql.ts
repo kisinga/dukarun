@@ -94,4 +94,3 @@ export const REVIEW_APPROVAL_REQUEST = graphql(`
     }
   }
 `);
-

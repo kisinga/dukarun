@@ -48,4 +48,3 @@ export const UNSUBSCRIBE_TO_PUSH = graphql(`
     unsubscribeToPush
   }
 `);
-

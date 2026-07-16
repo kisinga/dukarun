@@ -1,5 +1,11 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { GET_SUBSCRIPTION_TIERS, CHECK_SUBSCRIPTION_STATUS, INITIATE_SUBSCRIPTION_PURCHASE, VERIFY_SUBSCRIPTION_PAYMENT, CANCEL_SUBSCRIPTION } from '../operations.graphql';
+import {
+  GET_SUBSCRIPTION_TIERS,
+  CHECK_SUBSCRIPTION_STATUS,
+  INITIATE_SUBSCRIPTION_PURCHASE,
+  VERIFY_SUBSCRIPTION_PAYMENT,
+  CANCEL_SUBSCRIPTION,
+} from '../operations.graphql';
 import { GET_CHANNEL_SUBSCRIPTION } from '@dukarun/company';
 import { ApolloService } from '../../../shared/services/apollo.service';
 import { CompanyService } from '@dukarun/company';

@@ -318,4 +318,3 @@ export const UPDATE_PRODUCT_VARIANT = graphql(`
     }
   }
 `);
-

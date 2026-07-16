@@ -4,11 +4,11 @@
   @media (max-width: 639px) {
     // Break out of relative positioning context on mobile
     position: static;
-    
+
     ::ng-deep .notification-dropdown-wrapper {
       position: static;
     }
-    
+
     ::ng-deep .notification-dropdown-content {
       position: fixed !important;
       right: 0.5rem !important;
@@ -24,11 +24,11 @@
 // Ensure summary element doesn't show default marker
 ::ng-deep .notification-dropdown-wrapper summary {
   list-style: none;
-  
+
   &::-webkit-details-marker {
     display: none;
   }
-  
+
   &::marker {
     display: none;
   }
@@ -38,5 +38,3 @@
 ::ng-deep .notification-dropdown-content {
   z-index: 50; // Above navbar (z-40), same level as modals but modals have backdrop
 }
-
-

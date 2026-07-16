@@ -15,7 +15,9 @@ import { ItemType } from '../types/product-creation.types';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <fieldset class="fieldset">
-      <legend class="fieldset-legend text-sm font-medium text-base-content/70">{{ label() }}</legend>
+      <legend class="fieldset-legend text-sm font-medium text-base-content/70">
+        {{ label() }}
+      </legend>
       <input
         type="text"
         [formControl]="nameControl()"
@@ -40,18 +42,16 @@ export class ProductNameInputComponent {
 
   // Computed values based on item type
   readonly label = computed(() =>
-    this.itemType() === 'service' ? 'Service name' : 'Product name'
+    this.itemType() === 'service' ? 'Service name' : 'Product name',
   );
 
   readonly placeholder = computed(() =>
-    this.itemType() === 'service'
-      ? 'e.g. Haircut, Car Wash'
-      : 'e.g. Coca-Cola, Tomatoes'
+    this.itemType() === 'service' ? 'e.g. Haircut, Car Wash' : 'e.g. Coca-Cola, Tomatoes',
   );
 
   readonly hint = computed(() =>
     this.itemType() === 'service'
       ? 'Enter a clear name for your service'
-      : 'Enter the product name as it appears on the label'
+      : 'Enter the product name as it appears on the label',
   );
 }

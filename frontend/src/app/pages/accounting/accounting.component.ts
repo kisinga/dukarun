@@ -11,12 +11,9 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { forkJoin, startWith } from 'rxjs';
-import {
-  CashierSessionService,
-  type Reconciliation,
-} from '@dukarun/cashier-session';
+import { CashierSessionService, type Reconciliation } from '@dukarun/cashier-session';
 import { CompanyService } from '@dukarun/company';
-import { JournalEntry, LedgerAccount, LedgerService,  } from '@dukarun/ledger';
+import { JournalEntry, LedgerAccount, LedgerService } from '@dukarun/ledger';
 import type {
   AccountingContext,
   ReconciliationTabContext,
@@ -38,7 +35,10 @@ import {
   AccountingFilters,
   AccountingFiltersComponent,
 } from './components/accounting-filters.component';
-import { StatBarComponent, type StatItem } from '../../shared/components/dashboard/stat-bar.component';
+import {
+  StatBarComponent,
+  type StatItem,
+} from '../../shared/components/dashboard/stat-bar.component';
 import type { TabType } from './components/accounting-tabs.component';
 import { AccountsTabComponent } from './components/accounts-tab.component';
 import { OverviewTabComponent } from './components/overview-tab.component';

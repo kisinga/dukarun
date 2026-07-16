@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { JournalEntry, LedgerAccount, LedgerService,  } from '@dukarun/ledger';
+import { JournalEntry, LedgerAccount, LedgerService } from '@dukarun/ledger';
 import type { AccountingStats } from '../accounting-context';
 import { formatDate as formatDateUtil } from '../utils/accounting-formatting';
 

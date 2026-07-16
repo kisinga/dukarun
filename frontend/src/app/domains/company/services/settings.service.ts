@@ -9,7 +9,16 @@ import type {
   UpdatePrinterSettingsMutation,
 } from '../../../shared/graphql/generated/graphql';
 import { LanguageCode } from '../../../shared/graphql/generated/graphql';
-import { CREATE_CHANNEL_PAYMENT_METHOD, GET_AUDIT_LOGS, INVITE_CHANNEL_ADMINISTRATOR, UPDATE_BATCH_EXPIRY_SETTINGS, UPDATE_CHANNEL_LOGO, UPDATE_CASHIER_SETTINGS, UPDATE_PRINTER_SETTINGS, UPDATE_CHANNEL_PAYMENT_METHOD } from '../operations.graphql';
+import {
+  CREATE_CHANNEL_PAYMENT_METHOD,
+  GET_AUDIT_LOGS,
+  INVITE_CHANNEL_ADMINISTRATOR,
+  UPDATE_BATCH_EXPIRY_SETTINGS,
+  UPDATE_CHANNEL_LOGO,
+  UPDATE_CASHIER_SETTINGS,
+  UPDATE_PRINTER_SETTINGS,
+  UPDATE_CHANNEL_PAYMENT_METHOD,
+} from '../operations.graphql';
 import { ApolloService } from '../../../shared/services/apollo.service';
 import { AssetUploadService } from './asset-upload.service';
 import { CompanyService } from './company.service';
@@ -252,7 +261,9 @@ export class SettingsService {
   /**
    * Invite a new administrator
    */
-  async inviteAdministrator(input: InviteAdministratorInput): Promise<SettingsAdministrator | null> {
+  async inviteAdministrator(
+    input: InviteAdministratorInput,
+  ): Promise<SettingsAdministrator | null> {
     this.loading.set(true);
     this.error.set(null);
 

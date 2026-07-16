@@ -10,11 +10,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import {
-  TeamService,
-  type Administrator,
-  type RoleTemplate,
-} from '@dukarun/company';
+import { TeamService, type Administrator, type RoleTemplate } from '@dukarun/company';
 import {
   filterSuperAdminPermissions,
   formatPermissionName,

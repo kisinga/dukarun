@@ -73,4 +73,3 @@ export const CANCEL_SUBSCRIPTION = graphql(`
     cancelSubscription(channelId: $channelId)
   }
 `);
-

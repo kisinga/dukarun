@@ -1,8 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
-import {
-  DashboardService,
-  type StockValuationType,
-} from '@dukarun/analytics';
+import { DashboardService, type StockValuationType } from '@dukarun/analytics';
 import { CurrencyService } from '../../../../shared/services/currency.service';
 
 const VALUATION_LABELS: Record<StockValuationType, string> = {

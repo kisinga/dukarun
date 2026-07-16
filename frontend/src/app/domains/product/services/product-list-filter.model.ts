@@ -1,6 +1,9 @@
 import type { FacetCode } from './facet.types';
 import { SortOrder } from '../../../shared/graphql/generated/graphql';
-import type { ProductListOptions, ProductFilterParameter } from '../../../shared/graphql/generated/graphql';
+import type {
+  ProductListOptions,
+  ProductFilterParameter,
+} from '../../../shared/graphql/generated/graphql';
 
 /**
  * UI filter state for product list. Used by products table (and optionally sell browse).

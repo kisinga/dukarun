@@ -7,10 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {
-  NotificationCategory,
-  NotificationService,
-} from '@dukarun/notification';
+import { NotificationCategory, NotificationService } from '@dukarun/notification';
 import { ToastService } from '../../../../shared/services/toast.service';
 
 @Component({

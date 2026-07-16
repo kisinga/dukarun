@@ -146,4 +146,3 @@ export const DELETE_SUPPLIER = graphql(`
     }
   }
 `);
-

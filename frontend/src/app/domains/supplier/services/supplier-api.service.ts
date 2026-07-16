@@ -1,5 +1,10 @@
 import { inject, Injectable } from '@angular/core';
-import { CREATE_SUPPLIER, DELETE_SUPPLIER, GET_SUPPLIER, UPDATE_SUPPLIER } from '../operations.graphql';
+import {
+  CREATE_SUPPLIER,
+  DELETE_SUPPLIER,
+  GET_SUPPLIER,
+  UPDATE_SUPPLIER,
+} from '../operations.graphql';
 import { GET_CUSTOMERS, UPDATE_CUSTOMER, GET_CUSTOMER } from '@dukarun/customer';
 import { formatPhoneNumber } from '../../../shared/utils/phone.utils';
 import { mergeSupplierCapability } from '../../../shared/utils/customer-merge.utils';

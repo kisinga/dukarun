@@ -17,10 +17,7 @@ import { CompanyService } from '@dukarun/company';
 import { CustomerPaymentService, CustomerStateService } from '@dukarun/customer';
 import { CurrencyService } from '../../../shared/services/currency.service';
 import { OrdersService } from '../services/orders.service';
-import {
-  PaymentMethod,
-  PaymentMethodService,
-} from '@dukarun/payments';
+import { PaymentMethod, PaymentMethodService } from '@dukarun/payments';
 
 /**
  * Data for the unified Record Payment modal. When orderId is set, pays that order; when omitted, allocates across customer's unpaid orders (bulk).

@@ -10,7 +10,11 @@ import {
 import { PrintService } from '../../../../shared/services/print.service';
 import { PrintPreferencesService } from '../../../../shared/services/print-preferences.service';
 import { PaymentMethodService } from '@dukarun/payments';
-import type { OrderData, PrintMeta, DocumentType } from '../../../../shared/services/print-templates';
+import type {
+  OrderData,
+  PrintMeta,
+  DocumentType,
+} from '../../../../shared/services/print-templates';
 
 @Component({
   selector: 'app-print-controls',

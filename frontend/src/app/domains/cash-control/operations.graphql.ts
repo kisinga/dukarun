@@ -110,4 +110,3 @@ export const VERIFY_MPESA_TRANSACTIONS = graphql(`
     }
   }
 `);
-

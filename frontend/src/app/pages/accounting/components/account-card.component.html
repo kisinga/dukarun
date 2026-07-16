@@ -12,7 +12,7 @@
         <div class="flex items-center gap-2 mb-1">
           <span class="font-mono text-sm text-base-content/70">{{ account().code }}</span>
           @if (account().isParent) {
-          <span class="badge badge-sm badge-primary">Parent</span>
+            <span class="badge badge-sm badge-primary">Parent</span>
           }
         </div>
         <h4 class="font-semibold text-base leading-tight">{{ account().name }}</h4>
@@ -30,35 +30,28 @@
   </summary>
   <div class="collapse-content px-4 pb-4 pt-0">
     @if (account().children.length > 0) {
-    <div class="divider my-2"></div>
-    <div class="space-y-2">
-      @for (child of account().children; track child.id) {
-      <app-account-card
-        [account]="child"
-        [selectedAccount]="selectedAccount()"
-        [formatCurrency]="formatCurrency()"
-        [getDisplayBalance]="getDisplayBalance()"
-        [level]="level() + 1"
-        (accountSelect)="onAccountClick($event)"
-        (viewTransactions)="onViewTransactions($event, $any($event))"
-      />
-      }
-    </div>
+      <div class="divider my-2"></div>
+      <div class="space-y-2">
+        @for (child of account().children; track child.id) {
+          <app-account-card
+            [account]="child"
+            [selectedAccount]="selectedAccount()"
+            [formatCurrency]="formatCurrency()"
+            [getDisplayBalance]="getDisplayBalance()"
+            [level]="level() + 1"
+            (accountSelect)="onAccountClick($event)"
+            (viewTransactions)="onViewTransactions($event, $any($event))"
+          />
+        }
+      </div>
     }
     <div class="flex gap-2 mt-4">
-      <button
-        (click)="onAccountClick(account())"
-        class="btn btn-primary btn-sm flex-1"
-      >
+      <button (click)="onAccountClick(account())" class="btn btn-primary btn-sm flex-1">
         Select Account
       </button>
-      <button
-        (click)="onViewTransactions(account(), $event)"
-        class="btn btn-ghost btn-sm"
-      >
+      <button (click)="onViewTransactions(account(), $event)" class="btn btn-ghost btn-sm">
         View Transactions
       </button>
     </div>
   </div>
 </details>
-

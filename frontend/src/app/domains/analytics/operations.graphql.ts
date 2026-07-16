@@ -249,4 +249,3 @@ export const REFRESH_ANALYTICS = graphql(`
     refreshAnalytics
   }
 `);
-

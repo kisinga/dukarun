@@ -262,4 +262,3 @@ export const UPDATE_SUPPLIER_CREDIT_DURATION = graphql(`
     }
   }
 `);
-

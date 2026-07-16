@@ -16,10 +16,7 @@ import { CashierSessionService } from '@dukarun/cashier-session';
 import { CompanyService } from '@dukarun/company';
 import { CurrencyService } from '../../../shared/services/currency.service';
 import { LedgerService } from '@dukarun/ledger';
-import {
-  PurchasePaymentService,
-  PaySinglePurchaseResult,
-} from '@dukarun/purchases';
+import { PurchasePaymentService, PaySinglePurchaseResult } from '@dukarun/purchases';
 
 export interface PayPurchaseModalData {
   purchaseId: string;

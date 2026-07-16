@@ -169,4 +169,3 @@ export const PREFETCH_PRODUCTS = graphql(`
     }
   }
 `);
-

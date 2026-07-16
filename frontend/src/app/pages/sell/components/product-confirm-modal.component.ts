@@ -10,10 +10,7 @@ import {
 } from '@angular/core';
 import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../shared/services/currency.service';
-import {
-  ProductSearchResult,
-  ProductVariant,
-} from '@dukarun/product';
+import { ProductSearchResult, ProductVariant } from '@dukarun/product';
 import { ProductLabelComponent } from '../../../shared/components/dashboard-shared/components/product-label.component';
 
 /**

@@ -701,4 +701,3 @@ export const GET_ORDER_FULL = graphql(`
     }
   }
 `);
-

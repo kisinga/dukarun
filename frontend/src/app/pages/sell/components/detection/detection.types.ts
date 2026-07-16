@@ -67,4 +67,3 @@ export interface DetectionCoordinatorOptions {
   /** Minimum interval between frame processing (ms) - throttle */
   minFrameIntervalMs?: number;
 }
-

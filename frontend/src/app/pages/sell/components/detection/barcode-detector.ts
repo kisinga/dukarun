@@ -13,7 +13,7 @@ export class BarcodeDetector implements Detector {
 
   private ready = false;
   private processing = false;
-  
+
   // Debouncing: Track recently detected barcodes to prevent duplicate processing
   private readonly recentBarcodes = new Map<string, number>(); // barcode -> timestamp
   private readonly debounceMs = 2000; // Ignore same barcode for 2 seconds
@@ -40,7 +40,9 @@ export class BarcodeDetector implements Detector {
       if (initialized) {
         console.log('[BarcodeDetector] Initialized successfully');
       } else {
-        console.warn('[BarcodeDetector] Failed to initialize - barcodeService.initialize() returned false');
+        console.warn(
+          '[BarcodeDetector] Failed to initialize - barcodeService.initialize() returned false',
+        );
       }
 
       return initialized;
@@ -68,7 +70,12 @@ export class BarcodeDetector implements Detector {
     }
 
     // Check if video has valid dimensions
-    if (!video.videoWidth || !video.videoHeight || video.videoWidth < 64 || video.videoHeight < 64) {
+    if (
+      !video.videoWidth ||
+      !video.videoHeight ||
+      video.videoWidth < 64 ||
+      video.videoHeight < 64
+    ) {
       return null;
     }
 
@@ -89,17 +96,17 @@ export class BarcodeDetector implements Detector {
 
       const barcodeValue = barcodeResult.rawValue;
       const now = Date.now();
-      
+
       // Debounce: Check if this barcode was recently detected
       const lastDetected = this.recentBarcodes.get(barcodeValue);
       if (lastDetected && now - lastDetected < this.debounceMs) {
         // Same barcode detected within debounce window - ignore
         return null;
       }
-      
+
       // Record this detection timestamp
       this.recentBarcodes.set(barcodeValue, now);
-      
+
       // Clean up old entries (older than debounce window) to prevent memory leak
       for (const [barcode, timestamp] of this.recentBarcodes.entries()) {
         if (now - timestamp >= this.debounceMs) {
@@ -107,7 +114,12 @@ export class BarcodeDetector implements Detector {
         }
       }
 
-      console.log('[BarcodeDetector] Barcode detected:', barcodeValue, 'format:', barcodeResult.format);
+      console.log(
+        '[BarcodeDetector] Barcode detected:',
+        barcodeValue,
+        'format:',
+        barcodeResult.format,
+      );
 
       // CRITICAL: Play beep immediately when barcode is detected (before DB lookup)
       // This provides immediate feedback that a barcode was scanned
@@ -185,4 +197,3 @@ export class BarcodeNotFoundError extends Error {
     this.name = 'BarcodeNotFoundError';
   }
 }
-

@@ -390,4 +390,3 @@ export const GET_CHANNEL_SUBSCRIPTION = graphql(`
     }
   }
 `);
-

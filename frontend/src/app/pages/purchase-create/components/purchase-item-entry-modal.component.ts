@@ -11,10 +11,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import {
-  ProductSearchResult,
-  ProductVariant,
-} from '@dukarun/product';
+import { ProductSearchResult, ProductVariant } from '@dukarun/product';
 import { ProductLabelComponent } from '../../../shared/components/dashboard-shared/components/product-label.component';
 import { CurrencyService } from '../../../shared/services/currency.service';
 

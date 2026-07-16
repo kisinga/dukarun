@@ -88,7 +88,7 @@ export class SupplierPaymentModalComponent {
     this.isLoadingAccounts.set(true);
     try {
       const items = await firstValueFrom(this.ledgerService.loadEligibleDebitAccounts());
-      this.eligibleAccounts.set(items.map(a => ({ code: a.code, name: a.name })));
+      this.eligibleAccounts.set(items.map((a) => ({ code: a.code, name: a.name })));
     } catch {
       this.eligibleAccounts.set([]);
     } finally {

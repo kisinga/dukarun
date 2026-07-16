@@ -198,14 +198,11 @@ export class DeepLinkService {
     route: ActivatedRoute,
     config: DeepLinkConfig<T>,
   ) {
-    return route.queryParams.pipe(
+    return route.queryParams
+      .pipe
       // Transform raw params to typed params
       // Note: This is a simplified version - full implementation would need RxJS operators
       // For now, components can use route.queryParams.subscribe() and call readQueryParams
-    );
+      ();
   }
 }
-
-
-
-

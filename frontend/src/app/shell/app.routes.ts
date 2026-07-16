@@ -16,7 +16,8 @@ export const routes: Routes = [
   {
     path: 'login',
     canActivate: [noAuthGuard],
-    loadComponent: () => import('../pages/auth/login/login.component').then((m) => m.LoginComponent),
+    loadComponent: () =>
+      import('../pages/auth/login/login.component').then((m) => m.LoginComponent),
   },
   {
     path: 'signup',
@@ -68,9 +69,7 @@ export const routes: Routes = [
     path: 'dashboard',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./layout/dashboard-layout.component').then(
-        (m) => m.DashboardLayoutComponent,
-      ),
+      import('./layout/dashboard-layout.component').then((m) => m.DashboardLayoutComponent),
     children: [
       {
         path: '',
@@ -79,8 +78,7 @@ export const routes: Routes = [
       },
       {
         path: 'sell',
-        loadComponent: () =>
-          import('../pages/sell/sell.component').then((m) => m.SellComponent),
+        loadComponent: () => import('../pages/sell/sell.component').then((m) => m.SellComponent),
       },
       {
         path: 'cashier',
@@ -126,9 +124,7 @@ export const routes: Routes = [
       {
         path: 'customers',
         loadComponent: () =>
-          import('../pages/customers/customers.component').then(
-            (m) => m.CustomersComponent,
-          ),
+          import('../pages/customers/customers.component').then((m) => m.CustomersComponent),
       },
       {
         path: 'credit',
@@ -199,9 +195,7 @@ export const routes: Routes = [
       {
         path: 'suppliers',
         loadComponent: () =>
-          import('../pages/suppliers/suppliers.component').then(
-            (m) => m.SuppliersComponent,
-          ),
+          import('../pages/suppliers/suppliers.component').then((m) => m.SuppliersComponent),
       },
       {
         path: 'suppliers/create',
@@ -227,9 +221,7 @@ export const routes: Routes = [
       {
         path: 'purchases',
         loadComponent: () =>
-          import('../pages/purchases/purchases.component').then(
-            (m) => m.PurchasesComponent,
-          ),
+          import('../pages/purchases/purchases.component').then((m) => m.PurchasesComponent),
       },
       {
         path: 'purchases/create',
@@ -255,14 +247,11 @@ export const routes: Routes = [
       {
         path: 'approvals',
         loadComponent: () =>
-          import('../pages/approvals/approvals.component').then(
-            (m) => m.ApprovalsComponent,
-          ),
+          import('../pages/approvals/approvals.component').then((m) => m.ApprovalsComponent),
       },
       {
         path: 'profile',
-        loadChildren: () =>
-          import('../pages/profile/profile.routes').then((m) => m.PROFILE_ROUTES),
+        loadChildren: () => import('../pages/profile/profile.routes').then((m) => m.PROFILE_ROUTES),
       },
       {
         path: 'accounting',
@@ -277,25 +266,19 @@ export const routes: Routes = [
             path: 'ledger',
             canActivate: [financialsGuard],
             loadComponent: () =>
-              import('../pages/accounting/accounting.component').then(
-                (m) => m.AccountingComponent,
-              ),
+              import('../pages/accounting/accounting.component').then((m) => m.AccountingComponent),
           },
           {
             path: 'expenses',
             canActivate: [financialsGuard],
             loadComponent: () =>
-              import('../pages/expenses/expenses.component').then(
-                (m) => m.ExpensesComponent,
-              ),
+              import('../pages/expenses/expenses.component').then((m) => m.ExpensesComponent),
           },
           {
             path: 'transfers',
             canActivate: [financialsGuard],
             loadComponent: () =>
-              import('../pages/accounting/transfers.component').then(
-                (m) => m.TransfersComponent,
-              ),
+              import('../pages/accounting/transfers.component').then((m) => m.TransfersComponent),
           },
         ],
       },
@@ -346,9 +329,7 @@ export const routes: Routes = [
         path: 'admin',
         canActivate: [settingsGuard],
         loadComponent: () =>
-          import('../pages/admin/admin-layout.component').then(
-            (m) => m.AdminLayoutComponent,
-          ),
+          import('../pages/admin/admin-layout.component').then((m) => m.AdminLayoutComponent),
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'general' },
           {

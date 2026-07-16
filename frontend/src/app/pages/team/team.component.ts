@@ -9,11 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { NgIcon } from '@ng-icons/core';
-import {
-  TeamService,
-  type Administrator,
-  type RoleTemplate,
-} from '@dukarun/company';
+import { TeamService, type Administrator, type RoleTemplate } from '@dukarun/company';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 import { CreateAdminModalComponent } from './components/create-admin-modal.component';
 import { PermissionEditorComponent } from './components/permission-editor.component';

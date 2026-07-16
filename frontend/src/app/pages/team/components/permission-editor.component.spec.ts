@@ -7,11 +7,7 @@
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PermissionEditorComponent } from './permission-editor.component';
-import {
-  TeamService,
-  type Administrator,
-  type RoleTemplate,
-} from '@dukarun/company';
+import { TeamService, type Administrator, type RoleTemplate } from '@dukarun/company';
 
 describe('PermissionEditorComponent', () => {
   let component: PermissionEditorComponent;
