@@ -3,11 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import stripJsonComments from 'strip-json-comments';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const defaultRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const tsconfigPath = process.argv[2] ? path.resolve(process.argv[2]) : path.join(defaultRoot, 'tsconfig.json');
+const ROOT = path.dirname(tsconfigPath);
 const SRC = path.join(ROOT, 'src');
-const APP = path.join(SRC, 'app');
+const APP = process.argv[3] ? path.resolve(process.argv[3]) : path.join(SRC, 'app');
 
-const tsconfigRaw = fs.readFileSync(path.join(ROOT, 'tsconfig.json'), 'utf8');
+const tsconfigRaw = fs.readFileSync(tsconfigPath, 'utf8');
 const tsconfig = JSON.parse(stripJsonComments(tsconfigRaw));
 const paths = tsconfig.compilerOptions.paths || {};
 const aliasMap = {};
@@ -88,6 +90,15 @@ function* imports(srcText) {
   }
 }
 
+function* dynamicImports(srcText) {
+  // Match dynamic import() with a string literal specifier.
+  const re = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
+  let m;
+  while ((m = re.exec(srcText)) !== null) {
+    yield { spec: m[2], isType: false };
+  }
+}
+
 const violations = [];
 
 for (const file of walk(APP)) {
@@ -107,7 +118,7 @@ for (const file of walk(APP)) {
   const lines = srcText.split('\n');
   const lineOf = (pos) => srcText.substring(0, pos).split('\n').length;
 
-  for (const { spec, isType } of imports(srcText)) {
+  for (const { spec, isType } of [...imports(srcText), ...dynamicImports(srcText)]) {
     if (isType) continue; // erased at runtime, no bundle/layer edge
 
     const idx = lineOf(srcText.indexOf(spec));

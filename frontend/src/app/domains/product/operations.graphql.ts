@@ -318,3 +318,65 @@ export const UPDATE_PRODUCT_VARIANT = graphql(`
     }
   }
 `);
+
+export const UPDATE_PRODUCT_BASIC = graphql(`
+  mutation UpdateProductBasic($id: ID!, $name: String!, $slug: String!, $barcode: String) {
+    updateProduct(
+      input: {
+        id: $id
+        translations: [{ languageCode: en, name: $name, slug: $slug }]
+        customFields: { barcode: $barcode }
+      }
+    ) {
+      id
+      name
+      slug
+      customFields {
+        barcode
+      }
+    }
+  }
+`);
+
+export const UPDATE_PRODUCT_WITH_FACETS = graphql(`
+  mutation UpdateProductWithFacets(
+    $id: ID!
+    $name: String!
+    $slug: String!
+    $barcode: String
+    $facetValueIds: [ID!]!
+  ) {
+    updateProduct(
+      input: {
+        id: $id
+        translations: [{ languageCode: en, name: $name, slug: $slug }]
+        customFields: { barcode: $barcode }
+        facetValueIds: $facetValueIds
+      }
+    ) {
+      id
+      name
+      slug
+      customFields {
+        barcode
+      }
+    }
+  }
+`);
+
+export const UPDATE_PRODUCT_EMBEDDING = graphql(`
+  mutation UpdateProductEmbedding($id: ID!, $mlEmbedding: String, $mlEmbeddingVersion: String) {
+    updateProduct(
+      input: {
+        id: $id
+        customFields: { mlEmbedding: $mlEmbedding, mlEmbeddingVersion: $mlEmbeddingVersion }
+      }
+    ) {
+      id
+      customFields {
+        mlEmbedding
+        mlEmbeddingVersion
+      }
+    }
+  }
+`);

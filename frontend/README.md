@@ -13,7 +13,7 @@ npm start  # http://localhost:4200
 
 ## Tech Stack
 
-- Angular 20.3 (Standalone + Signals)
+- Angular 21 (Standalone + Signals)
 - Apollo Client (GraphQL)
 - Tailwind CSS 4 + daisyUI 5
 - Vendure Backend
@@ -32,7 +32,7 @@ authService.isAuthenticated(); // Computed signal
 
 ## GraphQL Codegen
 
-Codegen reads the backend schema from `/admin-api` and generates types and document maps into `src/app/core/graphql/generated/`. **Start the backend first** so the schema is available, then run:
+Codegen reads the backend schema from `/admin-api` and generates types and document maps into `src/app/shared/graphql/generated/`. **Start the backend first** so the schema is available, then run:
 
 ```bash
 npm run codegen         # Generate types (backend must be running)
@@ -45,14 +45,17 @@ If the backend is not running, codegen will fail. For CI or offline generation, 
 
 ```
 src/app/
-├── core/
-│   ├── services/     # apollo, auth, cart
-│   ├── guards/       # authGuard, noAuthGuard
-│   ├── graphql/      # queries/mutations
-│   └── models/       # types
-├── pages/            # login, landing
-└── dashboard/        # admin pages
+├── shell/            # app config, root layout, app-lifecycle services
+├── shared/           # domain-agnostic utilities, models, components, infra services
+├── domains/          # domain data-access (services, operations, owned components)
+└── pages/            # routed screens (lazy-loaded)
 ```
+
+Dependency rules:
+- `shared/` may import only `shared/`.
+- `domains/` may import `shared/` and other `domains/` (via `@dukarun/<domain>` aliases).
+- `pages/` may import `shell/`, `shared/`, and `domains/`.
+- `shell/` may import `shared/` and `domains/`.
 
 ## Scripts
 

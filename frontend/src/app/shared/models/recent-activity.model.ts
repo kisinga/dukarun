@@ -1,3 +1,5 @@
+import type { GetRecentOrdersQuery } from '../graphql/generated/graphql';
+
 /**
  * Recent activity item for the dashboard feed.
  *
@@ -13,3 +15,6 @@ export interface RecentActivity {
   amount: string;
   time: string;
 }
+
+/** Projection of an order as returned by the dashboard recent-orders query. */
+export type RecentOrder = GetRecentOrdersQuery['orders']['items'][number];

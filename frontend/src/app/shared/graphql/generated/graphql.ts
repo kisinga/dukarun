@@ -12649,6 +12649,36 @@ export type UnsubscribeToPushMutationVariables = Exact<{ [key: string]: never }>
 
 export type UnsubscribeToPushMutation = { __typename?: 'Mutation'; unsubscribeToPush: boolean };
 
+export type GetChannelNotificationPreferencesQueryVariables = Exact<{ [key: string]: never }>;
+
+export type GetChannelNotificationPreferencesQuery = {
+  __typename?: 'Query';
+  channelNotificationPreferences: {
+    __typename?: 'ChannelNotificationPreferences';
+    customer: boolean;
+    orders: boolean;
+    stock: boolean;
+    finance: boolean;
+    operations: boolean;
+  };
+};
+
+export type UpdateChannelNotificationPreferencesMutationVariables = Exact<{
+  input: ChannelNotificationPreferencesInput;
+}>;
+
+export type UpdateChannelNotificationPreferencesMutation = {
+  __typename?: 'Mutation';
+  updateChannelNotificationPreferences: {
+    __typename?: 'ChannelNotificationPreferences';
+    customer: boolean;
+    orders: boolean;
+    stock: boolean;
+    finance: boolean;
+    operations: boolean;
+  };
+};
+
 export type CreateDraftOrderMutationVariables = Exact<{ [key: string]: never }>;
 
 export type CreateDraftOrderMutation = {
@@ -14011,6 +14041,62 @@ export type UpdateProductVariantMutation = {
     priceWithTax: number;
     stockOnHand: number;
     product: { __typename?: 'Product'; id: string; name: string };
+  };
+};
+
+export type UpdateProductBasicMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+  name: Scalars['String']['input'];
+  slug: Scalars['String']['input'];
+  barcode?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type UpdateProductBasicMutation = {
+  __typename?: 'Mutation';
+  updateProduct: {
+    __typename?: 'Product';
+    id: string;
+    name: string;
+    slug: string;
+    customFields?: { __typename?: 'ProductCustomFields'; barcode?: string | null } | null;
+  };
+};
+
+export type UpdateProductWithFacetsMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+  name: Scalars['String']['input'];
+  slug: Scalars['String']['input'];
+  barcode?: InputMaybe<Scalars['String']['input']>;
+  facetValueIds: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
+}>;
+
+export type UpdateProductWithFacetsMutation = {
+  __typename?: 'Mutation';
+  updateProduct: {
+    __typename?: 'Product';
+    id: string;
+    name: string;
+    slug: string;
+    customFields?: { __typename?: 'ProductCustomFields'; barcode?: string | null } | null;
+  };
+};
+
+export type UpdateProductEmbeddingMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+  mlEmbedding?: InputMaybe<Scalars['String']['input']>;
+  mlEmbeddingVersion?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type UpdateProductEmbeddingMutation = {
+  __typename?: 'Mutation';
+  updateProduct: {
+    __typename?: 'Product';
+    id: string;
+    customFields?: {
+      __typename?: 'ProductCustomFields';
+      mlEmbedding?: string | null;
+      mlEmbeddingVersion?: string | null;
+    } | null;
   };
 };
 
@@ -21442,6 +21528,90 @@ export const UnsubscribeToPushDocument = {
     },
   ],
 } as unknown as DocumentNode<UnsubscribeToPushMutation, UnsubscribeToPushMutationVariables>;
+export const GetChannelNotificationPreferencesDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetChannelNotificationPreferences' },
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'channelNotificationPreferences' },
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'customer' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'orders' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'stock' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'finance' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'operations' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  GetChannelNotificationPreferencesQuery,
+  GetChannelNotificationPreferencesQueryVariables
+>;
+export const UpdateChannelNotificationPreferencesDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateChannelNotificationPreferences' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: { kind: 'Name', value: 'ChannelNotificationPreferencesInput' },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateChannelNotificationPreferences' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'input' } },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'customer' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'orders' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'stock' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'finance' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'operations' } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  UpdateChannelNotificationPreferencesMutation,
+  UpdateChannelNotificationPreferencesMutationVariables
+>;
 export const CreateDraftOrderDocument = {
   kind: 'Document',
   definitions: [
@@ -25583,6 +25753,378 @@ export const UpdateProductVariantDocument = {
     },
   ],
 } as unknown as DocumentNode<UpdateProductVariantMutation, UpdateProductVariantMutationVariables>;
+export const UpdateProductBasicDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateProductBasic' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'name' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'slug' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'barcode' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateProduct' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: {
+                  kind: 'ObjectValue',
+                  fields: [
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'id' },
+                      value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'translations' },
+                      value: {
+                        kind: 'ListValue',
+                        values: [
+                          {
+                            kind: 'ObjectValue',
+                            fields: [
+                              {
+                                kind: 'ObjectField',
+                                name: { kind: 'Name', value: 'languageCode' },
+                                value: { kind: 'EnumValue', value: 'en' },
+                              },
+                              {
+                                kind: 'ObjectField',
+                                name: { kind: 'Name', value: 'name' },
+                                value: { kind: 'Variable', name: { kind: 'Name', value: 'name' } },
+                              },
+                              {
+                                kind: 'ObjectField',
+                                name: { kind: 'Name', value: 'slug' },
+                                value: { kind: 'Variable', name: { kind: 'Name', value: 'slug' } },
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'customFields' },
+                      value: {
+                        kind: 'ObjectValue',
+                        fields: [
+                          {
+                            kind: 'ObjectField',
+                            name: { kind: 'Name', value: 'barcode' },
+                            value: { kind: 'Variable', name: { kind: 'Name', value: 'barcode' } },
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'slug' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'customFields' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [{ kind: 'Field', name: { kind: 'Name', value: 'barcode' } }],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UpdateProductBasicMutation, UpdateProductBasicMutationVariables>;
+export const UpdateProductWithFacetsDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateProductWithFacets' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'name' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'slug' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'barcode' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'facetValueIds' } },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'ListType',
+              type: {
+                kind: 'NonNullType',
+                type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+              },
+            },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateProduct' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: {
+                  kind: 'ObjectValue',
+                  fields: [
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'id' },
+                      value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'translations' },
+                      value: {
+                        kind: 'ListValue',
+                        values: [
+                          {
+                            kind: 'ObjectValue',
+                            fields: [
+                              {
+                                kind: 'ObjectField',
+                                name: { kind: 'Name', value: 'languageCode' },
+                                value: { kind: 'EnumValue', value: 'en' },
+                              },
+                              {
+                                kind: 'ObjectField',
+                                name: { kind: 'Name', value: 'name' },
+                                value: { kind: 'Variable', name: { kind: 'Name', value: 'name' } },
+                              },
+                              {
+                                kind: 'ObjectField',
+                                name: { kind: 'Name', value: 'slug' },
+                                value: { kind: 'Variable', name: { kind: 'Name', value: 'slug' } },
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'customFields' },
+                      value: {
+                        kind: 'ObjectValue',
+                        fields: [
+                          {
+                            kind: 'ObjectField',
+                            name: { kind: 'Name', value: 'barcode' },
+                            value: { kind: 'Variable', name: { kind: 'Name', value: 'barcode' } },
+                          },
+                        ],
+                      },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'facetValueIds' },
+                      value: { kind: 'Variable', name: { kind: 'Name', value: 'facetValueIds' } },
+                    },
+                  ],
+                },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'slug' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'customFields' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [{ kind: 'Field', name: { kind: 'Name', value: 'barcode' } }],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  UpdateProductWithFacetsMutation,
+  UpdateProductWithFacetsMutationVariables
+>;
+export const UpdateProductEmbeddingDocument = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'UpdateProductEmbedding' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'mlEmbedding' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'mlEmbeddingVersion' } },
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'String' } },
+        },
+      ],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'updateProduct' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'input' },
+                value: {
+                  kind: 'ObjectValue',
+                  fields: [
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'id' },
+                      value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+                    },
+                    {
+                      kind: 'ObjectField',
+                      name: { kind: 'Name', value: 'customFields' },
+                      value: {
+                        kind: 'ObjectValue',
+                        fields: [
+                          {
+                            kind: 'ObjectField',
+                            name: { kind: 'Name', value: 'mlEmbedding' },
+                            value: {
+                              kind: 'Variable',
+                              name: { kind: 'Name', value: 'mlEmbedding' },
+                            },
+                          },
+                          {
+                            kind: 'ObjectField',
+                            name: { kind: 'Name', value: 'mlEmbeddingVersion' },
+                            value: {
+                              kind: 'Variable',
+                              name: { kind: 'Name', value: 'mlEmbeddingVersion' },
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'customFields' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'mlEmbedding' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'mlEmbeddingVersion' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<
+  UpdateProductEmbeddingMutation,
+  UpdateProductEmbeddingMutationVariables
+>;
 export const RecordPurchaseDocument = {
   kind: 'Document',
   definitions: [

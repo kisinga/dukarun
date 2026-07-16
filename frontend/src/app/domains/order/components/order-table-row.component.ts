@@ -15,7 +15,7 @@ export interface OrderTableRowData {
   total: number;
   totalWithTax: number;
   currencyCode: string;
-  amountOwing: number;
+  amountOwing?: number;
   customer?: {
     id: string;
     firstName: string;

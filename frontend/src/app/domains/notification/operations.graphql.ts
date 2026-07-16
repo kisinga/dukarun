@@ -48,3 +48,27 @@ export const UNSUBSCRIBE_TO_PUSH = graphql(`
     unsubscribeToPush
   }
 `);
+
+export const GET_CHANNEL_NOTIFICATION_PREFERENCES = graphql(`
+  query GetChannelNotificationPreferences {
+    channelNotificationPreferences {
+      customer
+      orders
+      stock
+      finance
+      operations
+    }
+  }
+`);
+
+export const UPDATE_CHANNEL_NOTIFICATION_PREFERENCES = graphql(`
+  mutation UpdateChannelNotificationPreferences($input: ChannelNotificationPreferencesInput!) {
+    updateChannelNotificationPreferences(input: $input) {
+      customer
+      orders
+      stock
+      finance
+      operations
+    }
+  }
+`);

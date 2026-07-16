@@ -127,6 +127,8 @@ type Documents = {
   '\n  mutation MarkAllAsRead {\n    markAllAsRead\n  }\n': typeof types.MarkAllAsReadDocument;
   '\n  mutation SubscribeToPush($subscription: PushSubscriptionInput!) {\n    subscribeToPush(subscription: $subscription)\n  }\n': typeof types.SubscribeToPushDocument;
   '\n  mutation UnsubscribeToPush {\n    unsubscribeToPush\n  }\n': typeof types.UnsubscribeToPushDocument;
+  '\n  query GetChannelNotificationPreferences {\n    channelNotificationPreferences {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n': typeof types.GetChannelNotificationPreferencesDocument;
+  '\n  mutation UpdateChannelNotificationPreferences($input: ChannelNotificationPreferencesInput!) {\n    updateChannelNotificationPreferences(input: $input) {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n': typeof types.UpdateChannelNotificationPreferencesDocument;
   '\n  mutation CreateDraftOrder {\n    createDraftOrder {\n      id\n      code\n      state\n      total\n      totalWithTax\n    }\n  }\n': typeof types.CreateDraftOrderDocument;
   '\n  mutation CreateOrder($input: CreateOrderInput!) {\n    createOrder(input: $input) {\n      id\n      code\n      state\n      total\n      totalWithTax\n      customer {\n        id\n        firstName\n        lastName\n        emailAddress\n      }\n      lines {\n        id\n        quantity\n        linePrice\n        linePriceWithTax\n        productVariant {\n          id\n          name\n        }\n      }\n      payments {\n        id\n        state\n        amount\n        method\n        metadata\n      }\n    }\n  }\n': typeof types.CreateOrderDocument;
   '\n  mutation AddItemToDraftOrder($orderId: ID!, $input: AddItemToDraftOrderInput!) {\n    addItemToDraftOrder(orderId: $orderId, input: $input) {\n      ... on Order {\n        id\n        code\n        state\n        lines {\n          id\n          quantity\n          linePrice\n          linePriceWithTax\n          productVariant {\n            id\n            name\n          }\n        }\n      }\n    }\n  }\n': typeof types.AddItemToDraftOrderDocument;
@@ -172,6 +174,9 @@ type Documents = {
   '\n  mutation CreateProductOption($input: CreateProductOptionInput!) {\n    createProductOption(input: $input) {\n      id\n      code\n      name\n      group {\n        id\n        name\n      }\n    }\n  }\n': typeof types.CreateProductOptionDocument;
   '\n  mutation AddOptionGroupToProduct($productId: ID!, $optionGroupId: ID!) {\n    addOptionGroupToProduct(productId: $productId, optionGroupId: $optionGroupId) {\n      id\n      name\n      optionGroups {\n        id\n        code\n        name\n        options {\n          id\n          code\n          name\n        }\n      }\n    }\n  }\n': typeof types.AddOptionGroupToProductDocument;
   '\n  mutation UpdateProductVariant($input: UpdateProductVariantInput!) {\n    updateProductVariant(input: $input) {\n      id\n      name\n      sku\n      price\n      priceWithTax\n      stockOnHand\n      product {\n        id\n        name\n      }\n    }\n  }\n': typeof types.UpdateProductVariantDocument;
+  '\n  mutation UpdateProductBasic($id: ID!, $name: String!, $slug: String!, $barcode: String) {\n    updateProduct(\n      input: {\n        id: $id\n        translations: [{ languageCode: en, name: $name, slug: $slug }]\n        customFields: { barcode: $barcode }\n      }\n    ) {\n      id\n      name\n      slug\n      customFields {\n        barcode\n      }\n    }\n  }\n': typeof types.UpdateProductBasicDocument;
+  '\n  mutation UpdateProductWithFacets(\n    $id: ID!\n    $name: String!\n    $slug: String!\n    $barcode: String\n    $facetValueIds: [ID!]!\n  ) {\n    updateProduct(\n      input: {\n        id: $id\n        translations: [{ languageCode: en, name: $name, slug: $slug }]\n        customFields: { barcode: $barcode }\n        facetValueIds: $facetValueIds\n      }\n    ) {\n      id\n      name\n      slug\n      customFields {\n        barcode\n      }\n    }\n  }\n': typeof types.UpdateProductWithFacetsDocument;
+  '\n  mutation UpdateProductEmbedding($id: ID!, $mlEmbedding: String, $mlEmbeddingVersion: String) {\n    updateProduct(\n      input: {\n        id: $id\n        customFields: { mlEmbedding: $mlEmbedding, mlEmbeddingVersion: $mlEmbeddingVersion }\n      }\n    ) {\n      id\n      customFields {\n        mlEmbedding\n        mlEmbeddingVersion\n      }\n    }\n  }\n': typeof types.UpdateProductEmbeddingDocument;
   '\n  mutation RecordPurchase($input: RecordPurchaseInput!) {\n    recordPurchase(input: $input) {\n      id\n      supplierId\n      purchaseDate\n      referenceNumber\n      totalCost\n      paymentStatus\n      notes\n      lines {\n        id\n        variantId\n        quantity\n        unitCost\n        totalCost\n        stockLocationId\n      }\n      createdAt\n      updatedAt\n    }\n  }\n': typeof types.RecordPurchaseDocument;
   '\n  query GetPurchases($options: PurchaseListOptions) {\n    purchases(options: $options) {\n      items {\n        id\n        supplierId\n        status\n        supplier {\n          id\n          firstName\n          lastName\n          emailAddress\n        }\n        purchaseDate\n        referenceNumber\n        totalCost\n        paymentStatus\n        dueDate\n        isOverdue\n        isCreditPurchase\n        notes\n        lines {\n          id\n          variantId\n          variant {\n            id\n            name\n            product {\n              id\n              name\n            }\n          }\n          quantity\n          unitCost\n          totalCost\n          stockLocationId\n          stockLocation {\n            id\n            name\n          }\n        }\n        createdAt\n        updatedAt\n      }\n      totalItems\n    }\n  }\n': typeof types.GetPurchasesDocument;
   '\n  query GetPurchase($id: ID!) {\n    purchase(id: $id) {\n      id\n      supplierId\n      status\n      supplier {\n        id\n        firstName\n        lastName\n        emailAddress\n      }\n      purchaseDate\n      referenceNumber\n      totalCost\n      paymentStatus\n      isCreditPurchase\n      notes\n      lines {\n        id\n        variantId\n        variant {\n          id\n          name\n          product {\n            id\n            name\n          }\n        }\n        quantity\n        unitCost\n        totalCost\n        stockLocationId\n        stockLocation {\n          id\n          name\n        }\n      }\n      createdAt\n      updatedAt\n    }\n  }\n': typeof types.GetPurchaseDocument;
@@ -415,6 +420,10 @@ const documents: Documents = {
   '\n  mutation SubscribeToPush($subscription: PushSubscriptionInput!) {\n    subscribeToPush(subscription: $subscription)\n  }\n':
     types.SubscribeToPushDocument,
   '\n  mutation UnsubscribeToPush {\n    unsubscribeToPush\n  }\n': types.UnsubscribeToPushDocument,
+  '\n  query GetChannelNotificationPreferences {\n    channelNotificationPreferences {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n':
+    types.GetChannelNotificationPreferencesDocument,
+  '\n  mutation UpdateChannelNotificationPreferences($input: ChannelNotificationPreferencesInput!) {\n    updateChannelNotificationPreferences(input: $input) {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n':
+    types.UpdateChannelNotificationPreferencesDocument,
   '\n  mutation CreateDraftOrder {\n    createDraftOrder {\n      id\n      code\n      state\n      total\n      totalWithTax\n    }\n  }\n':
     types.CreateDraftOrderDocument,
   '\n  mutation CreateOrder($input: CreateOrderInput!) {\n    createOrder(input: $input) {\n      id\n      code\n      state\n      total\n      totalWithTax\n      customer {\n        id\n        firstName\n        lastName\n        emailAddress\n      }\n      lines {\n        id\n        quantity\n        linePrice\n        linePriceWithTax\n        productVariant {\n          id\n          name\n        }\n      }\n      payments {\n        id\n        state\n        amount\n        method\n        metadata\n      }\n    }\n  }\n':
@@ -505,6 +514,12 @@ const documents: Documents = {
     types.AddOptionGroupToProductDocument,
   '\n  mutation UpdateProductVariant($input: UpdateProductVariantInput!) {\n    updateProductVariant(input: $input) {\n      id\n      name\n      sku\n      price\n      priceWithTax\n      stockOnHand\n      product {\n        id\n        name\n      }\n    }\n  }\n':
     types.UpdateProductVariantDocument,
+  '\n  mutation UpdateProductBasic($id: ID!, $name: String!, $slug: String!, $barcode: String) {\n    updateProduct(\n      input: {\n        id: $id\n        translations: [{ languageCode: en, name: $name, slug: $slug }]\n        customFields: { barcode: $barcode }\n      }\n    ) {\n      id\n      name\n      slug\n      customFields {\n        barcode\n      }\n    }\n  }\n':
+    types.UpdateProductBasicDocument,
+  '\n  mutation UpdateProductWithFacets(\n    $id: ID!\n    $name: String!\n    $slug: String!\n    $barcode: String\n    $facetValueIds: [ID!]!\n  ) {\n    updateProduct(\n      input: {\n        id: $id\n        translations: [{ languageCode: en, name: $name, slug: $slug }]\n        customFields: { barcode: $barcode }\n        facetValueIds: $facetValueIds\n      }\n    ) {\n      id\n      name\n      slug\n      customFields {\n        barcode\n      }\n    }\n  }\n':
+    types.UpdateProductWithFacetsDocument,
+  '\n  mutation UpdateProductEmbedding($id: ID!, $mlEmbedding: String, $mlEmbeddingVersion: String) {\n    updateProduct(\n      input: {\n        id: $id\n        customFields: { mlEmbedding: $mlEmbedding, mlEmbeddingVersion: $mlEmbeddingVersion }\n      }\n    ) {\n      id\n      customFields {\n        mlEmbedding\n        mlEmbeddingVersion\n      }\n    }\n  }\n':
+    types.UpdateProductEmbeddingDocument,
   '\n  mutation RecordPurchase($input: RecordPurchaseInput!) {\n    recordPurchase(input: $input) {\n      id\n      supplierId\n      purchaseDate\n      referenceNumber\n      totalCost\n      paymentStatus\n      notes\n      lines {\n        id\n        variantId\n        quantity\n        unitCost\n        totalCost\n        stockLocationId\n      }\n      createdAt\n      updatedAt\n    }\n  }\n':
     types.RecordPurchaseDocument,
   '\n  query GetPurchases($options: PurchaseListOptions) {\n    purchases(options: $options) {\n      items {\n        id\n        supplierId\n        status\n        supplier {\n          id\n          firstName\n          lastName\n          emailAddress\n        }\n        purchaseDate\n        referenceNumber\n        totalCost\n        paymentStatus\n        dueDate\n        isOverdue\n        isCreditPurchase\n        notes\n        lines {\n          id\n          variantId\n          variant {\n            id\n            name\n            product {\n              id\n              name\n            }\n          }\n          quantity\n          unitCost\n          totalCost\n          stockLocationId\n          stockLocation {\n            id\n            name\n          }\n        }\n        createdAt\n        updatedAt\n      }\n      totalItems\n    }\n  }\n':
@@ -1243,6 +1258,18 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
+  source: '\n  query GetChannelNotificationPreferences {\n    channelNotificationPreferences {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n',
+): (typeof documents)['\n  query GetChannelNotificationPreferences {\n    channelNotificationPreferences {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation UpdateChannelNotificationPreferences($input: ChannelNotificationPreferencesInput!) {\n    updateChannelNotificationPreferences(input: $input) {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n',
+): (typeof documents)['\n  mutation UpdateChannelNotificationPreferences($input: ChannelNotificationPreferencesInput!) {\n    updateChannelNotificationPreferences(input: $input) {\n      customer\n      orders\n      stock\n      finance\n      operations\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
   source: '\n  mutation CreateDraftOrder {\n    createDraftOrder {\n      id\n      code\n      state\n      total\n      totalWithTax\n    }\n  }\n',
 ): (typeof documents)['\n  mutation CreateDraftOrder {\n    createDraftOrder {\n      id\n      code\n      state\n      total\n      totalWithTax\n    }\n  }\n'];
 /**
@@ -1509,6 +1536,24 @@ export function graphql(
 export function graphql(
   source: '\n  mutation UpdateProductVariant($input: UpdateProductVariantInput!) {\n    updateProductVariant(input: $input) {\n      id\n      name\n      sku\n      price\n      priceWithTax\n      stockOnHand\n      product {\n        id\n        name\n      }\n    }\n  }\n',
 ): (typeof documents)['\n  mutation UpdateProductVariant($input: UpdateProductVariantInput!) {\n    updateProductVariant(input: $input) {\n      id\n      name\n      sku\n      price\n      priceWithTax\n      stockOnHand\n      product {\n        id\n        name\n      }\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation UpdateProductBasic($id: ID!, $name: String!, $slug: String!, $barcode: String) {\n    updateProduct(\n      input: {\n        id: $id\n        translations: [{ languageCode: en, name: $name, slug: $slug }]\n        customFields: { barcode: $barcode }\n      }\n    ) {\n      id\n      name\n      slug\n      customFields {\n        barcode\n      }\n    }\n  }\n',
+): (typeof documents)['\n  mutation UpdateProductBasic($id: ID!, $name: String!, $slug: String!, $barcode: String) {\n    updateProduct(\n      input: {\n        id: $id\n        translations: [{ languageCode: en, name: $name, slug: $slug }]\n        customFields: { barcode: $barcode }\n      }\n    ) {\n      id\n      name\n      slug\n      customFields {\n        barcode\n      }\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation UpdateProductWithFacets(\n    $id: ID!\n    $name: String!\n    $slug: String!\n    $barcode: String\n    $facetValueIds: [ID!]!\n  ) {\n    updateProduct(\n      input: {\n        id: $id\n        translations: [{ languageCode: en, name: $name, slug: $slug }]\n        customFields: { barcode: $barcode }\n        facetValueIds: $facetValueIds\n      }\n    ) {\n      id\n      name\n      slug\n      customFields {\n        barcode\n      }\n    }\n  }\n',
+): (typeof documents)['\n  mutation UpdateProductWithFacets(\n    $id: ID!\n    $name: String!\n    $slug: String!\n    $barcode: String\n    $facetValueIds: [ID!]!\n  ) {\n    updateProduct(\n      input: {\n        id: $id\n        translations: [{ languageCode: en, name: $name, slug: $slug }]\n        customFields: { barcode: $barcode }\n        facetValueIds: $facetValueIds\n      }\n    ) {\n      id\n      name\n      slug\n      customFields {\n        barcode\n      }\n    }\n  }\n'];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: '\n  mutation UpdateProductEmbedding($id: ID!, $mlEmbedding: String, $mlEmbeddingVersion: String) {\n    updateProduct(\n      input: {\n        id: $id\n        customFields: { mlEmbedding: $mlEmbedding, mlEmbeddingVersion: $mlEmbeddingVersion }\n      }\n    ) {\n      id\n      customFields {\n        mlEmbedding\n        mlEmbeddingVersion\n      }\n    }\n  }\n',
+): (typeof documents)['\n  mutation UpdateProductEmbedding($id: ID!, $mlEmbedding: String, $mlEmbeddingVersion: String) {\n    updateProduct(\n      input: {\n        id: $id\n        customFields: { mlEmbedding: $mlEmbedding, mlEmbeddingVersion: $mlEmbeddingVersion }\n      }\n    ) {\n      id\n      customFields {\n        mlEmbedding\n        mlEmbeddingVersion\n      }\n    }\n  }\n'];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

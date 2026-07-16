@@ -1,23 +1,20 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { gql } from '@apollo/client/core';
 import {
   MarkAllAsReadDocument,
   MarkNotificationAsReadDocument,
   NotificationType,
+  type ChannelNotificationPreferences,
+  type ChannelNotificationPreferencesInput,
 } from '../../../shared/graphql/generated/graphql';
+import {
+  GET_CHANNEL_NOTIFICATION_PREFERENCES,
+  UPDATE_CHANNEL_NOTIFICATION_PREFERENCES,
+} from '../operations.graphql';
 import { ApolloService } from '../../../shared/services/apollo.service';
 import { NotificationLoaderService } from './notification-loader.service';
 import { NotificationPushService } from './notification-push.service';
 import { NotificationStateService } from './notification-state.service';
 import { ToastService } from '../../../shared/services/toast.service';
-
-export interface ChannelNotificationPreferences {
-  customer: boolean;
-  orders: boolean;
-  stock: boolean;
-  finance: boolean;
-  operations: boolean;
-}
 
 export type NotificationCategory = keyof ChannelNotificationPreferences;
 
@@ -28,30 +25,6 @@ const DEFAULT_CATEGORY_PREFERENCES: ChannelNotificationPreferences = {
   finance: true,
   operations: true,
 };
-
-const GET_CHANNEL_NOTIFICATION_PREFERENCES = gql`
-  query ChannelNotificationPreferences {
-    channelNotificationPreferences {
-      customer
-      orders
-      stock
-      finance
-      operations
-    }
-  }
-`;
-
-const UPDATE_CHANNEL_NOTIFICATION_PREFERENCES = gql`
-  mutation UpdateChannelNotificationPreferences($input: ChannelNotificationPreferencesInput!) {
-    updateChannelNotificationPreferences(input: $input) {
-      customer
-      orders
-      stock
-      finance
-      operations
-    }
-  }
-`;
 
 /**
  * Notification Service (Facade)
@@ -114,9 +87,7 @@ export class NotificationService {
       query: GET_CHANNEL_NOTIFICATION_PREFERENCES,
       fetchPolicy: 'network-only',
     });
-    const preferences = (
-      result.data as { channelNotificationPreferences?: ChannelNotificationPreferences } | undefined
-    )?.channelNotificationPreferences;
+    const preferences = result.data?.channelNotificationPreferences;
     if (preferences) {
       this.categoryPreferencesSignal.set(preferences);
     }
@@ -127,15 +98,12 @@ export class NotificationService {
     category: NotificationCategory,
     enabled: boolean,
   ): Promise<ChannelNotificationPreferences> {
+    const input: ChannelNotificationPreferencesInput = { [category]: enabled };
     const result = await this.apolloService.getClient().mutate({
       mutation: UPDATE_CHANNEL_NOTIFICATION_PREFERENCES,
-      variables: { input: { [category]: enabled } },
+      variables: { input },
     });
-    const preferences = (
-      result.data as
-        | { updateChannelNotificationPreferences?: ChannelNotificationPreferences }
-        | undefined
-    )?.updateChannelNotificationPreferences;
+    const preferences = result.data?.updateChannelNotificationPreferences;
     if (!preferences) {
       throw new Error('Notification preferences were not returned');
     }

@@ -1,7 +1,12 @@
 import { inject, Injectable } from '@angular/core';
-import { gql } from '@apollo/client/core';
-import type { TypedDocumentNode } from '@apollo/client';
-import { CREATE_PRODUCT, DELETE_PRODUCT, GET_PRODUCT_DETAIL } from '../operations.graphql';
+import {
+  CREATE_PRODUCT,
+  DELETE_PRODUCT,
+  GET_PRODUCT_DETAIL,
+  UPDATE_PRODUCT_BASIC,
+  UPDATE_PRODUCT_EMBEDDING,
+  UPDATE_PRODUCT_WITH_FACETS,
+} from '../operations.graphql';
 import { ApolloService } from '../../../shared/services/apollo.service';
 import { ProductInput } from './product.service';
 import { normalizeBarcodeForApi } from './barcode.util';
@@ -77,59 +82,6 @@ export class ProductApiService {
     const slug = this.generateSlug(payload.name);
     const hasFacets = payload.facetValueIds !== undefined;
 
-    // TODO(apollo-migration): move these inline mutations into operations.graphql.ts + codegen
-    // once the backend schema is reachable; typed here so result access stays checked.
-    const UPDATE_PRODUCT_BASIC: TypedDocumentNode<
-      { updateProduct?: { id: string } | null },
-      Record<string, unknown>
-    > = gql`
-      mutation UpdateProductBasic($id: ID!, $name: String!, $slug: String!, $barcode: String) {
-        updateProduct(
-          input: {
-            id: $id
-            translations: [{ languageCode: en, name: $name, slug: $slug }]
-            customFields: { barcode: $barcode }
-          }
-        ) {
-          id
-          name
-          slug
-          customFields {
-            barcode
-          }
-        }
-      }
-    `;
-
-    const UPDATE_PRODUCT_WITH_FACETS: TypedDocumentNode<
-      { updateProduct?: { id: string } | null },
-      Record<string, unknown>
-    > = gql`
-      mutation UpdateProductWithFacets(
-        $id: ID!
-        $name: String!
-        $slug: String!
-        $barcode: String
-        $facetValueIds: [ID!]!
-      ) {
-        updateProduct(
-          input: {
-            id: $id
-            translations: [{ languageCode: en, name: $name, slug: $slug }]
-            customFields: { barcode: $barcode }
-            facetValueIds: $facetValueIds
-          }
-        ) {
-          id
-          name
-          slug
-          customFields {
-            barcode
-          }
-        }
-      }
-    `;
-
     try {
       const client = this.apolloService.getClient();
       const baseVariables = {
@@ -159,34 +111,13 @@ export class ProductApiService {
    * Write a product's on-device recognition fingerprint(s) + embedder version. Pass nulls to clear.
    *
    * Only the two ML custom fields are sent; Vendure does a partial custom-field update, so the
-   * product's other custom fields (e.g. barcode) are preserved. Defined inline with `gql` (like the
-   * other product update mutations here) so it doesn't depend on the codegen `graphql()` map.
+   * product's other custom fields (e.g. barcode) are preserved.
    */
   async updateProductEmbedding(
     productId: string,
     embeddingJson: string | null,
     embedderVersion: string | null,
   ): Promise<boolean> {
-    const UPDATE_PRODUCT_EMBEDDING: TypedDocumentNode<
-      { updateProduct?: { id: string } | null },
-      Record<string, unknown>
-    > = gql`
-      mutation UpdateProductEmbedding($id: ID!, $mlEmbedding: String, $mlEmbeddingVersion: String) {
-        updateProduct(
-          input: {
-            id: $id
-            customFields: { mlEmbedding: $mlEmbedding, mlEmbeddingVersion: $mlEmbeddingVersion }
-          }
-        ) {
-          id
-          customFields {
-            mlEmbedding
-            mlEmbeddingVersion
-          }
-        }
-      }
-    `;
-
     try {
       const client = this.apolloService.getClient();
       const result = await client.mutate({

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { extractCents, extractDisplayName } from '../../../shared/utils/data-extractors';
-import type { RecentActivity } from '../../../shared/models/recent-activity.model';
+import type { RecentActivity, RecentOrder } from '../../../shared/models/recent-activity.model';
 
 @Injectable({
   providedIn: 'root',
@@ -11,7 +11,7 @@ export class OrderMapperService {
    * Uses shared extractors for amount and customer name.
    */
   toRecentActivity(
-    order: any,
+    order: RecentOrder,
     formatAmount: (cents: number) => string,
     getTimeDiff: (date: Date) => string,
   ): RecentActivity {
@@ -36,7 +36,7 @@ export class OrderMapperService {
    * Transform array of orders to RecentActivity items.
    */
   toRecentActivities(
-    orders: any[],
+    orders: RecentOrder[],
     formatAmount: (cents: number) => string,
     getTimeDiff: (date: Date) => string,
   ): RecentActivity[] {

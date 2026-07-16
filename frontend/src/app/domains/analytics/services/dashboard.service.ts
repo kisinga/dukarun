@@ -19,7 +19,7 @@ import { CompanyService } from '@dukarun/company';
 import { CurrencyService } from '../../../shared/services/currency.service';
 import { OrderMapperService } from '@dukarun/order';
 import { type AccountBreakdown, type PeriodStats } from '../../../shared/models/stats.model';
-import type { RecentActivity } from '../../../shared/models/recent-activity.model';
+import type { RecentActivity, RecentOrder } from '../../../shared/models/recent-activity.model';
 
 /** COGS-derived period totals (cents; from mv_daily_sales_summary + order stats) */
 export interface SalesSummaryPeriod {
@@ -140,7 +140,7 @@ export class DashboardService {
   // State signals
   private readonly statsSignal = signal<DashboardStats | null>(null);
   private readonly recentActivitySignal = signal<RecentActivity[]>([]);
-  private readonly recentOrdersSignal = signal<any[]>([]);
+  private readonly recentOrdersSignal = signal<RecentOrder[]>([]);
   private readonly lowStockCountSignal = signal<number>(0);
   private readonly expiringSoonCountSignal = signal<number>(0);
   private readonly expiredCountSignal = signal<number>(0);
@@ -375,7 +375,7 @@ export class DashboardService {
    * @param locationId - Optional location ID for filtering (currently not supported in Vendure standard API)
    * NOTE: Location filtering requires custom order fields or custom resolver
    */
-  private async fetchRecentOrders(): Promise<any[]> {
+  private async fetchRecentOrders(): Promise<RecentOrder[]> {
     const client = this.apolloService.getClient();
 
     try {
@@ -383,8 +383,7 @@ export class DashboardService {
         query: GET_RECENT_ORDERS,
       });
 
-      const items: GetRecentOrdersQuery['orders']['items'] = result.data?.orders?.items || [];
-      return items as any[];
+      return (result.data?.orders?.items || []) as RecentOrder[];
     } catch (error) {
       console.error('Failed to fetch recent orders:', error);
       return [];
