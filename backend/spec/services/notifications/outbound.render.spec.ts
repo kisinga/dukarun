@@ -26,15 +26,29 @@ describe('Outbound renderers', () => {
       expect(rendered.whatsappBody).toContain('no further credit sales are allowed');
     });
 
-    it('renders the limit reached reminder', () => {
-      const rendered = renderOutbound('credit_limit_reached', {
+    it('renders the limit warning reminder', () => {
+      const rendered = renderOutbound('credit_limit_warning', {
+        customerName: 'Test Customer',
+        outstandingAmount: 80000,
+        creditLimit: 100000,
+        utilizationPercent: 80,
+      });
+
+      expect(rendered.whatsappBody).toContain('Credit limit warning');
+      expect(rendered.whatsappBody).toContain('80%');
+      expect(rendered.emailBody).toContain('KES 800.00');
+      expect(rendered.emailBody).toContain('KES 1,000.00');
+    });
+
+    it('renders the limit near reminder', () => {
+      const rendered = renderOutbound('credit_limit_near', {
         customerName: 'Test Customer',
         outstandingAmount: 90000,
         creditLimit: 100000,
         utilizationPercent: 90,
       });
 
-      expect(rendered.whatsappBody).toContain('Credit limit alert');
+      expect(rendered.whatsappBody).toContain('Credit limit almost reached');
       expect(rendered.whatsappBody).toContain('90%');
       expect(rendered.emailBody).toContain('KES 900.00');
       expect(rendered.emailBody).toContain('KES 1,000.00');

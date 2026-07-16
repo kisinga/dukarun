@@ -32,15 +32,30 @@ function getVarianceEmoji(varianceCents: number, thresholdCents: number): string
   return Math.abs(varianceCents) > thresholdCents ? '🔴' : '🟡';
 }
 
+const EAT_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+/**
+ * Return a new Date shifted into EAT (UTC+3) so that UTC calendar methods
+ * display the EAT wall-clock time. Used instead of Intl to keep behaviour
+ * deterministic across runtimes.
+ */
+function toEatTime(date: Date): Date {
+  return new Date(date.getTime() + EAT_OFFSET_MS);
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
 function formatShiftDate(iso: unknown): string {
   if (!iso || typeof iso !== 'string') return '';
   try {
-    return new Date(iso).toLocaleDateString('en-KE', {
+    const eat = toEatTime(new Date(iso));
+    const weekday = eat.toLocaleDateString('en-KE', {
       weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+      timeZone: 'UTC',
     });
+    return `${weekday}, ${eat.getUTCFullYear()}-${pad(eat.getUTCMonth() + 1)}-${pad(eat.getUTCDate())}`;
   } catch {
     return '';
   }
@@ -49,10 +64,8 @@ function formatShiftDate(iso: unknown): string {
 function formatShiftTime(iso: unknown): string | null {
   if (!iso || typeof iso !== 'string') return null;
   try {
-    return new Date(iso).toLocaleTimeString('en-KE', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const eat = toEatTime(new Date(iso));
+    return `${pad(eat.getUTCHours())}:${pad(eat.getUTCMinutes())}`;
   } catch {
     return null;
   }
@@ -116,13 +129,19 @@ function renderSupplierApReminder(p: Record<string, unknown>, summary: string): 
   const formatted = formatCentsKes(Number(p.outstandingAmount ?? 0));
   const reference = p.referenceNumber ? ` (ref: ${p.referenceNumber})` : '';
   const dueDate = p.dueDate ? ` due ${formatDate(p.dueDate)}` : '';
+  const body = `${supplier}: ${summary}${reference}${dueDate}. Outstanding balance ${formatted}.`;
   return {
     inAppTitle: 'Supplier AP Reminder',
-    inAppMessage: `${supplier}: ${summary}${reference}${dueDate}. Outstanding balance ${formatted}.`,
+    inAppMessage: body,
+    emailSubject: summary,
+    emailBody: `${body}\n\n— DukaRun`,
   };
 }
 
-function renderCreditLimitReached(p: Record<string, unknown>): RenderedOutbound {
+function renderCreditLimitAlert(
+  p: Record<string, unknown>,
+  tone: 'warning' | 'near'
+): RenderedOutbound {
   const customer = p.customerName ? String(p.customerName) : 'there';
   const formattedOutstanding = formatCentsKes(Number(p.outstandingAmount ?? 0));
   const formattedLimit = formatCentsKes(Number(p.creditLimit ?? 0));
@@ -130,13 +149,21 @@ function renderCreditLimitReached(p: Record<string, unknown>): RenderedOutbound 
   const limit = Number(p.creditLimit ?? 0);
   const pct = p.utilizationPercent ?? Math.round(limit > 0 ? (amount / limit) * 100 : 0);
 
-  const body = `Hi ${customer},\n\nYou have used ${pct}% of your credit limit. Outstanding: ${formattedOutstanding} / Limit: ${formattedLimit}. Further credit sales may be blocked once the limit is reached.`;
+  const headings: Record<string, string> = {
+    warning: 'Credit limit warning',
+    near: 'Credit limit almost reached',
+  };
+  const bodies: Record<string, string> = {
+    warning: `Hi ${customer},\n\nYou have used ${pct}% of your credit limit. Outstanding: ${formattedOutstanding} / Limit: ${formattedLimit}. Consider making a payment to keep your credit active.`,
+    near: `Hi ${customer},\n\nYou have used ${pct}% of your credit limit. Outstanding: ${formattedOutstanding} / Limit: ${formattedLimit}. Further credit sales may be blocked once the limit is reached.`,
+  };
+  const body = bodies[tone];
 
   return {
     inAppTitle: '',
     inAppMessage: '',
-    whatsappBody: `Credit limit alert\n\n${body}\n\n— DukaRun`,
-    emailSubject: 'Credit limit alert',
+    whatsappBody: `${headings[tone]}\n\n${body}\n\n— DukaRun`,
+    emailSubject: headings[tone],
     emailBody: `${body}\n\n— DukaRun`,
   };
 }
@@ -307,12 +334,19 @@ const RENDERERS: Record<string, RenderFn> = {
   credit_period_10_days_frozen: p => renderCreditReminder(p, 'final'),
   credit_period_10_days_frozen_admin: p =>
     renderCreditAdminReminder(p, '10 days overdue — credit frozen'),
-  credit_limit_reached: p => renderCreditLimitReached(p),
-  credit_limit_reached_admin: p => ({
-    inAppTitle: 'Credit Limit Reached',
+  credit_limit_warning: p => renderCreditLimitAlert(p, 'warning'),
+  credit_limit_warning_admin: p => ({
+    inAppTitle: 'Credit Limit Warning',
     inAppMessage: p.customerName
-      ? `${p.customerName} has reached ${p.utilizationPercent ?? 90}% of their credit limit.`
-      : 'A customer has reached their credit limit.',
+      ? `${p.customerName} has used ${p.utilizationPercent ?? 80}% of their credit limit.`
+      : 'A customer has passed 80% of their credit limit.',
+  }),
+  credit_limit_near: p => renderCreditLimitAlert(p, 'near'),
+  credit_limit_near_admin: p => ({
+    inAppTitle: 'Credit Limit Almost Reached',
+    inAppMessage: p.customerName
+      ? `${p.customerName} has used ${p.utilizationPercent ?? 90}% of their credit limit.`
+      : 'A customer is near their credit limit.',
   }),
   credit_sale_blocked: p => {
     const reasonLabels: Record<string, string> = {
@@ -331,11 +365,17 @@ const RENDERERS: Record<string, RenderFn> = {
   supplier_ap_3_days: p => renderSupplierApReminder(p, 'AP payment due: 3 days overdue'),
   supplier_ap_7_days: p => renderSupplierApReminder(p, 'AP payment due: 7 days overdue'),
   supplier_ap_10_days: p => renderSupplierApReminder(p, 'AP payment urgent: 10 days overdue'),
-  supplier_limit_reached: p => ({
-    inAppTitle: 'Supplier Credit Limit Reached',
+  supplier_limit_warning: p => ({
+    inAppTitle: 'Supplier Credit Limit Warning',
     inAppMessage: p.supplierName
-      ? `${p.supplierName} has reached ${p.utilizationPercent ?? 90}% of their credit limit.`
-      : 'A supplier has reached their credit limit.',
+      ? `${p.supplierName} has used ${p.utilizationPercent ?? 80}% of their credit limit.`
+      : 'A supplier has passed 80% of their credit limit.',
+  }),
+  supplier_limit_near: p => ({
+    inAppTitle: 'Supplier Credit Limit Almost Reached',
+    inAppMessage: p.supplierName
+      ? `${p.supplierName} has used ${p.utilizationPercent ?? 90}% of their credit limit.`
+      : 'A supplier is near their credit limit.',
   }),
   supplier_credit_purchase_blocked: p => {
     const reasonLabels: Record<string, string> = {

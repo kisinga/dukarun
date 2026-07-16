@@ -13,6 +13,7 @@ export interface PurchaseStats {
   totalValue: number; // In cents
   thisMonth: number;
   pendingPayments: number;
+  overdue: number;
 }
 
 export interface Purchase {
@@ -20,6 +21,7 @@ export interface Purchase {
   totalCost: number; // In cents
   purchaseDate: string;
   paymentStatus?: string;
+  isOverdue?: boolean;
 }
 
 /**
@@ -47,7 +49,9 @@ export function calculatePurchaseStats(purchases: Purchase[]): PurchaseStats {
     return status === 'pending' || status === 'partial';
   }).length;
 
-  return { totalPurchases, totalValue, thisMonth, pendingPayments };
+  const overdue = purchases.filter((p) => p.isOverdue).length;
+
+  return { totalPurchases, totalValue, thisMonth, pendingPayments, overdue };
 }
 
 /**

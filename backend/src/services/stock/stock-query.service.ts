@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ID, RequestContext, TransactionalConnection } from '@vendure/core';
+import { In } from 'typeorm';
+import { startOfDay } from '../../utils/date.utils';
+import { FinancialService } from '../financial/financial.service';
 import { StockPurchase } from './entities/purchase.entity';
 import { InventoryStockAdjustment } from './entities/stock-adjustment.entity';
 
@@ -11,6 +14,7 @@ export interface PurchaseListOptions {
     status?: string;
     startDate?: Date;
     endDate?: Date;
+    overdueOnly?: boolean;
   };
 }
 
@@ -33,7 +37,10 @@ export interface StockAdjustmentListOptions {
 export class StockQueryService {
   private readonly logger = new Logger('StockQueryService');
 
-  constructor(private readonly connection: TransactionalConnection) {}
+  constructor(
+    private readonly connection: TransactionalConnection,
+    private readonly financialService: FinancialService
+  ) {}
 
   /**
    * Apply purchase filters to a query builder
@@ -67,6 +74,14 @@ export class StockQueryService {
         endDate: filter.endDate,
       });
     }
+
+    if (filter?.overdueOnly) {
+      qb.andWhere(`${alias}.isCreditPurchase = :isCreditPurchase`, {
+        isCreditPurchase: true,
+      }).andWhere(`${alias}.dueDate < :startOfToday`, {
+        startOfToday: startOfDay(new Date()),
+      });
+    }
   }
 
   /**
@@ -78,6 +93,11 @@ export class StockQueryService {
   ): Promise<{ items: StockPurchase[]; totalItems: number }> {
     const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
     const channelId = ctx.channelId as number;
+
+    // Overdue list must be filtered by the ledger AP balance, not paymentStatus.
+    if (options.filter?.overdueOnly) {
+      return this.getOverduePurchases(ctx, options);
+    }
 
     // Build base filter query for count
     const baseFilterQb = purchaseRepo.createQueryBuilder('purchase');
@@ -110,6 +130,53 @@ export class StockQueryService {
     itemsQb.orderBy('purchase.purchaseDate', 'DESC');
 
     const items = await itemsQb.getMany();
+
+    return { items, totalItems };
+  }
+
+  private async getOverduePurchases(
+    ctx: RequestContext,
+    options: PurchaseListOptions
+  ): Promise<{ items: StockPurchase[]; totalItems: number }> {
+    const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
+    const channelId = ctx.channelId as number;
+
+    // Candidate purchases: credit, past due date, other filters applied.
+    const candidateQb = purchaseRepo
+      .createQueryBuilder('purchase')
+      .select('purchase.id', 'id')
+      .addSelect('purchase.purchaseDate', 'purchaseDate');
+    this.applyPurchaseFilters(candidateQb, 'purchase', channelId, options.filter);
+    candidateQb.orderBy('purchase.purchaseDate', 'DESC');
+
+    const candidateRows = (await candidateQb.getRawMany()) as Array<{
+      id: string;
+      purchaseDate: Date;
+    }>;
+    const candidateIds = candidateRows.map(r => r.id);
+
+    // Batch-read AP balances and keep purchases that still owe money.
+    const statuses = await this.financialService.getPurchasePaymentStatuses(ctx, candidateIds);
+    const owingIds = candidateIds.filter(id => (statuses.get(id)?.amountOwing ?? 0) > 0);
+
+    const totalItems = owingIds.length;
+    const skip = options.skip ?? 0;
+    const take = options.take ?? 50;
+    const pageIds = owingIds.slice(skip, skip + take);
+
+    if (pageIds.length === 0) {
+      return { items: [], totalItems };
+    }
+
+    const items = await purchaseRepo
+      .createQueryBuilder('purchase')
+      .leftJoinAndSelect('purchase.supplier', 'supplier')
+      .leftJoinAndSelect('purchase.lines', 'lines')
+      .leftJoinAndSelect('lines.variant', 'variant')
+      .leftJoinAndSelect('lines.stockLocation', 'stockLocation')
+      .whereInIds(pageIds)
+      .orderBy('purchase.purchaseDate', 'DESC')
+      .getMany();
 
     return { items, totalItems };
   }

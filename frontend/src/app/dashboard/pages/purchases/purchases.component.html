@@ -11,7 +11,9 @@
       header-stats
       [stats]="stats()"
       [pendingPaymentsActive]="pendingPaymentsFilter()"
+      [overdueActive]="overdueOnlyFilter()"
       (pendingPaymentsClick)="onPendingPaymentsStatsClick()"
+      (overdueClick)="onOverdueStatsClick()"
     />
   </app-page-header>
 
@@ -36,7 +38,7 @@
 
   <!-- Search & Filter Bar -->
   <app-list-search-bar [(searchQuery)]="searchQuery" placeholder="Search by supplier, reference...">
-    @if (supplierIdFilter() || pendingPaymentsFilter()) {
+    @if (supplierIdFilter() || pendingPaymentsFilter() || overdueOnlyFilter()) {
       <div badges class="flex flex-wrap gap-2">
         @if (supplierIdFilter()) {
           <span class="badge badge-primary gap-1.5">
@@ -56,6 +58,18 @@
             <button
               class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
               (click)="clearPendingPaymentsFilter()"
+              type="button"
+            >
+              &times;
+            </button>
+          </span>
+        }
+        @if (overdueOnlyFilter()) {
+          <span class="badge badge-error gap-1.5">
+            Overdue
+            <button
+              class="btn btn-ghost btn-xs btn-circle p-0 h-4 w-4 min-h-0"
+              (click)="clearOverdueFilter()"
               type="button"
             >
               &times;

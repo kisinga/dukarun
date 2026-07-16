@@ -257,45 +257,98 @@ export class LedgerQueryService {
     channelId: number,
     orderIds: string[]
   ): Promise<Map<string, { totalOwed: number; amountPaid: number; amountOwing: number }>> {
-    if (orderIds.length === 0) {
-      return new Map();
-    }
+    return this.getPaymentStatuses(
+      channelId,
+      ACCOUNT_CODES.ACCOUNTS_RECEIVABLE,
+      'orderId',
+      orderIds,
+      {
+        totalOwedFromDebit: true,
+      }
+    );
+  }
 
-    const account = await this.dataSource.getRepository(Account).findOne({
-      where: { channelId, code: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE },
-    });
+  /**
+   * Get AP payment statuses for multiple purchases in a single query.
+   * Returns a map of purchaseId -> { totalOwed, amountPaid, amountOwing }.
+   */
+  async getPurchasePaymentStatuses(
+    channelId: number,
+    purchaseIds: string[]
+  ): Promise<Map<string, { totalOwed: number; amountPaid: number; amountOwing: number }>> {
+    return this.getPaymentStatuses(
+      channelId,
+      ACCOUNT_CODES.ACCOUNTS_PAYABLE,
+      'purchaseId',
+      purchaseIds,
+      { totalOwedFromDebit: false }
+    );
+  }
 
+  /**
+   * Generic batched payment-status lookup by account and meta id key.
+   * Queries are chunked to stay below Postgres parameter limits and keep IN clauses fast.
+   */
+  private async getPaymentStatuses(
+    channelId: number,
+    accountCode: string,
+    idKey: 'orderId' | 'purchaseId',
+    ids: string[],
+    options: { totalOwedFromDebit: boolean }
+  ): Promise<Map<string, { totalOwed: number; amountPaid: number; amountOwing: number }>> {
     const result = new Map<
       string,
       { totalOwed: number; amountPaid: number; amountOwing: number }
     >();
 
+    if (ids.length === 0) {
+      return result;
+    }
+
+    const account = await this.dataSource.getRepository(Account).findOne({
+      where: { channelId, code: accountCode },
+    });
+
     if (!account) {
       return result;
     }
 
-    const rows = (await this.dataSource
-      .getRepository(JournalLine)
-      .createQueryBuilder('line')
-      .innerJoin('line.entry', 'entry')
-      .where('line.channelId = :channelId', { channelId })
-      .andWhere('line.accountId = :accountId', { accountId: account.id })
-      .andWhere("line.meta->>'orderId' IN (:...orderIds)", { orderIds })
-      .select("line.meta->>'orderId'", 'orderId')
-      .addSelect('SUM(CAST(line.debit AS BIGINT))', 'debitTotal')
-      .addSelect('SUM(CAST(line.credit AS BIGINT))', 'creditTotal')
-      .groupBy("line.meta->>'orderId'")
-      .getRawMany()) as Array<{ orderId: string; debitTotal: string; creditTotal: string }>;
+    const CHUNK_SIZE = 1000;
+    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+      const chunk = ids.slice(i, i + CHUNK_SIZE);
+      const rows = (await this.dataSource
+        .getRepository(JournalLine)
+        .createQueryBuilder('line')
+        .innerJoin('line.entry', 'entry')
+        .where('line.channelId = :channelId', { channelId })
+        .andWhere('line.accountId = :accountId', { accountId: account.id })
+        .andWhere(`line.meta->>'${idKey}' IN (:...ids)`, { ids: chunk })
+        .select(`line.meta->>'${idKey}'`, 'id')
+        .addSelect('SUM(CAST(line.debit AS BIGINT))', 'debitTotal')
+        .addSelect('SUM(CAST(line.credit AS BIGINT))', 'creditTotal')
+        .groupBy(`line.meta->>'${idKey}'`)
+        .getRawMany()) as Array<{ id: string; debitTotal: string; creditTotal: string }>;
 
-    for (const row of rows) {
-      const debitTotal = parseInt(row.debitTotal || '0', 10);
-      const creditTotal = parseInt(row.creditTotal || '0', 10);
-      const balance = debitTotal - creditTotal;
-      result.set(row.orderId, {
-        totalOwed: debitTotal,
-        amountPaid: creditTotal,
-        amountOwing: Math.max(balance, 0),
-      });
+      for (const row of rows) {
+        const debitTotal = parseInt(row.debitTotal || '0', 10);
+        const creditTotal = parseInt(row.creditTotal || '0', 10);
+        const balance = debitTotal - creditTotal;
+        if (options.totalOwedFromDebit) {
+          // AR: debit = owed, credit = paid, positive balance = owing
+          result.set(row.id, {
+            totalOwed: debitTotal,
+            amountPaid: creditTotal,
+            amountOwing: Math.max(balance, 0),
+          });
+        } else {
+          // AP: credit = owed, debit = paid, negative balance = owing
+          result.set(row.id, {
+            totalOwed: creditTotal,
+            amountPaid: debitTotal,
+            amountOwing: Math.max(-balance, 0),
+          });
+        }
+      }
     }
 
     return result;

@@ -1,5 +1,16 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { Allow, Ctx, Permission, RequestContext, Order } from '@vendure/core';
+import {
+  Allow,
+  Ctx,
+  Customer,
+  Permission,
+  RequestContext,
+  Order,
+  TransactionalConnection,
+} from '@vendure/core';
+import { In } from 'typeorm';
+import { addDays, diffCalendarDays } from '../../utils/date.utils';
+import { PAYABLE_ORDER_STATES } from '../../constants/order-states.constants';
 import { AuditLog as AuditLogDecorator } from '../../infrastructure/audit/audit-log.decorator';
 import { AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
 import { FinancialService } from '../../services/financial/financial.service';
@@ -28,7 +39,8 @@ export class PaymentAllocationResolver {
   constructor(
     private readonly paymentAllocationService: PaymentAllocationService,
     private readonly financialService: FinancialService,
-    private readonly orderReconciliationService: OrderReconciliationService
+    private readonly orderReconciliationService: OrderReconciliationService,
+    private readonly connection: TransactionalConnection
   ) {}
 
   @Query()
@@ -47,6 +59,64 @@ export class PaymentAllocationResolver {
     @Args('customerId') customerId: string
   ): Promise<Order[]> {
     return this.paymentAllocationService.getUnpaidOrdersForCustomer(ctx, customerId);
+  }
+
+  @Query()
+  @Allow(Permission.ReadOrder)
+  async overdueOrders(
+    @Ctx() ctx: RequestContext,
+    @Args('options') options?: { take?: number; skip?: number; sort?: any }
+  ): Promise<{ items: Order[]; totalItems: number }> {
+    const orderRepo = this.connection.getRepository(ctx, Order);
+
+    const orders = await orderRepo
+      .createQueryBuilder('orderEntity')
+      .leftJoinAndSelect('orderEntity.customer', 'customer')
+      .where('orderEntity.channelId = :channelId', { channelId: ctx.channelId as number })
+      .andWhere('orderEntity.state IN (:...states)', { states: PAYABLE_ORDER_STATES })
+      .getMany();
+
+    const dueCandidates = orders.filter(order => {
+      const dueDate = this.computeDueDate(order);
+      return dueDate && diffCalendarDays(new Date(), dueDate) > 0;
+    });
+
+    const statuses = await this.financialService.getOrderPaymentStatuses(
+      ctx,
+      dueCandidates.map(o => o.id.toString())
+    );
+
+    const overdue = dueCandidates.filter(
+      order => (statuses.get(order.id.toString())?.amountOwing ?? 0) > 0
+    );
+
+    // Apply caller sort, default to most recently placed first.
+    const sort = options?.sort;
+    if (sort?.orderPlacedAt) {
+      overdue.sort((a, b) =>
+        sort.orderPlacedAt === 'ASC'
+          ? (a.orderPlacedAt?.getTime() ?? 0) - (b.orderPlacedAt?.getTime() ?? 0)
+          : (b.orderPlacedAt?.getTime() ?? 0) - (a.orderPlacedAt?.getTime() ?? 0)
+      );
+    } else {
+      overdue.sort((a, b) => (b.orderPlacedAt?.getTime() ?? 0) - (a.orderPlacedAt?.getTime() ?? 0));
+    }
+
+    const skip = options?.skip ?? 0;
+    const take = options?.take ?? 100;
+    const items = overdue.slice(skip, skip + take);
+    return { items, totalItems: overdue.length };
+  }
+
+  private computeDueDate(order: Order): Date | null {
+    const customer = order.customer as Customer | undefined;
+    if (!customer) return null;
+    const anchorDate = order.orderPlacedAt || order.createdAt;
+    if (!anchorDate) return null;
+    const customFields = (customer.customFields || {}) as { creditDuration?: number };
+    const duration = Number(customFields.creditDuration ?? 30);
+    if (!Number.isFinite(duration) || duration <= 0) return null;
+    return addDays(new Date(anchorDate), duration);
   }
 
   @Query()

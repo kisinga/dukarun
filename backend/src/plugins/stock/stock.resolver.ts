@@ -1,11 +1,21 @@
 import { Args, Mutation, Query, ResolveField, Resolver, Root } from '@nestjs/graphql';
-import { Allow, Ctx, Logger, Permission, RequestContext } from '@vendure/core';
+import {
+  Allow,
+  Ctx,
+  Customer,
+  Logger,
+  Permission,
+  RequestContext,
+  TransactionalConnection,
+} from '@vendure/core';
 import { ManageStockAdjustmentsPermission } from './permissions';
 import { ManageSupplierCreditPurchasesPermission } from '../credit/supplier-credit.permissions';
 import { StockManagementService } from '../../services/stock/stock-management.service';
 import { StockQueryService } from '../../services/stock/stock-query.service';
 import { PurchaseService } from '../../services/stock/purchase.service';
 import { FinancialService } from '../../services/financial/financial.service';
+import { addDays, diffCalendarDays } from '../../utils/date.utils';
+import { PurchaseAmountOwingLoader } from './purchase-amount-owing.loader';
 import { StockPurchase } from '../../services/stock/entities/purchase.entity';
 import { InventoryStockAdjustment } from '../../services/stock/entities/stock-adjustment.entity';
 
@@ -66,7 +76,9 @@ export class StockResolver {
     private readonly stockManagementService: StockManagementService,
     private readonly stockQueryService: StockQueryService,
     private readonly purchaseService: PurchaseService,
-    private readonly financialService: FinancialService
+    private readonly financialService: FinancialService,
+    private readonly purchaseAmountOwingLoader: PurchaseAmountOwingLoader,
+    private readonly connection: TransactionalConnection
   ) {}
 
   @ResolveField()
@@ -76,8 +88,7 @@ export class StockResolver {
     @Ctx() ctx: RequestContext
   ): Promise<number | null> {
     try {
-      const status = await this.financialService.getPurchasePaymentStatus(ctx, purchase.id);
-      return status.amountOwing;
+      return await this.purchaseAmountOwingLoader.load(purchase.id);
     } catch (e) {
       Logger.error(
         `Failed to compute amountOwing for purchase ${purchase.id}: ${e instanceof Error ? e.message : String(e)}`,
@@ -86,6 +97,41 @@ export class StockResolver {
       // Return null so a ledger failure never falsely shows an unpaid purchase as paid.
       return null;
     }
+  }
+
+  @ResolveField()
+  @Allow(Permission.ReadProduct)
+  async dueDate(@Root() purchase: StockPurchase, @Ctx() ctx: RequestContext): Promise<Date | null> {
+    if (!purchase.isCreditPurchase) return null;
+    if (purchase.dueDate) return purchase.dueDate;
+    const supplier = await this.loadSupplier(ctx, purchase.supplierId);
+    const duration = Number((supplier?.customFields as any)?.supplierCreditDuration ?? 30);
+    return addDays(new Date(purchase.purchaseDate || purchase.createdAt), duration);
+  }
+
+  @ResolveField()
+  @Allow(Permission.ReadProduct)
+  async isOverdue(@Root() purchase: StockPurchase, @Ctx() ctx: RequestContext): Promise<boolean> {
+    if (!purchase.isCreditPurchase) return false;
+    const due = await this.dueDate(purchase, ctx);
+    if (!due || diffCalendarDays(new Date(), due) <= 0) return false;
+    try {
+      const amountOwing = await this.purchaseAmountOwingLoader.load(purchase.id);
+      return amountOwing > 0;
+    } catch (e) {
+      Logger.error(
+        `Failed to compute isOverdue for purchase ${purchase.id}: ${e instanceof Error ? e.message : String(e)}`,
+        StockResolver.loggerCtx
+      );
+      return false;
+    }
+  }
+
+  private async loadSupplier(ctx: RequestContext, supplierId: number): Promise<Customer | null> {
+    if (!supplierId) return null;
+    return this.connection.getRepository(ctx, Customer).findOne({
+      where: { id: supplierId },
+    });
   }
 
   @Query()

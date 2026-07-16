@@ -3,14 +3,18 @@ import { Resolver, ResolveField, Root } from '@nestjs/graphql';
 import {
   Allow,
   Ctx,
+  Customer,
   EntityHydrator,
   Logger,
   Order,
   Permission,
   RequestContext,
 } from '@vendure/core';
+import { addDays } from '../../utils/date.utils';
 import { FinancialService } from '../../services/financial/financial.service';
 import { OrderAmountOwingLoader } from './order-amount-owing.loader';
+
+const DEFAULT_CREDIT_DURATION_DAYS = 30;
 
 /**
  * Order Field Resolver
@@ -44,6 +48,44 @@ export class OrderFieldResolver {
       );
       return this.computeModelAmountOwing(ctx, order);
     }
+  }
+
+  @ResolveField()
+  @Allow(Permission.ReadOrder)
+  async dueDate(@Root() order: Order): Promise<Date | null> {
+    return this.computeDueDate(order);
+  }
+
+  @ResolveField()
+  @Allow(Permission.ReadOrder)
+  async isOverdue(@Root() order: Order, @Ctx() ctx: RequestContext): Promise<boolean> {
+    const dueDate = this.computeDueDate(order);
+    if (!dueDate) return false;
+    if (dueDate.getTime() > Date.now()) return false;
+    try {
+      const owing = await this.amountOwingLoader.load(order.id.toString());
+      return owing > 0;
+    } catch (e) {
+      Logger.error(
+        `Failed to compute isOverdue for order ${order.id}: ${e instanceof Error ? e.message : String(e)}`,
+        OrderFieldResolver.loggerCtx
+      );
+      return false;
+    }
+  }
+
+  private computeDueDate(order: Order): Date | null {
+    const customer = order.customer as Customer | undefined;
+    if (!customer) return null;
+
+    const anchorDate = order.orderPlacedAt || order.createdAt;
+    if (!anchorDate) return null;
+
+    const customFields = (customer.customFields || {}) as { creditDuration?: number };
+    const duration = Number(customFields.creditDuration ?? DEFAULT_CREDIT_DURATION_DAYS);
+    if (!Number.isFinite(duration) || duration <= 0) return null;
+
+    return addDays(new Date(anchorDate), duration);
   }
 
   private async computeModelAmountOwing(ctx: RequestContext, order: Order): Promise<number> {

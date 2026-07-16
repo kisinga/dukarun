@@ -8,8 +8,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Idempotent: each step checks existence before altering.
  */
-export class FixCreditNotificationSchema1784120299965 implements MigrationInterface {
-  name = 'FixCreditNotificationSchema1784120299965';
+export class FixCreditNotificationSchema9990000000007 implements MigrationInterface {
+  name = 'FixCreditNotificationSchema9990000000007';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Customer, Order, RequestContext, TransactionalConnection } from '@vendure/core';
-import { In, MoreThan, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { AR_OWING_ORDER_STATES } from '../../constants/order-states.constants';
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+import { addDays, diffCalendarDays } from '../../utils/date.utils';
+import { FinancialService } from '../financial/financial.service';
 
 export interface AgedOrder {
   orderId: string;
@@ -40,7 +40,10 @@ export interface CustomerCreditAging {
  */
 @Injectable()
 export class CreditAgingService {
-  constructor(private readonly connection: TransactionalConnection) {}
+  constructor(
+    private readonly connection: TransactionalConnection,
+    private readonly financialService: FinancialService
+  ) {}
 
   async getCustomerAging(
     ctx: RequestContext,
@@ -81,15 +84,25 @@ export class CreditAgingService {
    */
   async findCustomersWithOutstanding(ctx: RequestContext): Promise<string[]> {
     const rows = (await this.orderRepo(ctx)
-      .createQueryBuilder('order')
-      .select('DISTINCT order.customerId', 'customerId')
-      .where('order.channelId = :channelId', { channelId: ctx.channelId as number })
-      .andWhere('order.state IN (:...states)', { states: AR_OWING_ORDER_STATES })
-      .andWhere('order.state != :settledState', { settledState: 'PaymentSettled' })
-      .andWhere('order.totalWithTax > 0')
-      .getRawMany()) as Array<{ customerId: string | number }>;
+      .createQueryBuilder('orderEntity')
+      .select(['orderEntity.id AS id', 'orderEntity.customerId AS customerId'])
+      .where('orderEntity.channelId = :channelId', { channelId: ctx.channelId as number })
+      .andWhere('orderEntity.state IN (:...states)', { states: AR_OWING_ORDER_STATES })
+      .getRawMany()) as Array<{ id: string; customerId: string | number }>;
 
-    return rows.map(r => String(r.customerId));
+    const statuses = await this.financialService.getOrderPaymentStatuses(
+      ctx,
+      rows.map(r => r.id)
+    );
+
+    const owingCustomers = new Set<string>();
+    for (const row of rows) {
+      const amountOwing = statuses.get(row.id)?.amountOwing ?? 0;
+      if (amountOwing <= 0) continue;
+      owingCustomers.add(String(row.customerId));
+    }
+
+    return Array.from(owingCustomers);
   }
 
   private async getOldestUnpaidOrder(
@@ -103,33 +116,33 @@ export class CreditAgingService {
         customer: { id: customerId },
         channelId: ctx.channelId as number,
         state: In(AR_OWING_ORDER_STATES),
-        totalWithTax: MoreThan(0),
       } as any,
-      relations: ['payments'],
       order: { createdAt: 'ASC' },
     });
+
+    const statuses = await this.financialService.getOrderPaymentStatuses(
+      ctx,
+      orders.map(o => o.id.toString())
+    );
 
     let oldest: AgedOrder | null = null;
 
     for (const order of orders) {
-      const totalOwed = order.totalWithTax || order.total || 0;
-      const settledPayments = (order.payments || [])
-        .filter(p => p.state === 'Settled')
-        .reduce((paid, p) => paid + Number(p.amount), 0);
-      const amountOwing = Math.max(0, totalOwed - settledPayments);
+      const status = statuses.get(order.id.toString());
+      const amountOwing = status?.amountOwing ?? 0;
       if (amountOwing <= 0) continue;
 
       const orderDate = order.orderPlacedAt ?? order.createdAt;
       if (!orderDate) continue;
 
-      const dueDate = this.addDays(new Date(orderDate), creditDurationDays);
-      const daysOverdue = Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / MS_PER_DAY));
+      const dueDate = addDays(new Date(orderDate), creditDurationDays);
+      const daysOverdue = Math.max(0, diffCalendarDays(now, dueDate));
 
       if (!oldest || dueDate.getTime() < oldest.dueDate.getTime()) {
         oldest = {
           orderId: order.id.toString(),
           orderCode: order.code,
-          orderTotal: totalOwed,
+          orderTotal: status?.totalOwed ?? order.totalWithTax ?? order.total ?? 0,
           amountOwing,
           orderDate: new Date(orderDate),
           dueDate,
@@ -139,13 +152,6 @@ export class CreditAgingService {
     }
 
     return oldest;
-  }
-
-  private addDays(date: Date, days: number): Date {
-    const result = new Date(date);
-    result.setDate(result.getDate() + days);
-    result.setHours(0, 0, 0, 0);
-    return result;
   }
 
   private customerName(customer: Customer): string {

@@ -138,6 +138,17 @@ export class FinancialService {
   }
 
   /**
+   * Get purchase payment statuses for multiple purchases in a single ledger query.
+   * Returns a map of purchaseId -> { totalOwed, amountPaid, amountOwing }.
+   */
+  async getPurchasePaymentStatuses(
+    ctx: RequestContext,
+    purchaseIds: string[]
+  ): Promise<Map<string, { totalOwed: number; amountPaid: number; amountOwing: number }>> {
+    return this.queryService.getPurchasePaymentStatuses(ctx.channelId as number, purchaseIds);
+  }
+
+  /**
    * Get sales total for a period
    * Returns amount in smallest currency unit (cents)
    */

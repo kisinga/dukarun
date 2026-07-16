@@ -80,6 +80,7 @@ export class PurchasesComponent implements OnInit {
   // Local UI state
   readonly searchQuery = signal('');
   readonly pendingPaymentsFilter = signal(false);
+  readonly overdueOnlyFilter = signal(false);
   readonly supplierIdFilter = signal<string | null>(null);
   readonly currentPage = signal(1);
   readonly itemsPerPage = signal(10);
@@ -189,10 +190,14 @@ export class PurchasesComponent implements OnInit {
   }
 
   async loadPurchases(): Promise<void> {
-    await this.purchaseService.fetchPurchases({
+    const options: any = {
       take: 100,
       skip: 0,
-    });
+    };
+    if (this.overdueOnlyFilter()) {
+      options.filter = { overdueOnly: true };
+    }
+    await this.purchaseService.fetchPurchases(options);
   }
 
   async refreshPurchases(): Promise<void> {
@@ -300,6 +305,24 @@ export class PurchasesComponent implements OnInit {
   clearPendingPaymentsFilter(): void {
     this.pendingPaymentsFilter.set(false);
     this.currentPage.set(1);
+  }
+
+  /**
+   * Handle overdue filter click from stats component
+   */
+  onOverdueStatsClick(): void {
+    this.overdueOnlyFilter.set(!this.overdueOnlyFilter());
+    this.currentPage.set(1);
+    this.loadPurchases();
+  }
+
+  /**
+   * Clear overdue filter
+   */
+  clearOverdueFilter(): void {
+    this.overdueOnlyFilter.set(false);
+    this.currentPage.set(1);
+    this.loadPurchases();
   }
 
   /**

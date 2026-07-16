@@ -1490,6 +1490,57 @@ export const GET_ORDERS = graphql(`
         totalWithTax
         currencyCode
         amountOwing
+        dueDate
+        isOverdue
+        customer {
+          id
+          firstName
+          lastName
+          emailAddress
+        }
+        lines {
+          id
+          quantity
+          linePrice
+          linePriceWithTax
+          productVariant {
+            id
+            name
+            sku
+          }
+        }
+        payments {
+          id
+          state
+          amount
+          method
+          createdAt
+        }
+        customFields {
+          reversedAt
+        }
+      }
+      totalItems
+    }
+  }
+`);
+
+export const GET_OVERDUE_ORDERS = graphql(`
+  query GetOverdueOrders($options: OrderListOptions) {
+    overdueOrders(options: $options) {
+      items {
+        id
+        code
+        state
+        createdAt
+        updatedAt
+        orderPlacedAt
+        total
+        totalWithTax
+        currencyCode
+        amountOwing
+        dueDate
+        isOverdue
         customer {
           id
           firstName
@@ -1556,9 +1607,9 @@ export const GET_PAYMENTS = graphql(`
 `);
 
 // Single source for "a customer's orders + their payments", via the paginated
-// customer.orders relation. Used by the Payments page (customer context) and the
-// customer-detail page (recent orders + payments history). Complete and scoped —
-// never truncated by the global orders window.
+// customer.orders relation. Used by the Payments page (customer context), the
+// customer-detail page (recent orders + payments history), and the Orders list
+// customer filter. Complete and scoped — never truncated by the global orders window.
 export const GET_CUSTOMER_ORDERS = graphql(`
   query GetCustomerOrders($id: ID!, $options: OrderListOptions) {
     customer(id: $id) {
@@ -1572,11 +1623,31 @@ export const GET_CUSTOMER_ORDERS = graphql(`
           code
           state
           createdAt
+          updatedAt
           orderPlacedAt
           total
           totalWithTax
           currencyCode
           amountOwing
+          dueDate
+          isOverdue
+          customer {
+            id
+            firstName
+            lastName
+            emailAddress
+          }
+          lines {
+            id
+            quantity
+            linePrice
+            linePriceWithTax
+            productVariant {
+              id
+              name
+              sku
+            }
+          }
           payments {
             id
             state
@@ -1733,6 +1804,11 @@ export const GET_CUSTOMERS = graphql(`
         createdAt
         updatedAt
         outstandingAmount
+        daysOverdue
+        isOverdue
+        supplierOutstandingAmount
+        supplierDaysOverdue
+        supplierIsOverdue
         customFields {
           isSupplier
           supplierType
@@ -1795,6 +1871,11 @@ export const GET_CUSTOMER = graphql(`
       createdAt
       updatedAt
       outstandingAmount
+      daysOverdue
+      isOverdue
+      supplierOutstandingAmount
+      supplierDaysOverdue
+      supplierIsOverdue
       customFields {
         isSupplier
         supplierType
@@ -2891,6 +2972,8 @@ export const GET_PURCHASES = graphql(`
         referenceNumber
         totalCost
         paymentStatus
+        dueDate
+        isOverdue
         isCreditPurchase
         notes
         lines {

@@ -10,6 +10,15 @@ export interface OutboundChannels {
   whatsapp: boolean;
 }
 
+export interface ChannelDispatchPolicy {
+  /** When true, messages sent outside the allowed window are queued for the next window. */
+  deferOutsideWindow?: boolean;
+}
+
+export interface NotificationDispatchPolicy {
+  whatsapp?: ChannelDispatchPolicy;
+}
+
 export interface OutboundTriggerConfig {
   audience: OutboundAudience;
   category?: NotificationCategory;
@@ -17,6 +26,8 @@ export interface OutboundTriggerConfig {
   inAppType: NotificationType;
   /** When set, used for SMS send (e.g. ACCOUNT_NOTIFICATION, ADMIN). Omit to use default NOTIFICATION. */
   smsCategory?: SmsCategory;
+  /** Per-channel scheduling rules. If omitted, messages are sent immediately. */
+  dispatchPolicy?: NotificationDispatchPolicy;
 }
 
 /**
@@ -127,6 +138,7 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
     category: 'customer',
     channels: { inApp: false, sms: false, email: true, whatsapp: true },
     inAppType: NotificationType.PAYMENT,
+    dispatchPolicy: { whatsapp: { deferOutsideWindow: true } },
   },
   credit_period_3_days_admin: {
     audience: 'channel_admins',
@@ -139,6 +151,7 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
     category: 'customer',
     channels: { inApp: false, sms: false, email: true, whatsapp: true },
     inAppType: NotificationType.PAYMENT,
+    dispatchPolicy: { whatsapp: { deferOutsideWindow: true } },
   },
   credit_period_7_days_admin: {
     audience: 'channel_admins',
@@ -151,6 +164,7 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
     category: 'customer',
     channels: { inApp: false, sms: false, email: true, whatsapp: true },
     inAppType: NotificationType.PAYMENT,
+    dispatchPolicy: { whatsapp: { deferOutsideWindow: true } },
   },
   credit_period_10_days_frozen_admin: {
     audience: 'channel_admins',
@@ -158,13 +172,27 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
     channels: { inApp: true, sms: false, email: false, whatsapp: false },
     inAppType: NotificationType.PAYMENT,
   },
-  credit_limit_reached: {
+  credit_limit_warning: {
     audience: 'customer',
     category: 'customer',
     channels: { inApp: false, sms: false, email: true, whatsapp: true },
     inAppType: NotificationType.PAYMENT,
+    dispatchPolicy: { whatsapp: { deferOutsideWindow: true } },
   },
-  credit_limit_reached_admin: {
+  credit_limit_warning_admin: {
+    audience: 'channel_admins',
+    category: 'customer',
+    channels: { inApp: true, sms: false, email: false, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
+  credit_limit_near: {
+    audience: 'customer',
+    category: 'customer',
+    channels: { inApp: false, sms: false, email: true, whatsapp: true },
+    inAppType: NotificationType.PAYMENT,
+    dispatchPolicy: { whatsapp: { deferOutsideWindow: true } },
+  },
+  credit_limit_near_admin: {
     audience: 'channel_admins',
     category: 'customer',
     channels: { inApp: true, sms: false, email: false, whatsapp: false },
@@ -176,7 +204,7 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
     channels: { inApp: true, sms: false, email: false, whatsapp: false },
     inAppType: NotificationType.PAYMENT,
   },
-  // Supplier AP reminders: internal only (channel admins, in-app)
+  // Supplier AP reminders: internal only (channel admins, in-app + urgent email)
   supplier_ap_3_days: {
     audience: 'channel_admins',
     category: 'finance',
@@ -192,10 +220,16 @@ export const OUTBOUND_CONFIG: Record<string, OutboundTriggerConfig> = {
   supplier_ap_10_days: {
     audience: 'channel_admins',
     category: 'finance',
+    channels: { inApp: true, sms: false, email: true, whatsapp: false },
+    inAppType: NotificationType.PAYMENT,
+  },
+  supplier_limit_warning: {
+    audience: 'channel_admins',
+    category: 'finance',
     channels: { inApp: true, sms: false, email: false, whatsapp: false },
     inAppType: NotificationType.PAYMENT,
   },
-  supplier_limit_reached: {
+  supplier_limit_near: {
     audience: 'channel_admins',
     category: 'finance',
     channels: { inApp: true, sms: false, email: false, whatsapp: false },

@@ -431,7 +431,7 @@ describe('OutboundDeliveryService customer notification gating', () => {
     );
   });
 
-  it('defers system-generated WhatsApp messages to the scheduling service', async () => {
+  it('defers WhatsApp when the trigger dispatchPolicy says so', async () => {
     const { service, communicationService, notificationSchedulingService } = buildService(
       true,
       true
@@ -441,7 +441,6 @@ describe('OutboundDeliveryService customer notification gating', () => {
       channelId: '1',
       customerId: 'customer-1',
       outstandingAmount: 50000,
-      systemGenerated: true,
     });
 
     expect(communicationService.send).not.toHaveBeenCalled();
@@ -450,6 +449,28 @@ describe('OutboundDeliveryService customer notification gating', () => {
       expect.objectContaining({
         channelId: '1',
         triggerKey: 'credit_period_3_days',
+        recipient: '0712345678',
+      })
+    );
+  });
+
+  it('sends WhatsApp immediately when the trigger has no deferral policy', async () => {
+    const { service, communicationService, notificationSchedulingService } = buildService(
+      true,
+      true
+    );
+
+    await service.deliver(ctx, 'balance_changed', {
+      channelId: '1',
+      customerId: 'customer-1',
+      newBalanceCents: 50000,
+      systemGenerated: true,
+    });
+
+    expect(notificationSchedulingService.deferOrSendWhatsApp).not.toHaveBeenCalled();
+    expect(communicationService.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: 'whatsapp',
         recipient: '0712345678',
       })
     );

@@ -560,9 +560,9 @@ export class CreditService {
   private async findCustomerIdsInChannel(ctx: RequestContext): Promise<ID[]> {
     const orderRepo = this.connection.getRepository(ctx, Order);
     const rows = (await orderRepo
-      .createQueryBuilder('order')
-      .select('DISTINCT order.customerId', 'customerId')
-      .where('order.channelId = :channelId', { channelId: ctx.channelId as number })
+      .createQueryBuilder('orderEntity')
+      .select('DISTINCT orderEntity.customerId', 'customerId')
+      .where('orderEntity.channelId = :channelId', { channelId: ctx.channelId as number })
       .getRawMany()) as Array<{ customerId: string | number }>;
     return rows.map(r => Number(r.customerId));
   }

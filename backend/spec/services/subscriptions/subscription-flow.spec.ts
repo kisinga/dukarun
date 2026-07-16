@@ -39,6 +39,7 @@ describe('Subscription Flow Integration', () => {
       createCustomer: jest.fn(),
       chargeMobile: jest.fn(),
       initializeTransaction: jest.fn(),
+      verifyTransaction: jest.fn(),
     } as any;
 
     // Mock EventBus - now uses publish() instead of routeEvent()
@@ -589,6 +590,140 @@ describe('Subscription Flow Integration', () => {
       expect(status.canPerformAction).toBe(false);
 
       // Restore real timers
+      jest.useRealTimers();
+    });
+  });
+
+  describe('Purchase Initiation', () => {
+    it('should persist selected tier and billing cycle on the channel', async () => {
+      jest.clearAllMocks();
+
+      const channelId = '1';
+      const phoneNumber = '+254712345678';
+      const mockChannel: Channel = {
+        id: channelId,
+        customFields: {},
+      } as any;
+
+      mockChannelService.findOne.mockResolvedValue(mockChannel);
+      mockPaystackService.createCustomer.mockResolvedValue({
+        data: { customer_code: 'cust-123' },
+      } as any);
+      mockPaystackService.chargeMobile.mockResolvedValue({
+        data: { reference: 'ref-123', status: 'pending' },
+      } as any);
+      mockChannelService.update.mockResolvedValue(mockChannel);
+
+      const result = await subscriptionService.initiatePurchase(
+        ctx,
+        channelId,
+        TEST_TIER_ID,
+        'yearly',
+        phoneNumber,
+        ''
+      );
+
+      expect(result.success).toBe(true);
+
+      // Should write the selected tier and billing cycle before creating the Paystack customer
+      const tierUpdateCall = mockChannelService.update.mock.calls.find(
+        call => call[1].customFields?.subscriptionTierId === TEST_TIER_ID
+      );
+      expect(tierUpdateCall).toBeDefined();
+      expect(tierUpdateCall![1].customFields.billingCycle).toBe('yearly');
+    });
+  });
+
+  describe('Payment Verification', () => {
+    it('should treat Paystack "ongoing" status as pending', async () => {
+      const channelId = '1';
+      const reference = 'SUB-10-1234567890';
+
+      mockChannelService.findOne.mockResolvedValue({
+        id: channelId,
+        customFields: { subscriptionStatus: 'trial' },
+      } as any);
+      mockPaystackService.verifyTransaction.mockResolvedValue({
+        data: { status: 'ongoing', reference },
+      } as any);
+
+      const result = await subscriptionService.checkPaymentStatus(ctx, channelId, reference);
+
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('pending');
+    });
+
+    it('should use tier and billing cycle from payment metadata on success', async () => {
+      const channelId = '1';
+      const reference = 'SUB-10-1234567890';
+      const metadataTierId = '00000000-0000-0000-0000-000000000002';
+
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2024-02-15'));
+
+      const mockChannel: Channel = {
+        id: channelId,
+        customFields: {
+          subscriptionStatus: 'trial',
+          // Channel has a different tier stored; metadata should win
+          subscriptionTierId: TEST_TIER_ID,
+          billingCycle: 'monthly',
+        },
+      } as any;
+
+      mockChannelService.findOne.mockResolvedValue(mockChannel);
+      mockChannelService.update.mockResolvedValue(mockChannel);
+      mockPaystackService.verifyTransaction.mockResolvedValue({
+        data: {
+          status: 'success',
+          reference,
+          amount: 100000,
+          metadata: {
+            tierId: metadataTierId,
+            billingCycle: 'yearly',
+          },
+        },
+      } as any);
+
+      // Mock the metadata tier lookup so every repository instance returned
+      // during this test resolves both the channel tier and the metadata tier.
+      const customFindOne = jest.fn((options?: any) => {
+        const id = options?.where?.id || options?.id;
+        if (id === metadataTierId) {
+          return Promise.resolve({ id: metadataTierId, priceMonthly: 10000, priceYearly: 100000 });
+        }
+        if (id === TEST_TIER_ID || id === 'tier-1') {
+          return Promise.resolve({ id, priceMonthly: 10000, priceYearly: 100000 });
+        }
+        return Promise.resolve(null);
+      });
+      mockConnection.rawConnection.getRepository.mockReturnValue({
+        findOne: customFindOne,
+        find: jest.fn(),
+      });
+
+      const result = await subscriptionService.checkPaymentStatus(ctx, channelId, reference);
+
+      expect(result.success).toBe(true);
+
+      // Should look up the tier from payment metadata, not the channel's current tier
+      expect(customFindOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: metadataTierId } })
+      );
+
+      expect(mockChannelService.update).toHaveBeenCalled();
+      const updateCall = mockChannelService.update.mock.calls.find(
+        call => call[1].customFields?.subscriptionStatus === 'active'
+      );
+      expect(updateCall).toBeDefined();
+
+      // Yearly billing cycle from metadata should extend expiry by one year
+      const newExpiry =
+        updateCall![1].customFields.subscriptionExpiresAt instanceof Date
+          ? updateCall![1].customFields.subscriptionExpiresAt
+          : new Date(updateCall![1].customFields.subscriptionExpiresAt);
+      expect(newExpiry.getFullYear()).toBe(2025);
+
       jest.useRealTimers();
     });
   });

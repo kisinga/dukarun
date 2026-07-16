@@ -2202,16 +2202,30 @@ export type Customer = Node & {
   addresses?: Maybe<Array<Address>>;
   createdAt: Scalars['DateTime']['output'];
   customFields?: Maybe<CustomerCustomFields>;
+  /** Number of whole days the oldest unpaid order is past its due date. 0 if not overdue. */
+  daysOverdue: Scalars['Int']['output'];
   emailAddress: Scalars['String']['output'];
   firstName: Scalars['String']['output'];
   groups: Array<CustomerGroup>;
   history: HistoryEntryList;
   id: Scalars['ID']['output'];
+  /** True when at least one unpaid order has passed its due date. */
+  isOverdue: Scalars['Boolean']['output'];
   lastName: Scalars['String']['output'];
   orders: OrderList;
   /** Customer balance (AR). Cents. Null when the ledger balance cannot be computed. */
   outstandingAmount?: Maybe<Scalars['Float']['output']>;
   phoneNumber?: Maybe<Scalars['String']['output']>;
+  /**
+   * Number of whole days the oldest unpaid purchase is past its due date. 0 if not overdue.
+   * Only meaningful when the customer is a supplier.
+   */
+  supplierDaysOverdue: Scalars['Int']['output'];
+  /**
+   * True when at least one unpaid purchase has passed its due date.
+   * Only meaningful when the customer is a supplier.
+   */
+  supplierIsOverdue: Scalars['Boolean']['output'];
   /**
    * Supplier balance (AP). Only non-zero when customer is a supplier. Cents.
    * Null when the ledger balance cannot be computed.
@@ -2261,10 +2275,12 @@ export type CustomerFilterParameter = {
   createdAt?: InputMaybe<DateOperators>;
   creditDuration?: InputMaybe<NumberOperators>;
   creditLimit?: InputMaybe<NumberOperators>;
+  daysOverdue?: InputMaybe<NumberOperators>;
   emailAddress?: InputMaybe<StringOperators>;
   firstName?: InputMaybe<StringOperators>;
   id?: InputMaybe<IdOperators>;
   isCreditApproved?: InputMaybe<BooleanOperators>;
+  isOverdue?: InputMaybe<BooleanOperators>;
   isSupplier?: InputMaybe<BooleanOperators>;
   isSupplierCreditApproved?: InputMaybe<BooleanOperators>;
   lastName?: InputMaybe<StringOperators>;
@@ -2278,6 +2294,8 @@ export type CustomerFilterParameter = {
   postalCode?: InputMaybe<StringOperators>;
   supplierCreditDuration?: InputMaybe<NumberOperators>;
   supplierCreditLimit?: InputMaybe<NumberOperators>;
+  supplierDaysOverdue?: InputMaybe<NumberOperators>;
+  supplierIsOverdue?: InputMaybe<BooleanOperators>;
   supplierLastRepaymentAmount?: InputMaybe<NumberOperators>;
   supplierLastRepaymentDate?: InputMaybe<DateOperators>;
   supplierOutstandingAmount?: InputMaybe<NumberOperators>;
@@ -2362,6 +2380,7 @@ export type CustomerSortParameter = {
   creditApprovedByUserId?: InputMaybe<SortOrder>;
   creditDuration?: InputMaybe<SortOrder>;
   creditLimit?: InputMaybe<SortOrder>;
+  daysOverdue?: InputMaybe<SortOrder>;
   emailAddress?: InputMaybe<SortOrder>;
   firstName?: InputMaybe<SortOrder>;
   id?: InputMaybe<SortOrder>;
@@ -2378,6 +2397,7 @@ export type CustomerSortParameter = {
   phoneNumber?: InputMaybe<SortOrder>;
   supplierCreditDuration?: InputMaybe<SortOrder>;
   supplierCreditLimit?: InputMaybe<SortOrder>;
+  supplierDaysOverdue?: InputMaybe<SortOrder>;
   supplierLastRepaymentAmount?: InputMaybe<SortOrder>;
   supplierLastRepaymentDate?: InputMaybe<SortOrder>;
   supplierOutstandingAmount?: InputMaybe<SortOrder>;
@@ -3124,6 +3144,12 @@ export type InventoryAlertCounts = {
   expiringSoonCount: Scalars['Int']['output'];
   lowStockCount: Scalars['Int']['output'];
 };
+
+export enum InventoryAlertFilter {
+  EXPIRED = 'EXPIRED',
+  EXPIRING_SOON = 'EXPIRING_SOON',
+  LOW_STOCK = 'LOW_STOCK'
+}
 
 export type InventoryBatch = {
   __typename?: 'InventoryBatch';
@@ -5968,9 +5994,16 @@ export type Order = Node & {
   customFields?: Maybe<OrderCustomFields>;
   customer?: Maybe<Customer>;
   discounts: Array<Discount>;
+  /**
+   * Date by which this order is expected to be paid. Computed from orderPlacedAt
+   * plus the customer's creditDuration. Null when the order has no customer.
+   */
+  dueDate?: Maybe<Scalars['DateTime']['output']>;
   fulfillments?: Maybe<Array<Fulfillment>>;
   history: HistoryEntryList;
   id: Scalars['ID']['output'];
+  /** True when the order is unpaid, has a dueDate, and that date has passed. */
+  isOverdue: Scalars['Boolean']['output'];
   lines: Array<OrderLine>;
   modifications: Array<OrderModification>;
   nextStates: Array<Scalars['String']['output']>;
@@ -6062,7 +6095,9 @@ export type OrderFilterParameter = {
   createdAt?: InputMaybe<DateOperators>;
   currencyCode?: InputMaybe<StringOperators>;
   customerLastName?: InputMaybe<StringOperators>;
+  dueDate?: InputMaybe<DateOperators>;
   id?: InputMaybe<IdOperators>;
+  isOverdue?: InputMaybe<BooleanOperators>;
   orderPlacedAt?: InputMaybe<DateOperators>;
   reconciledAt?: InputMaybe<DateOperators>;
   reconciliationNote?: InputMaybe<StringOperators>;
@@ -6293,6 +6328,7 @@ export type OrderSortParameter = {
   createdAt?: InputMaybe<SortOrder>;
   createdByUserId?: InputMaybe<SortOrder>;
   customerLastName?: InputMaybe<SortOrder>;
+  dueDate?: InputMaybe<SortOrder>;
   id?: InputMaybe<SortOrder>;
   lastModifiedByUserId?: InputMaybe<SortOrder>;
   orderPlacedAt?: InputMaybe<SortOrder>;
@@ -7618,6 +7654,7 @@ export type ProvinceTranslationInput = {
 
 export type PurchaseFilterInput = {
   endDate?: InputMaybe<Scalars['DateTime']['input']>;
+  overdueOnly?: InputMaybe<Scalars['Boolean']['input']>;
   startDate?: InputMaybe<Scalars['DateTime']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   supplierId?: InputMaybe<Scalars['ID']['input']>;
@@ -7783,6 +7820,11 @@ export type Query = {
   order?: Maybe<Order>;
   orderPaymentStatus?: Maybe<OrderPaymentStatus>;
   orders: OrderList;
+  /**
+   * Orders whose due date has passed and which still owe money.
+   * Uses the same options shape as the built-in orders query.
+   */
+  overdueOrders: OrderList;
   paymentMethod?: Maybe<PaymentMethod>;
   paymentMethodEligibilityCheckers: Array<ConfigurableOperationDefinition>;
   paymentMethodHandlers: Array<ConfigurableOperationDefinition>;
@@ -7816,6 +7858,7 @@ export type Query = {
   productVariants: ProductVariantList;
   /** List Products */
   products: ProductList;
+  productsByInventoryAlert: ProductList;
   promotion?: Maybe<Promotion>;
   promotionActions: Array<ConfigurableOperationDefinition>;
   promotionConditions: Array<ConfigurableOperationDefinition>;
@@ -8264,6 +8307,11 @@ export type QueryOrdersArgs = {
 };
 
 
+export type QueryOverdueOrdersArgs = {
+  options?: InputMaybe<OrderListOptions>;
+};
+
+
 export type QueryPaymentMethodArgs = {
   id: Scalars['ID']['input'];
 };
@@ -8340,6 +8388,12 @@ export type QueryProductVariantsArgs = {
 
 
 export type QueryProductsArgs = {
+  options?: InputMaybe<ProductListOptions>;
+};
+
+
+export type QueryProductsByInventoryAlertArgs = {
+  filter: InventoryAlertFilter;
   options?: InputMaybe<ProductListOptions>;
 };
 
@@ -9539,8 +9593,10 @@ export type StockPurchase = {
   __typename?: 'StockPurchase';
   amountOwing?: Maybe<Scalars['Int']['output']>;
   createdAt: Scalars['DateTime']['output'];
+  dueDate?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['ID']['output'];
   isCreditPurchase: Scalars['Boolean']['output'];
+  isOverdue: Scalars['Boolean']['output'];
   lines: Array<StockPurchaseLine>;
   notes?: Maybe<Scalars['String']['output']>;
   paymentStatus: Scalars['String']['output'];

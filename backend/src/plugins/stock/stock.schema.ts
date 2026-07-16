@@ -10,6 +10,8 @@ export const STOCK_ADMIN_SCHEMA = gql`
     totalCost: Int!
     paymentStatus: String!
     amountOwing: Int
+    dueDate: DateTime
+    isOverdue: Boolean!
     notes: String
     isCreditPurchase: Boolean!
     status: String!
@@ -127,6 +129,7 @@ export const STOCK_ADMIN_SCHEMA = gql`
     status: String
     startDate: DateTime
     endDate: DateTime
+    overdueOnly: Boolean
   }
 
   input PurchaseSortInput {

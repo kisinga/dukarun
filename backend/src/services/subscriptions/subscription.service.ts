@@ -202,6 +202,17 @@ export class SubscriptionService {
         return { success: false, message: 'Subscription tier not found' };
       }
 
+      // Persist selected tier/billing cycle so payment verification can associate
+      // the payment with the correct tier even if the customer changes their mind
+      // or retries with different options.
+      await this.channelService.update(ctx, {
+        id: channelId,
+        customFields: {
+          subscriptionTierId: tierId,
+          billingCycle,
+        },
+      });
+
       const amount = billingCycle === 'monthly' ? tier.priceMonthly : tier.priceYearly;
       const amountInKes = amount / 100; // Convert from cents to KES
 
@@ -393,6 +404,8 @@ export class SubscriptionService {
       amount: number;
       customerCode?: string;
       subscriptionCode?: string;
+      tierId?: string;
+      billingCycle?: 'monthly' | 'yearly';
     }
   ): Promise<void> {
     const channel = await this.channelService.findOne(ctx, channelId);
@@ -401,14 +414,19 @@ export class SubscriptionService {
     }
 
     const customFields = channel.customFields as any;
-    const subscriptionTierRef = customFields.subscriptionTier ?? null;
-    const tierId =
-      (typeof subscriptionTierRef === 'string' && subscriptionTierRef) ||
-      (typeof subscriptionTierRef === 'object' && subscriptionTierRef?.id) ||
-      customFields.subscriptionTierId ||
-      customFields.subscriptionTierId?.id ||
-      customFields.subscriptiontierid ||
-      null;
+    // Prefer tier/billing cycle tied to the specific payment reference (from metadata),
+    // falling back to the channel's current values for backward compatibility.
+    let tierId = paystackData.tierId;
+    if (!tierId) {
+      const subscriptionTierRef = customFields.subscriptionTier ?? null;
+      tierId =
+        (typeof subscriptionTierRef === 'string' && subscriptionTierRef) ||
+        (typeof subscriptionTierRef === 'object' && subscriptionTierRef?.id) ||
+        customFields.subscriptionTierId ||
+        customFields.subscriptionTierId?.id ||
+        customFields.subscriptiontierid ||
+        null;
+    }
     if (!tierId) {
       throw new Error('No subscription tier associated with channel');
     }
@@ -420,7 +438,7 @@ export class SubscriptionService {
     }
 
     // Prepaid extension logic: New Expiry = MAX(Current Expiry, Trial End, Now) + Billing Cycle.
-    const billingCycle = customFields.billingCycle || 'monthly';
+    const billingCycle = paystackData.billingCycle || customFields.billingCycle || 'monthly';
     const currentExpiry = customFields.subscriptionExpiresAt
       ? new Date(customFields.subscriptionExpiresAt)
       : null;
@@ -449,6 +467,8 @@ export class SubscriptionService {
       subscriptionExpiredReminderSentAt: null,
       lastPaymentDate: new Date(),
       lastPaymentAmount: paystackData.amount,
+      subscriptionTierId: tierId,
+      billingCycle,
     };
 
     if (paystackData.customerCode) {
@@ -543,17 +563,22 @@ export class SubscriptionService {
         status = 'success';
         success = true;
 
-        // Process successful payment
-        const customerCode =
-          verification.data.customer?.customer_code ||
-          (verification.data.metadata as any)?.customerCode;
+        // Process successful payment using tier/billing cycle tied to this reference
+        const metadata = (verification.data.metadata as any) || {};
+        const customerCode = verification.data.customer?.customer_code || metadata?.customerCode;
 
         await this.processSuccessfulPayment(ctx, channelId, {
           reference,
           amount: verification.data.amount,
           customerCode: customerCode,
+          tierId: metadata.tierId,
+          billingCycle: metadata.billingCycle,
         });
-      } else if (verification.data.status === 'pending' || verification.data.status === 'sent') {
+      } else if (
+        verification.data.status === 'pending' ||
+        verification.data.status === 'sent' ||
+        verification.data.status === 'ongoing'
+      ) {
         status = 'pending';
         success = false;
       } else {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { RequestContext } from '@vendure/core';
 import { CommunicationService } from '../../../src/infrastructure/communication/communication.service';
+import { NotificationCalendarService } from '../../../src/services/notifications/notification-calendar.service';
 import { NotificationSchedulingService } from '../../../src/services/notifications/notification-scheduling.service';
 import { PendingNotificationService } from '../../../src/services/notifications/pending-notification.service';
 import { PendingNotification } from '../../../src/services/notifications/pending-notification.entity';
@@ -40,7 +41,8 @@ describe('NotificationSchedulingService', () => {
     communicationService = createMockCommunicationService();
     service = new NotificationSchedulingService(
       pendingService as unknown as PendingNotificationService,
-      communicationService as unknown as CommunicationService
+      communicationService as unknown as CommunicationService,
+      new NotificationCalendarService()
     );
   });
 

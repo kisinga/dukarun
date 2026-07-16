@@ -38,6 +38,9 @@ export class StockPurchase {
   @Column({ type: 'boolean', default: false })
   isCreditPurchase: boolean;
 
+  @Column({ type: 'timestamp', nullable: true })
+  dueDate: Date | null;
+
   @Column({ type: 'varchar', default: 'confirmed' })
   status: 'draft' | 'confirmed';
 

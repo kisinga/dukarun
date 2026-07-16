@@ -11,6 +11,7 @@ export interface OrdersListFilterState {
   amountMin: number | null;
   amountMax: number | null;
   productVariantId: string | null;
+  overdueOnly: boolean;
 }
 
 /**
@@ -32,6 +33,7 @@ export class OrdersListFilterService {
   readonly amountMin = signal<number | null>(null);
   readonly amountMax = signal<number | null>(null);
   readonly productVariantId = signal<string | null>(null);
+  readonly overdueOnly = signal(false);
 
   setFilters(partial: Partial<OrdersListFilterState>): void {
     if (partial.searchQuery !== undefined) this.searchQuery.set(partial.searchQuery);
@@ -44,6 +46,7 @@ export class OrdersListFilterService {
     if (partial.amountMin !== undefined) this.amountMin.set(partial.amountMin);
     if (partial.amountMax !== undefined) this.amountMax.set(partial.amountMax);
     if (partial.productVariantId !== undefined) this.productVariantId.set(partial.productVariantId);
+    if (partial.overdueOnly !== undefined) this.overdueOnly.set(partial.overdueOnly);
   }
 
   clearFilters(): void {
@@ -57,6 +60,7 @@ export class OrdersListFilterService {
     this.amountMin.set(null);
     this.amountMax.set(null);
     this.productVariantId.set(null);
+    this.overdueOnly.set(false);
   }
 
   setDateRange(from: string | null, to: string | null): void {
@@ -83,7 +87,8 @@ export class OrdersListFilterService {
       this.orderCode().trim() !== '' ||
       this.amountMin() != null ||
       this.amountMax() != null ||
-      this.productVariantId() != null
+      this.productVariantId() != null ||
+      this.overdueOnly()
     );
   }
 }

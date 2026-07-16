@@ -1607,6 +1607,12 @@ export type InventoryAlertCounts = {
   lowStockCount: Scalars['Int']['output'];
 };
 
+export enum InventoryAlertFilter {
+  EXPIRED = 'EXPIRED',
+  EXPIRING_SOON = 'EXPIRING_SOON',
+  LOW_STOCK = 'LOW_STOCK'
+}
+
 export type InventoryReconciliationResult = {
   __typename?: 'InventoryReconciliationResult';
   channelId: Scalars['Int']['output'];
@@ -3726,6 +3732,7 @@ export type Query = {
   product?: Maybe<Product>;
   /** Get a list of Products */
   products: ProductList;
+  productsByInventoryAlert: ProductList;
   /**
    * List all browsable public storefronts (opted-in + APPROVED + active subscription). Powers the
    * discovery/directory page. Public, no auth.
@@ -3912,6 +3919,12 @@ export type QueryProductArgs = {
 
 
 export type QueryProductsArgs = {
+  options?: InputMaybe<ProductListOptions>;
+};
+
+
+export type QueryProductsByInventoryAlertArgs = {
+  filter: InventoryAlertFilter;
   options?: InputMaybe<ProductListOptions>;
 };
 
