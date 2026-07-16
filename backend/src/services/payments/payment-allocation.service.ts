@@ -767,9 +767,27 @@ export class PaymentAllocationService {
         state: In(PAYABLE_ORDER_STATES),
         customFields: { cashierPendingAt: Not(IsNull()) } as any,
       },
-      relations: ['customer', 'createdByUserId'],
+      relations: ['customer'],
       order: { createdAt: 'ASC' }, // Oldest first
     });
+
+    // Relation custom fields store the FK ID when the relation is not loaded,
+    // and the User entity when loaded via relations/eager loading. Batch-resolve
+    // the creator IDs to User entities to avoid N+1 queries.
+    const creatorIds = new Set<ID>();
+    for (const order of orders) {
+      const ref = order.customFields?.createdByUserId;
+      if (ref != null && typeof ref !== 'object') {
+        creatorIds.add(ref);
+      }
+    }
+    const users =
+      creatorIds.size > 0
+        ? await this.connection.getRepository(ctx, User).find({
+            where: { id: In([...creatorIds]) },
+          })
+        : [];
+    const userById = new Map(users.map(u => [u.id.toString(), u]));
 
     // Channel isolation + correctness: getOrderPaymentStatus reads AR by orderId within the
     // request's channel, so an order parked in another channel resolves to amountOwing 0 here
@@ -780,11 +798,18 @@ export class PaymentAllocationService {
       const status = await this.financialService.getOrderPaymentStatus(ctx, order.id.toString());
       if (status.amountOwing > 0) {
         const customFields = order.customFields ?? {};
+        const createdByRef = customFields.createdByUserId;
+        const createdBy: User | null =
+          createdByRef == null
+            ? null
+            : typeof createdByRef === 'object'
+              ? createdByRef
+              : (userById.get(createdByRef.toString()) ?? null);
         pending.push({
           order,
           amountOwing: status.amountOwing,
           pendingSince: customFields.cashierPendingAt ?? null,
-          createdBy: order.createdByUserId ?? null,
+          createdBy,
         });
       }
     }
