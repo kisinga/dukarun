@@ -1,7 +1,46 @@
 import { Injectable, inject, signal, computed, effect } from '@angular/core';
-import moment from 'moment';
 import { ApolloService } from '../apollo.service';
 import { CompanyService } from '../company.service';
+
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function formatDateTime(date: Date): string {
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const months = Math.floor(days / 30);
+  const years = Math.floor(days / 365);
+
+  if (years > 0) return years === 1 ? 'a year' : `${years} years`;
+  if (months > 0) return months === 1 ? 'a month' : `${months} months`;
+  if (days > 0) return days === 1 ? 'a day' : `${days} days`;
+  if (hours > 0) return hours === 1 ? 'an hour' : `${hours} hours`;
+  if (minutes > 0) return minutes === 1 ? 'a minute' : `${minutes} minutes`;
+  return 'a few seconds';
+}
+
 import { map, catchError, of, from, tap } from 'rxjs';
 import {
   GET_ACCOUNT_BALANCES_AS_OF,
@@ -177,17 +216,17 @@ export class CashierSessionService {
    * Used by dashboard badge and sell banner so label (Open/Closed) is only shown once in the UI.
    */
   formatShiftTimeAt(isoDate: string): string | null {
-    const m = moment(isoDate);
-    if (!m.isValid()) return null;
-    if (m.isSame(moment(), 'day')) return `at ${m.format('HH:mm')}`;
-    return `on ${m.format('D MMM YYYY HH:mm')}`;
+    const date = new Date(isoDate);
+    if (isNaN(date.getTime())) return null;
+    if (isSameDay(date, new Date())) return `at ${formatTime(date)}`;
+    return `on ${formatDateTime(date)}`;
   }
 
   /** How long the shift has been open (openedAt → now), e.g. "2 hours" / "a day". */
   formatShiftDuration(openedAt: string): string | null {
-    const m = moment(openedAt);
-    if (!m.isValid()) return null;
-    return m.fromNow(true);
+    const date = new Date(openedAt);
+    if (isNaN(date.getTime())) return null;
+    return formatDuration(Date.now() - date.getTime());
   }
 
   /** Computed: variance amount parsed as number (in cents) */
