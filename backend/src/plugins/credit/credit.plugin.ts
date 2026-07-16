@@ -529,14 +529,15 @@ const COMBINED_SCHEMA = gql`
     supplierId: ID!
     paymentAmount: Float!
     purchaseIds: [ID!]
-    debitAccountCode: String
+    debitAccountCode: String!
+    reference: String
   }
 
   # purchaseId is String! so UUIDs are passed through (see archive/docs/2026-07-10/GRAPHQL_IDS_AND_UUIDS.md)
   input PaySinglePurchaseInput {
     purchaseId: String!
     paymentAmount: Float
-    debitAccountCode: String
+    debitAccountCode: String!
   }
 
   extend type Query {

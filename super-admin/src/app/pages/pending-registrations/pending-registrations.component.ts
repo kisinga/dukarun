@@ -1,11 +1,8 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApolloService } from '../../core/services/apollo.service';
-import {
-  PENDING_REGISTRATIONS,
-  APPROVE_USER,
-  REJECT_USER,
-} from '../../core/graphql/operations.graphql';
+import { PENDING_REGISTRATIONS } from '@dukarun-sa/registration';
+import { APPROVE_USER, REJECT_USER } from '@dukarun-sa/user';
 import { PageHeaderComponent } from '../../shared/components/page-header';
 
 interface PendingRegistration {

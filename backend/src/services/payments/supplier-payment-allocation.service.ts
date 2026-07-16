@@ -23,7 +23,8 @@ export interface SupplierPaymentAllocationInput {
   supplierId: string;
   paymentAmount: number; // In smallest currency unit (cents)
   purchaseIds?: string[]; // Optional - if not provided, auto-select oldest
-  debitAccountCode?: string; // Optional - overrides method-based debit account
+  debitAccountCode: string; // Ledger account to debit (source of funds)
+  reference?: string; // External reference (receipt number, bank ref, etc.)
 }
 
 export interface SupplierPaymentAllocationResult {
@@ -97,12 +98,12 @@ export class SupplierPaymentAllocationService {
     ctx: RequestContext,
     input: SupplierPaymentAllocationInput
   ): Promise<SupplierPaymentAllocationResult> {
-    if (input.debitAccountCode?.trim()) {
-      await this.chartOfAccountsService.validatePaymentSourceAccount(
-        ctx,
-        input.debitAccountCode.trim()
-      );
+    const debitAccountCode = input.debitAccountCode?.trim();
+    if (!debitAccountCode) {
+      throw new UserInputError('debitAccountCode is required');
     }
+    await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, debitAccountCode);
+
     const allocationResult = await this.connection.withTransaction(ctx, async transactionCtx => {
       try {
         // 1. Get unpaid purchases
@@ -185,7 +186,7 @@ export class SupplierPaymentAllocationService {
             purchaseId: purchase.id,
             amount: allocation.amountToAllocate,
             method: PAYMENT_METHOD_CODES.CASH,
-            reference: null,
+            reference: input.reference?.trim() || null,
             supplierId: supplierIdNum,
           });
           await purchasePaymentRepo.save(paymentRecord);
@@ -199,7 +200,7 @@ export class SupplierPaymentAllocationService {
             input.supplierId,
             allocation.amountToAllocate,
             PAYMENT_METHOD_CODES.CASH,
-            input.debitAccountCode?.trim()
+            debitAccountCode
           );
 
           // Derive the new paymentStatus from the pre-posting ledger snapshot plus this
@@ -295,8 +296,8 @@ export class SupplierPaymentAllocationService {
   async paySinglePurchase(
     ctx: RequestContext,
     purchaseId: string,
-    paymentAmount?: number,
-    debitAccountCode?: string
+    debitAccountCode: string,
+    paymentAmount?: number
   ): Promise<SupplierPaymentAllocationResult> {
     const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
     const purchase = await purchaseRepo.findOne({
@@ -331,7 +332,7 @@ export class SupplierPaymentAllocationService {
       supplierId: String(purchase.supplierId),
       paymentAmount: amount,
       purchaseIds: [purchaseId],
-      debitAccountCode: debitAccountCode?.trim() || undefined,
+      debitAccountCode: debitAccountCode.trim(),
     });
   }
 

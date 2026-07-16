@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 
-import { PUBLIC_STOREFRONTS } from '../graphql/operations.graphql';
+import { PUBLIC_STOREFRONTS } from '@dukarun-st/storefront';
 import { ApolloService } from '../services/apollo.service';
 import { SeoService } from '../services/seo.service';
 import { baseDomain, isLocalHost } from '../utils/storefront-host.util';

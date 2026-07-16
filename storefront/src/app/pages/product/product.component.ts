@@ -9,7 +9,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 
-import { PRODUCT_DETAIL } from '../../core/graphql/operations.graphql';
+import { PRODUCT_DETAIL } from '@dukarun-st/product';
 import { withImagePreset } from '../../core/utils/asset.util';
 import { manufacturerFromFacets } from '../../core/utils/facet.util';
 import { ApolloService } from '../../core/services/apollo.service';

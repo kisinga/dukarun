@@ -17,7 +17,8 @@
     "codegen:watch": "graphql-codegen --config codegen.ts",
     "lint": "ng lint",
     "format": "prettier --write \"**/*.{ts,js,json,html,scss,css}\"",
-    "format:check": "prettier --check \"**/*.{ts,js,json,html,scss,css}\""
+    "format:check": "prettier --check \"**/*.{ts,js,json,html,scss,css}\"",
+    "boundary-check": "node scripts/boundary-check.mjs"
   },
   "prettier": {
     "printWidth": 100,
@@ -83,6 +84,7 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.2.0",
     "prettier": "^3.7.4",
+    "strip-json-comments": "^5.0.3",
     "ts-node": "^10.9.2",
     "typescript": "~5.9.3"
   }

@@ -7,7 +7,7 @@ import {
   CREATE_SUBSCRIPTION_TIER,
   UPDATE_SUBSCRIPTION_TIER,
   DEACTIVATE_SUBSCRIPTION_TIER,
-} from '../../core/graphql/operations.graphql';
+} from '@dukarun-sa/subscription';
 import { PageHeaderComponent } from '../../shared/components/page-header';
 
 interface Tier {

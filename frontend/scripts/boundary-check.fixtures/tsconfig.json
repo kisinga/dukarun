@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@dukarun/order": ["./app/domains/order/index.ts"],
+      "@dukarun/order/components": ["./app/domains/order/components/index.ts"]
+    }
+  }
+}

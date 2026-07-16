@@ -36,7 +36,7 @@ interface RecordPurchaseInput {
   isCreditPurchase?: boolean;
   payment?: {
     amount: number;
-    debitAccountCode?: string;
+    debitAccountCode: string;
     reference?: string;
   };
   saveAsDraft?: boolean;

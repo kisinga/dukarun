@@ -8,9 +8,9 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../../core/services/auth.service';
-import { RegistrationService } from '../../../core/services/registration.service';
-import { formatPhoneNumber, generateCompanyCode } from '../../../core/utils/phone.utils';
+import { AuthService } from '@dukarun/auth';
+import { RegistrationService } from '../../../shared/services/registration.service';
+import { formatPhoneNumber, generateCompanyCode } from '../../../shared/utils/phone.utils';
 
 type Step = 1 | 2 | 3;
 

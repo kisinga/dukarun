@@ -49,8 +49,8 @@ export interface SupplierPaymentPostingContext {
   purchaseId: string;
   purchaseReference: string;
   supplierId: string;
-  method: string; // payment method code
-  resolvedAccountCode?: string; // Pre-resolved from PaymentMethod custom fields
+  method: string; // payment method code (audit/metadata only)
+  resolvedAccountCode: string; // Ledger account to credit (source of funds)
 }
 
 export interface RefundPostingContext {
@@ -279,8 +279,10 @@ export function createSupplierPurchaseEntry(context: PurchasePostingContext): Jo
 export function createSupplierPaymentEntry(
   context: SupplierPaymentPostingContext
 ): JournalEntryTemplate {
-  // Use pre-resolved account if provided, otherwise fall back to method-based mapping
-  const cashAccount = context.resolvedAccountCode || mapPaymentMethodToAccount(context.method);
+  const cashAccount = context.resolvedAccountCode?.trim();
+  if (!cashAccount) {
+    throw new Error('Supplier payment requires a resolvedAccountCode');
+  }
 
   return {
     lines: [

@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { FooterComponent } from '../../core/layout/footer/footer.component';
-import { NavbarComponent } from '../../core/layout/navbar/navbar.component';
-import { SEOService } from '../../core/services/seo.service';
+import { FooterComponent } from '../../shell/layout/footer/footer.component';
+import { NavbarComponent } from '../../shell/layout/navbar/navbar.component';
+import { SEOService } from '../../shared/services/seo.service';
 
 interface FAQItem {
   question: string;

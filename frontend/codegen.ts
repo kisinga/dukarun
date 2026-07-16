@@ -26,12 +26,13 @@ const config: CodegenConfig = {
   generates: {
     // Client preset - generates ALL schema types + operation types + documents
     // This is your single source of truth for GraphQL types
-    'src/app/core/graphql/generated/': {
+    'src/app/shared/graphql/generated/': {
       preset: 'client',
       documents: [
-        'src/app/**/*.ts',
-        'src/app/**/*.graphql.ts',
-        '!src/app/core/graphql/generated/**/*',
+        'src/app/domains/**/*.graphql.ts',
+        'src/app/shell/**/*.graphql.ts',
+        'src/app/shared/**/*.graphql.ts',
+        '!src/app/shared/graphql/generated/**/*',
       ],
       // This disables the "fragment masking" feature for simpler usage
       presetConfig: {

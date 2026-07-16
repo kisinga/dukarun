@@ -8,11 +8,11 @@
 
 A **per-channel stat** that answers: “What is the total value of my current stock?” using three methods:
 
-| Method     | Meaning                          | Source |
-|-----------|-----------------------------------|--------|
-| **Retail**   | Sum of (stock on hand × selling price) per variant | Product variants + stock levels |
-| **Wholesale**| Sum of (stock on hand × wholesale price) per variant | Product variant custom field `wholesalePrice` |
-| **Cost**     | Sum of (batch quantity × unit cost) across all open batches | `inventory_batch` (FIFO/COGS) |
+| Method        | Meaning                                                     | Source                                        |
+| ------------- | ----------------------------------------------------------- | --------------------------------------------- |
+| **Retail**    | Sum of (stock on hand × selling price) per variant          | Product variants + stock levels               |
+| **Wholesale** | Sum of (stock on hand × wholesale price) per variant        | Product variant custom field `wholesalePrice` |
+| **Cost**      | Sum of (batch quantity × unit cost) across all open batches | `inventory_batch` (FIFO/COGS)                 |
 
 All values are in **cents** (smallest currency unit). The UI formats them with the channel currency.
 
@@ -60,19 +60,19 @@ No TTL; invalidation is event-based. Optional `forceRefresh: true` forces a reco
 
 ### Key files (backend)
 
-| Area | File |
-|------|------|
-| Config | `backend/src/vendure-config.ts` (Channel custom field `stockValueCache`, type `text`) |
-| Migration | `backend/src/migrations/8000000000014-AddChannelStockValueCache.ts` |
-| Domain | `backend/src/domain/channel-custom-fields.ts` (`StockValueCache`, `parseStockValueCache`) |
-| Event | `backend/src/infrastructure/events/custom-events.ts` (`StockLevelChangedEvent`) |
-| Service | `backend/src/services/financial/stock-valuation.service.ts` |
-| Schema | `backend/src/plugins/ledger/dashboard-stats.schema.ts` (type + query) |
-| Resolver | `backend/src/plugins/ledger/stock-value-stats.resolver.ts` |
-| Subscriber | `backend/src/plugins/ledger/stock-value-cache.subscriber.ts` |
-| Emit event | `backend/src/services/stock/stock-movement.service.ts` (after `adjustStockLevel`) |
-| Invalidate on sale | `backend/src/services/inventory/inventory.service.ts` (end of `recordSale`) |
-| Plugin registration | `backend/src/plugins/ledger/ledger.plugin.ts` |
+| Area                | File                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| Config              | `backend/src/vendure-config.ts` (Channel custom field `stockValueCache`, type `text`)     |
+| Migration           | `backend/src/migrations/8000000000014-AddChannelStockValueCache.ts`                       |
+| Domain              | `backend/src/domain/channel-custom-fields.ts` (`StockValueCache`, `parseStockValueCache`) |
+| Event               | `backend/src/infrastructure/events/custom-events.ts` (`StockLevelChangedEvent`)           |
+| Service             | `backend/src/services/financial/stock-valuation.service.ts`                               |
+| Schema              | `backend/src/plugins/ledger/dashboard-stats.schema.ts` (type + query)                     |
+| Resolver            | `backend/src/plugins/ledger/stock-value-stats.resolver.ts`                                |
+| Subscriber          | `backend/src/plugins/ledger/stock-value-cache.subscriber.ts`                              |
+| Emit event          | `backend/src/services/stock/stock-movement.service.ts` (after `adjustStockLevel`)         |
+| Invalidate on sale  | `backend/src/services/inventory/inventory.service.ts` (end of `recordSale`)               |
+| Plugin registration | `backend/src/plugins/ledger/ledger.plugin.ts`                                             |
 
 ---
 
@@ -91,5 +91,3 @@ When adding or changing Channel custom fields used by this feature, follow the p
 
 - [Vendure: Database migrations](https://docs.vendure.io/guides/developer-guide/migrations)
 - [Vendure: CustomFieldType](https://docs.vendure.io/reference/typescript-api/custom-fields/custom-field-type)
-
-See also `.cursor/rules/vendure-migrations.mdc`.

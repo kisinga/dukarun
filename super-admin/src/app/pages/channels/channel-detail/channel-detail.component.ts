@@ -4,20 +4,20 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { PageHeaderComponent } from '../../../shared/components/page-header';
 import { ApolloService } from '../../../core/services/apollo.service';
+import { PLATFORM_ZONES } from '@dukarun-sa/platform';
 import {
-  PLATFORM_ZONES,
   CHANNEL_DETAIL_PLATFORM,
-  ANALYTICS_STATS_FOR_CHANNEL,
-  AUDIT_LOGS_FOR_CHANNEL,
-  ADMINISTRATORS_FOR_CHANNEL,
-  NOTIFICATIONS_FOR_CHANNEL,
   UPDATE_CHANNEL_STATUS_PLATFORM,
-  EXTEND_TRIAL_PLATFORM,
   UPDATE_CHANNEL_SUBSCRIPTION_PLATFORM,
   UPDATE_CHANNEL_FEATURE_FLAGS_PLATFORM,
   UPDATE_CHANNEL_ZONES_PLATFORM,
   UPDATE_CHANNEL_PUBLIC_STOREFRONT_PLATFORM,
-} from '../../../core/graphql/operations.graphql';
+} from '@dukarun-sa/channel';
+import { ANALYTICS_STATS_FOR_CHANNEL } from '@dukarun-sa/analytics';
+import { AUDIT_LOGS_FOR_CHANNEL } from '@dukarun-sa/audit';
+import { ADMINISTRATORS_FOR_CHANNEL } from '@dukarun-sa/user';
+import { NOTIFICATIONS_FOR_CHANNEL } from '@dukarun-sa/notification';
+import { EXTEND_TRIAL_PLATFORM } from '@dukarun-sa/subscription';
 
 interface PlatformZone {
   id: string;

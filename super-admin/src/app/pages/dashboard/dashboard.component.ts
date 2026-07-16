@@ -6,12 +6,12 @@ import { ApolloService } from '../../core/services/apollo.service';
 import {
   PLATFORM_STATS,
   PLATFORM_MONITORING,
-  PLATFORM_CHANNELS,
-  PENDING_REGISTRATIONS,
   PLATFORM_ADMINISTRATORS,
-  ROLE_TEMPLATES,
-  GET_SUBSCRIPTION_TIERS,
-} from '../../core/graphql/operations.graphql';
+} from '@dukarun-sa/platform';
+import { PLATFORM_CHANNELS } from '@dukarun-sa/channel';
+import { PENDING_REGISTRATIONS } from '@dukarun-sa/registration';
+import { ROLE_TEMPLATES } from '@dukarun-sa/role-template';
+import { GET_SUBSCRIPTION_TIERS } from '@dukarun-sa/subscription';
 import type { PlatformMonitoringQuery } from '../../core/graphql/generated/graphql';
 
 interface PlatformStats {
