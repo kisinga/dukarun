@@ -101,12 +101,14 @@ export class SubscriptionWebhookController {
         return;
       }
 
-      // Process successful payment
+      // Process successful payment using tier/billing cycle tied to this reference
       await this.subscriptionService.processSuccessfulPayment(ctx, channelId, {
         reference: data.reference,
         amount: verification.data.amount,
         customerCode: verification.data.customer?.customer_code || metadata.customerCode,
         subscriptionCode: metadata.subscriptionCode,
+        tierId: metadata.tierId,
+        billingCycle: metadata.billingCycle,
       });
 
       this.logger.log(`Successfully processed payment for channel ${channelId}`);

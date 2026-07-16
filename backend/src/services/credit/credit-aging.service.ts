@@ -84,10 +84,10 @@ export class CreditAgingService {
    */
   async findCustomersWithOutstanding(ctx: RequestContext): Promise<string[]> {
     const rows = (await this.orderRepo(ctx)
-      .createQueryBuilder('order')
-      .select(['order.id AS id', 'order.customerId AS customerId'])
-      .where('order.channelId = :channelId', { channelId: ctx.channelId as number })
-      .andWhere('order.state IN (:...states)', { states: AR_OWING_ORDER_STATES })
+      .createQueryBuilder('orderEntity')
+      .select(['orderEntity.id AS id', 'orderEntity.customerId AS customerId'])
+      .where('orderEntity.channelId = :channelId', { channelId: ctx.channelId as number })
+      .andWhere('orderEntity.state IN (:...states)', { states: AR_OWING_ORDER_STATES })
       .getRawMany()) as Array<{ id: string; customerId: string | number }>;
 
     const statuses = await this.financialService.getOrderPaymentStatuses(

@@ -355,58 +355,6 @@ export class LedgerQueryService {
   }
 
   /**
-   * Get AP payment statuses for multiple purchases in a single query.
-   * Returns a map of purchaseId -> { totalOwed, amountPaid, amountOwing }.
-   */
-  async getPurchasePaymentStatuses(
-    channelId: number,
-    purchaseIds: string[]
-  ): Promise<Map<string, { totalOwed: number; amountPaid: number; amountOwing: number }>> {
-    if (purchaseIds.length === 0) {
-      return new Map();
-    }
-
-    const account = await this.dataSource.getRepository(Account).findOne({
-      where: { channelId, code: ACCOUNT_CODES.ACCOUNTS_PAYABLE },
-    });
-
-    const result = new Map<
-      string,
-      { totalOwed: number; amountPaid: number; amountOwing: number }
-    >();
-
-    if (!account) {
-      return result;
-    }
-
-    const rows = (await this.dataSource
-      .getRepository(JournalLine)
-      .createQueryBuilder('line')
-      .innerJoin('line.entry', 'entry')
-      .where('line.channelId = :channelId', { channelId })
-      .andWhere('line.accountId = :accountId', { accountId: account.id })
-      .andWhere("line.meta->>'purchaseId' IN (:...purchaseIds)", { purchaseIds })
-      .select("line.meta->>'purchaseId'", 'purchaseId')
-      .addSelect('SUM(CAST(line.debit AS BIGINT))', 'debitTotal')
-      .addSelect('SUM(CAST(line.credit AS BIGINT))', 'creditTotal')
-      .groupBy("line.meta->>'purchaseId'")
-      .getRawMany()) as Array<{ purchaseId: string; debitTotal: string; creditTotal: string }>;
-
-    for (const row of rows) {
-      const debitTotal = parseInt(row.debitTotal || '0', 10);
-      const creditTotal = parseInt(row.creditTotal || '0', 10);
-      const balance = debitTotal - creditTotal; // negative = we owe money
-      result.set(row.purchaseId, {
-        totalOwed: creditTotal,
-        amountPaid: debitTotal,
-        amountOwing: Math.max(-balance, 0),
-      });
-    }
-
-    return result;
-  }
-
-  /**
    * Get sales total for a period
    */
   async getSalesTotal(channelId: number, startDate?: string, endDate?: string): Promise<number> {

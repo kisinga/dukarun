@@ -70,10 +70,10 @@ export class PaymentAllocationResolver {
     const orderRepo = this.connection.getRepository(ctx, Order);
 
     const orders = await orderRepo
-      .createQueryBuilder('order')
-      .leftJoinAndSelect('order.customer', 'customer')
-      .where('order.channelId = :channelId', { channelId: ctx.channelId as number })
-      .andWhere('order.state IN (:...states)', { states: PAYABLE_ORDER_STATES })
+      .createQueryBuilder('orderEntity')
+      .leftJoinAndSelect('orderEntity.customer', 'customer')
+      .where('orderEntity.channelId = :channelId', { channelId: ctx.channelId as number })
+      .andWhere('orderEntity.state IN (:...states)', { states: PAYABLE_ORDER_STATES })
       .getMany();
 
     const dueCandidates = orders.filter(order => {

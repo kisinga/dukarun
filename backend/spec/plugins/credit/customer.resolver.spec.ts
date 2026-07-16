@@ -3,7 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Customer, RequestContext } from '@vendure/core';
+import { Customer, ListQueryBuilder, RequestContext } from '@vendure/core';
 import { CustomerFieldResolver } from '../../../src/plugins/credit/customer.resolver';
 import { CreditAgingService } from '../../../src/services/credit/credit-aging.service';
 import { CreditService } from '../../../src/services/credit/credit.service';
@@ -15,6 +15,7 @@ describe('CustomerFieldResolver', () => {
   let mockCreditService: jest.Mocked<CreditService>;
   let mockCreditAgingService: jest.Mocked<CreditAgingService>;
   let mockSupplierAgingService: jest.Mocked<SupplierCreditAgingService>;
+  let mockListQueryBuilder: jest.Mocked<ListQueryBuilder>;
 
   beforeEach(() => {
     mockCreditService = {
@@ -26,10 +27,14 @@ describe('CustomerFieldResolver', () => {
     mockSupplierAgingService = {
       getSupplierAging: jest.fn(),
     } as any;
+    mockListQueryBuilder = {
+      build: jest.fn(),
+    } as any;
     resolver = new CustomerFieldResolver(
       mockCreditService,
       mockCreditAgingService,
-      mockSupplierAgingService
+      mockSupplierAgingService,
+      mockListQueryBuilder
     );
   });
 
@@ -49,5 +54,30 @@ describe('CustomerFieldResolver', () => {
     const result = await resolver.outstandingAmount(customer, ctx);
 
     expect(result).toBeNull();
+  });
+
+  it('resolves customer orders with a non-reserved alias and customer filter', async () => {
+    const customer = { id: 'cust-1' } as Customer;
+    const mockQb: any = {
+      andWhere: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn(async () => [[{ id: 'order-1' }], 1]),
+    };
+    mockListQueryBuilder.build.mockReturnValue(mockQb);
+
+    const result = await resolver.orders(ctx, customer, { options: { take: 10 } }, []);
+
+    expect(mockListQueryBuilder.build).toHaveBeenCalledWith(
+      expect.any(Function),
+      { take: 10 },
+      expect.objectContaining({ entityAlias: 'orderEntity' })
+    );
+    expect(mockQb.andWhere).toHaveBeenCalledWith('orderEntity.state != :draftState', {
+      draftState: 'Draft',
+    });
+    expect(mockQb.andWhere).toHaveBeenCalledWith('orderEntity.customerId = :customerId', {
+      customerId: 'cust-1',
+    });
+    expect(result.items).toHaveLength(1);
+    expect(result.totalItems).toBe(1);
   });
 });

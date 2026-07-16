@@ -244,13 +244,9 @@ export class InventoryAlertService {
       .getRepository(ctx, Product)
       .createQueryBuilder('product')
       .select('COUNT(DISTINCT product.id)', 'count')
-      .innerJoin(
-        `(${variantSubQuery.getQuery()})`,
-        'alert_products',
-        'alert_products.productId = product.id'
-      )
-      .setParameters(variantSubQuery.getParameters())
       .where('product.deletedAt IS NULL')
+      .andWhere(`product.id IN (${variantSubQuery.getQuery()})`)
+      .setParameters(variantSubQuery.getParameters())
       .getRawOne<{ count: string }>();
 
     return Number(result?.count ?? 0);

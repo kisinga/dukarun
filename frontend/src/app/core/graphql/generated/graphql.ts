@@ -12120,11 +12120,29 @@ export type GetCustomerOrdersQuery = {
         code: string;
         state: string;
         createdAt: any;
+        updatedAt: any;
         orderPlacedAt?: any | null;
         total: number;
         totalWithTax: number;
         currencyCode: CurrencyCode;
         amountOwing: number;
+        dueDate?: any | null;
+        isOverdue: boolean;
+        customer?: {
+          __typename?: 'Customer';
+          id: string;
+          firstName: string;
+          lastName: string;
+          emailAddress: string;
+        } | null;
+        lines: Array<{
+          __typename?: 'OrderLine';
+          id: string;
+          quantity: number;
+          linePrice: number;
+          linePriceWithTax: number;
+          productVariant: { __typename?: 'ProductVariant'; id: string; name: string; sku: string };
+        }>;
         payments?: Array<{
           __typename?: 'Payment';
           id: string;
@@ -20516,11 +20534,55 @@ export const GetCustomerOrdersDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'code' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'state' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'orderPlacedAt' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'total' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'totalWithTax' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'currencyCode' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'amountOwing' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'dueDate' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'isOverdue' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'customer' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
+                                ],
+                              },
+                            },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'lines' },
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
+                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'quantity' } },
+                                  { kind: 'Field', name: { kind: 'Name', value: 'linePrice' } },
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: 'linePriceWithTax' },
+                                  },
+                                  {
+                                    kind: 'Field',
+                                    name: { kind: 'Name', value: 'productVariant' },
+                                    selectionSet: {
+                                      kind: 'SelectionSet',
+                                      selections: [
+                                        { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                                        { kind: 'Field', name: { kind: 'Name', value: 'name' } },
+                                        { kind: 'Field', name: { kind: 'Name', value: 'sku' } },
+                                      ],
+                                    },
+                                  },
+                                ],
+                              },
+                            },
                             {
                               kind: 'Field',
                               name: { kind: 'Name', value: 'payments' },

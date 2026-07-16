@@ -210,6 +210,8 @@ export class OrdersComponent implements OnInit {
       this.filterService.amountMin();
       this.filterService.amountMax();
       this.filterService.overdueOnly();
+      this.filterService.customerIdFilter();
+      this.currentPage.set(1);
       this.loadOrdersWithFilter();
     });
 
@@ -298,10 +300,15 @@ export class OrdersComponent implements OnInit {
   }
 
   async loadOrdersWithFilter(): Promise<void> {
-    await this.ordersService.fetchOrders(
-      this.buildOrderListOptions(),
-      this.filterService.overdueOnly(),
-    );
+    const customerId = this.filterService.customerIdFilter();
+    const options = this.buildOrderListOptions();
+    const overdueOnly = this.filterService.overdueOnly();
+
+    if (customerId) {
+      await this.ordersService.fetchOrdersForCustomer(customerId, options, overdueOnly);
+    } else {
+      await this.ordersService.fetchOrders(options, overdueOnly);
+    }
   }
 
   async loadOrdersForStats(): Promise<void> {
