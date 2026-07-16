@@ -7,6 +7,7 @@
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Order, OrderService, Payment, PaymentService, RequestContext, User } from '@vendure/core';
+import { In } from 'typeorm';
 import { PaymentAllocationService } from '../../../src/services/payments/payment-allocation.service';
 import { FinancialService } from '../../../src/services/financial/financial.service';
 import { OpenSessionService } from '../../../src/services/financial/open-session.service';
@@ -251,8 +252,10 @@ describe('PaymentAllocationService', () => {
         code: 'ORD-001',
         state: 'ArrangingPayment',
         customer: { id: 'cust-1' },
-        customFields: { cashierPendingAt: new Date('2024-02-15T10:30:00Z') },
-        createdByUserId: createdByUser,
+        customFields: {
+          cashierPendingAt: new Date('2024-02-15T10:30:00Z'),
+          createdByUserId: createdByUser,
+        },
       } as unknown as Order;
 
       const orderRepo: Record<string, jest.Mock> = {
@@ -278,7 +281,53 @@ describe('PaymentAllocationService', () => {
       expect(result[0].createdBy).toBe(createdByUser);
       expect(orderRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({
-          relations: ['customer', 'createdByUserId'],
+          relations: ['customer'],
+        })
+      );
+    });
+
+    it('resolves createdBy from a scalar user ID', async () => {
+      const createdByUser = { id: 'user-2', identifier: 'salesperson@example.com' } as User;
+      const pendingOrder = {
+        id: 'order-2',
+        code: 'ORD-002',
+        state: 'ArrangingPayment',
+        customer: { id: 'cust-2' },
+        customFields: {
+          cashierPendingAt: new Date('2024-02-15T10:30:00Z'),
+          createdByUserId: createdByUser.id,
+        },
+      } as unknown as Order;
+
+      const orderRepo: Record<string, jest.Mock> = {
+        update: jest.fn(),
+        findOne: jest.fn(),
+        find: jest.fn(),
+      };
+      orderRepo.find.mockReturnValue(Promise.resolve([pendingOrder]));
+
+      const userRepo = {
+        find: jest.fn().mockReturnValue(Promise.resolve([createdByUser])),
+      };
+
+      mockConnection.getRepository.mockImplementation((_: any, entity: any) =>
+        entity === Order ? orderRepo : userRepo
+      );
+
+      mockFinancialService.getOrderPaymentStatus.mockResolvedValue({
+        totalOwed: 10000,
+        amountPaid: 0,
+        amountOwing: 10000,
+      });
+
+      const result = await service.getPendingCashierOrders(ctx);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].order.id).toBe('order-2');
+      expect(result[0].createdBy).toBe(createdByUser);
+      expect(userRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: In([createdByUser.id]) },
         })
       );
     });
@@ -289,8 +338,7 @@ describe('PaymentAllocationService', () => {
         code: 'ORD-001',
         state: 'ArrangingPayment',
         customer: { id: 'cust-1' },
-        customFields: { cashierPendingAt: new Date() },
-        createdByUserId: null,
+        customFields: { cashierPendingAt: new Date(), createdByUserId: null },
       } as unknown as Order;
 
       const orderRepo: Record<string, jest.Mock> = {
