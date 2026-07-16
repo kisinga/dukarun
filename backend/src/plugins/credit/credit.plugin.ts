@@ -284,6 +284,7 @@ const COMBINED_SCHEMA = gql`
     order: Order!
     amountOwing: Int!
     pendingSince: DateTime
+    createdBy: User
   }
 
   type CreditValidationResult {

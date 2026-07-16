@@ -765,6 +765,7 @@ export type CashDrawerCount = {
 export type CashierPendingOrder = {
   __typename?: 'CashierPendingOrder';
   amountOwing: Scalars['Int']['output'];
+  createdBy?: Maybe<User>;
   order: Order;
   pendingSince?: Maybe<Scalars['DateTime']['output']>;
 };
@@ -12734,6 +12735,7 @@ export type PendingCashierOrdersQuery = {
     __typename?: 'CashierPendingOrder';
     amountOwing: number;
     pendingSince?: any | null;
+    createdBy?: { __typename?: 'User'; id: string; identifier: string } | null;
     order: {
       __typename?: 'Order';
       id: string;
@@ -12742,11 +12744,14 @@ export type PendingCashierOrdersQuery = {
       total: number;
       totalWithTax: number;
       createdAt: any;
+      orderPlacedAt?: any | null;
       customer?: {
         __typename?: 'Customer';
         id: string;
         firstName: string;
         lastName: string;
+        emailAddress: string;
+        phoneNumber?: string | null;
       } | null;
       lines: Array<{
         __typename?: 'OrderLine';
@@ -22107,6 +22112,17 @@ export const PendingCashierOrdersDocument = {
                 { kind: 'Field', name: { kind: 'Name', value: 'pendingSince' } },
                 {
                   kind: 'Field',
+                  name: { kind: 'Name', value: 'createdBy' },
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'identifier' } },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
                   name: { kind: 'Name', value: 'order' },
                   selectionSet: {
                     kind: 'SelectionSet',
@@ -22117,6 +22133,7 @@ export const PendingCashierOrdersDocument = {
                       { kind: 'Field', name: { kind: 'Name', value: 'total' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'totalWithTax' } },
                       { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'orderPlacedAt' } },
                       {
                         kind: 'Field',
                         name: { kind: 'Name', value: 'customer' },
@@ -22126,6 +22143,8 @@ export const PendingCashierOrdersDocument = {
                             { kind: 'Field', name: { kind: 'Name', value: 'id' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
                             { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
+                            { kind: 'Field', name: { kind: 'Name', value: 'phoneNumber' } },
                           ],
                         },
                       },

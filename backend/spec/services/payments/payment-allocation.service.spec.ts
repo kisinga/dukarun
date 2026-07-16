@@ -6,7 +6,7 @@
  */
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Order, OrderService, Payment, PaymentService, RequestContext } from '@vendure/core';
+import { Order, OrderService, Payment, PaymentService, RequestContext, User } from '@vendure/core';
 import { PaymentAllocationService } from '../../../src/services/payments/payment-allocation.service';
 import { FinancialService } from '../../../src/services/financial/financial.service';
 import { OpenSessionService } from '../../../src/services/financial/open-session.service';
@@ -59,6 +59,7 @@ describe('PaymentAllocationService', () => {
       getRepository: jest.fn(() => ({
         update: jest.fn(),
         findOne: jest.fn(),
+        find: jest.fn(),
       })),
     };
 
@@ -239,6 +240,76 @@ describe('PaymentAllocationService', () => {
       expect(result.fullySettled).toBe(false);
       expect(result.remainingOwing).toBe(6000);
       expect(mockOrderService.transitionToState).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getPendingCashierOrders', () => {
+    it('returns pending orders with createdBy user and pendingSince', async () => {
+      const createdByUser = { id: 'user-1', identifier: 'salesperson@example.com' } as User;
+      const pendingOrder = {
+        id: 'order-1',
+        code: 'ORD-001',
+        state: 'ArrangingPayment',
+        customer: { id: 'cust-1' },
+        customFields: { cashierPendingAt: new Date('2024-02-15T10:30:00Z') },
+        createdByUserId: createdByUser,
+      } as unknown as Order;
+
+      const orderRepo: Record<string, jest.Mock> = {
+        update: jest.fn(),
+        findOne: jest.fn(),
+        find: jest.fn(),
+      };
+      orderRepo.find.mockReturnValue(Promise.resolve([pendingOrder]));
+      mockConnection.getRepository.mockReturnValue(orderRepo);
+
+      mockFinancialService.getOrderPaymentStatus.mockResolvedValue({
+        totalOwed: 10000,
+        amountPaid: 0,
+        amountOwing: 10000,
+      });
+
+      const result = await service.getPendingCashierOrders(ctx);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].order.id).toBe('order-1');
+      expect(result[0].amountOwing).toBe(10000);
+      expect(result[0].pendingSince).toEqual(new Date('2024-02-15T10:30:00Z'));
+      expect(result[0].createdBy).toBe(createdByUser);
+      expect(orderRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          relations: ['customer', 'createdByUserId'],
+        })
+      );
+    });
+
+    it('filters out orders that no longer owe money', async () => {
+      const pendingOrder = {
+        id: 'order-1',
+        code: 'ORD-001',
+        state: 'ArrangingPayment',
+        customer: { id: 'cust-1' },
+        customFields: { cashierPendingAt: new Date() },
+        createdByUserId: null,
+      } as unknown as Order;
+
+      const orderRepo: Record<string, jest.Mock> = {
+        update: jest.fn(),
+        findOne: jest.fn(),
+        find: jest.fn(),
+      };
+      orderRepo.find.mockReturnValue(Promise.resolve([pendingOrder]));
+      mockConnection.getRepository.mockReturnValue(orderRepo);
+
+      mockFinancialService.getOrderPaymentStatus.mockResolvedValue({
+        totalOwed: 10000,
+        amountPaid: 10000,
+        amountOwing: 0,
+      });
+
+      const result = await service.getPendingCashierOrders(ctx);
+
+      expect(result).toHaveLength(0);
     });
   });
 });

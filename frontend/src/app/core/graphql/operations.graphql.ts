@@ -2171,6 +2171,10 @@ export const PENDING_CASHIER_ORDERS = graphql(`
     pendingCashierOrders {
       amountOwing
       pendingSince
+      createdBy {
+        id
+        identifier
+      }
       order {
         id
         code
@@ -2178,10 +2182,13 @@ export const PENDING_CASHIER_ORDERS = graphql(`
         total
         totalWithTax
         createdAt
+        orderPlacedAt
         customer {
           id
           firstName
           lastName
+          emailAddress
+          phoneNumber
         }
         lines {
           id

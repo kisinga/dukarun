@@ -6,6 +6,7 @@ import { PENDING_CASHIER_ORDERS, SETTLE_ORDER_PAYMENTS } from '../../graphql/ope
 export interface CashierPendingOrderView {
   amountOwing: number; // cents
   pendingSince: string | null;
+  createdBy?: { id: string; identifier: string } | null;
   order: {
     id: string;
     code: string;
@@ -13,7 +14,14 @@ export interface CashierPendingOrderView {
     total: number;
     totalWithTax: number;
     createdAt: string;
-    customer?: { id: string; firstName?: string | null; lastName?: string | null } | null;
+    orderPlacedAt?: string | null;
+    customer?: {
+      id: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      emailAddress?: string | null;
+      phoneNumber?: string | null;
+    } | null;
     lines: Array<{ id: string; quantity: number; productVariant: { id: string; name: string } }>;
   };
 }

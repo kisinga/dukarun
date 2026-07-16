@@ -742,6 +742,7 @@ export type CashDrawerCount = {
 export type CashierPendingOrder = {
   __typename?: 'CashierPendingOrder';
   amountOwing: Scalars['Int']['output'];
+  createdBy?: Maybe<User>;
   order: Order;
   pendingSince?: Maybe<Scalars['DateTime']['output']>;
 };
