@@ -119,6 +119,52 @@ export const mpesaPaymentHandler = new PaymentMethodHandler({
 });
 
 /**
+ * Bank Transfer Payment Handler
+ *
+ * Records a payment received by bank transfer. No real-time API integration;
+ * the payment is treated as settled once recorded, with an optional reference
+ * (e.g. cheque number, transfer reference) captured in metadata for statement
+ * reconciliation.
+ */
+export const bankPaymentHandler = new PaymentMethodHandler({
+  code: PAYMENT_METHOD_CODES.BANK,
+  description: [
+    {
+      languageCode: LanguageCode.en,
+      value: 'Bank Transfer - Recorded for statement reconciliation',
+    },
+  ],
+  args: {},
+
+  createPayment: async (ctx, order, _amount, args, metadata): Promise<CreatePaymentResult> => {
+    const orderTotal = order.total ?? 0;
+    const amount =
+      typeof metadata?.allocatedAmount === 'number' &&
+      metadata.allocatedAmount > 0 &&
+      metadata.allocatedAmount <= orderTotal
+        ? metadata.allocatedAmount
+        : orderTotal;
+    const result = {
+      amount,
+      state: 'Settled' as const,
+      transactionId: `BANK-${Date.now()}`,
+      metadata: {
+        paymentType: 'bank',
+        userId: ctx.activeUserId?.toString(),
+        ...(metadata || {}),
+      },
+    };
+
+    return result;
+  },
+
+  settlePayment: async (): Promise<SettlePaymentResult> => {
+    // Already settled in createPayment
+    return { success: true };
+  },
+});
+
+/**
  * Factory for Credit Payment Handler
  *
  * We construct this handler with an injected CreditService to avoid

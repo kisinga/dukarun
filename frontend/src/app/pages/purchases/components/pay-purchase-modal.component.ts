@@ -129,7 +129,7 @@ export interface PayPurchaseModalData {
               </select>
               <label class="label">
                 <span class="label-text-alt text-base-content/60"
-                  >Account to debit (e.g. Cash, M-Pesa).</span
+                  >Account to debit (e.g. Cash, M-Pesa, Bank).</span
                 >
               </label>
             </div>

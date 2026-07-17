@@ -29,6 +29,7 @@ import {
   OrderArSnapshot,
 } from '../financial/ledger-projection';
 import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
+import { isCashierControlledPaymentMethod } from '../financial/payment-method-mapping.config';
 import { PaymentAllocationItem, calculatePaymentAllocation } from './payment-allocation-base.types';
 
 export interface PaymentAllocationInput {
@@ -112,23 +113,34 @@ export class PaymentAllocationService {
   ) {}
 
   /**
-   * Resolve payment method code to channel's PaymentMethod.code so createPayment receives a valid code.
-   * Accepts either full code (e.g. credit-1) or handler (e.g. credit); returns full code.
+   * Resolve payment method code to channel's PaymentMethod and return both the full channel-specific
+   * code and whether the method is cashier-controlled. Accepts either full code (e.g. credit-1) or
+   * handler (e.g. credit).
    */
-  private async resolvePaymentMethodCode(ctx: RequestContext, methodCode: string): Promise<string> {
+  private async resolvePaymentMethod(
+    ctx: RequestContext,
+    methodCode: string
+  ): Promise<{ code: string; isCashierControlled: boolean }> {
     const channelId = ctx.channelId as number;
     const methods = await this.channelPaymentMethodService.getChannelPaymentMethods(ctx, channelId);
     const trimmed = methodCode?.trim() || '';
     const fullMatch = methods.find(pm => pm.code === trimmed);
-    if (fullMatch) return fullMatch.code;
-    const handler = trimmed || PAYMENT_METHOD_CODES.CREDIT;
-    const byHandler = methods.find(
-      pm => pm.code === `${handler}-${channelId}` || pm.code.startsWith(handler + '-')
-    );
-    if (byHandler) return byHandler.code;
-    throw new UserInputError(
-      `Payment method not found for channel. Provide a valid payment method code (e.g. from channel payment methods).`
-    );
+    const method =
+      fullMatch ||
+      methods.find(
+        pm =>
+          pm.code === `${trimmed || PAYMENT_METHOD_CODES.CREDIT}-${channelId}` ||
+          pm.code.startsWith((trimmed || PAYMENT_METHOD_CODES.CREDIT) + '-')
+      );
+    if (!method) {
+      throw new UserInputError(
+        `Payment method not found for channel. Provide a valid payment method code (e.g. from channel payment methods).`
+      );
+    }
+    return {
+      code: method.code,
+      isCashierControlled: isCashierControlledPaymentMethod(method),
+    };
   }
 
   /**
@@ -203,14 +215,13 @@ export class PaymentAllocationService {
         input.debitAccountCode.trim()
       );
     }
-    const resolvedMethodCode = await this.resolvePaymentMethodCode(
+    const { code: resolvedMethodCode, isCashierControlled } = await this.resolvePaymentMethod(
       ctx,
       input.paymentMethodCode || PAYMENT_METHOD_CODES.CREDIT
     );
-    const session = await this.cashierSessionService.requireOpenSession(
-      ctx,
-      ctx.channelId as number
-    );
+    const session = isCashierControlled
+      ? await this.cashierSessionService.requireOpenSession(ctx, ctx.channelId as number)
+      : null;
     return this.connection.withTransaction(ctx, async transactionCtx => {
       try {
         // 1. Get unpaid orders
@@ -305,7 +316,7 @@ export class PaymentAllocationService {
             resolvedMethodCode,
             amountToAllocate,
             input.debitAccountCode?.trim(),
-            session.id,
+            session?.id,
             input.customerId
           );
 
@@ -441,7 +452,7 @@ export class PaymentAllocationService {
     // Store customer ID before transaction (TypeScript safety)
     const customerId = order.customer.id.toString();
 
-    const actualPaymentMethodCode = await this.resolvePaymentMethodCode(
+    const { code: actualPaymentMethodCode, isCashierControlled } = await this.resolvePaymentMethod(
       ctx,
       paymentMethodCode || PAYMENT_METHOD_CODES.CREDIT
     );
@@ -450,10 +461,9 @@ export class PaymentAllocationService {
       await this.chartOfAccountsService.validatePaymentSourceAccount(ctx, debitAccountCode.trim());
     }
 
-    const session = await this.cashierSessionService.requireOpenSession(
-      ctx,
-      ctx.channelId as number
-    );
+    const session = isCashierControlled
+      ? await this.cashierSessionService.requireOpenSession(ctx, ctx.channelId as number)
+      : null;
 
     // Prepare metadata with reference number if provided
     const metadata: Record<string, any> = {
@@ -483,7 +493,7 @@ export class PaymentAllocationService {
         actualPaymentMethodCode,
         paymentAmountInCents,
         debitAccountCode?.trim(),
-        session.id,
+        session?.id,
         customerId
       );
 
@@ -601,7 +611,7 @@ export class PaymentAllocationService {
     // Resolve every tender's payment method to a channel PaymentMethod.code up front (fail fast).
     const resolvedTenders: Array<{ code: string; amount: number; referenceNumber?: string }> = [];
     for (const tender of tenders) {
-      const code = await this.resolvePaymentMethodCode(ctx, tender.paymentMethodCode);
+      const { code } = await this.resolvePaymentMethod(ctx, tender.paymentMethodCode);
       resolvedTenders.push({
         code,
         amount: tender.amount,

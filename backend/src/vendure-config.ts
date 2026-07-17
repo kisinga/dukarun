@@ -43,7 +43,11 @@ import { ManageStockAdjustmentsPermission } from './plugins/stock/permissions';
 import { StockPlugin } from './plugins/stock/stock.plugin';
 import { SubscriptionPlugin } from './plugins/subscriptions/subscription.plugin';
 import { StorefrontPlugin } from './plugins/storefront/storefront.plugin';
-import { cashPaymentHandler, mpesaPaymentHandler } from './services/payments/payment-handlers';
+import {
+  bankPaymentHandler,
+  cashPaymentHandler,
+  mpesaPaymentHandler,
+} from './services/payments/payment-handlers';
 import {
   channelCustomFields,
   customerCustomFields,
@@ -213,6 +217,7 @@ export const config: VendureConfig = {
     paymentMethodHandlers: [
       cashPaymentHandler,
       mpesaPaymentHandler,
+      bankPaymentHandler,
       // Credit handler is now created via factory with DI.
       // It will be replaced at runtime in the CreditPlugin configuration hook.
       // A temporary placeholder is registered here to satisfy the type system;

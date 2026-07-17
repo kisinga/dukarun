@@ -1,4 +1,4 @@
-import { ID, User } from '@vendure/core';
+import { Asset, ID, User } from '@vendure/core';
 
 declare module '@vendure/core' {
   /**
@@ -16,5 +16,14 @@ declare module '@vendure/core' {
     reversedByUserId?: User | ID | null;
     cashierPendingAt?: Date | null;
     reversedAt?: Date | null;
+  }
+
+  interface CustomPaymentMethodFields {
+    imageAsset?: Asset | ID | null;
+    isActive?: boolean | null;
+    reconciliationType: 'blind_count' | 'transaction_verification' | 'statement_match' | 'none';
+    ledgerAccountCode?: string | null;
+    isCashierControlled: boolean;
+    requiresReconciliation: boolean;
   }
 }

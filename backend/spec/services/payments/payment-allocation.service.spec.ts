@@ -93,7 +93,7 @@ describe('PaymentAllocationService', () => {
     beforeEach(() => {
       mockOpenSessionService.requireOpenSession.mockResolvedValue({ id: 'session-1' } as any);
       mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([
-        { code: 'cash-1' } as any,
+        { code: 'cash-1', customFields: { isCashierControlled: true } } as any,
       ]);
       mockFinancialService.recordPaymentAllocation.mockResolvedValue(undefined);
     });

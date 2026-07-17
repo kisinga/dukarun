@@ -46,6 +46,8 @@ export const PAYMENT_METHOD_CODES = {
   CASH: 'cash',
   /** M-Pesa payment handler code */
   MPESA: 'mpesa',
+  /** Bank transfer payment handler code */
+  BANK: 'bank',
   /** Credit payment handler code */
   CREDIT: 'credit',
 } as const;

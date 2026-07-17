@@ -152,7 +152,9 @@ describe('Cashier-ledger flows', () => {
       const mockChannelPaymentMethodForAllocation = {
         getChannelPaymentMethods: jest
           .fn()
-          .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
+          .mockImplementation(() =>
+            Promise.resolve([{ code: 'cash-1', customFields: { isCashierControlled: true } }])
+          ),
       } as any;
       const orderArProjectionFlowA = new OrderArProjection(mockPaymentFinancialService);
       const ledgerConsistencyGuardFlowA = new LedgerConsistencyGuard();
@@ -179,7 +181,7 @@ describe('Cashier-ledger flows', () => {
         ctx1,
         'order-1',
         5000,
-        undefined,
+        'cash-1',
         undefined,
         ACCOUNT_CODES.CASH_ON_HAND
       );
@@ -188,7 +190,7 @@ describe('Cashier-ledger flows', () => {
         ctx1,
         expect.any(String),
         expect.any(Object),
-        'credit-1',
+        'cash-1',
         5000,
         ACCOUNT_CODES.CASH_ON_HAND,
         FLOW_A_SESSION_ID,

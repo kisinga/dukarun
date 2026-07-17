@@ -6,7 +6,7 @@ import { InventoryService } from '../inventory/inventory.service';
 import { InventoryReconciliationService } from '../inventory/inventory-reconciliation.service';
 import { InventoryConfigurationService } from '../inventory/inventory-configuration.service';
 import { FinancialService } from '../financial/financial.service';
-import { PAYMENT_METHOD_CODES } from '../payments/payment-method-codes.constants';
+import { debitAccountCodeToPaymentMethodCode } from '../financial/payment-method-mapping.config';
 import { ApprovalService } from '../approval/approval.service';
 import { StockPurchase } from './entities/purchase.entity';
 import { PurchasePayment } from './entities/purchase-payment.entity';
@@ -267,23 +267,25 @@ export class StockManagementService {
           const channelId = transactionCtx.channelId as number;
           const supplierIdNum = parseInt(String(input.supplierId), 10);
 
-          // Create PurchasePayment record for audit trail
-          const paymentRecord = purchasePaymentRepo.create({
-            channelId,
-            purchaseId: purchase.id,
-            amount: paymentAmount,
-            method: PAYMENT_METHOD_CODES.CASH,
-            reference: input.payment.reference || null,
-            supplierId: supplierIdNum,
-          });
-          await purchasePaymentRepo.save(paymentRecord);
-
           // Post payment to ledger (debit AP, credit payment source)
           const paymentId = `supplier-payment-${purchase.id}-${Date.now()}`;
           const debitAccountCode = input.payment.debitAccountCode?.trim();
           if (!debitAccountCode) {
             throw new UserInputError('Payment source account is required');
           }
+          const paymentMethodCode = debitAccountCodeToPaymentMethodCode(debitAccountCode);
+
+          // Create PurchasePayment record for audit trail
+          const paymentRecord = purchasePaymentRepo.create({
+            channelId,
+            purchaseId: purchase.id,
+            amount: paymentAmount,
+            method: paymentMethodCode,
+            reference: input.payment.reference || null,
+            supplierId: supplierIdNum,
+          });
+          await purchasePaymentRepo.save(paymentRecord);
+
           await this.financialService.recordSupplierPayment(
             transactionCtx,
             paymentId,
@@ -291,7 +293,7 @@ export class StockManagementService {
             purchase.referenceNumber || purchase.id,
             String(input.supplierId),
             paymentAmount,
-            PAYMENT_METHOD_CODES.CASH,
+            paymentMethodCode,
             debitAccountCode
           );
 
