@@ -1,193 +1,111 @@
 <app-navbar />
 
-<main class="bg-base-100 text-base-content">
-  <section class="section scroll-mt-28 bg-base-100 py-16">
+<main class="bg-base-100 text-base-content overflow-x-hidden w-full">
+  <!-- ══ Hero ═════════════════════════════════════════════════════════════ -->
+  <section class="section scroll-mt-28 bg-base-100">
     <div class="container-app space-y-4 text-center">
-      <span class="mkt-eyebrow"> Get in touch </span>
-      <h1 class="mkt-h1">Contact us</h1>
-      <p class="mkt-lead">
-        Have questions? Need help? We're here to support you. Reach out and we'll get back to you as
-        soon as possible.
+      <span class="mkt-eyebrow">Contact</span>
+      <h1 class="mkt-h1">Talk to a human</h1>
+      <p class="mkt-lead mx-auto max-w-2xl">
+        No ticket numbers, no bots reading scripts. Real people who know the product and the market,
+        one message away.
       </p>
     </div>
 
-    <div class="container-app mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-      <article
-        class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
-      >
-        <div class="flex flex-col gap-4 flex-1">
-          <div
-            class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
-          >
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
+    <!-- Channels -->
+    <div class="container-app mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      @for (channel of channels; track channel.title) {
+        <article
+          class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+        >
+          <div class="flex flex-col gap-4 flex-1">
+            <div
+              class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors duration-200 group-hover:bg-primary group-hover:text-primary-content"
+            >
+              <ng-icon [name]="channel.icon" size="1.5rem" aria-hidden="true" />
+            </div>
+            <h3 class="text-lg font-semibold">{{ channel.title }}</h3>
+            <p class="text-base-content/80 flex-1">{{ channel.copy }}</p>
+            @if (channel.external) {
+              <a
+                [href]="channel.linkHref"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="link link-primary mt-auto font-medium"
+              >
+                {{ channel.linkText }}
+              </a>
+            } @else {
+              <a [routerLink]="channel.linkHref" class="link link-primary mt-auto font-medium">
+                {{ channel.linkText }}
+              </a>
+            }
           </div>
-          <h3 class="text-lg font-semibold">Email us</h3>
-          <p class="text-base-content/80 flex-1">
-            Send us an email and we'll respond within 24 hours.
-          </p>
-          <a href="mailto:hello@dukarun.com" class="link link-primary mt-auto">hello@dukarun.com</a>
-        </div>
-      </article>
-
-      <article
-        class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
-      >
-        <div class="flex flex-col gap-4 flex-1">
-          <div
-            class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
-          >
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-              />
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold">WhatsApp us</h3>
-          <p class="text-base-content/80 flex-1">
-            Chat with us on WhatsApp for quick responses and support.
-          </p>
-          <a
-            href="https://wa.me/254788922222"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="link link-primary mt-auto"
-          >
-            +254 788 922 222
-          </a>
-        </div>
-      </article>
-
-      <article
-        class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
-      >
-        <div class="flex flex-col gap-4 flex-1">
-          <div
-            class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
-          >
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold">Support</h3>
-          <p class="text-base-content/80 flex-1">
-            Need help with your account? Check out our
-            <a routerLink="/support" class="link link-primary">support page</a> for answers to
-            common questions.
-          </p>
-        </div>
-      </article>
-
-      <article
-        class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
-      >
-        <div class="flex flex-col gap-4 flex-1">
-          <div
-            class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
-          >
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-              />
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold">Enterprise inquiries</h3>
-          <p class="text-base-content/80 flex-1">
-            Interested in Enterprise plans or custom solutions? We'd love to discuss how dukarun can
-            work for your business.
-          </p>
-          <a href="mailto:hello@dukarun.com" class="link link-primary mt-auto">hello@dukarun.com</a>
-        </div>
-      </article>
+        </article>
+      }
     </div>
+  </section>
 
-    <div class="container-app mt-10">
-      <div
-        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
-      >
-        <h2 class="mb-4 text-2xl font-bold">Installation and training</h2>
-        <p class="text-base-content/80 mb-4">
-          We offer optional setup and staff training. Pricing depends on your location, number of
-          shops, and team size. Contact us on WhatsApp or by email for a quote.
-        </p>
-        <div class="flex flex-col gap-3 sm:flex-row">
-          <a
-            href="https://wa.me/254788922222"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="btn btn-outline btn-primary"
+  <!-- ══ Setup and training ═══════════════════════════════════════════════ -->
+  <section class="section bg-base-100">
+    <div class="container-app">
+      <div class="mkt-stage p-8 sm:p-12">
+        <div
+          class="pointer-events-none absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-primary/25 blur-3xl"
+          aria-hidden="true"
+        ></div>
+        <div class="relative mx-auto max-w-2xl text-center">
+          <span
+            class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white/80"
           >
-            WhatsApp us for a quote
-          </a>
-          <a href="mailto:hello@dukarun.com" class="btn btn-outline btn-primary">
-            Email us for a quote
-          </a>
+            Optional extra
+          </span>
+          <h2 class="mkt-h2 mt-4 text-white">Installation and training</h2>
+          <p class="mt-4 text-base text-white/70">
+            Want hands-on help? We offer optional setup and staff training. Pricing depends on your
+            location, number of shops, and team size, and it's always quoted before any work begins.
+          </p>
+          <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <a
+              href="https://wa.me/254788922222"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/30"
+            >
+              WhatsApp us for a quote
+            </a>
+            <a href="mailto:hello@dukarun.com" class="btn btn-ghost text-white/80 hover:text-white">
+              Email us for a quote
+            </a>
+          </div>
         </div>
       </div>
     </div>
+  </section>
 
-    <div class="container-app mt-10">
-      <div
-        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
-      >
-        <h2 class="mb-6 text-2xl font-bold">Send us a message</h2>
-        <form class="space-y-4">
-          <div>
-            <label class="label">
-              <span class="label-text">Name</span>
-            </label>
-            <input type="text" placeholder="Your name" class="input input-bordered w-full" />
-          </div>
-          <div>
-            <label class="label">
-              <span class="label-text">Email</span>
-            </label>
-            <input type="email" placeholder="your@email.com" class="input input-bordered w-full" />
-          </div>
-          <div>
-            <label class="label">
-              <span class="label-text">Subject</span>
-            </label>
-            <input
-              type="text"
-              placeholder="What's this about?"
-              class="input input-bordered w-full"
+  <!-- ══ Honest expectation ═══════════════════════════════════════════════ -->
+  <section class="section bg-base-200/40">
+    <div class="container-app text-center">
+      <h2 class="mkt-h2">We answer ourselves</h2>
+      <p class="mkt-subhead mt-4">
+        Every message is read and answered by the team that builds dukarun. WhatsApp is fastest;
+        email gets a reply within 24 hours.
+      </p>
+      <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+        <a
+          href="https://wa.me/254788922222"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn btn-lg bg-[#25D366] text-white border-[#25D366] hover:bg-[#128C7E] hover:border-[#128C7E] transition-transform duration-200 hover:-translate-y-0.5"
+        >
+          <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"
             />
-          </div>
-          <div>
-            <label class="label">
-              <span class="label-text">Message</span>
-            </label>
-            <textarea
-              class="textarea textarea-bordered w-full"
-              placeholder="Tell us how we can help..."
-              rows="6"
-            ></textarea>
-          </div>
-          <button
-            type="submit"
-            class="btn btn-primary btn-lg w-full shadow-lg shadow-primary/20 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl"
-          >
-            Send message
-          </button>
-        </form>
+          </svg>
+          WhatsApp us
+        </a>
+        <a href="mailto:hello@dukarun.com" class="btn btn-lg btn-outline">hello@dukarun.com</a>
       </div>
     </div>
   </section>

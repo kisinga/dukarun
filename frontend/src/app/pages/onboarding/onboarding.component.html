@@ -17,17 +17,13 @@
   >
     <div class="container-app space-y-6">
       <header class="text-center space-y-4">
-        <span
-          class="badge badge-primary badge-soft badge-sm font-semibold uppercase tracking-wider"
-        >
-          Guide
-        </span>
-        <h1 id="onboarding-title" class="text-3xl font-bold sm:text-4xl md:text-5xl">
-          Dukarun onboarding and reference
+        <span class="mkt-eyebrow">Guide</span>
+        <h1 id="onboarding-title" class="mkt-h1">
+          From sign-up to first sale, and everything after
         </h1>
-        <p class="mx-auto max-w-2xl text-base text-base-content/70">
-          How to set up products, stock, shifts, selling, purchasing, credit, accounting, and admin
-          — in the order a business runs.
+        <p class="mkt-subhead">
+          How to set up products, stock, shifts, selling, purchasing, credit, accounting, and admin,
+          in the order a business runs.
         </p>
       </header>
 
@@ -61,25 +57,25 @@
           <p>Before you can sell, certain things must be in place. The following chain applies:</p>
           <ol class="list-decimal list-inside space-y-2 text-base-content/90">
             <li>
-              <strong>Channel approved</strong> — Your business (channel) must be approved. If the
+              <strong>Channel approved</strong>: Your business (channel) must be approved. If the
               account is pending approval, you can log in but mutations are blocked (read-only).
             </li>
             <li>
-              <strong>Products and pricing</strong> — You need at least one product (or service)
-              with at least one variant and a price to sell anything.
+              <strong>Products and pricing</strong>: You need at least one product (or service) with
+              at least one variant and a price to sell anything.
             </li>
             <li>
-              <strong>Stock (for physical products)</strong> — Quantity on hand must be greater than
+              <strong>Stock (for physical products)</strong>: Quantity on hand must be greater than
               zero at the chosen stock location. Stock comes from opening stock or purchases.
             </li>
             <li>
-              <strong>Open shift</strong> — To record any payment (complete a sale, pay a supplier,
+              <strong>Open shift</strong>: To record any payment (complete a sale, pay a supplier,
               record an expense, or create an inter-account transfer), you must have an open cashier
               session. You can add items to the cart without an open shift, but you cannot complete
               checkout until a shift is open.
             </li>
             <li>
-              <strong>Credit sales</strong> — To sell on credit, the customer must exist and be
+              <strong>Credit sales</strong>: To sell on credit, the customer must exist and be
               credit-approved with a limit; the user may need credit management permission.
             </li>
           </ol>
@@ -132,13 +128,13 @@
           <h2 class="text-2xl font-bold border-b border-base-300 pb-2">Types of products</h2>
           <ul class="space-y-2 text-base-content/90">
             <li>
-              <strong>Item type:</strong> <strong>Product</strong> — physical goods, can have stock
-              (measured or discrete). <strong>Service</strong> — no stock tracked; you still track
+              <strong>Item type:</strong> <strong>Product</strong>: physical goods, can have stock
+              (measured or discrete). <strong>Service</strong>: no stock tracked; you still track
               revenue.
             </li>
             <li>
-              <strong>Product type (for products):</strong> <strong>Measured</strong> — sold by
-              weight, volume, or other continuous measure. <strong>Discrete</strong> — sold by unit
+              <strong>Product type (for products):</strong> <strong>Measured</strong>: sold by
+              weight, volume, or other continuous measure. <strong>Discrete</strong>: sold by unit
               (e.g. bottles, packets).
             </li>
             <li>
@@ -223,7 +219,7 @@
             <li>View reports or accounting</li>
           </ul>
           <p class="mt-4">
-            <strong>Where:</strong> Dashboard — click <strong>Open shift</strong>. On the Sell page,
+            <strong>Where:</strong> Dashboard: click <strong>Open shift</strong>. On the Sell page,
             if no shift is open, a banner appears with <strong>Open shift</strong>; clicking it
             opens the shift modal.
           </p>
@@ -231,7 +227,7 @@
             <p class="font-semibold text-warning-content">Common pitfalls</p>
             <ul class="list-disc list-inside mt-1 text-sm">
               <li>
-                <strong>"Open a session to record payments"</strong> — You tried to complete
+                <strong>"Open a session to record payments"</strong>: You tried to complete
                 checkout, pay a supplier, record an expense, or create a transfer without an open
                 shift. Fix: open a shift from the Dashboard or Sell page banner, then retry.
               </li>
@@ -272,14 +268,12 @@
             <p class="font-semibold text-warning-content">Common pitfalls</p>
             <ul class="list-disc list-inside mt-1 text-sm">
               <li>
-                Checkout disabled or "Open a session to record payments" — No open shift. Open a
+                Checkout disabled or "Open a session to record payments": No open shift. Open a
                 shift and try again.
               </li>
-              <li>Credit option not available — Customer not credit-approved or over limit.</li>
-              <li>Low stock / quantity not available — Add opening stock or record a purchase.</li>
-              <li>
-                Payment method missing — Add methods under Settings → Admin → Payment Methods.
-              </li>
+              <li>Credit option not available: Customer not credit-approved or over limit.</li>
+              <li>Low stock / quantity not available: Add opening stock or record a purchase.</li>
+              <li>Payment method missing: Add methods under Settings → Admin → Payment Methods.</li>
             </ul>
           </div>
         </article>
@@ -317,8 +311,8 @@
           <div class="rounded-lg bg-warning/10 border border-warning/30 p-4 mt-4">
             <p class="font-semibold text-warning-content">Common pitfalls</p>
             <ul class="list-disc list-inside mt-1 text-sm">
-              <li>Cannot record supplier payment — No open shift. Open a shift first.</li>
-              <li>Supplier not in list — Ensure the customer is created with "Is supplier" set.</li>
+              <li>Cannot record supplier payment: No open shift. Open a shift first.</li>
+              <li>Supplier not in list: Ensure the customer is created with "Is supplier" set.</li>
             </ul>
           </div>
         </article>
@@ -368,10 +362,10 @@
             <p class="font-semibold text-warning-content">Common pitfalls</p>
             <ul class="list-disc list-inside mt-1 text-sm">
               <li>
-                Credit option not available — Customer not credit-approved, or over limit, or
-                frozen. Edit customer and approve / increase limit.
+                Credit option not available: Customer not credit-approved, or over limit, or frozen.
+                Edit customer and approve / increase limit.
               </li>
-              <li>Permission denied — Credit management may require a specific permission.</li>
+              <li>Permission denied: Credit management may require a specific permission.</li>
             </ul>
           </div>
         </article>
@@ -394,15 +388,15 @@
           <p><strong>Reconciliation:</strong></p>
           <ul class="list-disc list-inside space-y-1">
             <li>
-              <strong>Opening a shift</strong> — You can enter opening balances; creates an opening
+              <strong>Opening a shift</strong>: You can enter opening balances; creates an opening
               reconciliation record.
             </li>
             <li>
-              <strong>Closing a shift</strong> — When you close a cashier session, a closing
+              <strong>Closing a shift</strong>: When you close a cashier session, a closing
               reconciliation is created. Every closed session should have one.
             </li>
             <li>
-              <strong>Manual reconciliation</strong> — Accounting → Ledger → Reconciliation tab →
+              <strong>Manual reconciliation</strong>: Accounting → Ledger → Reconciliation tab →
               Create manual reconciliation. Record declared amounts for accounts for a date range.
             </li>
           </ul>
@@ -410,10 +404,10 @@
             <p class="font-semibold text-warning-content">Common pitfalls</p>
             <ul class="list-disc list-inside mt-1 text-sm">
               <li>
-                Missing closing reconciliation — Use the repair flow (query closed sessions missing
+                Missing closing reconciliation: Use the repair flow (query closed sessions missing
                 reconciliation and create reconciliation for each).
               </li>
-              <li>Cannot record expense — Open a shift first.</li>
+              <li>Cannot record expense: Open a shift first.</li>
             </ul>
           </div>
         </article>
@@ -437,8 +431,8 @@
             <p class="font-semibold text-warning-content">Common pitfalls</p>
             <ul class="list-disc list-inside mt-1 text-sm">
               <li>
-                Cannot create transfer — No open shift, or missing permission. Open a shift and
-                check your role.
+                Cannot create transfer: No open shift, or missing permission. Open a shift and check
+                your role.
               </li>
             </ul>
           </div>
@@ -499,10 +493,10 @@
             <p class="font-semibold text-warning-content">Common pitfalls</p>
             <ul class="list-disc list-inside mt-1 text-sm">
               <li>
-                Cannot see Admin or a tab — Your user may not have the required permission. Contact
+                Cannot see Admin or a tab: Your user may not have the required permission. Contact
                 the channel owner.
               </li>
-              <li>Cannot add payment methods — Must have access to Admin → Payment Methods.</li>
+              <li>Cannot add payment methods: Must have access to Admin → Payment Methods.</li>
             </ul>
           </div>
         </article>

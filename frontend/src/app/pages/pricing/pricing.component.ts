@@ -1,26 +1,32 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { FooterComponent } from '../../shell/layout/footer/footer.component';
 import { NavbarComponent } from '../../shell/layout/navbar/navbar.component';
 import {
   PublicPricingService,
   PublicSubscriptionTier,
-  PublicPlatformConfig,
 } from '../../shared/services/public-pricing.service';
+import { SEOService } from '../../shared/services/seo.service';
 
 interface PricingPlan {
   name: string;
   monthlyPrice: string;
   yearlyPrice: string;
+  /** "KES 1,200": monthly equivalent when billed yearly; null for Custom plans */
+  monthlyEquivalent: string | null;
+  /** Whole-percent saving of yearly vs monthly billing; null when not applicable */
+  savingsPercent: number | null;
   description: string;
   features: { text: string; included: boolean }[];
   ctaText: string;
-  ctaLink: string;
+  ctaRoute: string;
+  /** Plan code for signup query params; null for contact-sales CTAs */
+  ctaPlanCode: string | null;
   popular?: boolean;
 }
 
-function formatPrice(amount: number): string {
-  if (amount <= 0) return 'Custom';
+function formatKes(amount: number): string {
   return new Intl.NumberFormat('en-KE', { style: 'decimal', minimumFractionDigits: 0 }).format(
     amount,
   );
@@ -28,12 +34,13 @@ function formatPrice(amount: number): string {
 
 @Component({
   selector: 'app-pricing',
-  imports: [RouterLink, NavbarComponent, FooterComponent],
+  imports: [RouterLink, NavbarComponent, FooterComponent, NgIcon],
   templateUrl: './pricing.component.html',
   styleUrl: './pricing.component.scss',
 })
 export class PricingComponent implements OnInit {
   private readonly publicPricingService = inject(PublicPricingService);
+  private readonly seoService = inject(SEOService);
 
   protected readonly pricingPlans = signal<PricingPlan[]>([]);
   protected readonly pricingLoading = signal(true);
@@ -41,15 +48,28 @@ export class PricingComponent implements OnInit {
   protected readonly trialDays = signal<number | null>(null);
   protected readonly isYearly = signal(false);
 
-  async ngOnInit(): Promise<void> {
-    await this.loadPricing();
+  protected readonly trialDaysText = computed(() => {
+    const days = this.trialDays();
+    return typeof days === 'number' && days > 0 ? `${days}` : '30';
+  });
+
+  ngOnInit(): void {
+    this.seoService.updateTags({
+      title: 'Pricing: The Honest Deal | Dukarun',
+      description:
+        'One honest price for the till that keeps your books. Free trial, no credit card, no hardware, no hidden fees. Pause or cancel anytime.',
+      url: 'https://dukarun.com/pricing',
+    });
+    this.loadPricing();
   }
 
   toggleBilling(): void {
     this.isYearly.update((value) => !value);
   }
 
-  private async loadPricing(): Promise<void> {
+  async loadPricing(): Promise<void> {
+    this.pricingLoading.set(true);
+    this.pricingError.set(false);
     try {
       const [tiers, config] = await Promise.all([
         this.publicPricingService.getPublicTiers(),
@@ -58,14 +78,15 @@ export class PricingComponent implements OnInit {
 
       this.trialDays.set(config?.trialDays ?? null);
 
+      // No hardcoded price fallbacks: either the API's real figures or an
+      // honest error state. Feature *descriptions* may fall back (no figures).
       if (tiers.length > 0) {
         this.pricingPlans.set(tiers.map((tier) => this.mapTierToPlan(tier)));
       } else {
-        this.pricingPlans.set(this.fallbackPlans());
+        this.pricingError.set(true);
       }
     } catch {
       this.pricingError.set(true);
-      this.pricingPlans.set(this.fallbackPlans());
     } finally {
       this.pricingLoading.set(false);
     }
@@ -78,71 +99,26 @@ export class PricingComponent implements OnInit {
       ? tier.features.map((text) => ({ text, included: true }))
       : this.defaultFeaturesForTier(tier.code);
 
+    const hasPrices = monthly > 0 && yearly > 0;
+    const monthlyEquivalent = hasPrices ? yearly / 12 : null;
+    const savingsPercent =
+      hasPrices && yearly < monthly * 12 ? Math.round((1 - yearly / (monthly * 12)) * 100) : null;
+
+    const isEnterprise = tier.code === 'enterprise';
+
     return {
       name: tier.name,
-      monthlyPrice: monthly > 0 ? `KES ${formatPrice(monthly)}` : 'Custom',
-      yearlyPrice: yearly > 0 ? `KES ${formatPrice(yearly)}` : 'Custom',
+      monthlyPrice: monthly > 0 ? `KES ${formatKes(monthly)}` : 'Custom',
+      yearlyPrice: yearly > 0 ? `KES ${formatKes(yearly)}` : 'Custom',
+      monthlyEquivalent: monthlyEquivalent !== null ? `KES ${formatKes(monthlyEquivalent)}` : null,
+      savingsPercent,
       description: tier.description ?? '',
       features,
-      ctaText: tier.code === 'enterprise' ? 'Contact Sales' : 'Start free trial',
-      ctaLink: tier.code === 'enterprise' ? '/contact' : `/signup?plan=${tier.code}&trial=true`,
+      ctaText: isEnterprise ? 'Talk to us' : 'Start free trial',
+      ctaRoute: isEnterprise ? '/contact' : '/signup',
+      ctaPlanCode: isEnterprise ? null : tier.code,
       popular: tier.code === 'business',
     };
-  }
-
-  private fallbackPlans(): PricingPlan[] {
-    return [
-      {
-        name: 'Pro',
-        monthlyPrice: 'KES 1,500',
-        yearlyPrice: 'KES 14,400',
-        description: 'Everything you need to sell fast, track stock, and stay organized.',
-        features: [
-          { text: 'Sell with camera, barcode, or search', included: true },
-          { text: 'Offline-first POS with auto-sync', included: true },
-          { text: 'Real-time inventory tracking', included: true },
-          { text: 'Customer credit tracking', included: true },
-          { text: 'Basic sales reports', included: true },
-          { text: 'Unlimited products', included: true },
-        ],
-        ctaText: 'Start free trial',
-        ctaLink: '/signup?plan=pro&trial=true',
-      },
-      {
-        name: 'Business',
-        monthlyPrice: 'KES 2,500',
-        yearlyPrice: 'KES 24,000',
-        description:
-          'For shops that need rigorous accounting, FIFO profit tracking, and deeper insights.',
-        features: [
-          { text: 'Everything in Pro', included: true },
-          { text: 'True profit tracking (FIFO)', included: true },
-          { text: 'Daily and randomized reconciliation', included: true },
-          { text: 'Full double-entry ledger as single source of truth', included: true },
-          { text: 'WhatsApp and SMS alerts for shifts and customer balances', included: true },
-          { text: 'Multi-store management', included: true },
-          { text: 'Advanced financial reports', included: true },
-        ],
-        ctaText: 'Start free trial',
-        ctaLink: '/signup?plan=business&trial=true',
-        popular: true,
-      },
-      {
-        name: 'Enterprise',
-        monthlyPrice: 'Custom',
-        yearlyPrice: 'Custom',
-        description: 'For larger retail chains needing custom integrations and dedicated support.',
-        features: [
-          { text: 'Everything in Business', included: true },
-          { text: 'Unlimited users and locations', included: true },
-          { text: 'Advanced API integrations', included: true },
-          { text: 'Dedicated success manager', included: true },
-          { text: 'Custom onboarding and training', included: true },
-        ],
-        ctaText: 'Contact Sales',
-        ctaLink: '/contact',
-      },
-    ];
   }
 
   private defaultFeaturesForTier(code: string): { text: string; included: boolean }[] {

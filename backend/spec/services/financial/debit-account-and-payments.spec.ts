@@ -179,6 +179,8 @@ describe('PaymentAllocationService.paySingleOrder', () => {
   let mockFinancialService: any;
   let mockConnection: any;
   let mockChartOfAccountsService: any;
+  let mockCashierSessionService: any;
+  let mockChannelPaymentMethodService: any;
 
   beforeEach(() => {
     const mockOrderRepo = {
@@ -213,15 +215,20 @@ describe('PaymentAllocationService.paySingleOrder', () => {
     mockChartOfAccountsService = {
       validatePaymentSourceAccount: jest.fn(),
     };
-    const mockCashierSessionService = {
+    mockCashierSessionService = {
       requireOpenSession: jest
         .fn()
         .mockImplementation(() => Promise.resolve({ id: 'session-123', channelId: 1 })),
     } as any;
-    const mockChannelPaymentMethodService = {
-      getChannelPaymentMethods: jest
-        .fn()
-        .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
+    mockChannelPaymentMethodService = {
+      getChannelPaymentMethods: jest.fn().mockImplementation(() =>
+        Promise.resolve([
+          {
+            code: 'credit-1',
+            customFields: { isCashierControlled: false },
+          },
+        ])
+      ),
     } as any;
     const orderArProjection = new OrderArProjection(mockFinancialService);
     const ledgerConsistencyGuard = new LedgerConsistencyGuard();
@@ -346,7 +353,7 @@ describe('PaymentAllocationService.paySingleOrder', () => {
     const recordCall = mockFinancialService.recordPaymentAllocation.mock.calls[0];
     expect(recordCall[4]).toBe(5000);
     expect(recordCall[5]).toBe('CASH_ON_HAND');
-    expect(recordCall[6]).toBe('session-123');
+    expect(recordCall[6]).toBeUndefined();
   });
 
   it('should call recordPaymentAllocation without debitAccountCode when not provided', async () => {
@@ -369,7 +376,67 @@ describe('PaymentAllocationService.paySingleOrder', () => {
     expect(mockChartOfAccountsService.validatePaymentSourceAccount).not.toHaveBeenCalled();
     const recordCall = mockFinancialService.recordPaymentAllocation.mock.calls[0];
     expect(recordCall[5]).toBeUndefined();
+    expect(recordCall[6]).toBeUndefined();
+  });
+
+  it('should require an open session for cashier-controlled methods', async () => {
+    mockChannelPaymentMethodService.getChannelPaymentMethods.mockImplementation(() =>
+      Promise.resolve([
+        {
+          code: 'cash-1',
+          customFields: { isCashierControlled: true },
+        },
+      ])
+    );
+
+    const order = createOrder();
+    const payment = {
+      id: 'pay-1',
+      method: 'cash-1',
+      amount: 5000,
+      state: 'Settled',
+      metadata: { allocatedAmount: 5000 },
+      createdAt: new Date(),
+    };
+    mockOrderService.findOne.mockResolvedValue(order);
+    mockPaymentService.createPayment.mockResolvedValue(payment);
+    mockFinancialService.recordPaymentAllocation.mockResolvedValue(undefined);
+
+    await service.paySingleOrder(ctx, 'order-1', 5000, 'cash');
+
+    expect(mockCashierSessionService.requireOpenSession).toHaveBeenCalled();
+    const recordCall = mockFinancialService.recordPaymentAllocation.mock.calls[0];
     expect(recordCall[6]).toBe('session-123');
+  });
+
+  it('should not require an open session for bank transfers', async () => {
+    mockChannelPaymentMethodService.getChannelPaymentMethods.mockImplementation(() =>
+      Promise.resolve([
+        {
+          code: 'bank-1',
+          customFields: { isCashierControlled: false },
+        },
+      ])
+    );
+
+    const order = createOrder();
+    const payment = {
+      id: 'pay-1',
+      method: 'bank-1',
+      amount: 5000,
+      state: 'Settled',
+      metadata: { allocatedAmount: 5000 },
+      createdAt: new Date(),
+    };
+    mockOrderService.findOne.mockResolvedValue(order);
+    mockPaymentService.createPayment.mockResolvedValue(payment);
+    mockFinancialService.recordPaymentAllocation.mockResolvedValue(undefined);
+
+    await service.paySingleOrder(ctx, 'order-1', 5000, 'bank');
+
+    expect(mockCashierSessionService.requireOpenSession).not.toHaveBeenCalled();
+    const recordCall = mockFinancialService.recordPaymentAllocation.mock.calls[0];
+    expect(recordCall[6]).toBeUndefined();
   });
 });
 
@@ -381,6 +448,9 @@ describe('PaymentAllocationService.recordPayment', () => {
   let mockFinancialService: any;
   let mockConnection: any;
   let mockChartOfAccountsService: any;
+  let mockCashierSessionService: any;
+  let mockChannelPaymentMethodService: any;
+  let mockCreditService: any;
 
   beforeEach(() => {
     const mockOrderRepo = {
@@ -415,16 +485,24 @@ describe('PaymentAllocationService.recordPayment', () => {
     mockChartOfAccountsService = {
       validatePaymentSourceAccount: jest.fn(),
     };
-    const mockCashierSessionService = {
+    mockCashierSessionService = {
       requireOpenSession: jest
         .fn()
         .mockImplementation(() => Promise.resolve({ id: 'session-123', channelId: 1 })),
     } as any;
-    const mockChannelPaymentMethodService = {
-      getChannelPaymentMethods: jest
-        .fn()
-        .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
+    mockChannelPaymentMethodService = {
+      getChannelPaymentMethods: jest.fn().mockImplementation(() =>
+        Promise.resolve([
+          {
+            code: 'credit-1',
+            customFields: { isCashierControlled: false },
+          },
+        ])
+      ),
     } as any;
+    mockCreditService = {
+      recordRepayment: jest.fn().mockImplementation(() => Promise.resolve()),
+    };
     const orderArProjection = new OrderArProjection(mockFinancialService);
     const ledgerConsistencyGuard = new LedgerConsistencyGuard();
     service = new PaymentAllocationService(
@@ -432,7 +510,7 @@ describe('PaymentAllocationService.recordPayment', () => {
       mockOrderService,
       mockPaymentService,
       mockFinancialService,
-      {} as any,
+      mockCreditService,
       mockChartOfAccountsService,
       mockCashierSessionService,
       mockChannelPaymentMethodService,
@@ -537,6 +615,65 @@ describe('PaymentAllocationService.recordPayment', () => {
     ).rejects.toThrow(/out of sync with the ledger/);
 
     expect(mockPaymentService.createPayment).not.toHaveBeenCalled();
+  });
+
+  it('without orderId: records a bank payment without requiring an open session', async () => {
+    mockChannelPaymentMethodService.getChannelPaymentMethods.mockImplementation(() =>
+      Promise.resolve([
+        {
+          code: 'bank-1',
+          customFields: { isCashierControlled: false },
+        },
+      ])
+    );
+
+    const unpaidOrder = {
+      id: 'order-1',
+      code: 'ORD-001',
+      state: 'ArrangingPayment',
+      customer: { id: 'cust-1' },
+    };
+    const mockOrderRepo = {
+      find: jest.fn(() => Promise.resolve([unpaidOrder as any])) as any,
+      findOne: jest.fn(),
+      update: jest.fn(),
+    };
+    mockConnection.getRepository.mockImplementation((_: any, entity: any) =>
+      entity === Order ? mockOrderRepo : ({} as any)
+    );
+    mockFinancialService.getOrderPaymentStatus.mockResolvedValue({
+      totalOwed: 10000,
+      amountPaid: 0,
+      amountOwing: 10000,
+    });
+    const payment = {
+      id: 'pay-1',
+      method: 'bank-1',
+      amount: 10000,
+      state: 'Settled',
+      metadata: { allocatedAmount: 10000 },
+      createdAt: new Date(),
+    };
+    mockPaymentService.createPayment.mockResolvedValue(payment);
+
+    const result = await service.recordPayment(ctx, {
+      customerId: 'cust-1',
+      paymentAmount: 10000,
+      paymentMethodCode: 'bank-1',
+      referenceNumber: 'BANK-REF-001',
+    });
+
+    expect(mockCashierSessionService.requireOpenSession).not.toHaveBeenCalled();
+    expect(result.totalAllocated).toBe(10000);
+    expect(mockPaymentService.createPayment).toHaveBeenCalledWith(
+      expect.anything(),
+      unpaidOrder,
+      10000,
+      'bank-1',
+      expect.objectContaining({ referenceNumber: 'BANK-REF-001', allocatedAmount: 10000 })
+    );
+    const recordCall = mockFinancialService.recordPaymentAllocation.mock.calls[0];
+    expect(recordCall[6]).toBeUndefined();
   });
 });
 

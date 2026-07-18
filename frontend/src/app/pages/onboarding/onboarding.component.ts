@@ -50,7 +50,7 @@ export class OnboardingComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit(): void {
     this.seo.updateTags({
-      title: 'Getting started guide – Dukarun POS',
+      title: 'Getting started guide: Dukarun POS',
       description:
         'Step-by-step guide: create products, set pricing and opening stock, open a shift, sell, purchase from suppliers, sell on credit, and use accounting and admin features. Reference for customer care and self-onboarding.',
       url: 'https://dukarun.com/onboarding',
@@ -74,7 +74,7 @@ export class OnboardingComponent implements OnInit, AfterViewInit, OnDestroy {
     script.textContent = JSON.stringify({
       '@context': 'https://schema.org',
       '@type': 'Article',
-      headline: 'Getting started guide – Dukarun POS',
+      headline: 'Getting started guide: Dukarun POS',
       description: this.jsonLdDescription,
       url: this.canonicalUrl,
       mainEntityOfPage: { '@type': 'WebPage', '@id': this.canonicalUrl },
@@ -137,6 +137,6 @@ export class OnboardingComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Base URL for JSON-LD (canonical). */
   readonly canonicalUrl = 'https://dukarun.com/onboarding';
   readonly jsonLdDescription =
-    'How to set up products, stock, shifts, selling, purchasing, credit, accounting, and admin in Dukarun — in the order a business runs.';
+    'How to set up products, stock, shifts, selling, purchasing, credit, accounting, and admin in Dukarun, in the order a business runs.';
   readonly jsonLdSteps = this.sections.map((s) => ({ name: s.label }));
 }

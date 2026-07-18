@@ -17,7 +17,11 @@
  */
 
 import { PaymentMethod } from '@vendure/core';
-import { ACCOUNT_CODES, isValidAccountCode, type AccountCode } from '../../ledger/account-codes.constants';
+import {
+  ACCOUNT_CODES,
+  isValidAccountCode,
+  type AccountCode,
+} from '../../ledger/account-codes.constants';
 import { PAYMENT_METHOD_CODES } from '../payments/payment-method-codes.constants';
 
 /**
@@ -26,6 +30,7 @@ import { PAYMENT_METHOD_CODES } from '../payments/payment-method-codes.constants
 export enum PaymentMethodPattern {
   CASH = 'cash',
   MPESA = 'mpesa',
+  BANK = 'bank',
   CREDIT = 'credit',
 }
 
@@ -58,6 +63,10 @@ const PAYMENT_METHOD_MAPPINGS: PaymentMethodMappingRule[] = [
     accountCode: ACCOUNT_CODES.CLEARING_MPESA,
   },
   {
+    exactCode: PAYMENT_METHOD_CODES.BANK,
+    accountCode: ACCOUNT_CODES.BANK_MAIN,
+  },
+  {
     exactCode: PAYMENT_METHOD_CODES.CREDIT,
     accountCode: ACCOUNT_CODES.CLEARING_CREDIT,
   },
@@ -65,6 +74,10 @@ const PAYMENT_METHOD_MAPPINGS: PaymentMethodMappingRule[] = [
   {
     pattern: PaymentMethodPattern.MPESA,
     accountCode: ACCOUNT_CODES.CLEARING_MPESA,
+  },
+  {
+    pattern: PaymentMethodPattern.BANK,
+    accountCode: ACCOUNT_CODES.BANK_MAIN,
   },
   {
     pattern: PaymentMethodPattern.CASH,
@@ -137,8 +150,7 @@ export function getPaymentMethodsForAccount(accountCode: AccountCode): string[] 
  */
 export function getAccountCodeFromPaymentMethod(paymentMethod: PaymentMethod): AccountCode {
   // 1. Check custom field override
-  const customFields = (paymentMethod as any).customFields;
-  const customCode = customFields?.ledgerAccountCode;
+  const customCode = paymentMethod.customFields?.ledgerAccountCode;
 
   if (customCode && typeof customCode === 'string' && customCode.trim() !== '') {
     const trimmedCode = customCode.trim();
@@ -162,8 +174,7 @@ export function getAccountCodeFromPaymentMethod(paymentMethod: PaymentMethod): A
 export function getReconciliationTypeFromPaymentMethod(
   paymentMethod: PaymentMethod
 ): 'blind_count' | 'transaction_verification' | 'statement_match' | 'none' {
-  const customFields = (paymentMethod as any).customFields;
-  const reconType = customFields?.reconciliationType;
+  const reconType = paymentMethod.customFields?.reconciliationType;
 
   if (
     reconType === 'blind_count' ||
@@ -183,8 +194,7 @@ export function getReconciliationTypeFromPaymentMethod(
  * @returns true if payment method should be included in cashier session reconciliation
  */
 export function isCashierControlledPaymentMethod(paymentMethod: PaymentMethod): boolean {
-  const customFields = (paymentMethod as any).customFields;
-  return customFields?.isCashierControlled === true;
+  return paymentMethod.customFields?.isCashierControlled === true;
 }
 
 /**
@@ -194,9 +204,8 @@ export function isCashierControlledPaymentMethod(paymentMethod: PaymentMethod): 
  * @returns true if payment method must be reconciled before period close
  */
 export function requiresReconciliation(paymentMethod: PaymentMethod): boolean {
-  const customFields = (paymentMethod as any).customFields;
   // Default to true if not explicitly set to false
-  return customFields?.requiresReconciliation !== false;
+  return paymentMethod.customFields?.requiresReconciliation !== false;
 }
 
 /**
@@ -214,11 +223,13 @@ export function requiresReconciliation(paymentMethod: PaymentMethod): boolean {
  * @returns true if payment method can participate in cash control
  */
 export function canParticipateInCashControl(paymentMethod: PaymentMethod): boolean {
-  const customFields = (paymentMethod as any).customFields;
-
   // Must have a ledger account code
-  const ledgerAccountCode = customFields?.ledgerAccountCode;
-  if (!ledgerAccountCode || typeof ledgerAccountCode !== 'string' || ledgerAccountCode.trim() === '') {
+  const ledgerAccountCode = paymentMethod.customFields?.ledgerAccountCode;
+  if (
+    !ledgerAccountCode ||
+    typeof ledgerAccountCode !== 'string' ||
+    ledgerAccountCode.trim() === ''
+  ) {
     // Fallback: check if handler-based mapping would provide an account
     const accountCode = getAccountCodeFromPaymentMethod(paymentMethod);
     if (!accountCode || accountCode === 'CLEARING_GENERIC') {
@@ -234,4 +245,20 @@ export function canParticipateInCashControl(paymentMethod: PaymentMethod): boole
   // Must have a reconciliation type other than 'none'
   const reconType = getReconciliationTypeFromPaymentMethod(paymentMethod);
   return reconType !== 'none';
+}
+
+/**
+ * Map the debit account used for a supplier payment to the corresponding payment method code.
+ * This keeps the PurchasePayment audit record aligned with the actual source of funds.
+ */
+export function debitAccountCodeToPaymentMethodCode(debitAccountCode: string): string {
+  switch (debitAccountCode?.trim()) {
+    case ACCOUNT_CODES.CLEARING_MPESA:
+      return PAYMENT_METHOD_CODES.MPESA;
+    case ACCOUNT_CODES.BANK_MAIN:
+      return PAYMENT_METHOD_CODES.BANK;
+    case ACCOUNT_CODES.CASH_ON_HAND:
+    default:
+      return PAYMENT_METHOD_CODES.CASH;
+  }
 }

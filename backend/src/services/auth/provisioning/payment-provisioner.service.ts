@@ -9,7 +9,11 @@ import { RegistrationErrorService } from './registration-error.service';
 /**
  * Reconciliation type for payment methods
  */
-export type ReconciliationType = 'blind_count' | 'transaction_verification' | 'statement_match' | 'none';
+export type ReconciliationType =
+  | 'blind_count'
+  | 'transaction_verification'
+  | 'statement_match'
+  | 'none';
 
 /**
  * Reconciliation defaults for payment method handlers
@@ -25,7 +29,7 @@ interface ReconciliationDefaults {
  * Payment Provisioner Service
  *
  * Handles payment method creation and channel assignment.
- * Creates both Cash and M-Pesa payment methods.
+ * Creates Cash, M-Pesa, and Bank Transfer payment methods.
  * LOB: Payment = Payment processing capabilities for the channel.
  */
 @Injectable()
@@ -101,8 +105,38 @@ export class PaymentProvisionerService {
       );
       paymentMethods.push(mpesaPayment);
 
-      // Verify both payment methods are assigned
-      await this.channelAssignment.verifyPaymentMethodCount(ctx, channelId as any, 2);
+      // Create Bank Transfer Payment Method
+      const bankPayment = await this.createPaymentMethod(
+        ctx,
+        channelId,
+        PAYMENT_METHOD_CODES.BANK,
+        'Bank Transfer',
+        'Bank Transfer - Recorded for statement reconciliation'
+      );
+      await this.channelAssignment.assignPaymentMethodToChannel(
+        ctx,
+        bankPayment.id,
+        channelId as any
+      );
+      await this.auditor.logEntityCreated(
+        ctx,
+        'PaymentMethod',
+        bankPayment.id.toString(),
+        bankPayment,
+        {
+          handler: PAYMENT_METHOD_CODES.BANK,
+          channelId,
+          companyCode,
+        }
+      );
+      paymentMethods.push(bankPayment);
+
+      // Verify all payment methods are assigned
+      await this.channelAssignment.verifyPaymentMethodCount(
+        ctx,
+        channelId as any,
+        paymentMethods.length
+      );
 
       return paymentMethods;
     } catch (error: any) {
@@ -195,6 +229,12 @@ export class PaymentProvisionerService {
         reconciliationType: 'transaction_verification',
         ledgerAccountCode: ACCOUNT_CODES.CLEARING_MPESA,
         isCashierControlled: true,
+        requiresReconciliation: true,
+      },
+      [PAYMENT_METHOD_CODES.BANK]: {
+        reconciliationType: 'statement_match',
+        ledgerAccountCode: ACCOUNT_CODES.BANK_MAIN,
+        isCashierControlled: false,
         requiresReconciliation: true,
       },
       [PAYMENT_METHOD_CODES.CREDIT]: {

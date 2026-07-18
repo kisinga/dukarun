@@ -1,24 +1,111 @@
 <app-navbar />
 
-<main class="bg-base-100 text-base-content">
-  <section class="section scroll-mt-28 bg-base-100 py-16">
+<main class="bg-base-100 text-base-content overflow-x-hidden w-full">
+  <section class="section scroll-mt-28 bg-base-100">
     <div class="container-app space-y-4 text-center">
-      <span class="badge badge-primary badge-soft badge-sm font-semibold uppercase tracking-wider">
-        Privacy Policy
-      </span>
-      <h1 class="mkt-h1">Your privacy matters</h1>
-      <p class="mkt-lead mx-auto max-w-2xl text-base-content/70">
-        We're committed to protecting your business data and personal information. This policy
-        explains how we collect, use, and safeguard your information.
+      <span class="mkt-eyebrow">Privacy Policy</span>
+      <h1 class="mkt-h1">Your data is yours</h1>
+      <p class="mkt-lead mx-auto max-w-2xl">
+        The fine print, in plain words. Each section opens with a one-line summary; the full legal
+        text follows it.
       </p>
       <p class="text-sm text-base-content/60">Last updated: {{ lastUpdated }}</p>
     </div>
 
     <div class="container-app mt-10 max-w-3xl space-y-6">
+      <!-- In short -->
+      <div class="rounded-2xl border-2 border-primary/30 bg-primary/5 p-6 sm:p-8">
+        <h2 class="flex items-center gap-2 text-lg font-bold">
+          <ng-icon name="heroCheckBadge" size="1.375rem" class="text-primary" aria-hidden="true" />
+          In short
+        </h2>
+        <ul class="mt-4 flex flex-col gap-2.5 text-sm text-base-content/85">
+          <li class="flex items-start gap-2.5">
+            <ng-icon
+              name="heroCheck"
+              size="1.125rem"
+              class="mt-0.5 flex-shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            We never sell your data.
+          </li>
+          <li class="flex items-start gap-2.5">
+            <ng-icon
+              name="heroCheck"
+              size="1.125rem"
+              class="mt-0.5 flex-shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            Your data is encrypted in transit and at rest.
+          </li>
+          <li class="flex items-start gap-2.5">
+            <ng-icon
+              name="heroCheck"
+              size="1.125rem"
+              class="mt-0.5 flex-shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            Export it, correct it, or delete it. Anytime.
+          </li>
+          <li class="flex items-start gap-2.5">
+            <ng-icon
+              name="heroCheck"
+              size="1.125rem"
+              class="mt-0.5 flex-shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            Questions go to privacy@dukarun.com, answered by a human.
+          </li>
+        </ul>
+      </div>
+
+      <!-- Contents -->
+      <nav
+        class="rounded-xl border border-base-300 bg-base-200/60 p-4 md:p-6"
+        aria-label="Policy contents"
+      >
+        <h2 class="text-sm font-semibold uppercase tracking-widest text-base-content/60">
+          Contents
+        </h2>
+        <ul class="mt-3 grid gap-2 sm:grid-cols-2">
+          <li>
+            <a href="#collect" class="link link-hover link-primary text-sm"
+              >Information we collect</a
+            >
+          </li>
+          <li>
+            <a href="#use" class="link link-hover link-primary text-sm"
+              >How we use your information</a
+            >
+          </li>
+          <li>
+            <a href="#security" class="link link-hover link-primary text-sm">Data security</a>
+          </li>
+          <li><a href="#sharing" class="link link-hover link-primary text-sm">Data sharing</a></li>
+          <li><a href="#rights" class="link link-hover link-primary text-sm">Your rights</a></li>
+          <li>
+            <a href="#cookies" class="link link-hover link-primary text-sm">Cookies and tracking</a>
+          </li>
+          <li>
+            <a href="#changes" class="link link-hover link-primary text-sm"
+              >Changes to this policy</a
+            >
+          </li>
+          <li><a href="#contact" class="link link-hover link-primary text-sm">Contact us</a></li>
+        </ul>
+      </nav>
+
       <section
-        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+        id="collect"
+        class="scroll-mt-28 rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-shadow duration-200 hover:shadow-xl hover:border-primary/40"
       >
         <h2 class="text-2xl font-bold mb-4">Information we collect</h2>
+        <p
+          class="mb-4 rounded-lg bg-primary/5 px-4 py-2.5 text-sm font-medium text-base-content/80"
+        >
+          <span class="font-bold text-primary">In plain words:</span> We collect what the till needs
+          to work: your business details, products, sales, people, and how you use the app.
+        </p>
         <p class="text-base-content/70 mb-4">
           We collect information necessary to provide and improve our services:
         </p>
@@ -33,9 +120,16 @@
       </section>
 
       <section
-        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+        id="use"
+        class="scroll-mt-28 rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-shadow duration-200 hover:shadow-xl hover:border-primary/40"
       >
         <h2 class="text-2xl font-bold mb-4">How we use your information</h2>
+        <p
+          class="mb-4 rounded-lg bg-primary/5 px-4 py-2.5 text-sm font-medium text-base-content/80"
+        >
+          <span class="font-bold text-primary">In plain words:</span> Your data runs your shop and
+          helps us improve the product. Nothing else.
+        </p>
         <p class="text-base-content/70 mb-4">We use your information to:</p>
         <ul class="list-disc space-y-2 pl-6 text-base-content/70">
           <li>Provide and maintain our services</li>
@@ -48,9 +142,16 @@
       </section>
 
       <section
-        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+        id="security"
+        class="scroll-mt-28 rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-shadow duration-200 hover:shadow-xl hover:border-primary/40"
       >
         <h2 class="text-2xl font-bold mb-4">Data security</h2>
+        <p
+          class="mb-4 rounded-lg bg-primary/5 px-4 py-2.5 text-sm font-medium text-base-content/80"
+        >
+          <span class="font-bold text-primary">In plain words:</span> Encrypted, audited,
+          access-controlled, and backed up.
+        </p>
         <p class="text-base-content/70 mb-4">
           We implement industry-standard security measures to protect your data:
         </p>
@@ -63,9 +164,17 @@
       </section>
 
       <section
-        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+        id="sharing"
+        class="scroll-mt-28 rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-shadow duration-200 hover:shadow-xl hover:border-primary/40"
       >
         <h2 class="text-2xl font-bold mb-4">Data sharing</h2>
+        <p
+          class="mb-4 rounded-lg bg-primary/5 px-4 py-2.5 text-sm font-medium text-base-content/80"
+        >
+          <span class="font-bold text-primary">In plain words:</span> We do not sell your data, full
+          stop. Sharing happens only with your consent, when the law requires it, or when a vetted
+          provider needs it to run the service.
+        </p>
         <p class="text-base-content/70 mb-4">
           We do not sell your data. We may share information only in these circumstances:
         </p>
@@ -81,9 +190,16 @@
       </section>
 
       <section
-        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+        id="rights"
+        class="scroll-mt-28 rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-shadow duration-200 hover:shadow-xl hover:border-primary/40"
       >
         <h2 class="text-2xl font-bold mb-4">Your rights</h2>
+        <p
+          class="mb-4 rounded-lg bg-primary/5 px-4 py-2.5 text-sm font-medium text-base-content/80"
+        >
+          <span class="font-bold text-primary">In plain words:</span> See it, fix it, export it,
+          delete it, or leave. Your call.
+        </p>
         <p class="text-base-content/70 mb-4">You have the right to:</p>
         <ul class="list-disc space-y-2 pl-6 text-base-content/70">
           <li>Access your personal and business data</li>
@@ -96,9 +212,16 @@
       </section>
 
       <section
-        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+        id="cookies"
+        class="scroll-mt-28 rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-shadow duration-200 hover:shadow-xl hover:border-primary/40"
       >
         <h2 class="text-2xl font-bold mb-4">Cookies and tracking</h2>
+        <p
+          class="mb-4 rounded-lg bg-primary/5 px-4 py-2.5 text-sm font-medium text-base-content/80"
+        >
+          <span class="font-bold text-primary">In plain words:</span> Cookies keep you signed in and
+          help us improve. Your browser controls them.
+        </p>
         <p class="text-base-content/70">
           We use cookies and similar technologies to improve your experience, analyze usage, and
           provide personalized content. You can control cookie preferences through your browser
@@ -107,9 +230,16 @@
       </section>
 
       <section
-        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+        id="changes"
+        class="scroll-mt-28 rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-shadow duration-200 hover:shadow-xl hover:border-primary/40"
       >
         <h2 class="text-2xl font-bold mb-4">Changes to this policy</h2>
+        <p
+          class="mb-4 rounded-lg bg-primary/5 px-4 py-2.5 text-sm font-medium text-base-content/80"
+        >
+          <span class="font-bold text-primary">In plain words:</span> If the policy changes
+          meaningfully, we tell you first.
+        </p>
         <p class="text-base-content/70">
           We may update this privacy policy from time to time. We'll notify you of significant
           changes by email or through our platform. Continued use of our services after changes
@@ -118,7 +248,8 @@
       </section>
 
       <section
-        class="group rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
+        id="contact"
+        class="scroll-mt-28 rounded-2xl border border-base-300 bg-base-100 p-8 shadow-md transition-shadow duration-200 hover:shadow-xl hover:border-primary/40"
       >
         <h2 class="text-2xl font-bold mb-4">Contact us</h2>
         <p class="text-base-content/70">

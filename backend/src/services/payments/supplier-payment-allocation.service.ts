@@ -10,7 +10,7 @@ import {
   PurchaseApProjection,
   PurchaseApSnapshot,
 } from '../financial/ledger-projection';
-import { PAYMENT_METHOD_CODES } from './payment-method-codes.constants';
+import { debitAccountCodeToPaymentMethodCode } from '../financial/payment-method-mapping.config';
 import { StockPurchase } from '../stock/entities/purchase.entity';
 import { PurchasePayment } from '../stock/entities/purchase-payment.entity';
 import {
@@ -174,6 +174,8 @@ export class SupplierPaymentAllocationService {
         const supplierIdNum = parseInt(String(input.supplierId), 10);
         const channelId = transactionCtx.channelId as number;
 
+        const paymentMethodCode = debitAccountCodeToPaymentMethodCode(debitAccountCode);
+
         for (const allocation of calculation.allocations) {
           const purchase = unpaidPurchases.find(p => p.id === allocation.itemId);
           if (!purchase) {
@@ -185,7 +187,7 @@ export class SupplierPaymentAllocationService {
             channelId,
             purchaseId: purchase.id,
             amount: allocation.amountToAllocate,
-            method: PAYMENT_METHOD_CODES.CASH,
+            method: paymentMethodCode,
             reference: input.reference?.trim() || null,
             supplierId: supplierIdNum,
           });
@@ -199,7 +201,7 @@ export class SupplierPaymentAllocationService {
             purchase.referenceNumber || purchase.id,
             input.supplierId,
             allocation.amountToAllocate,
-            PAYMENT_METHOD_CODES.CASH,
+            paymentMethodCode,
             debitAccountCode
           );
 

@@ -12,14 +12,6 @@
     "name": "Dukarun",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web, iOS, Android",
-    "offers": {
-      "@type": "Offer",
-      "priceCurrency": "KES",
-      "price": "1500",
-      "priceValidUntil": "2025-12-31",
-      "availability": "https://schema.org/InStock",
-      "url": "https://dukarun.com/signup"
-    },
     "aggregateRating": {
       "@type": "AggregateRating",
       "ratingValue": "4.8",
@@ -69,173 +61,565 @@
 </script>
 
 <main class="bg-base-100 text-base-content overflow-x-hidden w-full">
-  <section id="hero" class="section scroll-mt-28 bg-base-100 pb-16 overflow-x-hidden">
-    <div class="container-app flex w-full flex-col items-center text-center">
-      <div
-        class="home-hero-intro flex w-full max-w-3xl flex-col items-center gap-4 sm:gap-6 md:gap-7"
-      >
-        <h1 class="w-full text-3xl font-bold leading-tight sm:text-4xl md:text-5xl lg:text-6xl">
-          Run your shop calmly
-        </h1>
-        <p class="w-full text-base md:text-lg text-base-content/70">
-          Dukarun guides you through daily sales, stock, and books. Works on phone or desktop, even
-          when internet is slow.
-        </p>
-        <div class="flex flex-col gap-4 w-full sm:max-w-md sm:flex-row sm:items-center sm:gap-3">
-          <a
-            routerLink="/signup"
-            [queryParams]="{ plan: 'pro', trial: 'true' }"
-            class="btn btn-primary btn-lg shadow-lg shadow-primary/20 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          >
-            {{ trialCtaText() }}
-          </a>
-          <a
-            href="https://wa.me/254788922222"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="btn btn-lg bg-[#25D366] text-white border-[#25D366] hover:bg-[#128C7E] hover:border-[#128C7E] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2"
-          >
-            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"
-              />
-            </svg>
-            WhatsApp us
-          </a>
-        </div>
-        <div class="grid grid-cols-2 gap-3 sm:gap-4 text-base md:text-sm font-medium w-full">
-          @for (item of heroHighlights; track item.text) {
-            <span
-              class="badge badge-neutral badge-soft gap-1.5 sm:gap-2 text-base-content transition-transform duration-200 hover:-translate-y-0.5 whitespace-normal break-words min-w-0 flex items-center"
-            >
-              <span class="text-xl leading-none flex-shrink-0">{{ item.icon }}</span>
-              <span class="flex-1 min-w-0">{{ item.text }}</span>
-            </span>
-          }
-        </div>
-      </div>
-    </div>
-  </section>
+  <!-- ══ HERO: the promise, then the proof ═══════════════════════════════ -->
+  <section id="hero" class="relative overflow-hidden bg-stone-950 text-white scroll-mt-28">
+    <div
+      class="pointer-events-none absolute -top-40 -left-40 h-96 w-96 rounded-full bg-primary/25 blur-3xl"
+      aria-hidden="true"
+    ></div>
+    <div
+      class="pointer-events-none absolute -bottom-48 -right-32 h-96 w-96 rounded-full bg-primary/15 blur-3xl"
+      aria-hidden="true"
+    ></div>
 
-  <div class="divider divider-primary opacity-20 my-0"></div>
-
-  <section class="section scroll-mt-28 bg-base-200/40" id="relief">
-    <div class="container-app">
-      <div class="mkt-section-head">
-        <span class="mkt-eyebrow">We handle the hard parts</span>
-        <h2 class="mkt-h2">So you can focus on selling</h2>
-      </div>
-      <div class="container-app mt-10 grid gap-6 md:grid-cols-3">
-        @for (relief of reliefSteps; track relief.title) {
-          <article
-            class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-7 text-left shadow-lg transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
-          >
-            <div class="flex flex-col gap-4 flex-1">
-              <div
-                class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
-              >
-                <span class="text-2xl">{{ relief.icon }}</span>
-              </div>
-              <h3 class="text-lg font-semibold">{{ relief.title }}</h3>
-              <p class="text-base-content/80">{{ relief.description }}</p>
-            </div>
-          </article>
-        }
-      </div>
-    </div>
-  </section>
-
-  <div class="divider opacity-10 my-0"></div>
-
-  <section class="section scroll-mt-28 bg-base-200" id="walkthrough">
-    <div class="container-app">
-      <div class="mkt-section-head">
-        <span class="mkt-eyebrow">How we walk with you</span>
-        <h2 class="mkt-h2">From setup to daily selling, you are not alone</h2>
-      </div>
-      <div class="container-app mt-10 grid gap-6 md:grid-cols-3">
-        @for (step of walkthroughSteps; track step.title) {
-          <article
-            class="group flex flex-col rounded-2xl border border-base-300 bg-base-100 p-7 text-left shadow-lg transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
-          >
-            <div class="flex flex-col gap-4 flex-1">
-              <div
-                class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
-              >
-                <span class="text-2xl">{{ step.icon }}</span>
-              </div>
-              <h3 class="text-lg font-semibold">{{ step.title }}</h3>
-              <p class="text-base-content/80">{{ step.description }}</p>
-            </div>
-          </article>
-        }
-      </div>
-    </div>
-  </section>
-
-  <div class="divider opacity-10 my-0"></div>
-
-  <section class="section scroll-mt-28 bg-base-100 py-16" id="testimonials">
-    <div class="container-app space-y-4 text-center">
+    <!-- The promise -->
+    <div class="container-app relative flex flex-col items-center pt-14 text-center sm:pt-20">
       <span
-        class="inline-flex items-center gap-2 text-sm md:text-xs font-semibold uppercase tracking-[0.18em] text-primary/80"
+        class="anim-fade-in-down inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white/80 ring-1 ring-white/15"
       >
-        What our customers say
+        <ng-icon name="heroSparkles" size="0.875rem" class="text-primary" aria-hidden="true" />
+        Point &amp; sell POS · Built for Kenya
       </span>
-      <h2 class="text-2xl font-bold sm:text-3xl md:text-4xl lg:text-5xl">
-        Trusted by shopkeepers across Kenya
-      </h2>
-    </div>
-    <div class="container-app mt-10 grid gap-6 md:grid-cols-3">
-      @for (testimonial of testimonials; track $index) {
-        <figure
-          class="group rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-md transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl"
+      <h1
+        class="anim-fade-in-up mt-6 text-[clamp(2.5rem,8vw,5.25rem)] font-bold uppercase leading-[0.98] tracking-tight"
+      >
+        <span class="text-hollow block">Every shilling,</span>
+        <span class="block">accounted for<span class="text-primary">.</span></span>
+      </h1>
+      <p
+        class="anim-fade-in-up anim-delay-1 mt-6 max-w-xl text-base leading-relaxed text-white/70 sm:text-lg"
+      >
+        Point at a product to sell it. Every payment and stock change posts itself to your books.
+        cash or M-Pesa, online or off.
+      </p>
+      <div
+        class="anim-fade-in-up anim-delay-2 mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row"
+      >
+        <a
+          routerLink="/signup"
+          [queryParams]="{ plan: 'pro', trial: 'true' }"
+          class="btn btn-primary btn-lg shadow-lg shadow-primary/30 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
-          <span class="text-4xl text-primary/40 leading-none">"</span>
-          <blockquote class="mt-2 text-base-content/70">{{ testimonial.quote }}</blockquote>
-          @if (testimonial.metric) {
-            <span class="badge badge-success badge-sm mt-2 w-fit">{{ testimonial.metric }}</span>
-          }
-          <figcaption class="mt-4 flex flex-col gap-1 text-base md:text-sm text-base-content/70">
-            <strong class="text-base text-base-content">{{ testimonial.author }}</strong>
-            <span>{{ testimonial.title }}</span>
-          </figcaption>
-        </figure>
-      }
+          {{ trialCtaText() }}
+          <ng-icon name="heroArrowLongRight" size="1.125rem" aria-hidden="true" />
+        </a>
+        <a
+          href="https://wa.me/254788922222"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn btn-lg bg-[#25D366] text-white border-[#25D366] hover:bg-[#128C7E] hover:border-[#128C7E] transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2"
+        >
+          <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"
+            />
+          </svg>
+          WhatsApp us
+        </a>
+      </div>
+      <ul
+        class="anim-fade-in-up anim-delay-3 mt-7 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-white/60"
+      >
+        <li class="flex items-center gap-1.5">
+          <ng-icon name="heroCheck" size="1rem" class="text-primary" aria-hidden="true" />
+          No credit card
+        </li>
+        <li class="flex items-center gap-1.5">
+          <ng-icon name="heroCheck" size="1rem" class="text-primary" aria-hidden="true" />
+          No hardware
+        </li>
+        <li class="flex items-center gap-1.5">
+          <ng-icon name="heroCheck" size="1rem" class="text-primary" aria-hidden="true" />
+          Cancel anytime
+        </li>
+      </ul>
+    </div>
+
+    <!-- The proof: a working till -->
+    <div class="container-app relative pt-12 pb-14 sm:pt-16 sm:pb-20">
+      <div class="anim-fade-in-up anim-delay-2 mx-auto max-w-5xl">
+        <div
+          class="rounded-3xl bg-white/5 p-4 shadow-2xl ring-1 ring-white/10 backdrop-blur sm:p-5"
+        >
+          <div class="flex flex-wrap items-center gap-3 px-1 pb-4">
+            <span
+              class="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-primary-content"
+              >Live demo</span
+            >
+            <span class="text-sm font-medium text-white/80">
+              Don't take our word for it. Make a sale.
+            </span>
+            <span class="ml-auto hidden items-center gap-1 text-xs text-white/50 sm:flex">
+              <ng-icon name="heroSignalSlash" size="0.875rem" aria-hidden="true" />
+              works offline
+            </span>
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-[1.15fr,1fr]">
+            <!-- Products -->
+            <div class="grid grid-cols-3 content-start gap-2">
+              @for (product of tillProducts; track product.id) {
+                <button
+                  type="button"
+                  (click)="addToTill(product.id)"
+                  [attr.aria-label]="'Add ' + product.name + ' for ' + kes(product.price)"
+                  class="group relative flex flex-col items-start gap-2 rounded-xl bg-white/5 p-3 text-left ring-1 ring-white/10 transition-all duration-150 hover:bg-white/10 hover:ring-primary/50 active:scale-95"
+                >
+                  <span
+                    class="flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold transition-colors group-hover:brightness-110 {{
+                      product.tone
+                    }}"
+                  >
+                    {{ product.initials }}
+                  </span>
+                  <span class="text-xs font-medium leading-tight text-white/80">
+                    {{ product.name }}
+                  </span>
+                  <span class="text-sm font-bold tabular-nums">{{ kes(product.price) }}</span>
+                  @if (qtyOf(product.id) > 0) {
+                    <span
+                      class="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-content shadow-lg"
+                    >
+                      {{ qtyOf(product.id) }}
+                    </span>
+                  }
+                </button>
+              }
+            </div>
+
+            <!-- Cart / receipt -->
+            <div
+              class="flex min-h-64 flex-col rounded-2xl bg-stone-900/70 p-3.5 ring-1 ring-white/10"
+            >
+              @if (!paid()) {
+                <div class="flex-1">
+                  @if (cartLines().length === 0) {
+                    <div
+                      class="flex h-full min-h-32 flex-col items-center justify-center gap-2 text-white/40"
+                    >
+                      <ng-icon name="heroShoppingCart" size="1.75rem" aria-hidden="true" />
+                      <p class="mb-0 text-xs">Tap a product. That's the whole job</p>
+                    </div>
+                  } @else {
+                    <ul class="flex flex-col divide-y divide-white/5">
+                      @for (line of cartLines(); track line.product.id) {
+                        <li class="flex items-baseline justify-between gap-2 py-1.5 text-xs">
+                          <span class="min-w-0 truncate text-white/80">
+                            {{ line.product.name }}
+                            <span class="text-white/40">× {{ line.qty }}</span>
+                          </span>
+                          <span class="flex-shrink-0 font-semibold tabular-nums text-white/90">
+                            {{ line.amount.toLocaleString('en-KE') }}
+                          </span>
+                        </li>
+                      }
+                    </ul>
+                  }
+                </div>
+                <div class="mt-2 border-t border-white/10 pt-2.5">
+                  <div
+                    class="flex items-baseline justify-between text-sm font-bold"
+                    aria-live="polite"
+                  >
+                    <span>Total</span>
+                    <span class="tabular-nums">{{ kes(cartTotal()) }}</span>
+                  </div>
+                  <button
+                    type="button"
+                    (click)="chargeTill()"
+                    [disabled]="cartCount() === 0"
+                    class="mt-2.5 w-full rounded-lg bg-[#25D366] py-2.5 text-sm font-bold text-white transition-all duration-150 hover:bg-[#1fb859] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Charge with M-Pesa
+                  </button>
+                  @if (cartCount() > 0) {
+                    <button
+                      type="button"
+                      (click)="clearTill()"
+                      class="mt-1.5 w-full text-center text-xs text-white/40 transition-colors hover:text-white/70"
+                    >
+                      Clear sale
+                    </button>
+                  }
+                </div>
+              } @else {
+                <!-- Printed receipt -->
+                <div class="anim-scale-in flex flex-1 flex-col">
+                  <div class="receipt-edge receipt-edge--up" aria-hidden="true"></div>
+                  <div class="flex-1 bg-[#fdfaf2] px-4 py-3 font-mono text-stone-800">
+                    <p class="mb-0 text-center text-[10px] font-bold tracking-widest">
+                      DUKARUN · DEMO SALE
+                    </p>
+                    <div class="my-2 border-t border-dashed border-stone-300"></div>
+                    <ul>
+                      @for (line of paid()!.lines; track line.product.id) {
+                        <li class="flex justify-between gap-2 py-0.5 text-[10px]">
+                          <span class="uppercase">{{ line.product.name }} ×{{ line.qty }}</span>
+                          <span class="tabular-nums">{{
+                            line.amount.toLocaleString('en-KE')
+                          }}</span>
+                        </li>
+                      }
+                    </ul>
+                    <div class="my-2 border-t border-dashed border-stone-300"></div>
+                    <p class="mb-0 flex justify-between text-xs font-bold">
+                      <span>TOTAL</span>
+                      <span class="tabular-nums">{{ kes(paid()!.total) }}</span>
+                    </p>
+                    <p
+                      class="mt-1.5 mb-0 flex items-center gap-1 text-[10px] font-bold text-green-700"
+                    >
+                      <ng-icon name="heroCheckCircle" size="0.75rem" aria-hidden="true" />
+                      M-PESA CONFIRMED · POSTED TO LEDGER
+                    </p>
+                    <div class="barcode mt-2.5" aria-hidden="true"></div>
+                  </div>
+                  <div class="receipt-edge" aria-hidden="true"></div>
+                  <div class="mt-3 flex flex-col gap-1.5">
+                    <a
+                      routerLink="/signup"
+                      [queryParams]="{ plan: 'pro', trial: 'true' }"
+                      class="btn btn-primary btn-sm w-full font-sans font-semibold"
+                    >
+                      Make it yours. {{ trialCtaText() }}
+                    </a>
+                    <button
+                      type="button"
+                      (click)="resetTill()"
+                      class="w-full text-center text-xs text-white/40 transition-colors hover:text-white/70"
+                    >
+                      Sell again
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+        <p class="mt-3 text-center text-xs text-white/40">
+          You typed nothing. It's already in the books.
+        </p>
+      </div>
     </div>
   </section>
 
-  <div class="divider opacity-10 my-0"></div>
+  <!-- ══ Price ticker ═════════════════════════════════════════════════════ -->
+  <div
+    class="-rotate-1 scale-[1.02] overflow-hidden bg-primary py-2.5 text-primary-content"
+    aria-hidden="true"
+  >
+    <div class="ticker-track">
+      <div class="ticker-list">
+        @for (item of tickerItems; track item) {
+          <span class="text-sm font-semibold uppercase tracking-wide whitespace-nowrap">
+            {{ item }}
+          </span>
+        }
+      </div>
+      <div class="ticker-list">
+        @for (item of tickerItems; track item) {
+          <span class="text-sm font-semibold uppercase tracking-wide whitespace-nowrap">
+            {{ item }}
+          </span>
+        }
+      </div>
+    </div>
+  </div>
 
-  <section class="section scroll-mt-28 bg-base-200 py-16">
+  <!-- ══ The three questions ══════════════════════════════════════════════ -->
+  <section id="questions" class="section scroll-mt-28 bg-base-100">
     <div class="container-app">
-      <div
-        class="grid gap-6 rounded-3xl border border-base-300 bg-base-100 p-8 shadow-xl md:grid-cols-[2fr,1fr] md:items-center"
-      >
-        <div class="space-y-4">
-          <h2 class="text-2xl font-bold sm:text-3xl md:text-4xl lg:text-5xl">
-            Ready to run your shop calmly?
-          </h2>
-          <p class="text-base-content/70">Start your free trial or talk to us on WhatsApp.</p>
-        </div>
-        <div class="flex flex-col gap-3 md:flex-row md:justify-end">
-          <a
-            href="https://wa.me/254788922222"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="btn btn-lg btn-outline border border-transparent transition-all duration-200 hover:-translate-y-0.5 hover:border-base-300 hover:bg-base-100 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          >
-            WhatsApp us
-          </a>
-          <a
-            routerLink="/signup"
-            [queryParams]="{ plan: 'pro', trial: 'true' }"
-            class="btn btn-lg btn-primary shadow-lg shadow-primary/20 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          >
-            {{ trialCtaText() }}
-          </a>
+      <div class="mkt-section-head">
+        <span class="mkt-eyebrow">At closing time</span>
+        <h2 class="mkt-h2">Three questions your books should answer</h2>
+        <p class="mkt-subhead">
+          Every shopkeeper asks the same three when the doors close. Most notebooks can't answer
+          them.
+        </p>
+      </div>
+      <div class="mt-10 grid gap-6 md:grid-cols-3">
+        @for (q of closingQuestions; track q.question) {
+          <article class="mkt-card group flex flex-col">
+            <div class="flex flex-col gap-4 flex-1">
+              <div
+                class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors duration-200 group-hover:bg-primary group-hover:text-primary-content"
+              >
+                <ng-icon [name]="q.icon" size="1.5rem" aria-hidden="true" />
+              </div>
+              <h3 class="text-lg font-semibold">{{ q.question }}</h3>
+              <p class="text-base-content/80">{{ q.answer }}</p>
+            </div>
+          </article>
+        }
+      </div>
+      <p class="mt-8 text-center text-base font-semibold text-primary">
+        Answered by your ledger. Not your memory.
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ A day at the duka ════════════════════════════════════════════════ -->
+  <section id="journey" class="section scroll-mt-28 bg-base-200/40">
+    <div class="container-app">
+      <div class="mkt-section-head">
+        <span class="mkt-eyebrow">A day at the duka</span>
+        <h2 class="mkt-h2">The day counts itself</h2>
+      </div>
+      <ol class="mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
+        @for (scene of scenes; track scene.time) {
+          <li class="relative border-t-2 border-base-300 pt-6">
+            <span
+              class="absolute -top-[5px] left-0 h-2 w-2 rounded-full bg-primary"
+              aria-hidden="true"
+            ></span>
+            <div class="flex items-baseline justify-between gap-3">
+              <span
+                class="text-4xl font-bold tabular-nums tracking-tight text-base-content/90 md:text-5xl"
+              >
+                {{ scene.time }}
+              </span>
+              <span
+                class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+              >
+                <ng-icon [name]="scene.icon" size="1.25rem" aria-hidden="true" />
+              </span>
+            </div>
+            <h3 class="mt-3 text-lg font-semibold">{{ scene.title }}</h3>
+            <p class="mt-2 text-base-content/80">{{ scene.copy }}</p>
+          </li>
+        }
+      </ol>
+    </div>
+  </section>
+
+  <!-- ══ The honest deal ══════════════════════════════════════════════════ -->
+  <section class="section bg-base-100">
+    <div class="container-app">
+      <div class="mkt-stage p-8 sm:p-12">
+        <div
+          class="pointer-events-none absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-primary/25 blur-3xl"
+          aria-hidden="true"
+        ></div>
+        <div class="relative">
+          <div class="mx-auto max-w-2xl text-center">
+            <span
+              class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white/80"
+            >
+              The honest deal
+            </span>
+            <h2 class="mkt-h2 mt-4 text-white">What you pay. What you get. No fine print.</h2>
+            <p class="mt-4 text-base text-white/70">
+              Software earns its keep or it doesn't get kept. Here's the whole arrangement.
+            </p>
+          </div>
+          <div class="mx-auto mt-10 grid max-w-4xl gap-8 md:grid-cols-2 md:gap-12">
+            <div>
+              <h3 class="text-sm font-bold uppercase tracking-widest text-primary">The deal</h3>
+              <ul class="mt-4 flex flex-col gap-3 text-white/85">
+                <li class="flex items-start gap-2.5">
+                  <ng-icon
+                    name="heroCheck"
+                    size="1.125rem"
+                    class="mt-0.5 flex-shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  {{ trialDays() ?? 30 }} days free. No credit card.
+                </li>
+                <li class="flex items-start gap-2.5">
+                  <ng-icon
+                    name="heroCheck"
+                    size="1.125rem"
+                    class="mt-0.5 flex-shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  @if (startingPriceText(); as priceText) {
+                    {{ priceText }} after that. The whole product, not a teaser tier.
+                  } @else {
+                    One flat monthly price after that. The whole product, not a teaser tier.
+                  }
+                </li>
+                <li class="flex items-start gap-2.5">
+                  <ng-icon
+                    name="heroCheck"
+                    size="1.125rem"
+                    class="mt-0.5 flex-shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  Pause anytime. Your data stays yours; export it whenever.
+                </li>
+                <li class="flex items-start gap-2.5">
+                  <ng-icon
+                    name="heroCheck"
+                    size="1.125rem"
+                    class="mt-0.5 flex-shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  Cancel anytime. No exit fees, no phone calls, no guilt trip.
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold uppercase tracking-widest text-white/50">
+                Full disclosure
+              </h3>
+              <ul class="mt-4 flex flex-col gap-3 text-white/70">
+                <li class="flex items-start gap-2.5">
+                  <ng-icon
+                    name="heroMinus"
+                    size="1.125rem"
+                    class="mt-0.5 flex-shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  Customer-initiated M-Pesa (STK Push) is still in the works. Today you record
+                  M-Pesa from your existing Till.
+                </li>
+                <li class="flex items-start gap-2.5">
+                  <ng-icon
+                    name="heroMinus"
+                    size="1.125rem"
+                    class="mt-0.5 flex-shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  Camera recognition learns your products as you add them. The first few entries are
+                  on you.
+                </li>
+                <li class="flex items-start gap-2.5">
+                  <ng-icon
+                    name="heroMinus"
+                    size="1.125rem"
+                    class="mt-0.5 flex-shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  Hands-on setup and staff training are optional extras, quoted for your location
+                  and team size.
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ══ Voices: printed on paper ════════════════════════════════════════ -->
+  <section id="voices" class="section scroll-mt-28 bg-base-200/40">
+    <div class="container-app">
+      <div class="mkt-section-head">
+        <span class="mkt-eyebrow">Word of mouth</span>
+        <h2 class="mkt-h2">Proof, printed</h2>
+        <p class="mkt-subhead">Three shopkeepers. No scripts.</p>
+      </div>
+
+      <div class="mx-auto mt-12 max-w-md -rotate-1">
+        <div class="receipt-edge receipt-edge--up" aria-hidden="true"></div>
+        <div class="bg-[#fdfaf2] px-6 py-6 font-mono text-stone-800 shadow-2xl sm:px-8 sm:py-8">
+          <p class="mb-0 text-center text-sm font-bold tracking-[0.2em]">DUKARUN</p>
+          <p class="mb-0 mt-1 text-center text-[10px] uppercase tracking-widest text-stone-500">
+            Customer voices · Kenya
+          </p>
+          <div class="my-4 border-t border-dashed border-stone-300"></div>
+
+          @for (t of testimonials; track t.author; let last = $last) {
+            <blockquote class="text-xs leading-relaxed sm:text-sm">"{{ t.quote }}"</blockquote>
+            <p class="mb-0 mt-2 text-[10px] uppercase tracking-wider text-stone-500">
+              {{ t.author }} · {{ t.title }}
+            </p>
+            <p class="mb-0 mt-1 text-[10px] font-bold uppercase tracking-wider text-stone-800">
+              → {{ t.metric }}
+            </p>
+            @if (!last) {
+              <div class="my-4 border-t border-dashed border-stone-300"></div>
+            }
+          }
+
+          <div class="my-4 border-t border-dashed border-stone-300"></div>
+          <div class="flex flex-col gap-1 text-[11px] uppercase tracking-wider">
+            <p class="mb-0 flex justify-between"><span>Hours saved</span><span>2 daily</span></p>
+            <p class="mb-0 flex justify-between"><span>Lost sales</span><span>0</span></p>
+            <p class="mb-0 flex justify-between"><span>Calm</span><span>Included</span></p>
+          </div>
+          <div class="my-4 border-t border-dashed border-stone-300"></div>
+          <p class="mb-0 flex justify-between text-sm font-bold uppercase">
+            <span>Balance due</span><span>KES 0.00</span>
+          </p>
+          <div class="barcode mt-5" aria-hidden="true"></div>
+          <p class="mb-0 mt-2 text-center text-[10px] uppercase tracking-widest text-stone-500">
+            dukarun.com · Asante
+          </p>
+        </div>
+        <div class="receipt-edge" aria-hidden="true"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ FAQ ══════════════════════════════════════════════════════════════ -->
+  <section id="faq" class="section scroll-mt-28 bg-base-100">
+    <div class="container-app container-app--narrow">
+      <div class="mkt-section-head">
+        <span class="mkt-eyebrow">Questions</span>
+        <h2 class="mkt-h2">Straight answers</h2>
+      </div>
+      <div class="mt-10 flex flex-col gap-3">
+        @for (faq of faqs(); track faq.question) {
+          <div
+            class="collapse collapse-arrow rounded-xl border border-base-300 bg-base-100 shadow-sm transition-colors duration-200 hover:border-primary/40"
+          >
+            <input type="checkbox" [id]="'faq-' + $index" />
+            <div class="collapse-title flex items-baseline gap-3 text-base font-semibold">
+              <span class="text-sm font-bold tabular-nums text-primary">0{{ $index + 1 }}</span>
+              {{ faq.question }}
+            </div>
+            <div class="collapse-content text-base-content/80">
+              <p class="mb-0">{{ faq.answer }}</p>
+            </div>
+          </div>
+        }
+      </div>
+      <p class="mt-8 text-center text-sm text-base-content/70">
+        Still curious? See
+        <a routerLink="/pricing" class="link link-primary font-medium">pricing</a> or
+        <a
+          href="https://wa.me/254788922222"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="link link-primary font-medium"
+          >talk to us on WhatsApp</a
+        >.
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ Closer ═══════════════════════════════════════════════════════════ -->
+  <section class="relative overflow-hidden bg-primary text-primary-content">
+    <div class="container-app relative py-16 text-center sm:py-24">
+      <h2 class="text-[clamp(2.5rem,8vw,5rem)] font-bold uppercase leading-[0.95] tracking-tight">
+        Balance your books tonight.
+      </h2>
+      <p class="mx-auto mt-5 max-w-xl text-base text-primary-content/85 sm:text-lg">
+        Set up this morning. Sell by lunch. Close the day with nothing left to count.
+      </p>
+      <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+        <a
+          routerLink="/signup"
+          [queryParams]="{ plan: 'pro', trial: 'true' }"
+          class="btn btn-lg bg-white text-primary border-white hover:bg-white/90 hover:border-white/90 shadow-xl transition-transform duration-200 hover:-translate-y-0.5"
+        >
+          {{ trialCtaText() }}
+          <ng-icon name="heroArrowLongRight" size="1.125rem" aria-hidden="true" />
+        </a>
+        <a
+          href="https://wa.me/254788922222"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn btn-lg btn-outline border-white/70 text-white hover:bg-white/10 hover:border-white"
+        >
+          WhatsApp us
+        </a>
+      </div>
+      <p class="mt-6 text-xs text-primary-content/70">
+        {{ trialDays() ?? 30 }} days free · No credit card ·
+        {{ startingPriceText() ?? 'One flat monthly price' }} after · Cancel anytime
+      </p>
     </div>
   </section>
 </main>

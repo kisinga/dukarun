@@ -54,9 +54,14 @@ describe('Session gate (requireOpenSession)', () => {
       requireOpenSession: jest.fn().mockImplementation(requireOpenSessionImpl),
     } as any;
     const mockChannelPaymentMethodService = {
-      getChannelPaymentMethods: jest
-        .fn()
-        .mockImplementation(() => Promise.resolve([{ code: 'credit-1' }])),
+      getChannelPaymentMethods: jest.fn().mockImplementation(() =>
+        Promise.resolve([
+          {
+            code: 'cash-1',
+            customFields: { isCashierControlled: true },
+          },
+        ])
+      ),
     } as any;
     const payment = {
       id: 'pay-1',
@@ -111,9 +116,9 @@ describe('Session gate (requireOpenSession)', () => {
 
       const ctx = { channelId: 1, activeUserId: '1' } as RequestContext;
 
-      await expect(paymentAllocationService.paySingleOrder(ctx, 'order-1', 5000)).rejects.toThrow(
-        /No open session/
-      );
+      await expect(
+        paymentAllocationService.paySingleOrder(ctx, 'order-1', 5000, 'cash')
+      ).rejects.toThrow(/No open session/);
 
       expect(mockCashierSessionService.requireOpenSession).toHaveBeenCalledWith(ctx, 1);
       expect(mockFinancialService.recordPaymentAllocation).not.toHaveBeenCalled();
@@ -134,7 +139,7 @@ describe('Session gate (requireOpenSession)', () => {
       mockOrderService.findOne.mockResolvedValue(order);
 
       const ctx = { channelId: 1, activeUserId: '1' } as RequestContext;
-      const result = await paymentAllocationService.paySingleOrder(ctx, 'order-1', 5000);
+      const result = await paymentAllocationService.paySingleOrder(ctx, 'order-1', 5000, 'cash');
 
       expect(result.ordersPaid).toHaveLength(1);
       expect(result.ordersPaid[0].amountPaid).toBe(5000);
