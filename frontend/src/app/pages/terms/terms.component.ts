@@ -1,12 +1,13 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { FooterComponent } from '../../shell/layout/footer/footer.component';
 import { NavbarComponent } from '../../shell/layout/navbar/navbar.component';
 import { SEOService } from '../../shared/services/seo.service';
 
 @Component({
   selector: 'app-terms',
-  imports: [RouterLink, NavbarComponent, FooterComponent],
+  imports: [RouterLink, NavbarComponent, FooterComponent, NgIcon],
   templateUrl: './terms.component.html',
   styleUrl: './terms.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

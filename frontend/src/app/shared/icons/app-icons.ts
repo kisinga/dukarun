@@ -14,6 +14,7 @@ import {
   heroArrowUturnLeft,
   heroBanknotes,
   heroBars3,
+  heroBell,
   heroBookOpen,
   heroBuildingStorefront,
   heroCalendar,
@@ -35,6 +36,7 @@ import {
   heroCreditCard,
   heroCube,
   heroCurrencyDollar,
+  heroDevicePhoneMobile,
   heroDocumentText,
   heroEnvelope,
   heroExclamationCircle,
@@ -53,9 +55,11 @@ import {
   heroPhone,
   heroPlus,
   heroPrinter,
+  heroQrCode,
   heroQuestionMarkCircle,
   heroReceiptPercent,
   heroScale,
+  heroShieldCheck,
   heroShoppingBag,
   heroShoppingCart,
   heroSignalSlash,
@@ -73,7 +77,7 @@ import {
 } from '@ng-icons/heroicons/outline';
 
 /**
- * The app's registered icon set — single source of truth.
+ * The app's registered icon set; single source of truth.
  *
  * Icons come from @ng-icons/heroicons (outline). Register once via
  * `provideIcons(APP_ICONS)` in app.config, then reference by key anywhere:
@@ -98,6 +102,7 @@ export const APP_ICONS = {
   heroArrowUturnLeft,
   heroBanknotes,
   heroBars3,
+  heroBell,
   heroBookOpen,
   heroBuildingStorefront,
   heroCalendar,
@@ -119,6 +124,7 @@ export const APP_ICONS = {
   heroCreditCard,
   heroCube,
   heroCurrencyDollar,
+  heroDevicePhoneMobile,
   heroDocumentText,
   heroEnvelope,
   heroExclamationCircle,
@@ -137,9 +143,11 @@ export const APP_ICONS = {
   heroPhone,
   heroPlus,
   heroPrinter,
+  heroQrCode,
   heroQuestionMarkCircle,
   heroReceiptPercent,
   heroScale,
+  heroShieldCheck,
   heroShoppingBag,
   heroShoppingCart,
   heroSignalSlash,

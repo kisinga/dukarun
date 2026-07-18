@@ -16,115 +16,27 @@
   }
 }
 
-.section {
-  padding-top: 2rem;
-  padding-bottom: 2rem;
+/* Shared motifs (.text-hollow, .ticker-*, .receipt-edge, .barcode) live in
+   styles/_marketing.scss, available to every public page. */
 
-  @media (min-width: 640px) {
-    padding-top: 3rem;
-    padding-bottom: 3rem;
-  }
+/* ── Guards ───────────────────────────────────────────────────────────── */
 
-  @media (min-width: 1024px) {
-    padding-top: 4rem;
-    padding-bottom: 4rem;
-  }
-}
-
-#hero {
-  overflow-x: hidden;
-  padding-bottom: 1.5rem;
-
-  @media (min-width: 640px) {
-    padding-bottom: 2.5rem;
-  }
-
-  h1 {
-    font-size: 1.875rem;
-    line-height: 1.1;
-
-    @media (min-width: 640px) {
-      font-size: 2.5rem;
-    }
-  }
-
-  p {
-    font-size: 0.9375rem;
-    line-height: 1.5;
-  }
-
-  .badge {
-    max-width: 100%;
-    font-size: 0.75rem;
-  }
-}
-
-#relief,
-#walkthrough {
-  article.rounded-2xl {
-    padding: 1.25rem;
-
-    @media (min-width: 640px) {
-      padding: 1.5rem;
-    }
-
-    h3 {
-      font-size: 1rem;
-    }
-  }
-}
-
-#testimonials {
-  figure.rounded-2xl {
-    padding: 1rem;
-
-    @media (min-width: 640px) {
-      padding: 1.5rem;
-    }
-
-    blockquote {
-      font-size: 0.875rem;
-      margin-top: 0.5rem;
-    }
-  }
-}
-
-.divider {
-  margin: 0;
-  padding: 0;
-  min-height: 0;
-  height: 1px;
-  opacity: 0.1;
-
-  &::before,
-  &::after {
-    margin: 0;
-    padding: 0;
-  }
-}
-
-@media (max-width: 767px) {
-  * {
-    transition-duration: 0.15s !important;
-  }
-
-  .hover\:-translate-y-1:hover,
+// Touch: no sticky hover lifts; reduced motion: instant, single-run animations.
+@media (max-width: 767px), (prefers-reduced-motion: reduce) {
   .hover\:-translate-y-0\.5:hover {
-    transform: none;
+    transform: none !important;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .section *,
-  article {
+  .anim-fade-in-up,
+  .anim-fade-in-down,
+  .anim-scale-in {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
   }
 
-  .hover\:-translate-y-1:hover,
-  .hover\:-translate-y-0\.5:hover,
-  .group:hover .group-hover\:-translate-y-1 {
-    transform: none !important;
+  * {
+    transition-duration: 0.01ms !important;
   }
 }

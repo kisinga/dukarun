@@ -15,7 +15,7 @@
 @layer components {
   // ── Focal stage ────────────────────────────────────────────────────────────
   // A deep, warm stone panel that makes a bright render or screenshot pop on the
-  // otherwise light, sunlit-legible page. Contrast as hierarchy on ONE element —
+  // otherwise light, sunlit-legible page. Contrast as hierarchy on ONE element;
   // deliberately NOT a site-wide dark theme (duka owners read these in daylight).
   .mkt-stage {
     @apply relative overflow-hidden rounded-3xl bg-stone-950 text-white ring-1 ring-white/10 shadow-2xl shadow-stone-950/30;
@@ -30,7 +30,7 @@
     @apply mt-4;
   }
 
-  // The uppercase primary kicker above a heading — one look site-wide.
+  // The uppercase primary kicker above a heading; one look site-wide.
   .mkt-eyebrow {
     @apply inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary;
   }
@@ -54,5 +54,84 @@
   // ── Light marketing card (pillars, feature grids, etc.) ──────────────────────
   .mkt-card {
     @apply rounded-2xl border border-base-300 bg-base-100 p-6 text-left shadow-lg transition-all duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl;
+  }
+}
+
+// ============================================
+// SHARED MARKETING MOTIFS (raw CSS, usable on light and dark stages alike)
+// ============================================
+
+// Hollow outline display text (dark stages/heroes)
+.text-hollow {
+  color: transparent;
+  -webkit-text-stroke: 2px rgb(255 255 255 / 0.9);
+}
+
+// Price ticker: two identical .ticker-list children inside one .ticker-track
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker 32s linear infinite;
+}
+.ticker-list {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+  padding-right: 2.5rem;
+}
+@keyframes ticker {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+// Paper receipt motif: perforated edge strip + barcode.
+// Zigzag: strip height is half the background tile; the offset exposes only the teeth.
+.receipt-edge {
+  height: 12px;
+  background-image:
+    linear-gradient(
+      45deg,
+      transparent 33.333%,
+      #fdfaf2 33.333%,
+      #fdfaf2 66.667%,
+      transparent 66.667%
+    ),
+    linear-gradient(
+      -45deg,
+      transparent 33.333%,
+      #fdfaf2 33.333%,
+      #fdfaf2 66.667%,
+      transparent 66.667%
+    );
+  background-size: 12px 24px;
+  background-position: 0 -12px; // teeth point down (bottom edge)
+  background-repeat: repeat-x;
+
+  &--up {
+    transform: scaleY(-1); // teeth point up (top edge)
+  }
+}
+
+.barcode {
+  height: 2.25rem;
+  background-image: repeating-linear-gradient(
+    90deg,
+    currentColor 0 2px,
+    transparent 2px 4px,
+    currentColor 4px 8px,
+    transparent 8px 10px,
+    currentColor 10px 11px,
+    transparent 11px 15px,
+    currentColor 15px 18px,
+    transparent 18px 20px,
+    currentColor 20px 21px,
+    transparent 21px 24px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none !important;
   }
 }

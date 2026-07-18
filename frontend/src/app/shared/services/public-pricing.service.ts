@@ -77,4 +77,15 @@ export class PublicPricingService {
     }
     return res.data.getPublicPlatformConfig;
   }
+
+  /**
+   * Lowest paid monthly tier price in KES (API prices are cents; converted here).
+   * Null when tiers can't be loaded; callers must render honest fallback copy
+   * (e.g. "one flat monthly price") rather than a hardcoded figure.
+   */
+  async getStartingMonthlyPrice(): Promise<number | null> {
+    const tiers = await this.getPublicTiers();
+    const prices = tiers.map((t) => t.priceMonthly / 100).filter((p) => p > 0);
+    return prices.length > 0 ? Math.min(...prices) : null;
+  }
 }

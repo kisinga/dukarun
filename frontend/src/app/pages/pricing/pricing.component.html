@@ -1,15 +1,18 @@
 <app-navbar />
 
-<main class="bg-base-100 text-base-content">
-  <section class="section scroll-mt-28 bg-base-100 py-16">
+<main class="bg-base-100 text-base-content overflow-x-hidden w-full">
+  <!-- ══ Hero ═════════════════════════════════════════════════════════════ -->
+  <section class="section scroll-mt-28 bg-base-100">
     <div class="container-app space-y-4 text-center">
-      <span class="mkt-eyebrow">Simple pricing</span>
-      <h1 class="mkt-h1">Choose a plan that fits your shop</h1>
-      <p class="mx-auto max-w-2xl text-base text-base-content/70">
-        Start with a free trial. Pause anytime and keep your data.
+      <span class="mkt-eyebrow">Pricing · No fine print</span>
+      <h1 class="mkt-h1">The honest deal</h1>
+      <p class="mkt-lead mx-auto max-w-2xl">
+        Every plan keeps your books, sells offline, and starts with {{ trialDaysText() }} free days,
+        no credit card. Pick the size of your ambition. Change your mind anytime.
       </p>
     </div>
 
+    <!-- Billing toggle -->
     <div class="container-app mt-10 flex justify-center">
       <label
         class="flex cursor-pointer items-center gap-3 rounded-full border border-base-300 bg-base-200/50 p-1"
@@ -20,14 +23,16 @@
           class="toggle toggle-primary"
           [checked]="isYearly()"
           (change)="toggleBilling()"
+          aria-label="Toggle yearly billing"
         />
         <span class="px-3 py-1 text-sm" [class.font-semibold]="isYearly()">Yearly</span>
       </label>
     </div>
 
-    <div class="container-app mt-10 grid gap-6 lg:grid-cols-3 lg:items-start">
+    <!-- Plans -->
+    <div class="container-app mt-10">
       @if (pricingLoading()) {
-        <div class="grid gap-6 lg:grid-cols-3 lg:items-stretch w-full">
+        <div class="grid gap-6 lg:grid-cols-3 lg:items-stretch">
           @for (s of [1, 2, 3]; track s) {
             <div class="rounded-3xl border border-base-300 bg-base-200/50 p-8 flex flex-col">
               <div class="skeleton h-7 w-24 mb-4"></div>
@@ -39,98 +44,228 @@
             </div>
           }
         </div>
-      } @else {
-        @for (plan of pricingPlans(); track plan.name) {
-          <div
-            class="group relative flex flex-col rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
-            [class.border-primary]="plan.popular"
-            [class.bg-base-100]="!plan.popular"
-            [class.bg-base-200/30]="plan.popular"
-            [class.shadow-lg]="plan.popular"
-            [class.border-base-300]="!plan.popular"
+      } @else if (pricingError()) {
+        <!-- No hardcoded figures: real prices or an honest apology -->
+        <div
+          class="mx-auto flex max-w-lg flex-col items-center rounded-3xl border border-base-300 bg-base-100 p-10 text-center shadow-lg"
+        >
+          <span
+            class="flex h-14 w-14 items-center justify-center rounded-full bg-warning/15 text-warning"
           >
-            @if (plan.popular) {
-              <div class="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span class="badge badge-primary badge-sm font-semibold uppercase tracking-wider">
-                  Most Popular
-                </span>
-              </div>
-            }
-
-            <div class="mb-6 space-y-2">
-              <h3 class="text-xl font-bold">{{ plan.name }}</h3>
-              <div class="flex items-baseline gap-1">
-                <span class="text-3xl font-bold">
-                  {{ isYearly() ? plan.yearlyPrice : plan.monthlyPrice }}
-                </span>
-                @if (plan.monthlyPrice !== 'Custom') {
-                  <span class="text-base md:text-sm text-base-content/70">/month</span>
-                }
-              </div>
-              <p class="text-base md:text-sm text-base-content/70">{{ plan.description }}</p>
-            </div>
-
-            <ul class="mb-8 flex-1 space-y-3 text-base md:text-sm">
-              @for (feature of plan.features; track feature.text) {
-                <li class="flex items-start gap-3">
-                  <span class="text-success text-lg leading-none">✓</span>
-                  <span [class.text-base-content]="feature.included" class="text-base-content/80">
-                    {{ feature.text }}
-                  </span>
-                </li>
-              }
-            </ul>
-
+            <ng-icon name="heroExclamationTriangle" size="1.75rem" aria-hidden="true" />
+          </span>
+          <h2 class="mt-4 text-xl font-bold">Our prices aren't loading</h2>
+          <p class="mt-2 text-base-content/70">
+            The pricing service is unreachable right now. Try again, or WhatsApp us and we'll quote
+            you the same figures directly. No surprises either way.
+          </p>
+          <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+            <button type="button" class="btn btn-primary" (click)="loadPricing()">Try again</button>
             <a
-              [routerLink]="plan.ctaLink.split('?')[0]"
-              [queryParams]="
-                plan.ctaLink.includes('?')
-                  ? { plan: plan.ctaLink.split('=')[1].split('&')[0], trial: 'true' }
-                  : null
-              "
-              class="btn w-full transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              [class.btn-primary]="plan.popular"
-              [class.btn-outline]="!plan.popular"
+              href="https://wa.me/254788922222"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn btn-outline"
             >
-              {{ plan.ctaText }}
+              WhatsApp us
             </a>
           </div>
-        }
+        </div>
+      } @else {
+        <div class="grid gap-6 lg:grid-cols-3 lg:items-start">
+          @for (plan of pricingPlans(); track plan.name) {
+            <div
+              class="group relative flex flex-col rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+              [class.border-primary]="plan.popular"
+              [class.bg-base-100]="!plan.popular"
+              [class.bg-base-200/30]="plan.popular"
+              [class.shadow-lg]="plan.popular"
+              [class.border-base-300]="!plan.popular"
+            >
+              @if (plan.popular) {
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <span class="badge badge-primary badge-sm font-semibold uppercase tracking-wider">
+                    Most chosen
+                  </span>
+                </div>
+              }
+
+              <div class="mb-6 space-y-2">
+                <h3 class="text-xl font-bold">{{ plan.name }}</h3>
+                <div class="flex items-baseline gap-1.5">
+                  <span class="text-4xl font-bold tabular-nums tracking-tight">
+                    {{ isYearly() ? plan.yearlyPrice : plan.monthlyPrice }}
+                  </span>
+                  @if (plan.monthlyPrice !== 'Custom') {
+                    <span class="text-sm text-base-content/70">
+                      /{{ isYearly() ? 'year' : 'month' }}
+                    </span>
+                  }
+                </div>
+                @if (isYearly() && plan.monthlyEquivalent) {
+                  <p class="mb-0 text-sm text-base-content/70">
+                    That's {{ plan.monthlyEquivalent }}/month
+                    @if (plan.savingsPercent) {
+                      <span class="font-semibold text-success">
+                        (save {{ plan.savingsPercent }}%)</span
+                      >
+                    }
+                  </p>
+                }
+                <p class="text-sm text-base-content/70">{{ plan.description }}</p>
+              </div>
+
+              <ul class="mb-8 flex-1 space-y-3 text-sm">
+                @for (feature of plan.features; track feature.text) {
+                  <li class="flex items-start gap-2.5">
+                    <ng-icon
+                      name="heroCheck"
+                      size="1.125rem"
+                      class="mt-0.5 flex-shrink-0 text-success"
+                      aria-hidden="true"
+                    />
+                    <span class="text-base-content/80">{{ feature.text }}</span>
+                  </li>
+                }
+              </ul>
+
+              <a
+                [routerLink]="plan.ctaRoute"
+                [queryParams]="plan.ctaPlanCode ? { plan: plan.ctaPlanCode, trial: 'true' } : null"
+                class="btn w-full transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                [class.btn-primary]="plan.popular"
+                [class.btn-outline]="!plan.popular"
+              >
+                {{ plan.ctaText }}
+              </a>
+            </div>
+          }
+        </div>
       }
     </div>
 
-    <div class="container-app mt-10 text-center">
-      <p class="text-base text-base-content/70">
-        All plans include guided onboarding. Need help choosing?
-        <a
-          href="https://wa.me/254788922222"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="link link-primary"
-        >
-          WhatsApp us
-        </a>
-        .
-      </p>
+    <!-- Included in every plan -->
+    <div class="container-app mt-12">
+      <ul
+        class="mx-auto flex max-w-3xl flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-base-content/80"
+      >
+        <li class="flex items-center gap-1.5">
+          <ng-icon name="heroCheck" size="1rem" class="text-primary" aria-hidden="true" />
+          Keeps your books
+        </li>
+        <li class="flex items-center gap-1.5">
+          <ng-icon name="heroCheck" size="1rem" class="text-primary" aria-hidden="true" />
+          Sells offline
+        </li>
+        <li class="flex items-center gap-1.5">
+          <ng-icon name="heroCheck" size="1rem" class="text-primary" aria-hidden="true" />
+          Guided onboarding
+        </li>
+        <li class="flex items-center gap-1.5">
+          <ng-icon name="heroCheck" size="1rem" class="text-primary" aria-hidden="true" />
+          Pause or cancel anytime
+        </li>
+        <li class="flex items-center gap-1.5">
+          <ng-icon name="heroCheck" size="1rem" class="text-primary" aria-hidden="true" />
+          Your data, exportable
+        </li>
+      </ul>
     </div>
   </section>
 
-  <section class="section scroll-mt-28 bg-base-200/40 py-16">
+  <!-- ══ Full disclosure ══════════════════════════════════════════════════ -->
+  <section class="section bg-base-100">
     <div class="container-app">
-      <div class="mx-auto max-w-2xl space-y-6 text-center">
-        <h2 class="text-2xl font-bold sm:text-3xl">Setup and training</h2>
-        <p class="text-base text-base-content/70">
-          We offer optional installation and staff training. Pricing depends on your location,
-          number of locations, and team size. Contact us for a quote.
-        </p>
+      <div class="mkt-stage p-8 sm:p-12">
+        <div
+          class="pointer-events-none absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-primary/25 blur-3xl"
+          aria-hidden="true"
+        ></div>
+        <div class="relative mx-auto max-w-3xl">
+          <div class="text-center">
+            <span
+              class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white/80"
+            >
+              Full disclosure
+            </span>
+            <h2 class="mkt-h2 mt-4 text-white">The things most pricing pages hide</h2>
+          </div>
+          <ul class="mt-8 flex flex-col gap-4 text-white/75">
+            <li class="flex items-start gap-3">
+              <ng-icon
+                name="heroMinus"
+                size="1.125rem"
+                class="mt-0.5 flex-shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              <span>
+                <strong class="text-white">Customer-initiated M-Pesa (STK Push)</strong> is still in
+                the works. Today you record M-Pesa from your existing Till, fully posted to your
+                books, just not yet auto-collected.
+              </span>
+            </li>
+            <li class="flex items-start gap-3">
+              <ng-icon
+                name="heroMinus"
+                size="1.125rem"
+                class="mt-0.5 flex-shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              <span>
+                <strong class="text-white">Setup and staff training</strong> are optional extras.
+                Pricing depends on your location, number of shops, and team size, quoted before any
+                work, never added to your bill unasked.
+              </span>
+            </li>
+            <li class="flex items-start gap-3">
+              <ng-icon
+                name="heroMinus"
+                size="1.125rem"
+                class="mt-0.5 flex-shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              <span>
+                <strong class="text-white">Enterprise is a conversation,</strong> not a checkout
+                button. Tell us what you need and we'll tell you plainly what it costs.
+              </span>
+            </li>
+          </ul>
+          <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <a
+              href="https://wa.me/254788922222"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/30"
+            >
+              Get a setup quote
+            </a>
+            <a routerLink="/contact" class="btn btn-ghost text-white/80 hover:text-white">
+              Talk to us about Enterprise
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ Closer ═══════════════════════════════════════════════════════════ -->
+  <section class="section bg-base-200/40">
+    <div class="container-app text-center">
+      <h2 class="mkt-h2">Start free. Decide with evidence.</h2>
+      <p class="mkt-subhead mt-4">
+        Sell for {{ trialDaysText() }} days. If the books don't convince you, walk away: no charge,
+        no calls.
+      </p>
+      <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
         <a
-          href="https://wa.me/254788922222"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="btn btn-primary btn-lg"
+          routerLink="/signup"
+          [queryParams]="{ plan: 'pro', trial: 'true' }"
+          class="btn btn-primary btn-lg shadow-lg shadow-primary/20 transition-transform duration-200 hover:-translate-y-0.5"
         >
-          Get a setup quote
+          Start free trial
+          <ng-icon name="heroArrowLongRight" size="1.125rem" aria-hidden="true" />
         </a>
+        <a routerLink="/features" class="btn btn-ghost btn-lg">See what you get</a>
       </div>
     </div>
   </section>

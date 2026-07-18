@@ -4,33 +4,3 @@
   width: 100%;
   max-width: 100%;
 }
-
-// Make dividers flush separators without affecting section spacing
-.divider {
-  margin: 0;
-  padding: 0;
-  min-height: 0;
-  height: 1px;
-
-  // Remove default padding from divider lines
-  &::before,
-  &::after {
-    margin: 0;
-    padding: 0;
-  }
-}
-
-// Feature cards - ensure equal heights
-.feature-card {
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-
-  > * {
-    flex-shrink: 0;
-  }
-
-  > :last-child {
-    margin-top: auto;
-  }
-}
