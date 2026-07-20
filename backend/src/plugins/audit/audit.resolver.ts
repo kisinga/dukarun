@@ -12,7 +12,6 @@ import { gql } from 'graphql-tag';
 import { AuditLog } from '../../infrastructure/audit/audit-log.entity';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { AuditTrailFilters } from '../../infrastructure/audit/audit.types';
-
 export const auditSchema = gql`
   extend type Query {
     auditLogs(options: AuditLogOptions): [AuditLog!]!
@@ -124,9 +123,12 @@ export class AuditResolver {
     @Args('userId') userId: string
   ): Promise<Administrator | null> {
     if (!userId) return null;
+    // History lookups need to resolve the actor even after the administrator
+    // record has been soft-deleted, so include soft-deleted rows here.
     const administrator = await this.connection.getRepository(ctx, Administrator).findOne({
       where: { user: { id: userId } },
       relations: ['user', 'user.roles', 'user.roles.channels'],
+      withDeleted: true,
     });
     return administrator ?? null;
   }

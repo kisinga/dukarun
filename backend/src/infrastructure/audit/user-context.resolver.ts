@@ -8,6 +8,7 @@ import {
   Administrator,
   AdministratorService,
 } from '@vendure/core';
+import { IsNull } from 'typeorm';
 
 /**
  * User Context Resolver
@@ -44,7 +45,7 @@ export class UserContextResolver {
 
       // Load administrator with roles relation
       const administrator = await this.connection.getRepository(ctx, Administrator).findOne({
-        where: { user: { id: ctx.activeUserId } },
+        where: { user: { id: ctx.activeUserId }, deletedAt: IsNull() },
         relations: ['user', 'user.roles', 'user.roles.channels'],
       });
 

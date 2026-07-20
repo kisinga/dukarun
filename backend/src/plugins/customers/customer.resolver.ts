@@ -4,15 +4,23 @@ import {
   Allow,
   Ctx,
   Customer,
+  CustomerEvent,
   CustomerService,
+  EventBus,
   Permission,
   RequestContext,
   TransactionalConnection,
+  User,
   UserInputError,
 } from '@vendure/core';
 import { formatPhoneNumber } from '../../utils/phone.utils';
 import { generateSentinelEmailFromPhone, getWalkInEmail } from '../../utils/email.utils';
+import { CustomerCreationService } from '../../services/customers/customer-creation.service';
+import { CustomerLifecycleService } from '../../services/customers/customer-lifecycle.service';
+import type { UpdateCustomerInput } from '../../services/customers/customer-lifecycle.service';
 import { CustomerLookupService } from '../../services/customers/customer-lookup.service';
+import { DeletionResult } from '@vendure/common/lib/generated-types';
+import { IsNull } from 'typeorm';
 
 /**
  * Input type for creating a customer
@@ -38,7 +46,9 @@ export class CustomerResolver {
 
   constructor(
     private readonly customerService: CustomerService,
+    private readonly customerCreationService: CustomerCreationService,
     private readonly customerLookupService: CustomerLookupService,
+    private readonly eventBus: EventBus,
     private readonly connection: TransactionalConnection
   ) {}
 
@@ -114,23 +124,88 @@ export class CustomerResolver {
           };
         }
 
-        await customerRepo.save(existingCustomer);
-        this.logger.log(`Updated and returned existing customer ${existingCustomer.id}`);
-        return existingCustomer;
+        const updatedCustomer = await customerRepo.save(existingCustomer);
+        await this.eventBus.publish(
+          new CustomerEvent(ctx, updatedCustomer, 'updated', {
+            firstName: input.firstName,
+            lastName: input.lastName,
+            emailAddress: input.emailAddress,
+            phoneNumber: input.phoneNumber,
+            title: input.title,
+            customFields: input.customFields,
+          })
+        );
+        this.logger.log(`Updated and returned existing customer ${updatedCustomer.id}`);
+        return updatedCustomer;
       }
     }
 
-    // No existing customer found, proceed with normal creation
+    // No existing customer found. If the phone already belongs to an existing User
+    // (e.g. an admin), create a Customer record for that same user instead of a
+    // duplicate User.
+    if (normalizedPhone) {
+      const existingUser = await this.connection.getRepository(ctx, User).findOne({
+        where: { identifier: normalizedPhone, deletedAt: IsNull() },
+        relations: ['roles'],
+      });
+      if (existingUser) {
+        this.logger.log(
+          `Phone ${normalizedPhone} belongs to existing user ${existingUser.id}; creating Customer record for same user`
+        );
+        return this.customerCreationService.create(
+          ctx,
+          {
+            ...input,
+            phoneNumber: normalizedPhone,
+          },
+          existingUser
+        );
+      }
+    }
+
+    // No existing user found, proceed with Vendure's standard creation path.
     if (normalizedPhone) {
       input.phoneNumber = normalizedPhone;
     }
-    const result = await this.customerService.create(ctx, input);
+    return this.customerCreationService.create(ctx, input);
+  }
+}
 
-    // Handle error result (e.g., EmailAddressConflictError)
-    if ('errorCode' in result) {
-      throw new UserInputError(result.message || 'Failed to create customer');
-    }
+/**
+ * Admin-only customer mutations. Kept in a separate resolver (registered only
+ * for the admin API) because the shop schema does not define these mutations
+ * or their types.
+ */
+@Resolver()
+@Injectable()
+export class CustomerAdminResolver {
+  constructor(private readonly customerLifecycleService: CustomerLifecycleService) {}
 
-    return result;
+  /**
+   * Update a customer, protecting shared users (e.g. an admin who is also a
+   * customer) from Vendure's stock behavior of rewriting the User login
+   * identifier when the email changes.
+   */
+  @Mutation()
+  @Allow(Permission.UpdateCustomer)
+  async updateCustomerSafe(
+    @Ctx() ctx: RequestContext,
+    @Args('input') input: UpdateCustomerInput
+  ): Promise<Customer> {
+    return this.customerLifecycleService.update(ctx, input);
+  }
+
+  /**
+   * Delete a customer, protecting shared users (e.g. an admin who is also a
+   * customer) from Vendure's stock behavior of soft-deleting the User along
+   * with the Customer.
+   */
+  @Mutation()
+  @Allow(Permission.DeleteCustomer)
+  async deleteCustomerSafe(
+    @Ctx() ctx: RequestContext,
+    @Args('id') id: string
+  ): Promise<{ result: DeletionResult }> {
+    return this.customerLifecycleService.delete(ctx, id);
   }
 }

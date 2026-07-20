@@ -319,7 +319,8 @@ export class BatchMessagingService implements OnModuleInit {
       .innerJoinAndSelect('admin.user', 'user')
       .leftJoinAndSelect('user.roles', 'role')
       .leftJoinAndSelect('role.channels', 'channel')
-      .where('user.deletedAt IS NULL')
+      .where('admin.deletedAt IS NULL')
+      .andWhere('user.deletedAt IS NULL')
       .getMany();
 
     return this.toRecipients(admins, { defaultShopContext: true });
@@ -333,6 +334,7 @@ export class BatchMessagingService implements OnModuleInit {
       .innerJoinAndSelect('user.roles', 'role')
       .leftJoin('role.channels', 'channel')
       .where('channel.id IS NULL')
+      .andWhere('admin.deletedAt IS NULL')
       .andWhere('user.deletedAt IS NULL')
       .getMany();
 
@@ -347,7 +349,8 @@ export class BatchMessagingService implements OnModuleInit {
         .innerJoinAndSelect('admin.user', 'user')
         .innerJoin('user.roles', 'role')
         .innerJoin('role.channels', 'channel')
-        .where('user.deletedAt IS NULL')
+        .where('admin.deletedAt IS NULL')
+        .andWhere('user.deletedAt IS NULL')
         .getMany();
       return this.toRecipients(admins);
     }
@@ -359,6 +362,7 @@ export class BatchMessagingService implements OnModuleInit {
       .innerJoin('user.roles', 'role')
       .innerJoin('role.channels', 'channel')
       .where('channel.id IN (:...channelIds)', { channelIds })
+      .andWhere('admin.deletedAt IS NULL')
       .andWhere('user.deletedAt IS NULL')
       .getMany();
 
@@ -372,7 +376,8 @@ export class BatchMessagingService implements OnModuleInit {
       .innerJoinAndSelect('admin.user', 'user')
       .innerJoinAndSelect('user.roles', 'role')
       .innerJoin('role.channels', 'channel')
-      .where('user.deletedAt IS NULL');
+      .where('admin.deletedAt IS NULL')
+      .andWhere('user.deletedAt IS NULL');
 
     if (channelIds.length > 0) {
       query.andWhere('channel.id IN (:...channelIds)', { channelIds });
@@ -399,7 +404,8 @@ export class BatchMessagingService implements OnModuleInit {
       .getRepository(Administrator)
       .createQueryBuilder('admin')
       .innerJoinAndSelect('admin.user', 'user')
-      .where('user.id IN (:...adminUserIds)', { adminUserIds })
+      .where('admin.deletedAt IS NULL')
+      .andWhere('user.id IN (:...adminUserIds)', { adminUserIds })
       .getMany();
 
     const adminByUserId = new Map(admins.map(a => [a.user?.id.toString(), a]));

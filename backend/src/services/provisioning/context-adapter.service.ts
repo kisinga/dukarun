@@ -11,6 +11,7 @@ import {
 } from '@vendure/core';
 import { withChannel } from '../../utils/request-context.util';
 import { withSellerFromChannel } from '../../utils/seller-access.util';
+import { IsNull } from 'typeorm';
 
 /**
  * Provisioning Context Adapter
@@ -196,7 +197,7 @@ export class ProvisioningContextAdapter {
   ): Promise<Administrator> {
     const adminRepo = this.connection.getRepository(ctx, Administrator);
     const administrator = await adminRepo.findOne({
-      where: { id: adminId },
+      where: { id: adminId, deletedAt: IsNull() },
       relations: ['user'],
     });
 

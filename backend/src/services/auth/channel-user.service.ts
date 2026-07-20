@@ -46,6 +46,7 @@ export class ChannelUserService {
         .innerJoin('user.roles', 'role')
         .innerJoin('role.channels', 'channel')
         .where('channel.id = :channelId', { channelId })
+        .andWhere('administrator.deletedAt IS NULL')
         .andWhere('user.deletedAt IS NULL')
         .getMany();
 
@@ -63,6 +64,7 @@ export class ChannelUserService {
           .innerJoin('user.roles', 'role')
           .leftJoin('role.channels', 'channel')
           .where('channel.id IS NULL')
+          .andWhere('administrator.deletedAt IS NULL')
           .andWhere('user.deletedAt IS NULL')
           .getMany();
 
@@ -100,6 +102,7 @@ export class ChannelUserService {
         .innerJoinAndSelect('user.roles', 'role')
         .innerJoin('role.channels', 'channel')
         .where('channel.id = :channelId', { channelId })
+        .andWhere('administrator.deletedAt IS NULL')
         .andWhere('user.deletedAt IS NULL')
         .getMany();
 
@@ -122,6 +125,7 @@ export class ChannelUserService {
           .innerJoinAndSelect('user.roles', 'role')
           .leftJoin('role.channels', 'channel')
           .where('channel.id IS NULL')
+          .andWhere('administrator.deletedAt IS NULL')
           .andWhere('user.deletedAt IS NULL')
           .getMany();
 

@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withFetch } from '@angular/common/http';
 import {
   APP_INITIALIZER,
   ApplicationConfig,
@@ -47,7 +47,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
-    provideHttpClient(),
+    provideHttpClient(withFetch()),
     // Register the app's icon set once; default size 1rem (16px) matches the
     // dense UI, overridable per-icon via <ng-icon size="…">.
     provideNgIconsConfig({ size: '1rem' }),

@@ -192,6 +192,22 @@ export class AccessProvisionerService {
       relations: ['user'],
     });
 
+    // Update existing Administrator if needed (includes reactivating soft-deleted admins).
+    let requiresUpdate = false;
+
+    if (administrator && administrator.deletedAt) {
+      administrator.deletedAt = null as any;
+      requiresUpdate = true;
+    }
+
+    // A previously disabled admin also has its User soft-deleted. Restore the User
+    // so the account can authenticate again.
+    if (administrator && user.deletedAt) {
+      user.deletedAt = null as any;
+      await this.connection.getRepository(ctx, User).save(user);
+      requiresUpdate = true;
+    }
+
     if (!administrator) {
       // Create new Administrator
       const newAdmin = new Administrator({
@@ -208,9 +224,6 @@ export class AccessProvisionerService {
 
       return { administrator, created: true };
     }
-
-    // Update existing Administrator if needed
-    let requiresUpdate = false;
     if (administrator.firstName !== registrationData.adminFirstName) {
       administrator.firstName = registrationData.adminFirstName;
       requiresUpdate = true;

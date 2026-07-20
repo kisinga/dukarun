@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { BadRequestException } from '@nestjs/common';
 import { Administrator, Channel, RequestContext, Role, User } from '@vendure/core';
+import { CUSTOMER_ROLE_CODE } from '@vendure/common/lib/shared-constants';
 import { ChannelAdminService } from '../../../src/services/channels/channel-admin.service';
 
 describe('ChannelAdminService', () => {
@@ -57,6 +58,10 @@ describe('ChannelAdminService', () => {
     getLimit: jest.fn().mockResolvedValue(undefined as never),
   };
 
+  const mockSessionService = {
+    deleteSessionsByUser: jest.fn().mockResolvedValue(undefined as never),
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     service = new ChannelAdminService(
@@ -69,7 +74,8 @@ describe('ChannelAdminService', () => {
       mockRoleTemplateService as any,
       mockPasswordCipher as any,
       mockEventBus as any,
-      mockEntitlementService as any
+      mockEntitlementService as any,
+      mockSessionService as any
     );
   });
 
@@ -155,8 +161,18 @@ describe('ChannelAdminService', () => {
       const userRepo = {
         findOne: jest.fn().mockResolvedValue(createUserWithChannel(2) as never),
       };
+      const activeAdmin = {
+        id: '1',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        emailAddress: '0712345678',
+        user: { id: 100 },
+        deletedAt: null,
+      } as unknown as Administrator;
       mockConnection.getRepository.mockImplementation((_ctx: any, entity: any) => {
         if (entity === User) return userRepo;
+        if (entity === Administrator)
+          return { findOne: jest.fn().mockResolvedValue(activeAdmin as never), save: jest.fn() };
         return { findOne: jest.fn().mockResolvedValue(null as never), save: jest.fn() };
       });
 
@@ -183,8 +199,18 @@ describe('ChannelAdminService', () => {
       const userRepo = {
         findOne: jest.fn().mockResolvedValue(createUserWithChannel(2) as never),
       };
+      const activeAdmin = {
+        id: '1',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        emailAddress: '0712345678',
+        user: { id: 100 },
+        deletedAt: null,
+      } as unknown as Administrator;
       mockConnection.getRepository.mockImplementation((_ctx: any, entity: any) => {
         if (entity === User) return userRepo;
+        if (entity === Administrator)
+          return { findOne: jest.fn().mockResolvedValue(activeAdmin as never), save: jest.fn() };
         return { findOne: jest.fn().mockResolvedValue(null as never), save: jest.fn() };
       });
 
@@ -316,13 +342,13 @@ describe('ChannelAdminService', () => {
   });
 
   describe('re-add after disable', () => {
-    it('re-invite by phone after disable succeeds and returns an Administrator', async () => {
+    it('re-invite by phone after disable reactivates the soft-deleted Administrator', async () => {
       const ctx = { channelId: 2 } as unknown as RequestContext;
       const existingUser = {
         id: 100,
         identifier: '0712345678',
         verified: true,
-        roles: [], // cleared by disable
+        roles: [], // channel role was stripped by disable
       } as unknown as User;
       const userRepo = {
         findOne: jest.fn().mockResolvedValue(existingUser as never),
@@ -335,12 +361,13 @@ describe('ChannelAdminService', () => {
         select: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([{ admin_id: 1 }] as never),
       };
-      const newAdmin = {
-        id: '99',
+      const softDeletedAdmin = {
+        id: '42',
         firstName: 'Jane',
         lastName: 'Doe',
         emailAddress: '0712345678',
         user: existingUser,
+        deletedAt: new Date(),
       } as unknown as Administrator;
       mockChannelService.findOne.mockResolvedValue({
         id: 2,
@@ -356,11 +383,8 @@ describe('ChannelAdminService', () => {
         code: 'channel-2-tpl-1',
         channels: [{ id: 2 }],
       } as never);
-      const adminFindOne = jest
-        .fn()
-        .mockResolvedValue(null as never) // no existing Administrator (was removed on disable)
-        .mockResolvedValueOnce(null as never);
-      const adminSave = jest.fn().mockResolvedValue(newAdmin as never);
+      const adminFindOne = jest.fn().mockResolvedValue(softDeletedAdmin as never);
+      const adminSave = jest.fn().mockResolvedValue(softDeletedAdmin as never);
       mockConnection.getRepository.mockImplementation((_ctx: any, entity: any) => {
         if (entity === User) return userRepo;
         if (entity === Administrator) return { findOne: adminFindOne, save: adminSave };
@@ -379,13 +403,143 @@ describe('ChannelAdminService', () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.id).toBe('99');
+      expect(result.id).toBe('42');
       expect(result.firstName).toBe('Jane');
       expect(result.lastName).toBe('Doe');
       expect(adminSave).toHaveBeenCalled();
+      const saved = (adminSave as jest.Mock).mock.calls[0][0] as Administrator;
+      expect(saved.deletedAt).toBeNull();
       expect(mockEventBus.publish).toHaveBeenCalled();
       const event = (mockEventBus.publish as jest.Mock).mock.calls[0][0] as { type: string };
-      expect(event.type).toBe('created');
+      expect(event.type).toBe('updated');
+    });
+  });
+
+  describe('disableChannelAdministrator', () => {
+    const makeUserWithRoles = (roles: Role[]): User =>
+      ({
+        id: 100,
+        identifier: '0712345678',
+        verified: true,
+        roles,
+      }) as unknown as User;
+
+    const makeRole = (id: number, channelId: number | string): Role =>
+      ({
+        id,
+        code: `channel-${channelId}-admin`,
+        channels: [{ id: channelId } as Channel],
+      }) as unknown as Role;
+
+    const setupDisableMocks = (options: {
+      administrator?: Administrator;
+      user: User;
+      relationRemove?: jest.Mock;
+      adminSave?: jest.Mock;
+    }) => {
+      const administrator =
+        options.administrator ||
+        ({
+          id: '42',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          user: { id: 100 },
+          deletedAt: null,
+        } as unknown as Administrator);
+
+      mockAdministratorService.findOne.mockResolvedValue(administrator as never);
+
+      const relationRemove =
+        options.relationRemove || jest.fn().mockResolvedValue(undefined as never);
+      const userRepo = {
+        findOne: jest.fn().mockResolvedValue(options.user as never),
+        createQueryBuilder: jest.fn().mockReturnValue({
+          relation: jest.fn().mockReturnValue({
+            of: jest.fn().mockReturnValue({
+              remove: relationRemove,
+            }),
+          }),
+        }),
+      };
+
+      const adminSave = options.adminSave || jest.fn().mockResolvedValue(administrator as never);
+      const adminRepo = {
+        findOne: jest.fn().mockResolvedValue(administrator as never),
+        save: adminSave,
+      };
+
+      mockConnection.getRepository.mockImplementation((_ctx: any, entity: any) => {
+        if (entity === User) return userRepo;
+        if (entity === Administrator) return adminRepo;
+        return { findOne: jest.fn(), save: jest.fn() };
+      });
+
+      return { relationRemove, adminSave };
+    };
+
+    it('rejects disabling an administrator that does not belong to the channel', async () => {
+      const ctx = { channelId: 2 } as unknown as RequestContext;
+      const user = makeUserWithRoles([makeRole(1, 3)]);
+      setupDisableMocks({ user });
+
+      await expect(service.disableChannelAdministrator(ctx, '42')).rejects.toThrow(
+        'does not belong to this channel'
+      );
+    });
+
+    it('removes only this channel role and preserves other channel access', async () => {
+      const ctx = { channelId: 2 } as unknown as RequestContext;
+      const roleOnChannel2 = makeRole(1, 2);
+      const roleOnChannel3 = makeRole(2, 3);
+      const user = makeUserWithRoles([roleOnChannel2, roleOnChannel3]);
+      const { relationRemove, adminSave } = setupDisableMocks({ user });
+
+      const result = await service.disableChannelAdministrator(ctx, '42');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Administrator removed from this channel');
+      expect(relationRemove).toHaveBeenCalledWith([roleOnChannel2.id]);
+      expect(adminSave).not.toHaveBeenCalled();
+      expect(mockSessionService.deleteSessionsByUser).toHaveBeenCalledWith(ctx, user);
+    });
+
+    it('soft-deletes the Administrator when no channel admin roles remain', async () => {
+      const ctx = { channelId: 2 } as unknown as RequestContext;
+      const user = makeUserWithRoles([makeRole(1, 2)]);
+      const { relationRemove, adminSave } = setupDisableMocks({ user });
+
+      const result = await service.disableChannelAdministrator(ctx, '42');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Administrator disabled successfully');
+      expect(relationRemove).toHaveBeenCalledWith([user.roles[0].id]);
+      expect(adminSave).toHaveBeenCalled();
+      const saved = (adminSave as jest.Mock).mock.calls[0][0] as Administrator;
+      expect(saved.deletedAt).toBeInstanceOf(Date);
+      expect(mockSessionService.deleteSessionsByUser).toHaveBeenCalledWith(ctx, user);
+    });
+
+    it('preserves the customer role for dual-role users (admin + customer)', async () => {
+      const ctx = { channelId: 2 } as unknown as RequestContext;
+      const adminRole = makeRole(1, 2);
+      const customerRole = {
+        id: 99,
+        code: CUSTOMER_ROLE_CODE,
+        channels: [],
+      } as unknown as Role;
+      const user = makeUserWithRoles([adminRole, customerRole]);
+      const { relationRemove, adminSave } = setupDisableMocks({ user });
+
+      const result = await service.disableChannelAdministrator(ctx, '42');
+
+      // The channel-less customer role must not be treated as superadmin access,
+      // must not be stripped, and must not count as remaining admin access.
+      expect(result.success).toBe(true);
+      expect(relationRemove).toHaveBeenCalledWith([adminRole.id]);
+      expect(adminSave).toHaveBeenCalled();
+      const saved = (adminSave as jest.Mock).mock.calls[0][0] as Administrator;
+      expect(saved.deletedAt).toBeInstanceOf(Date);
+      expect(mockSessionService.deleteSessionsByUser).toHaveBeenCalledWith(ctx, user);
     });
   });
 });

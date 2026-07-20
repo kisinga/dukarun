@@ -34,7 +34,7 @@ export class PendingRegistrationsService {
 
     for (const user of pending) {
       const administrator = await adminRepo.findOne({
-        where: { user: { id: user.id } },
+        where: { user: { id: user.id }, deletedAt: IsNull() },
         relations: ['user'],
       });
       if (!administrator) continue;

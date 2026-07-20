@@ -13,10 +13,13 @@ import {
   Role,
   RoleEvent,
   RoleService,
+  SessionService,
   TransactionalConnection,
   User,
 } from '@vendure/core';
+import { CUSTOMER_ROLE_CODE } from '@vendure/common/lib/shared-constants';
 import crypto from 'crypto';
+import { IsNull } from 'typeorm';
 import { RoleTemplateAssignment } from '../../domain/role-template/role-template-assignment.entity';
 import { RoleTemplate } from '../../domain/role-template/role-template.entity';
 import { AuditService } from '../../infrastructure/audit/audit.service';
@@ -62,7 +65,8 @@ export class ChannelAdminService {
     private readonly roleTemplateService: RoleTemplateService,
     private readonly passwordCipher: PasswordCipher,
     private readonly eventBus: EventBus,
-    private readonly entitlementService: EntitlementService
+    private readonly entitlementService: EntitlementService,
+    private readonly sessionService: SessionService
   ) {}
 
   /**
@@ -117,11 +121,17 @@ export class ChannelAdminService {
     const existingUser = await this.findExistingUserByPhone(ctx, cleanInput.phoneNumber);
 
     if (existingUser) {
-      // User exists - check if they already belong to this channel
+      // User exists - check if they already belong to this channel as an active admin.
       if (this.userBelongsToChannel(existingUser, channelId)) {
-        throw new BadRequestException(
-          `Administrator with phone number ${cleanInput.phoneNumber} already belongs to this channel`
-        );
+        const activeAdmin = await this.findActiveAdministratorForUser(ctx, existingUser.id);
+        if (activeAdmin) {
+          throw new BadRequestException(
+            `Administrator with phone number ${cleanInput.phoneNumber} already belongs to this channel`
+          );
+        }
+        // Stale channel role left behind by the old hard-delete path: remove it
+        // before re-adding, otherwise the re-add will fail or attach a duplicate role.
+        await this.removeChannelRolesFromUser(ctx, existingUser.id, channelId);
       }
 
       await this.checkAdminCountLimit(ctx);
@@ -287,16 +297,11 @@ export class ChannelAdminService {
       relations: ['roles', 'roles.channels'],
     });
 
-    if (
-      !user ||
-      !user.roles.some(role => role.channels?.some(ch => this.channelIdMatches(ch.id, channelId)))
-    ) {
+    if (!user || !user.roles.some(role => this.isChannelAdminRole(role, channelId))) {
       throw new BadRequestException('Administrator does not belong to this channel');
     }
 
-    const role = user.roles.find(r =>
-      r.channels?.some(ch => this.channelIdMatches(ch.id, channelId))
-    );
+    const role = user.roles.find(r => this.isChannelAdminRole(r, channelId));
     if (!role) {
       throw new BadRequestException('Role not found for administrator');
     }
@@ -329,13 +334,19 @@ export class ChannelAdminService {
   }
 
   /**
-   * Disable (soft delete) channel administrator
+   * Disable a channel administrator for the current channel.
+   * - Verifies the administrator belongs to the current channel (no cross-tenant disables).
+   * - Removes only this channel's admin roles, preserving access to other channels.
+   *   The customer role (__customer_role__) is never treated as admin access and is
+   *   never stripped: dual-role users (admin + customer) keep their customer access.
+   * - Soft-deletes the Administrator row only when the user has no remaining channel admin roles.
+   * - Invalidates the user's active sessions so revoked permissions take effect immediately.
    */
   async disableChannelAdministrator(
     ctx: RequestContext,
     adminId: string
   ): Promise<{ success: boolean; message: string }> {
-    this.requireChannelId(ctx);
+    const channelId = this.requireChannelId(ctx);
 
     const administrator = await this.administratorService.findOne(ctx, adminId);
     if (!administrator) {
@@ -349,15 +360,51 @@ export class ChannelAdminService {
 
     const user = await this.connection.getRepository(ctx, User).findOne({
       where: { id: administrator.user.id },
-      relations: ['roles'],
+      relations: ['roles', 'roles.channels'],
     });
 
-    if (user && user.roles.length > 0) {
-      user.roles = [];
-      await this.connection.getRepository(ctx, User).save(user);
+    if (!user) {
+      throw new NotFoundException(`User for administrator ${adminId} not found`);
     }
 
-    await this.connection.getRepository(ctx, Administrator).remove(administrator);
+    // Security: the administrator must actually belong to the channel being modified.
+    const belongsToChannel = user.roles.some(role => this.isChannelAdminRole(role, channelId));
+    if (!belongsToChannel) {
+      throw new BadRequestException(
+        `Administrator with ID ${adminId} does not belong to this channel`
+      );
+    }
+
+    // Remove only the admin roles scoped to this channel.
+    const rolesToRemove = user.roles.filter(role => this.isChannelAdminRole(role, channelId));
+    if (rolesToRemove.length > 0) {
+      await this.connection
+        .getRepository(ctx, User)
+        .createQueryBuilder()
+        .relation(User, 'roles')
+        .of(user.id)
+        .remove(rolesToRemove.map(role => role.id));
+    }
+
+    // Determine whether the user still has admin access anywhere else.
+    // A channel admin role is identified by having at least one channel assigned.
+    const remainingChannelAdminRoles = user.roles.filter(
+      role =>
+        !rolesToRemove.some(r => r.id === role.id) &&
+        this.isAdminRole(role) &&
+        (role.channels?.length ?? 0) > 0
+    );
+
+    if (remainingChannelAdminRoles.length === 0) {
+      // No remaining channel admin access: soft-delete the Administrator row.
+      administrator.deletedAt = new Date();
+      await this.connection.getRepository(ctx, Administrator).save(administrator);
+    }
+
+    // Invalidate active sessions so the role change is effective immediately.
+    // SessionService also evicts the session cache; a raw repository delete would
+    // leave revoked permissions alive until cache expiry.
+    await this.sessionService.deleteSessionsByUser(ctx, user);
 
     await this.auditService
       .log(ctx, 'admin.disabled', {
@@ -366,6 +413,8 @@ export class ChannelAdminService {
         data: {
           firstName: administrator.firstName,
           lastName: administrator.lastName,
+          channelId: channelId.toString(),
+          softDeleted: remainingChannelAdminRoles.length === 0,
         },
       })
       .catch(err => {
@@ -376,7 +425,10 @@ export class ChannelAdminService {
 
     return {
       success: true,
-      message: 'Administrator disabled successfully',
+      message:
+        remainingChannelAdminRoles.length === 0
+          ? 'Administrator disabled successfully'
+          : 'Administrator removed from this channel',
     };
   }
 
@@ -395,7 +447,9 @@ export class ChannelAdminService {
         return false;
       }
 
-      return user.roles.some(role => !role.channels || role.channels.length === 0);
+      return user.roles.some(
+        role => role.code !== CUSTOMER_ROLE_CODE && (!role.channels || role.channels.length === 0)
+      );
     } catch (error) {
       this.logger.warn(
         `Failed to check if administrator is superadmin: ${error instanceof Error ? error.message : String(error)}`
@@ -597,12 +651,71 @@ export class ChannelAdminService {
     }
   }
 
+  private async findActiveAdministratorForUser(
+    ctx: RequestContext,
+    userId: number | string
+  ): Promise<Administrator | null> {
+    try {
+      return await this.connection.getRepository(ctx, Administrator).findOne({
+        where: { user: { id: userId as any }, deletedAt: IsNull() },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to find active administrator for user: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return null;
+    }
+  }
+
+  private async removeChannelRolesFromUser(
+    ctx: RequestContext,
+    userId: number | string,
+    channelId: string | number
+  ): Promise<void> {
+    try {
+      const user = await this.connection.getRepository(ctx, User).findOne({
+        where: { id: userId as any },
+        relations: ['roles', 'roles.channels'],
+      });
+      if (!user || user.roles.length === 0) return;
+
+      const rolesToRemove = user.roles.filter(role => this.isChannelAdminRole(role, channelId));
+      if (rolesToRemove.length === 0) return;
+
+      await this.connection
+        .getRepository(ctx, User)
+        .createQueryBuilder()
+        .relation(User, 'roles')
+        .of(userId)
+        .remove(rolesToRemove.map(role => role.id));
+    } catch (error) {
+      this.logger.warn(
+        `Failed to remove channel roles from user: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
   private userBelongsToChannel(user: User, channelId: string | number): boolean {
     if (!user.roles) {
       return false;
     }
-    return user.roles.some(role =>
-      role.channels?.some(channel => this.channelIdMatches(channel.id, channelId))
+    return user.roles.some(role => this.isChannelAdminRole(role, channelId));
+  }
+
+  /**
+   * True when the role grants admin access (i.e. it is not the customer role).
+   * Dual-role users (admin + customer) carry __customer_role__, which must never
+   * count as admin access nor be stripped by admin lifecycle operations.
+   */
+  private isAdminRole(role: Role): boolean {
+    return role.code !== CUSTOMER_ROLE_CODE;
+  }
+
+  /** True when the role grants admin access scoped to the given channel. */
+  private isChannelAdminRole(role: Role, channelId: string | number): boolean {
+    return (
+      this.isAdminRole(role) &&
+      !!role.channels?.some(channel => this.channelIdMatches(channel.id, channelId))
     );
   }
 
@@ -638,18 +751,34 @@ export class ChannelAdminService {
   }
 
   /**
-   * Find an existing Administrator for the user, or create one (e.g. when re-adding a user
-   * who was previously disabled and had their Administrator entity removed).
+   * Find an existing Administrator for the user, reactivate it if soft-deleted,
+   * or create one when re-adding a previously disabled channel admin.
+   * Also restores User.deletedAt so the account can authenticate again.
    */
   private async findOrCreateAdministratorForUser(
     ctx: RequestContext,
     existingUser: User,
     cleanInput: { firstName: string; lastName: string; phoneNumber: string; emailAddress?: string }
   ): Promise<Administrator> {
-    const existing = await this.connection.getRepository(ctx, Administrator).findOne({
+    const adminRepo = this.connection.getRepository(ctx, Administrator);
+    const existing = await adminRepo.findOne({
       where: { user: { id: existingUser.id } },
     });
     if (existing) {
+      let reactivated = false;
+      if (existing.deletedAt) {
+        existing.deletedAt = null as any;
+        await adminRepo.save(existing);
+        reactivated = true;
+      }
+      if (existingUser.deletedAt) {
+        existingUser.deletedAt = null as any;
+        await this.connection.getRepository(ctx, User).save(existingUser);
+        reactivated = true;
+      }
+      if (reactivated) {
+        await this.eventBus.publish(new AdministratorEvent(ctx, existing, 'updated'));
+      }
       return existing;
     }
     const emailToUse =
@@ -662,7 +791,7 @@ export class ChannelAdminService {
       lastName: cleanInput.lastName,
       user: existingUser,
     });
-    const savedAdmin = await this.connection.getRepository(ctx, Administrator).save(administrator);
+    const savedAdmin = await adminRepo.save(administrator);
     await this.eventBus.publish(new AdministratorEvent(ctx, savedAdmin, 'created'));
     return savedAdmin;
   }

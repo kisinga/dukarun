@@ -113,17 +113,14 @@ export class SupplierApiService {
             variables: { input: updateInput },
           });
 
-          const updated = updateResult.data?.updateCustomer;
-          if (updated?.__typename === 'Customer') {
+          const updated = updateResult.data?.updateCustomerSafe;
+          if (updated?.id) {
             console.log(
               `✅ ${isAlreadySupplier ? 'Supplier fields updated' : 'Supplier capability added'}:`,
               updated.id,
             );
             this.stateService.setIsCreating(false);
             return updated.id;
-          } else if (updated?.__typename === 'EmailAddressConflictError') {
-            this.stateService.setError(updated.message || 'Failed to add supplier capability');
-            return null;
           } else {
             this.stateService.setError('Failed to add supplier capability');
             return null;

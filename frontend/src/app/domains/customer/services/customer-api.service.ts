@@ -108,14 +108,11 @@ export class CustomerApiService {
             variables: { input: updateInput },
           });
 
-          const updated = updateResult.data?.updateCustomer;
-          if (updated?.__typename === 'Customer') {
+          const updated = updateResult.data?.updateCustomerSafe;
+          if (updated?.id) {
             console.log('✅ Customer fields updated:', updated.id);
             this.stateService.setIsCreating(false);
             return updated.id;
-          } else if (updated?.__typename === 'EmailAddressConflictError') {
-            this.stateService.setError(updated.message || 'Failed to update customer');
-            return null;
           } else {
             this.stateService.setError('Failed to update customer');
             return null;
@@ -297,17 +294,13 @@ export class CustomerApiService {
         variables: { input: mutationInput },
       });
 
-      const customer = result.data?.updateCustomer;
-      if (customer?.__typename === 'Customer') {
+      const customer = result.data?.updateCustomerSafe;
+      if (customer?.id) {
         console.log('✅ Customer updated:', customer.id);
         return true;
-      } else if (customer?.__typename === 'EmailAddressConflictError') {
-        this.stateService.setError(customer.message || 'Failed to update customer');
-        return false;
-      } else {
-        this.stateService.setError('Failed to update customer');
-        return false;
       }
+      this.stateService.setError('Failed to update customer');
+      return false;
     } catch (error: any) {
       console.error('❌ Customer update failed:', error);
       this.stateService.setError(error.message || 'Failed to update customer');
@@ -330,7 +323,7 @@ export class CustomerApiService {
         variables: { id: customerId },
       });
 
-      const deleteResult = result.data?.deleteCustomer;
+      const deleteResult = result.data?.deleteCustomerSafe;
 
       if (deleteResult?.result === 'DELETED') {
         console.log('✅ Customer deleted successfully');
