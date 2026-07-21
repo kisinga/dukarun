@@ -11,6 +11,9 @@ import {
 import { NgIcon } from '@ng-icons/core';
 import { TeamService, type Administrator, type RoleTemplate } from '@dukarun/company';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
+import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
+import { ListSearchBarComponent } from '../../shared/components/dashboard/list-search-bar.component';
+import { TeamStatsComponent } from './components/team-stats.component';
 import { CreateAdminModalComponent } from './components/create-admin-modal.component';
 import { PermissionEditorComponent } from './components/permission-editor.component';
 import { TeamMemberRowComponent } from './components/team-member-row.component';
@@ -30,6 +33,9 @@ import { TeamMemberRowComponent } from './components/team-member-row.component';
     CommonModule,
     NgIcon,
     PageHeaderComponent,
+    EmptyStateComponent,
+    ListSearchBarComponent,
+    TeamStatsComponent,
     TeamMemberRowComponent,
     CreateAdminModalComponent,
     PermissionEditorComponent,
@@ -88,15 +94,8 @@ export class TeamComponent implements OnInit {
     };
   });
 
-  // Expose Object for template use
-  readonly Object = Object;
-
   async ngOnInit(): Promise<void> {
     await Promise.all([this.teamService.loadRoleTemplates(), this.teamService.loadMembers()]);
-  }
-
-  onSearch(query: string): void {
-    this.searchQuery.set(query);
   }
 
   onCreateClick(): void {

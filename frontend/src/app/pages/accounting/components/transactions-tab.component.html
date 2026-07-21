@@ -9,43 +9,21 @@
       </div>
     </div>
   } @else if (context().entries.length === 0) {
-    <div class="card bg-base-100 shadow">
-      <div class="card-body">
-        <div class="text-center py-12 lg:py-20 px-4">
-          <div
-            class="w-20 h-20 lg:w-24 lg:h-24 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-10 w-10 lg:h-12 lg:w-12 text-base-content/30"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-          </div>
-          <h3 class="text-lg lg:text-xl font-semibold">No transactions found</h3>
-          <p class="text-sm lg:text-base text-base-content/60 mt-2 max-w-md mx-auto">
-            @if (hasActiveFilters()) {
-              No transactions match your current filters. Try adjusting your search criteria.
-            } @else {
-              No transactions have been recorded yet.
-            }
-          </p>
-          @if (hasActiveFilters()) {
-            <button (click)="clearFilters.emit()" class="btn btn-outline btn-sm lg:btn-md mt-6">
-              Clear Filters
-            </button>
-          }
-        </div>
-      </div>
-    </div>
+    <app-empty-state
+      icon="heroDocumentText"
+      title="No transactions found"
+      [description]="
+        hasActiveFilters()
+          ? 'No transactions match your current filters. Try adjusting your search criteria.'
+          : 'No transactions have been recorded yet. They will appear here as activity is posted.'
+      "
+    >
+      @if (hasActiveFilters()) {
+        <button actions (click)="clearFilters.emit()" class="btn btn-outline btn-sm lg:btn-md">
+          Clear Filters
+        </button>
+      }
+    </app-empty-state>
   } @else {
     <!-- Expand/Collapse Controls -->
     <div class="flex justify-end gap-2">
@@ -74,35 +52,9 @@
                   <td>
                     <button class="btn btn-ghost btn-xs" (click)="onToggleEntry(entry.id)">
                       @if (context().expandedEntries.has(entry.id)) {
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M5 15l7-7 7 7"
-                          />
-                        </svg>
+                        <ng-icon name="heroChevronUp" size="1rem" />
                       } @else {
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
+                        <ng-icon name="heroChevronDown" size="1rem" />
                       }
                     </button>
                   </td>
@@ -174,33 +126,14 @@
         </div>
 
         <!-- Pagination -->
-        @if (context().totalPages > 1) {
-          <div class="join flex justify-center mt-4">
-            <button
-              class="join-item btn btn-sm"
-              [disabled]="context().currentPage === 1"
-              (click)="onPageChange(context().currentPage - 1)"
-            >
-              «
-            </button>
-            @for (page of [].constructor(context().totalPages); track $index) {
-              <button
-                class="join-item btn btn-sm"
-                [class.btn-active]="context().currentPage === $index + 1"
-                (click)="onPageChange($index + 1)"
-              >
-                {{ $index + 1 }}
-              </button>
-            }
-            <button
-              class="join-item btn btn-sm"
-              [disabled]="context().currentPage === context().totalPages"
-              (click)="onPageChange(context().currentPage + 1)"
-            >
-              »
-            </button>
-          </div>
-        }
+        <app-pagination
+          [currentPage]="context().currentPage"
+          [totalPages]="context().totalPages"
+          [totalItems]="context().totalItems"
+          [itemsPerPage]="context().pageSize"
+          itemLabel="transactions"
+          (pageChange)="onPageChange($event)"
+        />
       </div>
     </div>
   }

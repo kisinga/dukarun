@@ -12,38 +12,12 @@
       (click)="onPurchase()"
       title="Purchase from Supplier"
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-4 w-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-        />
-      </svg>
+      <ng-icon name="heroShoppingCart" size="1rem" />
       <span class="hidden sm:inline">Purchase</span>
     </button>
     @if (canEdit()) {
       <button class="btn btn-ghost btn-sm gap-1.5" (click)="onEdit()" title="Edit Product">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-          />
-        </svg>
+        <ng-icon name="heroPencilSquare" size="1rem" />
         <span class="hidden sm:inline">Edit</span>
       </button>
     }
@@ -68,20 +42,7 @@
                     class="object-cover w-full h-full rounded-xl"
                   />
                 } @else {
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-12 w-12 text-primary"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                    />
-                  </svg>
+                  <ng-icon name="heroCube" size="2.5rem" class="text-primary" />
                 }
               </div>
             </div>
@@ -117,20 +78,7 @@
                 </span>
                 @if (barcode()) {
                   <span class="badge badge-ghost badge-sm gap-1 font-mono">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-3 w-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
-                      />
-                    </svg>
+                    <ng-icon name="heroQrCode" size="0.875rem" />
                     {{ barcode() }}
                   </span>
                 }

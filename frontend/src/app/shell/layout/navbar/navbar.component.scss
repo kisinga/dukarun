@@ -71,7 +71,7 @@
       transform: translateX(-50%) scaleX(0);
       width: 50%;
       height: 2px;
-      background: oklch(var(--p));
+      background: var(--color-primary);
       border-radius: 2px;
       transition: transform 0.15s ease;
     }

@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -18,7 +19,7 @@ import {
 
 @Component({
   selector: 'app-transaction-detail-modal',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   templateUrl: './transaction-detail-modal.component.html',
   styleUrl: './transaction-detail-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

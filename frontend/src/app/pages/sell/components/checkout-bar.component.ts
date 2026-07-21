@@ -25,10 +25,8 @@ import { CurrencyService } from '../../../shared/services/currency.service';
       <div class="container-app flex items-center gap-2 py-2.5 sm:gap-3 sm:py-3">
         <!-- Running total -->
         <div class="flex min-w-0 flex-col leading-tight">
-          <span class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50">
-            Total
-          </span>
-          <span class="truncate text-lg font-bold tabular-nums text-primary sm:text-2xl">
+          <span class="type-caption font-semibold uppercase tracking-wide"> Total </span>
+          <span class="type-hero truncate text-primary">
             {{ formatTotal(total()) }}
           </span>
         </div>

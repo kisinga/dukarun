@@ -28,6 +28,12 @@
       (expiringSoonClick)="toggleExpiringSoonFilter(!showExpiringSoonOnly())"
       (expiredClick)="toggleExpiredFilter(!showExpiredOnly())"
     />
+    @if (canEditProduct()) {
+      <a actions routerLink="/dashboard/products/create" class="btn btn-primary btn-sm gap-2">
+        <ng-icon name="heroPlus" size="1rem" />
+        Add Product
+      </a>
+    }
   </app-page-header>
 
   <!-- Search & Filter Bar -->
@@ -167,44 +173,35 @@
       </select>
       <button
         type="button"
-        class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border px-3 text-sm transition-colors"
-        [class]="
-          showLowStockOnly()
-            ? 'border-warning bg-warning/10 text-warning'
-            : 'border-base-300 bg-base-100 text-base-content/70 hover:bg-base-200'
-        "
+        class="btn btn-sm btn-outline gap-1.5"
+        [class.btn-warning]="showLowStockOnly()"
+        [class.btn-active]="showLowStockOnly()"
         [attr.aria-pressed]="showLowStockOnly()"
         (click)="toggleLowStockFilter(!showLowStockOnly())"
       >
-        <ng-icon name="heroExclamationTriangle" size="0.9rem" />
+        <ng-icon name="heroExclamationTriangle" size="0.875rem" />
         <span class="whitespace-nowrap">Low stock</span>
       </button>
       <button
         type="button"
-        class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border px-3 text-sm transition-colors"
-        [class]="
-          showExpiringSoonOnly()
-            ? 'border-warning bg-warning/10 text-warning'
-            : 'border-base-300 bg-base-100 text-base-content/70 hover:bg-base-200'
-        "
+        class="btn btn-sm btn-outline gap-1.5"
+        [class.btn-warning]="showExpiringSoonOnly()"
+        [class.btn-active]="showExpiringSoonOnly()"
         [attr.aria-pressed]="showExpiringSoonOnly()"
         (click)="toggleExpiringSoonFilter(!showExpiringSoonOnly())"
       >
-        <ng-icon name="heroClock" size="0.9rem" />
+        <ng-icon name="heroClock" size="0.875rem" />
         <span class="whitespace-nowrap">Expiring soon</span>
       </button>
       <button
         type="button"
-        class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border px-3 text-sm transition-colors"
-        [class]="
-          showExpiredOnly()
-            ? 'border-error bg-error/10 text-error'
-            : 'border-base-300 bg-base-100 text-base-content/70 hover:bg-base-200'
-        "
+        class="btn btn-sm btn-outline gap-1.5"
+        [class.btn-error]="showExpiredOnly()"
+        [class.btn-active]="showExpiredOnly()"
         [attr.aria-pressed]="showExpiredOnly()"
         (click)="toggleExpiredFilter(!showExpiredOnly())"
       >
-        <ng-icon name="heroCalendar" size="0.9rem" />
+        <ng-icon name="heroCalendar" size="0.875rem" />
         <span class="whitespace-nowrap">Expired</span>
       </button>
     </div>
@@ -221,7 +218,7 @@
 
   <!-- Loading State -->
   @if (isLoading()) {
-    <div class="rounded-box border border-base-300/60 bg-base-100">
+    <div class="card bg-base-100">
       <div class="card-body">
         <div class="flex flex-col items-center justify-center py-16">
           <span class="loading loading-spinner loading-lg text-primary"></span>
@@ -233,62 +230,50 @@
 
   <!-- Empty State -->
   @else if (totalItems() === 0 && !error()) {
-    <div class="rounded-box border border-base-300/60 bg-base-100">
-      <div class="card-body">
-        <div class="text-center py-12 lg:py-16 px-4">
-          <div
-            class="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
-          >
-            <ng-icon name="heroCube" size="2.5rem" class="text-base-content/30" />
-          </div>
-          <h3 class="text-lg font-semibold">No products found</h3>
-          @if (searchQuery() || showLowStockOnly() || showExpiringSoonOnly() || showExpiredOnly()) {
-            <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
-              @if (searchQuery()) {
-                No products match "{{ searchQuery() }}" with the current filters. Try adjusting your
-                filters.
-              } @else if (showLowStockOnly()) {
-                No products found with low stock. All products are above the threshold.
-              } @else if (showExpiringSoonOnly()) {
-                No products have batches expiring soon.
-              } @else {
-                No products have expired batches.
-              }
-            </p>
-            <div class="flex gap-2 justify-center mt-6">
-              <button (click)="clearAllFilters()" class="btn btn-outline btn-sm">
-                Clear filters
-              </button>
-              @if (showLowStockOnly()) {
-                <button (click)="toggleLowStockFilter(false)" class="btn btn-outline btn-sm">
-                  Clear Low Stock
-                </button>
-              }
-              @if (showExpiringSoonOnly()) {
-                <button (click)="toggleExpiringSoonFilter(false)" class="btn btn-outline btn-sm">
-                  Clear Expiring Soon
-                </button>
-              }
-              @if (showExpiredOnly()) {
-                <button (click)="toggleExpiredFilter(false)" class="btn btn-outline btn-sm">
-                  Clear Expired
-                </button>
-              }
-            </div>
-          } @else {
-            <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
-              Start building your inventory by adding your first product
-            </p>
-            @if (canEditProduct()) {
-              <a routerLink="/dashboard/products/create" class="btn btn-primary btn-sm mt-6 gap-2">
-                <ng-icon name="heroPlus" size="1rem" />
-                Create First Product
-              </a>
-            }
-          }
-        </div>
-      </div>
-    </div>
+    @if (searchQuery() || showLowStockOnly() || showExpiringSoonOnly() || showExpiredOnly()) {
+      <app-empty-state
+        icon="heroCube"
+        title="No products found"
+        [description]="
+          searchQuery()
+            ? 'No products match &quot;' +
+              searchQuery() +
+              '&quot; with the current filters. Try adjusting your filters.'
+            : showLowStockOnly()
+              ? 'No products found with low stock. All products are above the threshold.'
+              : showExpiringSoonOnly()
+                ? 'No products have batches expiring soon.'
+                : 'No products have expired batches.'
+        "
+      >
+        <button actions (click)="clearAllFilters()" class="btn btn-outline btn-sm">
+          Clear filters
+        </button>
+        @if (showLowStockOnly()) {
+          <button actions (click)="toggleLowStockFilter(false)" class="btn btn-outline btn-sm">
+            Clear Low Stock
+          </button>
+        }
+        @if (showExpiringSoonOnly()) {
+          <button actions (click)="toggleExpiringSoonFilter(false)" class="btn btn-outline btn-sm">
+            Clear Expiring Soon
+          </button>
+        }
+        @if (showExpiredOnly()) {
+          <button actions (click)="toggleExpiredFilter(false)" class="btn btn-outline btn-sm">
+            Clear Expired
+          </button>
+        }
+      </app-empty-state>
+    } @else {
+      <app-empty-state
+        icon="heroCube"
+        title="No products found"
+        description="Start building your inventory by adding your first product"
+        [ctaLabel]="canEditProduct() ? 'Create First Product' : ''"
+        ctaLink="/dashboard/products/create"
+      />
+    }
   }
 
   <!-- Products List -->
@@ -306,9 +291,9 @@
     </div>
 
     <!-- Desktop: Table View -->
-    <div class="rounded-box border border-base-300/60 bg-base-100 hidden lg:block">
+    <div class="card bg-base-100 hidden lg:block">
       <div class="overflow-x-auto">
-        <table class="table">
+        <table class="table table-zebra">
           <thead>
             <tr>
               <th class="w-16">Image</th>
@@ -387,17 +372,6 @@
       itemLabel="products"
       (pageChange)="goToPage($event)"
       (itemsPerPageChange)="changeItemsPerPage($event)"
-    >
-      @if (canEditProduct()) {
-        <a
-          pagination-actions
-          routerLink="/dashboard/products/create"
-          class="btn btn-primary btn-sm gap-2"
-        >
-          <ng-icon name="heroPlus" size="1rem" />
-          Add Product
-        </a>
-      }
-    </app-pagination>
+    />
   }
 </div>

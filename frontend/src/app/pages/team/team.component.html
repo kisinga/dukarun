@@ -5,84 +5,18 @@
     subtitle="Manage channel administrators and permissions"
     [showRefresh]="false"
   >
+    <app-team-stats header-stats [stats]="stats()" />
     <button actions class="btn btn-primary btn-sm gap-2" (click)="onCreateClick()">
       <ng-icon name="heroPlus" size="1rem" />
       Add Team Member
     </button>
   </app-page-header>
 
-  <!-- Statistics Cards -->
-  @if (stats(); as statsData) {
-    <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-      <!-- Total Members -->
-      <div
-        class="card bg-gradient-to-br from-secondary/10 to-secondary/5 border border-secondary/20"
-      >
-        <div class="card-body p-3 lg:p-4">
-          <div class="flex items-center gap-3">
-            <div
-              class="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0"
-            >
-              <ng-icon name="heroUsers" size="1.25rem" class="text-secondary" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs text-base-content/60 truncate">Total Members</p>
-              <p class="text-xl lg:text-2xl font-bold text-secondary tracking-tight">
-                {{ statsData.total }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Verified Members -->
-      <div class="card bg-gradient-to-br from-success/10 to-success/5 border border-success/20">
-        <div class="card-body p-3 lg:p-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
-              <ng-icon name="heroCheckCircle" size="1.25rem" class="text-success" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs text-base-content/60 truncate">Verified</p>
-              <p class="text-xl lg:text-2xl font-bold text-success tracking-tight">
-                {{ statsData.verified }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Roles Count -->
-      <div
-        class="card bg-gradient-to-br from-info/10 to-info/5 border border-info/20 col-span-2 lg:col-span-1"
-      >
-        <div class="card-body p-3 lg:p-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
-              <ng-icon name="heroCheckBadge" size="1.25rem" class="text-info" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs text-base-content/60 truncate">Roles</p>
-              <p class="text-xl lg:text-2xl font-bold text-info tracking-tight">
-                {{ Object.keys(statsData.byRole).length }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  }
-
   <!-- Search Bar -->
-  <div class="form-control">
-    <input
-      type="text"
-      placeholder="Search by name, email, or phone..."
-      class="input input-bordered w-full"
-      [value]="searchQuery()"
-      (input)="onSearch($any($event.target).value)"
-    />
-  </div>
+  <app-list-search-bar
+    [(searchQuery)]="searchQuery"
+    placeholder="Search by name, email, or phone..."
+  />
 
   <!-- Error Alert -->
   @if (error(); as errorMsg) {
@@ -106,34 +40,23 @@
 
   <!-- Empty State -->
   @else if (filteredMembers().length === 0 && !error()) {
-    <div class="card bg-base-100 shadow">
-      <div class="card-body">
-        <div class="text-center py-12 lg:py-16 px-4">
-          <div
-            class="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
-          >
-            <ng-icon name="heroUsers" size="2rem" class="lg:text-[2.5rem] text-base-content/30" />
-          </div>
-          <h3 class="text-lg font-semibold">No team members found</h3>
-          @if (searchQuery()) {
-            <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
-              No members match your search criteria.
-            </p>
-            <button (click)="searchQuery.set('')" class="btn btn-outline btn-sm mt-6">
-              Clear Search
-            </button>
-          } @else {
-            <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
-              Get started by adding your first team member.
-            </p>
-            <button class="btn btn-primary btn-sm mt-6 gap-2" (click)="onCreateClick()">
-              <ng-icon name="heroPlus" size="1rem" />
-              Add Team Member
-            </button>
-          }
-        </div>
-      </div>
-    </div>
+    <app-empty-state
+      icon="heroUsers"
+      title="No team members found"
+      [description]="
+        searchQuery()
+          ? 'No members match your search criteria.'
+          : 'Get started by adding your first team member.'
+      "
+      [ctaLabel]="searchQuery() ? '' : 'Add Team Member'"
+      (ctaClick)="onCreateClick()"
+    >
+      @if (searchQuery()) {
+        <button actions (click)="searchQuery.set('')" class="btn btn-outline btn-sm">
+          Clear Search
+        </button>
+      }
+    </app-empty-state>
   }
 
   <!-- Team Members List -->
@@ -218,7 +141,7 @@
     </div>
 
     <!-- Desktop: Table View -->
-    <div class="card bg-base-100 shadow-lg hidden lg:block">
+    <div class="card bg-base-100 hidden lg:block">
       <div class="overflow-x-auto">
         <table class="table table-zebra table-fixed w-full">
           <thead>

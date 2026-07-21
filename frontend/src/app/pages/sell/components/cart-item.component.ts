@@ -67,7 +67,7 @@ export interface CartItemData {
             (click)="removeItem.emit(item().variant.id)"
             aria-label="Remove item"
           >
-            <ng-icon name="heroXMark" size="1.2em" />
+            <ng-icon name="heroXMark" size="1.25rem" />
           </button>
           <div class="flex-1 min-w-0">
             <div class="flex items-baseline gap-1.5 min-w-0">
@@ -206,13 +206,11 @@ export interface CartItemData {
           >
             {{ getFormattedLinePrice() }}
           </span>
-          <span class="text-xs text-base-content/50 tabular-nums leading-tight md:text-[10px]">
+          <span class="text-xs text-base-content/50 tabular-nums leading-tight">
             @{{ getFormattedPerItemPrice() }}
           </span>
           @if (isBelowWholesalePrice()) {
-            <span class="text-xs text-error font-medium leading-tight md:text-[10px]"
-              >Below wholesale</span
-            >
+            <span class="text-xs text-error font-medium leading-tight">Below wholesale</span>
           }
         </button>
 

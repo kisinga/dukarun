@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -20,6 +21,7 @@ import { UserDetailsModalComponent } from '../user-details-modal/user-details-mo
   selector: 'app-audit-trail',
   imports: [
     CommonModule,
+    NgIcon,
     PaginationComponent,
     AuditTrailFilterComponent,
     UserDetailsModalComponent,

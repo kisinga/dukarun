@@ -9,34 +9,11 @@
       </div>
     </div>
   } @else if (!hasAccounts()) {
-    <div class="card bg-base-100 shadow">
-      <div class="card-body">
-        <div class="text-center py-12 lg:py-20 px-4">
-          <div
-            class="w-20 h-20 lg:w-24 lg:h-24 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-10 w-10 lg:h-12 lg:w-12 text-base-content/30"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-          </div>
-          <h3 class="text-lg lg:text-xl font-semibold">No accounts found</h3>
-          <p class="text-sm lg:text-base text-base-content/60 mt-2 max-w-md mx-auto">
-            No accounts have been set up yet. Accounts will appear here once they are created.
-          </p>
-        </div>
-      </div>
-    </div>
+    <app-empty-state
+      icon="heroDocumentText"
+      title="No accounts found"
+      description="No accounts have been set up yet. Accounts will appear here once they are created."
+    />
   } @else {
     <!-- Mobile: Card list grouped by type -->
     <div class="lg:hidden space-y-6">
@@ -86,7 +63,7 @@
         @if (
           context().hierarchicalAccounts[type] && context().hierarchicalAccounts[type].length > 0
         ) {
-          <div class="card card-border bg-base-100">
+          <div class="card bg-base-100">
             <div class="card-body p-4">
               <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-3">
@@ -105,7 +82,7 @@
                   {{ context().formatCurrency(context().getAccountTypeTotal(type)) }}
                 </span>
               </div>
-              <div class="overflow-x-auto rounded-lg border border-base-300">
+              <div class="overflow-x-auto">
                 <table class="table table-sm">
                   <thead class="bg-base-200/60">
                     <tr>

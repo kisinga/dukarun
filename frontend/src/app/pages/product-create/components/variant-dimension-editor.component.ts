@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { ProductType, VariantDimension } from '../types/product-creation.types';
 
 /**
@@ -11,7 +12,7 @@ import { ProductType, VariantDimension } from '../types/product-creation.types';
  */
 @Component({
   selector: 'app-variant-dimension-editor',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (productType() === 'measured') {
@@ -88,7 +89,7 @@ import { ProductType, VariantDimension } from '../types/product-creation.types';
           }
 
           <div class="bg-warning/10 p-2 rounded text-xs mt-2 flex items-center gap-1">
-            <span class="material-symbols-outlined text-sm">warning</span>
+            <ng-icon name="heroExclamationTriangle" size="1rem" />
             <span>Fractional sales disabled — customers buy whole units.</span>
           </div>
         </div>

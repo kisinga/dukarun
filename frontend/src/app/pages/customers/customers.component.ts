@@ -22,6 +22,7 @@ import { CustomerAction, CustomerCardComponent } from './components/customer-car
 import type { CustomerStats } from '../../shared/services/stats/customer-stats.util';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 import { ListSearchBarComponent } from '../../shared/components/dashboard/list-search-bar.component';
+import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
 import { CustomerStatsComponent } from './components/customer-stats.component';
 import { CustomerTableRowComponent } from './components/customer-table-row.component';
 import { CustomerViewModalComponent } from './components/customer-view-modal.component';
@@ -35,6 +36,7 @@ import {
   type AnalyticsPeriod,
 } from '../../shared/components/dashboard/charts/period-selector.component';
 import { EchartContainerComponent } from '../../shared/components/dashboard/charts/echart-container.component';
+import { TrendCardComponent } from '../../shared/components/dashboard/trend-card.component';
 
 /**
  * Customers list page - similar to products page
@@ -54,6 +56,7 @@ import { EchartContainerComponent } from '../../shared/components/dashboard/char
     CustomerStatsComponent,
     PageHeaderComponent,
     ListSearchBarComponent,
+    EmptyStateComponent,
     CustomerTableRowComponent,
     PaginationComponent,
     DeleteConfirmationModalComponent,
@@ -61,6 +64,7 @@ import { EchartContainerComponent } from '../../shared/components/dashboard/char
     CustomerViewModalComponent,
     PeriodSelectorComponent,
     EchartContainerComponent,
+    TrendCardComponent,
   ],
   templateUrl: './customers.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -505,10 +509,9 @@ export class CustomersComponent implements OnInit {
     return '';
   }
 
-  toggleCustomerGrowthTrend(): void {
-    const opening = !this.trendOpen();
-    this.trendOpen.set(opening);
-    if (opening && !this.trendFetched) {
+  /** Lazy-load analytics the first time the trend card is opened. */
+  onTrendOpenChange(open: boolean): void {
+    if (open && !this.trendFetched) {
       this.trendFetched = true;
       void this.analyticsService.fetch(this.trendPeriod());
     }

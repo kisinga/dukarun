@@ -15,9 +15,7 @@ export interface RankedItem {
     <div class="space-y-1.5">
       @for (item of items(); track item.label; let i = $index) {
         <div class="flex items-center gap-2">
-          <span
-            class="text-[10px] font-bold text-base-content/30 w-4 tabular-nums text-right shrink-0"
-          >
+          <span class="text-xs font-bold text-base-content/30 w-4 tabular-nums text-right shrink-0">
             {{ i + 1 }}
           </span>
           <div class="flex-1 min-w-0">

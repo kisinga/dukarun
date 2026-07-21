@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { ProductService } from '@dukarun/product';
 import { CurrencyService } from '../../../shared/services/currency.service';
 import { AuthService } from '@dukarun/auth';
@@ -24,7 +25,7 @@ import { StatusBadgeComponent } from '../../../shared/components/dashboard/statu
 @Component({
   selector: 'app-product-detail',
   standalone: true,
-  imports: [EntityDetailLayoutComponent, ProductLabelComponent, StatusBadgeComponent],
+  imports: [EntityDetailLayoutComponent, ProductLabelComponent, StatusBadgeComponent, NgIcon],
   templateUrl: './product-detail.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

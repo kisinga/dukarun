@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '@dukarun/auth';
+import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 
 export type AdminTabPermission = 'ManageStockAdjustments' | null;
 
@@ -24,7 +25,7 @@ const ADMIN_TABS: AdminTab[] = [
 @Component({
   selector: 'app-admin-layout',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet, PageHeaderComponent],
   templateUrl: './admin-layout.component.html',
   styleUrl: './admin-layout.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

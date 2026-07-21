@@ -15,6 +15,15 @@
       (pendingPaymentsClick)="onPendingPaymentsStatsClick()"
       (overdueClick)="onOverdueStatsClick()"
     />
+    <button
+      actions
+      type="button"
+      class="btn btn-primary btn-sm gap-2"
+      (click)="router.navigate(['/dashboard/purchases/create'])"
+    >
+      <ng-icon name="heroPlus" size="1rem" />
+      Create Purchase
+    </button>
   </app-page-header>
 
   <!-- Pending Draft Banner -->
@@ -103,37 +112,23 @@
 
   <!-- Empty State -->
   @else if (filteredPurchases().length === 0 && !error()) {
-    <div class="card bg-base-100 shadow">
-      <div class="card-body">
-        <div class="text-center py-12 lg:py-16 px-4">
-          <div
-            class="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
-          >
-            <ng-icon name="heroShoppingBag" size="2rem" class="text-base-content/30" />
-          </div>
-          <h3 class="text-lg font-semibold">No purchases found</h3>
-          @if (searchQuery()) {
-            <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
-              No purchases match "{{ searchQuery() }}". Try a different search term.
-            </p>
-            <button (click)="searchQuery.set('')" class="btn btn-outline btn-sm mt-6">
-              Clear Search
-            </button>
-          } @else {
-            <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
-              Start by recording your first purchase
-            </p>
-            <button
-              (click)="router.navigate(['/dashboard/purchases/create'])"
-              class="btn btn-primary btn-sm mt-6 gap-2"
-            >
-              <ng-icon name="heroPlus" size="1rem" />
-              Create First Purchase
-            </button>
-          }
-        </div>
-      </div>
-    </div>
+    <app-empty-state
+      icon="heroShoppingBag"
+      title="No purchases found"
+      [description]="
+        searchQuery()
+          ? 'No purchases match &quot;' + searchQuery() + '&quot;. Try a different search term.'
+          : 'Start by recording your first purchase'
+      "
+      [ctaLabel]="searchQuery() ? '' : 'Create First Purchase'"
+      ctaLink="/dashboard/purchases/create"
+    >
+      @if (searchQuery()) {
+        <button actions (click)="searchQuery.set('')" class="btn btn-outline btn-sm">
+          Clear Search
+        </button>
+      }
+    </app-empty-state>
   }
 
   <!-- Purchases List -->
@@ -183,26 +178,7 @@
       itemLabel="purchases"
       (pageChange)="goToPage($event)"
       (itemsPerPageChange)="changeItemsPerPage($event)"
-    >
-      <div pagination-actions class="flex flex-wrap gap-2">
-        <button
-          type="button"
-          class="btn btn-outline btn-sm gap-2"
-          (click)="router.navigate(['/dashboard/purchases/create'])"
-        >
-          <ng-icon name="heroDocumentText" size="1rem" />
-          Create PO
-        </button>
-        <button
-          type="button"
-          class="btn btn-primary btn-sm gap-2"
-          (click)="router.navigate(['/dashboard/purchases/create'])"
-        >
-          <ng-icon name="heroPlus" size="1rem" />
-          Create Purchase
-        </button>
-      </div>
-    </app-pagination>
+    />
   }
 </div>
 

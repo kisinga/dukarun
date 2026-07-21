@@ -23,13 +23,12 @@
   <div class="space-y-4 sm:space-y-6">
     <!-- Header -->
     @if (showHeader()) {
-      <div>
-        <button (click)="goBack()" class="btn btn-ghost btn-sm mb-2 gap-1">
-          <ng-icon name="heroArrowLeft" size="1rem" />
-          Back to Purchases
-        </button>
-        <h1 class="text-3xl font-bold">Purchase Details</h1>
-      </div>
+      <app-page-header
+        title="Purchase Details"
+        backLink="/dashboard/purchases"
+        backLabel="Back to Purchases"
+        [showRefresh]="false"
+      />
     }
 
     <!-- Error State -->

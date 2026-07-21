@@ -12,6 +12,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { ProductSearchResult, ProductVariant } from '@dukarun/product';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../services/currency.service';
 import { ProductLabelComponent } from './product-label.component';
 import type { VariantListItem } from './variant-list.component';
@@ -35,7 +36,7 @@ import { VariantListComponent } from './variant-list.component';
 @Component({
   selector: 'app-product-search-view',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProductLabelComponent, VariantListComponent],
+  imports: [CommonModule, FormsModule, NgIcon, ProductLabelComponent, VariantListComponent],
   template: `
     @if (resultsOnly()) {
       <!-- List only: no card (parent e.g. Quick Select is the card) -->
@@ -65,27 +66,9 @@ import { VariantListComponent } from './variant-list.component';
                 >
                   @if (product.variants.length > 1) {
                     @if (isExpanded(product.id)) {
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-4 w-4 shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="2"
-                      >
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                      </svg>
+                      <ng-icon name="heroChevronDown" size="1rem" class="shrink-0" />
                     } @else {
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-4 w-4 shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="2"
-                      >
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
+                      <ng-icon name="heroChevronRight" size="1rem" class="shrink-0" />
                     }
                     <span class="badge badge-xs badge-ghost text-base-content/60">{{
                       product.variants.length
@@ -117,41 +100,9 @@ import { VariantListComponent } from './variant-list.component';
                       class="w-8 h-8 rounded bg-base-300 flex items-center justify-center shrink-0"
                     >
                       @if (isService(product)) {
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-4 w-4 text-accent"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                          />
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                        </svg>
+                        <ng-icon name="heroCog6Tooth" size="1rem" class="text-accent" />
                       } @else {
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-4 w-4 text-primary"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                          />
-                        </svg>
+                        <ng-icon name="heroCube" size="1rem" class="text-primary" />
                       }
                     </div>
                   }
@@ -162,9 +113,7 @@ import { VariantListComponent } from './variant-list.component';
                     />
                   </div>
                   <div class="w-14 shrink-0 text-right">
-                    <div class="text-[10px] uppercase tracking-wider text-base-content/70">
-                      Stock
-                    </div>
+                    <div class="text-xs uppercase tracking-wider text-base-content/70">Stock</div>
                     <div
                       class="text-xs font-mono tabular-nums"
                       [class.text-error]="isSingleVariantOutOfStock(product)"
@@ -174,9 +123,7 @@ import { VariantListComponent } from './variant-list.component';
                     </div>
                   </div>
                   <div class="w-16 shrink-0 text-right">
-                    <div class="text-[10px] uppercase tracking-wider text-base-content/70">
-                      Price
-                    </div>
+                    <div class="text-xs uppercase tracking-wider text-base-content/70">Price</div>
                     <div class="text-xs font-mono tabular-nums text-base-content">
                       {{
                         product.variants.length === 1
@@ -208,20 +155,11 @@ import { VariantListComponent } from './variant-list.component';
           <div
             class="rounded-lg border border-base-300 bg-base-200 px-3 py-2.5 flex items-center gap-2"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5 text-base-content/60 shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
+            <ng-icon
+              name="heroMagnifyingGlass"
+              size="1.25rem"
+              class="text-base-content/60 shrink-0"
+            />
             <input
               type="text"
               class="input input-ghost flex-1 text-base p-0 focus:outline-none min-h-0 h-auto bg-transparent"
@@ -236,21 +174,7 @@ import { VariantListComponent } from './variant-list.component';
                 (click)="cameraToggle.emit()"
                 aria-label="Back to camera"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                  />
-                  <path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
+                <ng-icon name="heroCamera" size="1.25rem" />
               </button>
             }
           </div>
@@ -280,31 +204,9 @@ import { VariantListComponent } from './variant-list.component';
                     >
                       @if (product.variants.length > 1) {
                         @if (isExpanded(product.id)) {
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-4 w-4 shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            stroke-width="2"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
+                          <ng-icon name="heroChevronDown" size="1rem" class="shrink-0" />
                         } @else {
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-4 w-4 shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            stroke-width="2"
-                          >
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                          </svg>
+                          <ng-icon name="heroChevronRight" size="1rem" class="shrink-0" />
                         }
                         <span class="badge badge-xs badge-ghost text-base-content/60">{{
                           product.variants.length
@@ -336,41 +238,9 @@ import { VariantListComponent } from './variant-list.component';
                           class="w-8 h-8 rounded bg-base-300 flex items-center justify-center shrink-0"
                         >
                           @if (isService(product)) {
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              class="h-4 w-4 text-accent"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                              />
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                              />
-                            </svg>
+                            <ng-icon name="heroCog6Tooth" size="1rem" class="text-accent" />
                           } @else {
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              class="h-4 w-4 text-primary"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                              />
-                            </svg>
+                            <ng-icon name="heroCube" size="1rem" class="text-primary" />
                           }
                         </div>
                       }
@@ -381,7 +251,7 @@ import { VariantListComponent } from './variant-list.component';
                         />
                       </div>
                       <div class="w-14 shrink-0 text-right">
-                        <div class="text-[10px] uppercase tracking-wider text-base-content/70">
+                        <div class="text-xs uppercase tracking-wider text-base-content/70">
                           Stock
                         </div>
                         <div
@@ -393,7 +263,7 @@ import { VariantListComponent } from './variant-list.component';
                         </div>
                       </div>
                       <div class="w-16 shrink-0 text-right">
-                        <div class="text-[10px] uppercase tracking-wider text-base-content/70">
+                        <div class="text-xs uppercase tracking-wider text-base-content/70">
                           Price
                         </div>
                         <div class="text-xs font-mono tabular-nums text-base-content">

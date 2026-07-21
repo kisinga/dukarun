@@ -1,13 +1,16 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { JournalEntry } from '@dukarun/ledger';
 import { MoneyComponent } from '../../../shared/components/money.component';
+import { EmptyStateComponent } from '../../../shared/components/dashboard/empty-state.component';
+import { PaginationComponent } from '../../../shared/components/dashboard/pagination.component';
 import type { TransactionsTabContext } from '../accounting-context';
 import { sourceTypeLabel } from '../utils/accounting-formatting';
 
 @Component({
   selector: 'app-transactions-tab',
-  imports: [CommonModule, MoneyComponent],
+  imports: [CommonModule, MoneyComponent, NgIcon, EmptyStateComponent, PaginationComponent],
   templateUrl: './transactions-tab.component.html',
   styleUrl: './transactions-tab.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

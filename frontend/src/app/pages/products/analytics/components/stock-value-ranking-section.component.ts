@@ -26,7 +26,7 @@ const VALUATION_LABELS: Record<StockValuationType, string> = {
             [class.ring-offset-2]="activeCard() === type"
             [class.ring-offset-base-100]="activeCard() === type"
           >
-            <span class="text-[11px] font-semibold uppercase tracking-wide text-base-content/50">
+            <span class="text-xs font-semibold uppercase tracking-wide text-base-content/50">
               Stock value · {{ VALUATION_LABELS[type] }}
             </span>
             @if (stockValueLoading() && !stockValueStats()) {

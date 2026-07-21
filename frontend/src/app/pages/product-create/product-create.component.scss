@@ -23,7 +23,7 @@
   transition: box-shadow ds.$transition-fast;
 
   &:focus {
-    box-shadow: 0 0 0 2px oklch(var(--p) / 0.2);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary) 20%, transparent);
   }
 }
 
@@ -33,10 +33,10 @@
 }
 
 .btn.btn-primary:not(:disabled) {
-  box-shadow: 0 0 0 2px oklch(var(--p) / 0.3);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary) 30%, transparent);
 }
 
 .tooltip::before {
-  font-size: ds.$text-xs;
+  font-size: 0.75rem; // 12px — Counter caption role
   max-width: 200px;
 }

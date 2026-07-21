@@ -7,12 +7,13 @@ import {
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import { NotificationCategory, NotificationService } from '@dukarun/notification';
 import { ToastService } from '../../../../shared/services/toast.service';
 
 @Component({
   selector: 'app-notification-settings',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   templateUrl: './notification-settings.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -67,10 +68,34 @@ export class NotificationSettingsComponent implements OnInit {
   ];
 
   readonly notificationTypes = [
-    { key: 'ORDER', label: 'Orders', icon: '💰', description: 'Order updates', enabled: true },
-    { key: 'STOCK', label: 'Stock', icon: '📦', description: 'Inventory alerts', enabled: true },
-    { key: 'ML_TRAINING', label: 'ML', icon: '🤖', description: 'Model updates', enabled: true },
-    { key: 'PAYMENT', label: 'Payments', icon: '💳', description: 'Payment status', enabled: true },
+    {
+      key: 'ORDER',
+      label: 'Orders',
+      icon: 'heroShoppingBag',
+      description: 'Order updates',
+      enabled: true,
+    },
+    {
+      key: 'STOCK',
+      label: 'Stock',
+      icon: 'heroCube',
+      description: 'Inventory alerts',
+      enabled: true,
+    },
+    {
+      key: 'ML_TRAINING',
+      label: 'ML',
+      icon: 'heroCpuChip',
+      description: 'Model updates',
+      enabled: true,
+    },
+    {
+      key: 'PAYMENT',
+      label: 'Payments',
+      icon: 'heroCreditCard',
+      description: 'Payment status',
+      enabled: true,
+    },
   ];
 
   readonly filteredNotifications = computed(() => {
@@ -143,7 +168,7 @@ export class NotificationSettingsComponent implements OnInit {
 
   getNotificationIcon(type: string): string {
     const found = this.notificationTypes.find((t) => t.key === type);
-    return found?.icon || 'ℹ️';
+    return found?.icon || 'heroInformationCircle';
   }
 
   getNotificationTypeClass(type: string): string {

@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { FacetService, type FacetValueSummary } from '@dukarun/product';
 
 /**
@@ -17,7 +18,7 @@ import { FacetService, type FacetValueSummary } from '@dukarun/product';
  */
 @Component({
   selector: 'app-multi-facet-selector',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <fieldset class="fieldset">
@@ -36,14 +37,7 @@ import { FacetService, type FacetValueSummary } from '@dukarun/product';
                 (mousedown)="$event.preventDefault()"
                 aria-label="Remove {{ item.name }}"
               >
-                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <ng-icon name="heroXMark" size="0.875rem" />
               </button>
             </span>
           }

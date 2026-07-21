@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -13,7 +14,7 @@ import { ToastService } from '../../../../shared/services/toast.service';
 
 @Component({
   selector: 'app-subscription-tiers',
-  imports: [CommonModule, PaymentModalComponent],
+  imports: [CommonModule, PaymentModalComponent, NgIcon],
   templateUrl: './subscription-tiers.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

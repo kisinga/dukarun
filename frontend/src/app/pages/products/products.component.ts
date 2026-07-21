@@ -34,6 +34,7 @@ import { ProductStats, ProductStatsComponent } from './components/product-stats.
 import { ProductTableRowComponent } from './components/product-table-row.component';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 import { ListSearchBarComponent } from '../../shared/components/dashboard/list-search-bar.component';
+import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
 import { MoneyComponent } from '../../shared/components/money.component';
 import { stockBadgeClass, stockDisplay } from './utils/product-presentation';
 import { getNearestExpiryDays } from '../../shared/utils/expiry-days.util';
@@ -58,6 +59,7 @@ import { getNearestExpiryDays } from '../../shared/utils/expiry-days.util';
     ProductStatsComponent,
     ProductTableRowComponent,
     ListSearchBarComponent,
+    EmptyStateComponent,
     PaginationComponent,
     DeleteConfirmationModalComponent,
     PageHeaderComponent,

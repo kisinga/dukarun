@@ -1,104 +1,155 @@
-# Dukahub Design System
+# Dukarun Design Language — "The Counter"
 
-**North star:** every UI/UX decision in the dashboard is grounded in the design-principles
-video (`/Users/mac/Documents/personal/videoplayback.mp4`). This file is the durable
-translation of that video into concrete, enforceable rules for this codebase
-(Angular 21 + Tailwind v4 `@theme` + daisyUI). When a design choice is ambiguous, this
-file — and the video behind it — decides.
-
-Context that shapes every rule: **Dukahub is a dashboard/POS app used on shop phones.**
-So two constraints dominate — **information density** (dashboard, not landing page) and
-**mobile-first** (design the small screen first, never as an afterthought).
+This document is the normative spec for all Dukarun dashboard UI. It is short on purpose:
+the real enforcement lives in code — tokens in `frontend/src/styles.scss` (`@theme`), shared
+components in `frontend/src/app/shared/`, and the `design-guard` CI gate
+(`frontend/scripts/design-guard.mjs`). If this doc and the code disagree, **the code is
+wrong** — fix the code or update this doc in the same PR.
 
 ---
 
-## 1. Visual hierarchy (video: "size, position, colour, images")
+## Why "The Counter"
 
-Rank every surface's information, then express the rank with:
-- **Size** — the most important value is the largest/boldest; secondary info is smaller and below.
-- **Position** — most important near the top; primary numbers before supporting detail.
-- **Colour** — a different colour draws the eye (the video's example: price is top, right-aligned, and a distinct colour). Use sparingly and with meaning (§4).
-- **Icons over words** — replace labels with icons where an icon is unambiguous (the video replaces "from/to" with location pins; we replace `Email:`/`Phone:` labels with mail/phone icons).
-- **Contrast makes hierarchy** — big-vs-small and colourful-vs-muted *are* the hierarchy. If everything is the same weight, nothing reads as important (the "spreadsheet, not a design" failure).
+Dukarun is a counter tool for African small shops. Cashiers use it standing up, one-handed,
+on cheap Android phones, in sunlight, on spotty internet. Owners and finance use a desktop
+for the back office (ledger, reports, credit). Money is the product's soul: double-entry
+ledger, approvals, audit trails, credit limits, M-Pesa.
 
-Applied: a stat/KPI leads with the **number** (large, bold), the label is smaller and muted above/below, and only the number that needs attention (overdue, error) gets semantic colour.
+Everything on a duka counter is within reach, arranged for speed, and nothing is decorative.
+That is the whole language. The five principles below derive from it.
 
-**Enrichment must be signal, not filler.** A stat card's optional secondary (`delta`/`hint`) exists to surface the single **most important** supporting fact — an actionable number (e.g. "3 overdue") or a real trend (e.g. "+12 this week", "▼ 8% vs last month"). Never add a derived-but-obvious value ("26% of total") or a restated label ("needs review") just to fill the card or make it look busy — that is garbage for the sake of UI. If a stat has no important secondary fact, leave it as label + value; the icon chip + colour already give it life.
+## Principles
 
-## 2. Type scale — dashboard density (video: "no text larger than 24px" for dense info)
+### 1. Money talks first
 
-- **Never exceed ~24px (`text-2xl`) in dashboard surfaces.** Landing/marketing pages may use a large range and up to 6 sizes; dashboards must compress.
-- One sans-serif family only (already `DM Sans` in this app). Never introduce a second font.
-- **Tighten large text:** headers ≥ `text-xl` get `tracking-tight` (≈ −2/−3% letter-spacing) and `leading-tight`/`leading-snug` (110–120% line-height). Never leave big text loose.
-- Concrete ladder for dashboards (map to Tailwind):
-  - Page title: `text-xl font-bold tracking-tight` (≤ `text-2xl`).
-  - Stat/hero number: `text-2xl font-bold tracking-tight leading-tight`.
-  - Section heading: `text-sm font-semibold`.
-  - Body/value: `text-sm`.
-  - Label/caption: `text-xs text-base-content/60`.
-- **Kill arbitrary micro sizes** (`text-[10px]`, `text-[11px]`). Use `text-xs`; add one 2xs token only if genuinely needed.
+Numbers are the heroes of every screen.
 
-## 3. Spacing — 4-point system (video: "everything is a multiple… you can always split in half")
+- `tabular-nums` on every amount; amounts right-aligned; the total is the largest text on
+  any checkout/payment screen.
+- Semantic colour is **money meaning only**: `success` = received/positive, `error` =
+  owed/overdue/failed, `warning` = needs attention, `info`/primary = neutral emphasis.
+  Never decorative — no gradient-tinted stat cards, no red asterisks-as-decoration.
+- Muted text uses the `base-content/80|70|60` opacity ramp, never ad-hoc greys.
 
-- All spacing is a multiple of 4px → Tailwind steps `1,1.5,2,3,4,6,8` (4/6/8/12/16/24/32px). No arbitrary `px-[13px]`.
-- **White space over grids.** Grids (12-col) are guidelines, not law; prioritise breathing room and *grouping related elements* (a form of hierarchy). ~`gap-8`/`space-y-8` (32px) between distinct sections; tighter (`gap-2`/`gap-3`) within a group.
-- Group elements that belong together (title+subtitle, label+value) with small gaps; separate unrelated groups with large gaps.
+### 2. Sunlight-proof
 
-## 4. Colour — one primary + semantic (video: "colour for purpose, not decoration")
+Must read on a dim, glare-struck phone screen.
 
-- Start from the **primary/brand** colour; lighten for backgrounds, darken for text. daisyUI already gives us the ramp (`primary`, `primary-content`, `base-100/200/300`, `base-content`).
-- **Semantic colours are reserved for meaning:**
-  - `success` (green) — completed, paid, positive balance, approved.
-  - `error` (red) — danger/urgency, overdue, failed, destructive.
-  - `warning` (yellow/amber) — needs attention, pending-risk.
-  - `info`/primary (blue) — trust, neutral emphasis, links.
-- Never use a semantic colour decoratively. A red number must mean "bad"; a green number must mean "good". (Respect existing domain sign conventions when wiring this — e.g. the customer/supplier outstanding convention.)
-- Muted text uses opacity on `base-content` (`/80`, `/70`, `/60`, `/55`) — a controlled ramp, not ad-hoc greys.
+- Surfaces are separated by **hairline border + whisper shadow**, never shadow alone:
+  the one card recipe is `rounded-box border border-base-300/60 bg-base-100 shadow-sm`.
+- No bordered card inside a bordered card — use dividers or spacing for inner grouping.
+- Dark mode: depth comes from a **lighter surface**, not shadows (`--depth: 0` in the dark
+  theme); heavy shadows are reserved for overlays (menus, modals) in both modes.
 
-## 5. Signifiers & interaction states (video: "every action needs a response")
+### 3. Counter speed
 
-- **Signifiers:** containers group related items; a highlighted/toggled container = selected; greyed-out = inactive/disabled; active nav items are highlighted; hover states + tooltips tell the user what an element affords. Build these in, don't rely on instructions.
-- **Buttons: minimum 4 states** — default, hover, active/pressed, disabled — plus **loading** (spinner) where an action is async. daisyUI `btn` gives most; ensure disabled + loading are actually wired for async actions.
-- **Inputs:** focus state on click-in, **error** (red border + message), optional **warning**. Never fail silently.
-- **Feedback everywhere:** loading spinners while fetching, success confirmation on completion, empty states when there's no data.
-- **Micro-interactions** confirm actions with a little delight (e.g. a chip sliding up to confirm "copied"). Use where it adds clarity, not noise.
+One primary action per screen, thumb-reachable.
 
-## 6. Icons (video: "icon size = font line-height", ghost sidebar, padding 2×height)
+- Touch targets ≥ 44px; the primary action is bottom-anchored on mobile.
+- Modals are full-screen on phones — encoded globally on `.modal-box` in `styles.scss`
+  (`h-full` on mobile, `md:h-auto md:max-h-[90vh]` on desktop). Don't add your own
+  height handling; per-modal width via `md:max-w-*` only.
+- Transitions are 150–200ms, no ornamental animation in dashboard flows.
+- Every async action has a loading state; every list has an empty state (use
+  `EmptyStateComponent`); errors never fail silently.
 
-- Icon system = **@ng-icons/heroicons (outline)**. Register in `frontend/src/app/core/icons/app-icons.ts`; use `<ng-icon name="heroWallet">`. No emoji, no ad-hoc inline `<svg>`. (See memory `icon-system-ngicons`.)
-- **Size icons to the adjacent text's line-height** (the video's core icon rule). Inline-with-`text-sm` → ~16px (`size="1rem"`, our default); inline-with-`text-xs` → ~14px (`size="0.875rem"`). Then tighten text next to it.
-- **Sidebar links are ghost buttons** — no background until hover.
-- **Button padding guideline: width = 2 × height** (roughly what daisyUI `btn` already does; respect it, don't cramp).
+### 4. Warm, not corporate
 
-## 7. Depth — shadows (light) & layering (dark) (video)
+The orange is a spice, not a sauce.
 
-- **Light mode:** shadows are *subtle*. Reduce opacity, increase blur. Cards → light shadow; popovers/menus/modals → stronger. Inner+outer shadows only for deliberately raised/tactile controls. **"If the shadow is the first thing you notice, it's wrong."** Standardise on one soft card shadow (`shadow-sm` + a hairline `border border-base-300/60`), reserve heavier shadows for overlays.
-- **Dark mode:** don't lean on shadows for depth — make the **card lighter than the background** instead. Soften light borders (they over-contrast). Dim chip saturation/brightness and flip fg/bg for hierarchy.
+- Primary orange (`#e85d2f`) is reserved for actions and brand moments. Celebration is
+  allowed on success screens — expressed with colour and iconography, **not** oversized type.
+- One font family: **Outfit**. Headings are tightened (`tracking-tight`). Corners are
+  rounded but not bubbly (`--radius-box: 0.75rem`).
+- Empty states and errors speak like a person, not a system log.
 
-## 8. Surfaces & cards
+### 5. Desktop is the owner's office, not a stretched phone
 
-- One card recipe: `rounded-box border border-base-300/60 bg-base-100` + subtle shadow. No competing shadow levels, no boxes-nested-in-boxes (a bordered card inside a bordered card is banned — use dividers/spacing instead).
-- Flatten chrome to one surface level; primary info visible at a glance (no accordion hiding the key number).
-
-## 9. Overlays (video)
-
-- Never let a full flat overlay kill an image. Use a **linear gradient** that fades the image into a text-readable area; add a **progressive blur** on top of the gradient for a modern look. Applies to any image-with-text (marketing hero, product cards with captions).
-
-## 10. Mobile-first (project constraint — memory `feedback-mobile-first`)
-
-- Design the phone layout first. Touch targets ≥ ~44px. Full-screen modals on mobile (`h-full max-h-screen md:h-auto md:max-h-[90vh]`).
-- **Stats/KPIs on mobile:** a horizontally-scrollable or stacked strip — never a cramped multi-column grid that truncates the number. The number stays legible.
-- Primary actions are thumb-reachable (bottom on mobile).
+- Phone layout is designed first, always.
+- Desktop adds density and width via `lg:` enhancements (tables, accounting, reports) —
+  same tokens, same components, no separate desktop design.
 
 ---
 
-## Enforcement checklist (use in review)
+## Type scale — 5 roles (dashboard)
 
-- [ ] No dashboard text > `text-2xl` (24px); large headers are `tracking-tight leading-tight`.
-- [ ] Spacing is 4-pt (no arbitrary px); related items grouped, sections breathe.
-- [ ] Semantic colour only where it means something; muted text via `base-content/xx`.
-- [ ] Every interactive element has hover + disabled (+ loading/focus/error where relevant).
-- [ ] Icons via `<ng-icon>`, sized to line-height; zero emoji; zero ad-hoc inline `<svg>`.
-- [ ] One card recipe; subtle shadow; no nested bordered boxes.
-- [ ] Primary number/value visible without expanding; clear hierarchy (size/position/colour).
-- [ ] Mobile layout designed first; KPIs legible on a phone; targets ≥44px.
+Dashboard text never exceeds 24px. Use these roles (Tailwind classes shown):
+
+| Role | Classes | Use |
+|---|---|---|
+| `hero` | `text-2xl font-bold tracking-tight tabular-nums` | Stat numbers, totals |
+| `title` | `text-xl font-bold tracking-tight` | Page titles only (via `PageHeaderComponent`) |
+| `heading` | `text-sm font-semibold` | Section headings |
+| `body` | `text-sm` | Values, rows |
+| `caption` | `text-xs text-base-content/60` | Labels, timestamps |
+
+- No arbitrary sizes (`text-[10px]`, `text-[11px]`) — the guard rejects them.
+- Marketing pages (`home`, `pricing`, `features`, `about`, `contact`, auth) have their own
+  scale in `frontend/src/styles/_marketing.scss`; this scale governs the dashboard.
+
+## Spacing
+
+- 4-point system: Tailwind steps `1, 1.5, 2, 3, 4, 6, 8`. No arbitrary px spacing.
+- Page content lives in the standard `dashboard-main` wrapper — pages add only vertical
+  rhythm: `space-y-6` between sections, `gap-2`/`gap-3` within a group. Do not nest
+  `container-app` inside dashboard pages.
+
+## Icons
+
+- System: `@ng-icons/heroicons` (outline), registered in
+  `frontend/src/app/shared/icons/app-icons.ts`. Use `<ng-icon name="hero…">`.
+- **No inline `<svg>`, no emoji, ever** — the guard rejects them. Add missing icons to the
+  registry.
+- Sizes: use the `AppIconComponent` wrapper — `sm` (14px, with `text-xs`), `md` (16px, with
+  `text-sm`, the default), `lg` (20px, standalone), `xl` (40px, decorative only: empty states
+  and large placeholders). No other values.
+
+## Depth & colour tokens
+
+- Two shadows, defined in `@theme`: card (subtle) and overlay (strong). Nothing else.
+- Radius: `--radius-box` for cards, `--radius-field` for inputs/buttons, `--radius-selector`
+  for chips/toggles. No `rounded-xl/2xl/3xl` on cards.
+- Colours come from the daisyUI theme only. No hardcoded hex in component styles.
+
+## The List Page (canonical layout)
+
+Every list page is the same four blocks, top to bottom — no improvisation:
+
+1. **`<app-page-header>`** — title (+ subtitle). Stats strip in the `[header-stats]` slot via a
+   per-domain `*-stats` wrapper over `app-stat-bar` (pills; tones are money-meaning only —
+   neutral totals, warning/error for states that need action; the bar's zero-guard handles
+   the rest, wrappers don't re-implement it). **The create action lives in the `[actions]`
+   slot**: one `btn btn-primary btn-sm gap-2` with a `heroPlus` icon ("Add Customer",
+   "Record Adjustment"…). Never in the table footer, never a bare floating row.
+2. **`<app-list-search-bar>`** — search input + `[badges]` + `[filters]` slots. No custom
+   search rows, no bare `input-bordered`.
+3. **Data surface** — desktop: `card` (global recipe) containing `table table-zebra` with
+   row-click navigation to the detail view (no "View" buttons); mobile: a per-domain card
+   component. Empty state = `<app-empty-state>`.
+4. **`<app-pagination>`** — the shared component. No hand-rolled `join` pagination.
+
+Pages without countable state may omit stats (rare); pages whose entities originate
+elsewhere (orders from the POS) omit the create action.
+
+**Trend/insight cards** — any time-series or analytics panel on a list page uses
+`<app-trend-card>` (shared/components/dashboard/trend-card.component.ts): collapsible,
+lazy-loaded, `type-heading` title, hairline divider, standard card recipe. One per page,
+between the header and the search bar. Never hand-roll the collapse chrome.
+
+## Navigation chrome (sidebar / bottom nav)
+
+One recipe, encoded in `styles.scss`: `.nav-item` (sidebar links, drawer links, footer
+links) and `.bottom-nav-item` (mobile tab bar). Ghost by default, 4pt rhythm, 44px
+targets, icons inherit state color. Exactly **one active signifier**: the tinted
+container (`.nav-item-active` / the icon pill in `.bottom-nav-active`) — no indicator
+bars, dots, gradients, or weight games on top of it. Apply the active class via
+`routerLinkActive`. Never hand-roll nav rows in shell files.
+
+## Enforcement checklist (review + `npm run design-guard`)
+
+- [ ] No dashboard text > `text-2xl`; titles/hero numbers are `tracking-tight`; amounts are `tabular-nums`.
+- [ ] One card recipe; no nested bordered boxes; heavy shadows only on overlays.
+- [ ] Semantic colour only with money meaning; muted text via `base-content/xx`.
+- [ ] Icons via `AppIconComponent`/`<ng-icon>`; zero inline `<svg>`; zero emoji.
+- [ ] Page titles via `PageHeaderComponent`; modals via the shared shell (full-screen on mobile).
+- [ ] Loading, empty, and error states present; touch targets ≥ 44px; phone layout first.

@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { LanguageCode } from '../../../../shared/graphql/generated/graphql';
@@ -14,7 +15,7 @@ import {
 
 @Component({
   selector: 'app-payment-methods',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, NgIcon],
   templateUrl: './payment-methods.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 
 /**
  * Presentational company search/select: search input, dropdown list, optional clear.
@@ -9,7 +10,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output, signal } f
 @Component({
   selector: 'app-company-search-select',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -35,14 +36,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output, signal } f
             (click)="clear.emit()"
             aria-label="Clear selected company"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <ng-icon name="heroXMark" size="1rem" />
           </button>
         }
       </div>

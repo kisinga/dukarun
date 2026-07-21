@@ -188,7 +188,7 @@ interface MethodRef {
               (ngModelChange)="setMpesa($any($event))"
               aria-label="Split between M-Pesa and cash"
             />
-            <div class="flex justify-between text-[11px] text-base-content/50 mt-1 mb-3">
+            <div class="flex justify-between text-xs text-base-content/50 mt-1 mb-3">
               <span>All M-Pesa</span>
               <span>All cash</span>
             </div>

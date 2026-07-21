@@ -12,35 +12,9 @@
           class="btn btn-ghost btn-xs btn-square"
         >
           @if (isExpanded()) {
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
+            <ng-icon name="heroChevronDown" size="1rem" />
           } @else {
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
+            <ng-icon name="heroChevronRight" size="1rem" />
           }
         </button>
       } @else {

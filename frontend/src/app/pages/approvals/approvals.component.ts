@@ -1,20 +1,41 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { Router } from '@angular/router';
-import { NgIcon } from '@ng-icons/core';
 import { ApprovalRequest, ApprovalService } from '@dukarun/approval';
 import { NotificationService } from '@dukarun/notification';
 import { CurrencyService } from '../../shared/services/currency.service';
-import { PageHeaderComponent } from '../../shared/components/dashboard-shared/components/page-header.component';
+import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
+import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
+import { ApprovalsStatsComponent } from './approvals-stats.component';
 
 @Component({
   selector: 'app-approvals',
-  imports: [CommonModule, NgIcon, PageHeaderComponent],
+  imports: [CommonModule, PageHeaderComponent, EmptyStateComponent, ApprovalsStatsComponent],
   template: `
-    <div class="min-h-screen bg-base-100">
-      <app-page-header title="Approvals" (backClick)="goBack()" />
+    <div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
+      <app-page-header
+        title="Approvals"
+        backLink="/dashboard"
+        [isLoading]="isLoading()"
+        refreshTitle="Refresh approvals"
+        (refresh)="loadApprovals()"
+      >
+        <app-approvals-stats
+          header-stats
+          [pending]="pendingCount()"
+          [approved]="approvedCount()"
+          [rejected]="rejectedCount()"
+        />
+      </app-page-header>
 
-      <div class="p-4 max-w-2xl mx-auto">
+      <div>
         <!-- Tabs -->
         <div class="tabs tabs-boxed mb-4">
           <button
@@ -52,24 +73,17 @@ import { PageHeaderComponent } from '../../shared/components/dashboard-shared/co
 
         <!-- Empty state -->
         @if (!isLoading() && approvals().length === 0) {
-          <div class="text-center py-12 text-base-content/50">
-            <div class="mb-2 flex justify-center">
-              @if (activeTab() === 'pending') {
-                <ng-icon name="heroCheckCircle" size="2.25rem" />
-              } @else {
-                <ng-icon name="heroClipboardDocumentList" size="2.25rem" />
-              }
-            </div>
-            <p>
-              @if (activeTab() === 'pending') {
-                No pending approvals
-              } @else if (activeTab() === 'mine') {
-                You haven't made any approval requests
-              } @else {
-                No approval requests found
-              }
-            </p>
-          </div>
+          <app-empty-state
+            [embedded]="true"
+            [icon]="activeTab() === 'pending' ? 'heroCheckCircle' : 'heroClipboardDocumentList'"
+            [title]="
+              activeTab() === 'pending'
+                ? 'No pending approvals'
+                : activeTab() === 'mine'
+                  ? 'You haven\\'t made any approval requests'
+                  : 'No approval requests found'
+            "
+          />
         }
 
         <!-- Approval cards -->
@@ -216,6 +230,15 @@ export class ApprovalsComponent implements OnInit {
   readonly pendingCount = signal(0);
   readonly isLoading = signal(false);
   readonly error = signal<string | null>(null);
+
+  /** Status counts for the currently loaded list (the pending stat uses the
+   *  dedicated pendingCount signal, which is accurate regardless of tab). */
+  readonly approvedCount = computed(
+    () => this.approvals().filter((a) => a.status === 'approved').length,
+  );
+  readonly rejectedCount = computed(
+    () => this.approvals().filter((a) => a.status === 'rejected').length,
+  );
 
   // Review state
   readonly reviewingId = signal<string | null>(null);

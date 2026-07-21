@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -16,7 +17,7 @@ import { toDisplayDate } from '../../../../shared/utils/date.util';
 
 @Component({
   selector: 'app-user-details-modal',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   templateUrl: './user-details-modal.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

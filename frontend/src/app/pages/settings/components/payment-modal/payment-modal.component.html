@@ -8,20 +8,7 @@
         (click)="close()"
         [disabled]="isProcessingPayment()"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M6 18L18 6M6 6l12 12"
-          />
-        </svg>
+        <ng-icon name="heroXMark" size="1.25rem" />
       </button>
     </div>
 
@@ -80,18 +67,7 @@
     <!-- Error Message -->
     @if (error()) {
       <div class="alert alert-error py-2 mb-4 text-sm">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path
-            fill-rule="evenodd"
-            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-            clip-rule="evenodd"
-          />
-        </svg>
+        <ng-icon name="heroExclamationCircle" size="1.25rem" class="shrink-0" />
         <span>{{ error() }}</span>
       </div>
     }
@@ -112,16 +88,7 @@
           [disabled]="!phoneNumber() || isProcessingPayment()"
           (click)="initiateExpressPayment()"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"
-            />
-          </svg>
+          <ng-icon name="heroDevicePhoneMobile" size="1rem" />
           Mobile Money
         </button>
         <button
@@ -129,19 +96,7 @@
           [disabled]="isProcessingPayment()"
           (click)="initiateCheckoutPayment()"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
-            <path
-              fill-rule="evenodd"
-              d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"
-              clip-rule="evenodd"
-            />
-          </svg>
+          <ng-icon name="heroCreditCard" size="1rem" />
           Card / Other
         </button>
       </div>

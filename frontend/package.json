@@ -18,7 +18,9 @@
     "lint": "ng lint",
     "format": "prettier --write \"**/*.{ts,js,json,html,scss,css}\"",
     "format:check": "prettier --check \"**/*.{ts,js,json,html,scss,css}\"",
-    "boundary-check": "node scripts/boundary-check.mjs"
+    "boundary-check": "node scripts/boundary-check.mjs",
+    "design-guard": "node scripts/design-guard.mjs",
+    "design-guard:seed": "node scripts/design-guard.mjs --seed"
   },
   "prettier": {
     "printWidth": 100,

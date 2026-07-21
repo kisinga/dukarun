@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { FormArray, ReactiveFormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 
 /**
  * SKU List Editor Component
@@ -10,7 +11,7 @@ import { FormArray, ReactiveFormsModule } from '@angular/forms';
  */
 @Component({
   selector: 'app-sku-list-editor',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="card bg-base-100 shadow">
@@ -18,7 +19,8 @@ import { FormArray, ReactiveFormsModule } from '@angular/forms';
         <div class="flex items-center justify-between mb-2">
           <h3 class="font-bold text-sm">Generated SKUs</h3>
           <button type="button" class="btn btn-xs btn-secondary" (click)="onRegenerate()">
-            🔄 Regenerate
+            <ng-icon name="heroArrowPath" size="0.875rem" />
+            Regenerate
           </button>
         </div>
 
@@ -97,15 +99,7 @@ import { FormArray, ReactiveFormsModule } from '@angular/forms';
                 />
                 @if (isWholesalePriceHigher($index)) {
                   <div class="alert alert-warning py-1.5 px-2 mt-1.5">
-                    <svg
-                      class="h-3 w-3"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <ng-icon name="heroExclamationCircle" size="1rem" />
                     <span class="text-xs"
                       >Wholesale price should be lower than the regular price</span
                     >

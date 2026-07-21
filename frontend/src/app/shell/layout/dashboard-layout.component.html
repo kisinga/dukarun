@@ -66,10 +66,9 @@
             }
           </span>
           @if (shiftDurationText(); as duration) {
-            <span
-              class="text-[10px] sm:text-xs font-normal opacity-80 tabular-nums block sm:inline sm:ml-0.5"
-              >{{ duration }}</span
-            >
+            <span class="text-xs font-normal opacity-80 tabular-nums block sm:inline sm:ml-0.5">{{
+              duration
+            }}</span>
           }
         </button>
 
@@ -106,7 +105,7 @@
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-sm truncate">{{ fullName() }}</div>
-                  <div class="text-[11px] text-base-content/50 truncate">
+                  <div class="text-xs text-base-content/50 truncate">
                     {{ user()?.emailAddress }}
                   </div>
                   <div class="badge badge-success badge-soft badge-xs gap-1 mt-1 font-medium">
@@ -219,7 +218,7 @@
       <router-outlet />
     </main>
 
-    <!-- Mobile Bottom Nav - Clean, high-contrast design -->
+    <!-- Mobile Bottom Nav - one recipe, one signifier (pill behind active icon) -->
     <nav
       class="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 lg:hidden z-50 safe-area-inset-bottom"
       role="navigation"
@@ -228,110 +227,38 @@
         <!-- Products -->
         <a
           routerLink="/dashboard/products"
-          routerLinkActive="text-primary"
-          #productsLink="routerLinkActive"
-          class="nav-link-ripple flex flex-col items-center justify-center gap-0.5 py-2 px-4 min-w-[64px] transition-colors rounded-lg"
+          routerLinkActive="bottom-nav-active"
+          class="bottom-nav-item nav-link-ripple"
         >
-          <div
-            class="relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200"
-            [class.bg-gradient-to-br]="productsLink.isActive"
-            [class.from-primary/20]="productsLink.isActive"
-            [class.to-accent/20]="productsLink.isActive"
-            [class.shadow-md]="productsLink.isActive"
-            [class.shadow-primary/20]="productsLink.isActive"
-          >
-            @if (productsLink.isActive) {
-              <span
-                class="absolute -top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary"
-              ></span>
-            }
-            <ng-icon
-              name="heroCube"
-              size="1.5rem"
-              class="transition-colors"
-              [class.text-primary]="productsLink.isActive"
-              [class.text-base-content/50]="!productsLink.isActive"
-            />
-          </div>
-          <span
-            class="text-[11px] font-medium transition-colors"
-            [class.text-primary]="productsLink.isActive"
-            [class.text-base-content/50]="!productsLink.isActive"
-            >Products</span
-          >
+          <span class="bottom-nav-ico">
+            <ng-icon name="heroCube" size="1.25rem" />
+          </span>
+          <span class="bottom-nav-label">Products</span>
         </a>
 
         <!-- Home -->
         <a
           routerLink="/dashboard"
-          routerLinkActive="text-primary"
+          routerLinkActive="bottom-nav-active"
           [routerLinkActiveOptions]="{ exact: true }"
-          #homeLink="routerLinkActive"
-          class="nav-link-ripple flex flex-col items-center justify-center gap-0.5 py-2 px-4 min-w-[64px] transition-colors rounded-lg"
+          class="bottom-nav-item nav-link-ripple"
         >
-          <div
-            class="relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200"
-            [class.bg-gradient-to-br]="homeLink.isActive"
-            [class.from-primary/20]="homeLink.isActive"
-            [class.to-accent/20]="homeLink.isActive"
-            [class.shadow-md]="homeLink.isActive"
-            [class.shadow-primary/20]="homeLink.isActive"
-          >
-            @if (homeLink.isActive) {
-              <span
-                class="absolute -top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary"
-              ></span>
-            }
-            <ng-icon
-              name="heroHome"
-              size="1.5rem"
-              class="transition-colors"
-              [class.text-primary]="homeLink.isActive"
-              [class.text-base-content/50]="!homeLink.isActive"
-            />
-          </div>
-          <span
-            class="text-[11px] font-medium transition-colors"
-            [class.text-primary]="homeLink.isActive"
-            [class.text-base-content/50]="!homeLink.isActive"
-            >Home</span
-          >
+          <span class="bottom-nav-ico">
+            <ng-icon name="heroHome" size="1.25rem" />
+          </span>
+          <span class="bottom-nav-label">Home</span>
         </a>
 
         <!-- Sell -->
         <a
           routerLink="/dashboard/sell"
-          routerLinkActive="text-primary"
-          #sellLink="routerLinkActive"
-          class="nav-link-ripple flex flex-col items-center justify-center gap-0.5 py-2 px-4 min-w-[64px] transition-colors rounded-lg"
+          routerLinkActive="bottom-nav-active"
+          class="bottom-nav-item nav-link-ripple"
         >
-          <div
-            class="relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200"
-            [class.bg-gradient-to-br]="sellLink.isActive"
-            [class.from-primary/20]="sellLink.isActive"
-            [class.to-accent/20]="sellLink.isActive"
-            [class.shadow-md]="sellLink.isActive"
-            [class.shadow-primary/20]="sellLink.isActive"
-          >
-            @if (sellLink.isActive) {
-              <span
-                class="absolute -top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary"
-              ></span>
-            }
-            <ng-icon
-              name="heroShoppingCart"
-              size="1.5rem"
-              class="transition-colors"
-              [class.text-primary]="sellLink.isActive"
-              [class.text-base-content/50]="!sellLink.isActive"
-            />
-          </div>
-          <span
-            class="text-[11px] font-medium transition-colors"
-            [class.text-primary]="sellLink.isActive"
-            [class.text-base-content/50]="!sellLink.isActive"
-            >Sell</span
-          >
+          <span class="bottom-nav-ico">
+            <ng-icon name="heroShoppingCart" size="1.25rem" />
+          </span>
+          <span class="bottom-nav-label">Sell</span>
         </a>
       </div>
     </nav>
@@ -662,7 +589,7 @@
       aria-label="Close menu"
     ></label>
     <aside
-      class="sidebar-aside bg-base-100 text-base-content min-h-screen w-64 flex flex-col border-r border-base-300 shadow-2xl"
+      class="sidebar-aside bg-base-100 text-base-content min-h-screen w-64 flex flex-col border-r border-base-300"
     >
       <!-- Sidebar Header — aligned with top nav height -->
       <div class="flex items-center px-4 border-b border-base-300 min-h-16">
@@ -690,23 +617,19 @@
           <!-- Overview -->
           <a
             [routerLink]="overviewItem.route"
-            routerLinkActive="nav-link-active bg-base-200 text-primary font-bold border-l-2 border-primary"
+            routerLinkActive="nav-item-active"
             [routerLinkActiveOptions]="{ exact: true }"
             (click)="closeDrawer()"
-            class="group nav-link-ripple flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-base-content min-h-[2.75rem] active:bg-base-200 transition-colors"
+            class="nav-item nav-link-ripple"
           >
-            <span
-              class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-base-100 text-base-content/70 transition-all duration-200 group-[.nav-link-active]:bg-gradient-to-br group-[.nav-link-active]:from-primary/25 group-[.nav-link-active]:to-accent/25 group-[.nav-link-active]:text-primary group-[.nav-link-active]:shadow-md group-[.nav-link-active]:shadow-primary/20"
-            >
-              <app-nav-icon [name]="overviewItem.icon" />
-            </span>
+            <app-nav-icon [name]="overviewItem.icon" />
             <span>{{ overviewItem.label }}</span>
           </a>
 
           @for (section of navSections(); track $index) {
             @if (section.label) {
               <div
-                class="pt-3 pb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-base-content/50"
+                class="pt-4 pb-1 px-3 text-xs font-semibold uppercase tracking-wider text-base-content/40"
               >
                 {{ section.label }}
               </div>
@@ -716,16 +639,12 @@
                 <a
                   [routerLink]="item.route"
                   [queryParams]="item.queryParams"
-                  routerLinkActive="nav-link-active bg-base-200 text-primary font-bold border-l-2 border-primary"
+                  routerLinkActive="nav-item-active"
                   [routerLinkActiveOptions]="{ exact: false }"
                   (click)="closeDrawer()"
-                  class="group nav-link-ripple flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-base-content min-h-[2.75rem] active:bg-base-200 transition-colors"
+                  class="nav-item nav-link-ripple"
                 >
-                  <span
-                    class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-base-100 text-base-content/70 transition-all duration-200 group-[.nav-link-active]:bg-gradient-to-br group-[.nav-link-active]:from-primary/25 group-[.nav-link-active]:to-accent/25 group-[.nav-link-active]:text-primary group-[.nav-link-active]:shadow-md group-[.nav-link-active]:shadow-primary/20"
-                  >
-                    <app-nav-icon [name]="item.icon" />
-                  </span>
+                  <app-nav-icon [name]="item.icon" />
                   <span>{{ item.label }}</span>
                 </a>
               }
@@ -739,16 +658,12 @@
         @if (hasSettingsForFooter()) {
           <a
             routerLink="/dashboard/settings"
-            routerLinkActive="nav-link-active bg-base-200 text-primary font-bold"
+            routerLinkActive="nav-item-active"
             [routerLinkActiveOptions]="{ exact: false }"
             (click)="closeDrawer()"
-            class="group nav-link-ripple flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-semibold text-base-content hover:bg-base-200 transition-colors"
+            class="nav-item nav-link-ripple"
           >
-            <span
-              class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-base-100 text-base-content/70 transition-all duration-200 group-[.nav-link-active]:bg-gradient-to-br group-[.nav-link-active]:from-primary/25 group-[.nav-link-active]:to-accent/25 group-[.nav-link-active]:text-primary group-[.nav-link-active]:shadow-md group-[.nav-link-active]:shadow-primary/20"
-            >
-              <app-nav-icon name="settings" />
-            </span>
+            <app-nav-icon name="settings" />
             <span>Settings</span>
           </a>
         }
@@ -765,7 +680,7 @@
                 </div>
               </div>
               <span class="flex-1 text-left truncate text-xs">{{ activeCompany()?.code }}</span>
-              <ng-icon name="heroChevronUpDown" size="0.75rem" class="text-base-content/40" />
+              <ng-icon name="heroChevronUpDown" size="0.875rem" class="text-base-content/40" />
             </div>
             <div
               tabindex="0"
@@ -799,13 +714,13 @@
           href="/onboarding"
           target="_blank"
           rel="noopener noreferrer"
-          class="nav-link-ripple flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-base-content/50 active:bg-base-200 transition-colors cursor-pointer"
+          class="nav-item nav-link-ripple text-xs text-base-content/50"
         >
           <ng-icon name="heroQuestionMarkCircle" size="1rem" />
           <span>Help</span>
         </a>
 
-        <div class="text-[9px] text-base-content/30 text-center">v2.0.0</div>
+        <div class="text-xs text-base-content/30 text-center">v2.0.0</div>
       </div>
     </aside>
   </div>

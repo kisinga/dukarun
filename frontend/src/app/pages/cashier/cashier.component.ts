@@ -35,7 +35,7 @@ import { SettleOrderModalComponent } from '@dukarun/cashier-session/components';
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-xl sm:text-2xl font-bold flex items-center gap-2">
+          <h1 class="type-title flex items-center gap-2">
             <ng-icon name="heroBanknotes" size="1.5rem" class="text-primary" />
             Cashier
           </h1>
@@ -96,7 +96,7 @@ import { SettleOrderModalComponent } from '@dukarun/cashier-session/components';
                   </div>
                   <div class="text-right shrink-0">
                     <div class="text-xs text-base-content/60">Due</div>
-                    <div class="text-lg font-bold text-primary">
+                    <div class="text-lg font-bold tabular-nums text-primary">
                       {{ formatCurrency(item.amountOwing) }}
                     </div>
                   </div>

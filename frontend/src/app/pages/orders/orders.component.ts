@@ -28,11 +28,13 @@ import {
 import { OrderStats, OrderStatsComponent } from './components/order-stats.component';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 import { ListSearchBarComponent } from '../../shared/components/dashboard/list-search-bar.component';
+import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
 import {
   PeriodSelectorComponent,
   type AnalyticsPeriod,
 } from '../../shared/components/dashboard/charts/period-selector.component';
 import { EchartContainerComponent } from '../../shared/components/dashboard/charts/echart-container.component';
+import { TrendCardComponent } from '../../shared/components/dashboard/trend-card.component';
 import { OrdersAdvancedFiltersModalComponent } from './components/orders-advanced-filters-modal.component';
 import { OrdersListFilterService } from './services/orders-list-filter.service';
 
@@ -57,8 +59,10 @@ import { OrdersListFilterService } from './services/orders-list-filter.service';
     PayOrderModalComponent,
     PageHeaderComponent,
     ListSearchBarComponent,
+    EmptyStateComponent,
     PeriodSelectorComponent,
     EchartContainerComponent,
+    TrendCardComponent,
     OrdersAdvancedFiltersModalComponent,
   ],
   templateUrl: './orders.component.html',
@@ -505,10 +509,9 @@ export class OrdersComponent implements OnInit {
     this.advancedFiltersOpen.set(false);
   }
 
-  toggleOrderVolumeTrend(): void {
-    const opening = !this.trendOpen();
-    this.trendOpen.set(opening);
-    if (opening && !this.trendFetched) {
+  /** Lazy-load analytics the first time the trend card is opened. */
+  onTrendOpenChange(open: boolean): void {
+    if (open && !this.trendFetched) {
       this.trendFetched = true;
       void this.analyticsService.fetch(this.trendPeriod());
     }

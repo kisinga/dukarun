@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -24,7 +25,7 @@ import { JournalEntry, LedgerService } from '@dukarun/ledger';
 @Component({
   selector: 'app-create-transfer-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <dialog #modal class="modal modal-bottom sm:modal-middle" (click)="onBackdropClick($event)">
@@ -41,14 +42,7 @@ import { JournalEntry, LedgerService } from '@dukarun/ledger';
               [disabled]="isProcessing()"
               aria-label="Close"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              <ng-icon name="heroXMark" size="1.25rem" />
             </button>
           </form>
         </div>

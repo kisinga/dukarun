@@ -37,6 +37,7 @@ import { Customer } from './components/customer-selector.component';
 import { ProductConfirmModalComponent } from './components/product-confirm-modal.component';
 import { ProductSearchViewComponent } from '../../shared/components/dashboard-shared/components/product-search-view.component';
 import { ProductScannerComponent } from './components/product-scanner.component';
+import { MobileFabComponent } from '../../shared/components/dashboard/mobile-fab.component';
 
 type CheckoutType = 'credit' | 'cashier' | null;
 
@@ -70,6 +71,7 @@ type CheckoutType = 'credit' | 'cashier' | null;
     CheckoutBarComponent,
     CheckoutModalComponent,
     SettleOrderModalComponent,
+    MobileFabComponent,
   ],
   templateUrl: './sell.component.html',
   styleUrl: './sell.component.scss',

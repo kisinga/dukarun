@@ -12,6 +12,7 @@ import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../shared/services/currency.service';
 import { CustomerService, CustomerStatementService } from '@dukarun/customer';
 import { toDisplayDate } from '../../../shared/utils/date.util';
+import { PageHeaderComponent } from '../../../shared/components/dashboard/page-header.component';
 
 /**
  * Customer Statement Page
@@ -23,7 +24,7 @@ import { toDisplayDate } from '../../../shared/utils/date.util';
 @Component({
   selector: 'app-customer-statement',
   standalone: true,
-  imports: [CommonModule, RouterLink, NgIcon],
+  imports: [CommonModule, RouterLink, NgIcon, PageHeaderComponent],
   templateUrl: './customer-statement.component.html',
   styleUrl: './customer-statement.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -18,7 +18,7 @@ import { phoneValidator } from '../../../utils/phone.utils';
   styles: [
     `
       .input-wrapper:focus-within .label-text {
-        color: oklch(var(--p));
+        color: var(--color-primary);
       }
       .form-container {
         max-width: 100%;

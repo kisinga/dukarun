@@ -1,8 +1,8 @@
-<div class="card bg-base-100 shadow-lg">
+<div class="card bg-base-100">
   <div class="card-body p-4 sm:p-6">
     <!-- Header -->
     <div class="mb-4">
-      <h2 class="text-lg sm:text-xl font-bold">Notification Testing</h2>
+      <h2 class="text-lg sm:text-xl font-bold tracking-tight">Notification Testing</h2>
       <p class="text-sm opacity-60">Monitor and test notification system</p>
     </div>
 
@@ -16,27 +16,9 @@
       <div class="bg-base-200 rounded-lg p-3 text-center">
         <div class="text-xl sm:text-2xl">
           @if (isPushEnabled()) {
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-6 w-6 sm:h-8 sm:w-8 mx-auto text-success"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
-              />
-            </svg>
+            <ng-icon name="heroBell" size="1.25rem" class="mx-auto text-success" />
           } @else {
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-6 w-6 sm:h-8 sm:w-8 mx-auto opacity-50"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
-              />
-            </svg>
+            <ng-icon name="heroBell" size="1.25rem" class="mx-auto opacity-50" />
           }
         </div>
         <div class="text-xs opacity-60">Push</div>
@@ -45,31 +27,9 @@
       <div class="bg-base-200 rounded-lg p-3 text-center">
         <div class="text-xl sm:text-2xl">
           @if (swStatus()) {
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-6 w-6 sm:h-8 sm:w-8 mx-auto text-success"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                clip-rule="evenodd"
-              />
-            </svg>
+            <ng-icon name="heroCheck" size="1.25rem" class="mx-auto text-success" />
           } @else {
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-6 w-6 sm:h-8 sm:w-8 mx-auto text-error"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                clip-rule="evenodd"
-              />
-            </svg>
+            <ng-icon name="heroXMark" size="1.25rem" class="mx-auto text-error" />
           }
         </div>
         <div class="text-xs opacity-60">Worker</div>
@@ -92,7 +52,7 @@
           @if (isLoading()) {
             <span class="loading loading-spinner loading-xs"></span>
           } @else {
-            <span class="hidden sm:inline">{{ test.icon }}</span>
+            <ng-icon [name]="test.icon" size="1rem" class="hidden sm:inline-flex" />
             {{ test.label }}
           }
         </button>
@@ -131,7 +91,7 @@
               [class.bg-error/20]="log.type === 'error'"
               [class.bg-info/20]="log.type === 'info'"
             >
-              <span>{{ log.icon }}</span>
+              <ng-icon [name]="log.icon" size="0.875rem" />
               <span class="flex-1 truncate">{{ log.message }}</span>
               <span class="opacity-50 shrink-0">{{ log.timestamp }}</span>
             </div>

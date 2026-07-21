@@ -1,22 +1,18 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 
 @Component({
   selector: 'app-trend-indicator',
   standalone: true,
+  imports: [NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <span
-      class="inline-flex items-center gap-0.5 text-[11px] font-semibold tabular-nums"
+      class="inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums"
       [class.text-success]="isUp()"
       [class.text-error]="!isUp()"
     >
-      <svg class="h-3 w-3" viewBox="0 0 12 12" fill="currentColor">
-        @if (isUp()) {
-          <path d="M6 2l4 6H2l4-6z" />
-        } @else {
-          <path d="M6 10L2 4h8L6 10z" />
-        }
-      </svg>
+      <ng-icon [name]="isUp() ? 'heroArrowTrendingUp' : 'heroArrowTrendingDown'" size="0.875rem" />
       {{ absValue() }}%
     </span>
   `,

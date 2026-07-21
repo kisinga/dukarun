@@ -15,6 +15,7 @@ import { JournalEntry, LedgerService } from '@dukarun/ledger';
 import { toDisplayDate } from '../../shared/utils/date.util';
 import { TransactionDetailModalComponent } from './components/transaction-detail-modal.component';
 import { CreateTransferModalComponent } from './create-transfer-modal.component';
+import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
 import { sourceTypeLabel } from './utils/accounting-formatting';
 
 const TRANSFER_SOURCE_TYPE = 'inter-account-transfer';
@@ -27,7 +28,13 @@ export interface TransferFromTo {
 @Component({
   selector: 'app-transfers',
   standalone: true,
-  imports: [CommonModule, NgIcon, CreateTransferModalComponent, TransactionDetailModalComponent],
+  imports: [
+    CommonModule,
+    NgIcon,
+    CreateTransferModalComponent,
+    TransactionDetailModalComponent,
+    EmptyStateComponent,
+  ],
   templateUrl: './transfers.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

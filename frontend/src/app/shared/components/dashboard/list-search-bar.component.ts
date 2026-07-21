@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, model } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 
 /**
  * Standardized search bar for all list pages.
@@ -23,6 +24,7 @@ import { ChangeDetectionStrategy, Component, input, model } from '@angular/core'
 @Component({
   selector: 'app-list-search-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NgIcon],
   template: `
     <div
       class="rounded-xl bg-base-100 shadow-sm border border-base-200 p-3 sm:p-4 flex flex-col gap-3"
@@ -32,20 +34,11 @@ import { ChangeDetectionStrategy, Component, input, model } from '@angular/core'
 
       <!-- Search input -->
       <div class="relative max-w-lg">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-base-content/40 pointer-events-none"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
+        <ng-icon
+          name="heroMagnifyingGlass"
+          size="1rem"
+          class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40 pointer-events-none"
+        />
         <input
           type="text"
           [placeholder]="placeholder()"
@@ -60,20 +53,7 @@ import { ChangeDetectionStrategy, Component, input, model } from '@angular/core'
             (click)="searchQuery.set('')"
             aria-label="Clear search"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-3.5 w-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <ng-icon name="heroXMark" size="0.875rem" />
           </button>
         }
       </div>

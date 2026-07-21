@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { HoverPreviewHostComponent } from '../../../../shared/components/dashboard/hover-preview-host/hover-preview-host.component';
 
 /**
@@ -10,7 +11,7 @@ import { HoverPreviewHostComponent } from '../../../../shared/components/dashboa
  */
 @Component({
   selector: 'app-purchase-supplier-info',
-  imports: [CommonModule, RouterLink, HoverPreviewHostComponent],
+  imports: [CommonModule, RouterLink, NgIcon, HoverPreviewHostComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>
@@ -30,20 +31,7 @@ import { HoverPreviewHostComponent } from '../../../../shared/components/dashboa
         <div class="space-y-1">
           @if (supplier()!.emailAddress) {
             <div class="flex items-center gap-2 text-sm text-base-content/70">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4 shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                />
-              </svg>
+              <ng-icon name="heroEnvelope" size="1rem" class="shrink-0" />
               <span>{{ supplier()!.emailAddress }}</span>
             </div>
           }

@@ -13,6 +13,7 @@ import { SupplierService, SupplierSearchService } from '@dukarun/supplier';
 import { ApolloService } from '../../../shared/services/apollo.service';
 import { GetPurchasesDocument, SortOrder } from '../../../shared/graphql/generated/graphql';
 import { toDisplayDate } from '../../../shared/utils/date.util';
+import { PageHeaderComponent } from '../../../shared/components/dashboard/page-header.component';
 
 const RECENT_PURCHASES_TAKE = 15;
 
@@ -23,7 +24,7 @@ const RECENT_PURCHASES_TAKE = 15;
 @Component({
   selector: 'app-supplier-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, PageHeaderComponent],
   templateUrl: './supplier-detail.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

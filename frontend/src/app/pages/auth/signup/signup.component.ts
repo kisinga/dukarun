@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '@dukarun/auth';
 import { RegistrationService } from '../../../shared/services/registration.service';
@@ -16,7 +17,7 @@ type Step = 1 | 2 | 3;
 
 @Component({
   selector: 'app-signup',
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, NgIcon],
   templateUrl: './signup.component.html',
   styleUrl: './signup.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

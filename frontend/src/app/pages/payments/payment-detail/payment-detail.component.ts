@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -14,6 +15,7 @@ import { CurrencyService } from '../../../shared/services/currency.service';
 import { PaymentsService } from '@dukarun/payments';
 import { toDisplayDate } from '../../../shared/utils/date.util';
 import { PaymentStateBadgeComponent } from '../components/payment-state-badge.component';
+import { PageHeaderComponent } from '../../../shared/components/dashboard/page-header.component';
 
 /**
  * Payment Detail Component
@@ -22,7 +24,14 @@ import { PaymentStateBadgeComponent } from '../components/payment-state-badge.co
  */
 @Component({
   selector: 'app-payment-detail',
-  imports: [CommonModule, RouterLink, HoverPreviewHostComponent, PaymentStateBadgeComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    HoverPreviewHostComponent,
+    PaymentStateBadgeComponent,
+    PageHeaderComponent,
+    NgIcon,
+  ],
   templateUrl: './payment-detail.component.html',
   styleUrl: './payment-detail.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

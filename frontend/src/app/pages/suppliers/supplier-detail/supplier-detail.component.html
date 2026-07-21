@@ -1,22 +1,10 @@
 <div class="space-y-4 sm:space-y-6">
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-    <div>
-      <a routerLink="/dashboard/suppliers" class="btn btn-ghost btn-sm mb-2 gap-1">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Suppliers
-      </a>
-      <h1 class="text-xl sm:text-2xl font-bold text-base-content">Supplier</h1>
-    </div>
-  </div>
+  <app-page-header
+    title="Supplier"
+    backLink="/dashboard/suppliers"
+    backLabel="Back to Suppliers"
+    [showRefresh]="false"
+  />
 
   @if (error()) {
     <div role="alert" class="alert alert-error">

@@ -17,7 +17,7 @@ import { toDisplayDate } from '../../../../shared/utils/date.util';
     >
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
-          <h2 class="text-xl sm:text-2xl font-bold text-base-content">
+          <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-base-content">
             @if (referenceNumber()) {
               Purchase {{ referenceNumber() }}
             } @else {

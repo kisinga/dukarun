@@ -10,5 +10,8 @@
   ],
   "frontend/src/app/**/*.ts": [
     "sh -c 'cd frontend && npm run boundary-check'"
+  ],
+  "frontend/src/app/**/*.{html,ts,scss}": [
+    "sh -c 'files=\"\"; for f in \"$@\"; do files=\"$files ${f#frontend/}\"; done; cd frontend && node scripts/design-guard.mjs $files' _"
   ]
 }

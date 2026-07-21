@@ -3,6 +3,7 @@ import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon } from '@ng-icons/core';
+import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 
 const LEDGER = ['/dashboard/accounting/ledger'];
 
@@ -69,7 +70,7 @@ const TABS: FinanceTab[] = [
 @Component({
   selector: 'app-accounting-layout',
   standalone: true,
-  imports: [RouterLink, RouterOutlet, NgIcon],
+  imports: [RouterLink, RouterOutlet, NgIcon, PageHeaderComponent],
   templateUrl: './accounting-layout.component.html',
   styleUrl: './accounting-layout.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
