@@ -4136,6 +4136,8 @@ export type Mutation = {
   /** Delete multiple CustomerGroups */
   deleteCustomerGroups: Array<DeletionResponse>;
   deleteCustomerNote: DeletionResponse;
+  /** Delete a customer without soft-deleting the shared user. */
+  deleteCustomerSafe: DeletionResponse;
   /** Deletes Customers */
   deleteCustomers: Array<DeletionResponse>;
   /** Deletes a draft Order */
@@ -4380,6 +4382,8 @@ export type Mutation = {
   updateCustomerGroup: CustomerGroup;
   updateCustomerNote: HistoryEntry;
   updateCustomerNotificationsEnabled: PlatformSettings;
+  /** Update a customer without rewriting the login identifier of a shared user. */
+  updateCustomerSafe: Customer;
   updateDraftPurchase: StockPurchase;
   /** Update an existing Facet */
   updateFacet: Facet;
@@ -4816,6 +4820,10 @@ export type MutationDeleteCustomerGroupsArgs = {
 };
 
 export type MutationDeleteCustomerNoteArgs = {
+  id: Scalars['ID']['input'];
+};
+
+export type MutationDeleteCustomerSafeArgs = {
   id: Scalars['ID']['input'];
 };
 
@@ -5441,6 +5449,10 @@ export type MutationUpdateCustomerNoteArgs = {
 
 export type MutationUpdateCustomerNotificationsEnabledArgs = {
   enabled: Scalars['Boolean']['input'];
+};
+
+export type MutationUpdateCustomerSafeArgs = {
+  input: UpdateCustomerInput;
 };
 
 export type MutationUpdateDraftPurchaseArgs = {
@@ -12338,29 +12350,27 @@ export type UpdateCustomerMutationVariables = Exact<{
 
 export type UpdateCustomerMutation = {
   __typename?: 'Mutation';
-  updateCustomer:
-    | {
-        __typename?: 'Customer';
-        id: string;
-        firstName: string;
-        lastName: string;
-        emailAddress: string;
-        phoneNumber?: string | null;
-        updatedAt: any;
-        customFields?: {
-          __typename?: 'CustomerCustomFields';
-          isSupplier?: boolean | null;
-          supplierType?: string | null;
-          contactPerson?: string | null;
-          taxId?: string | null;
-          paymentTerms?: string | null;
-          notes?: string | null;
-          isCreditApproved?: boolean | null;
-          creditLimit?: number | null;
-          notificationsEnabled?: boolean | null;
-        } | null;
-      }
-    | { __typename?: 'EmailAddressConflictError'; errorCode: ErrorCode; message: string };
+  updateCustomerSafe: {
+    __typename?: 'Customer';
+    id: string;
+    firstName: string;
+    lastName: string;
+    emailAddress: string;
+    phoneNumber?: string | null;
+    updatedAt: any;
+    customFields?: {
+      __typename?: 'CustomerCustomFields';
+      isSupplier?: boolean | null;
+      supplierType?: string | null;
+      contactPerson?: string | null;
+      taxId?: string | null;
+      paymentTerms?: string | null;
+      notes?: string | null;
+      isCreditApproved?: boolean | null;
+      creditLimit?: number | null;
+      notificationsEnabled?: boolean | null;
+    } | null;
+  };
 };
 
 export type DeleteCustomerMutationVariables = Exact<{
@@ -12369,7 +12379,7 @@ export type DeleteCustomerMutationVariables = Exact<{
 
 export type DeleteCustomerMutation = {
   __typename?: 'Mutation';
-  deleteCustomer: {
+  deleteCustomerSafe: {
     __typename?: 'DeletionResponse';
     result: DeletionResult;
     message?: string | null;
@@ -20461,7 +20471,7 @@ export const UpdateCustomerDocument = {
         selections: [
           {
             kind: 'Field',
-            name: { kind: 'Name', value: 'updateCustomer' },
+            name: { kind: 'Name', value: 'updateCustomerSafe' },
             arguments: [
               {
                 kind: 'Argument',
@@ -20472,53 +20482,27 @@ export const UpdateCustomerDocument = {
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'phoneNumber' } },
+                { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
                 {
-                  kind: 'InlineFragment',
-                  typeCondition: { kind: 'NamedType', name: { kind: 'Name', value: 'Customer' } },
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'customFields' },
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'firstName' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'lastName' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'emailAddress' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'phoneNumber' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
-                      {
-                        kind: 'Field',
-                        name: { kind: 'Name', value: 'customFields' },
-                        selectionSet: {
-                          kind: 'SelectionSet',
-                          selections: [
-                            { kind: 'Field', name: { kind: 'Name', value: 'isSupplier' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'supplierType' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'contactPerson' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'taxId' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'paymentTerms' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'isCreditApproved' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'creditLimit' } },
-                            {
-                              kind: 'Field',
-                              name: { kind: 'Name', value: 'notificationsEnabled' },
-                            },
-                          ],
-                        },
-                      },
-                    ],
-                  },
-                },
-                {
-                  kind: 'InlineFragment',
-                  typeCondition: {
-                    kind: 'NamedType',
-                    name: { kind: 'Name', value: 'EmailAddressConflictError' },
-                  },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: 'errorCode' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'message' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isSupplier' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'supplierType' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'contactPerson' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'taxId' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'paymentTerms' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'isCreditApproved' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'creditLimit' } },
+                      { kind: 'Field', name: { kind: 'Name', value: 'notificationsEnabled' } },
                     ],
                   },
                 },
@@ -20552,7 +20536,7 @@ export const DeleteCustomerDocument = {
         selections: [
           {
             kind: 'Field',
-            name: { kind: 'Name', value: 'deleteCustomer' },
+            name: { kind: 'Name', value: 'deleteCustomerSafe' },
             arguments: [
               {
                 kind: 'Argument',

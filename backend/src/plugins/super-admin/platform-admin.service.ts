@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Administrator, RequestContext, TransactionalConnection, User } from '@vendure/core';
+import { IsNull } from 'typeorm';
 
 export interface PlatformAdministratorDto {
   id: string;
@@ -61,6 +62,7 @@ export class PlatformAdminService {
       .innerJoinAndSelect('user.roles', 'role')
       .innerJoinAndSelect('role.channels', 'channel')
       .where('channel.id = :channelId', { channelId: channelIdNum })
+      .andWhere('admin.deletedAt IS NULL')
       .andWhere('user.deletedAt IS NULL')
       .getMany();
 
@@ -118,7 +120,8 @@ export class PlatformAdminService {
       .innerJoinAndSelect('admin.user', 'user')
       .innerJoinAndSelect('user.roles', 'role')
       .leftJoinAndSelect('role.channels', 'channel')
-      .where('user.deletedAt IS NULL')
+      .where('admin.deletedAt IS NULL')
+      .andWhere('user.deletedAt IS NULL')
       .orderBy('admin.id', 'ASC')
       .getMany();
 
@@ -187,7 +190,7 @@ export class PlatformAdminService {
   ): Promise<PlatformAdministratorDetailDto | null> {
     const adminRepo = this.connection.getRepository(ctx, Administrator);
     const admin = await adminRepo.findOne({
-      where: { id: parseInt(administratorId, 10) },
+      where: { id: parseInt(administratorId, 10), deletedAt: IsNull() },
       relations: ['user', 'user.roles', 'user.roles.channels'],
     });
     if (!admin?.user) return null;

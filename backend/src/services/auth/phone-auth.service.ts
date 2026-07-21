@@ -191,7 +191,7 @@ export class PhoneAuthService {
       // Pass context and channelId for tracking if available
       // Check if user has an associated administrator to get email
       const administrator = await this.connection.getRepository(ctx, Administrator).findOne({
-        where: { user: { id: existingUser.id } },
+        where: { user: { id: existingUser.id }, deletedAt: IsNull() },
       });
 
       // Pass context and channelId for tracking if available
@@ -668,7 +668,7 @@ export class PhoneAuthService {
   ): Promise<Administrator> {
     const adminRepo = this.connection.getRepository(ctx, Administrator);
     const administrator = await adminRepo.findOne({
-      where: { user: { id: ctx.activeUserId } },
+      where: { user: { id: ctx.activeUserId }, deletedAt: IsNull() },
       relations: ['user', 'customFields.profilePicture'],
     });
 

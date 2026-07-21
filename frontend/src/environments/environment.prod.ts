@@ -29,7 +29,8 @@ export const environment = {
   apiUrl: '/admin-api', // Will use same origin in production
   vendureAdminUrl: runtimeConfig.vendureAdminUrl ?? '/admin', // Backend Admin UI (same origin or override)
   // SigNoz Observability Configuration - injected at runtime via window.__APP_CONFIG__
-  enableTracing: runtimeConfig.enableTracing ?? true,
+  // Disabled by default: the SigNoz stack is not currently provisioned.
+  enableTracing: runtimeConfig.enableTracing ?? false,
   signozEndpoint: runtimeConfig.signozEndpoint ?? '/signoz/v1/traces',
   serviceName: runtimeConfig.serviceName ?? `${BRAND_CONFIG.servicePrefix}-frontend`,
   serviceVersion: runtimeConfig.serviceVersion ?? '2.0.0',

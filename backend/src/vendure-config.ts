@@ -25,7 +25,7 @@ import { ChannelEventsPlugin } from './plugins/channels/channel-events.plugin';
 import { ChannelSettingsPlugin } from './plugins/channels/channel-settings.plugin';
 import { EnvironmentPlugin } from './plugins/core/environment.plugin';
 import { CreditPlugin } from './plugins/credit/credit.plugin';
-import { CustomerPlugin } from './plugins/customers/customer.plugin';
+import { CustomerPlugin, CustomerAdminPlugin } from './plugins/customers/customer.plugin';
 import {
   ApproveCustomerCreditPermission,
   ManageCustomerCreditLimitPermission,
@@ -266,6 +266,7 @@ export const config: VendureConfig = {
     StockPlugin, // Load before CreditPlugin so StockPurchase type is available
     CreditPlugin, // Depends on LedgerPlugin
     CustomerPlugin, // Customer duplicate prevention
+    CustomerAdminPlugin, // Admin-only shared-user-safe customer update/delete
     SubscriptionPlugin,
     StorefrontPlugin, // Public per-merchant storefront: shop-api storefront(slug) + sitemap/robots
     ChannelEventsPlugin,

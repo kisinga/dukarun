@@ -132,29 +132,23 @@ export const CREATE_CUSTOMER = graphql(`
 
 export const UPDATE_CUSTOMER = graphql(`
   mutation UpdateCustomer($input: UpdateCustomerInput!) {
-    updateCustomer(input: $input) {
-      ... on Customer {
-        id
-        firstName
-        lastName
-        emailAddress
-        phoneNumber
-        updatedAt
-        customFields {
-          isSupplier
-          supplierType
-          contactPerson
-          taxId
-          paymentTerms
-          notes
-          isCreditApproved
-          creditLimit
-          notificationsEnabled
-        }
-      }
-      ... on EmailAddressConflictError {
-        errorCode
-        message
+    updateCustomerSafe(input: $input) {
+      id
+      firstName
+      lastName
+      emailAddress
+      phoneNumber
+      updatedAt
+      customFields {
+        isSupplier
+        supplierType
+        contactPerson
+        taxId
+        paymentTerms
+        notes
+        isCreditApproved
+        creditLimit
+        notificationsEnabled
       }
     }
   }
@@ -162,7 +156,7 @@ export const UPDATE_CUSTOMER = graphql(`
 
 export const DELETE_CUSTOMER = graphql(`
   mutation DeleteCustomer($id: ID!) {
-    deleteCustomer(id: $id) {
+    deleteCustomerSafe(id: $id) {
       result
       message
     }
