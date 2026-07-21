@@ -319,22 +319,22 @@
               <!-- Variant detail rows — aligned under the parent columns -->
               @if (isExpanded(product.id)) {
                 @for (v of product.variants ?? []; track v.id) {
-                  <tr class="bg-base-200/20 text-base-content/80">
+                  <tr class="row-detail text-base-content/80">
                     <td></td>
-                    <td class="!py-1.5">
+                    <td>
                       <div class="flex items-center gap-2 border-l-2 border-primary/20 pl-3">
                         <span class="text-sm">{{ v.name }}</span>
                         <span class="text-xs text-base-content/50 font-mono">{{ v.sku }}</span>
                       </div>
                     </td>
                     <td></td>
-                    <td class="!py-1.5">
-                      <span class="text-sm tabular-nums"
+                    <td>
+                      <span class="text-sm font-medium tabular-nums"
                         ><app-money [value]="v.priceWithTax"
                       /></span>
                     </td>
-                    <td class="!py-1.5 text-center">
-                      <span class="badge badge-sm" [class]="variantBadgeClass(v)">
+                    <td class="text-center">
+                      <span class="badge badge-sm tabular-nums" [class]="variantBadgeClass(v)">
                         {{ variantStock(v) }}
                       </span>
                       @if (

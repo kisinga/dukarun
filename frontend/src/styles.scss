@@ -182,6 +182,37 @@
   }
 }
 
+/* ============================================
+   THE COUNTER — TABLE LANGUAGE (docs/DESIGN_SYSTEM.md)
+   Calm uppercase headers, middle-aligned cells, one density.
+   Applies to every daisy table inside the dashboard; per-page
+   table CSS should not exist.
+   ============================================ */
+@layer components {
+  .dashboard-main .table {
+    thead th {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+      border-bottom: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
+    }
+
+    tbody td {
+      vertical-align: middle;
+    }
+
+    /* Expanded detail row: inset surface, hairline edges, breathing room.
+       Beats zebra striping on purpose. */
+    tr.row-detail td {
+      background: color-mix(in oklab, var(--color-base-content) 3%, transparent);
+      border-bottom: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
+      padding: 1rem;
+    }
+  }
+}
+
 @plugin "daisyui" {
   themes: false;
   logs: false;

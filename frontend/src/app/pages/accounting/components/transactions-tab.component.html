@@ -74,48 +74,46 @@
                 </tr>
                 <!-- Expanded Row: Journal Lines -->
                 @if (context().expandedEntries.has(entry.id)) {
-                  <tr>
-                    <td colspan="6" class="bg-base-200 p-0">
-                      <div class="p-4">
-                        <h4 class="font-semibold mb-2">Accounting detail</h4>
-                        <div class="overflow-x-auto">
-                          <table class="table table-xs table-zebra">
-                            <thead>
+                  <tr class="row-detail">
+                    <td colspan="6">
+                      <h4 class="font-semibold mb-2">Accounting detail</h4>
+                      <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                          <thead>
+                            <tr>
+                              <th>Account Code</th>
+                              <th>Account Name</th>
+                              <th class="text-right">Debit</th>
+                              <th class="text-right">Credit</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (line of entry.lines; track line.id) {
                               <tr>
-                                <th>Account Code</th>
-                                <th>Account Name</th>
-                                <th class="text-right">Debit</th>
-                                <th class="text-right">Credit</th>
+                                <td class="font-mono text-sm">{{ line.accountCode }}</td>
+                                <td>{{ line.accountName }}</td>
+                                <td class="text-right">
+                                  @if (line.debit > 0) {
+                                    <span class="text-success">
+                                      {{ context().formatCurrency(line.debit) }}
+                                    </span>
+                                  } @else {
+                                    <span class="text-base-content/30">-</span>
+                                  }
+                                </td>
+                                <td class="text-right">
+                                  @if (line.credit > 0) {
+                                    <span class="text-error">
+                                      {{ context().formatCurrency(line.credit) }}
+                                    </span>
+                                  } @else {
+                                    <span class="text-base-content/30">-</span>
+                                  }
+                                </td>
                               </tr>
-                            </thead>
-                            <tbody>
-                              @for (line of entry.lines; track line.id) {
-                                <tr>
-                                  <td class="font-mono text-sm">{{ line.accountCode }}</td>
-                                  <td>{{ line.accountName }}</td>
-                                  <td class="text-right">
-                                    @if (line.debit > 0) {
-                                      <span class="text-success">
-                                        {{ context().formatCurrency(line.debit) }}
-                                      </span>
-                                    } @else {
-                                      <span class="text-base-content/30">-</span>
-                                    }
-                                  </td>
-                                  <td class="text-right">
-                                    @if (line.credit > 0) {
-                                      <span class="text-error">
-                                        {{ context().formatCurrency(line.credit) }}
-                                      </span>
-                                    } @else {
-                                      <span class="text-base-content/30">-</span>
-                                    }
-                                  </td>
-                                </tr>
-                              }
-                            </tbody>
-                          </table>
-                        </div>
+                            }
+                          </tbody>
+                        </table>
                       </div>
                     </td>
                   </tr>

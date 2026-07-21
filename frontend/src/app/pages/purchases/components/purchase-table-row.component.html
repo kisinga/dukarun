@@ -5,50 +5,50 @@
 
 <!-- Supplier -->
 <td>
-  <div class="font-semibold">{{ getSupplierName() }}</div>
+  <div class="font-medium">{{ getSupplierName() }}</div>
 </td>
 
 <!-- Reference -->
 <td>
-  <span class="text-sm text-base-content/70">
-    {{ purchase().referenceNumber || '—' }}
-  </span>
+  @if (purchase().referenceNumber) {
+    <span class="text-sm text-base-content/70">{{ purchase().referenceNumber }}</span>
+  } @else {
+    <span class="text-sm text-base-content/40">—</span>
+  }
 </td>
 
 <!-- Total Cost -->
-<td>
-  <span class="font-mono text-sm font-semibold">{{ formatCurrency(purchase().totalCost) }}</span>
+<td class="text-right">
+  <span class="text-sm font-medium tabular-nums">{{ formatCurrency(purchase().totalCost) }}</span>
 </td>
 
 <!-- Payment Status -->
 <td>
-  <span class="badge badge-sm" [ngClass]="getPaymentStatusBadgeClass()">
-    {{ purchase().paymentStatus }}
-  </span>
-  @if (purchase().isCreditPurchase) {
-    <span class="badge badge-xs badge-info ml-1">Credit</span>
-  }
+  <div class="flex flex-wrap items-center gap-1">
+    <span class="badge badge-sm" [ngClass]="getPaymentStatusBadgeClass()">
+      {{ purchase().paymentStatus }}
+    </span>
+    @if (purchase().isCreditPurchase) {
+      <span class="badge badge-xs badge-info">Credit</span>
+    }
+  </div>
 </td>
 
 <!-- Actions -->
-<td class="text-right">
+<td class="text-right" (click)="$event.stopPropagation()">
   <div class="flex justify-end gap-1">
-    <button (click)="onAction('view', $event)" class="btn btn-ghost btn-xs" title="View Details">
+    <button (click)="onAction('view')" class="btn btn-ghost btn-xs" title="View Details">
       <ng-icon name="heroEye" size="1rem" />
     </button>
     @if (canPay()) {
-      <button (click)="onAction('pay', $event)" class="btn btn-success btn-xs" title="Pay">
-        Pay
+      <button (click)="onAction('pay')" class="btn btn-ghost btn-xs" title="Pay">
+        <ng-icon name="heroBanknotes" size="1rem" />
       </button>
     }
-    <button (click)="onAction('edit', $event)" class="btn btn-ghost btn-xs" title="Edit">
+    <button (click)="onAction('edit')" class="btn btn-ghost btn-xs" title="Edit">
       <ng-icon name="heroPencilSquare" size="1rem" />
     </button>
-    <button
-      (click)="onAction('delete', $event)"
-      class="btn btn-error btn-ghost btn-xs"
-      title="Delete"
-    >
+    <button (click)="onAction('delete')" class="btn btn-error btn-ghost btn-xs" title="Delete">
       <ng-icon name="heroTrash" size="1rem" />
     </button>
   </div>

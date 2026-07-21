@@ -3,6 +3,7 @@ import {
   Component,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -19,6 +20,7 @@ import {
   type StatItem,
 } from '../../shared/components/dashboard/stat-bar.component';
 import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
+import { PaginationComponent } from '../../shared/components/dashboard/pagination.component';
 
 type CreditMode = 'receivables' | 'payables';
 
@@ -53,6 +55,7 @@ interface CreditParty {
     ListSearchBarComponent,
     StatBarComponent,
     EmptyStateComponent,
+    PaginationComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -113,7 +116,7 @@ interface CreditParty {
                     type="button"
                     aria-label="Clear filter"
                   >
-                    <ng-icon name="heroXMark" size="0.75rem" />
+                    <ng-icon name="heroXMark" size="0.875rem" />
                   </button>
                 </span>
               }
@@ -126,7 +129,7 @@ interface CreditParty {
                     type="button"
                     aria-label="Clear filter"
                   >
-                    <ng-icon name="heroXMark" size="0.75rem" />
+                    <ng-icon name="heroXMark" size="0.875rem" />
                   </button>
                 </span>
               }
@@ -136,7 +139,7 @@ interface CreditParty {
 
         <!-- Loading -->
         @if (isLoading()) {
-          <div class="card bg-base-100 shadow-sm border border-base-300/60">
+          <div class="card bg-base-100">
             <div class="card-body items-center py-12">
               <span class="loading loading-spinner loading-lg text-primary"></span>
               <p class="text-sm text-base-content/60 mt-2">Loading…</p>
@@ -162,54 +165,53 @@ interface CreditParty {
         } @else {
           <!-- Mobile cards -->
           <div class="lg:hidden space-y-3">
-            @for (party of filteredParties(); track party.id) {
-              <div class="card bg-base-100 shadow-sm border border-base-300/60 rounded-box">
-                <div class="card-body p-4 gap-0">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <h3 class="font-semibold truncate">{{ party.name }}</h3>
-                      <p class="text-xs text-base-content/60 truncate">
-                        {{ party.phone || party.email || '—' }}
-                      </p>
+            @for (party of pagedParties(); track party.id) {
+              <div class="card bg-base-100">
+                <a [routerLink]="party.manageLink" class="block">
+                  <div class="card-body p-4 gap-0">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <h3 class="font-semibold truncate">{{ party.name }}</h3>
+                        <p class="text-xs text-base-content/60 truncate">
+                          {{ party.phone || party.email || '—' }}
+                        </p>
+                      </div>
+                      <span
+                        class="badge badge-sm shrink-0"
+                        [class.badge-success]="party.approved"
+                        [class.badge-warning]="!party.approved"
+                      >
+                        {{ party.approved ? 'On credit' : 'Pending' }}
+                      </span>
                     </div>
-                    <span
-                      class="badge badge-sm shrink-0"
-                      [class.badge-success]="party.approved"
-                      [class.badge-warning]="!party.approved"
-                    >
-                      {{ party.approved ? 'On credit' : 'Pending' }}
-                    </span>
+                    <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-base-300/60">
+                      <div>
+                        <p class="text-xs text-base-content/60">{{ outstandingLabel() }}</p>
+                        <p class="text-sm font-semibold tabular-nums text-error">
+                          {{ currencyService.format(party.outstanding) }}
+                        </p>
+                      </div>
+                      <div>
+                        <p class="text-xs text-base-content/60">Limit</p>
+                        <p class="text-sm font-semibold tabular-nums">
+                          {{ currencyService.format(party.limit) }}
+                        </p>
+                      </div>
+                      <div>
+                        <p class="text-xs text-base-content/60">Available</p>
+                        <p class="text-sm font-semibold tabular-nums text-success">
+                          {{ currencyService.format(party.available) }}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-base-300">
-                    <div>
-                      <p class="text-xs text-base-content/60">{{ outstandingLabel() }}</p>
-                      <p class="text-sm font-semibold text-error">
-                        {{ currencyService.format(party.outstanding) }}
-                      </p>
-                    </div>
-                    <div>
-                      <p class="text-xs text-base-content/60">Limit</p>
-                      <p class="text-sm font-semibold">
-                        {{ currencyService.format(party.limit) }}
-                      </p>
-                    </div>
-                    <div>
-                      <p class="text-xs text-base-content/60">Available</p>
-                      <p class="text-sm font-semibold text-success">
-                        {{ currencyService.format(party.available) }}
-                      </p>
-                    </div>
-                  </div>
-                  <a [routerLink]="party.manageLink" class="btn btn-sm btn-primary w-full mt-3">
-                    Manage
-                  </a>
-                </div>
+                </a>
               </div>
             }
           </div>
 
           <!-- Desktop table -->
-          <div class="card bg-base-100 shadow-sm border border-base-300/60 hidden lg:block">
+          <div class="card bg-base-100 hidden lg:block">
             <div class="overflow-x-auto">
               <table class="table table-zebra">
                 <thead>
@@ -221,12 +223,11 @@ interface CreditParty {
                     <th class="text-right">Available</th>
                     <th>Terms</th>
                     <th>Status</th>
-                    <th class="text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @for (party of filteredParties(); track party.id) {
-                    <tr>
+                  @for (party of pagedParties(); track party.id) {
+                    <tr class="hover cursor-pointer" (click)="goTo(party)">
                       <td>
                         <div class="font-semibold">{{ party.name }}</div>
                       </td>
@@ -235,13 +236,15 @@ interface CreditParty {
                         <div class="text-xs text-base-content/60">{{ party.email || '—' }}</div>
                       </td>
                       <td class="text-right">
-                        <span class="text-error font-medium">{{
+                        <span class="text-error font-medium tabular-nums">{{
                           currencyService.format(party.outstanding)
                         }}</span>
                       </td>
-                      <td class="text-right">{{ currencyService.format(party.limit) }}</td>
+                      <td class="text-right font-medium tabular-nums">
+                        {{ currencyService.format(party.limit) }}
+                      </td>
                       <td class="text-right">
-                        <span class="text-success font-medium">{{
+                        <span class="text-success font-medium tabular-nums">{{
                           currencyService.format(party.available)
                         }}</span>
                       </td>
@@ -255,15 +258,21 @@ interface CreditParty {
                           {{ party.approved ? 'On credit' : 'Pending' }}
                         </span>
                       </td>
-                      <td class="text-right">
-                        <a [routerLink]="party.manageLink" class="btn btn-xs btn-primary">Manage</a>
-                      </td>
                     </tr>
                   }
                 </tbody>
               </table>
             </div>
           </div>
+
+          <app-pagination
+            [currentPage]="currentPage()"
+            [totalPages]="totalPages()"
+            [totalItems]="filteredParties().length"
+            [itemsPerPage]="pageSize"
+            [itemLabel]="partyNoun() + 's'"
+            (pageChange)="currentPage.set($event)"
+          />
         }
       }
     </div>
@@ -284,6 +293,10 @@ export class CreditComponent implements OnInit {
   readonly approvedFilter = signal(false);
   readonly outstandingFilter = signal(false);
 
+  // Client-side pagination
+  readonly currentPage = signal(1);
+  readonly pageSize = 20;
+
   // Receivables (customers)
   private readonly customers = signal<CreditCustomerSummary[]>([]);
   private readonly loadingReceivables = signal(false);
@@ -291,6 +304,14 @@ export class CreditComponent implements OnInit {
   // Payables (suppliers) — sourced from the shared SupplierService signals
   private readonly suppliers = this.supplierService.suppliers;
   private payablesLoaded = false;
+
+  constructor() {
+    // Any search change returns the list to page 1
+    effect(() => {
+      this.searchTerm();
+      this.currentPage.set(1);
+    });
+  }
 
   readonly isLoading = computed(() =>
     this.mode() === 'receivables' ? this.loadingReceivables() : this.supplierService.isLoading(),
@@ -329,6 +350,15 @@ export class CreditComponent implements OnInit {
         (p.phone ?? '').toLowerCase().includes(term) ||
         p.id.toLowerCase().includes(term),
     );
+  });
+
+  readonly totalPages = computed(() =>
+    Math.max(1, Math.ceil(this.filteredParties().length / this.pageSize)),
+  );
+
+  readonly pagedParties = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize;
+    return this.filteredParties().slice(start, start + this.pageSize);
   });
 
   readonly stats = computed(() => {
@@ -374,6 +404,7 @@ export class CreditComponent implements OnInit {
     this.approvedFilter.set(false);
     this.outstandingFilter.set(false);
     this.searchTerm.set('');
+    this.currentPage.set(1);
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { tab: mode === 'payables' ? 'payables' : null },
@@ -385,10 +416,16 @@ export class CreditComponent implements OnInit {
 
   toggleApproved(): void {
     this.approvedFilter.update((v) => !v);
+    this.currentPage.set(1);
   }
 
   toggleOutstanding(): void {
     this.outstandingFilter.update((v) => !v);
+    this.currentPage.set(1);
+  }
+
+  goTo(party: CreditParty): void {
+    void this.router.navigate(party.manageLink);
   }
 
   async reload(): Promise<void> {

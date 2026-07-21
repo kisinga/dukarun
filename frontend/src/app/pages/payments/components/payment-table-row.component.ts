@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { HoverPreviewHostComponent } from '../../../shared/components/dashboard/hover-preview-host/hover-preview-host.component';
 import { CurrencyService } from '../../../shared/services/currency.service';
 import { PaymentWithOrder } from '@dukarun/payments';
@@ -14,7 +15,13 @@ export type PaymentAction = 'view' | 'viewOrder';
  */
 @Component({
   selector: 'tr[app-payment-table-row]',
-  imports: [CommonModule, RouterLink, HoverPreviewHostComponent, PaymentStateBadgeComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    NgIcon,
+    HoverPreviewHostComponent,
+    PaymentStateBadgeComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class: 'hover cursor-pointer',
@@ -29,7 +36,7 @@ export type PaymentAction = 'view' | 'viewOrder';
           >{{ payment().order.code }}</a
         >
       </app-hover-preview-host>
-      <div class="text-sm text-base-content/60">{{ formatDate(payment().createdAt) }}</div>
+      <div class="text-xs text-base-content/60">{{ formatDate(payment().createdAt) }}</div>
     </td>
     <td (click)="$event.stopPropagation()">
       @if (payment().order.customer?.id) {
@@ -47,7 +54,7 @@ export type PaymentAction = 'view' | 'viewOrder';
       }
     </td>
     <td>{{ payment().method }}</td>
-    <td class="text-right font-medium">{{ formatCurrency(payment().amount) }}</td>
+    <td class="text-right font-medium tabular-nums">{{ formatCurrency(payment().amount) }}</td>
     <td>
       <app-payment-state-badge [state]="payment().state" />
     </td>
@@ -55,13 +62,14 @@ export type PaymentAction = 'view' | 'viewOrder';
       @if (payment().transactionId) {
         <span class="font-mono text-xs">{{ truncateId(payment().transactionId) }}</span>
       } @else {
-        <span class="text-base-content/60">—</span>
+        <span class="text-base-content/40">—</span>
       }
     </td>
     <td class="text-right" (click)="$event.stopPropagation()">
-      <div class="flex gap-2 justify-end">
-        <button class="btn btn-sm btn-primary" (click)="onAction('view')">View Payment</button>
-        <button class="btn btn-sm btn-outline" (click)="onAction('viewOrder')">View Order</button>
+      <div class="flex justify-end gap-1">
+        <button class="btn btn-ghost btn-xs" (click)="onAction('viewOrder')" title="View Order">
+          <ng-icon name="heroClipboardDocumentList" size="1rem" />
+        </button>
       </div>
     </td>
   `,

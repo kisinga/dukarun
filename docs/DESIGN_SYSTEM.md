@@ -145,6 +145,29 @@ container (`.nav-item-active` / the icon pill in `.bottom-nav-active`) — no in
 bars, dots, gradients, or weight games on top of it. Apply the active class via
 `routerLinkActive`. Never hand-roll nav rows in shell files.
 
+## Tables (the row language)
+
+Header chrome is encoded globally (`.dashboard-main .table thead th`): uppercase 12px
+semibold, `/50` muted, hairline divider. Never style `<th>` per page. Rows follow one
+vocabulary — same meaning, same shape; different data, different cells:
+
+- **Density**: cells are `vertical-align: middle` (encoded); one line per cell where
+  possible. A cell may stack exactly two lines: primary `text-sm font-medium`, secondary
+  `text-xs text-base-content/60` (a date under a code, a caption under an amount).
+- **First cell** carries the entity: avatar (`app-entity-avatar` sm) + name, or the
+  record's code as a `link link-hover font-medium`.
+- **Numbers**: right-aligned, `tabular-nums`, `font-medium`; semantic colour only for
+  money meaning (owed = error, in-your-favour = success). Empty value = `—` in
+  `text-base-content/40`, never blank.
+- **Status**: `app-status-badge` (or one badge component) — inline `flex flex-wrap gap-1`,
+  never a vertical stack that inflates row height.
+- **Actions**: right-aligned ghost icon buttons only (`btn btn-ghost btn-xs` + `title`),
+  `$event.stopPropagation()` on the cell. The row itself navigates
+  (`hover cursor-pointer` + row click); **labeled "View" buttons are forbidden**.
+- **Expanded detail rows** (line items, reconciliations): one `tr.row-detail` with a
+  single full-width `td` (inset surface is encoded). No second zebra inside, no nested
+  bordered boxes.
+
 ## Enforcement checklist (review + `npm run design-guard`)
 
 - [ ] No dashboard text > `text-2xl`; titles/hero numbers are `tracking-tight`; amounts are `tabular-nums`.

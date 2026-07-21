@@ -75,8 +75,14 @@
                 <tr>
                   <td>{{ formatDate(entry.entryDate) }}</td>
                   <td>{{ getCategoryLabel(entry) }}</td>
-                  <td>{{ entry.memo || '-' }}</td>
-                  <td class="text-right font-semibold text-error tabular-nums">
+                  <td>
+                    @if (entry.memo) {
+                      {{ entry.memo }}
+                    } @else {
+                      <span class="text-base-content/40">—</span>
+                    }
+                  </td>
+                  <td class="text-right font-medium text-error tabular-nums">
                     {{ formatCurrency(getEntryAmount(entry)) }}
                   </td>
                 </tr>
