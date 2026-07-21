@@ -149,9 +149,9 @@
                   </td>
                 </tr>
                 @if (isSessionExpanded(session)) {
-                  <tr class="bg-base-200/50">
-                    <td colspan="4" class="p-0">
-                      <div class="px-4 py-3 pl-12">
+                  <tr class="row-detail">
+                    <td colspan="4">
+                      <div class="pl-8">
                         @if (loadingDetailsSessionId() === session.id) {
                           <div class="flex items-center gap-2 text-base-content/70">
                             <span class="loading loading-spinner loading-sm"></span>
@@ -168,7 +168,7 @@
                                       Opening reconciliation
                                     </p>
                                     <div class="overflow-x-auto">
-                                      <table class="table table-sm table-zebra">
+                                      <table class="table table-sm">
                                         <thead>
                                           <tr>
                                             <th>Account</th>
@@ -203,7 +203,7 @@
                                       Closing reconciliation
                                     </p>
                                     <div class="overflow-x-auto">
-                                      <table class="table table-sm table-zebra">
+                                      <table class="table table-sm">
                                         <thead>
                                           <tr>
                                             <th>Account</th>

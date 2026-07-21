@@ -18,7 +18,7 @@
   </div>
 </td>
 <td>
-  <div class="flex flex-col gap-1">
+  <div class="flex flex-wrap gap-1">
     @if (isVerified()) {
       <app-status-badge type="success" label="Verified" size="xs" />
     }
@@ -29,14 +29,14 @@
       <app-status-badge type="neutral" label="Frozen" size="xs" />
     }
     @if (!isVerified() && !isSupplierCreditApproved() && !isSupplierCreditFrozen()) {
-      <span class="text-sm text-base-content/50">—</span>
+      <span class="text-sm text-base-content/40">—</span>
     }
   </div>
 </td>
 <td class="text-right">
   @if (getSupplierOutstandingAmount() !== 0) {
     <div
-      class="font-medium"
+      class="font-medium tabular-nums"
       [class.text-warning]="getSupplierOutstandingAmount() < 0"
       [class.text-error]="getSupplierOutstandingAmount() > 0"
     >
@@ -46,17 +46,17 @@
       {{ getSupplierOutstandingAmount() < 0 ? 'owed' : 'credit' }}
     </div>
   } @else {
-    <span class="text-sm text-base-content/50">—</span>
+    <span class="text-sm text-base-content/40">—</span>
   }
 </td>
 <td class="text-right">
   @if (isSupplierCreditApproved() && getSupplierCreditLimit() > 0) {
-    <div class="font-medium">{{ formatCurrency(getSupplierAvailableCredit()) }}</div>
-    <div class="text-xs text-base-content/60">
+    <div class="font-medium tabular-nums">{{ formatCurrency(getSupplierAvailableCredit()) }}</div>
+    <div class="text-xs text-base-content/60 tabular-nums">
       of {{ formatCurrency(getSupplierCreditLimit()) }}
     </div>
   } @else {
-    <span class="text-sm text-base-content/50">—</span>
+    <span class="text-sm text-base-content/40">—</span>
   }
 </td>
 <td class="text-right" (click)="$event.stopPropagation()">

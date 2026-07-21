@@ -10,7 +10,7 @@
 </td>
 <td>{{ customer().emailAddress || customer().phoneNumber || '—' }}</td>
 <td>
-  <div class="flex flex-col gap-1">
+  <div class="flex flex-wrap gap-1">
     @if (isVerified()) {
       <app-status-badge type="success" label="Verified" size="xs" />
     }
@@ -25,7 +25,7 @@
 <td class="text-right">
   @if (getOutstandingAmount() !== 0) {
     <div
-      class="font-medium"
+      class="font-medium tabular-nums"
       [class.text-warning]="getOutstandingAmount() < 0"
       [class.text-error]="getOutstandingAmount() > 0"
     >
@@ -35,15 +35,17 @@
       {{ getOutstandingAmount() < 0 ? 'owed' : 'credit' }}
     </div>
   } @else {
-    <span class="text-sm text-base-content/50">—</span>
+    <span class="text-sm text-base-content/40">—</span>
   }
 </td>
 <td class="text-right">
   @if (isCreditApproved() && getCreditLimit() > 0) {
-    <div class="font-medium">{{ formatCurrency(getAvailableCredit()) }}</div>
-    <div class="text-xs text-base-content/60">of {{ formatCurrency(getCreditLimit()) }}</div>
+    <div class="font-medium tabular-nums">{{ formatCurrency(getAvailableCredit()) }}</div>
+    <div class="text-xs text-base-content/60 tabular-nums">
+      of {{ formatCurrency(getCreditLimit()) }}
+    </div>
   } @else {
-    <span class="text-sm text-base-content/50">—</span>
+    <span class="text-sm text-base-content/40">—</span>
   }
 </td>
 <td class="text-right" (click)="$event.stopPropagation()">

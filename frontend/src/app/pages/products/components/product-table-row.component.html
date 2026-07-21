@@ -61,7 +61,7 @@
 
 <!-- Price Range -->
 <td>
-  <span class="text-sm tabular-nums whitespace-nowrap">
+  <span class="text-sm font-medium tabular-nums whitespace-nowrap">
     @if (!price().empty) {
       @if (!price().single) {
         <span class="text-base-content/50">from </span>
@@ -75,7 +75,7 @@
 
 <!-- Total Stock -->
 <td class="text-center">
-  <span class="badge badge-sm" [class]="stockBadge()">{{ stockLabel() }}</span>
+  <span class="badge badge-sm tabular-nums" [class]="stockBadge()">{{ stockLabel() }}</span>
   @if (batchExpiryEnabled() && expiryLabel(); as label) {
     <span
       class="badge badge-sm ml-1"

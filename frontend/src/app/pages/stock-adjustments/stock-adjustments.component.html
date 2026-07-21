@@ -200,59 +200,57 @@
                 <td class="max-w-xs truncate">{{ adj.notes ?? '—' }}</td>
               </tr>
               @if (isExpanded(adj.id) && adj.lines?.length) {
-                <tr>
-                  <td colspan="6" class="bg-base-200 p-0">
-                    <div class="p-4">
-                      <h4 class="font-semibold mb-2 text-sm">Line items</h4>
-                      <div class="overflow-x-auto">
-                        <table class="table table-xs table-zebra">
-                          <thead>
+                <tr class="row-detail">
+                  <td colspan="6">
+                    <h4 class="font-semibold mb-2 text-sm">Line items</h4>
+                    <div class="overflow-x-auto">
+                      <table class="table table-sm">
+                        <thead>
+                          <tr>
+                            <th>Variant</th>
+                            <th class="text-right">Previous</th>
+                            <th class="text-right">New</th>
+                            <th class="text-right">Difference</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (line of adj.lines; track line.id) {
                             <tr>
-                              <th>Variant</th>
-                              <th class="text-right">Previous</th>
-                              <th class="text-right">New</th>
-                              <th class="text-right">Difference</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            @for (line of adj.lines; track line.id) {
-                              <tr>
-                                <td>
-                                  @if (line.variant?.product?.id) {
-                                    <app-hover-preview-host
-                                      previewKey="product"
-                                      [entityId]="line.variant.product.id"
-                                    >
-                                      <a
-                                        [routerLink]="[
-                                          '/dashboard/products',
-                                          line.variant.product.id,
-                                        ]"
-                                        class="link link-hover font-medium"
-                                        >{{ getLineVariantDisplay(line) }}</a
-                                      >
-                                    </app-hover-preview-host>
-                                  } @else {
-                                    <div class="font-medium">{{ getLineVariantDisplay(line) }}</div>
-                                  }
-                                </td>
-                                <td class="text-right text-tabular">{{ line.previousStock }}</td>
-                                <td class="text-right text-tabular">{{ line.newStock }}</td>
-                                <td class="text-right">
-                                  <span
-                                    class="font-semibold text-tabular"
-                                    [class.text-success]="line.quantityChange > 0"
-                                    [class.text-error]="line.quantityChange < 0"
-                                    [class.text-base-content]="line.quantityChange === 0"
+                              <td>
+                                @if (line.variant?.product?.id) {
+                                  <app-hover-preview-host
+                                    previewKey="product"
+                                    [entityId]="line.variant.product.id"
                                   >
-                                    {{ formatDifference(line.quantityChange) }}
-                                  </span>
-                                </td>
-                              </tr>
-                            }
-                          </tbody>
-                        </table>
-                      </div>
+                                    <a
+                                      [routerLink]="[
+                                        '/dashboard/products',
+                                        line.variant.product.id,
+                                      ]"
+                                      class="link link-hover font-medium"
+                                      >{{ getLineVariantDisplay(line) }}</a
+                                    >
+                                  </app-hover-preview-host>
+                                } @else {
+                                  <div class="font-medium">{{ getLineVariantDisplay(line) }}</div>
+                                }
+                              </td>
+                              <td class="text-right text-tabular">{{ line.previousStock }}</td>
+                              <td class="text-right text-tabular">{{ line.newStock }}</td>
+                              <td class="text-right">
+                                <span
+                                  class="font-semibold text-tabular"
+                                  [class.text-success]="line.quantityChange > 0"
+                                  [class.text-error]="line.quantityChange < 0"
+                                  [class.text-base-content]="line.quantityChange === 0"
+                                >
+                                  {{ formatDifference(line.quantityChange) }}
+                                </span>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
                     </div>
                   </td>
                 </tr>

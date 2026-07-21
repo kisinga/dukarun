@@ -47,13 +47,13 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
   imports: [OrderStateBadgeComponent, RouterLink, HoverPreviewHostComponent, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    class: 'cursor-pointer transition-colors',
+    class: 'hover cursor-pointer transition-colors',
     '(click)': 'navigateToOrder()',
   },
   template: `
     <td>
       <div class="font-medium">{{ order().code }}</div>
-      <div class="text-sm text-base-content/60">
+      <div class="text-xs text-base-content/60">
         {{ formatDate(order().orderPlacedAt || order().createdAt) }}
       </div>
     </td>
@@ -73,13 +73,15 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
         <span class="text-base-content/60">Walk-in</span>
       }
     </td>
-    <td class="text-center">{{ getItemCount() }}</td>
-    <td class="text-right font-medium">{{ formatCurrency(order().totalWithTax) }}</td>
+    <td class="text-center tabular-nums">{{ getItemCount() }}</td>
+    <td class="text-right font-medium tabular-nums">{{ formatCurrency(order().totalWithTax) }}</td>
     <td class="text-right">
       @if (amountOwing() > 0) {
-        <span class="font-medium text-warning">{{ formatCurrency(amountOwing()) }}</span>
+        <span class="font-medium tabular-nums text-warning">{{
+          formatCurrency(amountOwing())
+        }}</span>
       } @else {
-        <span class="text-base-content/40">-</span>
+        <span class="text-base-content/40">—</span>
       }
     </td>
     <td>
@@ -89,30 +91,21 @@ export type OrderAction = 'view' | 'print' | 'pay' | 'void';
         [reversedAt]="order().customFields?.reversedAt ?? null"
       />
     </td>
-    <td class="text-right">
+    <td class="text-right" (click)="$event.stopPropagation()">
       <div class="flex justify-end gap-1">
         @if (canPay()) {
-          <button
-            class="btn btn-xs btn-success"
-            (click)="onAction('pay'); $event.stopPropagation()"
-          >
-            Pay
+          <button class="btn btn-xs btn-ghost" (click)="onAction('pay')" title="Pay">
+            <ng-icon name="heroBanknotes" size="1rem" />
           </button>
         }
         @if (canPrint()) {
-          <button
-            class="btn btn-xs btn-ghost"
-            (click)="onAction('print'); $event.stopPropagation()"
-          >
+          <button class="btn btn-xs btn-ghost" (click)="onAction('print')" title="Print">
             <ng-icon name="heroPrinter" size="1rem" />
           </button>
         }
         @if (canVoid()) {
-          <button
-            class="btn btn-xs btn-ghost btn-error"
-            (click)="onAction('void'); $event.stopPropagation()"
-          >
-            Void
+          <button class="btn btn-xs btn-ghost btn-error" (click)="onAction('void')" title="Void">
+            <ng-icon name="heroNoSymbol" size="1rem" />
           </button>
         }
       </div>
