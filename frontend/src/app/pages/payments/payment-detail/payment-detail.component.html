@@ -1,29 +1,16 @@
 <div class="space-y-6">
   <!-- Header -->
-  <div class="flex items-center justify-between mb-6">
-    <div>
-      <button (click)="goBack()" class="btn btn-ghost btn-sm mb-2">← Back to Payments</button>
-      <h1 class="text-xl lg:text-2xl font-bold tracking-tight">Payment Details</h1>
-    </div>
-  </div>
+  <app-page-header
+    title="Payment Details"
+    backLink="/dashboard/payments"
+    backLabel="Back to Payments"
+    [showRefresh]="false"
+  />
 
   <!-- Error Alert -->
   @if (error()) {
-    <div role="alert" class="alert alert-error shadow-lg">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-6 w-6 shrink-0"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
+    <div role="alert" class="alert alert-error">
+      <ng-icon name="heroXCircle" size="1.25rem" class="shrink-0" />
       <span class="flex-1">{{ error() }}</span>
       <button (click)="clearError()" class="btn btn-sm">Dismiss</button>
     </div>
@@ -51,7 +38,9 @@
         >
           <div>
             <div class="flex items-center gap-3 mb-2">
-              <h2 class="text-2xl font-bold">Payment {{ payment()!.id.substring(0, 8) }}</h2>
+              <h2 class="text-2xl font-bold tracking-tight">
+                Payment {{ payment()!.id.substring(0, 8) }}
+              </h2>
               <app-payment-state-badge [state]="payment()!.state" />
             </div>
             <p class="text-sm text-base-content/60">
@@ -123,20 +112,7 @@
             }
             @if (payment()!.errorMessage) {
               <div class="alert alert-error">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-6 w-6 shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+                <ng-icon name="heroXCircle" size="1.25rem" class="shrink-0" />
                 <span>Error: {{ payment()!.errorMessage }}</span>
               </div>
             }

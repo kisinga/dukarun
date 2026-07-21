@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { ProductSearchResult, ProductVariant } from '@dukarun/product';
 import { ProductLabelComponent } from '../../../shared/components/dashboard-shared/components/product-label.component';
 import { CurrencyService } from '../../../shared/services/currency.service';
@@ -18,7 +19,7 @@ import { CurrencyService } from '../../../shared/services/currency.service';
 /** Modal: variant selection + qty/cost entry for adding a purchase line. */
 @Component({
   selector: 'app-purchase-item-entry-modal',
-  imports: [CommonModule, ReactiveFormsModule, ProductLabelComponent],
+  imports: [CommonModule, ReactiveFormsModule, NgIcon, ProductLabelComponent],
   template: `
     @if (isOpen() && product(); as p) {
       <div class="modal modal-open modal-bottom sm:modal-middle">
@@ -31,16 +32,7 @@ import { CurrencyService } from '../../../shared/services/currency.service';
                 (click)="closeModal.emit()"
                 aria-label="Close"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <ng-icon name="heroXMark" size="1rem" />
               </button>
             </div>
           </div>
@@ -57,20 +49,7 @@ import { CurrencyService } from '../../../shared/services/currency.service';
                 <div
                   class="w-14 h-14 rounded-lg bg-base-300 flex items-center justify-center shrink-0"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-6 w-6 text-primary"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                    />
-                  </svg>
+                  <ng-icon name="heroCube" size="1.25rem" class="text-primary" />
                 </div>
               }
               <div class="flex-1 min-w-0">
@@ -182,16 +161,7 @@ import { CurrencyService } from '../../../shared/services/currency.service';
                       type="button"
                       aria-label="Decrease quantity"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                      >
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
-                      </svg>
+                      <ng-icon name="heroMinus" size="1rem" />
                     </button>
                     <input
                       type="number"
@@ -207,16 +177,7 @@ import { CurrencyService } from '../../../shared/services/currency.service';
                       type="button"
                       aria-label="Increase quantity"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                      >
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                      </svg>
+                      <ng-icon name="heroPlus" size="1rem" />
                     </button>
                   </div>
                 </div>
@@ -279,16 +240,7 @@ import { CurrencyService } from '../../../shared/services/currency.service';
                 [disabled]="!canAdd()"
                 (click)="handleAdd()"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
+                <ng-icon name="heroPlus" size="1.25rem" />
                 Add to Purchase
               </button>
             }

@@ -7,6 +7,7 @@ import {
   output,
   viewChild,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { NotificationData } from './notification-item.component';
 import { NotificationListComponent } from './notification-list.component';
 
@@ -19,7 +20,7 @@ export type { NotificationData as NotificationItem } from './notification-item.c
  */
 @Component({
   selector: 'app-notification-dropdown',
-  imports: [NotificationListComponent],
+  imports: [NgIcon, NotificationListComponent],
   styleUrls: ['./notification-dropdown.component.scss'],
   template: `
     <details #detailsRef class="dropdown dropdown-end notification-dropdown-wrapper">
@@ -29,20 +30,7 @@ export type { NotificationData as NotificationItem } from './notification-item.c
         [class.animate-pulse]="unreadCount() > 0"
         aria-label="View notifications"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-          />
-        </svg>
+        <ng-icon name="heroBell" size="1.25rem" />
         @if (unreadCount() > 0) {
           <span class="badge badge-error badge-sm indicator-item font-semibold">
             {{ unreadCount() > 99 ? '99+' : unreadCount() }}

@@ -29,63 +29,26 @@
       </div>
     </div>
   } @else if (entries().length === 0 && !error()) {
-    <div class="card bg-base-100 shadow">
-      <div class="card-body">
-        <div class="text-center py-12 lg:py-16 px-4">
-          <div
-            class="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-8 w-8 lg:h-10 lg:w-10 text-base-content/30"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-              />
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold">No transfers yet</h3>
-          <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
-            Move funds between accounts (e.g. Cash to M-Pesa). Create a transfer when you need to
-            record till moves or bank transfers.
-          </p>
-          <button
-            (click)="openCreateTransfer()"
-            class="btn btn-primary mt-6 gap-2"
-            [disabled]="!canCreate()"
-            [title]="canCreate() ? null : 'You need permission to create transfers'"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              />
-            </svg>
-            Create transfer
-          </button>
-          @if (!canCreate()) {
-            <p class="text-sm text-base-content/50 mt-4">
-              You need permission to create transfers.
-            </p>
-          }
-        </div>
-      </div>
-    </div>
+    <app-empty-state
+      icon="heroArrowsRightLeft"
+      title="No transfers yet"
+      [description]="
+        canCreate()
+          ? 'Move funds between accounts (e.g. Cash to M-Pesa). Create a transfer when you need to record till moves or bank transfers.'
+          : 'Move funds between accounts (e.g. Cash to M-Pesa). You need permission to create transfers.'
+      "
+    >
+      <button
+        actions
+        (click)="openCreateTransfer()"
+        class="btn btn-primary btn-sm lg:btn-md gap-2"
+        [disabled]="!canCreate()"
+        [title]="canCreate() ? null : 'You need permission to create transfers'"
+      >
+        <ng-icon name="heroPlus" size="1rem" />
+        Create transfer
+      </button>
+    </app-empty-state>
   } @else if (entries().length > 0) {
     <div class="card bg-base-100 shadow">
       <div class="card-body p-0">

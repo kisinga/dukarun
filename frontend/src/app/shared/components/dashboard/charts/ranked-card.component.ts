@@ -11,7 +11,7 @@ import { RankedListComponent, type RankedItem } from './ranked-list.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="rounded-xl border border-base-300 bg-base-100 p-3">
-      <p class="text-[11px] font-semibold uppercase tracking-wide text-base-content/50 mb-2">
+      <p class="text-xs font-semibold uppercase tracking-wide text-base-content/50 mb-2">
         {{ title() }}
       </p>
       @if (items().length === 0) {

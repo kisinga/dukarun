@@ -1,14 +1,12 @@
 <div class="space-y-4 lg:space-y-6">
   <!-- Header -->
-  <div class="no-print">
-    <button type="button" (click)="goBack()" class="btn btn-ghost btn-sm gap-1 mb-2">
-      <ng-icon name="heroArrowLeft" size="1rem" />
-      Back to Customers
-    </button>
-    <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-base-content">
-      Customer Statement
-    </h1>
-  </div>
+  <app-page-header
+    class="no-print"
+    title="Customer Statement"
+    backLink="/dashboard/customers"
+    backLabel="Back to Customers"
+    [showRefresh]="false"
+  />
 
   @if (error()) {
     <div role="alert" class="alert alert-error">

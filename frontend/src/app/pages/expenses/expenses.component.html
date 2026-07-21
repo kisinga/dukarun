@@ -1,12 +1,24 @@
 <div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
-  @if (sessionOpen()) {
-    <div class="flex justify-end">
+  <!-- Stats row + create action -->
+  <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+    <app-expenses-stats [stats]="listStats()" />
+    @if (sessionOpen()) {
       <button type="button" class="btn btn-primary btn-sm gap-2" (click)="openRecordExpense()">
         <ng-icon name="heroPlus" size="1rem" />
         Record Expense
       </button>
-    </div>
-  }
+    }
+  </div>
+
+  <!-- Expense trend (collapsible; uses already-loaded entries) -->
+  <app-trend-card
+    title="Expense trend"
+    icon="heroChartBar"
+    [(open)]="trendOpen"
+    [loading]="isLoading()"
+  >
+    <app-echart-container [option]="expenseTrendChartOption()" height="220px" />
+  </app-trend-card>
 
   <!-- Error Alert -->
   @if (error()) {
@@ -31,33 +43,17 @@
 
   <!-- Empty State -->
   @else if (entries().length === 0 && !error()) {
-    <div class="card bg-base-100 shadow">
-      <div class="card-body">
-        <div class="text-center py-12 lg:py-16 px-4">
-          <div
-            class="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
-          >
-            <ng-icon
-              name="heroDocumentText"
-              size="2rem"
-              class="lg:text-[2.5rem] text-base-content/30"
-            />
-          </div>
-          <h3 class="text-lg font-semibold">No expenses recorded</h3>
-          <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
-            Record your first expense to start tracking operating costs.
-          </p>
-          @if (sessionOpen()) {
-            <button (click)="openRecordExpense()" class="btn btn-primary btn-sm mt-6 gap-2">
-              <ng-icon name="heroPlus" size="1rem" />
-              Record expense
-            </button>
-          } @else {
-            <p class="text-sm text-base-content/50 mt-4">Open a shift to record expenses.</p>
-          }
-        </div>
-      </div>
-    </div>
+    <app-empty-state
+      icon="heroDocumentText"
+      title="No expenses recorded"
+      description="Record your first expense to start tracking operating costs."
+      [ctaLabel]="sessionOpen() ? 'Record expense' : ''"
+      (ctaClick)="openRecordExpense()"
+    >
+      @if (!sessionOpen()) {
+        <p actions class="text-sm text-base-content/50">Open a shift to record expenses.</p>
+      }
+    </app-empty-state>
   }
 
   <!-- Expenses List -->

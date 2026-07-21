@@ -23,6 +23,7 @@ import { SupplierAction, SupplierCardComponent } from './components/supplier-car
 import { SupplierStats, SupplierStatsComponent } from './components/supplier-stats.component';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 import { ListSearchBarComponent } from '../../shared/components/dashboard/list-search-bar.component';
+import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
 import { SupplierTableRowComponent } from './components/supplier-table-row.component';
 import { SupplierViewModalComponent } from './components/supplier-view-modal.component';
 import { SupplierPaymentModalComponent } from './components/supplier-payment-modal.component';
@@ -45,6 +46,7 @@ import { SupplierPaymentModalComponent } from './components/supplier-payment-mod
     SupplierStatsComponent,
     PageHeaderComponent,
     ListSearchBarComponent,
+    EmptyStateComponent,
     SupplierTableRowComponent,
     PaginationComponent,
     DeleteConfirmationModalComponent,

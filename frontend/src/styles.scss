@@ -21,6 +21,165 @@
 @theme {
   --font-sans: #{ds.$font-family-sans};
   --font-mono: #{ds.$font-family-mono};
+
+  // The Counter — depth tokens (docs/DESIGN_SYSTEM.md):
+  // `shadow-card` = whisper shadow for surfaces (shadow-sm aliases it);
+  // `shadow-overlay` = the only heavy shadow, reserved for menus/modals/popovers.
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 2px 8px -2px rgb(0 0 0 / 0.06);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 2px 8px -2px rgb(0 0 0 / 0.06);
+  --shadow-overlay: 0 8px 24px -8px rgb(0 0 0 / 0.18), 0 2px 8px -2px rgb(0 0 0 / 0.08);
+}
+
+/* ============================================
+   THE COUNTER — TYPE ROLES (docs/DESIGN_SYSTEM.md)
+   Dashboard text never exceeds 24px. Use these roles
+   instead of ad-hoc size/weight combinations.
+   ============================================ */
+@utility type-hero {
+  font-size: 1.5rem; // 24px — stat numbers, totals (the dashboard cap)
+  line-height: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility type-title {
+  font-size: 1.25rem; // 20px — page titles only
+  line-height: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+@utility type-heading {
+  font-size: 0.875rem; // 14px — section headings
+  line-height: 1.25rem;
+  font-weight: 600;
+}
+
+@utility type-body {
+  font-size: 0.875rem; // 14px — values, rows
+  line-height: 1.375;
+}
+
+@utility type-caption {
+  font-size: 0.75rem; // 12px — labels, timestamps
+  line-height: 1rem;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+
+/* ============================================
+   THE COUNTER — ONE CARD RECIPE (docs/DESIGN_SYSTEM.md)
+   Every .card gets the hairline border + whisper shadow by
+   default; utilities (e.g. shadow-overlay on real overlays)
+   still win because they live in the later utilities layer.
+   ============================================ */
+@layer components {
+  .card {
+    border-width: 1px;
+    border-style: solid;
+    border-color: color-mix(in oklab, var(--color-base-300) 60%, transparent);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* The Counter — modals are full-screen on phones (Counter speed:
+     thumb-reachable, no pecking at a floating box). Desktop restores
+     the floating box; per-modal max-w-* utilities still win (utilities
+     layer comes after components). */
+  .modal-box {
+    height: 100%;
+    max-height: 100vh;
+    max-height: 100dvh;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+
+    @media (min-width: 768px) {
+      height: auto;
+      max-height: 90vh;
+      width: auto;
+      border-radius: var(--radius-box);
+    }
+  }
+
+  /* The Counter — ONE nav-item recipe (sidebar, drawer, footer links).
+     Ghost by default; exactly ONE active signifier: the tinted container.
+     4pt rhythm, 44px touch target, icons inherit state color. */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    min-height: 2.75rem;
+    border-radius: var(--radius-field);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-base-content);
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+    -webkit-tap-highlight-color: transparent;
+
+    ng-icon {
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+      transition: color 150ms ease;
+    }
+
+    &:hover {
+      background-color: color-mix(in oklab, var(--color-base-content) 6%, transparent);
+    }
+  }
+
+  .nav-item-active,
+  .nav-item-active:hover {
+    background-color: color-mix(in oklab, var(--color-primary) 10%, transparent);
+    color: var(--color-primary);
+    font-weight: 600;
+
+    ng-icon {
+      color: var(--color-primary);
+    }
+  }
+
+  /* The Counter — mobile bottom nav item. Same language as .nav-item:
+     color + one signifier (the pill behind the active icon). */
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    min-width: 4rem;
+    border-radius: var(--radius-field);
+    color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+    transition: color 150ms ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .bottom-nav-ico {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 1rem;
+    border-radius: 9999px;
+    transition: background-color 150ms ease;
+  }
+
+  .bottom-nav-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .bottom-nav-active {
+    color: var(--color-primary);
+
+    .bottom-nav-ico {
+      background-color: color-mix(in oklab, var(--color-primary) 12%, transparent);
+    }
+
+    .bottom-nav-label {
+      font-weight: 600;
+    }
+  }
 }
 
 @plugin "daisyui" {
@@ -73,8 +232,8 @@
   prefersdark: true;
   color-scheme: dark;
 
-  --color-base-100: #131316;
-  --color-base-200: #1c1c1f;
+  --color-base-100: #1c1c1f;
+  --color-base-200: #131316;
   --color-base-300: #2a2a2e;
   --color-base-content: #e8e8e6;
   --color-primary: #e85d2f;
@@ -100,13 +259,11 @@
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
-  --depth: 1;
+  // The Counter, dark mode: depth comes from lighter surfaces, not shadows.
+  // base-100 (cards/nav) is LIGHTER than base-200 (page) — the inverse of light mode.
+  --depth: 0;
   --noise: 0;
 }
-
-/* ============================================
-   GLOBAL STYLES
-   ============================================ */
 
 :root {
   scroll-behavior: smooth;
@@ -133,16 +290,16 @@
 
 body {
   font-family: ds.$font-family-sans;
-  font-size: ds.$text-base;
+  font-size: 0.875rem; // 14px — Counter body role
   line-height: ds.$leading-normal;
   @include ds.text-smooth;
 
   @media (min-width: #{ds.$tablet}) {
-    font-size: ds.$text-lg;
+    font-size: 1rem; // 16px
   }
 }
 
-// Headings
+// Headings (marketing/long-form defaults; dashboard uses type-role utilities)
 h1,
 h2,
 h3,
@@ -155,26 +312,26 @@ h6 {
 }
 
 h1 {
-  font-size: ds.$text-4xl;
+  font-size: 1.875rem;
 
   @media (min-width: #{ds.$tablet}) {
-    font-size: ds.$text-5xl;
+    font-size: 2.25rem;
   }
 }
 
 h2 {
-  font-size: ds.$text-2xl;
+  font-size: 1.5rem;
 
   @media (min-width: #{ds.$tablet}) {
-    font-size: ds.$text-3xl;
+    font-size: 1.875rem;
   }
 }
 
 h3 {
-  font-size: ds.$text-xl;
+  font-size: 1.25rem;
 
   @media (min-width: #{ds.$tablet}) {
-    font-size: ds.$text-2xl;
+    font-size: 1.5rem;
   }
 }
 

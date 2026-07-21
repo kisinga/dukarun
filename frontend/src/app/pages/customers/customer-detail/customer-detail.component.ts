@@ -27,6 +27,7 @@ import {
   BalanceOverrideModalComponent,
   BalanceOverrideModalData,
 } from '../components/balance-override-modal.component';
+import { PageHeaderComponent } from '../../../shared/components/dashboard/page-header.component';
 
 const RECENT_ORDERS_TAKE = 25;
 
@@ -37,7 +38,13 @@ const RECENT_ORDERS_TAKE = 25;
 @Component({
   selector: 'app-customer-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, OrderStateBadgeComponent, BalanceOverrideModalComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    OrderStateBadgeComponent,
+    BalanceOverrideModalComponent,
+    PageHeaderComponent,
+  ],
   templateUrl: './customer-detail.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

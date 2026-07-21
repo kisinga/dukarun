@@ -159,6 +159,8 @@ export class AccountingComponent implements OnInit {
     expandedEntries: this.listState.expandedEntries(),
     totalPages: this.listState.totalPages(),
     currentPage: this.listState.currentPage(),
+    totalItems: this.listState.filteredEntries().length,
+    pageSize: this.listState.itemsPerPage(),
     formatCurrency: this.formatCurrency,
     formatDate: this.formatDate,
     getEntryTotalDebit: this.getEntryTotalDebit.bind(this),

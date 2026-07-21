@@ -6,6 +6,15 @@
     refreshTitle="Refresh adjustments"
     (refresh)="refreshAdjustments()"
   >
+    <app-stock-adjustment-stats header-stats [stats]="stats()" />
+    <a
+      actions
+      routerLink="/dashboard/stock-adjustments/create"
+      class="btn btn-primary btn-sm gap-2"
+    >
+      <ng-icon name="heroPlus" size="1rem" />
+      Record Adjustment
+    </a>
   </app-page-header>
 
   @if (showRecordedSuccess()) {
@@ -64,28 +73,13 @@
       </div>
     </div>
   } @else if (adjustments().length === 0 && !errorList()) {
-    <div class="card bg-base-100 shadow">
-      <div class="card-body">
-        <div class="text-center py-12 lg:py-16 px-4">
-          <div
-            class="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4 rounded-full bg-base-200 flex items-center justify-center"
-          >
-            <ng-icon name="heroArrowPath" size="2.5rem" class="text-base-content/30" />
-          </div>
-          <h3 class="text-lg font-semibold">No adjustments yet</h3>
-          <p class="text-sm text-base-content/60 mt-2 max-w-md mx-auto">
-            Record your first stock adjustment to correct inventory levels.
-          </p>
-          <a
-            routerLink="/dashboard/stock-adjustments/create"
-            class="btn btn-primary btn-sm mt-6 gap-2"
-          >
-            <ng-icon name="heroPlus" size="1rem" />
-            Record adjustment
-          </a>
-        </div>
-      </div>
-    </div>
+    <app-empty-state
+      icon="heroArrowPath"
+      title="No adjustments yet"
+      description="Record your first stock adjustment to correct inventory levels."
+      ctaLabel="Record adjustment"
+      ctaLink="/dashboard/stock-adjustments/create"
+    />
   } @else {
     <!-- Expand / Collapse controls -->
     <div class="flex justify-end gap-2">
@@ -193,35 +187,9 @@
                     aria-label="Toggle line items"
                   >
                     @if (isExpanded(adj.id)) {
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M5 15l7-7 7 7"
-                        />
-                      </svg>
+                      <ng-icon name="heroChevronUp" size="1rem" />
                     } @else {
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
+                      <ng-icon name="heroChevronDown" size="1rem" />
                     }
                   </button>
                 </td>
@@ -305,15 +273,6 @@
       itemLabel="adjustments"
       (pageChange)="goToPage($event)"
       (itemsPerPageChange)="changeItemsPerPage($event)"
-    >
-      <a
-        pagination-actions
-        routerLink="/dashboard/stock-adjustments/create"
-        class="btn btn-primary btn-sm gap-2"
-      >
-        <ng-icon name="heroPlus" size="1rem" />
-        Record Adjustment
-      </a>
-    </app-pagination>
+    />
   }
 </div>

@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -12,10 +13,11 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { PaymentsService, PaymentWithOrder } from '@dukarun/payments';
 import { calculatePaymentStats } from '../../shared/services/stats/payment-stats.util';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
+import { ListSearchBarComponent } from '../../shared/components/dashboard/list-search-bar.component';
+import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
 import { PaginationComponent } from '../../shared/components/dashboard/pagination.component';
 import { OrderDetailComponent } from '@dukarun/order/components';
 import { PaymentAction, PaymentCardComponent } from './components/payment-card.component';
-import { PaymentSearchBarComponent } from './components/payment-search-bar.component';
 import { PaymentStats, PaymentStatsComponent } from './components/payment-stats.component';
 import { PaymentTableRowComponent } from './components/payment-table-row.component';
 
@@ -31,10 +33,12 @@ import { PaymentTableRowComponent } from './components/payment-table-row.compone
   selector: 'app-payments',
   imports: [
     CommonModule,
+    NgIcon,
     PageHeaderComponent,
+    ListSearchBarComponent,
+    EmptyStateComponent,
     PaymentCardComponent,
     PaymentStatsComponent,
-    PaymentSearchBarComponent,
     PaymentTableRowComponent,
     PaginationComponent,
     OrderDetailComponent,

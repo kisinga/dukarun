@@ -144,30 +144,13 @@
   </div>
 
   @if (totalPages() > 1) {
-    <div class="join flex justify-center mt-4">
-      <button
-        class="join-item btn btn-sm"
-        [disabled]="context().currentPage === 1"
-        (click)="onPageChange(context().currentPage - 1)"
-      >
-        «
-      </button>
-      @for (page of pageNumbers(); track page) {
-        <button
-          class="join-item btn btn-sm"
-          [class.btn-active]="context().currentPage === page"
-          (click)="onPageChange(page)"
-        >
-          {{ page }}
-        </button>
-      }
-      <button
-        class="join-item btn btn-sm"
-        [disabled]="context().currentPage === totalPages()"
-        (click)="onPageChange(context().currentPage + 1)"
-      >
-        »
-      </button>
-    </div>
+    <app-pagination
+      [currentPage]="context().currentPage"
+      [totalPages]="totalPages()"
+      [totalItems]="context().totalItems"
+      [itemsPerPage]="context().pageSize"
+      itemLabel="reconciliations"
+      (pageChange)="onPageChange($event)"
+    />
   }
 }

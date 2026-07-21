@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -14,7 +15,7 @@ import { ChannelSettings, SettingsService } from '@dukarun/company';
 
 @Component({
   selector: 'app-general-settings',
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, NgIcon],
   templateUrl: './general-settings.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

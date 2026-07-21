@@ -13,6 +13,7 @@ import {
   type Reconciliation,
   type ReconciliationAccountDetail,
 } from '../../services/cashier-session.service';
+import { PaginationComponent } from '../../../../shared/components/dashboard/pagination.component';
 
 /** Context for the shared reconciliation history table (list + pagination only). */
 export interface ReconciliationHistoryContext {
@@ -27,7 +28,7 @@ export interface ReconciliationHistoryContext {
 
 @Component({
   selector: 'app-reconciliation-history',
-  imports: [CommonModule],
+  imports: [CommonModule, PaginationComponent],
   templateUrl: './reconciliation-history.component.html',
   styleUrl: './reconciliation-history.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -50,11 +51,6 @@ export class ReconciliationHistoryComponent {
     const total = ctx.totalItems;
     const size = ctx.pageSize;
     return Math.ceil(total / size) || 1;
-  });
-
-  readonly pageNumbers = computed(() => {
-    const total = this.totalPages();
-    return Array.from({ length: total }, (_, i) => i + 1);
   });
 
   hasVariance(r: Reconciliation): boolean {

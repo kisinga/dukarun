@@ -33,7 +33,7 @@
 
 <!-- Main Content -->
 <div
-  class="container-app py-4 md:py-6 space-y-4 md:space-y-6 anim-stagger"
+  class="space-y-4 md:space-y-6 anim-stagger"
   [class.pb-20]="cartItems().length === 0"
   [class.md:pb-6]="cartItems().length === 0"
   [class.pb-40]="cartItems().length > 0"
@@ -110,7 +110,7 @@
   @if (isManualSearchActive() && searchResultsForMainView().length === 0 && !isSearching()) {
     <div class="text-center py-12">
       <div class="mb-2 flex justify-center">
-        <ng-icon name="heroMagnifyingGlass" size="3rem" class="text-base-content/40" />
+        <ng-icon name="heroMagnifyingGlass" size="2.5rem" class="text-base-content/40" />
       </div>
       <p class="font-semibold">No products found</p>
       <p class="text-sm text-base-content/70 mt-1">Try a different search term</p>
@@ -150,18 +150,15 @@
   />
 }
 
-<!-- Floating Camera Button (Mobile only, when searching) — sits above the
+<!-- Floating Camera Button (Mobile only, when searching) — stacked above the
      checkout bar when the cart has items so the two don't overlap -->
-@if (isManualSearchActive()) {
-  <button
-    class="btn btn-circle btn-primary btn-lg fixed right-4 z-40 md:hidden shadow-lg"
-    [class.bottom-20]="cartItems().length === 0"
-    [class.bottom-44]="cartItems().length > 0"
-    (click)="handleClearSearch()"
-    aria-label="Back to camera"
-  >
-    <ng-icon name="heroCamera" size="1.5rem" />
-  </button>
+@if (isManualSearchActive() && isMobile()) {
+  <app-mobile-fab
+    icon="heroCamera"
+    ariaLabel="Back to camera"
+    [stack]="cartItems().length > 0 ? 1 : 0"
+    (fabClick)="handleClearSearch()"
+  />
 }
 
 <!-- Product Confirmation Modal -->

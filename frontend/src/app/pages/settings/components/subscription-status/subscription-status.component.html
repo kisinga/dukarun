@@ -1,9 +1,9 @@
-<div class="card bg-base-100 shadow-lg">
+<div class="card bg-base-100">
   <div class="card-body p-4 sm:p-6">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
       <div>
-        <h2 class="text-lg sm:text-xl font-bold">Subscription</h2>
+        <h2 class="text-lg sm:text-xl font-bold tracking-tight">Subscription</h2>
         <p class="text-sm opacity-60">Manage your plan and billing</p>
       </div>
       @if (access() === 'read_only' || access() === 'blocked') {
@@ -57,18 +57,7 @@
     <!-- Trial Alert -->
     @if (subscriptionService.isTrialActive()) {
       <div class="alert alert-info py-3 mb-4">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path
-            fill-rule="evenodd"
-            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-            clip-rule="evenodd"
-          />
-        </svg>
+        <ng-icon name="heroInformationCircle" size="1.25rem" class="shrink-0" />
         <div class="text-sm">
           <span class="font-medium">Trial ends {{ trialEndsAt() | date: 'mediumDate' }}</span>
           <p class="text-xs opacity-80 mt-0.5">Subscribe to keep all features</p>
@@ -79,18 +68,7 @@
     <!-- Expired / Suspended Alert -->
     @if (access() === 'read_only') {
       <div class="alert alert-warning py-3 mb-4">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path
-            fill-rule="evenodd"
-            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-            clip-rule="evenodd"
-          />
-        </svg>
+        <ng-icon name="heroExclamationCircle" size="1.25rem" class="shrink-0" />
         <div class="text-sm">
           <span class="font-medium">Read-only access</span>
           <p class="text-xs opacity-80 mt-0.5">{{ readOnlyMessage() }}</p>
@@ -98,18 +76,7 @@
       </div>
     } @else if (access() === 'blocked') {
       <div class="alert alert-error py-3 mb-4">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path
-            fill-rule="evenodd"
-            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-            clip-rule="evenodd"
-          />
-        </svg>
+        <ng-icon name="heroExclamationCircle" size="1.25rem" class="shrink-0" />
         <div class="text-sm">
           <span class="font-medium">Account suspended</span>
           <p class="text-xs opacity-80 mt-0.5">{{ suspendedMessage() }}</p>

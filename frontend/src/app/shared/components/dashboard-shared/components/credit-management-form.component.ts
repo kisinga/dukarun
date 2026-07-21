@@ -9,6 +9,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../../services/currency.service';
 
 /**
@@ -19,7 +20,7 @@ import { CurrencyService } from '../../../services/currency.service';
  */
 @Component({
   selector: 'app-credit-management-form',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   template: `
     <div class="card bg-base-100 border border-base-300 shadow-sm max-w-md mx-auto">
       <div class="card-body p-5">
@@ -30,20 +31,7 @@ import { CurrencyService } from '../../../services/currency.service';
 
         @if (!hasPermission()) {
           <div class="alert alert-info">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5 flex-shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <ng-icon name="heroInformationCircle" size="1.25rem" class="flex-shrink-0" />
             <span class="text-sm">Credit management requires appropriate permissions</span>
           </div>
         } @else {

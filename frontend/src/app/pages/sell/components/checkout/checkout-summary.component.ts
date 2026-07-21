@@ -22,7 +22,7 @@ import { CurrencyService } from '../../../../shared/services/currency.service';
       <div class="flex justify-between items-center">
         <span class="font-bold text-base sm:text-xl">{{ totalLabel() }}</span>
         <span
-          class="text-2xl sm:text-3xl font-bold text-tabular"
+          class="type-hero"
           [class.text-info]="totalColor() === 'info'"
           [class.text-warning]="totalColor() === 'warning'"
           [class.text-success]="totalColor() === 'success'"

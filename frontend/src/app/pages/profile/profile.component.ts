@@ -1,27 +1,24 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { UPDATE_ADMIN_PROFILE, AuthService } from '@dukarun/auth';
 import { ApolloService } from '../../shared/services/apollo.service';
 import { AssetUploadService } from '@dukarun/company';
 import { ToastService } from '../../shared/services/toast.service';
+import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 
 @Component({
   selector: 'app-profile',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NgIcon, PageHeaderComponent],
   template: `
     <div class="max-w-3xl mx-auto space-y-6">
       <!-- Header -->
-      <div class="flex items-start justify-between gap-3">
-        <div class="flex-1 min-w-0">
-          <h1 class="text-2xl sm:text-2xl lg:text-3xl font-bold tracking-tight">
-            Profile Settings
-          </h1>
-          <p class="text-xs sm:text-sm text-base-content/60 font-medium">
-            Update your personal information
-          </p>
-        </div>
-      </div>
+      <app-page-header
+        title="Profile Settings"
+        subtitle="Update your personal information"
+        [showRefresh]="false"
+      />
 
       <!-- Main Card -->
       <div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -32,20 +29,7 @@ import { ToastService } from '../../shared/services/toast.service';
               <span
                 class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
+                <ng-icon name="heroPhoto" size="1.25rem" />
               </span>
               Profile Picture
             </h2>
@@ -92,7 +76,7 @@ import { ToastService } from '../../shared/services/toast.service';
                   <div
                     class="bg-neutral text-neutral-content rounded-full w-24 ring ring-primary ring-offset-base-100 ring-offset-2"
                   >
-                    <span class="text-3xl font-bold">{{ getInitials() }}</span>
+                    <span class="text-2xl font-bold">{{ getInitials() }}</span>
                   </div>
                 </div>
                 <div class="flex flex-col gap-2">

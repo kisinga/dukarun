@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { PurchaseLineItem } from '@dukarun/purchases';
 import { CurrencyService } from '../../../shared/services/currency.service';
 
@@ -11,7 +12,7 @@ import { CurrencyService } from '../../../shared/services/currency.service';
  */
 @Component({
   selector: 'app-purchase-line-items-table',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   template: `
     @if (lineItems().length > 0) {
       <!-- Mobile card layout -->
@@ -30,20 +31,7 @@ import { CurrencyService } from '../../../shared/services/currency.service';
                   <div
                     class="w-10 h-10 rounded bg-base-300 flex items-center justify-center shrink-0"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5 text-primary"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                      />
-                    </svg>
+                    <ng-icon name="heroCube" size="1.25rem" class="text-primary" />
                   </div>
                 }
                 <div class="min-w-0">
@@ -61,14 +49,7 @@ import { CurrencyService } from '../../../shared/services/currency.service';
                 (click)="onLineItemRemove($index)"
                 aria-label="Remove item"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
+                <ng-icon name="heroTrash" size="1rem" />
               </button>
             </div>
 

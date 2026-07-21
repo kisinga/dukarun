@@ -42,7 +42,7 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error' | 
   imports: [CommonModule, NgIcon],
   template: `
     @if (isScanning()) {
-      <div class="card bg-base-100 shadow-xl border-2 border-primary anim-fade-in">
+      <div class="card bg-base-100 border-2 border-primary anim-fade-in">
         <div class="card-body p-3">
           <!-- Scanner Header -->
           <div class="flex items-center justify-between mb-2" role="status" aria-live="polite">
@@ -85,7 +85,7 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error' | 
                   class="absolute -bottom-px -right-px w-6 h-6 border-b-4 border-r-4 border-primary rounded-br-2xl"
                 ></span>
                 <span
-                  class="absolute -bottom-7 inset-x-0 text-center text-[11px] text-white/90 drop-shadow"
+                  class="absolute -bottom-7 inset-x-0 text-center text-xs text-white/90 drop-shadow"
                 >
                   Frame the item here
                 </span>
@@ -137,7 +137,7 @@ type ScannerStatus = 'idle' | 'initializing' | 'ready' | 'scanning' | 'error' | 
       </div>
     } @else {
       <!-- Non-scanning states: never leave the camera area blank (error / permission / idle) -->
-      <div class="card bg-base-100 shadow-md border border-base-300">
+      <div class="card bg-base-100 border border-base-300">
         <div class="card-body items-center text-center gap-3 p-6">
           @if (scannerStatus() === 'error') {
             <ng-icon name="heroNoSymbol" size="2.25rem" class="text-error" />

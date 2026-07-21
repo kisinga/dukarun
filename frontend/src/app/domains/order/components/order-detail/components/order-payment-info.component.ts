@@ -29,7 +29,7 @@ import type { OrderPaymentInfoInput } from '../order-detail.types';
       @if (paymentList().length === 0) {
         <p class="text-sm text-base-content/60">No payments</p>
       } @else {
-        <div class="overflow-x-auto rounded-lg border border-base-300/60">
+        <div class="overflow-x-auto">
           <table class="table table-sm table-zebra">
             <thead>
               <tr>

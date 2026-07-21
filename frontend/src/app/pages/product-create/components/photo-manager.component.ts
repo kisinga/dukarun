@@ -8,6 +8,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 
 /**
  * Photo Manager Component
@@ -17,7 +18,7 @@ import {
  */
 @Component({
   selector: 'app-photo-manager',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
@@ -81,7 +82,7 @@ import {
         (click)="photoInput.click()"
         class="btn btn-outline btn-block gap-2 h-auto py-6 flex-col btn-upload-empty"
       >
-        <span class="material-symbols-outlined text-4xl">photo_camera</span>
+        <ng-icon name="heroCamera" size="2.5rem" />
         <div class="flex items-center gap-2">
           <span class="font-semibold">Add Photos</span>
           <div
@@ -102,7 +103,7 @@ import {
           (click)="photoInput.click()"
           class="btn btn-sm btn-outline btn-block gap-1"
         >
-          <span class="material-symbols-outlined text-base">add</span>
+          <ng-icon name="heroPlus" size="1rem" />
           <span>Add more</span>
           <span class="badge badge-sm" [class.badge-primary]="photos().length > 0">
             {{ photos().length }}
@@ -125,16 +126,16 @@ import {
               <button
                 type="button"
                 (click)="removePhoto(i)"
-                class="btn btn-circle btn-xs btn-error absolute -top-1 -right-1 shadow-lg btn-remove sm:opacity-0 sm:group-hover:opacity-100"
+                class="btn btn-circle btn-xs btn-error absolute -top-1 -right-1 btn-remove sm:opacity-0 sm:group-hover:opacity-100"
                 aria-label="Remove photo"
               >
-                ✕
+                <ng-icon name="heroXMark" size="0.875rem" />
               </button>
 
               <!-- Featured Badge -->
               @if (i === 0) {
                 <div class="badge badge-xs badge-primary absolute bottom-1 left-1 gap-0.5">
-                  <span class="material-symbols-outlined text-[10px]">star</span>
+                  <ng-icon name="heroStar" size="0.875rem" />
                   <span>Main</span>
                 </div>
               }

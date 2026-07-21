@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -16,7 +17,7 @@ import { CompanyService } from '@dukarun/company';
 
 @Component({
   selector: 'app-payment-modal',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NgIcon],
   templateUrl: './payment-modal.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

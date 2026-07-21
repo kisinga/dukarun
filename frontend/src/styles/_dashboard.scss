@@ -61,30 +61,15 @@ html[data-theme='dark'] app-dashboard-layout .duka-door-logo {
 }
 
 app-dashboard-layout .drawer-side > .sidebar-aside {
-  background-color: var(--color-base-100, #fafafa);
+  background-color: var(--color-base-100);
 }
 
 app-dashboard-layout .navbar {
-  background-color: var(--color-base-100, #fafafa);
+  background-color: var(--color-base-100);
 }
 
 app-dashboard-layout aside nav a {
   -webkit-tap-highlight-color: transparent;
-
-  &.bg-primary\/10 {
-    position: relative;
-
-    &::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 20%;
-      bottom: 20%;
-      width: 3px;
-      background: oklch(var(--p));
-      border-radius: 0 2px 2px 0;
-    }
-  }
 }
 
 app-dashboard-layout nav[role='navigation'] a {
@@ -122,14 +107,14 @@ app-dashboard-layout .border-l-3 {
 
 app-dashboard-layout .drawer-side aside {
   scrollbar-width: thin;
-  scrollbar-color: oklch(var(--bc) / 0.08) transparent;
+  scrollbar-color: color-mix(in oklab, var(--color-base-content) 8%, transparent) transparent;
 
   &::-webkit-scrollbar {
     width: 3px;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: oklch(var(--bc) / 0.08);
+    background: color-mix(in oklab, var(--color-base-content) 8%, transparent);
     border-radius: 3px;
   }
 }
@@ -203,7 +188,7 @@ app-dashboard-layout .drawer-side aside {
 }
 
 .dashboard-main .overview-header {
-  border-top: 3px solid oklch(var(--p));
+  border-top: 3px solid var(--color-primary);
 }
 
 .dashboard-main .rotate-180 {

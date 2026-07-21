@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 
 /**
  * EntityDetailLayoutComponent — shared presentational shell for all entity detail pages.
@@ -19,16 +20,17 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
  *     <button class="btn btn-sm">Edit</button>
  *   </div>
  *   <!-- default slot: detail body -->
- *   <div class="card bg-base-100 shadow">...</div>
+ *   <div class="card bg-base-100">...</div>
  * </app-entity-detail-layout>
  * ```
  */
 @Component({
   selector: 'app-entity-detail-layout',
   standalone: true,
+  imports: [NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="container-app py-4 md:py-6 space-y-4 md:space-y-6 anim-stagger">
+    <div class="py-4 md:py-6 space-y-4 md:space-y-6 anim-stagger">
       <!-- Back + Title bar -->
       <div class="flex items-center gap-3">
         <button
@@ -36,19 +38,10 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
           (click)="back.emit()"
           aria-label="Go back"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
+          <ng-icon name="heroChevronLeft" size="1.25rem" />
         </button>
         <div class="flex-1 min-w-0">
-          <h1 class="text-xl font-bold truncate">{{ title() }}</h1>
+          <h1 class="text-xl font-bold tracking-tight truncate">{{ title() }}</h1>
           @if (subtitle()) {
             <p class="text-sm text-base-content/60 truncate">{{ subtitle() }}</p>
           }
@@ -64,20 +57,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
       } @else if (error()) {
         <!-- Error -->
         <div role="alert" class="alert alert-error">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
+          <ng-icon name="heroExclamationCircle" size="1.25rem" class="shrink-0" />
           <span>{{ error() }}</span>
         </div>
       } @else {

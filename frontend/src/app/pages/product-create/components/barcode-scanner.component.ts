@@ -10,6 +10,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { BarcodeScannerService } from '../../../shared/services/barcode-scanner.service';
 import { CameraService } from '../../../shared/services/camera.service';
 import { ScannerBeepService } from '../../../shared/services/scanner-beep.service';
@@ -24,7 +25,7 @@ import { TracingService } from '../../../shared/services/tracing.service';
  */
 @Component({
   selector: 'app-barcode-scanner',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (compact()) {
@@ -61,15 +62,7 @@ import { TracingService } from '../../../shared/services/tracing.service';
         }
         @if (lastScannedCode()) {
           <div class="alert alert-success alert-sm py-2">
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
+            <ng-icon name="heroCheck" size="1rem" />
             <span class="text-xs">{{ lastScannedCode() }}</span>
           </div>
         }
@@ -111,15 +104,7 @@ import { TracingService } from '../../../shared/services/tracing.service';
 
           @if (lastScannedCode()) {
             <div class="alert alert-success mt-2">
-              <svg
-                class="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
+              <ng-icon name="heroCheck" size="1.25rem" />
               <span>Scanned: {{ lastScannedCode() }}</span>
             </div>
           }
@@ -171,7 +156,7 @@ import { TracingService } from '../../../shared/services/tracing.service';
       position: absolute;
       width: 24px;
       height: 24px;
-      border-color: oklch(var(--p));
+      border-color: var(--color-primary);
       border-style: solid;
       border-width: 3px;
     }
@@ -215,7 +200,7 @@ import { TracingService } from '../../../shared/services/tracing.service';
       right: 8px;
       height: 2px;
       top: 10%;
-      background: linear-gradient(90deg, transparent, oklch(var(--p)), transparent);
+      background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
     }
   `,
 })

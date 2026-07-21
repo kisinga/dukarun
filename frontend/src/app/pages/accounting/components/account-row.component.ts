@@ -1,11 +1,12 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import { LedgerAccount } from '@dukarun/ledger';
 import { AccountNode } from './accounts-tab.component';
 
 @Component({
   selector: 'app-account-row',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   templateUrl: './account-row.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },

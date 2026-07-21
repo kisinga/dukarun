@@ -16,8 +16,12 @@ export type PaymentAction = 'view' | 'viewOrder';
   selector: 'tr[app-payment-table-row]',
   imports: [CommonModule, RouterLink, HoverPreviewHostComponent, PaymentStateBadgeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'hover cursor-pointer',
+    '(click)': 'onRowClick()',
+  },
   template: `
-    <td>
+    <td (click)="$event.stopPropagation()">
       <app-hover-preview-host previewKey="order" [entityId]="payment().order.id">
         <a
           [routerLink]="['/dashboard/orders', payment().order.id]"
@@ -27,7 +31,7 @@ export type PaymentAction = 'view' | 'viewOrder';
       </app-hover-preview-host>
       <div class="text-sm text-base-content/60">{{ formatDate(payment().createdAt) }}</div>
     </td>
-    <td>
+    <td (click)="$event.stopPropagation()">
       @if (payment().order.customer?.id) {
         <app-hover-preview-host previewKey="customer" [entityId]="payment().order.customer!.id">
           <a
@@ -54,7 +58,7 @@ export type PaymentAction = 'view' | 'viewOrder';
         <span class="text-base-content/60">—</span>
       }
     </td>
-    <td class="text-right">
+    <td class="text-right" (click)="$event.stopPropagation()">
       <div class="flex gap-2 justify-end">
         <button class="btn btn-sm btn-primary" (click)="onAction('view')">View Payment</button>
         <button class="btn btn-sm btn-outline" (click)="onAction('viewOrder')">View Order</button>
@@ -66,6 +70,10 @@ export class PaymentTableRowComponent {
   private readonly currencyService = inject(CurrencyService);
   readonly payment = input.required<PaymentWithOrder>();
   readonly action = output<{ action: PaymentAction; paymentId: string; orderId?: string }>();
+
+  onRowClick(): void {
+    this.action.emit({ action: 'view', paymentId: this.payment().id });
+  }
 
   getCustomerName(): string {
     const customer = this.payment().order.customer;

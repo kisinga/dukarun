@@ -18,6 +18,8 @@ import {
 import { CompanyService } from '@dukarun/company';
 import { toDisplayDate } from '../../shared/utils/date.util';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
+import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
+import { PaginationComponent } from '../../shared/components/dashboard/pagination.component';
 
 /** Cached reconciliation details for a shift (opening and/or closing). */
 export interface ShiftReconciliationDetails {
@@ -28,7 +30,14 @@ export interface ShiftReconciliationDetails {
 @Component({
   selector: 'app-shifts',
   standalone: true,
-  imports: [CommonModule, RouterLink, NgIcon, PageHeaderComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    NgIcon,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    PaginationComponent,
+  ],
   templateUrl: './shifts.component.html',
   styleUrl: './shifts.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -158,11 +167,6 @@ export class ShiftsComponent implements OnInit {
     const total = this.sessionsTotal();
     const size = this.sessionsPageSize;
     return Math.ceil(total / size) || 1;
-  });
-
-  readonly sessionsPageNumbers = computed(() => {
-    const total = this.sessionsTotalPages();
-    return Array.from({ length: total }, (_, i) => i + 1);
   });
 
   isSessionExpanded(session: CashierSession): boolean {

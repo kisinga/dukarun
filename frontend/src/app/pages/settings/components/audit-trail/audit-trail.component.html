@@ -1,21 +1,10 @@
-<div class="card bg-base-100 shadow-lg">
+<div class="card bg-base-100">
   <div class="card-body p-4 sm:p-6">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
       <div>
-        <h2 class="text-lg sm:text-xl font-bold flex items-center gap-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-              clip-rule="evenodd"
-            />
-          </svg>
+        <h2 class="text-lg sm:text-xl font-bold tracking-tight flex items-center gap-2">
+          <ng-icon name="heroBars3" size="1.25rem" />
           Audit Trail
         </h2>
         <p class="text-sm opacity-60">View system events and user actions</p>
@@ -24,18 +13,7 @@
         @if (isLoading()) {
           <span class="loading loading-spinner loading-xs"></span>
         } @else {
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-              clip-rule="evenodd"
-            />
-          </svg>
+          <ng-icon name="heroArrowPath" size="1rem" />
         }
         Refresh
       </button>
@@ -51,18 +29,7 @@
     <!-- Error State -->
     @if (error()) {
       <div class="alert alert-error py-2 text-sm mb-4">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path
-            fill-rule="evenodd"
-            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-            clip-rule="evenodd"
-          />
-        </svg>
+        <ng-icon name="heroExclamationCircle" size="1.25rem" class="shrink-0" />
         <span>{{ error() }}</span>
       </div>
     }
@@ -86,18 +53,7 @@
       !isLoading() && filteredLogs().length === 0 && auditLogs().length > 0 && hasActiveFilters()
     ) {
       <div class="alert alert-info py-2 text-sm">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path
-            fill-rule="evenodd"
-            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-            clip-rule="evenodd"
-          />
-        </svg>
+        <ng-icon name="heroInformationCircle" size="1.25rem" class="shrink-0" />
         <span>No logs match filters</span>
         <button class="btn btn-xs btn-ghost" (click)="clearFilters()">Clear</button>
       </div>
@@ -165,7 +121,10 @@
                   </td>
                   <td>
                     <button class="btn btn-ghost btn-xs" (click)="toggleExpanded(log.id)">
-                      {{ expandedLogs().has(log.id) ? '▼' : '▶' }}
+                      <ng-icon
+                        [name]="expandedLogs().has(log.id) ? 'heroChevronDown' : 'heroChevronRight'"
+                        size="1rem"
+                      />
                     </button>
                   </td>
                 </tr>

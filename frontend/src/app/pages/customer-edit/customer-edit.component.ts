@@ -8,12 +8,13 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { AuthService } from '@dukarun/auth';
 import { CurrencyService } from '../../shared/services/currency.service';
 import { CreditCustomerSummary, CustomerInput, CustomerService } from '@dukarun/customer';
 import { ToastService } from '../../shared/services/toast.service';
 import { toDisplayDate } from '../../shared/utils/date.util';
-import { PageHeaderComponent } from '../../shared/components/dashboard-shared/components/page-header.component';
+import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 import { PersonEditFormComponent } from '../../shared/components/dashboard-shared/components/person-edit-form.component';
 
 /**
@@ -26,22 +27,19 @@ import { PersonEditFormComponent } from '../../shared/components/dashboard-share
  */
 @Component({
   selector: 'app-customer-edit',
-  imports: [CommonModule, PageHeaderComponent, PersonEditFormComponent],
+  imports: [CommonModule, NgIcon, PageHeaderComponent, PersonEditFormComponent],
   template: `
     <div class="min-h-screen bg-base-100">
-      <app-page-header title="Edit Customer" (backClick)="goBack()" />
+      <app-page-header
+        title="Edit Customer"
+        backLink="/dashboard/customers"
+        [showRefresh]="false"
+      />
 
       <div class="p-4">
         @if (error()) {
           <div class="alert alert-warning mb-4" [class.alert-error]="!isWalkInCustomer()">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
+            <ng-icon name="heroExclamationCircle" size="1.25rem" />
             <div class="flex-1">
               <div class="font-semibold">
                 {{ isWalkInCustomer() ? 'Walk-in Customer' : 'Error' }}
@@ -146,20 +144,7 @@ import { PersonEditFormComponent } from '../../shared/components/dashboard-share
                       <div class="space-y-2">
                         @if (creditSummary()?.creditFrozen) {
                           <div class="alert alert-warning">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              class="h-5 w-5 shrink-0"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                              />
-                            </svg>
+                            <ng-icon name="heroLockClosed" size="1.25rem" class="shrink-0" />
                             <div>
                               <div class="font-semibold">Account frozen</div>
                               <div class="text-sm">
@@ -307,20 +292,11 @@ import { PersonEditFormComponent } from '../../shared/components/dashboard-share
                       <!-- Last Repayment Info -->
                       @if (creditSummary()?.lastRepaymentDate) {
                         <div class="alert alert-info mt-4">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-5 w-5 flex-shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
+                          <ng-icon
+                            name="heroInformationCircle"
+                            size="1.25rem"
+                            class="flex-shrink-0"
+                          />
                           <div class="text-sm">
                             <div class="font-semibold">Last Repayment</div>
                             <div>

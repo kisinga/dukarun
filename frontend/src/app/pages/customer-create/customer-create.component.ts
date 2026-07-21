@@ -14,7 +14,7 @@ import { CustomerService, CustomerApiService } from '@dukarun/customer';
 import { AuthPermissionsService } from '@dukarun/auth';
 import { ToastService } from '../../shared/services/toast.service';
 import { CreditManagementFormComponent } from '../../shared/components/dashboard-shared/components/credit-management-form.component';
-import { PageHeaderComponent } from '../../shared/components/dashboard-shared/components/page-header.component';
+import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 import { ErrorAlertComponent } from '../../shared/components/dashboard-shared/components/error-alert.component';
 import { RejectionBannerComponent } from '../../shared/components/dashboard-shared/components/rejection-banner.component';
 import { PersonBasicInfoFormComponent } from '../../shared/components/dashboard-shared/components/person-basic-info-form.component';
@@ -40,7 +40,11 @@ import { ApprovableFormBase } from '@dukarun/approval';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="min-h-screen bg-base-100">
-      <app-page-header title="Create Customer" (backClick)="goBack()" />
+      <app-page-header
+        title="Create Customer"
+        backLink="/dashboard/customers"
+        [showRefresh]="false"
+      />
 
       <div class="p-4">
         <app-rejection-banner [message]="rejectionMessage()" (dismiss)="dismissRejection()" />

@@ -19,6 +19,7 @@ import { PurchaseCardComponent } from './components/purchase-card.component';
 import { PurchaseStats, PurchaseStatsComponent } from './components/purchase-stats.component';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 import { ListSearchBarComponent } from '../../shared/components/dashboard/list-search-bar.component';
+import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
 import {
   PayPurchaseModalComponent,
   PayPurchaseModalData,
@@ -47,6 +48,7 @@ import { PurchaseDetailComponent } from './purchase-detail/purchase-detail.compo
     PurchaseCardComponent,
     PageHeaderComponent,
     ListSearchBarComponent,
+    EmptyStateComponent,
     PurchaseTableRowComponent,
     PayPurchaseModalComponent,
     PaginationComponent,

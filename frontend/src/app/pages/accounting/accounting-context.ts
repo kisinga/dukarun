@@ -38,6 +38,8 @@ export interface TransactionsTabContext {
   expandedEntries: Set<string>;
   totalPages: number;
   currentPage: number;
+  totalItems: number;
+  pageSize: number;
   formatCurrency: (amount: number) => string;
   formatDate: (date: string) => string;
   getEntryTotalDebit: (entry: JournalEntry) => number;

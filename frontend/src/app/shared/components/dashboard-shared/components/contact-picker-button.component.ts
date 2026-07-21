@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
+import { NgIcon } from '@ng-icons/core';
 import { ContactPickerService } from '../../../services/contact-picker.service';
 
 /**
@@ -9,7 +10,7 @@ import { ContactPickerService } from '../../../services/contact-picker.service';
  */
 @Component({
   selector: 'app-contact-picker-button',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (isSupported()) {
@@ -24,20 +25,7 @@ import { ContactPickerService } from '../../../services/contact-picker.service';
             <span class="loading loading-spinner loading-xs"></span>
             Importing...
           } @else {
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
+            <ng-icon name="heroPlus" size="1rem" />
             Import from Contacts
           }
         </button>

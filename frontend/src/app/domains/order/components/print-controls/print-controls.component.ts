@@ -10,6 +10,7 @@ import {
 import { PrintService } from '../../../../shared/services/print.service';
 import { PrintPreferencesService } from '../../../../shared/services/print-preferences.service';
 import { PaymentMethodService } from '@dukarun/payments';
+import { NgIcon } from '@ng-icons/core';
 import type {
   OrderData,
   PrintMeta,
@@ -19,6 +20,7 @@ import type {
 @Component({
   selector: 'app-print-controls',
   standalone: true,
+  imports: [NgIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-row items-center justify-end gap-2">
@@ -36,20 +38,7 @@ import type {
         (click)="onPrint()"
         [disabled]="!order() || disabled()"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-          />
-        </svg>
+        <ng-icon name="heroPrinter" size="1rem" />
         Print
       </button>
     </div>

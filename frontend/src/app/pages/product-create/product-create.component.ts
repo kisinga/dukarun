@@ -19,6 +19,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import {
   FacetService,
   normalizeBarcodeForApi,
@@ -80,6 +81,7 @@ import {
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    NgIcon,
     ItemTypeSelectorComponent,
     HowSoldSelectorComponent,
     ProductNameInputComponent,

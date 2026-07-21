@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 
 /**
@@ -8,7 +9,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
  */
 @Component({
   selector: 'app-pagination',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   templateUrl: './pagination.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

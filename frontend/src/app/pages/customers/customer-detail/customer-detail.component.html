@@ -1,22 +1,10 @@
 <div class="space-y-4 sm:space-y-6">
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-    <div>
-      <a routerLink="/dashboard/customers" class="btn btn-ghost btn-sm mb-2 gap-1">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Customers
-      </a>
-      <h1 class="text-xl sm:text-2xl font-bold text-base-content">Customer</h1>
-    </div>
-  </div>
+  <app-page-header
+    title="Customer"
+    backLink="/dashboard/customers"
+    backLabel="Back to Customers"
+    [showRefresh]="false"
+  />
 
   @if (error()) {
     <div role="alert" class="alert alert-error">
@@ -102,35 +90,40 @@
               </button>
             }
           </div>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
             @if (summary.isCreditApproved) {
-              <div class="stat bg-base-200/50 rounded-lg p-3">
-                <div class="stat-title text-xs">Status</div>
-                <div class="stat-value text-sm">
+              <div>
+                <p class="type-caption">Status</p>
+                <p class="mt-1">
                   <span class="badge badge-success badge-sm">Approved</span>
-                </div>
+                </p>
               </div>
             }
             @if (summary.creditLimit > 0) {
-              <div class="stat bg-base-200/50 rounded-lg p-3">
-                <div class="stat-title text-xs">Limit</div>
-                <div class="stat-value text-sm">{{ formatCurrency(summary.creditLimit) }}</div>
+              <div>
+                <p class="type-caption">Limit</p>
+                <p class="mt-1 text-lg font-bold tabular-nums">
+                  {{ formatCurrency(summary.creditLimit) }}
+                </p>
               </div>
             }
             @if (summary.outstandingAmount !== 0) {
-              <div class="stat bg-base-200/50 rounded-lg p-3">
-                <div class="stat-title text-xs">Outstanding</div>
-                <div class="stat-value text-sm" [class.text-error]="summary.outstandingAmount > 0">
+              <div>
+                <p class="type-caption">Outstanding</p>
+                <p
+                  class="mt-1 text-lg font-bold tabular-nums"
+                  [class.text-error]="summary.outstandingAmount > 0"
+                >
                   {{ formatCurrency(getOutstandingAbs(summary)) }}
-                </div>
+                </p>
               </div>
             }
             @if (summary.isCreditApproved && summary.creditLimit > 0) {
-              <div class="stat bg-base-200/50 rounded-lg p-3">
-                <div class="stat-title text-xs">Available</div>
-                <div class="stat-value text-sm">
+              <div>
+                <p class="type-caption">Available</p>
+                <p class="mt-1 text-lg font-bold tabular-nums">
                   {{ formatCurrency(summary.availableCredit) }}
-                </div>
+                </p>
               </div>
             }
           </div>

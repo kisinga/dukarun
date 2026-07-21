@@ -15,8 +15,13 @@ import { toDisplayDate } from '../../shared/utils/date.util';
 import { HoverPreviewHostComponent } from '../../shared/components/dashboard/hover-preview-host/hover-preview-host.component';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 import { ListSearchBarComponent } from '../../shared/components/dashboard/list-search-bar.component';
+import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
 import { PaginationComponent } from '../../shared/components/dashboard/pagination.component';
 import { ADJUSTMENT_REASONS } from './components/stock-adjustment-form-fields.component';
+import {
+  StockAdjustmentStats,
+  StockAdjustmentStatsComponent,
+} from './components/stock-adjustment-stats.component';
 
 @Component({
   selector: 'app-stock-adjustments',
@@ -27,7 +32,9 @@ import { ADJUSTMENT_REASONS } from './components/stock-adjustment-form-fields.co
     HoverPreviewHostComponent,
     PageHeaderComponent,
     ListSearchBarComponent,
+    EmptyStateComponent,
     PaginationComponent,
+    StockAdjustmentStatsComponent,
   ],
   templateUrl: './stock-adjustments.component.html',
   styleUrl: './stock-adjustments.component.scss',
@@ -59,6 +66,19 @@ export class StockAdjustmentsComponent implements OnInit {
   readonly showRecordedSuccess = computed(() => this.queryParams()['recorded'] === '1');
 
   readonly reasonOptions = ADJUSTMENT_REASONS;
+
+  /**
+   * Header stats derived from already-loaded client data only: the service's
+   * total count plus a this-month count over the currently loaded page.
+   */
+  readonly stats = computed((): StockAdjustmentStats => {
+    const now = new Date();
+    const thisMonthAdjustments = this.adjustments().filter((a) => {
+      const d = new Date(a.createdAt);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+    return { totalAdjustments: this.totalItems(), thisMonthAdjustments };
+  });
 
   readonly totalPages = computed(() => {
     const total = this.totalItems();

@@ -71,7 +71,7 @@
           >
             {{ getAmountForPeriod(category) }}
           </p>
-          <p class="mt-0.5 text-[0.625rem] text-base-content/40 tabular-nums truncate">
+          <p class="mt-0.5 text-xs text-base-content/40 tabular-nums truncate">
             @for (stat of getSecondaryStats(category); track stat.period) {
               <span class="mr-2">{{ stat.label }} {{ stat.amount }}</span>
             }
@@ -108,7 +108,7 @@
                   <div class="flex items-center justify-between px-4 py-2.5">
                     <div class="flex items-center gap-2">
                       <span
-                        class="w-6 h-6 rounded-md text-[10px] font-bold flex items-center justify-center"
+                        class="w-6 h-6 rounded-md text-xs font-bold flex items-center justify-center"
                         [class.bg-success/10]="category.type === 'sales'"
                         [class.text-success]="category.type === 'sales'"
                         [class.bg-info/10]="category.type === 'purchases'"
@@ -210,7 +210,7 @@
             class="stat-value text-left text-warning hover:opacity-80"
             (click)="navigateToLowStock()"
           >
-            {{ lowStockCount() }} <span class="text-sm font-normal text-base-content/40">→</span>
+            {{ lowStockCount() }} <ng-icon name="heroArrowRight" size="0.875rem" class="inline" />
           </button>
         } @else {
           <p class="stat-value text-success">0</p>
@@ -225,7 +225,7 @@
             (click)="navigateToExpiringSoon()"
           >
             {{ expiringSoonCount() }}
-            <span class="text-sm font-normal text-base-content/40">→</span>
+            <ng-icon name="heroArrowRight" size="0.875rem" class="inline" />
           </button>
         } @else {
           <p class="stat-value text-success">0</p>
@@ -239,7 +239,7 @@
             class="stat-value text-left text-error hover:opacity-80"
             (click)="navigateToExpired()"
           >
-            {{ expiredCount() }} <span class="text-sm font-normal text-base-content/40">→</span>
+            {{ expiredCount() }} <ng-icon name="heroArrowRight" size="0.875rem" class="inline" />
           </button>
         } @else {
           <p class="stat-value text-success">0</p>
@@ -252,7 +252,7 @@
             <div class="skeleton h-7 w-24 rounded mt-1"></div>
           } @else if (stockValueStats(); as sv) {
             <p class="stat-value truncate">{{ currencyService.format(sv.retail) }}</p>
-            <p class="mt-0.5 text-[0.625rem] text-base-content/40 tabular-nums truncate">
+            <p class="mt-0.5 text-xs text-base-content/40 tabular-nums truncate">
               whl {{ currencyService.format(sv.wholesale) }} · cost
               {{ currencyService.format(sv.cost) }}
             </p>

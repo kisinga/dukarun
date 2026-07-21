@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { HoverPreviewHostComponent } from '../../../shared/components/dashboard/hover-preview-host/hover-preview-host.component';
@@ -17,6 +18,7 @@ export type PaymentAction = 'view' | 'viewOrder';
   selector: 'app-payment-card',
   imports: [
     CommonModule,
+    NgIcon,
     RouterLink,
     HoverPreviewHostComponent,
     PaymentStateBadgeComponent,
@@ -34,20 +36,7 @@ export type PaymentAction = 'view' | 'viewOrder';
             <div
               class="w-16 h-16 rounded-lg ring-2 ring-base-300 ring-offset-1 bg-base-200 flex items-center justify-center"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-8 w-8 text-primary"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                />
-              </svg>
+              <ng-icon name="heroCreditCard" size="1.25rem" class="text-primary" />
             </div>
           </div>
 
@@ -90,20 +79,7 @@ export type PaymentAction = 'view' | 'viewOrder';
           <div class="mb-3">
             <h4 class="text-xs font-semibold mb-1.5">Customer</h4>
             <div class="flex items-center gap-2 p-2.5 rounded-lg bg-base-200">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4 text-base-content/50 shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
+              <ng-icon name="heroUser" size="1rem" class="text-base-content/50 shrink-0" />
               @if (payment().order.customer?.id) {
                 <app-hover-preview-host
                   previewKey="customer"
@@ -140,46 +116,14 @@ export type PaymentAction = 'view' | 'viewOrder';
             (click)="onAction('view')"
             class="btn btn-primary btn-sm flex-1 gap-1.5 touch-manipulation"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-              />
-            </svg>
+            <ng-icon name="heroEye" size="1rem" />
             View
           </button>
           <button
             (click)="onAction('viewOrder')"
             class="btn btn-outline btn-sm flex-1 gap-1.5 touch-manipulation"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
+            <ng-icon name="heroDocumentText" size="1rem" />
             Order
           </button>
         </div>

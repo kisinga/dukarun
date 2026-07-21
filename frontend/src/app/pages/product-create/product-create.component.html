@@ -5,24 +5,14 @@
   @if (isReady()) {
     <div class="max-w-lg lg:max-w-xl mx-auto" [formGroup]="productForm">
       <!-- Desktop card wrapper -->
-      <div
-        class="lg:bg-base-100 lg:rounded-2xl lg:shadow-lg lg:border lg:border-base-300/50 lg:p-6"
-      >
+      <div class="lg:bg-base-100 lg:rounded-2xl lg:border lg:border-base-300/50 lg:p-6">
         <!-- Header -->
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-3">
             <div
               class="hidden lg:flex w-10 h-10 rounded-xl bg-primary/10 items-center justify-center"
             >
-              <svg
-                class="w-5 h-5 text-primary"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
+              <ng-icon name="heroPlus" size="1.25rem" class="text-primary" />
             </div>
             <div>
               <h2 class="text-base sm:text-lg lg:text-xl font-semibold">
@@ -157,15 +147,7 @@
             <!-- Validation feedback -->
             @if (submitError() && currentStage() === 1) {
               <div class="alert alert-warning py-2">
-                <svg
-                  class="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <ng-icon name="heroExclamationCircle" size="1rem" />
                 <span class="text-xs">{{ submitError() }}</span>
               </div>
             }
@@ -177,15 +159,7 @@
               (click)="goToStage2()"
             >
               Continue
-              <svg
-                class="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
+              <ng-icon name="heroChevronRight" size="1rem" />
             </button>
           </div>
         }

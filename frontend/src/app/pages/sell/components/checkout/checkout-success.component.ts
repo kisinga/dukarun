@@ -10,11 +10,12 @@ import {
   signal,
 } from '@angular/core';
 import { CurrencyService } from '../../../../shared/services/currency.service';
+import { NgIcon } from '@ng-icons/core';
 
 @Component({
   selector: 'app-checkout-success',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   styles: [
     `
       .success-overlay {
@@ -53,17 +54,12 @@ import { CurrencyService } from '../../../../shared/services/currency.service';
                 class="absolute inset-0 rounded-full border-2 sm:border-4 md:border-6 border-success/40 success-rotate-glow"
               ></div>
 
-              <!-- Checkmark SVG with Draw Animation -->
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="w-16 h-16 sm:w-24 sm:h-24 md:w-28 md:h-28 text-success relative z-10 success-checkmark-draw success-checkmark-bounce"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2.5"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
+              <!-- Checkmark icon with bounce animation -->
+              <ng-icon
+                name="heroCheck"
+                size="2.5rem"
+                class="text-success relative z-10 success-checkmark-bounce"
+              />
             </div>
 
             <!-- Particle Effects -->
@@ -82,12 +78,8 @@ import { CurrencyService } from '../../../../shared/services/currency.service';
 
           <!-- Success Message with Fade In -->
           <div class="text-center space-y-2 sm:space-y-3 md:space-y-4 success-message">
-            <h2
-              class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-base-content leading-tight"
-            >
-              Order Confirmed!
-            </h2>
-            <p class="text-sm sm:text-base md:text-lg lg:text-xl text-base-content/60 px-2">
+            <h2 class="type-title text-base-content">Order Confirmed!</h2>
+            <p class="type-body text-base-content/60 px-2">
               {{ paymentMethod() }}
             </p>
           </div>
@@ -95,14 +87,8 @@ import { CurrencyService } from '../../../../shared/services/currency.service';
           <!-- Payment Amount with Counting Animation -->
           @if (amount()) {
             <div class="text-center success-amount">
-              <div
-                class="text-xs sm:text-sm md:text-base lg:text-lg text-base-content/60 mb-1.5 sm:mb-2 md:mb-3"
-              >
-                Total Amount
-              </div>
-              <div
-                class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-success text-tabular success-amount-value leading-none"
-              >
+              <div class="type-caption mb-1.5 sm:mb-2">Total Amount</div>
+              <div class="type-hero text-success success-amount-value">
                 {{ currencyService.format(animatedAmount()) }}
               </div>
             </div>

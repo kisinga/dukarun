@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { NgIcon } from '@ng-icons/core';
 import { AuthService } from '@dukarun/auth';
 import { CompanyService } from '@dukarun/company';
 import { NotificationService } from '@dukarun/notification';
@@ -16,7 +17,7 @@ interface ActivityLog {
 
 @Component({
   selector: 'app-notification-test',
-  imports: [CommonModule],
+  imports: [CommonModule, NgIcon],
   templateUrl: './notification-test.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -50,10 +51,15 @@ export class NotificationTestComponent {
   readonly activityLog = this.activityLogSignal.asReadonly();
 
   readonly testScenarios = [
-    { type: 'ORDER', label: 'Order', icon: '💰', description: 'Test order notifications' },
-    { type: 'STOCK', label: 'Stock', icon: '📦', description: 'Test stock alerts' },
-    { type: 'ML_TRAINING', label: 'ML', icon: '🤖', description: 'Test ML updates' },
-    { type: 'PAYMENT', label: 'Payment', icon: '💳', description: 'Test payments' },
+    {
+      type: 'ORDER',
+      label: 'Order',
+      icon: 'heroShoppingBag',
+      description: 'Test order notifications',
+    },
+    { type: 'STOCK', label: 'Stock', icon: 'heroCube', description: 'Test stock alerts' },
+    { type: 'ML_TRAINING', label: 'ML', icon: 'heroCpuChip', description: 'Test ML updates' },
+    { type: 'PAYMENT', label: 'Payment', icon: 'heroCreditCard', description: 'Test payments' },
   ];
 
   async triggerServerNotification(type: string): Promise<void> {
@@ -69,11 +75,11 @@ export class NotificationTestComponent {
 
       await this.http.get(`/test-notifications/trigger`, { params }).toPromise();
 
-      this.addActivityLog('success', '✅', `${type} notification triggered`);
+      this.addActivityLog('success', 'heroCheckCircle', `${type} notification triggered`);
       this.toastService.show('Notification', `Test ${type} sent`, 'success', 3000);
       this.refreshNotifications();
     } catch (error) {
-      this.addActivityLog('error', '❌', `Failed: ${type}`);
+      this.addActivityLog('error', 'heroXCircle', `Failed: ${type}`);
       this.toastService.show('Error', `Failed: ${error}`, 'error', 5000);
     } finally {
       this.isLoadingSignal.set(false);
@@ -93,11 +99,11 @@ export class NotificationTestComponent {
 
       await this.http.post(`/test-notifications/trigger-all`, payload).toPromise();
 
-      this.addActivityLog('success', '🚀', 'All notifications triggered');
+      this.addActivityLog('success', 'heroCheckCircle', 'All notifications triggered');
       this.toastService.show('Notifications', 'All test notifications sent', 'success', 3000);
       this.refreshNotifications();
     } catch (error) {
-      this.addActivityLog('error', '❌', 'Failed to trigger all');
+      this.addActivityLog('error', 'heroXCircle', 'Failed to trigger all');
       this.toastService.show('Error', `Failed: ${error}`, 'error', 5000);
     } finally {
       this.isLoadingSignal.set(false);
@@ -107,20 +113,20 @@ export class NotificationTestComponent {
   refreshNotifications(): void {
     this.notificationService.loadNotifications();
     this.notificationService.loadUnreadCount();
-    this.addActivityLog('info', '🔄', 'Refreshed');
+    this.addActivityLog('info', 'heroArrowPath', 'Refreshed');
   }
 
   async testPushSubscription(): Promise<void> {
     try {
       if (this.isPushEnabled()) {
         await this.notificationService.unsubscribeToPush();
-        this.addActivityLog('info', '📱', 'Push unsubscribed');
+        this.addActivityLog('info', 'heroDevicePhoneMobile', 'Push unsubscribed');
       } else {
         await this.notificationService.subscribeToPush();
-        this.addActivityLog('success', '📱', 'Push subscribed');
+        this.addActivityLog('success', 'heroDevicePhoneMobile', 'Push subscribed');
       }
     } catch {
-      this.addActivityLog('error', '❌', 'Push toggle failed');
+      this.addActivityLog('error', 'heroXCircle', 'Push toggle failed');
     }
   }
 

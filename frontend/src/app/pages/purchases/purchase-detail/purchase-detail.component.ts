@@ -25,6 +25,7 @@ import { PurchaseSupplierInfoComponent } from './components/purchase-supplier-in
 import { PurchaseItemsTableComponent } from './components/purchase-items-table.component';
 import { PurchaseTotalsComponent } from './components/purchase-totals.component';
 import { PurchasePaymentInfoComponent } from './components/purchase-payment-info.component';
+import { PageHeaderComponent } from '../../../shared/components/dashboard/page-header.component';
 
 /**
  * Purchase Detail Component (Container)
@@ -44,6 +45,7 @@ import { PurchasePaymentInfoComponent } from './components/purchase-payment-info
     CommonModule,
     RouterModule,
     NgIcon,
+    PageHeaderComponent,
     PurchaseDetailHeaderComponent,
     PurchaseSupplierInfoComponent,
     PurchaseItemsTableComponent,

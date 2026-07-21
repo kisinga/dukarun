@@ -13,10 +13,12 @@ import { CurrencyService } from '../../shared/services/currency.service';
 import { CustomerService, CreditCustomerSummary } from '@dukarun/customer';
 import { SupplierService } from '@dukarun/supplier';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
+import { ListSearchBarComponent } from '../../shared/components/dashboard/list-search-bar.component';
 import {
   StatBarComponent,
   type StatItem,
 } from '../../shared/components/dashboard/stat-bar.component';
+import { EmptyStateComponent } from '../../shared/components/dashboard/empty-state.component';
 
 type CreditMode = 'receivables' | 'payables';
 
@@ -44,7 +46,14 @@ interface CreditParty {
 @Component({
   selector: 'app-credit',
   standalone: true,
-  imports: [RouterLink, NgIcon, PageHeaderComponent, StatBarComponent],
+  imports: [
+    RouterLink,
+    NgIcon,
+    PageHeaderComponent,
+    ListSearchBarComponent,
+    StatBarComponent,
+    EmptyStateComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-5 lg:space-y-6">
@@ -54,7 +63,9 @@ interface CreditParty {
         [subtitle]="subtitle()"
         [isLoading]="isLoading()"
         (refresh)="reload()"
-      />
+      >
+        <app-stat-bar header-stats [stats]="statItems()" (select)="onStatSelect($event)" />
+      </app-page-header>
 
       @if (!hasPermission()) {
         <div role="alert" class="alert alert-warning">
@@ -62,37 +73,37 @@ interface CreditParty {
           <span>You need credit management permissions to access this page.</span>
         </div>
       } @else {
-        <!-- Toggle (left) + summary stats fill the space to the right -->
-        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-          <div class="join">
-            <button
-              type="button"
-              class="join-item btn btn-sm sm:btn-md"
-              [class.btn-active]="mode() === 'receivables'"
-              [class.btn-primary]="mode() === 'receivables'"
-              (click)="setMode('receivables')"
-            >
-              <ng-icon name="heroUsers" size="1rem" />
-              Receivables · Customers
-            </button>
-            <button
-              type="button"
-              class="join-item btn btn-sm sm:btn-md"
-              [class.btn-active]="mode() === 'payables'"
-              [class.btn-primary]="mode() === 'payables'"
-              (click)="setMode('payables')"
-            >
-              <ng-icon name="heroTruck" size="1rem" />
-              Payables · Suppliers
-            </button>
-          </div>
-          <app-stat-bar [stats]="statItems()" (select)="onStatSelect($event)" />
+        <!-- Receivables / Payables switch -->
+        <div class="join">
+          <button
+            type="button"
+            class="join-item btn btn-sm sm:btn-md"
+            [class.btn-active]="mode() === 'receivables'"
+            [class.btn-primary]="mode() === 'receivables'"
+            (click)="setMode('receivables')"
+          >
+            <ng-icon name="heroUsers" size="1rem" />
+            Receivables · Customers
+          </button>
+          <button
+            type="button"
+            class="join-item btn btn-sm sm:btn-md"
+            [class.btn-active]="mode() === 'payables'"
+            [class.btn-primary]="mode() === 'payables'"
+            (click)="setMode('payables')"
+          >
+            <ng-icon name="heroTruck" size="1rem" />
+            Payables · Suppliers
+          </button>
         </div>
 
-        <!-- Filters + search -->
-        <div class="flex flex-col gap-2 sm:gap-3">
+        <!-- Search + active filter badges -->
+        <app-list-search-bar
+          [(searchQuery)]="searchTerm"
+          [placeholder]="'Search by ' + partyNoun() + ' name or phone…'"
+        >
           @if (approvedFilter() || outstandingFilter()) {
-            <div class="flex flex-wrap gap-2">
+            <div badges class="flex flex-wrap gap-2">
               @if (approvedFilter()) {
                 <span class="badge badge-success gap-1">
                   On credit
@@ -121,15 +132,7 @@ interface CreditParty {
               }
             </div>
           }
-
-          <input
-            type="text"
-            class="input input-bordered w-full"
-            [placeholder]="'Search by ' + partyNoun() + ' name or phone…'"
-            [value]="searchTerm()"
-            (input)="searchTerm.set($any($event.target).value)"
-          />
-        </div>
+        </app-list-search-bar>
 
         <!-- Loading -->
         @if (isLoading()) {
@@ -141,31 +144,26 @@ interface CreditParty {
           </div>
         } @else if (filteredParties().length === 0) {
           <!-- Empty -->
-          <div class="card bg-base-100 shadow-sm border border-base-300/60">
-            <div class="card-body items-center text-center py-12 lg:py-16">
-              <div class="w-16 h-16 rounded-full bg-base-200 flex items-center justify-center">
-                <ng-icon name="heroCreditCard" size="2rem" class="text-base-content/30" />
-              </div>
-              <h3 class="text-base font-semibold mt-4">No {{ partyNoun() }}s found</h3>
-              <p class="text-sm text-base-content/60 mt-1 max-w-md">
-                {{
-                  searchTerm()
-                    ? 'Try adjusting your search.'
-                    : 'No ' + partyNoun() + 's with credit data yet.'
-                }}
-              </p>
-              @if (searchTerm()) {
-                <button (click)="searchTerm.set('')" class="btn btn-outline btn-sm mt-4">
-                  Clear search
-                </button>
-              }
-            </div>
-          </div>
+          <app-empty-state
+            icon="heroCreditCard"
+            [title]="'No ' + partyNoun() + 's found'"
+            [description]="
+              searchTerm()
+                ? 'Try adjusting your search.'
+                : 'No ' + partyNoun() + 's with credit data yet.'
+            "
+          >
+            @if (searchTerm()) {
+              <button actions (click)="searchTerm.set('')" class="btn btn-outline btn-sm">
+                Clear search
+              </button>
+            }
+          </app-empty-state>
         } @else {
           <!-- Mobile cards -->
           <div class="lg:hidden space-y-3">
             @for (party of filteredParties(); track party.id) {
-              <div class="card bg-base-100 shadow-sm border border-base-300/60 rounded-2xl">
+              <div class="card bg-base-100 shadow-sm border border-base-300/60 rounded-box">
                 <div class="card-body p-4 gap-0">
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">

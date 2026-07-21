@@ -3,35 +3,11 @@
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
       <h3 class="font-bold text-lg flex items-center gap-2">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path
-            fill-rule="evenodd"
-            d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-            clip-rule="evenodd"
-          />
-        </svg>
+        <ng-icon name="heroUser" size="1.25rem" />
         User Details
       </h3>
       <button class="btn btn-ghost btn-sm btn-circle" (click)="close()" aria-label="Close">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M6 18L18 6M6 6l12 12"
-          />
-        </svg>
+        <ng-icon name="heroXMark" size="1.25rem" />
       </button>
     </div>
 
@@ -47,18 +23,7 @@
       <!-- Error State -->
       @if (error() && !user()) {
         <div role="alert" class="alert alert-error py-2 mb-4">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-              clip-rule="evenodd"
-            />
-          </svg>
+          <ng-icon name="heroExclamationCircle" size="1.25rem" class="shrink-0" />
           <span class="flex-1 text-sm">{{ error() }}</span>
           <button (click)="usersService.clearError()" class="btn btn-xs">Dismiss</button>
         </div>

@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 
 const SETTINGS_TABS: { path: string; label: string }[] = [
   { path: 'notifications', label: 'Notifications' },
@@ -10,7 +11,7 @@ const SETTINGS_TABS: { path: string; label: string }[] = [
 @Component({
   selector: 'app-settings-layout',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet, PageHeaderComponent],
   templateUrl: './settings-layout.component.html',
   styleUrl: './settings-layout.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

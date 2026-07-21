@@ -16,7 +16,7 @@ a,
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: oklch(var(--bc) / 0.5);
+  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
 }
 .stat-value {
   font-size: 1.25rem;
