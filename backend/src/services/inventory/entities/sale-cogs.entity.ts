@@ -34,4 +34,8 @@ export class SaleCogs {
 
   @Column('varchar', { length: 32, default: 'fifo' })
   source!: string;
+
+  /** Set when the order is reversed; voided rows are excluded from analytics but kept for audit. */
+  @Column({ type: 'timestamp', nullable: true })
+  voidedAt!: Date | null;
 }

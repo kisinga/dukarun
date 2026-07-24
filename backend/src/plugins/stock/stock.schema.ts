@@ -53,6 +53,14 @@ export const STOCK_ADMIN_SCHEMA = gql`
     newStock: Float!
     stockLocationId: ID!
     stockLocation: StockLocation
+    "Batch the adjustment applied to (UUID), when a specific batch was used"
+    batchId: String
+    "Unit cost in cents captured at adjustment time (null when unknown/mixed)"
+    unitCostCents: Int
+    "Signed change in batch valuation for this line, in cents"
+    totalCostCents: Int
+    "Per-batch cost breakdown: [{ batchId, quantity, unitCostCents, totalCostCents }]"
+    allocations: JSON
   }
 
   type StockPurchaseList {
@@ -112,9 +120,15 @@ export const STOCK_ADMIN_SCHEMA = gql`
     quantityChange: Float!
     stockLocationId: ID!
     """
-    When multiple open batches exist, required to select which batch to apply to. UUID (use String!, not ID!, per GRAPHQL_IDS_AND_UUIDS.md).
+    Selects which open batch an increase merges into. Without batchId (and without unitCost),
+    the most recent batch is used. UUID (use String!, not ID!, per GRAPHQL_IDS_AND_UUIDS.md).
     """
     batchId: String
+    """
+    Unit cost in cents for increases. When it differs from the target batch's cost, a new batch
+    is created at this cost (costs are never blended). Required when the variant has no stock.
+    """
+    unitCost: Int
   }
 
   input PurchaseListOptions {

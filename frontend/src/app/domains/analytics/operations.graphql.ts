@@ -1,4 +1,5 @@
 import { graphql } from '../../shared/graphql/generated';
+import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core';
 
 export const GET_ORDERS_FOR_PERIOD = graphql(`
   query GetOrdersForPeriod($startDate: DateTime!) {
@@ -249,3 +250,244 @@ export const REFRESH_ANALYTICS = graphql(`
     refreshAnalytics
   }
 `);
+
+/**
+ * Period profit (tax-exclusive revenue vs FIFO COGS, minus expenses and inventory losses).
+ * Not part of the codegen-typed documents (schema addition postdates the last codegen run);
+ * ships as a precompiled AST document, same pattern as the order margin operations.
+ */
+export interface PeriodProfit {
+  netRevenueCents: number;
+  cogsCents: number;
+  grossMarginCents: number;
+  expensesCents: number;
+  expenseBreakdown: Array<{ label: string; value: number; icon: string }>;
+  inventoryLossesCents: number;
+  netProfitCents: number;
+  unreliableOrderCount: number;
+  basis: string;
+}
+
+export interface GetPeriodProfitResult {
+  periodProfit: PeriodProfit;
+}
+
+export const GET_PERIOD_PROFIT = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: {
+        kind: 'Name',
+        value: 'GetPeriodProfit',
+      },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: {
+            kind: 'Variable',
+            name: {
+              kind: 'Name',
+              value: 'startDate',
+            },
+          },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: {
+                kind: 'Name',
+                value: 'DateTime',
+              },
+            },
+          },
+          directives: [],
+        },
+        {
+          kind: 'VariableDefinition',
+          variable: {
+            kind: 'Variable',
+            name: {
+              kind: 'Name',
+              value: 'endDate',
+            },
+          },
+          type: {
+            kind: 'NonNullType',
+            type: {
+              kind: 'NamedType',
+              name: {
+                kind: 'Name',
+                value: 'DateTime',
+              },
+            },
+          },
+          directives: [],
+        },
+      ],
+      directives: [],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: {
+              kind: 'Name',
+              value: 'periodProfit',
+            },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: {
+                  kind: 'Name',
+                  value: 'startDate',
+                },
+                value: {
+                  kind: 'Variable',
+                  name: {
+                    kind: 'Name',
+                    value: 'startDate',
+                  },
+                },
+              },
+              {
+                kind: 'Argument',
+                name: {
+                  kind: 'Name',
+                  value: 'endDate',
+                },
+                value: {
+                  kind: 'Variable',
+                  name: {
+                    kind: 'Name',
+                    value: 'endDate',
+                  },
+                },
+              },
+            ],
+            directives: [],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: {
+                    kind: 'Name',
+                    value: 'netRevenueCents',
+                  },
+                  arguments: [],
+                  directives: [],
+                },
+                {
+                  kind: 'Field',
+                  name: {
+                    kind: 'Name',
+                    value: 'cogsCents',
+                  },
+                  arguments: [],
+                  directives: [],
+                },
+                {
+                  kind: 'Field',
+                  name: {
+                    kind: 'Name',
+                    value: 'grossMarginCents',
+                  },
+                  arguments: [],
+                  directives: [],
+                },
+                {
+                  kind: 'Field',
+                  name: {
+                    kind: 'Name',
+                    value: 'expensesCents',
+                  },
+                  arguments: [],
+                  directives: [],
+                },
+                {
+                  kind: 'Field',
+                  name: {
+                    kind: 'Name',
+                    value: 'expenseBreakdown',
+                  },
+                  arguments: [],
+                  directives: [],
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      {
+                        kind: 'Field',
+                        name: {
+                          kind: 'Name',
+                          value: 'label',
+                        },
+                        arguments: [],
+                        directives: [],
+                      },
+                      {
+                        kind: 'Field',
+                        name: {
+                          kind: 'Name',
+                          value: 'value',
+                        },
+                        arguments: [],
+                        directives: [],
+                      },
+                      {
+                        kind: 'Field',
+                        name: {
+                          kind: 'Name',
+                          value: 'icon',
+                        },
+                        arguments: [],
+                        directives: [],
+                      },
+                    ],
+                  },
+                },
+                {
+                  kind: 'Field',
+                  name: {
+                    kind: 'Name',
+                    value: 'inventoryLossesCents',
+                  },
+                  arguments: [],
+                  directives: [],
+                },
+                {
+                  kind: 'Field',
+                  name: {
+                    kind: 'Name',
+                    value: 'netProfitCents',
+                  },
+                  arguments: [],
+                  directives: [],
+                },
+                {
+                  kind: 'Field',
+                  name: {
+                    kind: 'Name',
+                    value: 'unreliableOrderCount',
+                  },
+                  arguments: [],
+                  directives: [],
+                },
+                {
+                  kind: 'Field',
+                  name: {
+                    kind: 'Name',
+                    value: 'basis',
+                  },
+                  arguments: [],
+                  directives: [],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetPeriodProfitResult, { startDate: string; endDate: string }>;

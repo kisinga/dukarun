@@ -146,6 +146,8 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
         expect.objectContaining({
           movementType: 'ADJUSTMENT',
           quantity: 10,
+          unitCostCents: 1000,
+          totalCostCents: 10000,
           batchId: 'batch-1',
         })
       );
@@ -318,10 +320,73 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
         expect.objectContaining({ valueChangeCents: -25000 })
       );
     });
+
+    it('decrease: persists one ADJUSTMENT movement per batch under the plain adjustment id', async () => {
+      const { service, inventoryStore } = buildService();
+      const batchOlder = makeBatch({
+        id: 'batch-old',
+        quantity: 10,
+        createdAt: new Date('2025-01-01'),
+      });
+      const batchNewer = makeBatch({
+        id: 'batch-new',
+        quantity: 40,
+        createdAt: new Date('2025-03-01'),
+      });
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([
+        batchOlder,
+        batchNewer,
+      ]);
+      (inventoryStore.updateBatchQuantity as any).mockResolvedValue({});
+      (inventoryStore.createMovement as any).mockImplementation((_ctx: any, input: any) =>
+        Promise.resolve({ id: `mov-${input.batchId}`, ...input })
+      );
+
+      const result = await service.applyAdjustmentToBatches(ctx, {
+        ...baseInput,
+        quantityChange: -25,
+      });
+
+      // Both FIFO deductions persist their own movement — not just the first one.
+      // Rows are distinguished by the batchId column, not by the sourceId string.
+      expect(inventoryStore.createMovement).toHaveBeenCalledTimes(2);
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          movementType: 'ADJUSTMENT',
+          quantity: -10,
+          unitCostCents: 1000,
+          totalCostCents: -10000,
+          batchId: 'batch-old',
+          sourceType: 'StockAdjustment',
+          sourceId: 'adj-1',
+        })
+      );
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          movementType: 'ADJUSTMENT',
+          quantity: -15,
+          unitCostCents: 1000,
+          totalCostCents: -15000,
+          batchId: 'batch-new',
+          sourceType: 'StockAdjustment',
+          sourceId: 'adj-1',
+        })
+      );
+
+      // Result carries the per-allocation cost breakdown
+      expect(result.valueChangeCents).toBe(-25000);
+      expect(result.allocations).toEqual([
+        { batchId: 'batch-old', quantity: -10, unitCost: 1000, totalCost: -10000 },
+        { batchId: 'batch-new', quantity: -15, unitCost: 1000, totalCost: -15000 },
+      ]);
+    });
   });
 
   describe('no batches', () => {
-    it('increase: creates a zero-cost batch', async () => {
+    it('increase: creates a zero-cost batch when allowZeroCost is set', async () => {
       const { service, inventoryStore, ledgerPostingService } = buildService();
       const newBatch = makeBatch({ id: 'new-batch', unitCost: 0, sourceType: 'StockAdjustment' });
 
@@ -332,6 +397,7 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
       const result = await service.applyAdjustmentToBatches(ctx, {
         ...baseInput,
         quantityChange: 20,
+        allowZeroCost: true,
       });
 
       expect(result.previousStock).toBe(0);
@@ -342,6 +408,7 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
           quantity: 20,
           unitCost: 0,
           sourceType: 'StockAdjustment',
+          metadata: { costEstimated: true },
         })
       );
       expect(ledgerPostingService.postInventoryAdjustment).toHaveBeenCalledWith(
@@ -349,6 +416,135 @@ describe('InventoryService — applyAdjustmentToBatches', () => {
         'StockAdjustment:adj-1:3:2',
         expect.objectContaining({ valueChangeCents: 0 })
       );
+    });
+
+    it('increase: throws when no unitCost is given and allowZeroCost is not set', async () => {
+      const { service, inventoryStore } = buildService();
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([]);
+
+      await expect(
+        service.applyAdjustmentToBatches(ctx, {
+          ...baseInput,
+          quantityChange: 20,
+        })
+      ).rejects.toThrow(UserInputError);
+      expect(inventoryStore.createBatch).not.toHaveBeenCalled();
+    });
+
+    it('increase: creates a batch at the user-supplied cost', async () => {
+      const { service, inventoryStore, ledgerPostingService } = buildService();
+      const newBatch = makeBatch({ id: 'new-batch', unitCost: 2500, sourceType: 'StockAdjustment' });
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([]);
+      (inventoryStore.createBatch as any).mockResolvedValue(newBatch);
+      (inventoryStore.createMovement as any).mockResolvedValue({});
+
+      const result = await service.applyAdjustmentToBatches(ctx, {
+        ...baseInput,
+        quantityChange: 20,
+        unitCost: 2500,
+      });
+
+      expect(result.newStock).toBe(20);
+      expect(result.valueChangeCents).toBe(50000);
+      expect(result.allocations).toEqual([
+        { batchId: 'new-batch', quantity: 20, unitCost: 2500, totalCost: 50000 },
+      ]);
+      expect(inventoryStore.createBatch).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({ quantity: 20, unitCost: 2500, sourceType: 'StockAdjustment' })
+      );
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          movementType: 'ADJUSTMENT',
+          quantity: 20,
+          unitCostCents: 2500,
+          totalCostCents: 50000,
+          batchId: 'new-batch',
+        })
+      );
+      expect(ledgerPostingService.postInventoryAdjustment).toHaveBeenCalledWith(
+        ctx,
+        'StockAdjustment:adj-1:3:2',
+        expect.objectContaining({ valueChangeCents: 50000 })
+      );
+    });
+  });
+
+  describe('user-supplied cost', () => {
+    it('equal to batch cost: merges into the batch', async () => {
+      const { service, inventoryStore } = buildService();
+      const batch = makeBatch({ id: 'batch-1', unitCost: 1000 });
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([batch]);
+      (inventoryStore.updateBatchQuantity as any).mockResolvedValue({ ...batch, quantity: 60 });
+      (inventoryStore.createMovement as any).mockResolvedValue({});
+
+      const result = await service.applyAdjustmentToBatches(ctx, {
+        ...baseInput,
+        quantityChange: 10,
+        unitCost: 1000,
+      });
+
+      expect(result.batchId).toBe('batch-1');
+      expect(result.valueChangeCents).toBe(10000);
+      expect(inventoryStore.updateBatchQuantity).toHaveBeenCalledWith(ctx, 'batch-1', 10);
+      expect(inventoryStore.createBatch).not.toHaveBeenCalled();
+    });
+
+    it('different from batch cost: creates a new batch (never blends)', async () => {
+      const { service, inventoryStore } = buildService();
+      const batch = makeBatch({ id: 'batch-1', unitCost: 1000 });
+      const newBatch = makeBatch({ id: 'new-batch', unitCost: 1500, sourceType: 'StockAdjustment' });
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([batch]);
+      (inventoryStore.createBatch as any).mockResolvedValue(newBatch);
+      (inventoryStore.createMovement as any).mockResolvedValue({});
+
+      const result = await service.applyAdjustmentToBatches(ctx, {
+        ...baseInput,
+        quantityChange: 10,
+        unitCost: 1500,
+      });
+
+      expect(result.batchId).toBe('new-batch');
+      expect(result.valueChangeCents).toBe(15000);
+      expect(inventoryStore.updateBatchQuantity).not.toHaveBeenCalled();
+      expect(inventoryStore.createBatch).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({ unitCost: 1500, sourceType: 'StockAdjustment' })
+      );
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          unitCostCents: 1500,
+          totalCostCents: 15000,
+          batchId: 'new-batch',
+        })
+      );
+    });
+
+    it('multiple open batches + user cost + no batchId: creates a new batch instead of auto-selecting', async () => {
+      const { service, inventoryStore } = buildService();
+      const batch1 = makeBatch({ id: 'batch-1', quantity: 30 });
+      const batch2 = makeBatch({ id: 'batch-2', quantity: 20, createdAt: new Date('2025-02-01') });
+      const newBatch = makeBatch({ id: 'new-batch', unitCost: 1500, sourceType: 'StockAdjustment' });
+
+      (inventoryStore.getOpenBatchesForConsumption as any).mockResolvedValue([batch1, batch2]);
+      (inventoryStore.createBatch as any).mockResolvedValue(newBatch);
+      (inventoryStore.createMovement as any).mockResolvedValue({});
+
+      const result = await service.applyAdjustmentToBatches(ctx, {
+        ...baseInput,
+        quantityChange: 10,
+        unitCost: 1500,
+      });
+
+      expect(result.batchId).toBe('new-batch');
+      expect(inventoryStore.updateBatchQuantity).not.toHaveBeenCalled();
+      expect(inventoryStore.createBatch).toHaveBeenCalled();
     });
   });
 

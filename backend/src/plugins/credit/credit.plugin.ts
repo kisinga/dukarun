@@ -55,6 +55,8 @@ import {
 } from './permissions';
 import { OrderReversalApprovalSubscriber } from './order-reversal-approval.subscriber';
 import { OrderReversalResolver } from './order-reversal.resolver';
+import { OrderMarginResolver } from './order-margin.resolver';
+import { OrderMarginService } from '../../services/orders/order-margin.service';
 import { PaymentReversalResolver } from './payment-reversal.resolver';
 import { PaymentReversalService } from '../../services/payments/payment-reversal.service';
 import { ManageSupplierCreditPurchasesPermission } from './supplier-credit.permissions';
@@ -345,6 +347,26 @@ const COMBINED_SCHEMA = gql`
     True when the order is unpaid, has a dueDate, and that date has passed.
     """
     isOverdue: Boolean!
+    """
+    Per-order margin: net revenue (tax-exclusive, post-discount, excludes shipping) vs FIFO COGS.
+    reliable=false marks estimates — see unreliableReasons. Amounts in cents.
+    """
+    margin: OrderMargin
+  }
+
+  """
+  Per-order margin breakdown. Amounts in smallest currency unit (cents).
+  """
+  type OrderMargin {
+    netRevenueCents: Int!
+    cogsCents: Int!
+    marginCents: Int!
+    "marginCents / netRevenueCents × 100; null when net revenue is zero"
+    marginPercent: Float
+    "False when the COGS figure is incomplete or estimated"
+    reliable: Boolean!
+    "SKIPPED_COGS | ZERO_COST_BATCH | NO_COGS_DATA"
+    unreliableReasons: [String!]!
   }
 
   """
@@ -441,6 +463,12 @@ const COMBINED_SCHEMA = gql`
     settleOrderPayments(input: SettleOrderPaymentsInput!): SettleOrderPaymentsResult!
     reverseOrder(orderId: ID!): OrderReversalResult!
     voidOrder(orderId: ID!): OrderReversalResult!
+    """
+    Re-run COGS recording for an order marked cogsStatus='skipped' (e.g. after restocking).
+    Returns the freshly computed margin; when stock is still insufficient the order stays
+    skipped and the margin returns with SKIPPED_COGS in unreliableReasons.
+    """
+    retrySkippedCogs(orderId: ID!): OrderMargin!
     reversePayment(paymentId: ID!): PaymentReversalResult!
     overrideCustomerBalance(input: OverrideCustomerBalanceInput!): BalanceOverrideResult!
     sendCustomerStatementEmail(customerId: ID!): Boolean!
@@ -598,6 +626,7 @@ const COMBINED_SCHEMA = gql`
     OrderItemService,
     OrderPaymentService,
     OrderReversalService,
+    OrderMarginService,
     OrderStateService,
     OrderCancellationDetectorSubscriber,
     // Payment services
@@ -611,6 +640,7 @@ const COMBINED_SCHEMA = gql`
     CustomerFieldResolver,
     OrderAmountOwingLoader,
     OrderFieldResolver,
+    OrderMarginResolver,
     CreditPaymentSubscriber,
     OrderReversalApprovalSubscriber,
     PaymentAllocationResolver,
@@ -658,6 +688,7 @@ const COMBINED_SCHEMA = gql`
       CreditResolver,
       CustomerFieldResolver,
       OrderFieldResolver,
+      OrderMarginResolver,
       OrderReversalResolver,
       PaymentReversalResolver,
       PaymentAllocationResolver,

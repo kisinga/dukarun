@@ -3223,12 +3223,20 @@ export type InventoryStockAdjustment = {
 export type InventoryStockAdjustmentLine = {
   __typename?: 'InventoryStockAdjustmentLine';
   adjustmentId: Scalars['ID']['output'];
+  /** Per-batch cost breakdown: [{ batchId, quantity, unitCostCents, totalCostCents }] */
+  allocations?: Maybe<Scalars['JSON']['output']>;
+  /** Batch the adjustment applied to (UUID), when a specific batch was used */
+  batchId?: Maybe<Scalars['String']['output']>;
   id: Scalars['ID']['output'];
   newStock: Scalars['Float']['output'];
   previousStock: Scalars['Float']['output'];
   quantityChange: Scalars['Float']['output'];
   stockLocation?: Maybe<StockLocation>;
   stockLocationId: Scalars['ID']['output'];
+  /** Signed change in batch valuation for this line, in cents */
+  totalCostCents?: Maybe<Scalars['Int']['output']>;
+  /** Unit cost in cents captured at adjustment time (null when unknown/mixed) */
+  unitCostCents?: Maybe<Scalars['Int']['output']>;
   variant?: Maybe<ProductVariant>;
   variantId: Scalars['ID']['output'];
 };
@@ -4300,6 +4308,12 @@ export type Mutation = {
   requestUpdateOTP: OtpResponse;
   reverseOrder: OrderReversalResult;
   reversePayment: PaymentReversalResult;
+  /**
+   * Re-run COGS recording for an order marked cogsStatus='skipped' (e.g. after restocking).
+   * Returns the freshly computed margin; when stock is still insufficient the order stays
+   * skipped and the margin returns with SKIPPED_COGS in unreliableReasons.
+   */
+  retrySkippedCogs: OrderMargin;
   reviewApprovalRequest: ApprovalRequest;
   reviewCashCount: CashDrawerCount;
   /**
@@ -5207,6 +5221,10 @@ export type MutationReversePaymentArgs = {
   paymentId: Scalars['ID']['input'];
 };
 
+export type MutationRetrySkippedCogsArgs = {
+  orderId: Scalars['ID']['input'];
+};
+
 export type MutationReviewApprovalRequestArgs = {
   input: ReviewApprovalRequestInput;
 };
@@ -5788,6 +5806,11 @@ export type Order = Node & {
   /** True when the order is unpaid, has a dueDate, and that date has passed. */
   isOverdue: Scalars['Boolean']['output'];
   lines: Array<OrderLine>;
+  /**
+   * Per-order margin: net revenue (tax-exclusive, post-discount, excludes shipping) vs FIFO COGS.
+   * reliable=false marks estimates — see unreliableReasons. Amounts in cents.
+   */
+  margin?: Maybe<OrderMargin>;
   modifications: Array<OrderModification>;
   nextStates: Array<Scalars['String']['output']>;
   /**
@@ -6012,6 +6035,20 @@ export type OrderListOptions = {
   sort?: InputMaybe<OrderSortParameter>;
   /** Takes n results, for use in pagination */
   take?: InputMaybe<Scalars['Int']['input']>;
+};
+
+/** Per-order margin breakdown. Amounts in smallest currency unit (cents). */
+export type OrderMargin = {
+  __typename?: 'OrderMargin';
+  netRevenueCents: Scalars['Int']['output'];
+  cogsCents: Scalars['Int']['output'];
+  marginCents: Scalars['Int']['output'];
+  /** marginCents / netRevenueCents × 100; null when net revenue is zero */
+  marginPercent?: Maybe<Scalars['Float']['output']>;
+  /** False when the COGS figure is incomplete or estimated */
+  reliable: Scalars['Boolean']['output'];
+  /** SKIPPED_COGS | ZERO_COST_BATCH | NO_COGS_DATA */
+  unreliableReasons: Array<Scalars['String']['output']>;
 };
 
 export type OrderModification = Node & {
@@ -9148,10 +9185,12 @@ export type StockAdjustmentFilterInput = {
 };
 
 export type StockAdjustmentLineInput = {
-  /** When multiple open batches exist, required to select which batch to apply to. UUID (use String!, not ID!, per GRAPHQL_IDS_AND_UUIDS.md). */
+  /** Selects which open batch an increase merges into. Without batchId (and without unitCost), the most recent batch is used. UUID (use String!, not ID!, per GRAPHQL_IDS_AND_UUIDS.md). */
   batchId?: InputMaybe<Scalars['String']['input']>;
   quantityChange: Scalars['Float']['input'];
   stockLocationId: Scalars['ID']['input'];
+  /** Unit cost in cents for increases. When it differs from the target batch's cost, a new batch is created at this cost (costs are never blended). Required when the variant has no stock. */
+  unitCost?: InputMaybe<Scalars['Int']['input']>;
   variantId: Scalars['ID']['input'];
 };
 
@@ -14378,6 +14417,10 @@ export type GetStockAdjustmentsQuery = {
         previousStock: number;
         newStock: number;
         stockLocationId: string;
+        batchId?: string | null;
+        unitCostCents?: number | null;
+        totalCostCents?: number | null;
+        allocations?: any | null;
         variant?: {
           __typename?: 'ProductVariant';
           id: string;
@@ -26728,118 +26771,390 @@ export const RecordStockAdjustmentDocument = {
   ],
 } as unknown as DocumentNode<RecordStockAdjustmentMutation, RecordStockAdjustmentMutationVariables>;
 export const GetStockAdjustmentsDocument = {
-  kind: 'Document',
-  definitions: [
+  "kind": "Document",
+  "definitions": [
     {
-      kind: 'OperationDefinition',
-      operation: 'query',
-      name: { kind: 'Name', value: 'GetStockAdjustments' },
-      variableDefinitions: [
-        {
-          kind: 'VariableDefinition',
-          variable: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
-          type: { kind: 'NamedType', name: { kind: 'Name', value: 'StockAdjustmentListOptions' } },
-        },
-      ],
-      selectionSet: {
-        kind: 'SelectionSet',
-        selections: [
-          {
-            kind: 'Field',
-            name: { kind: 'Name', value: 'stockAdjustments' },
-            arguments: [
-              {
-                kind: 'Argument',
-                name: { kind: 'Name', value: 'options' },
-                value: { kind: 'Variable', name: { kind: 'Name', value: 'options' } },
-              },
-            ],
-            selectionSet: {
-              kind: 'SelectionSet',
-              selections: [
-                {
-                  kind: 'Field',
-                  name: { kind: 'Name', value: 'items' },
-                  selectionSet: {
-                    kind: 'SelectionSet',
-                    selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'reason' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'notes' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'adjustedByUserId' } },
-                      {
-                        kind: 'Field',
-                        name: { kind: 'Name', value: 'adjustedBy' },
-                        selectionSet: {
-                          kind: 'SelectionSet',
-                          selections: [
-                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'identifier' } },
-                          ],
-                        },
-                      },
-                      {
-                        kind: 'Field',
-                        name: { kind: 'Name', value: 'lines' },
-                        selectionSet: {
-                          kind: 'SelectionSet',
-                          selections: [
-                            { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'variantId' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'quantityChange' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'previousStock' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'newStock' } },
-                            { kind: 'Field', name: { kind: 'Name', value: 'stockLocationId' } },
-                            {
-                              kind: 'Field',
-                              name: { kind: 'Name', value: 'variant' },
-                              selectionSet: {
-                                kind: 'SelectionSet',
-                                selections: [
-                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                                  { kind: 'Field', name: { kind: 'Name', value: 'name' } },
-                                  { kind: 'Field', name: { kind: 'Name', value: 'sku' } },
-                                  {
-                                    kind: 'Field',
-                                    name: { kind: 'Name', value: 'product' },
-                                    selectionSet: {
-                                      kind: 'SelectionSet',
-                                      selections: [
-                                        { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                                        { kind: 'Field', name: { kind: 'Name', value: 'name' } },
-                                      ],
-                                    },
-                                  },
-                                ],
-                              },
-                            },
-                            {
-                              kind: 'Field',
-                              name: { kind: 'Name', value: 'stockLocation' },
-                              selectionSet: {
-                                kind: 'SelectionSet',
-                                selections: [
-                                  { kind: 'Field', name: { kind: 'Name', value: 'id' } },
-                                  { kind: 'Field', name: { kind: 'Name', value: 'name' } },
-                                ],
-                              },
-                            },
-                          ],
-                        },
-                      },
-                      { kind: 'Field', name: { kind: 'Name', value: 'createdAt' } },
-                      { kind: 'Field', name: { kind: 'Name', value: 'updatedAt' } },
-                    ],
-                  },
-                },
-                { kind: 'Field', name: { kind: 'Name', value: 'totalItems' } },
-              ],
-            },
-          },
-        ],
+      "kind": "OperationDefinition",
+      "operation": "query",
+      "name": {
+        "kind": "Name",
+        "value": "GetStockAdjustments"
       },
-    },
-  ],
+      "variableDefinitions": [
+        {
+          "kind": "VariableDefinition",
+          "variable": {
+            "kind": "Variable",
+            "name": {
+              "kind": "Name",
+              "value": "options"
+            }
+          },
+          "type": {
+            "kind": "NamedType",
+            "name": {
+              "kind": "Name",
+              "value": "StockAdjustmentListOptions"
+            }
+          },
+          "directives": []
+        }
+      ],
+      "directives": [],
+      "selectionSet": {
+        "kind": "SelectionSet",
+        "selections": [
+          {
+            "kind": "Field",
+            "name": {
+              "kind": "Name",
+              "value": "stockAdjustments"
+            },
+            "arguments": [
+              {
+                "kind": "Argument",
+                "name": {
+                  "kind": "Name",
+                  "value": "options"
+                },
+                "value": {
+                  "kind": "Variable",
+                  "name": {
+                    "kind": "Name",
+                    "value": "options"
+                  }
+                }
+              }
+            ],
+            "directives": [],
+            "selectionSet": {
+              "kind": "SelectionSet",
+              "selections": [
+                {
+                  "kind": "Field",
+                  "name": {
+                    "kind": "Name",
+                    "value": "items"
+                  },
+                  "arguments": [],
+                  "directives": [],
+                  "selectionSet": {
+                    "kind": "SelectionSet",
+                    "selections": [
+                      {
+                        "kind": "Field",
+                        "name": {
+                          "kind": "Name",
+                          "value": "id"
+                        },
+                        "arguments": [],
+                        "directives": []
+                      },
+                      {
+                        "kind": "Field",
+                        "name": {
+                          "kind": "Name",
+                          "value": "reason"
+                        },
+                        "arguments": [],
+                        "directives": []
+                      },
+                      {
+                        "kind": "Field",
+                        "name": {
+                          "kind": "Name",
+                          "value": "notes"
+                        },
+                        "arguments": [],
+                        "directives": []
+                      },
+                      {
+                        "kind": "Field",
+                        "name": {
+                          "kind": "Name",
+                          "value": "adjustedByUserId"
+                        },
+                        "arguments": [],
+                        "directives": []
+                      },
+                      {
+                        "kind": "Field",
+                        "name": {
+                          "kind": "Name",
+                          "value": "adjustedBy"
+                        },
+                        "arguments": [],
+                        "directives": [],
+                        "selectionSet": {
+                          "kind": "SelectionSet",
+                          "selections": [
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "id"
+                              },
+                              "arguments": [],
+                              "directives": []
+                            },
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "identifier"
+                              },
+                              "arguments": [],
+                              "directives": []
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "Field",
+                        "name": {
+                          "kind": "Name",
+                          "value": "lines"
+                        },
+                        "arguments": [],
+                        "directives": [],
+                        "selectionSet": {
+                          "kind": "SelectionSet",
+                          "selections": [
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "id"
+                              },
+                              "arguments": [],
+                              "directives": []
+                            },
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "variantId"
+                              },
+                              "arguments": [],
+                              "directives": []
+                            },
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "quantityChange"
+                              },
+                              "arguments": [],
+                              "directives": []
+                            },
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "previousStock"
+                              },
+                              "arguments": [],
+                              "directives": []
+                            },
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "newStock"
+                              },
+                              "arguments": [],
+                              "directives": []
+                            },
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "stockLocationId"
+                              },
+                              "arguments": [],
+                              "directives": []
+                            },
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "batchId"
+                              },
+                              "arguments": [],
+                              "directives": []
+                            },
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "unitCostCents"
+                              },
+                              "arguments": [],
+                              "directives": []
+                            },
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "totalCostCents"
+                              },
+                              "arguments": [],
+                              "directives": []
+                            },
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "allocations"
+                              },
+                              "arguments": [],
+                              "directives": []
+                            },
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "variant"
+                              },
+                              "arguments": [],
+                              "directives": [],
+                              "selectionSet": {
+                                "kind": "SelectionSet",
+                                "selections": [
+                                  {
+                                    "kind": "Field",
+                                    "name": {
+                                      "kind": "Name",
+                                      "value": "id"
+                                    },
+                                    "arguments": [],
+                                    "directives": []
+                                  },
+                                  {
+                                    "kind": "Field",
+                                    "name": {
+                                      "kind": "Name",
+                                      "value": "name"
+                                    },
+                                    "arguments": [],
+                                    "directives": []
+                                  },
+                                  {
+                                    "kind": "Field",
+                                    "name": {
+                                      "kind": "Name",
+                                      "value": "sku"
+                                    },
+                                    "arguments": [],
+                                    "directives": []
+                                  },
+                                  {
+                                    "kind": "Field",
+                                    "name": {
+                                      "kind": "Name",
+                                      "value": "product"
+                                    },
+                                    "arguments": [],
+                                    "directives": [],
+                                    "selectionSet": {
+                                      "kind": "SelectionSet",
+                                      "selections": [
+                                        {
+                                          "kind": "Field",
+                                          "name": {
+                                            "kind": "Name",
+                                            "value": "id"
+                                          },
+                                          "arguments": [],
+                                          "directives": []
+                                        },
+                                        {
+                                          "kind": "Field",
+                                          "name": {
+                                            "kind": "Name",
+                                            "value": "name"
+                                          },
+                                          "arguments": [],
+                                          "directives": []
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "kind": "Field",
+                              "name": {
+                                "kind": "Name",
+                                "value": "stockLocation"
+                              },
+                              "arguments": [],
+                              "directives": [],
+                              "selectionSet": {
+                                "kind": "SelectionSet",
+                                "selections": [
+                                  {
+                                    "kind": "Field",
+                                    "name": {
+                                      "kind": "Name",
+                                      "value": "id"
+                                    },
+                                    "arguments": [],
+                                    "directives": []
+                                  },
+                                  {
+                                    "kind": "Field",
+                                    "name": {
+                                      "kind": "Name",
+                                      "value": "name"
+                                    },
+                                    "arguments": [],
+                                    "directives": []
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "Field",
+                        "name": {
+                          "kind": "Name",
+                          "value": "createdAt"
+                        },
+                        "arguments": [],
+                        "directives": []
+                      },
+                      {
+                        "kind": "Field",
+                        "name": {
+                          "kind": "Name",
+                          "value": "updatedAt"
+                        },
+                        "arguments": [],
+                        "directives": []
+                      }
+                    ]
+                  }
+                },
+                {
+                  "kind": "Field",
+                  "name": {
+                    "kind": "Name",
+                    "value": "totalItems"
+                  },
+                  "arguments": [],
+                  "directives": []
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
 } as unknown as DocumentNode<GetStockAdjustmentsQuery, GetStockAdjustmentsQueryVariables>;
 export const GetSubscriptionTiersDocument = {
   kind: 'Document',

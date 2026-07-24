@@ -48,6 +48,7 @@ import { InventoryMovement } from '../../services/inventory/entities/inventory-m
 import { SaleCogs } from '../../services/inventory/entities/sale-cogs.entity';
 import { InventoryAlertService } from '../../services/inventory/inventory-alert.service';
 import { InventoryService } from '../../services/inventory/inventory.service';
+import { OrderMarginService } from '../../services/orders/order-margin.service';
 import { InventoryStoreService } from '../../services/inventory/inventory-store.service';
 import { InventoryStore } from '../../services/inventory/interfaces/inventory-store.interface';
 import { DefaultExpiryPolicy } from '../../services/inventory/policies/default-expiry.policy';
@@ -158,6 +159,7 @@ const COMBINED_SCHEMA = gql`
     SalePostingStrategy,
     LedgerTransactionService,
     FinancialService,
+    OrderMarginService,
     OpenSessionService,
     LedgerConsistencyGuard,
     OrderArProjection,

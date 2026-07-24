@@ -101,6 +101,8 @@ export class OrderReversalService {
           ...customFields,
           reversedAt: new Date(),
           reversedByUserId: ctx.activeUserId ?? undefined,
+          // COGS was reversed with the order; clear so the order isn't counted as COGS-recorded.
+          cogsStatus: null,
         } as Record<string, unknown>,
       }
     );
@@ -154,6 +156,8 @@ export class OrderReversalService {
           ...customFields,
           reversedAt: new Date(),
           reversedByUserId: ctx.activeUserId ?? undefined,
+          // COGS was reversed with the order; clear so the order isn't counted as COGS-recorded.
+          cogsStatus: null,
         } as Record<string, unknown>,
       }
     );

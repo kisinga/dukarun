@@ -275,6 +275,19 @@
             <app-order-totals [subtotal]="subtotal()" [tax]="tax()" [total]="total()" />
           </div>
         </div>
+
+        <!-- Margin (internal financials — never printed) -->
+        <div class="card bg-base-100 shadow-sm border border-base-300/60 no-print">
+          <div class="card-body p-3 sm:p-4">
+            <app-order-margin-block
+              [margin]="margin()"
+              [loading]="marginLoading()"
+              [canRetry]="canRetryCogs()"
+              [retrying]="retryingCogs()"
+              (retry)="handleRetryCogs()"
+            />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -291,6 +304,19 @@
       <div class="card bg-base-100 shadow-sm border border-base-300/60">
         <div class="card-body p-3">
           <app-order-totals [subtotal]="subtotal()" [tax]="tax()" [total]="total()" />
+        </div>
+      </div>
+
+      <!-- Margin (internal financials — never printed) -->
+      <div class="card bg-base-100 shadow-sm border border-base-300/60 no-print">
+        <div class="card-body p-3">
+          <app-order-margin-block
+            [margin]="margin()"
+            [loading]="marginLoading()"
+            [canRetry]="canRetryCogs()"
+            [retrying]="retryingCogs()"
+            (retry)="handleRetryCogs()"
+          />
         </div>
       </div>
     </div>

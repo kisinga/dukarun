@@ -30,7 +30,7 @@ describe('SalePostingStrategy', () => {
   const orderWithLines = {
     id: 21,
     code: 'XAWMF5QT5QC2ATFR',
-    lines: [{ productVariantId: 16, quantity: 1, productVariant: { id: 16 } }],
+    lines: [{ id: 101, productVariantId: 16, quantity: 1, productVariant: { id: 16 } }],
     customer: { id: '1' },
     orderPlacedAt: new Date(),
   } as unknown as Order;
@@ -230,6 +230,7 @@ describe('SalePostingStrategy', () => {
     );
     const input = mockInventoryService.recordSale.mock.calls[0][1];
     expect(input.stockLocationId).toBeUndefined();
+    expect(input.lines[0].orderLineId).toBe('101');
   });
 
   it('does not call recordSale when COGS already posted (idempotency)', async () => {

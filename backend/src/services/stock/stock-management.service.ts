@@ -442,6 +442,13 @@ export class StockManagementService {
           previousStock: number;
           newStock: number;
           batchId?: string | null;
+          valueChangeCents?: number;
+          allocations?: Array<{
+            batchId: ID;
+            quantity: number;
+            unitCost: number;
+            totalCost: number;
+          }>;
         }> = [];
         const uuid = randomUUID();
 
@@ -459,6 +466,7 @@ export class StockManagementService {
             quantityChange: line.quantityChange,
             adjustmentId: uuid,
             batchId: line.batchId ?? undefined,
+            unitCost: line.unitCost ?? undefined,
             reason: input.reason,
           });
           stockMovements.push({
@@ -467,6 +475,8 @@ export class StockManagementService {
             previousStock: result.previousStock,
             newStock: result.newStock,
             batchId: result.batchId ?? null,
+            valueChangeCents: result.valueChangeCents,
+            allocations: result.allocations,
           });
           await this.stockMovementService.setStockLevelFromBatchSum(
             transactionCtx,

@@ -1,4 +1,5 @@
 import { graphql } from '../../shared/graphql/generated';
+import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core';
 
 export const CREATE_DRAFT_ORDER = graphql(`
   mutation CreateDraftOrder {
@@ -701,3 +702,142 @@ export const GET_ORDER_FULL = graphql(`
     }
   }
 `);
+
+/**
+ * Per-order margin (revenue vs FIFO COGS). Not part of the codegen-typed documents:
+ * the schema addition postdates the last codegen run, so these ship as precompiled
+ * AST documents (same runtime shape codegen emits — no graphql-tag in the bundle)
+ * with hand-written types. Regenerate types (`npm run codegen`) when the backend
+ * is available and migrate these to `graphql()`.
+ */
+export interface OrderMargin {
+  netRevenueCents: number;
+  cogsCents: number;
+  marginCents: number;
+  marginPercent: number | null;
+  reliable: boolean;
+  unreliableReasons: string[];
+}
+
+export interface GetOrderMarginResult {
+  order: { id: string; margin: OrderMargin | null } | null;
+}
+
+export interface RetrySkippedCogsResult {
+  retrySkippedCogs: OrderMargin;
+}
+
+export const GET_ORDER_MARGIN: DocumentNode<GetOrderMarginResult, { id: string }> = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: { kind: 'Name', value: 'GetOrderMargin' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+          directives: [],
+        },
+      ],
+      directives: [],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'order' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'id' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'id' } },
+              },
+            ],
+            directives: [],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'id' }, arguments: [], directives: [] },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'margin' },
+                  arguments: [],
+                  directives: [],
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
+                      { kind: 'Field', name: { kind: 'Name', value: 'netRevenueCents' }, arguments: [], directives: [] },
+                      { kind: 'Field', name: { kind: 'Name', value: 'cogsCents' }, arguments: [], directives: [] },
+                      { kind: 'Field', name: { kind: 'Name', value: 'marginCents' }, arguments: [], directives: [] },
+                      { kind: 'Field', name: { kind: 'Name', value: 'marginPercent' }, arguments: [], directives: [] },
+                      { kind: 'Field', name: { kind: 'Name', value: 'reliable' }, arguments: [], directives: [] },
+                      { kind: 'Field', name: { kind: 'Name', value: 'unreliableReasons' }, arguments: [], directives: [] },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<GetOrderMarginResult, { id: string }>;
+
+export const RETRY_SKIPPED_COGS: DocumentNode<RetrySkippedCogsResult, { orderId: string }> = {
+  kind: 'Document',
+  definitions: [
+    {
+      kind: 'OperationDefinition',
+      operation: 'mutation',
+      name: { kind: 'Name', value: 'RetrySkippedCogs' },
+      variableDefinitions: [
+        {
+          kind: 'VariableDefinition',
+          variable: { kind: 'Variable', name: { kind: 'Name', value: 'orderId' } },
+          type: {
+            kind: 'NonNullType',
+            type: { kind: 'NamedType', name: { kind: 'Name', value: 'ID' } },
+          },
+          directives: [],
+        },
+      ],
+      directives: [],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: { kind: 'Name', value: 'retrySkippedCogs' },
+            arguments: [
+              {
+                kind: 'Argument',
+                name: { kind: 'Name', value: 'orderId' },
+                value: { kind: 'Variable', name: { kind: 'Name', value: 'orderId' } },
+              },
+            ],
+            directives: [],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                { kind: 'Field', name: { kind: 'Name', value: 'netRevenueCents' }, arguments: [], directives: [] },
+                { kind: 'Field', name: { kind: 'Name', value: 'cogsCents' }, arguments: [], directives: [] },
+                { kind: 'Field', name: { kind: 'Name', value: 'marginCents' }, arguments: [], directives: [] },
+                { kind: 'Field', name: { kind: 'Name', value: 'marginPercent' }, arguments: [], directives: [] },
+                { kind: 'Field', name: { kind: 'Name', value: 'reliable' }, arguments: [], directives: [] },
+                { kind: 'Field', name: { kind: 'Name', value: 'unreliableReasons' }, arguments: [], directives: [] },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<RetrySkippedCogsResult, { orderId: string }>;
+

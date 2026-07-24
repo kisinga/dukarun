@@ -65,6 +65,7 @@ interface RecordStockAdjustmentInput {
     quantityChange: number;
     stockLocationId: string;
     batchId?: string | null;
+    unitCost?: number | null;
   }>;
 }
 

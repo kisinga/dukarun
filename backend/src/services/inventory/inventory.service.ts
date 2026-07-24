@@ -1,5 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ID, RequestContext, TransactionalConnection, UserInputError } from '@vendure/core';
+import { IsNull } from 'typeorm';
 import { LedgerPostingService } from '../financial/ledger-posting.service';
 import { StockValuationService } from '../financial/stock-valuation.service';
 import {
@@ -22,6 +23,7 @@ import {
   MovementType,
   ValuationSnapshot,
 } from './interfaces/inventory-store.interface';
+import { InventoryBatch as InventoryBatchEntity } from './entities/inventory-batch.entity';
 import { SaleCogs } from './entities/sale-cogs.entity';
 import { InventoryStoreService } from './inventory-store.service';
 
@@ -83,6 +85,8 @@ export interface RecordSaleInput {
   lines: Array<{
     productVariantId: ID;
     quantity: number;
+    /** Vendure OrderLine id — recorded on the SALE movement and sale_cogs row. */
+    orderLineId?: ID;
     /** When set, sell from this batch only; otherwise use costing strategy. */
     batchId?: ID;
   }>;
@@ -154,8 +158,15 @@ export interface ApplyAdjustmentToBatchesInput {
   productVariantId: ID;
   quantityChange: number; // positive = increase, negative = decrease
   adjustmentId: string;
-  /** When multiple batches exist, required to select which batch to apply to. */
+  /** When multiple batches exist, selects which batch to merge into. Without batchId or unitCost, the most recent batch is used. */
   batchId?: ID;
+  /**
+   * Unit cost in cents for increases. When it differs from the target batch's cost, a new
+   * batch is created at this cost (never blended). Required when no open batch exists.
+   */
+  unitCost?: number;
+  /** Escape hatch: allow creating a zero-cost batch when no open batch exists and no unitCost is given. */
+  allowZeroCost?: boolean;
   /** Optional human-readable reason, passed through to the ledger entry memo. */
   reason?: string;
 }
@@ -168,6 +179,10 @@ export interface ApplyAdjustmentToBatchesResult {
   newStock: number;
   /** Batch id used (single batch for increase or primary batch for decrease). */
   batchId?: string | null;
+  /** Signed change in batch valuation, in cents. */
+  valueChangeCents: number;
+  /** Per-batch cost breakdown (quantity and totalCost signed like the adjustment). */
+  allocations: BatchAllocation[];
 }
 
 /**
@@ -329,6 +344,8 @@ export class InventoryService {
           productVariantId: line.productVariantId,
           movementType: MovementType.PURCHASE,
           quantity: line.quantity,
+          unitCostCents: line.unitCost,
+          totalCostCents: Math.round(line.quantity * line.unitCost),
           batchId: batch.id,
           sourceType: 'Purchase',
           sourceId: input.purchaseId,
@@ -387,8 +404,22 @@ export class InventoryService {
       try {
         const allAllocations: BatchAllocation[] = [];
         const movements: InventoryMovement[] = [];
-        const lineCogsRows: Array<{ productVariantId: ID; quantity: number; cogsCents: number }> =
-          [];
+        const lineCogsRows: Array<{
+          productVariantId: ID;
+          orderLineId: string | null;
+          quantity: number;
+          cogsCents: number;
+        }> = [];
+        // Rounded per-allocation COGS in cents for movements + ledger meta.
+        // Cumulative rounding: each row is round(running total) minus the rounded rows so far,
+        // so rows sum exactly to round(totalCogs) — any remainder lands on the last allocation.
+        const cogsAllocationRows: Array<{
+          batchId: string;
+          quantity: number;
+          unitCostCents: number;
+          totalCostCents: number;
+        }> = [];
+        let cumulativeCogs = 0;
 
         // Process each line
         for (const line of input.lines) {
@@ -500,13 +531,25 @@ export class InventoryService {
               allocation.batchId,
               -allocation.quantity
             );
+            const newCumulative = cumulativeCogs + allocation.totalCost;
+            const allocationCostCents = Math.round(newCumulative) - Math.round(cumulativeCogs);
+            cumulativeCogs = newCumulative;
+            cogsAllocationRows.push({
+              batchId: String(allocation.batchId),
+              quantity: allocation.quantity,
+              unitCostCents: allocation.unitCost,
+              totalCostCents: allocationCostCents,
+            });
             const movementInput: CreateMovementInput = {
               channelId: input.channelId,
               stockLocationId: input.stockLocationId,
               productVariantId: line.productVariantId,
               movementType: MovementType.SALE,
               quantity: -allocation.quantity,
+              unitCostCents: allocation.unitCost,
+              totalCostCents: -allocationCostCents,
               batchId: allocation.batchId,
+              orderLineId: line.orderLineId ?? null,
               sourceType: 'Order',
               sourceId: input.orderId,
               metadata: {
@@ -525,6 +568,7 @@ export class InventoryService {
           const lineCogs = allocationResult.allocations.reduce((sum, a) => sum + a.totalCost, 0);
           lineCogsRows.push({
             productVariantId: line.productVariantId,
+            orderLineId: line.orderLineId != null ? String(line.orderLineId) : null,
             quantity: line.quantity,
             cogsCents: lineCogs,
           });
@@ -538,12 +582,7 @@ export class InventoryService {
           orderId: input.orderId,
           orderCode: input.orderCode,
           customerId: input.customerId,
-          cogsAllocations: allAllocations.map(a => ({
-            batchId: String(a.batchId),
-            quantity: a.quantity,
-            unitCost: a.unitCost,
-            totalCost: a.totalCost,
-          })),
+          cogsAllocations: cogsAllocationRows,
           totalCogs,
         });
 
@@ -554,7 +593,7 @@ export class InventoryService {
           const saleCogs = saleCogsRepo.create({
             channelId: Number(input.channelId),
             orderId: input.orderId,
-            orderLineId: null,
+            orderLineId: row.orderLineId,
             productVariantId: Number(row.productVariantId),
             saleDate,
             quantity: row.quantity,
@@ -622,6 +661,8 @@ export class InventoryService {
           productVariantId: line.productVariantId,
           movementType: MovementType.PURCHASE,
           quantity: line.quantity,
+          unitCostCents: 0,
+          totalCostCents: 0,
           batchId: batch.id,
           sourceType: 'OpeningStock',
           sourceId,
@@ -667,7 +708,10 @@ export class InventoryService {
 
   /**
    * Apply a stock adjustment to batch inventory (source of truth).
-   * If exactly one open batch exists, uses it; if multiple exist, batchId is required (UI selector).
+   * Increases merge into the target batch (explicit batchId, single open batch, or — without a
+   * user cost — the most recent batch) at that batch's cost. A user-supplied unitCost that
+   * differs from the target batch's cost creates a NEW batch at the user cost (never blended).
+   * With no open batch, unitCost is required unless allowZeroCost is set.
    * Returns previous and new stock from batch sum; caller should sync Vendure stock_level via setStockLevelFromBatchSum.
    */
   async applyAdjustmentToBatches(
@@ -678,7 +722,7 @@ export class InventoryService {
     const channelId = Number(input.channelId);
     const variantId = input.productVariantId;
     const locationId = input.stockLocationId;
-    const { quantityChange, adjustmentId, batchId } = input;
+    const { quantityChange, adjustmentId, batchId, unitCost, allowZeroCost } = input;
 
     const batches = await this.inventoryStore.getOpenBatchesForConsumption(ctx, {
       channelId: input.channelId,
@@ -696,47 +740,47 @@ export class InventoryService {
 
     let batchIdUsed: string | null = null;
     let valueChangeCents = 0;
+    const allocations: BatchAllocation[] = [];
 
     if (quantityChange > 0) {
+      let targetBatch: InventoryBatch | null = null;
       if (batchId) {
-        const batch = batches.find(b => String(b.id) === String(batchId));
-        if (!batch) {
+        targetBatch = batches.find(b => String(b.id) === String(batchId)) ?? null;
+        if (!targetBatch) {
           throw new UserInputError(
             `Batch ${batchId} not found or not open for variant ${variantId} at location ${locationId}`
           );
         }
-        await this.inventoryStore.updateBatchQuantity(ctx, batch.id, quantityChange);
-        batchIdUsed = String(batch.id);
-        valueChangeCents = quantityChange * batch.unitCost;
-        await this.inventoryStore.createMovement(ctx, {
-          channelId: input.channelId,
-          stockLocationId: input.stockLocationId,
-          productVariantId: input.productVariantId,
-          movementType: MovementType.ADJUSTMENT,
-          quantity: quantityChange,
-          batchId: batch.id,
-          sourceType: 'StockAdjustment',
-          sourceId: adjustmentId,
-          metadata: { reason: 'adjustment' },
-        });
       } else if (batches.length === 1) {
-        const batch = batches[0];
-        await this.inventoryStore.updateBatchQuantity(ctx, batch.id, quantityChange);
-        batchIdUsed = String(batch.id);
-        valueChangeCents = quantityChange * batch.unitCost;
+        targetBatch = batches[0];
+      }
+
+      if (targetBatch && (unitCost == null || unitCost === targetBatch.unitCost)) {
+        // Merge into the target batch at its own cost (no blending).
+        await this.inventoryStore.updateBatchQuantity(ctx, targetBatch.id, quantityChange);
+        batchIdUsed = String(targetBatch.id);
+        valueChangeCents = Math.round(quantityChange * targetBatch.unitCost);
+        allocations.push({
+          batchId: targetBatch.id,
+          quantity: quantityChange,
+          unitCost: targetBatch.unitCost,
+          totalCost: valueChangeCents,
+        });
         await this.inventoryStore.createMovement(ctx, {
           channelId: input.channelId,
           stockLocationId: input.stockLocationId,
           productVariantId: input.productVariantId,
           movementType: MovementType.ADJUSTMENT,
           quantity: quantityChange,
-          batchId: batch.id,
+          unitCostCents: targetBatch.unitCost,
+          totalCostCents: valueChangeCents,
+          batchId: targetBatch.id,
           sourceType: 'StockAdjustment',
           sourceId: adjustmentId,
           metadata: { reason: 'adjustment' },
         });
-      } else if (batches.length > 1) {
-        // Auto-select the most recent batch for increases (batches ordered by createdAt ASC)
+      } else if (!targetBatch && unitCost == null && batches.length > 1) {
+        // No user cost: auto-select the most recent batch for increases (batches ordered by createdAt ASC)
         const mostRecent = batches[batches.length - 1];
         this.logger.warn(
           `Auto-selected most recent batch ${mostRecent.id} for adjustment increase on variant ${variantId} ` +
@@ -744,46 +788,72 @@ export class InventoryService {
         );
         await this.inventoryStore.updateBatchQuantity(ctx, mostRecent.id, quantityChange);
         batchIdUsed = String(mostRecent.id);
-        valueChangeCents = quantityChange * mostRecent.unitCost;
+        valueChangeCents = Math.round(quantityChange * mostRecent.unitCost);
+        allocations.push({
+          batchId: mostRecent.id,
+          quantity: quantityChange,
+          unitCost: mostRecent.unitCost,
+          totalCost: valueChangeCents,
+        });
         await this.inventoryStore.createMovement(ctx, {
           channelId: input.channelId,
           stockLocationId: input.stockLocationId,
           productVariantId: input.productVariantId,
           movementType: MovementType.ADJUSTMENT,
           quantity: quantityChange,
+          unitCostCents: mostRecent.unitCost,
+          totalCostCents: valueChangeCents,
           batchId: mostRecent.id,
           sourceType: 'StockAdjustment',
           sourceId: adjustmentId,
           metadata: { reason: 'adjustment', autoSelectedBatch: true },
         });
       } else {
-        // No open batches exist — creating a zero-cost batch. COGS for future sales
-        // from this batch will be $0, which distorts gross margin reporting.
-        // Operators should receive stock via a purchase instead to capture cost.
-        this.logger.warn(
-          `No open batches for variant ${variantId} at location ${locationId}. ` +
-            `Creating zero-cost batch for adjustment ${adjustmentId}. ` +
-            `COGS for sales from this batch will be $0. Prefer recording a purchase to capture unit cost.`
-        );
-        const sourceId = `StockAdjustment:${adjustmentId}:${variantId}:${locationId}`;
+        // New batch at the user-supplied cost: either no open batch exists, or the user
+        // cost differs from the target batch's cost (never blend costs into one batch).
+        if (unitCost == null && !allowZeroCost) {
+          throw new UserInputError(
+            `No open batches for variant ${variantId} at location ${locationId}. ` +
+              `Provide unitCost (cents) for the new stock so cost of goods sold stays accurate.`
+          );
+        }
+        const newBatchCost = unitCost ?? 0;
+        if (unitCost == null) {
+          this.logger.warn(
+            `Creating zero-cost batch for adjustment ${adjustmentId} (variant ${variantId} at location ${locationId}). ` +
+              `COGS for sales from this batch will be $0. Prefer recording a purchase to capture unit cost.`
+          );
+        }
+        // Plain adjustment id as the batch source: per-allocation uniqueness comes from
+        // columns, and createBatch's idempotency lookup (sourceType+sourceId+variant) now
+        // matches the adjustment movement, so a retried adjustment returns the same batch.
         const batch = await this.inventoryStore.createBatch(ctx, {
           channelId: input.channelId,
           stockLocationId: input.stockLocationId,
           productVariantId: input.productVariantId,
           quantity: quantityChange,
-          unitCost: 0,
+          unitCost: newBatchCost,
           expiryDate: null,
           sourceType: 'StockAdjustment',
-          sourceId,
+          sourceId: adjustmentId,
+          metadata: unitCost == null ? { costEstimated: true } : undefined,
         });
         batchIdUsed = String(batch.id);
-        valueChangeCents = 0;
+        valueChangeCents = Math.round(quantityChange * newBatchCost);
+        allocations.push({
+          batchId: batch.id,
+          quantity: quantityChange,
+          unitCost: newBatchCost,
+          totalCost: valueChangeCents,
+        });
         await this.inventoryStore.createMovement(ctx, {
           channelId: input.channelId,
           stockLocationId: input.stockLocationId,
           productVariantId: input.productVariantId,
           movementType: MovementType.ADJUSTMENT,
           quantity: quantityChange,
+          unitCostCents: newBatchCost,
+          totalCostCents: valueChangeCents,
           batchId: batch.id,
           sourceType: 'StockAdjustment',
           sourceId: adjustmentId,
@@ -803,13 +873,22 @@ export class InventoryService {
         }
         await this.inventoryStore.updateBatchQuantity(ctx, batch.id, -toDeduct);
         batchIdUsed = String(batch.id);
-        valueChangeCents = -toDeduct * batch.unitCost;
+        const allocationCost = Math.round(toDeduct * batch.unitCost);
+        valueChangeCents = -allocationCost;
+        allocations.push({
+          batchId: batch.id,
+          quantity: -toDeduct,
+          unitCost: batch.unitCost,
+          totalCost: -allocationCost,
+        });
         await this.inventoryStore.createMovement(ctx, {
           channelId: input.channelId,
           stockLocationId: input.stockLocationId,
           productVariantId: input.productVariantId,
           movementType: MovementType.ADJUSTMENT,
           quantity: -toDeduct,
+          unitCostCents: batch.unitCost,
+          totalCostCents: -allocationCost,
           batchId: batch.id,
           sourceType: 'StockAdjustment',
           sourceId: adjustmentId,
@@ -822,13 +901,22 @@ export class InventoryService {
           const deduct = Math.min(remaining, batch.quantity);
           await this.inventoryStore.updateBatchQuantity(ctx, batch.id, -deduct);
           if (!batchIdUsed) batchIdUsed = String(batch.id);
-          valueChangeCents += -deduct * batch.unitCost;
+          const allocationCost = Math.round(deduct * batch.unitCost);
+          valueChangeCents += -allocationCost;
+          allocations.push({
+            batchId: batch.id,
+            quantity: -deduct,
+            unitCost: batch.unitCost,
+            totalCost: -allocationCost,
+          });
           await this.inventoryStore.createMovement(ctx, {
             channelId: input.channelId,
             stockLocationId: input.stockLocationId,
             productVariantId: input.productVariantId,
             movementType: MovementType.ADJUSTMENT,
             quantity: -deduct,
+            unitCostCents: batch.unitCost,
+            totalCostCents: -allocationCost,
             batchId: batch.id,
             sourceType: 'StockAdjustment',
             sourceId: adjustmentId,
@@ -849,7 +937,7 @@ export class InventoryService {
       stockLocationId: locationId,
     });
 
-    return { previousStock, newStock, batchId: batchIdUsed ?? undefined };
+    return { previousStock, newStock, batchId: batchIdUsed ?? undefined, valueChangeCents, allocations };
   }
 
   /**
@@ -861,14 +949,12 @@ export class InventoryService {
     await this.connection.withTransaction(ctx, async transactionCtx => {
       const channelId = ctx.channelId as number;
 
-      const allReversals = await this.inventoryStore.getMovements(transactionCtx, {
+      const existingReversals = await this.inventoryStore.getMovements(transactionCtx, {
         channelId,
         sourceType: 'OrderReversal',
+        sourceId: orderId,
       });
-      const existingReversal = allReversals.filter(m =>
-        m.sourceId.startsWith(`${orderId}-reversal`)
-      );
-      if (existingReversal.length > 0) {
+      if (existingReversals.length > 0) {
         this.logger.log(
           `Reversal already applied for order ${orderId}, skipping inventory reverseSale`
         );
@@ -895,16 +981,25 @@ export class InventoryService {
         const restoreQty = Math.abs(mov.quantity);
         await this.inventoryStore.updateBatchQuantity(transactionCtx, batchId, restoreQty);
 
-        const reversalSourceId = `${orderId}-reversal-${batchId}`;
+        // Restore at the batch's current unit cost; null (unknown) if the batch is gone.
+        const restoredBatch = await this.connection
+          .getRepository(transactionCtx, InventoryBatchEntity)
+          .findOne({ where: { id: batchId } });
+        const unitCostCents = restoredBatch ? restoredBatch.unitCost : null;
+
         const movementInput: CreateMovementInput = {
           channelId,
           stockLocationId: mov.stockLocationId,
           productVariantId: mov.productVariantId,
           movementType: MovementType.PURCHASE,
           quantity: restoreQty,
+          unitCostCents,
+          totalCostCents: unitCostCents != null ? Math.round(restoreQty * unitCostCents) : null,
           batchId,
+          orderLineId: mov.orderLineId ?? null,
+          reversesMovementId: mov.id,
           sourceType: 'OrderReversal',
-          sourceId: reversalSourceId,
+          sourceId: orderId,
           metadata: { reversedOrderId: orderId },
         };
         await this.inventoryStore.createMovement(transactionCtx, movementInput);
@@ -917,7 +1012,8 @@ export class InventoryService {
 
   private async voidSaleCogsForOrder(ctx: RequestContext, orderId: string): Promise<void> {
     const repo = this.connection.getRepository(ctx, SaleCogs);
-    await repo.delete({ orderId });
+    // Void (not delete) so history is preserved; already-voided rows are a no-op.
+    await repo.update({ orderId, voidedAt: IsNull() }, { voidedAt: new Date() });
   }
 
   /**
@@ -1012,6 +1108,8 @@ export class InventoryService {
               productVariantId: line.productVariantId,
               movementType: MovementType.WRITE_OFF,
               quantity: -allocation.quantity,
+              unitCostCents: allocation.unitCost,
+              totalCostCents: -Math.round(allocation.totalCost),
               batchId: allocation.batchId,
               sourceType: 'WriteOff',
               sourceId: input.adjustmentId,

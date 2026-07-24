@@ -573,7 +573,11 @@ describe('InventoryStoreService', () => {
         productVariantId: 3,
         movementType: MovementType.PURCHASE,
         quantity: 100,
+        unitCostCents: null,
+        totalCostCents: null,
         batchId: 'batch-1',
+        orderLineId: null,
+        reversesMovementId: null,
         sourceType: 'Purchase',
         sourceId: 'purchase-123',
         metadata: { test: true },
@@ -591,7 +595,41 @@ describe('InventoryStoreService', () => {
       expect(movementRepo.save).toHaveBeenCalled();
     });
 
-    it('should return existing movement for idempotent source', async () => {
+    it('dedupes on the full allocation key (source + variant + batch + orderLine + reversesMovement)', async () => {
+      const { service, movementRepo } = buildService();
+
+      (movementRepo.findOne as any).mockResolvedValue(null);
+      (movementRepo.create as any).mockImplementation((dto: any) => dto);
+      (movementRepo.save as any).mockImplementation((entity: any) => Promise.resolve(entity));
+
+      await service.createMovement(ctx, {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        movementType: MovementType.PURCHASE,
+        quantity: 30,
+        batchId: 'batch-1',
+        orderLineId: 'line-1',
+        reversesMovementId: 'mov-0',
+        sourceType: 'OrderReversal',
+        sourceId: 'order-789',
+      });
+
+      expect(movementRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          channelId: 1,
+          sourceType: 'OrderReversal',
+          sourceId: 'order-789',
+          movementType: MovementType.PURCHASE,
+          productVariantId: 3,
+          batchId: 'batch-1',
+          orderLineId: 'line-1',
+          reversesMovementId: 'mov-0',
+        },
+      });
+    });
+
+    it('should return existing movement for idempotent re-entry with identical data', async () => {
       const { service, movementRepo } = buildService();
 
       const existingMovement: InventoryMovement = {
@@ -601,7 +639,11 @@ describe('InventoryStoreService', () => {
         productVariantId: 3,
         movementType: MovementType.PURCHASE,
         quantity: 100,
+        unitCostCents: null,
+        totalCostCents: null,
         batchId: 'batch-1',
+        orderLineId: null,
+        reversesMovementId: null,
         sourceType: 'Purchase',
         sourceId: 'purchase-123',
         metadata: null,
@@ -625,6 +667,76 @@ describe('InventoryStoreService', () => {
 
       expect(result).toEqual(existingMovement);
       expect(movementRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw when the dedupe key hit has a different quantity', async () => {
+      const { service, movementRepo } = buildService();
+
+      const existingMovement: InventoryMovement = {
+        id: 'movement-existing',
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        movementType: MovementType.SALE,
+        quantity: -50,
+        unitCostCents: 5000,
+        totalCostCents: -250000,
+        batchId: 'batch-1',
+        orderLineId: 'line-1',
+        reversesMovementId: null,
+        sourceType: 'Order',
+        sourceId: 'order-789',
+        metadata: null,
+        createdAt: new Date(),
+      };
+
+      (movementRepo.findOne as any).mockResolvedValue(existingMovement);
+
+      const input: CreateMovementInput = {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        movementType: MovementType.SALE,
+        quantity: -20, // differs from the persisted movement
+        batchId: 'batch-1',
+        orderLineId: 'line-1',
+        sourceType: 'Order',
+        sourceId: 'order-789',
+      };
+
+      await expect(service.createMovement(ctx, input)).rejects.toThrow(/dedupe conflict/);
+      expect(movementRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a separate movement per batch under the same source', async () => {
+      const { service, movementRepo } = buildService();
+
+      // No existing row for the second allocation's key
+      (movementRepo.findOne as any).mockResolvedValue(null);
+      (movementRepo.create as any).mockImplementation((dto: any) => dto);
+      (movementRepo.save as any).mockImplementation((entity: any) => Promise.resolve(entity));
+
+      const result = await service.createMovement(ctx, {
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        movementType: MovementType.SALE,
+        quantity: -20,
+        batchId: 'batch-2', // same order, different batch allocation
+        orderLineId: 'line-1',
+        sourceType: 'Order',
+        sourceId: 'order-789',
+      });
+
+      expect(movementRepo.create).toHaveBeenCalled();
+      expect(result).toEqual(
+        expect.objectContaining({
+          batchId: 'batch-2',
+          orderLineId: 'line-1',
+          sourceType: 'Order',
+          sourceId: 'order-789',
+        })
+      );
     });
   });
 

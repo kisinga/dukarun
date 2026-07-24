@@ -50,6 +50,7 @@ export class StockAdjustmentApiService {
         variantId: line.variantId,
         quantityChange: line.quantityChange,
         stockLocationId: line.stockLocationId,
+        unitCost: line.unitCost ?? null,
       })),
     };
 

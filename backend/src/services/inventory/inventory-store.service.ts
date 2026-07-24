@@ -7,7 +7,7 @@ import {
   TransactionalConnection,
   UserInputError,
 } from '@vendure/core';
-import { LessThan, MoreThanOrEqual } from 'typeorm';
+import { IsNull, LessThan, MoreThanOrEqual } from 'typeorm';
 import { InventoryBatch } from './entities/inventory-batch.entity';
 import { InventoryMovement, MovementType } from './entities/inventory-movement.entity';
 import {
@@ -269,16 +269,33 @@ export class InventoryStoreService implements InventoryStore {
     ctx: RequestContext,
     input: CreateMovementInput
   ): Promise<InventoryMovement> {
-    // Check for idempotency
+    // Check for idempotency on the full allocation key
+    const batchId = input.batchId ? String(input.batchId) : null;
+    const orderLineId = input.orderLineId ? String(input.orderLineId) : null;
+    const reversesMovementId = input.reversesMovementId ? String(input.reversesMovementId) : null;
     const existingMovement = await this.connection.getRepository(ctx, InventoryMovement).findOne({
       where: {
         channelId: Number(input.channelId),
         sourceType: input.sourceType,
         sourceId: String(input.sourceId),
+        movementType: input.movementType,
+        productVariantId: Number(input.productVariantId),
+        batchId: batchId ?? IsNull(),
+        orderLineId: orderLineId ?? IsNull(),
+        reversesMovementId: reversesMovementId ?? IsNull(),
       },
     });
 
     if (existingMovement) {
+      // Tripwire: same allocation key with a different quantity means the key
+      // failed to distinguish two distinct allocations.
+      if (existingMovement.quantity !== input.quantity) {
+        throw new Error(
+          `Movement dedupe conflict for source ${input.sourceType}:${input.sourceId}: ` +
+            `existing (variant ${existingMovement.productVariantId}, batch ${existingMovement.batchId}, qty ${existingMovement.quantity}) ` +
+            `vs new (variant ${input.productVariantId}, batch ${batchId}, qty ${input.quantity})`
+        );
+      }
       this.logger.log(
         `Movement already exists for source ${input.sourceType}:${input.sourceId}, returning existing movement`
       );
@@ -301,7 +318,11 @@ export class InventoryStoreService implements InventoryStore {
       productVariantId: Number(input.productVariantId),
       movementType: input.movementType,
       quantity: input.quantity,
-      batchId: input.batchId ? String(input.batchId) : null,
+      unitCostCents: input.unitCostCents ?? null,
+      totalCostCents: input.totalCostCents ?? null,
+      batchId,
+      orderLineId,
+      reversesMovementId,
       sourceType: input.sourceType,
       sourceId: String(input.sourceId),
       metadata: input.metadata || null,

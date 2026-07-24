@@ -68,8 +68,28 @@ export const DASHBOARD_STATS_SCHEMA = gql`
     total: Float!
   }
 
+  """
+  Per-period profit from source tables (not the analytics MVs), on the per-order margin basis.
+  Amounts in cents. See basis for the exact computation disclosure.
+  """
+  type PeriodProfit {
+    netRevenueCents: Int!
+    cogsCents: Int!
+    grossMarginCents: Int!
+    expensesCents: Int!
+    "Expense totals by category for the period"
+    expenseBreakdown: [AccountBreakdown!]!
+    "Net inventory write-downs (INVENTORY_ADJUSTMENT debits), clamped at 0 for net-gain periods"
+    inventoryLossesCents: Int!
+    netProfitCents: Int!
+    "Orders in the period whose COGS figure is estimated or missing"
+    unreliableOrderCount: Int!
+    basis: String!
+  }
+
   extend type Query {
     dashboardStats(startDate: DateTime, endDate: DateTime): DashboardStats!
+    periodProfit(startDate: DateTime!, endDate: DateTime!): PeriodProfit!
     stockValueStats(stockLocationId: ID, forceRefresh: Boolean): StockValueStats!
     stockValueRanking(
       valuationType: StockValuationType!

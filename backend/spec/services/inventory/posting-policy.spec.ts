@@ -76,7 +76,9 @@ describe('Inventory Posting Policies', () => {
         orderId: 'order-789',
         orderCode: 'ORD-001',
         customerId: 'customer-123',
-        cogsAllocations: [{ batchId: 'batch-1', quantity: 25, unitCost: 10000, totalCost: 250000 }],
+        cogsAllocations: [
+          { batchId: 'batch-1', quantity: 25, unitCostCents: 10000, totalCostCents: 250000 },
+        ],
         totalCogs: 250000,
       };
 
@@ -96,8 +98,8 @@ describe('Inventory Posting Policies', () => {
         orderCode: 'ORD-001',
         customerId: 'customer-123',
         cogsAllocations: [
-          { batchId: 'batch-1', quantity: 25, unitCost: 10000, totalCost: 250000 },
-          { batchId: 'batch-2', quantity: 15, unitCost: 12000, totalCost: 180000 },
+          { batchId: 'batch-1', quantity: 25, unitCostCents: 10000, totalCostCents: 250000 },
+          { batchId: 'batch-2', quantity: 15, unitCostCents: 12000, totalCostCents: 180000 },
         ],
         totalCogs: 430000,
       };
@@ -106,6 +108,12 @@ describe('Inventory Posting Policies', () => {
 
       expect(entry.lines[0].meta?.batchCount).toBe(2);
       expect(entry.lines[0].meta?.cogsAllocations).toHaveLength(2);
+      expect(entry.lines[0].meta?.cogsAllocations[0]).toEqual({
+        batchId: 'batch-1',
+        quantity: 25,
+        unitCostCents: 10000,
+        totalCostCents: 250000,
+      });
     });
   });
 
