@@ -86,8 +86,8 @@ export interface InventorySalePostingContext {
   cogsAllocations: Array<{
     batchId: string;
     quantity: number;
-    unitCost: number;
-    totalCost: number;
+    unitCostCents: number;
+    totalCostCents: number;
   }>;
   totalCogs: number; // in cents
 }

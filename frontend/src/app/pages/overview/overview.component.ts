@@ -11,7 +11,7 @@ import { Router, RouterModule } from '@angular/router';
 import { CashierSessionService } from '@dukarun/cashier-session';
 import { CompanyService } from '@dukarun/company';
 import { CurrencyService } from '../../shared/services/currency.service';
-import { DashboardService, AnalyticsService } from '@dukarun/analytics';
+import { DashboardService, AnalyticsService, PeriodProfit } from '@dukarun/analytics';
 import { type PeriodStats } from '../../shared/models/stats.model';
 import { AuthPermissionsService } from '@dukarun/auth';
 import { OrderTableRowComponent, OrderCardComponent } from '@dukarun/order/components';
@@ -185,6 +185,10 @@ export class OverviewComponent {
     this.authPermissions.hasUpdateSettingsPermission(),
   );
 
+  /** Net profit for the selected period (admin-only; tax-exclusive margin basis). */
+  protected readonly periodProfit = signal<PeriodProfit | null>(null);
+  protected readonly periodProfitLoading = signal(false);
+
   constructor() {
     effect(
       () => {
@@ -200,6 +204,26 @@ export class OverviewComponent {
       },
       { allowSignalWrites: true },
     );
+
+    // Net profit follows the period tabs (admin-only stat)
+    effect(() => {
+      const companyId = this.companyService.activeCompanyId();
+      const { start, end } = this.periodDateRange();
+      if (!companyId || !this.hasAdminStats()) {
+        this.periodProfit.set(null);
+        return;
+      }
+      void this.loadPeriodProfit(start, end);
+    });
+  }
+
+  private async loadPeriodProfit(start: string, end: string): Promise<void> {
+    this.periodProfitLoading.set(true);
+    try {
+      this.periodProfit.set(await this.dashboardService.getPeriodProfit(start, end));
+    } finally {
+      this.periodProfitLoading.set(false);
+    }
   }
 
   private createCategoryData(
@@ -289,6 +313,8 @@ export class OverviewComponent {
     void this.analyticsService.fetch('30d');
     if (this.hasAdminStats()) {
       void this.dashboardService.loadStockValueStats(true);
+      const { start, end } = this.periodDateRange();
+      void this.loadPeriodProfit(start, end);
     }
     const companyId = this.companyService.activeCompanyId();
     if (companyId) {

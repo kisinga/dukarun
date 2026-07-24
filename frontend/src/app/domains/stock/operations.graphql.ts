@@ -40,6 +40,10 @@ export const GET_STOCK_ADJUSTMENTS = graphql(`
           previousStock
           newStock
           stockLocationId
+          batchId
+          unitCostCents
+          totalCostCents
+          allocations
           variant {
             id
             name

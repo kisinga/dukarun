@@ -8,6 +8,8 @@ export interface StockAdjustmentLineItem {
   variant?: ProductVariant; // Optional for display
   quantityChange: number; // Positive for increase, negative for decrease
   stockLocationId: string;
+  /** Unit cost in cents for increases; required by the backend when the variant has no stock */
+  unitCost?: number;
 }
 
 /**

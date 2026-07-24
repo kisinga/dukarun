@@ -407,6 +407,26 @@ export class LedgerQueryService {
   }
 
   /**
+   * Get net inventory losses for a period from the INVENTORY_ADJUSTMENT account.
+   * Debit-normal: positive balance = net losses (stock written down), negative = net gains
+   * (stock found). Net-credit periods are clamped to 0 — gains stay in inventory valuation
+   * and are not reported as negative losses.
+   */
+  async getInventoryAdjustmentLosses(
+    channelId: number,
+    startDate?: string,
+    endDate?: string
+  ): Promise<number> {
+    const balance = await this.getAccountBalance({
+      channelId,
+      accountCode: ACCOUNT_CODES.INVENTORY_ADJUSTMENT,
+      startDate,
+      endDate,
+    });
+    return Math.max(0, balance.balance);
+  }
+
+  /**
    * Get expense breakdown by category for a period (for dashboard).
    * Groups EXPENSES account lines from journal entries with sourceType 'Expense' by meta.expenseCategory.
    */

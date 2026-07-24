@@ -151,6 +151,15 @@
                       <span class="text-base-content/50 text-xs"
                         >(prev {{ line.previousStock }} → {{ line.newStock }})</span
                       >
+                      <span
+                        class="text-xs font-semibold tabular-nums"
+                        [class.text-error]="(line.totalCostCents ?? 0) < 0"
+                      >
+                        {{ formatCost(line.totalCostCents) }}
+                      </span>
+                      @for (ref of getLineBatchRefs(line); track ref) {
+                        <span class="badge badge-ghost badge-xs">{{ ref }}</span>
+                      }
                     </li>
                   }
                 </ul>
@@ -211,6 +220,7 @@
                             <th class="text-right">Previous</th>
                             <th class="text-right">New</th>
                             <th class="text-right">Difference</th>
+                            <th class="text-right">Cost change</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -246,6 +256,22 @@
                                 >
                                   {{ formatDifference(line.quantityChange) }}
                                 </span>
+                              </td>
+                              <td class="text-right">
+                                <span
+                                  class="font-semibold text-tabular"
+                                  [class.text-error]="(line.totalCostCents ?? 0) < 0"
+                                >
+                                  {{ formatCost(line.totalCostCents) }}
+                                </span>
+                                @if (line.unitCostCents != null) {
+                                  <p class="text-xs text-base-content/50 tabular-nums">
+                                    @ {{ formatCost(line.unitCostCents) }} / unit
+                                  </p>
+                                }
+                                @for (ref of getLineBatchRefs(line); track ref) {
+                                  <span class="badge badge-ghost badge-xs ml-1">{{ ref }}</span>
+                                }
                               </td>
                             </tr>
                           }

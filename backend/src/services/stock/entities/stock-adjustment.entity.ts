@@ -81,4 +81,21 @@ export class InventoryStockAdjustmentLine {
   /** Batch id used when multiple batches existed and user selected one. UUID; length matches migration. */
   @Column({ type: 'varchar', length: 255, nullable: true })
   batchId: string | null;
+
+  /** Unit cost in cents captured at adjustment time (user cost or batch cost). Null = unknown/mixed. */
+  @Column({ type: 'bigint', nullable: true })
+  unitCostCents: number | null;
+
+  /** Signed change in batch valuation for this line, in cents. Null = unknown. */
+  @Column({ type: 'bigint', nullable: true })
+  totalCostCents: number | null;
+
+  /** Per-batch cost breakdown: [{ batchId, quantity, unitCostCents, totalCostCents }]. */
+  @Column({ type: 'jsonb', nullable: true })
+  allocations: Array<{
+    batchId: string;
+    quantity: number;
+    unitCostCents: number;
+    totalCostCents: number;
+  }> | null;
 }

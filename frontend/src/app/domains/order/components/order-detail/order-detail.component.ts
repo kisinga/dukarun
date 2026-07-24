@@ -19,7 +19,14 @@ import { NgIcon } from '@ng-icons/core';
 import { CustomerService, CustomerPaymentService } from '@dukarun/customer';
 import { OrderService } from '../../services/order.service';
 import { OrdersService } from '../../services/orders.service';
-import { REVERSE_PAYMENT } from '../../operations.graphql';
+import {
+  GET_ORDER_MARGIN,
+  RETRY_SKIPPED_COGS,
+  REVERSE_PAYMENT,
+  GetOrderMarginResult,
+  OrderMargin,
+  RetrySkippedCogsResult,
+} from '../../operations.graphql';
 import { ToastService } from '../../../../shared/services/toast.service';
 import { CurrencyService } from '../../../../shared/services/currency.service';
 import { PaymentMethodService } from '@dukarun/payments';
@@ -33,6 +40,7 @@ import { OrderItemsTableComponent } from './components/order-items-table.compone
 import { OrderTotalsComponent } from './components/order-totals.component';
 import { OrderPaymentInfoComponent } from './components/order-payment-info.component';
 import { OrderFulfillmentInfoComponent } from './components/order-fulfillment-info.component';
+import { OrderMarginBlockComponent } from './components/order-margin-block.component';
 import { PrintControlsComponent } from '../print-controls/print-controls.component';
 import { PayOrderModalComponent, PayOrderModalData } from '../pay-order-modal.component';
 
@@ -60,6 +68,7 @@ import { PayOrderModalComponent, PayOrderModalData } from '../pay-order-modal.co
     OrderAddressComponent,
     OrderItemsTableComponent,
     OrderTotalsComponent,
+    OrderMarginBlockComponent,
     OrderPaymentInfoComponent,
     OrderFulfillmentInfoComponent,
     PrintControlsComponent,
@@ -103,6 +112,12 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
 
   // Draft order (proforma) - can print as proforma and complete to sale
   readonly isDraftOrder = computed(() => this.order()?.state === 'Draft');
+
+  // Per-order margin (revenue vs FIFO COGS)
+  readonly margin = signal<OrderMargin | null>(null);
+  readonly marginLoading = signal(false);
+  readonly retryingCogs = signal(false);
+  readonly canRetryCogs = computed(() => this.authPermissions.hasReverseOrderPermission());
 
   // Computed values for child components - allow print for all (Draft = proforma, others = receipt/invoice)
   readonly canPrint = computed(() => !!this.order());
@@ -207,6 +222,16 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
       }
     });
 
+    // Fetch the margin whenever the loaded order changes
+    effect(() => {
+      const order = this.order();
+      if (order?.id) {
+        void this.fetchMargin(order.id);
+      } else {
+        this.margin.set(null);
+      }
+    });
+
     // Check for print mode from query params (page mode only)
     effect(() => {
       if (this.modalMode()) return;
@@ -288,6 +313,59 @@ export class OrderDetailComponent implements OnInit, AfterViewInit {
 
   clearError(): void {
     this.ordersService.clearError();
+  }
+
+  private async fetchMargin(orderId: string): Promise<void> {
+    this.marginLoading.set(true);
+    try {
+      const client = this.apollo.getClient();
+      const result = await client.query({
+        query: GET_ORDER_MARGIN,
+        variables: { id: orderId },
+        fetchPolicy: 'network-only',
+      });
+      const data = result.data as GetOrderMarginResult | undefined;
+      this.margin.set(data?.order?.margin ?? null);
+    } catch {
+      // Margin is supplementary — never block the order page on it
+      this.margin.set(null);
+    } finally {
+      this.marginLoading.set(false);
+    }
+  }
+
+  async handleRetryCogs(): Promise<void> {
+    const order = this.order();
+    if (!order || this.retryingCogs()) return;
+
+    this.retryingCogs.set(true);
+    try {
+      const client = this.apollo.getClient();
+      const result = await client.mutate({
+        mutation: RETRY_SKIPPED_COGS,
+        variables: { orderId: order.id },
+      });
+      if (result.error) {
+        throw result.error;
+      }
+      const margin = (result.data as RetrySkippedCogsResult | undefined)?.retrySkippedCogs;
+      if (margin) {
+        this.margin.set(margin);
+        if (margin.reliable) {
+          this.toastService.show('Cost recalculated', 'Margin figures updated.', 'success');
+        } else {
+          this.toastService.show(
+            'Cost still incomplete',
+            'Check stock levels and try again.',
+            'warning'
+          );
+        }
+      }
+    } catch (error: any) {
+      this.toastService.show('Recalculate failed', error?.message || 'Failed to recalculate cost', 'error');
+    } finally {
+      this.retryingCogs.set(false);
+    }
   }
 
   readonly payOrderModalData = signal<PayOrderModalData | null>(null);

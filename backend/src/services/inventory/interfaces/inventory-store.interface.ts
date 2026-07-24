@@ -32,7 +32,15 @@ export interface InventoryMovement {
   productVariantId: number;
   movementType: MovementType;
   quantity: number; // positive for increases, negative for decreases
+  /** Unit cost in cents at movement time; null = unknown */
+  unitCostCents: number | null;
+  /** Total cost in cents, signed like quantity; null = unknown */
+  totalCostCents: number | null;
   batchId: string | null;
+  /** Vendure OrderLine id for SALE movements (and their reversals) */
+  orderLineId: string | null;
+  /** For reversal movements: the movement this row restores */
+  reversesMovementId: string | null;
   sourceType: string;
   sourceId: string;
   metadata: Record<string, any> | null;
@@ -109,7 +117,15 @@ export interface CreateMovementInput {
   productVariantId: ID;
   movementType: MovementType;
   quantity: number; // positive for increases, negative for decreases
+  /** Unit cost in cents; omit when unknown (never fabricate). */
+  unitCostCents?: number | null;
+  /** Total cost in cents, signed like quantity; omit when unknown. */
+  totalCostCents?: number | null;
   batchId?: ID | null;
+  /** Vendure OrderLine id — set on SALE movements and carried onto their reversals. */
+  orderLineId?: ID | null;
+  /** For reversal movements: id of the movement being restored. */
+  reversesMovementId?: ID | null;
   sourceType: string;
   sourceId: string;
   metadata?: Record<string, any>;

@@ -2,11 +2,14 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import {
   GET_DASHBOARD_STATS,
   GET_INVENTORY_ALERTS,
+  GET_PERIOD_PROFIT,
   GET_PLATFORM_METRICS,
   GET_PRODUCT_STATS,
   GET_RECENT_ORDERS,
   GET_STOCK_VALUE_RANKING,
   GET_STOCK_VALUE_STATS,
+  GetPeriodProfitResult,
+  PeriodProfit,
 } from '../operations.graphql';
 import {
   StockValuationType as GqlStockValuationType,
@@ -244,6 +247,26 @@ export class DashboardService {
       return result.data?.dashboardStats ?? null;
     } catch (error) {
       console.error('Failed to fetch dashboard stats from ledger:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Period profit for an arbitrary date range (YYYY-MM-DD), from source tables
+   * (tax-exclusive revenue vs FIFO COGS, minus expenses and inventory losses).
+   */
+  async getPeriodProfit(startDate: string, endDate: string): Promise<PeriodProfit | null> {
+    const client = this.apolloService.getClient();
+    try {
+      const result = await client.query({
+        query: GET_PERIOD_PROFIT,
+        variables: { startDate, endDate },
+        fetchPolicy: 'network-only',
+      });
+      const data = result.data as GetPeriodProfitResult | undefined;
+      return data?.periodProfit ?? null;
+    } catch (error) {
+      console.error('Failed to fetch period profit:', error);
       return null;
     }
   }

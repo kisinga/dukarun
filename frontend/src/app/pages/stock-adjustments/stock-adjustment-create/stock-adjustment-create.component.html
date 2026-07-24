@@ -68,6 +68,7 @@
         <app-stock-adjustment-line-item-form
           [lineItem]="newLineItem()"
           (newStockChange)="handleNewStockChange($event)"
+          (unitCostChange)="handleUnitCostChange($event)"
           (addItem)="handleAddLineItem()"
         />
       }

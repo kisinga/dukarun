@@ -71,6 +71,8 @@ describe('InventoryService', () => {
     const mockRepo = {
       create: jest.fn((dto: any) => dto),
       save: jest.fn((entity: any) => Promise.resolve(entity)),
+      update: jest.fn((_criteria: any, _partial: any) => Promise.resolve({ affected: 1 })),
+      findOne: jest.fn((_opts?: any) => Promise.resolve(null)),
     };
     const connection = {
       withTransaction: jest.fn((ctx: any, fn: any) => fn(ctx)),
@@ -98,6 +100,7 @@ describe('InventoryService', () => {
       connection,
       ledgerConsistencyGuard,
       inventoryValuationProjection,
+      mockRepo,
     };
   };
 
@@ -168,6 +171,10 @@ describe('InventoryService', () => {
       expect(result.movements).toHaveLength(1);
       expect(inventoryStore.createBatch).toHaveBeenCalled();
       expect(inventoryStore.verifyBatchExists).toHaveBeenCalled();
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({ unitCostCents: 5000, totalCostCents: 500000 })
+      );
       expect(expiryPolicy.onBatchCreated).toHaveBeenCalled();
       expect(ledgerPostingService.postInventoryPurchase).toHaveBeenCalled();
     });
@@ -755,6 +762,392 @@ describe('InventoryService', () => {
 
       expect(result.totalCogs).toBe(150);
       expect(result.allocations[0].quantity).toBe(1.5);
+    });
+
+    it('persists one SALE movement per batch allocation, keyed by batch columns', async () => {
+      const { service, inventoryStore, costingStrategy, expiryPolicy, ledgerPostingService } =
+        buildService();
+
+      const makeBatch = (id: string, unitCost: number) => ({
+        id,
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 100,
+        unitCost,
+        expiryDate: null,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-1',
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      const batch1 = makeBatch('batch-1', 5000);
+      const batch2 = makeBatch('batch-2', 6000);
+
+      (inventoryStore.verifyStockLevel as any).mockResolvedValue(true);
+      (costingStrategy.allocateCost as any).mockResolvedValue({
+        allocations: [
+          { batchId: 'batch-1', quantity: 30, unitCost: 5000, totalCost: 150000 },
+          { batchId: 'batch-2', quantity: 20, unitCost: 6000, totalCost: 120000 },
+        ],
+        totalCost: 270000,
+        metadata: {},
+      });
+      (inventoryStore.getOpenBatches as any).mockResolvedValue([batch1, batch2]);
+      (expiryPolicy.validateBeforeConsume as any).mockResolvedValue({ allowed: true });
+      (inventoryStore.updateBatchQuantity as any).mockResolvedValue({});
+      (inventoryStore.createMovement as any).mockImplementation((_ctx: any, input: any) =>
+        Promise.resolve({ id: `mov-${input.batchId}`, ...input })
+      );
+      (ledgerPostingService.postInventorySaleCogs as any).mockResolvedValue(undefined);
+
+      const result = await service.recordSale(ctx, {
+        orderId: 'order-789',
+        orderCode: 'ORD-001',
+        channelId: 1,
+        stockLocationId: 2,
+        customerId: 'customer-123',
+        lines: [{ productVariantId: 3, quantity: 50, orderLineId: 'line-1' }],
+      });
+
+      expect(result.movements).toHaveLength(2);
+      expect(inventoryStore.createMovement).toHaveBeenCalledTimes(2);
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          movementType: MovementType.SALE,
+          quantity: -30,
+          unitCostCents: 5000,
+          totalCostCents: -150000,
+          batchId: 'batch-1',
+          orderLineId: 'line-1',
+          sourceType: 'Order',
+          sourceId: 'order-789',
+        })
+      );
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          movementType: MovementType.SALE,
+          quantity: -20,
+          unitCostCents: 6000,
+          totalCostCents: -120000,
+          batchId: 'batch-2',
+          orderLineId: 'line-1',
+          sourceType: 'Order',
+          sourceId: 'order-789',
+        })
+      );
+
+      // Ledger meta carries the same rounded per-allocation costs
+      expect(ledgerPostingService.postInventorySaleCogs).toHaveBeenCalledWith(
+        ctx,
+        'order-789',
+        expect.objectContaining({
+          cogsAllocations: [
+            { batchId: 'batch-1', quantity: 30, unitCostCents: 5000, totalCostCents: 150000 },
+            { batchId: 'batch-2', quantity: 20, unitCostCents: 6000, totalCostCents: 120000 },
+          ],
+        })
+      );
+    });
+
+    it('rounds fractional allocation costs cumulatively so movement costs sum to rounded COGS', async () => {
+      const { service, inventoryStore, costingStrategy, expiryPolicy, ledgerPostingService } =
+        buildService();
+
+      const makeBatch = (id: string) => ({
+        id,
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId: 3,
+        quantity: 5,
+        unitCost: 333,
+        expiryDate: null,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-1',
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      (inventoryStore.verifyStockLevel as any).mockResolvedValue(true);
+      (costingStrategy.allocateCost as any).mockResolvedValue({
+        allocations: [
+          { batchId: 'batch-1', quantity: 1.5, unitCost: 333, totalCost: 499.5 },
+          { batchId: 'batch-2', quantity: 1.5, unitCost: 333, totalCost: 499.5 },
+        ],
+        totalCost: 999,
+        metadata: {},
+      });
+      (inventoryStore.getOpenBatches as any).mockResolvedValue([
+        makeBatch('batch-1'),
+        makeBatch('batch-2'),
+      ]);
+      (expiryPolicy.validateBeforeConsume as any).mockResolvedValue({ allowed: true });
+      (inventoryStore.updateBatchQuantity as any).mockResolvedValue({});
+      (inventoryStore.createMovement as any).mockImplementation((_ctx: any, input: any) =>
+        Promise.resolve({ id: `mov-${input.batchId}`, ...input })
+      );
+      (ledgerPostingService.postInventorySaleCogs as any).mockResolvedValue(undefined);
+
+      await service.recordSale(ctx, {
+        orderId: 'order-789',
+        orderCode: 'ORD-001',
+        channelId: 1,
+        stockLocationId: 2,
+        customerId: 'customer-123',
+        lines: [{ productVariantId: 3, quantity: 3, orderLineId: 'line-1' }],
+      });
+
+      // round(499.5)=500 first, remainder lands on the last allocation: 500 + 499 = 999
+      const costs = (inventoryStore.createMovement as any).mock.calls.map(
+        (c: any[]) => c[1].totalCostCents
+      );
+      expect(costs).toEqual([-500, -499]);
+      expect(costs.reduce((a: number, b: number) => a + b, 0)).toBe(-999);
+    });
+
+    it('multi-line order persists one movement per allocation with the line orderLineId', async () => {
+      const {
+        service,
+        inventoryStore,
+        costingStrategy,
+        expiryPolicy,
+        ledgerPostingService,
+        mockRepo,
+      } = buildService();
+
+      const makeBatch = (id: string, productVariantId: number) => ({
+        id,
+        channelId: 1,
+        stockLocationId: 2,
+        productVariantId,
+        quantity: 100,
+        unitCost: 5000,
+        expiryDate: null,
+        sourceType: 'Purchase',
+        sourceId: 'purchase-1',
+        metadata: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      const batch1 = makeBatch('batch-1', 3);
+      const batch2 = makeBatch('batch-2', 4);
+
+      (inventoryStore.verifyStockLevel as any).mockResolvedValue(true);
+      (costingStrategy.allocateCost as any)
+        .mockResolvedValueOnce({
+          allocations: [{ batchId: 'batch-1', quantity: 10, unitCost: 5000, totalCost: 50000 }],
+          totalCost: 50000,
+          metadata: {},
+        })
+        .mockResolvedValueOnce({
+          allocations: [{ batchId: 'batch-2', quantity: 5, unitCost: 5000, totalCost: 25000 }],
+          totalCost: 25000,
+          metadata: {},
+        });
+      (inventoryStore.getOpenBatches as any).mockResolvedValue([batch1, batch2]);
+      (expiryPolicy.validateBeforeConsume as any).mockResolvedValue({ allowed: true });
+      (inventoryStore.updateBatchQuantity as any).mockResolvedValue({});
+      (inventoryStore.createMovement as any).mockImplementation((_ctx: any, input: any) =>
+        Promise.resolve({ id: `mov-${input.batchId}`, ...input })
+      );
+      (ledgerPostingService.postInventorySaleCogs as any).mockResolvedValue(undefined);
+
+      const result = await service.recordSale(ctx, {
+        orderId: 'order-789',
+        orderCode: 'ORD-001',
+        channelId: 1,
+        stockLocationId: 2,
+        customerId: 'customer-123',
+        lines: [
+          { productVariantId: 3, quantity: 10, orderLineId: 'line-1' },
+          { productVariantId: 4, quantity: 5, orderLineId: 'line-2' },
+        ],
+      });
+
+      expect(result.movements).toHaveLength(2);
+      expect(inventoryStore.createMovement).toHaveBeenCalledTimes(2);
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          sourceType: 'Order',
+          sourceId: 'order-789',
+          orderLineId: 'line-1',
+          batchId: 'batch-1',
+        })
+      );
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          sourceType: 'Order',
+          sourceId: 'order-789',
+          orderLineId: 'line-2',
+          batchId: 'batch-2',
+        })
+      );
+
+      // sale_cogs rows are written per order line, carrying orderLineId
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ orderId: 'order-789', orderLineId: 'line-1' })
+      );
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ orderId: 'order-789', orderLineId: 'line-2' })
+      );
+    });
+  });
+
+  describe('reverseSale', () => {
+    const makeSaleMovement = (
+      id: string,
+      batchId: string,
+      quantity: number,
+      orderLineId: string | null = 'line-1',
+      productVariantId = 3
+    ) => ({
+      id,
+      channelId: 1,
+      stockLocationId: 2,
+      productVariantId,
+      movementType: MovementType.SALE,
+      quantity,
+      batchId,
+      orderLineId,
+      reversesMovementId: null,
+      sourceType: 'Order',
+      sourceId: 'order-789',
+      metadata: null,
+      createdAt: new Date(),
+    });
+
+    it('restores all batch quantities for a multi-batch order', async () => {
+      const { service, inventoryStore, mockRepo } = buildService();
+
+      const saleMovements = [
+        makeSaleMovement('mov-1', 'batch-1', -30),
+        makeSaleMovement('mov-2', 'batch-2', -20),
+      ];
+
+      (inventoryStore.getMovements as any).mockImplementation((_ctx: any, filters: any) => {
+        if (filters.sourceType === 'OrderReversal') return Promise.resolve([]);
+        if (filters.sourceType === 'Order' && filters.sourceId === 'order-789') {
+          return Promise.resolve(saleMovements);
+        }
+        return Promise.resolve([]);
+      });
+      (inventoryStore.updateBatchQuantity as any).mockResolvedValue({});
+      (inventoryStore.createMovement as any).mockResolvedValue({});
+      (mockRepo.findOne as any).mockImplementation((opts: any) =>
+        Promise.resolve({ id: opts.where.id, unitCost: 5000 })
+      );
+
+      await service.reverseSale(ctx, 'order-789');
+
+      // Both batches restored — not just the first one
+      expect(inventoryStore.updateBatchQuantity).toHaveBeenCalledTimes(2);
+      expect(inventoryStore.updateBatchQuantity).toHaveBeenCalledWith(ctx, 'batch-1', 30);
+      expect(inventoryStore.updateBatchQuantity).toHaveBeenCalledWith(ctx, 'batch-2', 20);
+
+      // One reversal movement per sale movement, linked via reversesMovementId,
+      // valued at the restored batch's unit cost
+      expect(inventoryStore.createMovement).toHaveBeenCalledTimes(2);
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          movementType: MovementType.PURCHASE,
+          quantity: 30,
+          unitCostCents: 5000,
+          totalCostCents: 150000,
+          batchId: 'batch-1',
+          orderLineId: 'line-1',
+          reversesMovementId: 'mov-1',
+          sourceType: 'OrderReversal',
+          sourceId: 'order-789',
+        })
+      );
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          movementType: MovementType.PURCHASE,
+          quantity: 20,
+          unitCostCents: 5000,
+          totalCostCents: 100000,
+          batchId: 'batch-2',
+          orderLineId: 'line-1',
+          reversesMovementId: 'mov-2',
+          sourceType: 'OrderReversal',
+          sourceId: 'order-789',
+        })
+      );
+
+      // sale_cogs rows are voided (not deleted), only once
+      expect(mockRepo.update).toHaveBeenCalledWith(
+        expect.objectContaining({ orderId: 'order-789' }),
+        expect.objectContaining({ voidedAt: expect.any(Date) })
+      );
+    });
+
+    it('restores a multi-line order selling the same batch twice', async () => {
+      const { service, inventoryStore } = buildService();
+
+      const saleMovements = [
+        makeSaleMovement('mov-1', 'batch-1', -5, 'line-1'),
+        makeSaleMovement('mov-2', 'batch-1', -3, 'line-2'),
+      ];
+
+      (inventoryStore.getMovements as any).mockImplementation((_ctx: any, filters: any) => {
+        if (filters.sourceType === 'OrderReversal') return Promise.resolve([]);
+        if (filters.sourceType === 'Order' && filters.sourceId === 'order-789') {
+          return Promise.resolve(saleMovements);
+        }
+        return Promise.resolve([]);
+      });
+      (inventoryStore.updateBatchQuantity as any).mockResolvedValue({});
+      (inventoryStore.createMovement as any).mockResolvedValue({});
+
+      await service.reverseSale(ctx, 'order-789');
+
+      // Both line allocations restored against the same batch
+      expect(inventoryStore.updateBatchQuantity).toHaveBeenCalledWith(ctx, 'batch-1', 5);
+      expect(inventoryStore.updateBatchQuantity).toHaveBeenCalledWith(ctx, 'batch-1', 3);
+      // Reversal movements stay distinct via orderLineId + reversesMovementId
+      expect(inventoryStore.createMovement).toHaveBeenCalledTimes(2);
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          batchId: 'batch-1',
+          orderLineId: 'line-1',
+          reversesMovementId: 'mov-1',
+        })
+      );
+      expect(inventoryStore.createMovement).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          batchId: 'batch-1',
+          orderLineId: 'line-2',
+          reversesMovementId: 'mov-2',
+        })
+      );
+    });
+
+    it('is a no-op when reversal movements already exist for the order', async () => {
+      const { service, inventoryStore } = buildService();
+
+      (inventoryStore.getMovements as any).mockImplementation((_ctx: any, filters: any) => {
+        if (filters.sourceType === 'OrderReversal' && filters.sourceId === 'order-789') {
+          return Promise.resolve([
+            { id: 'rev-1', sourceId: 'order-789', sourceType: 'OrderReversal' },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      await service.reverseSale(ctx, 'order-789');
+
+      expect(inventoryStore.updateBatchQuantity).not.toHaveBeenCalled();
+      expect(inventoryStore.createMovement).not.toHaveBeenCalled();
     });
   });
 

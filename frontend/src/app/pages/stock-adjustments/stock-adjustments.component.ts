@@ -12,6 +12,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NgIcon } from '@ng-icons/core';
 import { StockAdjustmentService } from '@dukarun/stock';
 import { toDisplayDate } from '../../shared/utils/date.util';
+import { CurrencyService } from '../../shared/services/currency.service';
 import { HoverPreviewHostComponent } from '../../shared/components/dashboard/hover-preview-host/hover-preview-host.component';
 import { PageHeaderComponent } from '../../shared/components/dashboard/page-header.component';
 import { ListSearchBarComponent } from '../../shared/components/dashboard/list-search-bar.component';
@@ -43,6 +44,7 @@ import {
 export class StockAdjustmentsComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly currencyService = inject(CurrencyService);
   readonly stockAdjustmentService = inject(StockAdjustmentService);
 
   readonly adjustments = this.stockAdjustmentService.adjustments;
@@ -189,6 +191,24 @@ export class StockAdjustmentsComponent implements OnInit {
     if (diff > 0) return `+${diff}`;
     if (diff < 0) return String(diff);
     return '0';
+  }
+
+  /** Signed cost change in cents → currency; em-dash when cost was not captured. */
+  formatCost(cents: number | null | undefined): string {
+    if (cents == null) return '—';
+    return this.currencyService.format(cents);
+  }
+
+  /** Short batch references for a line (from batchId / captured allocations). */
+  getLineBatchRefs(line: { batchId?: string | null; allocations?: any }): string[] {
+    const ids = new Set<string>();
+    if (line.batchId) ids.add(String(line.batchId));
+    if (Array.isArray(line.allocations)) {
+      for (const alloc of line.allocations) {
+        if (alloc?.batchId) ids.add(String(alloc.batchId));
+      }
+    }
+    return [...ids].map((id) => `…${id.slice(-6)}`);
   }
 
   /** Product name · Variant name (SKU) for list line items */

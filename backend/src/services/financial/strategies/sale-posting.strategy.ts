@@ -190,8 +190,9 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
   /**
    * Record COGS for the order (FIFO allocation, ledger COGS post) once per order.
    * Idempotent: skips if COGS already posted for this order.
+   * Public: also the entry point for retrying COGS on orders marked cogsStatus='skipped'.
    */
-  private async recordSaleCogsIfNeeded(ctx: RequestContext, order: Order): Promise<void> {
+  async recordSaleCogsIfNeeded(ctx: RequestContext, order: Order): Promise<void> {
     try {
       const channelId = ctx.channelId as number;
       const orderId = order.id.toString();
@@ -220,6 +221,7 @@ export class SalePostingStrategy extends BaseTransactionStrategy {
         .map(line => ({
           productVariantId: String(line.productVariantId ?? (line as any).productVariant?.id),
           quantity: line.quantity,
+          orderLineId: line.id?.toString(),
         }));
 
       if (lines.length === 0) {

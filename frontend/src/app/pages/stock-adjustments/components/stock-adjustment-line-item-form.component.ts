@@ -43,6 +43,22 @@ import { ProductVariant } from '@dukarun/product';
               (input)="onNewStockChange(parseFloat($any($event.target).value) || 0)"
             />
           </div>
+          <div class="flex-1 min-w-[7rem] max-w-[9rem]">
+            <label class="label py-0">
+              <span class="label-text text-xs font-semibold">
+                Unit cost {{ unitCostRequired() ? '*' : '(optional)' }}
+              </span>
+            </label>
+            <input
+              type="number"
+              class="input input-bordered w-full input-sm"
+              placeholder="0.00"
+              step="0.01"
+              min="0"
+              [value]="unitCostDisplay()"
+              (input)="onUnitCostChange($any($event.target).value)"
+            />
+          </div>
           <div class="min-w-[5rem]">
             <span class="label-text text-xs text-base-content/60 block mb-1">Difference</span>
             <span
@@ -76,12 +92,24 @@ export class StockAdjustmentLineItemFormComponent {
     stockLocationId?: string;
     newStock?: number;
     currentStock?: number;
+    /** Unit cost in cents (optional; backend requires it when the variant has no stock) */
+    unitCost?: number;
   }>();
 
   readonly newStockChange = output<number>();
+  readonly unitCostChange = output<number | undefined>();
   readonly addItem = output<void>();
 
   readonly currentStock = computed(() => this.lineItem().currentStock ?? null);
+
+  /** Cost is required in the UI when the variant has no stock (backend enforces the real rule). */
+  readonly unitCostRequired = computed(() => this.currentStock() === 0);
+
+  /** Display value in major currency units; internal value is cents. */
+  readonly unitCostDisplay = computed(() => {
+    const cents = this.lineItem().unitCost;
+    return cents === undefined || cents === null ? '' : (cents / 100).toFixed(2);
+  });
 
   readonly difference = computed(() => {
     const item = this.lineItem();
@@ -95,18 +123,32 @@ export class StockAdjustmentLineItemFormComponent {
     this.newStockChange.emit(value);
   }
 
+  onUnitCostChange(raw: string): void {
+    if (raw === '' || raw === null || raw === undefined) {
+      this.unitCostChange.emit(undefined);
+      return;
+    }
+    const major = parseFloat(raw);
+    this.unitCostChange.emit(isNaN(major) ? undefined : Math.round(major * 100));
+  }
+
   onAddItem(): void {
     this.addItem.emit();
   }
 
   canAddItem(): boolean {
     const item = this.lineItem();
-    return !!(
+    const hasBasics = !!(
       item.variantId &&
       item.newStock !== undefined &&
       item.newStock !== null &&
       item.newStock >= 0
     );
+    if (!hasBasics) return false;
+    if (this.unitCostRequired() && (item.unitCost === undefined || item.unitCost === null)) {
+      return false;
+    }
+    return true;
   }
 
   formatDifference(diff: number): string {

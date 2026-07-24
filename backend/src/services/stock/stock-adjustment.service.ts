@@ -12,6 +12,8 @@ export interface StockAdjustmentLineInput {
   stockLocationId: ID;
   /** When multiple open batches exist, required to select which batch to apply to. UUID as string (String! in GraphQL per GRAPHQL_IDS_AND_UUIDS.md). */
   batchId?: string | null;
+  /** Unit cost in cents for increases; a cost differing from the target batch creates a new batch. Required when the variant has no stock. */
+  unitCost?: number | null;
 }
 
 export interface RecordStockAdjustmentInput {
@@ -47,6 +49,13 @@ export class StockAdjustmentService {
       previousStock: number;
       newStock: number;
       batchId?: string | null;
+      valueChangeCents?: number;
+      allocations?: Array<{
+        batchId: ID;
+        quantity: number;
+        unitCost: number;
+        totalCost: number;
+      }>;
     }>,
     adjustmentId?: string
   ): Promise<InventoryStockAdjustment> {
@@ -75,6 +84,16 @@ export class StockAdjustmentService {
       adjustmentLine.newStock = movement.newStock;
       adjustmentLine.stockLocationId = parseInt(String(line.stockLocationId), 10);
       adjustmentLine.batchId = movement.batchId ?? null;
+      adjustmentLine.unitCostCents =
+        line.unitCost ?? (movement.allocations?.length ? movement.allocations[0].unitCost : null);
+      adjustmentLine.totalCostCents = movement.valueChangeCents ?? null;
+      adjustmentLine.allocations =
+        movement.allocations?.map(a => ({
+          batchId: String(a.batchId),
+          quantity: a.quantity,
+          unitCostCents: a.unitCost,
+          totalCostCents: a.totalCost,
+        })) ?? null;
       return adjustmentLine;
     });
 

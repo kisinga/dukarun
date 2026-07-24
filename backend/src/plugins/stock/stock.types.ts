@@ -24,6 +24,8 @@ export interface StockAdjustmentLineInput {
   variantId: ID;
   quantityChange: number; // Positive for increase, negative for decrease
   stockLocationId: ID;
+  /** Unit cost in cents for increases; required when the variant has no stock */
+  unitCost?: number | null;
 }
 
 export interface RecordStockAdjustmentInput {

@@ -63,6 +63,7 @@ export class StockAdjustmentCreateComponent implements OnInit {
     stockLocationId?: string;
     newStock?: number;
     currentStock?: number;
+    unitCost?: number;
   }>({});
 
   readonly displayLineItems = computed<StockAdjustmentLineItemDisplay[]>(() => {
@@ -133,6 +134,8 @@ export class StockAdjustmentCreateComponent implements OnInit {
         stockLocationId: locationId,
         currentStock: currentStock ?? undefined,
         newStock: currentStock ?? undefined,
+        // Prefill with the variant's wholesale price (cents) when available
+        unitCost: variant.customFields?.wholesalePrice ?? undefined,
       });
     } catch {
       this.stockAdjustmentService.clearError();
@@ -161,6 +164,10 @@ export class StockAdjustmentCreateComponent implements OnInit {
     this.newLineItem.update((c) => ({ ...c, newStock }));
   }
 
+  handleUnitCostChange(unitCost: number | undefined): void {
+    this.newLineItem.update((c) => ({ ...c, unitCost }));
+  }
+
   handleAddLineItem(): void {
     const item = this.newLineItem();
     const locationId = this.defaultLocation()?.id ?? '';
@@ -184,6 +191,7 @@ export class StockAdjustmentCreateComponent implements OnInit {
       stockLocationId: locationId,
       currentStock: item.currentStock,
       newStock: item.newStock,
+      unitCost: item.unitCost,
     };
     this.stockAdjustmentService.addAdjustmentItemLocal(lineItem as any);
     this.closeAddItemModal();
