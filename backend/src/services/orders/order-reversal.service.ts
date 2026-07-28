@@ -175,6 +175,11 @@ export class OrderReversalService {
    * Void an order: transition to Cancelled.
    * The OrderProcess hook performs payment cancellation, ledger reversal, inventory restoration,
    * and marks the order reversed atomically with the state change.
+   *
+   * For post-payment orders Vendure requires every order line to be cancelled before the
+   * order itself can transition to Cancelled. We therefore cancel all lines first via
+   * `orderService.cancelOrder` (which also transitions the order) for any non-active order,
+   * and keep the direct transition for active carts (AddingItems / ArrangingPayment).
    */
   async voidOrder(ctx: RequestContext, orderId: ID): Promise<OrderReversalResult> {
     const order = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
@@ -188,11 +193,21 @@ export class OrderReversalService {
 
     const hadPayments = (order.payments || []).some(p => p.state === 'Settled');
 
-    const result = await this.orderService.transitionToState(ctx, orderId, 'Cancelled' as any);
-    if (isGraphQlErrorResult(result)) {
-      throw new UserInputError(
-        `Cannot void order ${order.code}: ${result.message || result.errorCode || 'Unknown error'}`
-      );
+    if (order.state !== 'AddingItems' && order.state !== 'ArrangingPayment') {
+      // Cancels every order line, then transitions the order to Cancelled.
+      const result = await this.orderService.cancelOrder(ctx, { orderId });
+      if (isGraphQlErrorResult(result)) {
+        throw new UserInputError(
+          `Cannot void order ${order.code}: ${result.message || result.errorCode || 'Unknown error'}`
+        );
+      }
+    } else {
+      const result = await this.orderService.transitionToState(ctx, orderId, 'Cancelled' as any);
+      if (isGraphQlErrorResult(result)) {
+        throw new UserInputError(
+          `Cannot void order ${order.code}: ${result.message || result.errorCode || 'Unknown error'}`
+        );
+      }
     }
 
     const updatedOrder = await this.orderService.findOne(ctx, orderId, ['payments', 'customer']);
