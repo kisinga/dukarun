@@ -40,10 +40,44 @@
 
     <!--
       Money band — in/out for the selected period on one aligned grid:
-      Sales (hero = money in), Purchases + Expenses (money out), Orders (activity).
-      Sales/Purchases/Expenses expand an account breakdown below.
+      Net profit (admin hero), Sales (hero = money in), Purchases + Expenses (money out),
+      Orders (activity). Net profit / Sales / Purchases / Expenses expand a breakdown below.
     -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-5 px-4 py-4">
+    <div [class]="moneyBandGridClass()">
+      <!-- Net profit (admin only, left of sales) -->
+      @if (hasAdminStats()) {
+        <button type="button" class="text-left min-w-0" (click)="toggleCategory('netProfit')">
+          <span class="flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full shrink-0 bg-primary"></span>
+            <span class="stat-label">Net profit</span>
+            @if (periodProfit(); as pp) {
+              <span class="text-xs text-base-content/40" [title]="pp.basis">
+                <ng-icon name="heroInformationCircle" size="0.875rem" class="inline" />
+              </span>
+              <ng-icon
+                name="heroChevronDown"
+                size="0.875rem"
+                class="text-base-content/30 transition-transform"
+                [class.rotate-180]="expandedCategory() === 'netProfit'"
+              />
+            }
+          </span>
+          @if (periodProfitLoading() && !periodProfit()) {
+            <div class="skeleton h-7 w-24 rounded mt-1"></div>
+          } @else if (periodProfit(); as pp) {
+            <p class="stat-value truncate text-primary">
+              {{ currencyService.format(pp.netProfitCents) }}
+            </p>
+            <p class="mt-0.5 text-xs text-base-content/40 tabular-nums truncate">
+              <span class="mr-2">Margin {{ currencyService.format(pp.grossMarginCents) }}</span>
+              <span>Exp {{ currencyService.format(pp.expensesCents) }}</span>
+            </p>
+          } @else {
+            <p class="stat-value text-base-content/50">—</p>
+          }
+        </button>
+      }
+
       @for (category of categories(); track category.type) {
         <button type="button" class="text-left min-w-0" (click)="toggleCategory(category.type)">
           <span class="flex items-center gap-1.5">
@@ -57,7 +91,7 @@
             @if (category.accounts.length > 0) {
               <ng-icon
                 name="heroChevronDown"
-                size="0.75rem"
+                size="0.875rem"
                 class="text-base-content/30 transition-transform"
                 [class.rotate-180]="expandedCategory() === category.type"
               />
@@ -137,89 +171,56 @@
       }
     }
 
-    <!-- Net profit band — admin only; period-driven like the money band above -->
-    @if (hasAdminStats()) {
-      <div class="border-t border-base-300/60 px-4 py-4">
-        <div class="flex items-center gap-1.5 mb-3">
-          <span class="w-1.5 h-1.5 rounded-full bg-primary shrink-0"></span>
-          <span class="stat-label">Net profit</span>
-          @if (periodProfit(); as pp) {
-            <span class="text-xs text-base-content/40" [title]="pp.basis">
-              <ng-icon name="heroInformationCircle" size="0.875rem" class="inline" />
-            </span>
-          }
-        </div>
-        @if (periodProfitLoading() && !periodProfit()) {
-          <div class="skeleton h-7 w-32 rounded"></div>
-        } @else if (periodProfit(); as pp) {
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-4">
-            <div class="min-w-0">
-              <p class="stat-value truncate text-primary">
-                {{ currencyService.format(pp.netProfitCents) }}
-              </p>
-              @if (pp.unreliableOrderCount > 0) {
-                <p class="mt-0.5 text-xs text-warning truncate">
-                  {{ pp.unreliableOrderCount }} order(s) have estimated or missing cost
-                </p>
-              }
-            </div>
-            <div class="min-w-0">
-              <span class="stat-label">Gross margin (tax-excl.)</span>
-              <p class="text-sm font-semibold tabular-nums truncate">
-                {{ currencyService.format(pp.grossMarginCents) }}
-              </p>
-            </div>
-            <div class="min-w-0">
+    <!-- Net profit breakdown (expands below the whole grid) -->
+    @if (hasAdminStats() && periodProfit(); as pp) {
+      <div class="collapsible" [class.open]="expandedCategory() === 'netProfit'">
+        <div>
+          <div class="border-t border-base-300/60">
+            <div class="flex items-center justify-between px-4 py-2.5 bg-base-200/30">
+              <span class="text-xs font-bold text-base-content/60"> Net profit — Breakdown </span>
               <button
-                type="button"
-                class="text-left min-w-0"
-                [disabled]="pp.expenseBreakdown.length === 0"
-                (click)="toggleCategory('netProfitExpenses')"
+                class="btn btn-ghost btn-xs btn-square"
+                (click)="toggleCategory('netProfit'); $event.stopPropagation()"
+                aria-label="Close breakdown"
               >
-                <span class="stat-label flex items-center gap-1">
-                  Expenses
-                  @if (pp.expenseBreakdown.length > 0) {
-                    <ng-icon
-                      name="heroChevronDown"
-                      size="0.75rem"
-                      class="text-base-content/30 transition-transform"
-                      [class.rotate-180]="expandedCategory() === 'netProfitExpenses'"
-                    />
-                  }
-                </span>
-                <p class="text-sm font-semibold tabular-nums truncate text-error">
-                  {{ currencyService.format(pp.expensesCents) }}
-                </p>
+                <ng-icon name="heroXMark" size="0.875rem" />
               </button>
             </div>
-            <div class="min-w-0">
-              <span class="stat-label">Inventory losses</span>
-              <p class="text-sm font-semibold tabular-nums truncate">
-                {{ currencyService.format(pp.inventoryLossesCents) }}
-              </p>
+            <div class="divide-y divide-base-300/30">
+              <div class="flex items-center justify-between px-4 py-2.5">
+                <span class="text-sm text-base-content/70">Gross margin (tax-excl.)</span>
+                <span class="font-bold text-sm tabular-nums">
+                  {{ currencyService.format(pp.grossMarginCents) }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between px-4 py-2.5">
+                <span class="text-sm text-base-content/70">Expenses</span>
+                <span class="font-bold text-sm tabular-nums text-error">
+                  {{ currencyService.format(pp.expensesCents) }}
+                </span>
+              </div>
+              @for (cat of pp.expenseBreakdown; track cat.label) {
+                <div class="flex items-center justify-between px-4 py-2.5 pl-10">
+                  <span class="text-sm text-base-content/50">{{ cat.label }}</span>
+                  <span class="font-bold text-sm tabular-nums text-error">
+                    {{ currencyService.format(cat.value) }}
+                  </span>
+                </div>
+              }
+              <div class="flex items-center justify-between px-4 py-2.5">
+                <span class="text-sm text-base-content/70">Inventory losses</span>
+                <span class="font-bold text-sm tabular-nums">
+                  {{ currencyService.format(pp.inventoryLossesCents) }}
+                </span>
+              </div>
+              @if (pp.unreliableOrderCount > 0) {
+                <div class="px-4 py-2.5 text-xs text-warning">
+                  {{ pp.unreliableOrderCount }} order(s) have estimated or missing cost
+                </div>
+              }
             </div>
           </div>
-
-          <!-- Expense category breakdown (same collapsible pattern as the money band) -->
-          @if (pp.expenseBreakdown.length > 0) {
-            <div class="collapsible" [class.open]="expandedCategory() === 'netProfitExpenses'">
-              <div>
-                <div class="mt-3 divide-y divide-base-300/30 border-t border-base-300/60">
-                  @for (cat of pp.expenseBreakdown; track cat.label) {
-                    <div class="flex items-center justify-between py-2">
-                      <span class="text-sm text-base-content/70">{{ cat.label }}</span>
-                      <span class="font-bold text-sm tabular-nums text-error">
-                        {{ currencyService.format(cat.value) }}
-                      </span>
-                    </div>
-                  }
-                </div>
-              </div>
-            </div>
-          }
-        } @else {
-          <p class="text-sm text-base-content/50">—</p>
-        }
+        </div>
       </div>
     }
 

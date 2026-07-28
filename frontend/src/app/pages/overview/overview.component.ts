@@ -185,6 +185,13 @@ export class OverviewComponent {
     this.authPermissions.hasUpdateSettingsPermission(),
   );
 
+  /** Money band grid class — 5 cols when admin stats are visible, 4 otherwise. */
+  protected readonly moneyBandGridClass = computed(() =>
+    this.hasAdminStats()
+      ? 'grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-5 px-4 py-4'
+      : 'grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-5 px-4 py-4',
+  );
+
   /** Net profit for the selected period (admin-only; tax-exclusive margin basis). */
   protected readonly periodProfit = signal<PeriodProfit | null>(null);
   protected readonly periodProfitLoading = signal(false);
