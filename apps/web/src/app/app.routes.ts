@@ -89,6 +89,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./money/stock/money-stock.component').then(m => m.MoneyStockComponent),
   },
+  {
+    path: 'products',
+    canActivate: [authGuard],
+    loadComponent: () => import('./products/products.component').then(m => m.ProductsComponent),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   { path: '**', redirectTo: 'dashboard' },
 ];

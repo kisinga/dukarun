@@ -39,7 +39,10 @@ type CreditOrder = {
               {{ createOpen() ? '− Cancel' : '+ New customer' }}
             </button>
             @if (createOpen()) {
-              <form (submit)="$event.preventDefault(); createCustomer()" class="mt-2 grid gap-3 sm:grid-cols-3">
+              <form
+                (submit)="$event.preventDefault(); createCustomer()"
+                class="mt-2 grid gap-3 sm:grid-cols-3"
+              >
                 <input
                   type="text"
                   class="input input-bordered input-sm"
@@ -179,7 +182,10 @@ type CreditOrder = {
                       <!-- Credit settings -->
                       <div>
                         <h3 class="mb-1 text-sm font-semibold">Credit settings</h3>
-                        <form (submit)="$event.preventDefault(); saveCredit(c)" class="flex flex-col gap-2">
+                        <form
+                          (submit)="$event.preventDefault(); saveCredit(c)"
+                          class="flex flex-col gap-2"
+                        >
                           <label class="form-control">
                             <span class="label-text text-xs">Credit limit (KES)</span>
                             <input

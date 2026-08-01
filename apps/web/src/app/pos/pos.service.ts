@@ -7,6 +7,7 @@ export type Customer = Database['public']['Tables']['customers']['Row'];
 export type Order = Database['public']['Tables']['orders']['Row'];
 export type OrderLine = Database['public']['Tables']['order_lines']['Row'];
 export type Payment = Database['public']['Tables']['payments']['Row'];
+export type InventoryBatch = Database['public']['Tables']['inventory_batches']['Row'];
 
 /** p_lines item for post_sale / save_draft (amounts in cents). */
 export interface SaleLineInput {
@@ -72,6 +73,99 @@ export class PosService {
       .eq('active', true)
       .limit(20);
     if (error) throw error;
+    return data;
+  }
+
+  /** Management list: all products (active + inactive), name/sku/barcode search, sorted by name. */
+  async listProducts(query = ''): Promise<Product[]> {
+    let q = this.client.from('products').select('*').order('name').limit(500);
+    const trimmed = query.trim();
+    if (trimmed) {
+      const pattern = `%${trimmed.replace(/[%_,()]/g, ' ')}%`;
+      q = q.or(`name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}`);
+    }
+    const { data, error } = await q;
+    if (error) throw error;
+    return data;
+  }
+
+  /** Stock per product from the product_stock view (client-side join). */
+  async productStock(): Promise<Map<string, { stock: number; stock_value: number }>> {
+    const { data, error } = await this.client.from('product_stock').select('*');
+    if (error) throw error;
+    return new Map(
+      (data ?? [])
+        .filter(r => r.product_id !== null)
+        .map(r => [r.product_id!, { stock: Number(r.stock ?? 0), stock_value: r.stock_value ?? 0 }])
+    );
+  }
+
+  /** Batch history for one product (expand row on the Products screen). */
+  async productBatches(productId: string): Promise<InventoryBatch[]> {
+    const { data, error } = await this.client
+      .from('inventory_batches')
+      .select('*')
+      .eq('product_id', productId)
+      .order('purchased_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return data;
+  }
+
+  async createProduct(input: {
+    name: string;
+    price: number;
+    sku?: string;
+    barcode?: string;
+    wholesale_price?: number;
+    allow_fractional?: boolean;
+    track_inventory?: boolean;
+  }): Promise<string> {
+    const { data, error } = await this.client.rpc('create_product', {
+      p_name: input.name,
+      p_price: input.price,
+      ...(input.sku ? { p_sku: input.sku } : {}),
+      ...(input.barcode ? { p_barcode: input.barcode } : {}),
+      ...(input.wholesale_price !== undefined ? { p_wholesale_price: input.wholesale_price } : {}),
+      ...(input.allow_fractional !== undefined
+        ? { p_allow_fractional: input.allow_fractional }
+        : {}),
+      ...(input.track_inventory !== undefined ? { p_track_inventory: input.track_inventory } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  /** null/undefined fields are left unchanged by the backend. */
+  async updateProduct(
+    productId: string,
+    changes: {
+      name?: string;
+      price?: number;
+      barcode?: string;
+      wholesale_price?: number;
+      allow_fractional?: boolean;
+      track_inventory?: boolean;
+      active?: boolean;
+    }
+  ): Promise<string> {
+    const { data, error } = await this.client.rpc('update_product', {
+      p_product_id: productId,
+      ...(changes.name !== undefined ? { p_name: changes.name } : {}),
+      ...(changes.price !== undefined ? { p_price: changes.price } : {}),
+      ...(changes.barcode !== undefined ? { p_barcode: changes.barcode } : {}),
+      ...(changes.wholesale_price !== undefined
+        ? { p_wholesale_price: changes.wholesale_price }
+        : {}),
+      ...(changes.allow_fractional !== undefined
+        ? { p_allow_fractional: changes.allow_fractional }
+        : {}),
+      ...(changes.track_inventory !== undefined
+        ? { p_track_inventory: changes.track_inventory }
+        : {}),
+      ...(changes.active !== undefined ? { p_active: changes.active } : {}),
+    });
+    if (error) throw rpcError(error);
     return data;
   }
 
