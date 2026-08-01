@@ -648,6 +648,7 @@ export type Database = {
         Row: {
           cashier_pending_at: string | null
           cashier_session_id: string | null
+          client_ref: string | null
           code: string
           company_id: string
           created_at: string
@@ -665,6 +666,7 @@ export type Database = {
         Insert: {
           cashier_pending_at?: string | null
           cashier_session_id?: string | null
+          client_ref?: string | null
           code: string
           company_id: string
           created_at?: string
@@ -682,6 +684,7 @@ export type Database = {
         Update: {
           cashier_pending_at?: string | null
           cashier_session_id?: string | null
+          client_ref?: string | null
           code?: string
           company_id?: string
           created_at?: string
@@ -1050,6 +1053,7 @@ export type Database = {
       }
       post_sale: {
         Args: {
+          p_client_ref?: string
           p_customer_id: string
           p_lines: Json
           p_park?: boolean
