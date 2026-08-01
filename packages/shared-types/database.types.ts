@@ -1580,6 +1580,10 @@ export type Database = {
         Args: { p_code: string; p_company_id: string }
         Returns: number
       }
+      add_team_member: {
+        Args: { p_phone: string; p_role_id: string }
+        Returns: string
+      }
       close_accounting_period: { Args: { p_end_date: string }; Returns: string }
       close_cashier_session: {
         Args: { p_declarations: Json; p_session_id: string }
@@ -1772,6 +1776,7 @@ export type Database = {
         }
         Returns: string
       }
+      remove_team_member: { Args: { p_membership_id: string }; Returns: string }
       require_asset_leaf_account: {
         Args: { p_code: string; p_company_id: string }
         Returns: string
@@ -1783,6 +1788,17 @@ export type Database = {
       send_sms_hook: { Args: { event: Json }; Returns: Json }
       settle_order: {
         Args: { p_order_id: string; p_payments: Json }
+        Returns: string
+      }
+      update_customer: {
+        Args: {
+          p_customer_id: string
+          p_email?: string
+          p_first_name?: string
+          p_last_name?: string
+          p_notes?: string
+          p_phone?: string
+        }
         Returns: string
       }
       update_customer_credit: {
@@ -1805,6 +1821,18 @@ export type Database = {
           p_track_inventory?: boolean
           p_wholesale_price?: number
         }
+        Returns: string
+      }
+      update_team_member: {
+        Args: {
+          p_authorization_status?: string
+          p_membership_id: string
+          p_role_id?: string
+        }
+        Returns: string
+      }
+      upsert_role: {
+        Args: { p_name: string; p_permissions: string[]; p_role_id?: string }
         Returns: string
       }
       void_sale: {
