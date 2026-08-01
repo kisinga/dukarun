@@ -1,0 +1,10 @@
+/* ============================================
+   dukarun web — Global Styles
+   ============================================ */
+
+@use 'tailwindcss';
+
+@plugin "daisyui" {
+  themes: light --default;
+  logs: false;
+}
