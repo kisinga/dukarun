@@ -463,6 +463,13 @@ export type Database = {
             foreignKeyName: "inventory_batches_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "inventory_batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -553,6 +560,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "inventory_movements_product_id_fkey"
@@ -832,6 +846,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "order_lines_product_id_fkey"
@@ -1484,6 +1505,23 @@ export type Database = {
           },
         ]
       }
+      product_stock: {
+        Row: {
+          company_id: string | null
+          product_id: string | null
+          stock: number | null
+          stock_value: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_ap_balances: {
         Row: {
           balance: number | null
@@ -1537,6 +1575,18 @@ export type Database = {
           p_is_supplier?: boolean
           p_last_name?: string
           p_phone?: string
+        }
+        Returns: string
+      }
+      create_product: {
+        Args: {
+          p_allow_fractional?: boolean
+          p_barcode?: string
+          p_name: string
+          p_price: number
+          p_sku?: string
+          p_track_inventory?: boolean
+          p_wholesale_price?: number
         }
         Returns: string
       }
@@ -1705,6 +1755,19 @@ export type Database = {
           p_customer_id: string
           p_is_approved: boolean
           p_terms_days?: number
+        }
+        Returns: string
+      }
+      update_product: {
+        Args: {
+          p_active?: boolean
+          p_allow_fractional?: boolean
+          p_barcode?: string
+          p_name?: string
+          p_price?: number
+          p_product_id: string
+          p_track_inventory?: boolean
+          p_wholesale_price?: number
         }
         Returns: string
       }
