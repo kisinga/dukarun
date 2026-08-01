@@ -375,18 +375,50 @@ export class LedgerQueryService {
   /**
    * Get purchases total for a period
    *
-   * IMPORTANT: This queries the PURCHASES account from the ledger as the single source of truth.
+   * IMPORTANT: This queries the ledger (journal lines) as the single source of truth.
    * Do NOT calculate purchases by aggregating purchase records directly - use this method instead.
+   *
+   * A purchase is posted exactly once, but the posting account changed over time:
+   *   - Legacy entries (sourceType 'SupplierPurchase') debit the PURCHASES account.
+   *   - Current entries (sourceType 'InventoryPurchase') debit the INVENTORY account.
+   * The double-post repair reverses the legacy PURCHASES leg of affected purchases, so the
+   * PURCHASES net balance plus INVENTORY debits from InventoryPurchase entries counts every
+   * purchase exactly once across all history.
    */
   async getPurchaseTotal(channelId: number, startDate?: string, endDate?: string): Promise<number> {
-    const balance = await this.getAccountBalance({
+    const legacy = await this.getAccountBalance({
       channelId,
       accountCode: ACCOUNT_CODES.PURCHASES,
       startDate,
       endDate,
     });
     // Purchases is expense (debit normal), so positive balance = total purchases
-    return balance.balance;
+    let total = legacy.balance;
+
+    const inventoryAccount = await this.dataSource.getRepository(Account).findOne({
+      where: { channelId, code: ACCOUNT_CODES.INVENTORY },
+    });
+    if (inventoryAccount) {
+      const qb = this.dataSource
+        .getRepository(JournalLine)
+        .createQueryBuilder('line')
+        .innerJoin('line.entry', 'entry')
+        .where('line.channelId = :channelId', { channelId })
+        .andWhere('line.accountId = :accountId', { accountId: inventoryAccount.id })
+        .andWhere(`entry.sourceType = 'InventoryPurchase'`)
+        .select('COALESCE(SUM(CAST(line.debit AS BIGINT)), 0)', 'debitTotal');
+      if (startDate) {
+        qb.andWhere('entry.entryDate >= :startDate', { startDate });
+      }
+      if (endDate) {
+        qb.andWhere('entry.entryDate <= :endDate', { endDate });
+      }
+      const row = (await qb.getRawOne()) as { debitTotal: string } | undefined;
+      const inventoryDebits = parseInt(row?.debitTotal || '0', 10);
+      total += inventoryDebits;
+    }
+
+    return total;
   }
 
   /**
