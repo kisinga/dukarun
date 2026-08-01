@@ -1020,6 +1020,15 @@ export type Database = {
         Args: { p_order_id: string; p_payments: Json }
         Returns: string
       }
+      create_customer: {
+        Args: {
+          p_email?: string
+          p_first_name: string
+          p_last_name?: string
+          p_phone?: string
+        }
+        Returns: string
+      }
       current_company_id: { Args: never; Returns: string }
       current_role_name: { Args: never; Returns: string }
       current_user_has_permission: {
