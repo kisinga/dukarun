@@ -1,5 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { RequestContext, TransactionalConnection } from '@vendure/core';
+import { RequestContext, TransactionalConnection, UserInputError } from '@vendure/core';
 import { MetricsService } from '../../infrastructure/observability/metrics.service';
 import { TracingService } from '../../infrastructure/observability/tracing.service';
 import { ACCOUNT_CODES } from '../../ledger/account-codes.constants';
@@ -71,6 +71,18 @@ export class LedgerPostingService {
   ) {}
 
   /**
+   * Invalidate cached balances for the given account codes.
+   * Every posting path must call this — LedgerQueryService caches balances for 60s,
+   * and reconciliation/expected-balance reads go through that cache.
+   */
+  private invalidateAccountCaches(ctx: RequestContext, accountCodes: string[]): void {
+    const channelId = ctx.channelId as number;
+    for (const code of new Set(accountCodes)) {
+      this.ledgerQueryService.invalidateCache(channelId, code);
+    }
+  }
+
+  /**
    * Ensure required accounts exist for a channel
    * Throws if any account is missing
    */
@@ -122,6 +134,7 @@ export class LedgerPostingService {
       };
 
       await this.postingService.post(ctx, 'Payment', sourceId, payload);
+      this.invalidateAccountCaches(ctx, accountCodes);
 
       this.metricsService?.recordLedgerPosting('Payment', ctx.channelId?.toString() || '');
       this.tracingService?.addEvent(span!, 'ledger.posted', {
@@ -161,6 +174,7 @@ export class LedgerPostingService {
     };
 
     await this.postingService.post(ctx, 'CreditSale', sourceId, payload);
+    this.invalidateAccountCaches(ctx, accountCodes);
     this.logger.log(`Posted credit sale entry for order ${context.orderCode}`);
   }
 
@@ -187,6 +201,7 @@ export class LedgerPostingService {
     // Post allocation and enforce AR invariant inside the same transaction.
     await this.postingService.post(ctx, 'PaymentAllocation', sourceId, payload);
     await this.assertAccountsReceivableInvariant(ctx, context.orderId);
+    this.invalidateAccountCaches(ctx, accountCodes);
     this.logger.log(
       `Posted payment allocation entry for payment ${sourceId}, order ${context.orderCode}`
     );
@@ -276,6 +291,7 @@ export class LedgerPostingService {
     };
 
     await this.postingService.post(ctx, 'SupplierPurchase', sourceId, payload);
+    this.invalidateAccountCaches(ctx, accountCodes);
     this.logger.log(`Posted supplier purchase entry for purchase ${context.purchaseReference}`);
   }
 
@@ -302,6 +318,7 @@ export class LedgerPostingService {
     // Post payment and enforce AP invariant inside the same transaction.
     await this.postingService.post(ctx, 'SupplierPayment', sourceId, payload);
     await this.assertAccountsPayableInvariant(ctx, context.supplierId);
+    this.invalidateAccountCaches(ctx, accountCodes);
     this.logger.log(
       `Posted supplier payment entry for payment ${sourceId}, purchase ${context.purchaseReference}`
     );
@@ -325,6 +342,7 @@ export class LedgerPostingService {
       lines: template.lines,
     };
     await this.postingService.post(ctx, 'Expense', sourceId, payload);
+    this.invalidateAccountCaches(ctx, accountCodes);
     this.logger.log(
       `Posted expense entry ${sourceId}, amount: ${context.amount}, source: ${context.sourceAccountCode}`
     );
@@ -351,6 +369,7 @@ export class LedgerPostingService {
     };
 
     await this.postingService.post(ctx, 'Refund', sourceId, payload);
+    this.invalidateAccountCaches(ctx, accountCodes);
     this.logger.log(`Posted refund entry for refund ${sourceId}, order ${context.orderCode}`);
   }
 
@@ -716,6 +735,76 @@ export class LedgerPostingService {
     this.logger.log(
       `Posted payment reversal for ${originalEntry.sourceType} ${paymentId}, amount: ${reversedAmount}`
     );
+    return reversedAmount;
+  }
+
+  /**
+   * Reverse a variance adjustment (declared balance is no longer SSOT; the admin reverted it).
+   * Posts the inverse of the original adjustment, linked via reversalOf.
+   *
+   * Idempotent: sourceId = `${originalSourceId}-reversal`.
+   * Returns the reversed amount in cents, or 0 if the reversal already existed.
+   */
+  async postVarianceReversal(ctx: RequestContext, originalSourceId: string): Promise<number> {
+    const channelId = ctx.channelId as number;
+
+    const entryRepo = this.connection.getRepository(ctx, JournalEntry);
+    const originalEntry = await entryRepo.findOne({
+      where: { channelId, sourceType: 'variance-adjustment', sourceId: originalSourceId },
+      relations: ['lines', 'lines.account'],
+    });
+
+    if (!originalEntry) {
+      throw new UserInputError(
+        `No variance adjustment found for source ${originalSourceId} in channel ${channelId}.`
+      );
+    }
+
+    const reversalSourceId = `${originalSourceId}-reversal`;
+    const existingReversal = await entryRepo.findOne({
+      where: { channelId, sourceType: 'variance-adjustment-reversal', sourceId: reversalSourceId },
+    });
+    if (existingReversal) {
+      this.logger.log(`Variance reversal for ${originalSourceId} already exists, skipping.`);
+      return 0;
+    }
+
+    const reversalLines = originalEntry.lines
+      .map(line => ({
+        accountCode: line.account.code,
+        debit: parseInt(String(line.credit), 10) || 0,
+        credit: parseInt(String(line.debit), 10) || 0,
+        meta: { ...(line.meta ?? {}), revertedAt: new Date().toISOString() },
+      }))
+      .filter(l => l.debit > 0 || l.credit > 0);
+
+    if (reversalLines.length === 0) {
+      throw new Error(
+        `Original variance adjustment ${originalSourceId} has no amounts to reverse.`
+      );
+    }
+
+    const accountCodes = reversalLines.map(l => l.accountCode);
+    await this.ensureAccountsExist(ctx, accountCodes);
+
+    const payload: PostingPayload = {
+      channelId,
+      entryDate: new Date().toISOString().slice(0, 10),
+      memo: `Variance reversal for ${originalSourceId}`,
+      reversalOf: originalEntry.id,
+      lines: reversalLines,
+    };
+
+    await this.postingService.post(ctx, 'variance-adjustment-reversal', reversalSourceId, payload);
+
+    this.invalidateAccountCaches(ctx, accountCodes);
+
+    const reversedAmount = originalEntry.lines.reduce(
+      (sum, line) => sum + (parseInt(String(line.debit), 10) || 0),
+      0
+    );
+
+    this.logger.log(`Posted variance reversal for ${originalSourceId}, amount: ${reversedAmount}`);
     return reversedAmount;
   }
 

@@ -82,7 +82,7 @@ private getApprovalSourceRoute(type: string): string {
     overdraft: '/dashboard/purchases/create',
     your_type: '/dashboard/your-page',
   };
-  return routes[type] || '/dashboard/approvals';
+  return routes[type] || '/dashboard/action-items';
 }
 ```
 

@@ -59,6 +59,7 @@ export const PERIOD_MANAGEMENT_SCHEMA = gql`
     openingFloat: String!
     closingDeclared: String!
     ledgerTotals: CashierSessionLedgerTotals!
+    expectedTotal: String!
     variance: String!
   }
 

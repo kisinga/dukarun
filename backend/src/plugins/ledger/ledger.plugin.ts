@@ -7,6 +7,8 @@ import {
 import { gql } from 'graphql-tag';
 import { VENDURE_COMPATIBILITY_VERSION } from '../../constants/vendure-version.constants';
 import { AuditCorePlugin } from '../audit/audit-core.plugin';
+import { ApprovalPlugin } from '../approval/approval.plugin';
+import { CashVarianceApprovalSubscriber } from './cash-variance-approval.subscriber';
 import { CashDrawerCount } from '../../domain/cashier/cash-drawer-count.entity';
 import { CashierSession } from '../../domain/cashier/cashier-session.entity';
 import { MpesaVerification } from '../../domain/cashier/mpesa-verification.entity';
@@ -106,7 +108,7 @@ const COMBINED_SCHEMA = gql`
 `;
 
 @VendurePlugin({
-  imports: [PluginCommonModule, AuditCorePlugin],
+  imports: [PluginCommonModule, AuditCorePlugin, ApprovalPlugin],
   entities: [
     Account,
     JournalEntry,
@@ -161,6 +163,7 @@ const COMBINED_SCHEMA = gql`
     FinancialService,
     OrderMarginService,
     OpenSessionService,
+    CashVarianceApprovalSubscriber,
     LedgerConsistencyGuard,
     OrderArProjection,
     PurchaseApProjection,

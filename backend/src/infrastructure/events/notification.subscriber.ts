@@ -256,6 +256,7 @@ export class NotificationSubscriber implements OnModuleInit {
         customer_credit: 'Customer Credit',
         below_wholesale: 'Below Wholesale Price',
         order_reversal: 'Order Reversal',
+        cash_variance: 'Cash Variance',
       };
       const typeLabel = typeLabels[event.approvalType] ?? event.approvalType;
       const routes: Record<string, string> = {
@@ -263,8 +264,9 @@ export class NotificationSubscriber implements OnModuleInit {
         customer_credit: '/dashboard/customers/create',
         below_wholesale: '/dashboard/sell',
         order_reversal: '/dashboard/orders',
+        cash_variance: '/dashboard/action-items',
       };
-      const baseRoute = routes[event.approvalType] ?? '/dashboard/approvals';
+      const baseRoute = routes[event.approvalType] ?? '/dashboard/action-items';
       const navigateTo = `${baseRoute}?approvalId=${event.approvalId}`;
 
       if (event.action === 'created') {
@@ -280,7 +282,7 @@ export class NotificationSubscriber implements OnModuleInit {
           approvalType: event.approvalType,
           action: event.action,
           targetUserIds: targetIds,
-          navigateTo: '/dashboard/approvals',
+          navigateTo: '/dashboard/action-items',
         });
       } else {
         await this.outboundDelivery.deliver(event.ctx, 'approval_resolved', {

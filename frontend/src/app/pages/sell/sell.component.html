@@ -205,6 +205,7 @@
   [isSearchingCustomersForCash]="isSearchingCustomersForCash()"
   [selectedPaymentMethod]="selectedPaymentMethod()"
   (completeCashier)="handleCompleteCashier()"
+  (completeCashierAndPrint)="handleCompleteCashierAndPrint()"
   (completeCredit)="handleCompleteCredit()"
   (completeCreditAndPrint)="handleCompleteCreditAndPrint()"
   (completeCash)="handleCompleteCash()"
@@ -225,7 +226,9 @@
 <!-- Split payment (cash + M-Pesa) collection -->
 <app-settle-order-modal
   #splitModal
+  [enablePrint]="enablePrinter()"
   (confirm)="onSplitConfirm($event)"
   (settled)="onSplitSettled()"
   (cancelled)="onSplitCancelled()"
+  (printRequested)="onSplitPrintReceipt($event)"
 />

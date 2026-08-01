@@ -12,8 +12,8 @@ export interface ApprovalHandler {
 
 /**
  * Registry of approval type -> handler.
- * After reviewApprovalRequest saves and publishes the event, the approval service
- * invokes the registered handler for action === 'approved'.
+ * reviewApprovalRequest invokes the registered handler for action === 'approved'
+ * BEFORE persisting the review, so a throwing handler leaves the request pending.
  * Add new types by registering a handler (e.g. in your plugin's onModuleInit).
  */
 @Injectable()

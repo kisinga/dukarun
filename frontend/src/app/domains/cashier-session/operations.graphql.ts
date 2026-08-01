@@ -62,6 +62,7 @@ export const GET_CASHIER_SESSION = graphql(`
         mpesaTotal
         totalCollected
       }
+      expectedTotal
       variance
     }
   }
@@ -111,6 +112,7 @@ export const CLOSE_CASHIER_SESSION = graphql(`
         mpesaTotal
         totalCollected
       }
+      expectedTotal
       variance
     }
   }

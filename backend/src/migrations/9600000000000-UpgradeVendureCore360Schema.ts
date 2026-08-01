@@ -1,5 +1,4 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-import { migrateAssetTranslationData, migrateProductOptionGroupData } from '@vendure/core';
 
 /**
  * Vendure core 3.5.2 → 3.6.4 schema upgrade.
@@ -15,6 +14,12 @@ import { migrateAssetTranslationData, migrateProductOptionGroupData } from '@ven
  *     CHANNEL's defaultLanguageCode; throws if __default_channel__ is missing.
  * Both are hasColumn-guarded, so on a DB where the source column is already gone
  * they no-op.
+ *
+ * The helpers only exist in @vendure/core >= 3.6 — they are resolved LAZILY via
+ * require() so this file compiles under 3.5.2 as well. If a source column still
+ * exists but the helper is absent (migration running against a 3.5.2 package),
+ * we throw BEFORE any DROP: the migration fails loudly and rolls back instead
+ * of silently discarding product-option-group or asset-name data.
  *
  * DDL is GUARDED (IF [NOT] EXISTS) — deliberately NOT the verbatim auto-generated
  * DDL — because this app provisions a fresh/empty DB with `synchronize: true`
@@ -174,12 +179,35 @@ export class UpgradeVendureCore360Schema9600000000000 implements MigrationInterf
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_a6e91739227bf4d442f23c52c7"`);
 
     // ── Official data migration, then drop the source column (per Vendure 3.6 docs). ──
-    await migrateProductOptionGroupData(queryRunner);
-    await queryRunner.query(`ALTER TABLE "product_option_group" DROP COLUMN IF EXISTS "productId"`);
+    // Helpers are 3.6-only; lazy require keeps this file compilable under 3.5.2.
+    // Throws before any DROP when a source column exists but the helper is missing.
+    const vendureCore = require('@vendure/core');
+    const hasProductId = await queryRunner.hasColumn('product_option_group', 'productId');
+    if (hasProductId) {
+      if (typeof vendureCore.migrateProductOptionGroupData !== 'function') {
+        throw new Error(
+          'UpgradeVendureCore360Schema: product_option_group.productId still exists but ' +
+            'migrateProductOptionGroupData is unavailable (requires @vendure/core >= 3.6). ' +
+            'Upgrade @vendure/core before running this migration — aborting to avoid data loss.'
+        );
+      }
+      await vendureCore.migrateProductOptionGroupData(queryRunner);
+      await queryRunner.query(`ALTER TABLE "product_option_group" DROP COLUMN "productId"`);
+    }
 
     // ── Official data migration, then drop the source column (per Vendure 3.6 docs). ──
-    await migrateAssetTranslationData(queryRunner);
-    await queryRunner.query(`ALTER TABLE "asset" DROP COLUMN IF EXISTS "name"`);
+    const hasAssetName = await queryRunner.hasColumn('asset', 'name');
+    if (hasAssetName) {
+      if (typeof vendureCore.migrateAssetTranslationData !== 'function') {
+        throw new Error(
+          'UpgradeVendureCore360Schema: asset.name still exists but ' +
+            'migrateAssetTranslationData is unavailable (requires @vendure/core >= 3.6). ' +
+            'Upgrade @vendure/core before running this migration — aborting to avoid data loss.'
+        );
+      }
+      await vendureCore.migrateAssetTranslationData(queryRunner);
+      await queryRunner.query(`ALTER TABLE "asset" DROP COLUMN "name"`);
+    }
 
     // ── Administrator unique constraint removed in 3.6 (dup-email now enforced in app layer). ──
     await queryRunner.query(

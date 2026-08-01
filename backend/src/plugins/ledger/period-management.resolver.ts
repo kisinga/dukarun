@@ -838,6 +838,7 @@ export class PeriodManagementResolver {
         mpesaTotal: summary.ledgerTotals.mpesaTotal.toString(),
         totalCollected: summary.ledgerTotals.totalCollected.toString(),
       },
+      expectedTotal: summary.expectedTotal.toString(),
       variance: summary.variance.toString(),
     };
   }

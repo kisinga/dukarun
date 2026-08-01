@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   Administrator,
   Channel,
@@ -15,6 +15,7 @@ import { CashDrawerCount, CashCountType } from '../../domain/cashier/cash-drawer
 import { CashierSession } from '../../domain/cashier/cashier-session.entity';
 import { MpesaVerification } from '../../domain/cashier/mpesa-verification.entity';
 import { Account } from '../../ledger/account.entity';
+import { JournalEntry } from '../../ledger/journal-entry.entity';
 import { Reconciliation } from '../../domain/recon/reconciliation.entity';
 import { ReconciliationAccount } from '../../domain/recon/reconciliation-account.entity';
 import { LedgerQueryService } from './ledger-query.service';
@@ -35,6 +36,7 @@ import {
 import { ChannelPaymentMethodService } from './channel-payment-method.service';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { AUDIT_EVENTS } from '../../infrastructure/audit/audit-events.catalog';
+import { ApprovalService } from '../approval/approval.service';
 
 /**
  * Cashier Session Summary
@@ -53,7 +55,9 @@ export interface CashierSessionSummary {
     mpesaTotal: number;
     totalCollected: number;
   };
-  variance: number; // closingDeclared - expectedCash, where expectedCash is the session-scoped ledger total
+  /** Full-ledger expected summed across all cashier-controlled accounts (as of close date, or today when open). */
+  expectedTotal: number;
+  variance: number; // closingDeclared - expectedTotal, where expectedTotal is the full-ledger sum across cashier-controlled accounts
 }
 
 /**
@@ -135,8 +139,71 @@ export class OpenSessionService {
     private readonly channelPaymentMethodService: ChannelPaymentMethodService,
     private readonly auditService: AuditService,
     private readonly eventBus: EventBus,
-    private readonly channelService: ChannelService
+    private readonly channelService: ChannelService,
+    @Optional() private readonly approvalService?: ApprovalService
   ) {}
+
+  /**
+   * Approval-request plumbing for variance reviews. Never throws: a failure here must
+   * not affect session open/close or ledger posting.
+   */
+  private async createVarianceReviewRequest(
+    ctx: RequestContext,
+    params: {
+      channelId: number;
+      sessionId: string;
+      reconciliationId: string;
+      accountCode: string;
+      declaredCents: number;
+      expectedCents: number;
+      varianceCents: number;
+    }
+  ): Promise<void> {
+    if (!this.approvalService) return;
+    try {
+      await this.approvalService.createApprovalRequest(ctx, {
+        type: 'cash_variance',
+        entityType: 'Reconciliation',
+        entityId: params.reconciliationId,
+        metadata: {
+          sessionId: params.sessionId,
+          reconciliationId: params.reconciliationId,
+          accountCode: params.accountCode,
+          declaredCents: params.declaredCents,
+          expectedCents: params.expectedCents,
+          varianceCents: params.varianceCents,
+          direction: params.varianceCents < 0 ? 'short' : 'over',
+        },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Failed to create cash_variance review request for account ${params.accountCode}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  /**
+   * Expire still-pending variance reviews for an account when a new reconciliation
+   * is posted for it — the review window has closed and the ledger has moved on.
+   */
+  private async expireVarianceReviewRequests(
+    ctx: RequestContext,
+    channelId: number,
+    accountCode: string
+  ): Promise<void> {
+    if (!this.approvalService) return;
+    try {
+      await this.approvalService.expirePendingRequests(ctx, {
+        channelId,
+        type: 'cash_variance',
+        metadataMatch: { accountCode },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Failed to expire cash_variance review requests for account ${accountCode}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
 
   /**
    * Start a new cashier session with per-account opening reconciliation.
@@ -242,8 +309,14 @@ export class OpenSessionService {
       })
       .catch(() => {});
 
+    // A new opening reconciliation supersedes any still-pending variance reviews
+    // for these accounts (the ledger has moved on).
+    for (const { accountCode } of perAccount) {
+      await this.expireVarianceReviewRequests(ctx, input.channelId, accountCode);
+    }
+
     // Post variance only when declared differs from expected (not full amount)
-    for (const { accountCode, varianceCents } of perAccount) {
+    for (const { accountCode, declaredCents, expectedCents, varianceCents } of perAccount) {
       if (varianceCents !== 0) {
         await this.financialService.postVarianceAdjustment(
           ctx,
@@ -253,6 +326,15 @@ export class OpenSessionService {
           'Opening balance',
           openingRecon.id
         );
+        await this.createVarianceReviewRequest(ctx, {
+          channelId: input.channelId,
+          sessionId: savedSession.id,
+          reconciliationId: openingRecon.id,
+          accountCode,
+          declaredCents,
+          expectedCents,
+          varianceCents,
+        });
       }
     }
 
@@ -428,13 +510,22 @@ export class OpenSessionService {
     const channelId = session.channelId;
 
     return this.connection.withTransaction(ctx, async txCtx => {
-      // 1. Record blind count for audit trail (skip automatic variance posting — we handle per-account below)
-      const closingCount = await this.recordCashCount(txCtx, {
-        sessionId,
-        declaredCash: totalDeclared,
-        countType: 'closing',
-        skipVariancePosting: true,
-      });
+      // 1. Record blind count for audit trail (skip automatic variance posting — we handle per-account below).
+      // The count is a cash-drawer count: declare only the CASH_ON_HAND portion so it is
+      // compared against the full-ledger cash balance (cash-vs-cash). Channels without a
+      // cash account have no drawer to count — skip the count entirely.
+      const cashDeclared = input.closingBalances.find(
+        b => b.accountCode === ACCOUNT_CODES.CASH_ON_HAND
+      )?.amountCents;
+      const closingCount =
+        cashDeclared != null
+          ? await this.recordCashCount(txCtx, {
+              sessionId,
+              declaredCash: cashDeclared,
+              countType: 'closing',
+              skipVariancePosting: true,
+            })
+          : null;
 
       // 2. Close the session
       const txSessionRepo = this.connection.getRepository(txCtx, CashierSession);
@@ -474,7 +565,7 @@ export class OpenSessionService {
       // 5. Return summary
       const summary = await this.getSessionSummary(txCtx, sessionId);
       this.logger.log(
-        `Cashier session ${sessionId} closed. Expected: ${summary.ledgerTotals.cashTotal}, Declared: ${totalDeclared}, Variance: ${summary.variance}, ClosingCountId: ${closingCount.count.id}`
+        `Cashier session ${sessionId} closed. Expected: ${summary.ledgerTotals.cashTotal}, Declared: ${totalDeclared}, Variance: ${summary.variance}, ClosingCountId: ${closingCount?.count.id ?? 'none'}`
       );
 
       const [cashierName, storeName, salesBreakdown, purchases] = await Promise.all([
@@ -538,10 +629,49 @@ export class OpenSessionService {
       session.id
     );
 
+    // Expected = full-ledger balance summed across all cashier-controlled accounts.
+    // Same scope ('manual' + snapshot date) as opening/closing variance posting so
+    // summary variance always equals the sum of per-account closing variances.
+    const requirements = await this.getChannelReconciliationRequirements(ctx, session.channelId);
+    const accountCodes = [...new Set(requirements.paymentMethods.map(pm => pm.ledgerAccountCode))];
+    // Align the as-of date with the closing reconciliation's snapshot date (which
+    // postClosingVariance used) so summary and posted per-account variances match even
+    // when the recon was created on a different day than closedAt (repair flow).
+    let asOfDate = (session.closedAt ?? new Date()).toISOString().slice(0, 10);
+    if (session.status === 'closed') {
+      const reconRepo = this.connection.getRepository(ctx, Reconciliation);
+      const closingRecon = await reconRepo.findOne({
+        where: {
+          channelId: session.channelId,
+          scope: 'cash-session',
+          scopeRefId: toScopeRefId({
+            scope: 'cash-session',
+            sessionId: session.id,
+            kind: 'closing',
+          }),
+        },
+        order: { snapshotAt: 'DESC' },
+      });
+      if (closingRecon?.snapshotAt) {
+        asOfDate = String(closingRecon.snapshotAt).slice(0, 10);
+      }
+    }
+    const expectedParts = await Promise.all(
+      accountCodes.map(code =>
+        this.ledgerQueryService.getExpectedBalanceForReconciliation(
+          session.channelId,
+          'manual',
+          session.id,
+          code,
+          asOfDate
+        )
+      )
+    );
+    const expectedTotal = expectedParts.reduce((sum, v) => sum + v, 0);
+
     const openingFloat = await this.getOpeningBalanceForSession(ctx, session.id);
     const closingDeclared = parseInt(session.closingDeclared, 10);
-    const expectedCash = ledgerTotals.cashTotal;
-    const variance = session.status === 'closed' ? closingDeclared - expectedCash : 0;
+    const variance = session.status === 'closed' ? closingDeclared - expectedTotal : 0;
 
     return {
       sessionId: session.id,
@@ -552,6 +682,7 @@ export class OpenSessionService {
       openingFloat,
       closingDeclared,
       ledgerTotals,
+      expectedTotal,
       variance,
     };
   }
@@ -790,10 +921,18 @@ export class OpenSessionService {
       declaredAmounts: effectiveDeclaredAmounts,
     };
 
-    return this.reconciliationService.createReconciliation(ctx, input, {
+    const recon = await this.reconciliationService.createReconciliation(ctx, input, {
       snapshotDate,
       expectedAmountCentsByAccountId,
     });
+
+    // A new closing reconciliation supersedes any still-pending variance reviews
+    // for these accounts (the ledger has moved on).
+    for (const d of effectiveDeclaredAmounts) {
+      await this.expireVarianceReviewRequests(ctx, channelId, d.accountCode);
+    }
+
+    return recon;
   }
 
   /**
@@ -825,6 +964,14 @@ export class OpenSessionService {
       );
       const variance = declaredCents - expected;
       if (variance !== 0) {
+        // Only create a review item when this is a fresh posting — repair re-runs
+        // (createCashierSessionReconciliation) hit the same idempotent sourceId and
+        // must not spawn duplicate action items.
+        const sourceId = `${sessionId}-${row.account.code}-${closingRecon.id}`;
+        const alreadyPosted = await this.connection.getRepository(ctx, JournalEntry).findOne({
+          where: { channelId, sourceType: 'variance-adjustment', sourceId },
+          select: ['id'],
+        });
         await this.financialService.postVarianceAdjustment(
           ctx,
           sessionId,
@@ -833,6 +980,17 @@ export class OpenSessionService {
           'Closing balance variance',
           closingRecon.id
         );
+        if (!alreadyPosted) {
+          await this.createVarianceReviewRequest(ctx, {
+            channelId,
+            sessionId,
+            reconciliationId: closingRecon.id,
+            accountCode: row.account.code,
+            declaredCents,
+            expectedCents: expected,
+            varianceCents: variance,
+          });
+        }
       }
     }
   }
@@ -1029,6 +1187,8 @@ export class OpenSessionService {
     const hasVariance = Math.abs(variance) > 0;
 
     if (hasVariance && !input.skipVariancePosting) {
+      // A new count supersedes any still-pending variance review for this account.
+      await this.expireVarianceReviewRequests(ctx, session.channelId, ACCOUNT_CODES.CASH_ON_HAND);
       await this.financialService.postVarianceAdjustment(
         ctx,
         session.id,
@@ -1037,6 +1197,17 @@ export class OpenSessionService {
         input.varianceReason ?? 'Session count variance',
         savedCount.id
       );
+      // Same contract as session open/close: the declared value becomes ledger truth
+      // and the variance is surfaced as a reviewable action item (approve = revert).
+      await this.createVarianceReviewRequest(ctx, {
+        channelId: session.channelId,
+        sessionId: session.id,
+        reconciliationId: savedCount.id,
+        accountCode: ACCOUNT_CODES.CASH_ON_HAND,
+        declaredCents: input.declaredCash,
+        expectedCents: expectedCash,
+        varianceCents: variance,
+      });
     }
 
     this.logger.log(
@@ -1065,18 +1236,23 @@ export class OpenSessionService {
   }
 
   /**
-   * Calculate expected cash for a session (session-scoped ledger total only).
+   * Calculate expected cash for a session (full-ledger CASH_ON_HAND balance as of today).
+   * Uses the same 'manual' scope as opening/closing variance so cash outflows that never
+   * tag openSessionId (expenses, refunds, supplier payments, reversals) are reflected.
    * Internal method - not exposed to cashiers
    */
   private async calculateExpectedCash(
     ctx: RequestContext,
     session: CashierSession
   ): Promise<number> {
-    const ledgerTotals = await this.ledgerQueryService.getCashierSessionTotals(
+    const today = new Date().toISOString().slice(0, 10);
+    return this.ledgerQueryService.getExpectedBalanceForReconciliation(
       session.channelId,
-      session.id
+      'manual',
+      session.id,
+      ACCOUNT_CODES.CASH_ON_HAND,
+      today
     );
-    return ledgerTotals.cashTotal;
   }
 
   /**
@@ -1344,7 +1520,8 @@ export class OpenSessionService {
 
   /**
    * Get expected closing balances for an open session (per cashier-controlled account).
-   * Expected = session-scoped ledger balance for that account.
+   * Expected = full-ledger balance as of today (scope 'manual'), matching what
+   * postClosingVariance computes at close so the prefill never disagrees with the close.
    */
   async getExpectedClosingBalances(
     ctx: RequestContext,
@@ -1355,6 +1532,7 @@ export class OpenSessionService {
     if (!session) throw new Error(`Session ${sessionId} not found`);
 
     const requirements = await this.getChannelReconciliationRequirements(ctx, session.channelId);
+    const today = new Date().toISOString().slice(0, 10);
     const results: Array<{
       accountCode: string;
       accountName: string;
@@ -1364,9 +1542,10 @@ export class OpenSessionService {
     for (const pm of requirements.paymentMethods) {
       const expected = await this.ledgerQueryService.getExpectedBalanceForReconciliation(
         session.channelId,
-        'cash-session',
+        'manual',
         sessionId,
-        pm.ledgerAccountCode
+        pm.ledgerAccountCode,
+        today
       );
       results.push({
         accountCode: pm.ledgerAccountCode,

@@ -125,6 +125,7 @@ export interface CashierSessionSummary {
   openingFloat: string;
   closingDeclared: string;
   ledgerTotals: CashierSessionLedgerTotals;
+  expectedTotal: string;
   variance: string;
 }
 

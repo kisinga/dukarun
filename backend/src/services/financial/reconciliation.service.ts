@@ -184,7 +184,8 @@ export class ReconciliationService {
 
       const reconciliationRepo = this.connection.getRepository(txCtx, Reconciliation);
       const createdBy = txCtx.activeUserId ? parseInt(txCtx.activeUserId.toString(), 10) : 0;
-      const varianceAmount = (expectedSum - actualSum).toString();
+      // Header variance matches the per-account convention: declared - expected (positive = overage).
+      const varianceAmount = (actualSum - expectedSum).toString();
 
       const reconciliation = reconciliationRepo.create({
         channelId: input.channelId,
@@ -249,8 +250,8 @@ export class ReconciliationService {
     const reconciliationRepo = this.connection.getRepository(ctx, Reconciliation);
     const expectedBalance = input.expectedBalance ? BigInt(input.expectedBalance) : BigInt(0);
     const actualBalance = BigInt(input.actualBalance);
-    // Header variance: expected - actual (legacy). Per-account convention is variance = declared - expected (positive = overage, negative = shortage).
-    const varianceAmount = (expectedBalance - actualBalance).toString();
+    // Header variance matches the per-account convention: declared - expected (positive = overage, negative = shortage).
+    const varianceAmount = (actualBalance - expectedBalance).toString();
     const createdBy = ctx.activeUserId ? parseInt(ctx.activeUserId.toString(), 10) : 0;
     const reconciliation = reconciliationRepo.create({
       channelId: input.channelId,
@@ -550,7 +551,7 @@ export class ReconciliationService {
         expectedStr = String(balance.balance);
         const expected = BigInt(expectedStr);
         const declared = BigInt(declaredStr);
-        varianceStr = (expected - declared).toString();
+        varianceStr = (declared - expected).toString();
       } catch {
         // Account may be deleted or balance unavailable
       }
@@ -635,7 +636,7 @@ export class ReconciliationService {
             expectedStr = String(balance.balance);
             const expected = BigInt(expectedStr);
             const declared = declaredStr !== null ? BigInt(declaredStr) : BigInt(0);
-            varianceStr = (expected - declared).toString();
+            varianceStr = (declared - expected).toString();
           } catch {
             // Account may be deleted or balance unavailable
           }

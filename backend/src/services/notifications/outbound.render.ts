@@ -449,11 +449,12 @@ Please log in to the admin panel to review and approve this registration.
       customer_credit: 'Customer Credit',
       below_wholesale: 'Below Wholesale Price',
       order_reversal: 'Order Reversal',
+      cash_variance: 'Cash Variance',
     };
     const typeLabel = typeLabels[String(p.approvalType)] ?? String(p.approvalType);
     return {
       inAppTitle: `${typeLabel} Approval Needed`,
-      inAppMessage: `A ${typeLabel.toLowerCase()} approval has been requested. Review it on the Approvals page.`,
+      inAppMessage: `A ${typeLabel.toLowerCase()} approval has been requested. Review it on the Action Items page.`,
     };
   },
   approval_resolved: p => {
@@ -462,6 +463,7 @@ Please log in to the admin panel to review and approve this registration.
       customer_credit: 'Customer Credit',
       below_wholesale: 'Below Wholesale Price',
       order_reversal: 'Order Reversal',
+      cash_variance: 'Cash Variance',
     };
     const typeLabel = typeLabels[String(p.approvalType)] ?? String(p.approvalType);
     const action = String(p.action);
