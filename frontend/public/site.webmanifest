@@ -7,16 +7,10 @@
   "start_url": "/dashboard",
   "icons": [
     {
-      "src": "/web-app-manifest-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/web-app-manifest-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "src": "/assets/logo/dukarun-icon-dark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "shortcuts": [
@@ -27,8 +21,10 @@
       "url": "/dashboard/sell",
       "icons": [
         {
-          "src": "web-app-manifest-192x192.png",
-          "sizes": "192x192"
+          "src": "/assets/logo/dukarun-icon-dark.svg",
+          "sizes": "any",
+          "type": "image/svg+xml",
+          "purpose": "any"
         }
       ]
     },
@@ -39,8 +35,10 @@
       "url": "/dashboard/inventory",
       "icons": [
         {
-          "src": "web-app-manifest-192x192.png",
-          "sizes": "192x192"
+          "src": "/assets/logo/dukarun-icon-dark.svg",
+          "sizes": "any",
+          "type": "image/svg+xml",
+          "purpose": "any"
         }
       ]
     },
@@ -51,8 +49,10 @@
       "url": "/dashboard/products",
       "icons": [
         {
-          "src": "web-app-manifest-192x192.png",
-          "sizes": "192x192"
+          "src": "/assets/logo/dukarun-icon-dark.svg",
+          "sizes": "any",
+          "type": "image/svg+xml",
+          "purpose": "any"
         }
       ]
     }
