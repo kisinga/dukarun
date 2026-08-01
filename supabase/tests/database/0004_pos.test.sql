@@ -78,19 +78,21 @@ select is(
   'order total is 245000 cents'
 );
 
--- Payment entry: DR CASH_ON_HAND 200000, DR CLEARING_MPESA 45000, CR SALES 245000.
+-- Payment entries (one per payment row): DR CASH_ON_HAND 200000,
+-- DR CLEARING_MPESA 45000, CR SALES 245000 across both entries.
 select results_eq(
   $$select a.code::text, l.debit, l.credit
     from public.ledger_journal_lines l
     join public.ledger_accounts a on a.id = l.account_id
     join public.ledger_journal_entries e on e.id = l.entry_id
-    where e.source_type = 'Payment' and e.source_id = (select order_id::text from sale1)
-    order by a.code$$,
+    where e.source_type = 'Payment' and l.order_id = (select order_id from sale1)
+    order by a.code, l.credit desc$$,
   $$values
     ('CASH_ON_HAND', 200000::bigint, 0::bigint),
     ('CLEARING_MPESA', 45000::bigint, 0::bigint),
-    ('SALES', 0::bigint, 245000::bigint)$$,
-  'payment entry posts DR clearing per method / CR SALES gross'
+    ('SALES', 0::bigint, 200000::bigint),
+    ('SALES', 0::bigint, 45000::bigint)$$,
+  'payment entries post DR clearing per method / CR SALES gross (one entry per payment)'
 );
 
 -- COGS entry: DR COGS 130000 / CR INVENTORY 130000.

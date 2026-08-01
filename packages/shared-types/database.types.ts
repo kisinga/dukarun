@@ -888,6 +888,54 @@ export type Database = {
           },
         ]
       }
+      refunds: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          method_code: string
+          order_id: string
+          reason: string | null
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          method_code: string
+          order_id: string
+          reason?: string | null
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          method_code?: string
+          order_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refunds_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       roles: {
         Row: {
           company_id: string | null
@@ -1040,12 +1088,46 @@ export type Database = {
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       is_platform_admin: { Args: never; Returns: boolean }
+      post_balance_adjustment: {
+        Args: { p_amount: number; p_customer_id: string; p_reason: string }
+        Returns: string
+      }
+      post_expense: {
+        Args: {
+          p_amount: number
+          p_category?: string
+          p_memo?: string
+          p_source_account_code: string
+        }
+        Returns: string
+      }
       post_journal_entry: {
         Args: {
           p_company_id: string
           p_entry_date?: string
           p_lines: Json
           p_memo: string
+          p_source_id: string
+          p_source_type: string
+        }
+        Returns: string
+      }
+      post_payment_reversal: { Args: { p_payment_id: string }; Returns: string }
+      post_refund: {
+        Args: {
+          p_amount: number
+          p_method_code: string
+          p_order_id: string
+          p_reason?: string
+        }
+        Returns: string
+      }
+      post_reversal_entry: {
+        Args: {
+          p_company_id: string
+          p_lines: Json
+          p_memo: string
+          p_reversal_of: string
           p_source_id: string
           p_source_type: string
         }
@@ -1061,12 +1143,31 @@ export type Database = {
         }
         Returns: string
       }
+      post_supplier_balance_adjustment: {
+        Args: { p_amount: number; p_reason: string; p_supplier_id: string }
+        Returns: string
+      }
+      post_transfer: {
+        Args: {
+          p_fee?: number
+          p_from_account_code: string
+          p_memo?: string
+          p_principal: number
+          p_to_account_code: string
+          p_transfer_id?: string
+        }
+        Returns: string
+      }
       provision_company: {
         Args: {
           p_company_name: string
           p_currency?: string
           p_store_name?: string
         }
+        Returns: string
+      }
+      require_asset_leaf_account: {
+        Args: { p_code: string; p_company_id: string }
         Returns: string
       }
       save_draft: {
