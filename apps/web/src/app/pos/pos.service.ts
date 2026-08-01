@@ -3,15 +3,23 @@ import type { Database } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
 
 export type Product = Database['public']['Tables']['products']['Row'];
+export type Variant = Database['public']['Views']['variant_catalog']['Row'];
 export type Customer = Database['public']['Tables']['customers']['Row'];
 export type Order = Database['public']['Tables']['orders']['Row'];
 export type OrderLine = Database['public']['Tables']['order_lines']['Row'];
 export type Payment = Database['public']['Tables']['payments']['Row'];
 export type InventoryBatch = Database['public']['Tables']['inventory_batches']['Row'];
 
+/** Display name for a catalog row; hides the synthetic 'Default' variant name. */
+export function variantLabel(v: Pick<Variant, 'product_name' | 'variant_name'>): string {
+  const product = v.product_name ?? '';
+  if (!v.variant_name || v.variant_name === 'Default') return product;
+  return `${product} — ${v.variant_name}`;
+}
+
 /** p_lines item for post_sale / save_draft (amounts in cents). */
 export interface SaleLineInput {
-  product_id: string;
+  variant_id: string;
   quantity: number;
   unit_price: number;
   custom_price?: number;
@@ -31,7 +39,8 @@ export type OrderWithCustomer = Order & {
 };
 
 export type OrderLineWithProduct = OrderLine & {
-  products: Pick<Product, 'name' | 'sku'> | null;
+  /** Resolved from variant_catalog (product — variant). */
+  label: string;
 };
 
 /**
@@ -63,74 +72,78 @@ export class PosService {
     return this.supabase.client;
   }
 
-  async searchProducts(query: string): Promise<Product[]> {
+  /** POS search: active variants of active products from variant_catalog. */
+  async searchVariants(query: string): Promise<Variant[]> {
     // Strip characters that would break the PostgREST .or() filter string.
     const pattern = `%${query.trim().replace(/[%_,()]/g, ' ')}%`;
     const { data, error } = await this.client
-      .from('products')
+      .from('variant_catalog')
       .select('*')
-      .or(`name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}`)
-      .eq('active', true)
+      .or(
+        `product_name.ilike.${pattern},variant_name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}`
+      )
+      .eq('variant_active', true)
+      .eq('product_active', true)
       .limit(20);
     if (error) throw error;
     return data;
   }
 
-  /** Management list: all products (active + inactive), name/sku/barcode search, sorted by name. */
-  async listProducts(query = ''): Promise<Product[]> {
-    let q = this.client.from('products').select('*').order('name').limit(500);
+  /** Management list: whole catalog (active + inactive), search across family/variant/sku/barcode. */
+  async listCatalog(query = ''): Promise<Variant[]> {
+    let q = this.client
+      .from('variant_catalog')
+      .select('*')
+      .order('product_name')
+      .order('variant_name')
+      .limit(1000);
     const trimmed = query.trim();
     if (trimmed) {
       const pattern = `%${trimmed.replace(/[%_,()]/g, ' ')}%`;
-      q = q.or(`name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}`);
+      q = q.or(
+        `product_name.ilike.${pattern},variant_name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}`
+      );
     }
     const { data, error } = await q;
     if (error) throw error;
     return data;
   }
 
-  /** Stock per product from the product_stock view (client-side join). */
+  /** Product families (the products table) for the management screen grouping. */
+  async listFamilies(): Promise<Product[]> {
+    const { data, error } = await this.client.from('products').select('*').order('name').limit(500);
+    if (error) throw error;
+    return data;
+  }
+
+  /** Stock per variant from the product_stock view (client-side join). */
   async productStock(): Promise<Map<string, { stock: number; stock_value: number }>> {
     const { data, error } = await this.client.from('product_stock').select('*');
     if (error) throw error;
     return new Map(
       (data ?? [])
-        .filter(r => r.product_id !== null)
-        .map(r => [r.product_id!, { stock: Number(r.stock ?? 0), stock_value: r.stock_value ?? 0 }])
+        .filter(r => r.variant_id !== null)
+        .map(r => [r.variant_id!, { stock: Number(r.stock ?? 0), stock_value: r.stock_value ?? 0 }])
     );
   }
 
-  /** Batch history for one product (expand row on the Products screen). */
-  async productBatches(productId: string): Promise<InventoryBatch[]> {
+  /** Batch history for one variant (expand row on the Products screen). */
+  async variantBatches(variantId: string): Promise<InventoryBatch[]> {
     const { data, error } = await this.client
       .from('inventory_batches')
       .select('*')
-      .eq('product_id', productId)
+      .eq('variant_id', variantId)
       .order('purchased_at', { ascending: false })
       .limit(50);
     if (error) throw error;
     return data;
   }
 
-  async createProduct(input: {
-    name: string;
-    price: number;
-    sku?: string;
-    barcode?: string;
-    wholesale_price?: number;
-    allow_fractional?: boolean;
-    track_inventory?: boolean;
-  }): Promise<string> {
+  /** Create a product family (variants are added via upsertVariant). */
+  async createProduct(input: { name: string; barcode?: string }): Promise<string> {
     const { data, error } = await this.client.rpc('create_product', {
       p_name: input.name,
-      p_price: input.price,
-      ...(input.sku ? { p_sku: input.sku } : {}),
       ...(input.barcode ? { p_barcode: input.barcode } : {}),
-      ...(input.wholesale_price !== undefined ? { p_wholesale_price: input.wholesale_price } : {}),
-      ...(input.allow_fractional !== undefined
-        ? { p_allow_fractional: input.allow_fractional }
-        : {}),
-      ...(input.track_inventory !== undefined ? { p_track_inventory: input.track_inventory } : {}),
     });
     if (error) throw rpcError(error);
     return data;
@@ -139,43 +152,59 @@ export class PosService {
   /** null/undefined fields are left unchanged by the backend. */
   async updateProduct(
     productId: string,
-    changes: {
-      name?: string;
-      price?: number;
-      barcode?: string;
-      wholesale_price?: number;
-      allow_fractional?: boolean;
-      track_inventory?: boolean;
-      active?: boolean;
-    }
+    changes: { name?: string; barcode?: string; active?: boolean }
   ): Promise<string> {
     const { data, error } = await this.client.rpc('update_product', {
       p_product_id: productId,
       ...(changes.name !== undefined ? { p_name: changes.name } : {}),
-      ...(changes.price !== undefined ? { p_price: changes.price } : {}),
       ...(changes.barcode !== undefined ? { p_barcode: changes.barcode } : {}),
-      ...(changes.wholesale_price !== undefined
-        ? { p_wholesale_price: changes.wholesale_price }
-        : {}),
-      ...(changes.allow_fractional !== undefined
-        ? { p_allow_fractional: changes.allow_fractional }
-        : {}),
-      ...(changes.track_inventory !== undefined
-        ? { p_track_inventory: changes.track_inventory }
-        : {}),
       ...(changes.active !== undefined ? { p_active: changes.active } : {}),
     });
     if (error) throw rpcError(error);
     return data;
   }
 
-  /** Full active catalog for the offline product snapshot (IndexedDB cache). */
-  async fetchActiveProducts(): Promise<Product[]> {
+  /** Create (no variantId) or update a variant. */
+  async upsertVariant(input: {
+    product_id: string;
+    name: string;
+    price: number;
+    variant_id?: string;
+    sku?: string;
+    barcode?: string;
+    wholesale_price?: number;
+    allow_fractional?: boolean;
+    track_inventory?: boolean;
+    active?: boolean;
+    kind?: string;
+  }): Promise<string> {
+    const { data, error } = await this.client.rpc('upsert_variant', {
+      p_product_id: input.product_id,
+      p_name: input.name,
+      p_price: input.price,
+      ...(input.variant_id ? { p_variant_id: input.variant_id } : {}),
+      ...(input.sku ? { p_sku: input.sku } : {}),
+      ...(input.barcode ? { p_barcode: input.barcode } : {}),
+      ...(input.wholesale_price !== undefined ? { p_wholesale_price: input.wholesale_price } : {}),
+      ...(input.allow_fractional !== undefined
+        ? { p_allow_fractional: input.allow_fractional }
+        : {}),
+      ...(input.track_inventory !== undefined ? { p_track_inventory: input.track_inventory } : {}),
+      ...(input.active !== undefined ? { p_active: input.active } : {}),
+      ...(input.kind ? { p_kind: input.kind } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  /** Full active catalog for the offline snapshot (IndexedDB cache). */
+  async fetchActiveVariants(): Promise<Variant[]> {
     const { data, error } = await this.client
-      .from('products')
+      .from('variant_catalog')
       .select('*')
-      .eq('active', true)
-      .order('name')
+      .eq('variant_active', true)
+      .eq('product_active', true)
+      .order('product_name')
       .limit(500);
     if (error) throw error;
     return data;
@@ -234,13 +263,20 @@ export class PosService {
     return data;
   }
 
+  /** Order lines with variant labels resolved from variant_catalog. */
   async orderLines(orderId: string): Promise<OrderLineWithProduct[]> {
     const { data, error } = await this.client
       .from('order_lines')
-      .select('*, products(name, sku)')
+      .select('*')
       .eq('order_id', orderId);
     if (error) throw error;
-    return data;
+    const ids = [...new Set(data.map(l => l.variant_id))];
+    const variants = await this.variantsByIds(ids);
+    const byId = new Map(variants.map(v => [v.variant_id, v]));
+    return data.map(l => {
+      const v = byId.get(l.variant_id);
+      return { ...l, label: v ? variantLabel(v) : l.variant_id.slice(0, 8) };
+    });
   }
 
   async orderPayments(orderId: string): Promise<Payment[]> {
@@ -249,9 +285,12 @@ export class PosService {
     return data;
   }
 
-  async productsByIds(ids: string[]): Promise<Product[]> {
+  async variantsByIds(ids: string[]): Promise<Variant[]> {
     if (ids.length === 0) return [];
-    const { data, error } = await this.client.from('products').select('*').in('id', ids);
+    const { data, error } = await this.client
+      .from('variant_catalog')
+      .select('*')
+      .in('variant_id', ids);
     if (error) throw error;
     return data;
   }

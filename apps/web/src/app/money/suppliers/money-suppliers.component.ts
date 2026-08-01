@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../../core/money';
-import { PosService, Product } from '../../pos/pos.service';
+import { PosService, Variant, variantLabel } from '../../pos/pos.service';
 import { LedgerAccount, MoneyCustomer, MoneyService } from '../money.service';
 
 type SupplierWithAp = MoneyCustomer & { ap_balance: number };
@@ -17,7 +17,7 @@ type PurchaseRow = {
 };
 
 interface PurchaseLineForm {
-  productId: string;
+  variantId: string;
   quantity: number;
   unitCost: string; // KES text
   expiryDate: string; // yyyy-mm-dd or ''
@@ -159,11 +159,11 @@ interface PurchaseLineForm {
                       <span class="label-text text-xs">Product</span>
                       <select
                         class="select select-bordered select-xs"
-                        [(ngModel)]="line.productId"
+                        [(ngModel)]="line.variantId"
                         [ngModelOptions]="{ standalone: true }"
                       >
-                        @for (p of products(); track p.id) {
-                          <option [value]="p.id">{{ p.name }} ({{ p.sku }})</option>
+                        @for (v of variants(); track v.variant_id) {
+                          <option [value]="v.variant_id">{{ label(v) }} ({{ v.sku }})</option>
                         }
                       </select>
                     </label>
@@ -216,7 +216,7 @@ interface PurchaseLineForm {
               <button
                 type="submit"
                 class="btn btn-primary btn-sm self-start"
-                [disabled]="busy() || suppliers().length === 0 || products().length === 0"
+                [disabled]="busy() || suppliers().length === 0 || variants().length === 0"
               >
                 {{ busy() ? 'Recording…' : 'Record purchase' }}
               </button>
@@ -311,7 +311,8 @@ export class MoneySuppliersComponent implements OnInit {
   protected readonly fmt = formatKes;
   protected readonly suppliers = signal<SupplierWithAp[]>([]);
   protected readonly accounts = signal<LedgerAccount[]>([]);
-  protected readonly products = signal<Product[]>([]);
+  protected readonly variants = signal<Variant[]>([]);
+  protected readonly label = variantLabel;
   protected readonly purchases = signal<PurchaseRow[]>([]);
   protected readonly createOpen = signal(false);
 
@@ -338,15 +339,16 @@ export class MoneySuppliersComponent implements OnInit {
 
   protected async load(): Promise<void> {
     try {
-      const [suppliers, accounts, products, purchases] = await Promise.all([
+      const [suppliers, accounts, variants, purchases] = await Promise.all([
         this.money.suppliersWithAp(),
         this.money.assetAccounts(),
-        this.pos.fetchActiveProducts(),
+        this.pos.fetchActiveVariants(),
         this.money.purchasesWithPayments(),
       ]);
       this.suppliers.set(suppliers);
       this.accounts.set(accounts);
-      this.products.set(products);
+      // Purchases stock goods only (services are rejected server-side).
+      this.variants.set(variants.filter(v => v.kind !== 'service'));
       this.purchases.set(purchases as PurchaseRow[]);
       if (!this.purchaseSupplier.value && suppliers.length > 0)
         this.purchaseSupplier.setValue(suppliers[0].id);
@@ -355,8 +357,8 @@ export class MoneySuppliersComponent implements OnInit {
       if (!this.purchaseAccount.value && accounts.length > 0)
         this.purchaseAccount.setValue(accounts[0].code);
       if (!this.payAccount.value && accounts.length > 0) this.payAccount.setValue(accounts[0].code);
-      if (this.lines.every(l => !l.productId) && products.length > 0)
-        this.lines = [{ ...this.emptyLine(), productId: products[0].id }];
+      if (this.lines.every(l => !l.variantId) && this.variants().length > 0)
+        this.lines = [{ ...this.emptyLine(), variantId: this.variants()[0].variant_id ?? '' }];
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load');
@@ -371,7 +373,10 @@ export class MoneySuppliersComponent implements OnInit {
   }
 
   protected addLine(): void {
-    this.lines = [...this.lines, { ...this.emptyLine(), productId: this.products()[0]?.id ?? '' }];
+    this.lines = [
+      ...this.lines,
+      { ...this.emptyLine(), variantId: this.variants()[0]?.variant_id ?? '' },
+    ];
   }
 
   protected removeLine(index: number): void {
@@ -380,19 +385,19 @@ export class MoneySuppliersComponent implements OnInit {
 
   protected async recordPurchase(): Promise<void> {
     const parsed: {
-      product_id: string;
+      variant_id: string;
       quantity: number;
       unit_cost: number;
       expiry_date?: string;
     }[] = [];
     for (const l of this.lines) {
       const unitCost = parseKesToCents(l.unitCost);
-      if (!l.productId || !(l.quantity > 0) || unitCost === null) {
-        this.error.set('Every line needs a product, a quantity, and a valid unit cost');
+      if (!l.variantId || !(l.quantity > 0) || unitCost === null) {
+        this.error.set('Every line needs a variant, a quantity, and a valid unit cost');
         return;
       }
       parsed.push({
-        product_id: l.productId,
+        variant_id: l.variantId,
         quantity: l.quantity,
         unit_cost: unitCost,
         ...(l.expiryDate ? { expiry_date: l.expiryDate } : {}),
@@ -411,7 +416,7 @@ export class MoneySuppliersComponent implements OnInit {
       );
       this.notice.set('Purchase recorded');
       this.purchaseReference.setValue('');
-      this.lines = [{ ...this.emptyLine(), productId: this.products()[0]?.id ?? '' }];
+      this.lines = [{ ...this.emptyLine(), variantId: this.variants()[0]?.variant_id ?? '' }];
       await this.load();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to record purchase');
@@ -480,6 +485,6 @@ export class MoneySuppliersComponent implements OnInit {
   }
 
   private emptyLine(): PurchaseLineForm {
-    return { productId: '', quantity: 1, unitCost: '', expiryDate: '' };
+    return { variantId: '', quantity: 1, unitCost: '', expiryDate: '' };
   }
 }

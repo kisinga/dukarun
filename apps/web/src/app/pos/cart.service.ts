@@ -1,9 +1,9 @@
 import { Injectable, computed, effect, signal } from '@angular/core';
 import { offlineDb, type PersistedCart } from './offline/offline-db';
-import type { Product, SaleLineInput } from './pos.service';
+import { variantLabel, type SaleLineInput, type Variant } from './pos.service';
 
 export interface CartLine {
-  product: Product;
+  variant: Variant;
   quantity: number;
   unitPrice: number; // cents
   customPrice: number | null; // cents; null = no override
@@ -18,6 +18,11 @@ export class CartService {
   readonly customerName = signal('Walk-in');
   /** Set when editing an existing proforma. */
   readonly draftId = signal<string | null>(null);
+
+  readonly total = computed(() =>
+    this.lines().reduce((sum, line) => sum + this.lineTotal(line), 0)
+  );
+  readonly isEmpty = computed(() => this.lines().length === 0);
 
   /** True once the persisted cart has been restored from IndexedDB. */
   private restored = false;
@@ -55,27 +60,22 @@ export class CartService {
     }
   }
 
-  readonly total = computed(() =>
-    this.lines().reduce((sum, line) => sum + this.lineTotal(line), 0)
-  );
-  readonly isEmpty = computed(() => this.lines().length === 0);
-
   /** Mirrors the backend's per-line round(qty * price). */
   lineTotal(line: CartLine): number {
     return Math.round(line.quantity * (line.customPrice ?? line.unitPrice));
   }
 
-  addProduct(product: Product): void {
-    const existing = this.lines().find(l => l.product.id === product.id);
+  addVariant(variant: Variant): void {
+    const existing = this.lines().find(l => l.variant.variant_id === variant.variant_id);
     if (existing) {
-      this.setQuantity(product.id, existing.quantity + this.quantityStep(product));
+      this.setQuantity(variant.variant_id!, existing.quantity + this.quantityStep(variant));
     } else {
       this.lines.update(lines => [
         ...lines,
         {
-          product,
-          quantity: this.quantityStep(product),
-          unitPrice: product.price,
+          variant,
+          quantity: this.quantityStep(variant),
+          unitPrice: variant.price ?? 0,
           customPrice: null,
           overrideReason: '',
         },
@@ -83,27 +83,27 @@ export class CartService {
     }
   }
 
-  quantityStep(product: Product): number {
-    return product.allow_fractional ? 0.5 : 1;
+  quantityStep(variant: Variant): number {
+    return variant.allow_fractional ? 0.5 : 1;
   }
 
-  setQuantity(productId: string, quantity: number): void {
-    const line = this.lines().find(l => l.product.id === productId);
+  setQuantity(variantId: string, quantity: number): void {
+    const line = this.lines().find(l => l.variant.variant_id === variantId);
     if (!line) return;
-    const normalized = line.product.allow_fractional ? quantity : Math.round(quantity);
+    const normalized = line.variant.allow_fractional ? quantity : Math.round(quantity);
     if (!(normalized > 0)) {
-      this.removeLine(productId);
+      this.removeLine(variantId);
       return;
     }
-    this.patch(productId, { quantity: normalized });
+    this.patch(variantId, { quantity: normalized });
   }
 
-  setCustomPrice(productId: string, priceCents: number | null, reason: string): void {
-    this.patch(productId, { customPrice: priceCents, overrideReason: reason });
+  setCustomPrice(variantId: string, priceCents: number | null, reason: string): void {
+    this.patch(variantId, { customPrice: priceCents, overrideReason: reason });
   }
 
-  removeLine(productId: string): void {
-    this.lines.update(lines => lines.filter(l => l.product.id !== productId));
+  removeLine(variantId: string): void {
+    this.lines.update(lines => lines.filter(l => l.variant.variant_id !== variantId));
   }
 
   setCustomer(id: string | null, name: string): void {
@@ -111,9 +111,13 @@ export class CartService {
     this.customerName.set(name);
   }
 
+  lineLabel(line: CartLine): string {
+    return variantLabel(line.variant);
+  }
+
   toSaleLines(): SaleLineInput[] {
     return this.lines().map(l => ({
-      product_id: l.product.id,
+      variant_id: l.variant.variant_id!,
       quantity: l.quantity,
       unit_price: l.unitPrice,
       ...(l.customPrice !== null && l.customPrice !== l.unitPrice
@@ -129,9 +133,9 @@ export class CartService {
     this.draftId.set(null);
   }
 
-  private patch(productId: string, changes: Partial<CartLine>): void {
+  private patch(variantId: string, changes: Partial<CartLine>): void {
     this.lines.update(lines =>
-      lines.map(l => (l.product.id === productId ? { ...l, ...changes } : l))
+      lines.map(l => (l.variant.variant_id === variantId ? { ...l, ...changes } : l))
     );
   }
 }

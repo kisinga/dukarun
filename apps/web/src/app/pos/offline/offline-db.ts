@@ -1,6 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { CartLine } from '../cart.service';
-import type { PaymentInput, Product, SaleLineInput } from '../pos.service';
+import type { PaymentInput, SaleLineInput, Variant } from '../pos.service';
 
 /**
  * A sale completed locally while offline (or after a network failure).
@@ -20,7 +20,7 @@ export interface OutboxEntry {
 
 export interface ProductSnapshot {
   key: 'latest';
-  products: Product[];
+  products: Variant[];
   fetched_at: string; // ISO
 }
 
@@ -51,8 +51,16 @@ interface PosOfflineDb extends DBSchema {
 let dbPromise: Promise<IDBPDatabase<PosOfflineDb>> | null = null;
 
 export function offlineDb(): Promise<IDBPDatabase<PosOfflineDb>> {
-  dbPromise ??= openDB<PosOfflineDb>('dukarun-pos-offline', 1, {
-    upgrade(db) {
+  // v2: catalog remodeled to families + variants (line items carry variant_id).
+  // The old flat-product outbox/snapshot/cart payloads are incompatible, so
+  // the upgrade drops and recreates all stores — dev-stage data loss is fine.
+  dbPromise ??= openDB<PosOfflineDb>('dukarun-pos-offline', 2, {
+    upgrade(db, oldVersion) {
+      if (oldVersion >= 1) {
+        for (const store of ['outbox', 'products', 'cart'] as const) {
+          if (db.objectStoreNames.contains(store)) db.deleteObjectStore(store);
+        }
+      }
       const outbox = db.createObjectStore('outbox', { keyPath: 'client_ref' });
       outbox.createIndex('by-queued-at', 'queued_at');
       db.createObjectStore('products', { keyPath: 'key' });

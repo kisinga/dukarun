@@ -4,7 +4,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { formatKes, parseKesToCents } from '../../core/money';
-import { PosService, Product } from '../../pos/pos.service';
+import { PosService, Variant, variantLabel } from '../../pos/pos.service';
 import { MoneyService } from '../money.service';
 
 /** Parse a signed KES amount ("-450.00") to signed cents. Null when invalid. */
@@ -38,11 +38,14 @@ function parseSignedKes(raw: string): number | null {
         <div class="card mb-4 bg-base-100 shadow">
           <div class="card-body p-4">
             <h2 class="card-title text-lg">Product</h2>
-            @if (selected(); as p) {
+            @if (selected(); as v) {
               <div class="flex items-center gap-3">
-                <span class="font-semibold">{{ p.name }}</span>
-                <span class="text-xs text-base-content/60">{{ p.sku }}</span>
-                <span class="text-xs">{{ fmt(p.price) }}</span>
+                <span class="font-semibold">{{ label(v) }}</span>
+                <span class="text-xs text-base-content/60">{{ v.sku }}</span>
+                <span class="badge badge-xs" [class.badge-info]="v.kind === 'service'">{{
+                  v.kind
+                }}</span>
+                <span class="text-xs">{{ fmt(v.price ?? 0) }}</span>
                 <button class="btn btn-ghost btn-xs" (click)="selected.set(null)">Change</button>
               </div>
             } @else {
@@ -57,11 +60,11 @@ function parseSignedKes(raw: string): number | null {
                   <ul
                     class="menu absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-box bg-base-100 shadow-lg"
                   >
-                    @for (p of results(); track p.id) {
+                    @for (v of results(); track v.variant_id) {
                       <li>
-                        <a (click)="pick(p)">
-                          <span class="flex-1">{{ p.name }}</span>
-                          <span class="text-xs text-base-content/60">{{ p.sku }}</span>
+                        <a (click)="pick(v)">
+                          <span class="flex-1">{{ label(v) }}</span>
+                          <span class="text-xs text-base-content/60">{{ v.sku }}</span>
                         </a>
                       </li>
                     }
@@ -158,8 +161,9 @@ export class MoneyStockComponent implements OnInit {
 
   protected readonly fmt = formatKes;
   protected readonly search = new FormControl('', { nonNullable: true });
-  protected readonly results = signal<Product[]>([]);
-  protected readonly selected = signal<Product | null>(null);
+  protected readonly results = signal<Variant[]>([]);
+  protected readonly selected = signal<Variant | null>(null);
+  protected readonly label = variantLabel;
 
   protected readonly writeOffQty = new FormControl(1, { nonNullable: true });
   protected readonly writeOffReason = new FormControl('', { nonNullable: true });
@@ -187,21 +191,21 @@ export class MoneyStockComponent implements OnInit {
       return;
     }
     try {
-      this.results.set(await this.pos.searchProducts(q));
+      this.results.set(await this.pos.searchVariants(q));
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Search failed');
     }
   }
 
-  protected pick(product: Product): void {
-    this.selected.set(product);
+  protected pick(variant: Variant): void {
+    this.selected.set(variant);
     this.search.setValue('', { emitEvent: false });
     this.results.set([]);
   }
 
   protected async writeOff(): Promise<void> {
-    const product = this.selected();
-    if (!product) return;
+    const variant = this.selected();
+    if (!variant) return;
     if (!(this.writeOffQty.value > 0)) {
       this.error.set('Enter a valid quantity');
       return;
@@ -215,11 +219,11 @@ export class MoneyStockComponent implements OnInit {
     this.notice.set(null);
     try {
       await this.money.postInventoryWriteOff(
-        product.id,
+        variant.variant_id!,
         this.writeOffQty.value,
         this.writeOffReason.value.trim()
       );
-      this.notice.set(`Wrote off ${this.writeOffQty.value} × ${product.name}`);
+      this.notice.set(`Wrote off ${this.writeOffQty.value} × ${this.label(variant)}`);
       this.writeOffReason.setValue('');
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Write-off failed');
@@ -229,8 +233,8 @@ export class MoneyStockComponent implements OnInit {
   }
 
   protected async adjust(): Promise<void> {
-    const product = this.selected();
-    if (!product) return;
+    const variant = this.selected();
+    if (!variant) return;
     const cents = parseSignedKes(this.adjustAmount.value);
     if (cents === null || cents === 0) {
       this.error.set('Enter a valid signed amount');
@@ -244,8 +248,12 @@ export class MoneyStockComponent implements OnInit {
     this.error.set(null);
     this.notice.set(null);
     try {
-      await this.money.postInventoryAdjustment(product.id, cents, this.adjustReason.value.trim());
-      this.notice.set(`Adjusted ${product.name} by ${formatKes(cents)}`);
+      await this.money.postInventoryAdjustment(
+        variant.variant_id!,
+        cents,
+        this.adjustReason.value.trim()
+      );
+      this.notice.set(`Adjusted ${this.label(variant)} by ${formatKes(cents)}`);
       this.adjustAmount.setValue('');
       this.adjustReason.setValue('');
     } catch (err) {

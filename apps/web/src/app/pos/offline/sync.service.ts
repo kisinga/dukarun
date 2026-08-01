@@ -1,5 +1,5 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { PosRpcError, PosService, Product } from '../pos.service';
+import { PosRpcError, PosService, Variant } from '../pos.service';
 import { ConnectivityService } from './connectivity.service';
 import { OutboxEntry, ProductSnapshot, offlineDb } from './offline-db';
 
@@ -131,7 +131,7 @@ export class SyncService {
   async refreshProductSnapshot(): Promise<void> {
     if (!this.connectivity.online()) return;
     try {
-      const products = await this.pos.fetchActiveProducts();
+      const products = await this.pos.fetchActiveVariants();
       const db = await offlineDb();
       const snapshot: ProductSnapshot = {
         key: 'latest',
@@ -145,7 +145,7 @@ export class SyncService {
   }
 
   /** Offline product search over the last successful snapshot. */
-  async searchProductsOffline(query: string): Promise<Product[]> {
+  async searchProductsOffline(query: string): Promise<Variant[]> {
     const db = await offlineDb();
     const snapshot = await db.get('products', 'latest');
     if (!snapshot) return [];
@@ -153,10 +153,11 @@ export class SyncService {
     if (!q) return [];
     return snapshot.products
       .filter(
-        p =>
-          p.name.toLowerCase().includes(q) ||
-          p.sku.toLowerCase().includes(q) ||
-          (p.barcode ?? '').toLowerCase().includes(q)
+        v =>
+          (v.product_name ?? '').toLowerCase().includes(q) ||
+          (v.variant_name ?? '').toLowerCase().includes(q) ||
+          (v.sku ?? '').toLowerCase().includes(q) ||
+          (v.barcode ?? '').toLowerCase().includes(q)
       )
       .slice(0, 20);
   }

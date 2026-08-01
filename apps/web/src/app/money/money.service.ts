@@ -333,7 +333,7 @@ export class MoneyService {
 
   async recordPurchase(
     supplierId: string,
-    lines: { product_id: string; quantity: number; unit_cost: number; expiry_date?: string }[],
+    lines: { variant_id: string; quantity: number; unit_cost: number; expiry_date?: string }[],
     isCredit: boolean,
     reference?: string,
     accountCode?: string
@@ -360,12 +360,12 @@ export class MoneyService {
   }
 
   async postInventoryWriteOff(
-    productId: string,
+    variantId: string,
     quantity: number,
     reason: string
   ): Promise<string> {
     const { data, error } = await this.db.rpc('post_inventory_write_off', {
-      p_product_id: productId,
+      p_variant_id: variantId,
       p_quantity: quantity,
       p_reason: reason,
     });
@@ -374,12 +374,12 @@ export class MoneyService {
   }
 
   async postInventoryAdjustment(
-    productId: string,
+    variantId: string,
     valueChange: number,
     reason: string
   ): Promise<string> {
     const { data, error } = await this.db.rpc('post_inventory_adjustment', {
-      p_product_id: productId,
+      p_variant_id: variantId,
       p_value_change: valueChange,
       p_reason: reason,
     });

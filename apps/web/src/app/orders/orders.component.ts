@@ -99,7 +99,7 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'pending_payment'];
                         <tbody>
                           @for (line of lines(); track line.id) {
                             <tr>
-                              <td>{{ line.products?.name ?? line.product_id }}</td>
+                              <td>{{ line.label }}</td>
                               <td>{{ line.quantity }}</td>
                               <td>{{ fmt(line.custom_price ?? line.unit_price) }}</td>
                               <td class="text-right">{{ fmt(line.line_total) }}</td>

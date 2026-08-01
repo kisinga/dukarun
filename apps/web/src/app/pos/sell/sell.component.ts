@@ -8,7 +8,14 @@ import { CartService } from '../cart.service';
 import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
 import { ConnectivityService } from '../offline/connectivity.service';
 import { SyncService } from '../offline/sync.service';
-import { Customer, PaymentInput, PosRpcError, PosService, Product } from '../pos.service';
+import {
+  Customer,
+  PaymentInput,
+  PosRpcError,
+  PosService,
+  Variant,
+  variantLabel,
+} from '../pos.service';
 
 @Component({
   selector: 'app-sell',
@@ -53,12 +60,19 @@ import { Customer, PaymentInput, PosRpcError, PosService, Product } from '../pos
                     <ul
                       class="menu absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-box bg-base-100 shadow-lg"
                     >
-                      @for (p of results(); track p.id) {
+                      @for (v of results(); track v.variant_id) {
                         <li>
-                          <a (click)="addProduct(p)">
-                            <span class="flex-1">{{ p.name }}</span>
-                            <span class="text-xs text-base-content/60">{{ p.sku }}</span>
-                            <span class="font-semibold">{{ fmt(p.price) }}</span>
+                          <a (click)="addVariant(v)">
+                            <span class="flex-1">{{ label(v) }}</span>
+                            <span class="text-xs text-base-content/60">{{ v.sku }}</span>
+                            <span class="badge badge-xs badge-outline">
+                              {{
+                                v.kind === 'service' || !v.track_inventory
+                                  ? '—'
+                                  : (v.stock ?? 0) + ' in stock'
+                              }}
+                            </span>
+                            <span class="font-semibold">{{ fmt(v.price ?? 0) }}</span>
                           </a>
                         </li>
                       }
@@ -87,31 +101,31 @@ import { Customer, PaymentInput, PosRpcError, PosService, Product } from '../pos
                       </tr>
                     </thead>
                     <tbody>
-                      @for (line of cart.lines(); track line.product.id) {
+                      @for (line of cart.lines(); track line.variant.variant_id) {
                         <tr>
                           <td>
-                            <div class="font-medium">{{ line.product.name }}</div>
-                            <div class="text-xs text-base-content/60">{{ line.product.sku }}</div>
+                            <div class="font-medium">{{ cart.lineLabel(line) }}</div>
+                            <div class="text-xs text-base-content/60">{{ line.variant.sku }}</div>
                           </td>
                           <td>
                             <div class="join">
                               <button
                                 class="btn btn-sm join-item"
-                                (click)="stepQty(line.product.id, -1)"
+                                (click)="stepQty(line.variant.variant_id!, -1)"
                               >
                                 −
                               </button>
                               <input
                                 type="number"
                                 class="input input-bordered input-sm join-item w-16 text-center"
-                                [min]="line.product.allow_fractional ? 0.5 : 1"
-                                [step]="line.product.allow_fractional ? 0.5 : 1"
+                                [min]="line.variant.allow_fractional ? 0.5 : 1"
+                                [step]="line.variant.allow_fractional ? 0.5 : 1"
                                 [ngModel]="line.quantity"
-                                (ngModelChange)="onQtyInput(line.product.id, $event)"
+                                (ngModelChange)="onQtyInput(line.variant.variant_id!, $event)"
                               />
                               <button
                                 class="btn btn-sm join-item"
-                                (click)="stepQty(line.product.id, 1)"
+                                (click)="stepQty(line.variant.variant_id!, 1)"
                               >
                                 +
                               </button>
@@ -136,13 +150,13 @@ import { Customer, PaymentInput, PosRpcError, PosService, Product } from '../pos
                           <td>
                             <button
                               class="btn btn-ghost btn-sm"
-                              (click)="cart.removeLine(line.product.id)"
+                              (click)="cart.removeLine(line.variant.variant_id!)"
                             >
                               ✕
                             </button>
                           </td>
                         </tr>
-                        @if (overrideFor() === line.product.id) {
+                        @if (overrideFor() === line.variant.variant_id) {
                           <tr>
                             <td colspan="5">
                               <div class="flex flex-wrap items-end gap-2 rounded bg-base-200 p-2">
@@ -306,7 +320,7 @@ export class SellComponent implements OnInit {
     this.cart.lineTotal(line);
 
   protected readonly search = new FormControl('', { nonNullable: true });
-  protected readonly results = signal<Product[]>([]);
+  protected readonly results = signal<Variant[]>([]);
   protected readonly customerSearch = new FormControl('', { nonNullable: true });
   protected readonly customerResults = signal<Customer[]>([]);
   protected readonly customerPickerOpen = signal(false);
@@ -352,45 +366,49 @@ export class SellComponent implements OnInit {
     }
     try {
       // Offline: search the IndexedDB snapshot of the active catalog instead.
-      const products = this.connectivity.online()
-        ? await this.pos.searchProducts(q)
+      const variants = this.connectivity.online()
+        ? await this.pos.searchVariants(q)
         : await this.sync.searchProductsOffline(q);
       // Scanner-style entry: an exact barcode match goes straight to the cart.
-      const exact = products.find(p => p.barcode === q);
+      const exact = variants.find(v => v.barcode === q);
       if (exact) {
-        this.cart.addProduct(exact);
+        this.cart.addVariant(exact);
         this.search.setValue('', { emitEvent: false });
         this.results.set([]);
         return;
       }
-      this.results.set(products);
+      this.results.set(variants);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Product search failed');
     }
   }
 
-  protected addProduct(product: Product): void {
-    this.cart.addProduct(product);
+  protected addVariant(variant: Variant): void {
+    this.cart.addVariant(variant);
     this.search.setValue('', { emitEvent: false });
     this.results.set([]);
   }
 
-  protected stepQty(productId: string, direction: 1 | -1): void {
-    const line = this.cart.lines().find(l => l.product.id === productId);
+  protected label(variant: Variant): string {
+    return variantLabel(variant);
+  }
+
+  protected stepQty(variantId: string, direction: 1 | -1): void {
+    const line = this.cart.lines().find(l => l.variant.variant_id === variantId);
     if (!line) return;
     this.cart.setQuantity(
-      productId,
-      line.quantity + direction * this.cart.quantityStep(line.product)
+      variantId,
+      line.quantity + direction * this.cart.quantityStep(line.variant)
     );
   }
 
-  protected onQtyInput(productId: string, value: number | string): void {
+  protected onQtyInput(variantId: string, value: number | string): void {
     const qty = Number(value);
-    if (Number.isFinite(qty)) this.cart.setQuantity(productId, qty);
+    if (Number.isFinite(qty)) this.cart.setQuantity(variantId, qty);
   }
 
-  protected startOverride(line: { product: Product; unitPrice: number }): void {
-    this.overrideFor.set(line.product.id);
+  protected startOverride(line: { variant: Variant; unitPrice: number }): void {
+    this.overrideFor.set(line.variant.variant_id!);
     this.overridePrice.setValue((line.unitPrice / 100).toFixed(2));
     this.overrideReason.setValue('');
   }
@@ -529,16 +547,20 @@ export class SellComponent implements OnInit {
         return;
       }
       const lines = await this.pos.orderLines(orderId);
-      const products = await this.pos.productsByIds(lines.map(l => l.product_id));
-      const byId = new Map(products.map(p => [p.id, p]));
+      const variants = await this.pos.variantsByIds(lines.map(l => l.variant_id));
+      const byId = new Map(variants.map(v => [v.variant_id, v]));
       this.cart.clear();
       for (const l of lines) {
-        const product = byId.get(l.product_id);
-        if (!product) continue;
-        this.cart.addProduct(product);
-        this.cart.setQuantity(product.id, Number(l.quantity));
+        const variant = byId.get(l.variant_id);
+        if (!variant) continue;
+        this.cart.addVariant(variant);
+        this.cart.setQuantity(variant.variant_id!, Number(l.quantity));
         if (l.custom_price !== null) {
-          this.cart.setCustomPrice(product.id, l.custom_price, l.price_override_reason ?? '');
+          this.cart.setCustomPrice(
+            variant.variant_id!,
+            l.custom_price,
+            l.price_override_reason ?? ''
+          );
         }
       }
       if (order.customer_id && order.customers) {
