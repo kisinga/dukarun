@@ -353,6 +353,8 @@ export type Database = {
           notifications_enabled: boolean
           payment_terms: string | null
           phone: string | null
+          supplier_credit_limit: number
+          supplier_credit_terms_days: number | null
           updated_at: string
         }
         Insert: {
@@ -373,6 +375,8 @@ export type Database = {
           notifications_enabled?: boolean
           payment_terms?: string | null
           phone?: string | null
+          supplier_credit_limit?: number
+          supplier_credit_terms_days?: number | null
           updated_at?: string
         }
         Update: {
@@ -393,6 +397,8 @@ export type Database = {
           notifications_enabled?: boolean
           payment_terms?: string | null
           phone?: string | null
+          supplier_credit_limit?: number
+          supplier_credit_terms_days?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -1092,6 +1098,99 @@ export type Database = {
           },
         ]
       }
+      purchase_payments: {
+        Row: {
+          account_code: string
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          purchase_id: string
+        }
+        Insert: {
+          account_code: string
+          amount: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          purchase_id: string
+        }
+        Update: {
+          account_code?: string
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          purchase_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_payments_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchases: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_credit: boolean
+          reference: string | null
+          supplier_id: string
+          total_cost: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_credit?: boolean
+          reference?: string | null
+          supplier_id: string
+          total_cost: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_credit?: boolean
+          reference?: string | null
+          supplier_id?: string
+          total_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchases_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reconciliation_accounts: {
         Row: {
           account_code: string
@@ -1346,6 +1445,7 @@ export type Database = {
       consume_fifo: {
         Args: {
           p_company_id: string
+          p_movement_type?: string
           p_product_id: string
           p_quantity: number
           p_source_id: string
@@ -1375,6 +1475,14 @@ export type Database = {
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       is_platform_admin: { Args: never; Returns: boolean }
       open_cashier_session: { Args: { p_declarations: Json }; Returns: string }
+      pay_supplier: {
+        Args: {
+          p_account_code: string
+          p_amount: number
+          p_supplier_id: string
+        }
+        Returns: string
+      }
       post_balance_adjustment: {
         Args: { p_amount: number; p_customer_id: string; p_reason: string }
         Returns: string
@@ -1386,6 +1494,14 @@ export type Database = {
           p_memo?: string
           p_source_account_code: string
         }
+        Returns: string
+      }
+      post_inventory_adjustment: {
+        Args: { p_product_id: string; p_reason: string; p_value_change: number }
+        Returns: string
+      }
+      post_inventory_write_off: {
+        Args: { p_product_id: string; p_quantity: number; p_reason: string }
         Returns: string
       }
       post_journal_entry: {
@@ -1483,6 +1599,16 @@ export type Database = {
           p_flagged_ids?: Json
           p_notes?: string
           p_session_id: string
+        }
+        Returns: string
+      }
+      record_purchase: {
+        Args: {
+          p_account_code?: string
+          p_is_credit: boolean
+          p_lines: Json
+          p_reference?: string
+          p_supplier_id: string
         }
         Returns: string
       }
