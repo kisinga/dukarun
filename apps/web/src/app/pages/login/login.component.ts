@@ -17,7 +17,7 @@ const RESEND_COOLDOWN_SECONDS = 60;
           <p class="text-sm text-base-content/70">Sign in with your phone number</p>
 
           @if (step() === 'phone') {
-            <form (ngSubmit)="sendOtp()" class="mt-4 flex flex-col gap-4">
+            <form (submit)="$event.preventDefault(); sendOtp()" class="mt-4 flex flex-col gap-4">
               <label class="form-control">
                 <span class="label-text mb-1">Phone number</span>
                 <input
@@ -33,7 +33,7 @@ const RESEND_COOLDOWN_SECONDS = 60;
               </button>
             </form>
           } @else {
-            <form (ngSubmit)="verifyOtp()" class="mt-4 flex flex-col gap-4">
+            <form (submit)="$event.preventDefault(); verifyOtp()" class="mt-4 flex flex-col gap-4">
               <p class="text-sm">
                 Enter the 6-digit code sent to <strong>{{ phoneE164() }}</strong>
               </p>

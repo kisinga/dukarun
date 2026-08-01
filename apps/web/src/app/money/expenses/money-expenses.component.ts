@@ -20,7 +20,7 @@ import { JournalEntryWithLines, LedgerAccount, MoneyService } from '../money.ser
         <div class="card mb-4 bg-base-100 shadow">
           <div class="card-body p-4">
             <h2 class="card-title text-lg">Record expense</h2>
-            <form (ngSubmit)="submit()" class="mt-2 grid gap-3 sm:grid-cols-2">
+            <form (submit)="$event.preventDefault(); submit()" class="mt-2 grid gap-3 sm:grid-cols-2">
               <label class="form-control">
                 <span class="label-text">Paid from</span>
                 <select class="select select-bordered select-sm" [formControl]="account">

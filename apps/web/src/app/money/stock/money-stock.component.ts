@@ -77,7 +77,7 @@ function parseSignedKes(raw: string): number | null {
           <div class="card bg-base-100 shadow">
             <div class="card-body p-4">
               <h2 class="card-title text-lg">Write off stock</h2>
-              <form (ngSubmit)="writeOff()" class="mt-2 flex flex-col gap-3">
+              <form (submit)="$event.preventDefault(); writeOff()" class="mt-2 flex flex-col gap-3">
                 <label class="form-control">
                   <span class="label-text">Quantity</span>
                   <input
@@ -115,7 +115,7 @@ function parseSignedKes(raw: string): number | null {
           <div class="card bg-base-100 shadow">
             <div class="card-body p-4">
               <h2 class="card-title text-lg">Value adjustment</h2>
-              <form (ngSubmit)="adjust()" class="mt-2 flex flex-col gap-3">
+              <form (submit)="$event.preventDefault(); adjust()" class="mt-2 flex flex-col gap-3">
                 <label class="form-control">
                   <span class="label-text">Amount (KES, signed)</span>
                   <input

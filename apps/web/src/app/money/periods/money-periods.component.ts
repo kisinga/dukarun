@@ -84,7 +84,7 @@ import { AccountingPeriod, CashierAccount, MoneyService, PeriodLock } from '../m
               Closing locks all posting through the end date. The backend gates this on
               reconciliations and open sessions — its messages are shown verbatim.
             </p>
-            <form (ngSubmit)="askClose()" class="mt-2 flex flex-wrap items-end gap-2">
+            <form (submit)="$event.preventDefault(); askClose()" class="mt-2 flex flex-wrap items-end gap-2">
               <label class="form-control">
                 <span class="label-text text-xs">Period end date</span>
                 <input type="date" class="input input-bordered input-sm" [formControl]="endDate" />

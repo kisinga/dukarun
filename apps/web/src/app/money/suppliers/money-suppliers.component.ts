@@ -52,7 +52,7 @@ interface PurchaseLineForm {
               </button>
             </div>
             @if (createOpen()) {
-              <form (ngSubmit)="createSupplier()" class="mt-2 flex flex-wrap gap-2">
+              <form (submit)="$event.preventDefault(); createSupplier()" class="mt-2 flex flex-wrap gap-2">
                 <input
                   type="text"
                   class="input input-bordered input-sm"
@@ -105,7 +105,7 @@ interface PurchaseLineForm {
         <div class="card mb-4 bg-base-100 shadow">
           <div class="card-body p-4">
             <h2 class="card-title text-lg">Record purchase</h2>
-            <form (ngSubmit)="recordPurchase()" class="mt-2 flex flex-col gap-3">
+            <form (submit)="$event.preventDefault(); recordPurchase()" class="mt-2 flex flex-col gap-3">
               <div class="grid gap-3 sm:grid-cols-3">
                 <label class="form-control">
                   <span class="label-text">Supplier</span>
@@ -222,7 +222,7 @@ interface PurchaseLineForm {
         <div class="card mb-4 bg-base-100 shadow">
           <div class="card-body p-4">
             <h2 class="card-title text-lg">Pay supplier</h2>
-            <form (ngSubmit)="paySupplier()" class="mt-2 flex flex-wrap items-end gap-3">
+            <form (submit)="$event.preventDefault(); paySupplier()" class="mt-2 flex flex-wrap items-end gap-3">
               <label class="form-control">
                 <span class="label-text">Supplier</span>
                 <select class="select select-bordered select-sm" [formControl]="paySupplierId">

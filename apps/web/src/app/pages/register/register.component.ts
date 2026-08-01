@@ -13,7 +13,7 @@ import { SupabaseService } from '../../core/supabase.service';
           <h1 class="card-title text-2xl">Set up your business</h1>
           <p class="text-sm text-base-content/70">Create your company and first store</p>
 
-          <form (ngSubmit)="provision()" class="mt-4 flex flex-col gap-4">
+          <form (submit)="$event.preventDefault(); provision()" class="mt-4 flex flex-col gap-4">
             <label class="form-control">
               <span class="label-text mb-1">Company name</span>
               <input
