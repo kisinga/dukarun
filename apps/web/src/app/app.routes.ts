@@ -94,6 +94,21 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./products/products.component').then(m => m.ProductsComponent),
   },
+  {
+    path: 'customers',
+    canActivate: [authGuard],
+    loadComponent: () => import('./customers/customers.component').then(m => m.CustomersComponent),
+  },
+  {
+    path: 'team',
+    canActivate: [authGuard],
+    loadComponent: () => import('./team/team.component').then(m => m.TeamComponent),
+  },
+  {
+    path: 'orders',
+    canActivate: [authGuard],
+    loadComponent: () => import('./orders/orders.component').then(m => m.OrdersComponent),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   { path: '**', redirectTo: 'dashboard' },
 ];

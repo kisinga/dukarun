@@ -31,9 +31,12 @@ import { SyncService } from '../../pos/offline/sync.service';
             <nav class="mt-6 grid grid-cols-2 gap-2">
               <a routerLink="/pos/sell" class="btn btn-primary">Sell</a>
               <a routerLink="/pos/sales" class="btn btn-outline">Today's Sales</a>
+              <a routerLink="/orders" class="btn btn-outline">Orders</a>
               <a routerLink="/pos/proformas" class="btn btn-outline">Proformas</a>
               <a routerLink="/pos/cashier" class="btn btn-outline">Cashier Queue</a>
               <a routerLink="/products" class="btn btn-outline">Products</a>
+              <a routerLink="/customers" class="btn btn-outline">Customers</a>
+              <a routerLink="/team" class="btn btn-outline">Team</a>
             </nav>
 
             <h2 class="mt-6 text-sm font-semibold uppercase tracking-wide text-base-content/60">

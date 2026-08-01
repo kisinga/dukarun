@@ -203,8 +203,12 @@ export class PosService {
     return data.map(m => m.code);
   }
 
-  /** Orders by status, most recent first. `since` limits to orders created at/after it. */
-  async ordersByStatus(statuses: string[], since?: string): Promise<OrderWithCustomer[]> {
+  /** Orders by status, most recent first. `since`/`until` bound created_at. */
+  async ordersByStatus(
+    statuses: string[],
+    since?: string,
+    until?: string
+  ): Promise<OrderWithCustomer[]> {
     let query = this.client
       .from('orders')
       .select('*, customers(first_name, last_name)')
@@ -212,7 +216,20 @@ export class PosService {
       .order('created_at', { ascending: false })
       .limit(100);
     if (since) query = query.gte('created_at', since);
+    if (until) query = query.lt('created_at', until);
     const { data, error } = await query;
+    if (error) throw error;
+    return data;
+  }
+
+  /** Full order history for one customer (all statuses). */
+  async customerOrders(customerId: string, limit = 20): Promise<OrderWithCustomer[]> {
+    const { data, error } = await this.client
+      .from('orders')
+      .select('*, customers(first_name, last_name)')
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
     if (error) throw error;
     return data;
   }

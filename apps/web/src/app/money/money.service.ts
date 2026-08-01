@@ -308,6 +308,29 @@ export class MoneyService {
     return data;
   }
 
+  /** null/undefined fields are left unchanged by the backend. */
+  async updateCustomer(
+    customerId: string,
+    changes: {
+      first_name?: string;
+      last_name?: string;
+      phone?: string;
+      email?: string;
+      notes?: string;
+    }
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('update_customer', {
+      p_customer_id: customerId,
+      ...(changes.first_name !== undefined ? { p_first_name: changes.first_name } : {}),
+      ...(changes.last_name !== undefined ? { p_last_name: changes.last_name } : {}),
+      ...(changes.phone !== undefined ? { p_phone: changes.phone } : {}),
+      ...(changes.email !== undefined ? { p_email: changes.email } : {}),
+      ...(changes.notes !== undefined ? { p_notes: changes.notes } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
   async recordPurchase(
     supplierId: string,
     lines: { product_id: string; quantity: number; unit_cost: number; expiry_date?: string }[],
