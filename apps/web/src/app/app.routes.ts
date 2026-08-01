@@ -41,6 +41,12 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pos/cashier/cashier-queue.component').then(m => m.CashierQueueComponent),
   },
+  {
+    path: 'pos/sync',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./pos/sync/pending-sync.component').then(m => m.PendingSyncComponent),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   { path: '**', redirectTo: 'dashboard' },
 ];

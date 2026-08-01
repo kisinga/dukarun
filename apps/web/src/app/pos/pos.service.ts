@@ -33,6 +33,27 @@ export type OrderLineWithProduct = OrderLine & {
   products: Pick<Product, 'name' | 'sku'> | null;
 };
 
+/**
+ * RPC failure with the PostgREST/PostgreSQL error code preserved.
+ * 'P0001' = business rejection from a raise exception (insufficient_stock,
+ * payment_mismatch, permission_denied, …) — safe to show to the user and
+ * NOT retryable by the sync engine. Thrown fetch errors (network) never
+ * become PosRpcError.
+ */
+export class PosRpcError extends Error {
+  readonly code: string;
+
+  constructor(message: string, code: string) {
+    super(message);
+    this.name = 'PosRpcError';
+    this.code = code;
+  }
+}
+
+function rpcError(error: { message: string; code?: string }): PosRpcError {
+  return new PosRpcError(error.message, error.code ?? '');
+}
+
 @Injectable({ providedIn: 'root' })
 export class PosService {
   private readonly supabase = inject(SupabaseService);
@@ -50,6 +71,18 @@ export class PosService {
       .or(`name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}`)
       .eq('active', true)
       .limit(20);
+    if (error) throw error;
+    return data;
+  }
+
+  /** Full active catalog for the offline product snapshot (IndexedDB cache). */
+  async fetchActiveProducts(): Promise<Product[]> {
+    const { data, error } = await this.client
+      .from('products')
+      .select('*')
+      .eq('active', true)
+      .order('name')
+      .limit(500);
     if (error) throw error;
     return data;
   }
@@ -128,7 +161,8 @@ export class PosService {
     customerId: string | null,
     lines: SaleLineInput[],
     payments: PaymentInput[],
-    park: boolean
+    park: boolean,
+    clientRef?: string
   ): Promise<string> {
     const { data, error } = await this.client.rpc('post_sale', {
       // null = walk-in customer (accepted by the backend; generated types mark it non-null)
@@ -136,8 +170,10 @@ export class PosService {
       p_lines: lines as never,
       p_payments: payments as never,
       p_park: park,
+      // Exactly-once replay: same client_ref returns the original order id.
+      ...(clientRef ? { p_client_ref: clientRef } : {}),
     });
-    if (error) throw new Error(error.message);
+    if (error) throw rpcError(error);
     return data;
   }
 
@@ -152,7 +188,7 @@ export class PosService {
       p_lines: lines as never,
       ...(draftId ? { p_draft_id: draftId } : {}),
     });
-    if (error) throw new Error(error.message);
+    if (error) throw rpcError(error);
     return data;
   }
 
@@ -161,7 +197,7 @@ export class PosService {
       p_order_id: orderId,
       p_payments: payments as never,
     });
-    if (error) throw new Error(error.message);
+    if (error) throw rpcError(error);
     return data;
   }
 
@@ -170,7 +206,7 @@ export class PosService {
       p_order_id: orderId,
       p_payments: payments as never,
     });
-    if (error) throw new Error(error.message);
+    if (error) throw rpcError(error);
     return data;
   }
 
@@ -179,7 +215,7 @@ export class PosService {
       p_order_id: orderId,
       p_reason: reason,
     });
-    if (error) throw new Error(error.message);
+    if (error) throw rpcError(error);
     return data;
   }
 }

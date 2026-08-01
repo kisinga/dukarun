@@ -6,7 +6,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { formatKes, parseKesToCents } from '../../core/money';
 import { CartService } from '../cart.service';
 import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
-import { Customer, PaymentInput, PosService, Product } from '../pos.service';
+import { ConnectivityService } from '../offline/connectivity.service';
+import { SyncService } from '../offline/sync.service';
+import { Customer, PaymentInput, PosRpcError, PosService, Product } from '../pos.service';
 
 @Component({
   selector: 'app-sell',
@@ -19,6 +21,19 @@ import { Customer, PaymentInput, PosService, Product } from '../pos.service';
           <h1 class="text-2xl font-bold">Sell</h1>
           @if (cart.draftId()) {
             <span class="badge badge-info">Editing proforma</span>
+          }
+          @if (!connectivity.online()) {
+            <span class="badge badge-warning">Offline — sales will queue</span>
+          }
+          @if (sync.queuedCount() > 0 || sync.failedCount() > 0) {
+            <a
+              routerLink="/pos/sync"
+              class="badge"
+              [class.badge-error]="sync.failedCount() > 0"
+              [class.badge-outline]="sync.failedCount() === 0"
+            >
+              {{ sync.queuedCount() + sync.failedCount() }} pending sync
+            </a>
           }
         </header>
 
@@ -281,6 +296,8 @@ import { Customer, PaymentInput, PosService, Product } from '../pos.service';
 })
 export class SellComponent implements OnInit {
   protected readonly cart = inject(CartService);
+  protected readonly connectivity = inject(ConnectivityService);
+  protected readonly sync = inject(SyncService);
   private readonly pos = inject(PosService);
   private readonly route = inject(ActivatedRoute);
 
@@ -321,6 +338,8 @@ export class SellComponent implements OnInit {
     } catch {
       // keep defaults
     }
+    // Keep the offline product snapshot fresh (fire-and-forget).
+    void this.sync.refreshProductSnapshot();
     const draftId = this.route.snapshot.queryParamMap.get('draft');
     if (draftId) await this.loadDraft(draftId);
   }
@@ -332,7 +351,10 @@ export class SellComponent implements OnInit {
       return;
     }
     try {
-      const products = await this.pos.searchProducts(q);
+      // Offline: search the IndexedDB snapshot of the active catalog instead.
+      const products = this.connectivity.online()
+        ? await this.pos.searchProducts(q)
+        : await this.sync.searchProductsOffline(q);
       // Scanner-style entry: an exact barcode match goes straight to the cart.
       const exact = products.find(p => p.barcode === q);
       if (exact) {
@@ -419,17 +441,43 @@ export class SellComponent implements OnInit {
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
+    const customerId = this.cart.customerId();
+    const lines = this.cart.toSaleLines();
+    // Offline: complete locally into the outbox — never claim "completed".
+    if (!this.connectivity.online()) {
+      await this.queueSale(customerId, lines, payments);
+      this.busy.set(false);
+      return;
+    }
     try {
-      await this.pos.postSale(this.cart.customerId(), this.cart.toSaleLines(), payments, false);
+      await this.pos.postSale(customerId, lines, payments, false);
       this.checkoutOpen.set(false);
       this.cart.clear();
       this.notice.set('Sale completed');
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Sale failed');
-      this.checkoutOpen.set(false);
+      if (!(err instanceof PosRpcError)) {
+        // Network failure mid-request: the outcome is unknown but safe —
+        // queue with a client_ref so the replay is exactly-once.
+        await this.queueSale(customerId, lines, payments);
+      } else {
+        this.error.set(err.message);
+        this.checkoutOpen.set(false);
+      }
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** Complete the sale locally into the offline outbox (FIFO, exactly-once replay). */
+  private async queueSale(
+    customerId: string | null,
+    lines: ReturnType<CartService['toSaleLines']>,
+    payments: PaymentInput[]
+  ): Promise<void> {
+    await this.sync.enqueue({ customer_id: customerId, lines, payments });
+    this.checkoutOpen.set(false);
+    this.cart.clear();
+    this.notice.set('Sale queued — will sync when online');
   }
 
   protected async park(): Promise<void> {
