@@ -361,10 +361,11 @@ export class SettingsService {
         ledgerAccountCode,
       } = input;
       const customFields: Record<string, any> = {};
-      if (isActive !== undefined) customFields.isActive = isActive;
-      if (imageAssetId !== undefined) customFields.imageAssetId = imageAssetId;
-      if (isCashierControlled !== undefined) customFields.isCashierControlled = isCashierControlled;
-      if (ledgerAccountCode !== undefined) customFields.ledgerAccountCode = ledgerAccountCode;
+      if (isActive !== undefined) customFields['isActive'] = isActive;
+      if (imageAssetId !== undefined) customFields['imageAssetId'] = imageAssetId;
+      if (isCashierControlled !== undefined)
+        customFields['isCashierControlled'] = isCashierControlled;
+      if (ledgerAccountCode !== undefined) customFields['ledgerAccountCode'] = ledgerAccountCode;
 
       const client = this.apolloService.getClient();
       await client.mutate({
