@@ -34,6 +34,98 @@ export type Database = {
   }
   public: {
     Tables: {
+      cash_drawer_counts: {
+        Row: {
+          company_id: string
+          count_type: string
+          created_at: string
+          created_by: string | null
+          declared_cash: number
+          expected_cash: number
+          id: string
+          session_id: string
+          variance: number
+        }
+        Insert: {
+          company_id: string
+          count_type: string
+          created_at?: string
+          created_by?: string | null
+          declared_cash: number
+          expected_cash: number
+          id?: string
+          session_id: string
+          variance: number
+        }
+        Update: {
+          company_id?: string
+          count_type?: string
+          created_at?: string
+          created_by?: string | null
+          declared_cash?: number
+          expected_cash?: number
+          id?: string
+          session_id?: string
+          variance?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_drawer_counts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_drawer_counts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cashier_sessions: {
+        Row: {
+          cashier_user_id: string
+          closed_at: string | null
+          closing_declared: number | null
+          company_id: string
+          created_at: string
+          id: string
+          opened_at: string
+          status: string
+        }
+        Insert: {
+          cashier_user_id: string
+          closed_at?: string | null
+          closing_declared?: number | null
+          company_id: string
+          created_at?: string
+          id?: string
+          opened_at?: string
+          status?: string
+        }
+        Update: {
+          cashier_user_id?: string
+          closed_at?: string | null
+          closing_declared?: number | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          opened_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cashier_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           batch_expiry_enabled: boolean
@@ -583,6 +675,54 @@ export type Database = {
           },
         ]
       }
+      mpesa_verifications: {
+        Row: {
+          all_confirmed: boolean
+          company_id: string
+          created_at: string
+          created_by: string | null
+          flagged_ids: Json
+          id: string
+          notes: string | null
+          session_id: string | null
+        }
+        Insert: {
+          all_confirmed?: boolean
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          flagged_ids?: Json
+          id?: string
+          notes?: string | null
+          session_id?: string | null
+        }
+        Update: {
+          all_confirmed?: boolean
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          flagged_ids?: Json
+          id?: string
+          notes?: string | null
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_verifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_verifications_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cashier_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_lines: {
         Row: {
           company_id: string
@@ -888,6 +1028,79 @@ export type Database = {
           },
         ]
       }
+      reconciliation_accounts: {
+        Row: {
+          account_code: string
+          declared: number
+          expected: number
+          id: string
+          reconciliation_id: string
+          variance: number
+        }
+        Insert: {
+          account_code: string
+          declared: number
+          expected: number
+          id?: string
+          reconciliation_id: string
+          variance: number
+        }
+        Update: {
+          account_code?: string
+          declared?: number
+          expected?: number
+          id?: string
+          reconciliation_id?: string
+          variance?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_accounts_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reconciliations: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          scope: string
+          scope_ref_id: string
+          status: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          scope: string
+          scope_ref_id: string
+          status?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          scope?: string
+          scope_ref_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       refunds: {
         Row: {
           amount: number
@@ -1053,6 +1266,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      account_balance: {
+        Args: { p_code: string; p_company_id: string }
+        Returns: number
+      }
+      close_cashier_session: {
+        Args: { p_declarations: Json; p_session_id: string }
+        Returns: string
+      }
       complete_order: {
         Args: { p_actor: string; p_order_id: string; p_payments: Json }
         Returns: string
@@ -1088,6 +1309,7 @@ export type Database = {
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       is_platform_admin: { Args: never; Returns: boolean }
+      open_cashier_session: { Args: { p_declarations: Json }; Returns: string }
       post_balance_adjustment: {
         Args: { p_amount: number; p_customer_id: string; p_reason: string }
         Returns: string
@@ -1167,11 +1389,31 @@ export type Database = {
         }
         Returns: string
       }
+      post_variance_adjustment: {
+        Args: {
+          p_account_code: string
+          p_company_id: string
+          p_count_id: string
+          p_declared: number
+          p_reason?: string
+          p_session_id: string
+        }
+        Returns: string
+      }
       provision_company: {
         Args: {
           p_company_name: string
           p_currency?: string
           p_store_name?: string
+        }
+        Returns: string
+      }
+      record_mpesa_verification: {
+        Args: {
+          p_all_confirmed: boolean
+          p_flagged_ids?: Json
+          p_notes?: string
+          p_session_id: string
         }
         Returns: string
       }
