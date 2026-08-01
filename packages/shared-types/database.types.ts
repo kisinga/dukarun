@@ -477,8 +477,22 @@ export type Database = {
             foreignKeyName: "inventory_batches_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "inventory_batches_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_batches_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
           },
         ]
       }
@@ -895,8 +909,22 @@ export type Database = {
             foreignKeyName: "orders_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
           },
         ]
       }
@@ -1186,8 +1214,22 @@ export type Database = {
             foreignKeyName: "purchases_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
           },
         ]
       }
@@ -1426,7 +1468,38 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      customer_ar_balances: {
+        Row: {
+          balance: number | null
+          company_id: string | null
+          customer_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_ap_balances: {
+        Row: {
+          balance: number | null
+          company_id: string | null
+          supplier_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       account_balance: {
@@ -1461,6 +1534,7 @@ export type Database = {
         Args: {
           p_email?: string
           p_first_name: string
+          p_is_supplier?: boolean
           p_last_name?: string
           p_phone?: string
         }
@@ -1623,6 +1697,15 @@ export type Database = {
       send_sms_hook: { Args: { event: Json }; Returns: Json }
       settle_order: {
         Args: { p_order_id: string; p_payments: Json }
+        Returns: string
+      }
+      update_customer_credit: {
+        Args: {
+          p_credit_limit: number
+          p_customer_id: string
+          p_is_approved: boolean
+          p_terms_days?: number
+        }
         Returns: string
       }
       void_sale: {
