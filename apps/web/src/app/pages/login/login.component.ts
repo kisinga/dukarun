@@ -122,6 +122,9 @@ export class LoginComponent {
         type: 'sms',
       });
       if (error) throw error;
+      // OTP-issued tokens lack the custom claims (company_id, user_role);
+      // refresh so permission-gated RPCs (settle/void/override) work.
+      await this.supabase.client.auth.refreshSession();
       const company = await this.supabase.currentCompany();
       await this.router.navigate(company ? ['/dashboard'] : ['/register']);
     } catch (err) {

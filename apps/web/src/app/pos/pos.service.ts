@@ -1,0 +1,185 @@
+import { Injectable, inject } from '@angular/core';
+import type { Database } from '@dukarun/shared-types';
+import { SupabaseService } from '../core/supabase.service';
+
+export type Product = Database['public']['Tables']['products']['Row'];
+export type Customer = Database['public']['Tables']['customers']['Row'];
+export type Order = Database['public']['Tables']['orders']['Row'];
+export type OrderLine = Database['public']['Tables']['order_lines']['Row'];
+export type Payment = Database['public']['Tables']['payments']['Row'];
+
+/** p_lines item for post_sale / save_draft (amounts in cents). */
+export interface SaleLineInput {
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  custom_price?: number;
+  override_reason?: string;
+}
+
+/** p_payments item for post_sale / convert_draft / settle_order. */
+export interface PaymentInput {
+  method: 'cash' | 'mpesa' | 'bank';
+  amount: number;
+  reference?: string;
+  mpesa_receipt?: string;
+}
+
+export type OrderWithCustomer = Order & {
+  customers: Pick<Customer, 'first_name' | 'last_name'> | null;
+};
+
+export type OrderLineWithProduct = OrderLine & {
+  products: Pick<Product, 'name' | 'sku'> | null;
+};
+
+@Injectable({ providedIn: 'root' })
+export class PosService {
+  private readonly supabase = inject(SupabaseService);
+
+  get client() {
+    return this.supabase.client;
+  }
+
+  async searchProducts(query: string): Promise<Product[]> {
+    // Strip characters that would break the PostgREST .or() filter string.
+    const pattern = `%${query.trim().replace(/[%_,()]/g, ' ')}%`;
+    const { data, error } = await this.client
+      .from('products')
+      .select('*')
+      .or(`name.ilike.${pattern},sku.ilike.${pattern},barcode.ilike.${pattern}`)
+      .eq('active', true)
+      .limit(20);
+    if (error) throw error;
+    return data;
+  }
+
+  async searchCustomers(query: string): Promise<Customer[]> {
+    const pattern = `%${query.trim().replace(/[%_,()]/g, ' ')}%`;
+    const { data, error } = await this.client
+      .from('customers')
+      .select('*')
+      .or(`first_name.ilike.${pattern},last_name.ilike.${pattern},phone.ilike.${pattern}`)
+      .limit(10);
+    if (error) throw error;
+    return data;
+  }
+
+  /** Enabled non-credit payment method codes (credit is handled as its own checkout mode). */
+  async enabledPaymentMethods(): Promise<string[]> {
+    const { data, error } = await this.client
+      .from('payment_methods')
+      .select('code')
+      .eq('enabled', true)
+      .neq('code', 'credit');
+    if (error) throw error;
+    return data.map(m => m.code);
+  }
+
+  /** Orders by status, most recent first. `since` limits to orders created at/after it. */
+  async ordersByStatus(statuses: string[], since?: string): Promise<OrderWithCustomer[]> {
+    let query = this.client
+      .from('orders')
+      .select('*, customers(first_name, last_name)')
+      .in('status', statuses)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (since) query = query.gte('created_at', since);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+  }
+
+  async orderLines(orderId: string): Promise<OrderLineWithProduct[]> {
+    const { data, error } = await this.client
+      .from('order_lines')
+      .select('*, products(name, sku)')
+      .eq('order_id', orderId);
+    if (error) throw error;
+    return data;
+  }
+
+  async orderPayments(orderId: string): Promise<Payment[]> {
+    const { data, error } = await this.client.from('payments').select('*').eq('order_id', orderId);
+    if (error) throw error;
+    return data;
+  }
+
+  async productsByIds(ids: string[]): Promise<Product[]> {
+    if (ids.length === 0) return [];
+    const { data, error } = await this.client.from('products').select('*').in('id', ids);
+    if (error) throw error;
+    return data;
+  }
+
+  async getOrder(orderId: string): Promise<OrderWithCustomer> {
+    const { data, error } = await this.client
+      .from('orders')
+      .select('*, customers(first_name, last_name)')
+      .eq('id', orderId)
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  // --- RPCs (errors come back as P0001 with a human-readable message) ---
+
+  async postSale(
+    customerId: string | null,
+    lines: SaleLineInput[],
+    payments: PaymentInput[],
+    park: boolean
+  ): Promise<string> {
+    const { data, error } = await this.client.rpc('post_sale', {
+      // null = walk-in customer (accepted by the backend; generated types mark it non-null)
+      p_customer_id: customerId!,
+      p_lines: lines as never,
+      p_payments: payments as never,
+      p_park: park,
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  async saveDraft(
+    customerId: string | null,
+    lines: SaleLineInput[],
+    draftId: string | null
+  ): Promise<string> {
+    const { data, error } = await this.client.rpc('save_draft', {
+      // null = walk-in customer (accepted by the backend; generated types mark it non-null)
+      p_customer_id: customerId!,
+      p_lines: lines as never,
+      ...(draftId ? { p_draft_id: draftId } : {}),
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  async convertDraft(orderId: string, payments: PaymentInput[]): Promise<string> {
+    const { data, error } = await this.client.rpc('convert_draft', {
+      p_order_id: orderId,
+      p_payments: payments as never,
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  async settleOrder(orderId: string, payments: PaymentInput[]): Promise<string> {
+    const { data, error } = await this.client.rpc('settle_order', {
+      p_order_id: orderId,
+      p_payments: payments as never,
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  async voidSale(orderId: string, reason: string): Promise<string> {
+    const { data, error } = await this.client.rpc('void_sale', {
+      p_order_id: orderId,
+      p_reason: reason,
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+}

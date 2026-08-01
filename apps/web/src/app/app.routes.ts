@@ -18,6 +18,29 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent),
   },
+  {
+    path: 'pos/sell',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pos/sell/sell.component').then(m => m.SellComponent),
+  },
+  {
+    path: 'pos/sales',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./pos/sales/today-sales.component').then(m => m.TodaySalesComponent),
+  },
+  {
+    path: 'pos/proformas',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./pos/proformas/proformas.component').then(m => m.ProformasComponent),
+  },
+  {
+    path: 'pos/cashier',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./pos/cashier/cashier-queue.component').then(m => m.CashierQueueComponent),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   { path: '**', redirectTo: 'dashboard' },
 ];

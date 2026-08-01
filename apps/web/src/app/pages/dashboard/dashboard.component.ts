@@ -1,9 +1,10 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Company, SupabaseService } from '../../core/supabase.service';
 
 @Component({
   selector: 'app-dashboard',
+  imports: [RouterLink],
   template: `
     <main class="flex min-h-screen items-center justify-center bg-base-200 p-4">
       <div class="card w-full max-w-md bg-base-100 shadow-xl">
@@ -25,6 +26,13 @@ import { Company, SupabaseService } from '../../core/supabase.service';
                 <dd class="badge badge-primary">{{ role() ?? '—' }}</dd>
               </div>
             </dl>
+
+            <nav class="mt-6 grid grid-cols-2 gap-2">
+              <a routerLink="/pos/sell" class="btn btn-primary">Sell</a>
+              <a routerLink="/pos/sales" class="btn btn-outline">Today's Sales</a>
+              <a routerLink="/pos/proformas" class="btn btn-outline">Proformas</a>
+              <a routerLink="/pos/cashier" class="btn btn-outline">Cashier Queue</a>
+            </nav>
           } @else if (error()) {
             <p class="mt-4 text-sm text-error">{{ error() }}</p>
           } @else {
