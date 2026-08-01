@@ -30,13 +30,21 @@
     "services:down": "docker compose -f docker-compose.services.yml -f docker-compose.services.override.yml down",
     "coverage:summary": "node scripts/coverage-summary.mjs --badge-dir badges",
     "test": "npm run test --workspaces --if-present",
-    "prepare": "node -e \"if (process.env.CI === 'true' || process.env.HUSKY === '0') process.exit(0); require('child_process').execSync('npx husky install', {stdio:'inherit'})\""
+    "prepare": "node -e \"if (process.env.CI === 'true' || process.env.HUSKY === '0') process.exit(0); require('child_process').execSync('npx husky install', {stdio:'inherit'})\"",
+    "sb": "supabase",
+    "sb:start": "supabase start",
+    "sb:stop": "supabase stop",
+    "sb:reset": "supabase db reset",
+    "sb:test": "supabase test db",
+    "sb:lint": "supabase db lint",
+    "sb:types": "supabase gen types typescript --local > packages/shared-types/database.types.ts"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
     "concurrently": "^10.0.3",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
+    "supabase": "^2.111.0",
     "ts-node": "^10.9.2",
     "typescript": "~5.9.3"
   }
