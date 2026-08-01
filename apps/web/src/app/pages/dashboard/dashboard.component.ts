@@ -35,6 +35,19 @@ import { SyncService } from '../../pos/offline/sync.service';
               <a routerLink="/pos/cashier" class="btn btn-outline">Cashier Queue</a>
             </nav>
 
+            <h2 class="mt-6 text-sm font-semibold uppercase tracking-wide text-base-content/60">
+              Money
+            </h2>
+            <nav class="mt-2 grid grid-cols-2 gap-2">
+              <a routerLink="/money/cashier" class="btn btn-outline btn-sm">Cashier Sessions</a>
+              <a routerLink="/money/expenses" class="btn btn-outline btn-sm">Expenses</a>
+              <a routerLink="/money/transfers" class="btn btn-outline btn-sm">Transfers</a>
+              <a routerLink="/money/credit" class="btn btn-outline btn-sm">Customer Credit</a>
+              <a routerLink="/money/suppliers" class="btn btn-outline btn-sm">Suppliers</a>
+              <a routerLink="/money/periods" class="btn btn-outline btn-sm">Reconciliation</a>
+              <a routerLink="/money/stock" class="btn btn-outline btn-sm">Stock Adjustments</a>
+            </nav>
+
             @if (pendingCount() > 0) {
               <a
                 routerLink="/pos/sync"

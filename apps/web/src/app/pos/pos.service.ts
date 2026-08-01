@@ -50,7 +50,7 @@ export class PosRpcError extends Error {
   }
 }
 
-function rpcError(error: { message: string; code?: string }): PosRpcError {
+export function rpcError(error: { message: string; code?: string }): PosRpcError {
   return new PosRpcError(error.message, error.code ?? '');
 }
 

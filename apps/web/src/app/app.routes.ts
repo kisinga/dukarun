@@ -47,6 +47,48 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pos/sync/pending-sync.component').then(m => m.PendingSyncComponent),
   },
+  {
+    path: 'money/cashier',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./money/cashier/money-cashier.component').then(m => m.MoneyCashierComponent),
+  },
+  {
+    path: 'money/expenses',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./money/expenses/money-expenses.component').then(m => m.MoneyExpensesComponent),
+  },
+  {
+    path: 'money/transfers',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./money/transfers/money-transfers.component').then(m => m.MoneyTransfersComponent),
+  },
+  {
+    path: 'money/credit',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./money/credit/money-credit.component').then(m => m.MoneyCreditComponent),
+  },
+  {
+    path: 'money/suppliers',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./money/suppliers/money-suppliers.component').then(m => m.MoneySuppliersComponent),
+  },
+  {
+    path: 'money/periods',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./money/periods/money-periods.component').then(m => m.MoneyPeriodsComponent),
+  },
+  {
+    path: 'money/stock',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./money/stock/money-stock.component').then(m => m.MoneyStockComponent),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   { path: '**', redirectTo: 'dashboard' },
 ];
