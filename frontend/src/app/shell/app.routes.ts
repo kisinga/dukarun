@@ -245,9 +245,13 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'approvals',
+        path: 'action-items',
         loadComponent: () =>
           import('../pages/approvals/approvals.component').then((m) => m.ApprovalsComponent),
+      },
+      {
+        path: 'approvals',
+        redirectTo: 'action-items',
       },
       {
         path: 'profile',

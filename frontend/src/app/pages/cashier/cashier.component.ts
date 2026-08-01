@@ -3,14 +3,19 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  computed,
   inject,
   signal,
   viewChild,
 } from '@angular/core';
 import { NgIcon } from '@ng-icons/core';
 import { CurrencyService } from '../../shared/services/currency.service';
-import { OrderService } from '@dukarun/order';
+import { OrderService, OrdersService } from '@dukarun/order';
+import { CompanyService } from '@dukarun/company';
+import { AuthService } from '@dukarun/auth';
 import { ToastService } from '../../shared/services/toast.service';
+import { PrintService } from '../../shared/services/print.service';
+import { PrintPreferencesService } from '../../shared/services/print-preferences.service';
 import {
   CashierPendingOrderView,
   CashierSettlementService,
@@ -163,17 +168,26 @@ import { SettleOrderModalComponent } from '@dukarun/cashier-session/components';
 
     <app-settle-order-modal
       #settleModal
+      [enablePrint]="enablePrinter()"
       (confirm)="onConfirm($event)"
       (settled)="onSettled()"
       (cancelled)="onCancelled()"
+      (printRequested)="onPrintReceipt($event)"
     />
   `,
 })
 export class CashierComponent implements OnInit {
   private readonly settlementService = inject(CashierSettlementService);
   private readonly orderService = inject(OrderService);
+  private readonly ordersService = inject(OrdersService);
   private readonly currencyService = inject(CurrencyService);
   private readonly toastService = inject(ToastService);
+  private readonly companyService = inject(CompanyService);
+  private readonly authService = inject(AuthService);
+  private readonly printService = inject(PrintService);
+  private readonly printPreferences = inject(PrintPreferencesService);
+
+  readonly enablePrinter = computed(() => this.companyService.enablePrinter());
 
   private readonly settleModal = viewChild<SettleOrderModalComponent>('settleModal');
 
@@ -244,6 +258,31 @@ export class CashierComponent implements OnInit {
   onSettled(): void {
     this.selectedItem.set(null);
     void this.refresh();
+  }
+
+  /**
+   * Optional receipt print from the settle modal's success state. Best-effort:
+   * a print failure must never affect the settled order.
+   */
+  async onPrintReceipt(paymentSummary: string): Promise<void> {
+    const item = this.selectedItem();
+    if (!item) return;
+    try {
+      const fullOrder = await this.ordersService.fetchOrderById(item.order.id);
+      if (!fullOrder) return;
+      const templateId = await this.printPreferences.getDefaultTemplateId();
+      await this.printService.printOrder(fullOrder, templateId, {
+        documentType: templateId === 'a4' ? 'invoice' : 'receipt',
+        paymentMethodName: paymentSummary || undefined,
+        servedBy: this.authService.user()?.firstName ?? undefined,
+      });
+    } catch (err: any) {
+      this.toastService.show(
+        'Print failed',
+        err?.message || 'Could not print the receipt.',
+        'error',
+      );
+    }
   }
 
   onCancelled(): void {

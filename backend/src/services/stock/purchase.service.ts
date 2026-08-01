@@ -7,8 +7,6 @@ import {
   UserInputError,
 } from '@vendure/core';
 import { FinancialService } from '../financial/financial.service';
-import { LedgerTransactionService } from '../financial/ledger-transaction.service';
-import { PurchaseTransactionData } from '../financial/strategies/purchase-posting.strategy';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 import { addDays } from '../../utils/date.utils';
 import { StockPurchase, StockPurchaseLine } from './entities/purchase.entity';
@@ -64,7 +62,6 @@ export class PurchaseService {
     private readonly connection: TransactionalConnection,
     private readonly validationService: StockValidationService,
     private readonly financialService: FinancialService,
-    private readonly ledgerTransactionService: LedgerTransactionService,
     @Optional() private readonly auditService?: AuditService
   ) {}
 
@@ -177,23 +174,10 @@ export class PurchaseService {
 
     const savedPurchase = await purchaseRepo.save(purchase);
 
-    // Post purchase to ledger automatically (single source of truth)
-    // Handles both credit purchases (AP) and cash purchases (Cash on Hand)
-    const transactionData: PurchaseTransactionData = {
-      ctx,
-      sourceId: savedPurchase.id,
-      channelId: ctx.channelId as number,
-      purchaseId: savedPurchase.id,
-      purchaseReference: savedPurchase.referenceNumber || savedPurchase.id,
-      supplierId: input.supplierId.toString(),
-      totalCost,
-      isCreditPurchase: savedPurchase.isCreditPurchase,
-    };
-
-    const result = await this.ledgerTransactionService.postTransaction(transactionData);
-    if (!result.success) {
-      throw new Error(`Failed to post purchase to ledger: ${result.error}`);
-    }
+    // NOTE: No ledger posting here. The single purchase ledger entry
+    // (DR INVENTORY / CR AP|CASH_ON_HAND) is posted by InventoryService.recordPurchase,
+    // called by StockManagementService within the same transaction. Posting here as well
+    // double-counted AP/cash (see InventoryPurchase vs SupplierPurchase sourceTypes).
 
     // Create purchase lines
     const purchaseLines = input.lines.map(line => {
@@ -317,7 +301,7 @@ export class PurchaseService {
   }
 
   /**
-   * Confirm a draft purchase: post to ledger. Caller (StockManagementService) handles stock movements.
+   * Confirm a draft purchase. Caller (StockManagementService) handles ledger posting and stock movements.
    */
   async confirmPurchase(ctx: RequestContext, id: string): Promise<StockPurchase> {
     const purchaseRepo = this.connection.getRepository(ctx, StockPurchase);
@@ -342,21 +326,9 @@ export class PurchaseService {
     }
     await purchaseRepo.save(purchase);
 
-    const transactionData: PurchaseTransactionData = {
-      ctx,
-      sourceId: purchase.id,
-      channelId: ctx.channelId as number,
-      purchaseId: purchase.id,
-      purchaseReference: purchase.referenceNumber || purchase.id,
-      supplierId: String(purchase.supplierId),
-      totalCost: Number(purchase.totalCost),
-      isCreditPurchase: purchase.isCreditPurchase,
-    };
-
-    const result = await this.ledgerTransactionService.postTransaction(transactionData);
-    if (!result.success) {
-      throw new Error(`Failed to post purchase to ledger: ${result.error}`);
-    }
+    // NOTE: No ledger posting here. The single purchase ledger entry is posted by
+    // InventoryService.recordPurchase, called by StockManagementService.confirmPurchase
+    // within the same transaction.
 
     this.logger.log(`Confirmed purchase: ${id}`);
     return purchase;

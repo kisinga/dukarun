@@ -40,6 +40,8 @@ export class PaymentMethodsComponent {
       code: ['', [Validators.required, Validators.minLength(2)]],
       description: [''],
       isActive: [true],
+      isCashierControlled: [false],
+      ledgerAccountCode: [''],
     });
 
     effect(() => {
@@ -71,6 +73,8 @@ export class PaymentMethodsComponent {
       code: method.code,
       description: method.description || '',
       isActive: method.customFields?.isActive ?? true,
+      isCashierControlled: method.customFields?.isCashierControlled ?? false,
+      ledgerAccountCode: method.customFields?.ledgerAccountCode ?? '',
     });
     this.showModal.set(true);
   }
@@ -94,6 +98,8 @@ export class PaymentMethodsComponent {
         name: formValue.name,
         description: formValue.description,
         isActive: formValue.isActive,
+        isCashierControlled: formValue.isCashierControlled ?? false,
+        ledgerAccountCode: (formValue.ledgerAccountCode ?? '').trim(),
       };
       await this.settingsService.updatePaymentMethod(input);
     } else {
@@ -135,6 +141,23 @@ export class PaymentMethodsComponent {
     if (channel) await this.loadPaymentMethods(channel.id);
   }
 
+  /**
+   * Toggle whether the method's ledger account is cashier controlled — i.e. included in
+   * shift open/close counts and visible to the cashier. Cash and M-Pesa default to on
+   * (set during channel provisioning).
+   */
+  async toggleCashierControlled(method: PaymentMethod, event: Event): Promise<void> {
+    const target = event.target as HTMLInputElement;
+
+    await this.settingsService.updatePaymentMethod({
+      id: method.id,
+      isCashierControlled: target.checked,
+    });
+
+    const channel = this.companyService.activeChannel();
+    if (channel) await this.loadPaymentMethods(channel.id);
+  }
+
   async deleteMethod(method: PaymentMethod): Promise<void> {
     console.log('Delete payment method:', method.name);
   }
@@ -169,6 +192,8 @@ export class PaymentMethodsComponent {
                     }
                   : null,
                 isActive: method.customFields.isActive ?? null,
+                isCashierControlled: method.customFields.isCashierControlled ?? null,
+                ledgerAccountCode: method.customFields.ledgerAccountCode ?? null,
               }
             : null,
         }));

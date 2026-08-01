@@ -173,10 +173,10 @@ export class InventoryReconciliationService {
       input.stockLocationId
     );
 
-    // Calculate variance
+    // Calculate variance — same convention as other scopes: declared - expected (positive = overage)
     const expectedBalance = BigInt(inventoryValuation.totalValue);
     const actualBalance = BigInt(input.actualBalance);
-    const varianceAmount = (expectedBalance - actualBalance).toString();
+    const varianceAmount = (actualBalance - expectedBalance).toString();
 
     const scopeRefId = toScopeRefId({
       scope: 'inventory',

@@ -1,5 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PaymentMethod, PaymentMethodService, RequestContext } from '@vendure/core';
+import {
+  PaymentMethod,
+  PaymentMethodService,
+  RequestContext,
+  TransactionalConnection,
+  UserInputError,
+} from '@vendure/core';
+import { Account } from '../../ledger/account.entity';
 import { AuditService } from '../../infrastructure/audit/audit.service';
 
 @Injectable()
@@ -8,7 +15,8 @@ export class ChannelPaymentService {
 
   constructor(
     private readonly paymentMethodService: PaymentMethodService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly connection: TransactionalConnection
   ) {}
 
   async createChannelPaymentMethod(ctx: RequestContext, input: any): Promise<PaymentMethod> {
@@ -54,7 +62,10 @@ export class ChannelPaymentService {
       updateInput.description = input.description;
     }
 
-    const customFields: Record<string, any> = {};
+    // Reconciliation custom fields (isCashierControlled, ledgerAccountCode, …) pass
+    // through Vendure's customFields input; top-level isActive/imageAssetId are the
+    // legacy shape kept for existing callers.
+    const customFields: Record<string, any> = { ...(input.customFields ?? {}) };
 
     if (input.imageAssetId !== undefined) {
       customFields.imageAssetId = input.imageAssetId;
@@ -62,6 +73,25 @@ export class ChannelPaymentService {
 
     if (input.isActive !== undefined) {
       customFields.isActive = input.isActive;
+    }
+
+    if (customFields.ledgerAccountCode !== undefined && customFields.ledgerAccountCode !== null) {
+      const code = String(customFields.ledgerAccountCode).trim();
+      if (code === '') {
+        // Empty means "auto-derive from handler/method code" — store null.
+        customFields.ledgerAccountCode = null;
+      } else {
+        const account = await this.connection
+          .getRepository(ctx, Account)
+          .findOne({ where: { channelId: ctx.channelId as number, code } });
+        if (!account) {
+          throw new UserInputError(
+            `Ledger account "${code}" does not exist for this channel. ` +
+              `Use an existing account code or leave empty to auto-derive.`
+          );
+        }
+        customFields.ledgerAccountCode = code;
+      }
     }
 
     if (Object.keys(customFields).length > 0) {

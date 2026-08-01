@@ -15,6 +15,7 @@ import { MpesaVerification } from '../../../src/domain/cashier/mpesa-verificatio
 import { Reconciliation } from '../../../src/domain/recon/reconciliation.entity';
 import { ReconciliationAccount } from '../../../src/domain/recon/reconciliation-account.entity';
 import { Account } from '../../../src/ledger/account.entity';
+import { JournalEntry } from '../../../src/ledger/journal-entry.entity';
 import { FinancialService } from '../../../src/services/financial/financial.service';
 import { LedgerQueryService } from '../../../src/services/financial/ledger-query.service';
 import { ReconciliationService } from '../../../src/services/financial/reconciliation.service';
@@ -81,6 +82,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         if (entity === Reconciliation) return mockReconRepo;
         if (entity === ReconciliationAccount) return mockReconAccountRepo;
         if (entity === Account) return mockAccountRepo;
+        if (entity === JournalEntry) return { findOne: (jest.fn() as any).mockResolvedValue(null) };
         if (entity === MpesaVerification)
           return { create: jest.fn(), save: jest.fn(), findOne: jest.fn() };
         return {};
@@ -741,7 +743,7 @@ describe('CashierSessionService - Reconciliation Integration', () => {
   });
 
   describe('Expected balance and variance (no double-count)', () => {
-    it('getSessionSummary uses session-scoped ledger total only for expectedCash', async () => {
+    it('getSessionSummary computes variance from full-ledger expected summed across cashier-controlled accounts', async () => {
       const sessionId = UUID_SESSION_1;
       const channelId = 1;
       const session: CashierSession = {
@@ -759,12 +761,230 @@ describe('CashierSessionService - Reconciliation Integration', () => {
         mpesaTotal: 0,
         totalCollected: 150,
       });
+      mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([
+        {
+          id: 1,
+          enabled: true,
+          customFields: { isCashierControlled: true, ledgerAccountCode: 'CASH_ON_HAND' },
+        },
+      ]);
+      mockLedgerQueryService.getExpectedBalanceForReconciliation.mockResolvedValue(150);
 
       const summary = await service.getSessionSummary(ctx, sessionId);
 
+      // Session-scoped totals remain informational only — they must NOT drive variance
       expect(summary.ledgerTotals.cashTotal).toBe(150);
+      // Expected comes from the full ledger (scope 'manual' + snapshot date), same as
+      // opening/closing variance posting, so outflows that never tag openSessionId count.
+      expect(mockLedgerQueryService.getExpectedBalanceForReconciliation).toHaveBeenCalledWith(
+        channelId,
+        'manual',
+        sessionId,
+        'CASH_ON_HAND',
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
+      );
+      expect(summary.expectedTotal).toBe(150);
       expect(summary.variance).toBe(160 - 150);
       expect(summary.closingDeclared).toBe(160);
+    });
+
+    it('recordCashCount uses full-ledger cash expected (scope manual + date), not session-scoped', async () => {
+      const sessionId = UUID_SESSION_1;
+      const session: CashierSession = {
+        id: sessionId,
+        channelId: 1,
+        cashierUserId: 1,
+        openedAt: new Date(),
+        status: 'open',
+        closingDeclared: '0',
+      } as CashierSession;
+      mockSessionRepo.findOne.mockResolvedValue(session);
+      mockLedgerQueryService.getExpectedBalanceForReconciliation.mockResolvedValue(5000);
+      mockCountRepo.create.mockImplementation((o: any) => ({ ...o, id: 'count-mid' }));
+      mockCountRepo.save.mockImplementation((c: any) => Promise.resolve({ ...c }));
+      mockChannelRepo.findOne.mockResolvedValue({ id: 1, customFields: {} });
+
+      const result = await service.recordCashCount(ctx, {
+        sessionId,
+        declaredCash: 4800,
+        countType: 'interim',
+        skipVariancePosting: true,
+      });
+
+      expect(mockLedgerQueryService.getExpectedBalanceForReconciliation).toHaveBeenCalledWith(
+        1,
+        'manual',
+        sessionId,
+        'CASH_ON_HAND',
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
+      );
+      // Session-scoped totals must not be consulted for expected cash
+      expect(mockLedgerQueryService.getCashierSessionTotals).not.toHaveBeenCalled();
+      expect(result.count.expectedCash).toBe('5000');
+      expect(result.count.variance).toBe(String(4800 - 5000));
+    });
+
+    it('getExpectedClosingBalances uses full-ledger expected (scope manual + date)', async () => {
+      const sessionId = UUID_SESSION_1;
+      const session: CashierSession = {
+        id: sessionId,
+        channelId: 1,
+        cashierUserId: 1,
+        openedAt: new Date(),
+        status: 'open',
+        closingDeclared: '0',
+      } as CashierSession;
+      mockSessionRepo.findOne.mockResolvedValue(session);
+      mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([
+        {
+          id: 1,
+          enabled: true,
+          code: 'cash-1',
+          customFields: { isCashierControlled: true, ledgerAccountCode: 'CASH_ON_HAND' },
+        },
+      ]);
+      mockLedgerQueryService.getExpectedBalanceForReconciliation.mockResolvedValue(7500);
+
+      const results = await service.getExpectedClosingBalances(ctx, sessionId);
+
+      expect(mockLedgerQueryService.getExpectedBalanceForReconciliation).toHaveBeenCalledWith(
+        1,
+        'manual',
+        sessionId,
+        'CASH_ON_HAND',
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
+      );
+      expect(results).toEqual([
+        {
+          accountCode: 'CASH_ON_HAND',
+          accountName: 'cash-1',
+          expectedBalanceCents: '7500',
+        },
+      ]);
+    });
+
+    it('closeSession records the closing count with the CASH_ON_HAND declared amount only', async () => {
+      const sessionId = UUID_SESSION_1;
+      const channelId = 1;
+      const openSession: CashierSession = {
+        id: sessionId,
+        channelId,
+        cashierUserId: 1,
+        openedAt: new Date(),
+        status: 'open',
+        closingDeclared: '0',
+      } as CashierSession;
+      const closedSession = {
+        ...openSession,
+        status: 'closed' as const,
+        closedAt: new Date(),
+        closingDeclared: '13000',
+      };
+      let closeSessionSaveCalled = false;
+      mockSessionRepo.findOne.mockImplementation((opts: any) => {
+        const id = opts?.where?.id;
+        if (id === sessionId && closeSessionSaveCalled) return Promise.resolve(closedSession);
+        if (id === sessionId) return Promise.resolve(openSession);
+        return Promise.resolve(null);
+      });
+      mockSessionRepo.save.mockImplementation((s: any) => {
+        if (s.id === sessionId && s.status === 'closed') closeSessionSaveCalled = true;
+        return Promise.resolve({ ...s });
+      });
+      mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([
+        {
+          id: 1,
+          enabled: true,
+          code: 'cash-1',
+          customFields: { isCashierControlled: true, ledgerAccountCode: 'CASH_ON_HAND' },
+        },
+        {
+          id: 2,
+          enabled: true,
+          code: 'mpesa-1',
+          customFields: { isCashierControlled: true, ledgerAccountCode: 'CLEARING_MPESA' },
+        },
+      ]);
+      mockLedgerQueryService.getCashierSessionTotals.mockResolvedValue({
+        cashTotal: 10000,
+        mpesaTotal: 3000,
+        totalCollected: 13000,
+      });
+      mockLedgerQueryService.getExpectedBalanceForReconciliation.mockResolvedValue(13000);
+      mockCountRepo.create.mockImplementation((o: any) => ({ ...o, id: 'count-close' }));
+      mockCountRepo.save.mockImplementation((c: any) => Promise.resolve({ ...c }));
+      mockReconAccountRepo.find.mockResolvedValue([]);
+
+      await service.closeSession(ctx, {
+        sessionId,
+        closingBalances: [
+          { accountCode: 'CASH_ON_HAND', amountCents: 10000 },
+          { accountCode: 'CLEARING_MPESA', amountCents: 3000 },
+        ],
+      });
+
+      // Closing count is a cash-drawer count: declared must be the cash portion only,
+      // not the 13000 total across accounts.
+      expect(mockCountRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          countType: 'closing',
+          declaredCash: '10000',
+        })
+      );
+    });
+
+    it('closeSession skips the cash count when the channel has no CASH_ON_HAND account', async () => {
+      const sessionId = UUID_SESSION_1;
+      const channelId = 1;
+      const openSession: CashierSession = {
+        id: sessionId,
+        channelId,
+        cashierUserId: 1,
+        openedAt: new Date(),
+        status: 'open',
+        closingDeclared: '0',
+      } as CashierSession;
+      const closedSession = {
+        ...openSession,
+        status: 'closed' as const,
+        closedAt: new Date(),
+        closingDeclared: '3000',
+      };
+      let closeSessionSaveCalled = false;
+      mockSessionRepo.findOne.mockImplementation((opts: any) => {
+        const id = opts?.where?.id;
+        if (id === sessionId && closeSessionSaveCalled) return Promise.resolve(closedSession);
+        if (id === sessionId) return Promise.resolve(openSession);
+        return Promise.resolve(null);
+      });
+      mockSessionRepo.save.mockImplementation((s: any) => {
+        if (s.id === sessionId && s.status === 'closed') closeSessionSaveCalled = true;
+        return Promise.resolve({ ...s });
+      });
+      mockChannelPaymentMethodService.getChannelPaymentMethods.mockResolvedValue([
+        {
+          id: 2,
+          enabled: true,
+          code: 'mpesa-1',
+          customFields: { isCashierControlled: true, ledgerAccountCode: 'CLEARING_MPESA' },
+        },
+      ]);
+      mockLedgerQueryService.getCashierSessionTotals.mockResolvedValue({
+        cashTotal: 0,
+        mpesaTotal: 3000,
+        totalCollected: 3000,
+      });
+      mockLedgerQueryService.getExpectedBalanceForReconciliation.mockResolvedValue(3000);
+      mockReconAccountRepo.find.mockResolvedValue([]);
+
+      await service.closeSession(ctx, {
+        sessionId,
+        closingBalances: [{ accountCode: 'CLEARING_MPESA', amountCents: 3000 }],
+      });
+
+      // No drawer to count: comparing all-accounts declared against cash-only expected
+      // would record a bogus variance, so no count row is created.
+      expect(mockCountRepo.create).not.toHaveBeenCalled();
     });
 
     it('createSessionReconciliationWithVariancePosting posts variance when declared != expected', async () => {
@@ -1215,10 +1435,10 @@ describe('CashierSessionService - Reconciliation Integration', () => {
       ]);
       mockLedgerQueryService.getExpectedBalanceForReconciliation
         .mockReset()
-        .mockResolvedValueOnce(fullLedgerCashCents)
-        .mockResolvedValueOnce(fullLedgerMpesaCents)
-        .mockResolvedValueOnce(fullLedgerCashCents)
-        .mockResolvedValueOnce(fullLedgerMpesaCents);
+        .mockImplementation(((_ch: any, _scope: any, _ref: any, code: string) =>
+          Promise.resolve(
+            code === 'CASH_ON_HAND' ? fullLedgerCashCents : fullLedgerMpesaCents
+          )) as any);
 
       await service.createSessionReconciliationWithVariancePosting(ctx, sessionId, 'Repair');
 

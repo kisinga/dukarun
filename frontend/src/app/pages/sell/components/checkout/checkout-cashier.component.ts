@@ -23,18 +23,35 @@ import { CheckoutSummaryComponent } from './checkout-summary.component';
         [delay]="true"
       />
 
-      <button
-        class="btn btn-info btn-md sm:btn-lg w-full interactive-press min-h-[44px]"
-        (click)="complete.emit()"
-        [disabled]="isProcessing()"
-      >
-        @if (isProcessing()) {
-          <span class="loading loading-spinner"></span>
-        } @else {
-          <ng-icon name="heroClipboardDocumentCheck" size="1.25rem" />
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button
+          class="btn btn-info btn-md sm:btn-lg flex-1 interactive-press min-h-[44px]"
+          (click)="complete.emit()"
+          [disabled]="isProcessing()"
+        >
+          @if (isProcessing()) {
+            <span class="loading loading-spinner"></span>
+          } @else {
+            <ng-icon name="heroClipboardDocumentCheck" size="1.25rem" />
+          }
+          Submit to Cashier
+        </button>
+
+        @if (enablePrinter()) {
+          <button
+            class="btn btn-outline btn-info btn-md sm:btn-lg flex-1 interactive-press min-h-[44px]"
+            (click)="completeAndPrint.emit()"
+            [disabled]="isProcessing()"
+          >
+            @if (isProcessing()) {
+              <span class="loading loading-spinner"></span>
+            } @else {
+              <ng-icon name="heroPrinter" size="1.25rem" />
+            }
+            Submit & Print Slip
+          </button>
         }
-        Submit to Cashier
-      </button>
+      </div>
     </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -43,6 +60,8 @@ export class CheckoutCashierComponent {
   readonly itemCount = input.required<number>();
   readonly total = input.required<number>();
   readonly isProcessing = input<boolean>(false);
+  readonly enablePrinter = input<boolean>(true);
 
   readonly complete = output<void>();
+  readonly completeAndPrint = output<void>();
 }

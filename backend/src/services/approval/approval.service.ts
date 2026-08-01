@@ -133,6 +133,13 @@ export class ApprovalService {
     request.rejectionReasonCode =
       input.action === 'rejected' && input.rejectionReasonCode ? input.rejectionReasonCode : null;
 
+    // Invoke the type-specific handler BEFORE persisting: if the handler throws
+    // (e.g. a variance reversal hits a locked period), the request must stay
+    // pending rather than show "approved" while its side effect never happened.
+    if (input.action === 'approved') {
+      await this.approvalHandlerRegistry.invokeApproved(ctx, request);
+    }
+
     const saved = await repo.save(request);
     this.logger.log(`Approval request ${saved.id} ${saved.status} by user ${reviewerId}`);
 
@@ -171,12 +178,39 @@ export class ApprovalService {
       )
     );
 
-    // Invoke type-specific handler when approved
-    if (saved.status === 'approved') {
-      await this.approvalHandlerRegistry.invokeApproved(ctx, saved);
-    }
-
     return saved;
+  }
+
+  /**
+   * Expire pending requests of a type whose window has passed (e.g. a cash variance
+   * review is superseded when the next reconciliation for that account is posted).
+   * Silent by design: no notifications, no handler invocation.
+   * `metadataMatch` is applied as a jsonb containment check on request.metadata.
+   */
+  async expirePendingRequests(
+    ctx: RequestContext,
+    opts: { channelId: number; type: string; metadataMatch: Record<string, string> }
+  ): Promise<number> {
+    const repo = this.connection.getRepository(ctx, ApprovalRequest);
+    const result = await repo
+      .createQueryBuilder()
+      .update(ApprovalRequest)
+      .set({ status: 'expired' })
+      .where('channelId = :channelId', { channelId: opts.channelId })
+      .andWhere('type = :type', { type: opts.type })
+      .andWhere('status = :status', { status: 'pending' })
+      .andWhere('metadata @> CAST(:metadataMatch AS jsonb)', {
+        metadataMatch: JSON.stringify(opts.metadataMatch),
+      })
+      .execute();
+
+    const count = result.affected ?? 0;
+    if (count > 0) {
+      this.logger.log(
+        `Expired ${count} pending approval request(s) of type "${opts.type}" for channel ${opts.channelId}`
+      );
+    }
+    return count;
   }
 
   /**

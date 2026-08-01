@@ -21,10 +21,10 @@ import { ApprovalsStatsComponent } from './approvals-stats.component';
   template: `
     <div class="space-y-4 sm:space-y-5 lg:space-y-6 anim-stagger">
       <app-page-header
-        title="Approvals"
+        title="Action Items"
         backLink="/dashboard"
         [isLoading]="isLoading()"
-        refreshTitle="Refresh approvals"
+        refreshTitle="Refresh action items"
         (refresh)="loadApprovals()"
       >
         <app-approvals-stats
@@ -78,10 +78,10 @@ import { ApprovalsStatsComponent } from './approvals-stats.component';
             [icon]="activeTab() === 'pending' ? 'heroCheckCircle' : 'heroClipboardDocumentList'"
             [title]="
               activeTab() === 'pending'
-                ? 'No pending approvals'
+                ? 'No pending action items'
                 : activeTab() === 'mine'
-                  ? 'You haven\\'t made any approval requests'
-                  : 'No approval requests found'
+                  ? 'You haven\\'t made any requests'
+                  : 'No action items found'
             "
           />
         }
@@ -124,6 +124,32 @@ import { ApprovalsStatsComponent } from './approvals-stats.component';
                       <span class="font-medium">{{
                         formatCurrency(approval.metadata['availableBalance'])
                       }}</span>
+                    </p>
+                  } @else if (approval.type === 'cash_variance' && approval.metadata) {
+                    <p>
+                      Account:
+                      <span class="font-medium">{{ approval.metadata['accountCode'] }}</span>
+                      &middot; Declared:
+                      <span class="font-medium">{{
+                        formatCurrency(approval.metadata['declaredCents'])
+                      }}</span>
+                      &middot; Expected:
+                      <span class="font-medium">{{
+                        formatCurrency(approval.metadata['expectedCents'])
+                      }}</span>
+                    </p>
+                    <p>
+                      Variance:
+                      <span
+                        class="font-medium"
+                        [class.text-error]="approval.metadata['varianceCents'] < 0"
+                        [class.text-success]="approval.metadata['varianceCents'] > 0"
+                      >
+                        {{ formatCurrency(approval.metadata['varianceCents']) }}
+                        {{ approval.metadata['direction'] === 'short' ? 'short' : 'over' }}
+                      </span>
+                      — the declared amount was posted as the new balance. Reverting restores the
+                      previous ledger balance.
                     </p>
                   } @else {
                     <p class="text-base-content/70">{{ getTypeSummary(approval) }}</p>
@@ -176,7 +202,7 @@ import { ApprovalsStatsComponent } from './approvals-stats.component';
                           @if (isReviewing()) {
                             <span class="loading loading-spinner loading-xs"></span>
                           }
-                          Approve
+                          {{ getApproveLabel(approval.type) }}
                         </button>
                         <button
                           class="btn btn-error btn-sm flex-1"
@@ -186,7 +212,7 @@ import { ApprovalsStatsComponent } from './approvals-stats.component';
                           @if (isReviewing()) {
                             <span class="loading loading-spinner loading-xs"></span>
                           }
-                          Reject
+                          {{ getRejectLabel(approval.type) }}
                         </button>
                         <button class="btn btn-ghost btn-sm" (click)="cancelReview()">
                           Cancel
@@ -199,13 +225,13 @@ import { ApprovalsStatsComponent } from './approvals-stats.component';
                         class="btn btn-success btn-sm flex-1"
                         (click)="startReview(approval.id)"
                       >
-                        Approve
+                        {{ getApproveLabel(approval.type) }}
                       </button>
                       <button
                         class="btn btn-error btn-sm flex-1"
                         (click)="startReview(approval.id)"
                       >
-                        Reject
+                        {{ getRejectLabel(approval.type) }}
                       </button>
                     </div>
                   }
@@ -343,8 +369,19 @@ export class ApprovalsComponent implements OnInit {
       customer_credit: 'Customer Credit',
       below_wholesale: 'Below Wholesale',
       order_reversal: 'Order Reversal',
+      cash_variance: 'Cash Variance',
     };
     return labels[type] || type;
+  }
+
+  /** For cash_variance the "approve" action reverts the posted adjustment. */
+  getApproveLabel(type: string): string {
+    return type === 'cash_variance' ? 'Revert adjustment' : 'Approve';
+  }
+
+  /** For cash_variance the "reject" action keeps the declared amount as SSOT. */
+  getRejectLabel(type: string): string {
+    return type === 'cash_variance' ? 'Keep declared value' : 'Reject';
   }
 
   getTypeBadgeClass(type: string): string {
@@ -353,6 +390,7 @@ export class ApprovalsComponent implements OnInit {
       customer_credit: 'badge-info',
       below_wholesale: 'badge-error',
       order_reversal: 'badge-neutral',
+      cash_variance: 'badge-warning',
     };
     return classes[type] || 'badge-ghost';
   }
@@ -365,6 +403,8 @@ export class ApprovalsComponent implements OnInit {
         return 'badge-success';
       case 'rejected':
         return 'badge-error';
+      case 'expired':
+        return 'badge-ghost';
       default:
         return 'badge-ghost';
     }

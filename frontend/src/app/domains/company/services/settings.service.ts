@@ -64,6 +64,8 @@ export interface PaymentMethod {
       preview: string;
     } | null;
     isActive?: boolean | null;
+    isCashierControlled?: boolean | null;
+    ledgerAccountCode?: string | null;
   } | null;
 }
 
@@ -99,6 +101,10 @@ export interface UpdatePaymentMethodInput {
   description?: string;
   imageAssetId?: string;
   isActive?: boolean;
+  /** Cashier session reconciliation: include this method's account in shift open/close. */
+  isCashierControlled?: boolean;
+  /** Ledger account this method posts to; empty/undefined leaves the current value. */
+  ledgerAccountCode?: string;
 }
 
 export interface AuditLog {
@@ -342,10 +348,36 @@ export class SettingsService {
     this.error.set(null);
 
     try {
+      // Only id/name/description are native UpdatePaymentMethodInput fields; everything
+      // else (isActive, imageAssetId, reconciliation flags) must go under customFields —
+      // top-level unknown fields fail GraphQL input coercion.
+      const {
+        id,
+        name,
+        description,
+        isActive,
+        imageAssetId,
+        isCashierControlled,
+        ledgerAccountCode,
+      } = input;
+      const customFields: Record<string, any> = {};
+      if (isActive !== undefined) customFields['isActive'] = isActive;
+      if (imageAssetId !== undefined) customFields['imageAssetId'] = imageAssetId;
+      if (isCashierControlled !== undefined)
+        customFields['isCashierControlled'] = isCashierControlled;
+      if (ledgerAccountCode !== undefined) customFields['ledgerAccountCode'] = ledgerAccountCode;
+
       const client = this.apolloService.getClient();
       await client.mutate({
         mutation: UPDATE_CHANNEL_PAYMENT_METHOD,
-        variables: { input },
+        variables: {
+          input: {
+            id,
+            ...(name !== undefined ? { name } : {}),
+            ...(description !== undefined ? { description } : {}),
+            ...(Object.keys(customFields).length > 0 ? { customFields } : {}),
+          },
+        },
       });
     } catch (err) {
       console.error('Failed to update payment method:', err);

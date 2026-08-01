@@ -807,6 +807,7 @@ export type CashierSessionSummary = {
   cashierUserId: Scalars['Int']['output'];
   closedAt?: Maybe<Scalars['DateTime']['output']>;
   closingDeclared: Scalars['String']['output'];
+  expectedTotal: Scalars['String']['output'];
   ledgerTotals: CashierSessionLedgerTotals;
   openedAt: Scalars['DateTime']['output'];
   openingFloat: Scalars['String']['output'];
@@ -11255,6 +11256,7 @@ export type GetCashierSessionQuery = {
     openingFloat: string;
     closingDeclared: string;
     variance: string;
+    expectedTotal: string;
     ledgerTotals: {
       __typename?: 'CashierSessionLedgerTotals';
       cashTotal: string;
@@ -11319,6 +11321,7 @@ export type CloseCashierSessionMutation = {
     openingFloat: string;
     closingDeclared: string;
     variance: string;
+    expectedTotal: string;
     ledgerTotals: {
       __typename?: 'CashierSessionLedgerTotals';
       cashTotal: string;
@@ -13136,6 +13139,8 @@ export type GetPaymentMethodsQuery = {
       customFields?: {
         __typename?: 'PaymentMethodCustomFields';
         isActive?: boolean | null;
+        isCashierControlled?: boolean | null;
+        ledgerAccountCode?: string | null;
         imageAsset?: {
           __typename?: 'Asset';
           id: string;
@@ -17170,6 +17175,7 @@ export const GetCashierSessionDocument = {
                     ],
                   },
                 },
+                { kind: 'Field', name: { kind: 'Name', value: 'expectedTotal' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'variance' } },
               ],
             },
@@ -17345,6 +17351,7 @@ export const CloseCashierSessionDocument = {
                     ],
                   },
                 },
+                { kind: 'Field', name: { kind: 'Name', value: 'expectedTotal' } },
                 { kind: 'Field', name: { kind: 'Name', value: 'variance' } },
               ],
             },
@@ -22947,6 +22954,11 @@ export const GetPaymentMethodsDocument = {
                               },
                             },
                             { kind: 'Field', name: { kind: 'Name', value: 'isActive' } },
+                            {
+                              kind: 'Field',
+                              name: { kind: 'Name', value: 'isCashierControlled' },
+                            },
+                            { kind: 'Field', name: { kind: 'Name', value: 'ledgerAccountCode' } },
                           ],
                         },
                       },
@@ -26771,390 +26783,390 @@ export const RecordStockAdjustmentDocument = {
   ],
 } as unknown as DocumentNode<RecordStockAdjustmentMutation, RecordStockAdjustmentMutationVariables>;
 export const GetStockAdjustmentsDocument = {
-  "kind": "Document",
-  "definitions": [
+  kind: 'Document',
+  definitions: [
     {
-      "kind": "OperationDefinition",
-      "operation": "query",
-      "name": {
-        "kind": "Name",
-        "value": "GetStockAdjustments"
+      kind: 'OperationDefinition',
+      operation: 'query',
+      name: {
+        kind: 'Name',
+        value: 'GetStockAdjustments',
       },
-      "variableDefinitions": [
+      variableDefinitions: [
         {
-          "kind": "VariableDefinition",
-          "variable": {
-            "kind": "Variable",
-            "name": {
-              "kind": "Name",
-              "value": "options"
-            }
-          },
-          "type": {
-            "kind": "NamedType",
-            "name": {
-              "kind": "Name",
-              "value": "StockAdjustmentListOptions"
-            }
-          },
-          "directives": []
-        }
-      ],
-      "directives": [],
-      "selectionSet": {
-        "kind": "SelectionSet",
-        "selections": [
-          {
-            "kind": "Field",
-            "name": {
-              "kind": "Name",
-              "value": "stockAdjustments"
+          kind: 'VariableDefinition',
+          variable: {
+            kind: 'Variable',
+            name: {
+              kind: 'Name',
+              value: 'options',
             },
-            "arguments": [
+          },
+          type: {
+            kind: 'NamedType',
+            name: {
+              kind: 'Name',
+              value: 'StockAdjustmentListOptions',
+            },
+          },
+          directives: [],
+        },
+      ],
+      directives: [],
+      selectionSet: {
+        kind: 'SelectionSet',
+        selections: [
+          {
+            kind: 'Field',
+            name: {
+              kind: 'Name',
+              value: 'stockAdjustments',
+            },
+            arguments: [
               {
-                "kind": "Argument",
-                "name": {
-                  "kind": "Name",
-                  "value": "options"
+                kind: 'Argument',
+                name: {
+                  kind: 'Name',
+                  value: 'options',
                 },
-                "value": {
-                  "kind": "Variable",
-                  "name": {
-                    "kind": "Name",
-                    "value": "options"
-                  }
-                }
-              }
-            ],
-            "directives": [],
-            "selectionSet": {
-              "kind": "SelectionSet",
-              "selections": [
-                {
-                  "kind": "Field",
-                  "name": {
-                    "kind": "Name",
-                    "value": "items"
+                value: {
+                  kind: 'Variable',
+                  name: {
+                    kind: 'Name',
+                    value: 'options',
                   },
-                  "arguments": [],
-                  "directives": [],
-                  "selectionSet": {
-                    "kind": "SelectionSet",
-                    "selections": [
+                },
+              },
+            ],
+            directives: [],
+            selectionSet: {
+              kind: 'SelectionSet',
+              selections: [
+                {
+                  kind: 'Field',
+                  name: {
+                    kind: 'Name',
+                    value: 'items',
+                  },
+                  arguments: [],
+                  directives: [],
+                  selectionSet: {
+                    kind: 'SelectionSet',
+                    selections: [
                       {
-                        "kind": "Field",
-                        "name": {
-                          "kind": "Name",
-                          "value": "id"
+                        kind: 'Field',
+                        name: {
+                          kind: 'Name',
+                          value: 'id',
                         },
-                        "arguments": [],
-                        "directives": []
+                        arguments: [],
+                        directives: [],
                       },
                       {
-                        "kind": "Field",
-                        "name": {
-                          "kind": "Name",
-                          "value": "reason"
+                        kind: 'Field',
+                        name: {
+                          kind: 'Name',
+                          value: 'reason',
                         },
-                        "arguments": [],
-                        "directives": []
+                        arguments: [],
+                        directives: [],
                       },
                       {
-                        "kind": "Field",
-                        "name": {
-                          "kind": "Name",
-                          "value": "notes"
+                        kind: 'Field',
+                        name: {
+                          kind: 'Name',
+                          value: 'notes',
                         },
-                        "arguments": [],
-                        "directives": []
+                        arguments: [],
+                        directives: [],
                       },
                       {
-                        "kind": "Field",
-                        "name": {
-                          "kind": "Name",
-                          "value": "adjustedByUserId"
+                        kind: 'Field',
+                        name: {
+                          kind: 'Name',
+                          value: 'adjustedByUserId',
                         },
-                        "arguments": [],
-                        "directives": []
+                        arguments: [],
+                        directives: [],
                       },
                       {
-                        "kind": "Field",
-                        "name": {
-                          "kind": "Name",
-                          "value": "adjustedBy"
+                        kind: 'Field',
+                        name: {
+                          kind: 'Name',
+                          value: 'adjustedBy',
                         },
-                        "arguments": [],
-                        "directives": [],
-                        "selectionSet": {
-                          "kind": "SelectionSet",
-                          "selections": [
+                        arguments: [],
+                        directives: [],
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "id"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'id',
                               },
-                              "arguments": [],
-                              "directives": []
+                              arguments: [],
+                              directives: [],
                             },
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "identifier"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'identifier',
                               },
-                              "arguments": [],
-                              "directives": []
-                            }
-                          ]
-                        }
+                              arguments: [],
+                              directives: [],
+                            },
+                          ],
+                        },
                       },
                       {
-                        "kind": "Field",
-                        "name": {
-                          "kind": "Name",
-                          "value": "lines"
+                        kind: 'Field',
+                        name: {
+                          kind: 'Name',
+                          value: 'lines',
                         },
-                        "arguments": [],
-                        "directives": [],
-                        "selectionSet": {
-                          "kind": "SelectionSet",
-                          "selections": [
+                        arguments: [],
+                        directives: [],
+                        selectionSet: {
+                          kind: 'SelectionSet',
+                          selections: [
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "id"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'id',
                               },
-                              "arguments": [],
-                              "directives": []
+                              arguments: [],
+                              directives: [],
                             },
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "variantId"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'variantId',
                               },
-                              "arguments": [],
-                              "directives": []
+                              arguments: [],
+                              directives: [],
                             },
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "quantityChange"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'quantityChange',
                               },
-                              "arguments": [],
-                              "directives": []
+                              arguments: [],
+                              directives: [],
                             },
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "previousStock"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'previousStock',
                               },
-                              "arguments": [],
-                              "directives": []
+                              arguments: [],
+                              directives: [],
                             },
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "newStock"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'newStock',
                               },
-                              "arguments": [],
-                              "directives": []
+                              arguments: [],
+                              directives: [],
                             },
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "stockLocationId"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'stockLocationId',
                               },
-                              "arguments": [],
-                              "directives": []
+                              arguments: [],
+                              directives: [],
                             },
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "batchId"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'batchId',
                               },
-                              "arguments": [],
-                              "directives": []
+                              arguments: [],
+                              directives: [],
                             },
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "unitCostCents"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'unitCostCents',
                               },
-                              "arguments": [],
-                              "directives": []
+                              arguments: [],
+                              directives: [],
                             },
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "totalCostCents"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'totalCostCents',
                               },
-                              "arguments": [],
-                              "directives": []
+                              arguments: [],
+                              directives: [],
                             },
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "allocations"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'allocations',
                               },
-                              "arguments": [],
-                              "directives": []
+                              arguments: [],
+                              directives: [],
                             },
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "variant"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'variant',
                               },
-                              "arguments": [],
-                              "directives": [],
-                              "selectionSet": {
-                                "kind": "SelectionSet",
-                                "selections": [
+                              arguments: [],
+                              directives: [],
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
                                   {
-                                    "kind": "Field",
-                                    "name": {
-                                      "kind": "Name",
-                                      "value": "id"
+                                    kind: 'Field',
+                                    name: {
+                                      kind: 'Name',
+                                      value: 'id',
                                     },
-                                    "arguments": [],
-                                    "directives": []
+                                    arguments: [],
+                                    directives: [],
                                   },
                                   {
-                                    "kind": "Field",
-                                    "name": {
-                                      "kind": "Name",
-                                      "value": "name"
+                                    kind: 'Field',
+                                    name: {
+                                      kind: 'Name',
+                                      value: 'name',
                                     },
-                                    "arguments": [],
-                                    "directives": []
+                                    arguments: [],
+                                    directives: [],
                                   },
                                   {
-                                    "kind": "Field",
-                                    "name": {
-                                      "kind": "Name",
-                                      "value": "sku"
+                                    kind: 'Field',
+                                    name: {
+                                      kind: 'Name',
+                                      value: 'sku',
                                     },
-                                    "arguments": [],
-                                    "directives": []
+                                    arguments: [],
+                                    directives: [],
                                   },
                                   {
-                                    "kind": "Field",
-                                    "name": {
-                                      "kind": "Name",
-                                      "value": "product"
+                                    kind: 'Field',
+                                    name: {
+                                      kind: 'Name',
+                                      value: 'product',
                                     },
-                                    "arguments": [],
-                                    "directives": [],
-                                    "selectionSet": {
-                                      "kind": "SelectionSet",
-                                      "selections": [
+                                    arguments: [],
+                                    directives: [],
+                                    selectionSet: {
+                                      kind: 'SelectionSet',
+                                      selections: [
                                         {
-                                          "kind": "Field",
-                                          "name": {
-                                            "kind": "Name",
-                                            "value": "id"
+                                          kind: 'Field',
+                                          name: {
+                                            kind: 'Name',
+                                            value: 'id',
                                           },
-                                          "arguments": [],
-                                          "directives": []
+                                          arguments: [],
+                                          directives: [],
                                         },
                                         {
-                                          "kind": "Field",
-                                          "name": {
-                                            "kind": "Name",
-                                            "value": "name"
+                                          kind: 'Field',
+                                          name: {
+                                            kind: 'Name',
+                                            value: 'name',
                                           },
-                                          "arguments": [],
-                                          "directives": []
-                                        }
-                                      ]
-                                    }
-                                  }
-                                ]
-                              }
+                                          arguments: [],
+                                          directives: [],
+                                        },
+                                      ],
+                                    },
+                                  },
+                                ],
+                              },
                             },
                             {
-                              "kind": "Field",
-                              "name": {
-                                "kind": "Name",
-                                "value": "stockLocation"
+                              kind: 'Field',
+                              name: {
+                                kind: 'Name',
+                                value: 'stockLocation',
                               },
-                              "arguments": [],
-                              "directives": [],
-                              "selectionSet": {
-                                "kind": "SelectionSet",
-                                "selections": [
+                              arguments: [],
+                              directives: [],
+                              selectionSet: {
+                                kind: 'SelectionSet',
+                                selections: [
                                   {
-                                    "kind": "Field",
-                                    "name": {
-                                      "kind": "Name",
-                                      "value": "id"
+                                    kind: 'Field',
+                                    name: {
+                                      kind: 'Name',
+                                      value: 'id',
                                     },
-                                    "arguments": [],
-                                    "directives": []
+                                    arguments: [],
+                                    directives: [],
                                   },
                                   {
-                                    "kind": "Field",
-                                    "name": {
-                                      "kind": "Name",
-                                      "value": "name"
+                                    kind: 'Field',
+                                    name: {
+                                      kind: 'Name',
+                                      value: 'name',
                                     },
-                                    "arguments": [],
-                                    "directives": []
-                                  }
-                                ]
-                              }
-                            }
-                          ]
-                        }
+                                    arguments: [],
+                                    directives: [],
+                                  },
+                                ],
+                              },
+                            },
+                          ],
+                        },
                       },
                       {
-                        "kind": "Field",
-                        "name": {
-                          "kind": "Name",
-                          "value": "createdAt"
+                        kind: 'Field',
+                        name: {
+                          kind: 'Name',
+                          value: 'createdAt',
                         },
-                        "arguments": [],
-                        "directives": []
+                        arguments: [],
+                        directives: [],
                       },
                       {
-                        "kind": "Field",
-                        "name": {
-                          "kind": "Name",
-                          "value": "updatedAt"
+                        kind: 'Field',
+                        name: {
+                          kind: 'Name',
+                          value: 'updatedAt',
                         },
-                        "arguments": [],
-                        "directives": []
-                      }
-                    ]
-                  }
+                        arguments: [],
+                        directives: [],
+                      },
+                    ],
+                  },
                 },
                 {
-                  "kind": "Field",
-                  "name": {
-                    "kind": "Name",
-                    "value": "totalItems"
+                  kind: 'Field',
+                  name: {
+                    kind: 'Name',
+                    value: 'totalItems',
                   },
-                  "arguments": [],
-                  "directives": []
-                }
-              ]
-            }
-          }
-        ]
-      }
-    }
-  ]
+                  arguments: [],
+                  directives: [],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
 } as unknown as DocumentNode<GetStockAdjustmentsQuery, GetStockAdjustmentsQueryVariables>;
 export const GetSubscriptionTiersDocument = {
   kind: 'Document',

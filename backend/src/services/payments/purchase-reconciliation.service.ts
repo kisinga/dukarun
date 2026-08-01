@@ -171,7 +171,9 @@ export class PurchaseReconciliationService {
       return;
     }
 
-    const direction = diff > 0 ? 'decrease' : 'increase';
+    // AP is a liability: model owing more than the ledger means we owe more (increase AP);
+    // model owing less means the ledger overstates the debt (decrease AP).
+    const direction = diff > 0 ? 'increase' : 'decrease';
     const amount = Math.abs(diff);
 
     await this.ledgerPostingService.postSupplierBalanceAdjustment(

@@ -187,6 +187,8 @@ export class SellComponent implements OnInit, OnDestroy {
   /** Parked order created for an in-progress inline split; reused across retries so a
    * failed settle never spawns a duplicate. */
   private readonly splitOrderId = signal<string | null>(null);
+  /** Order id of the last successful inline settle, kept for the optional receipt print. */
+  private readonly lastSettledOrderId = signal<string | null>(null);
   readonly showCheckoutModal = signal<boolean>(false);
   readonly checkoutType = signal<CheckoutType>(null);
   readonly isProcessingCheckout = signal<boolean>(false);
@@ -555,6 +557,7 @@ export class SellComponent implements OnInit, OnDestroy {
       // Settlement is committed — clear local state NOW, not on the modal's post-animation
       // `settled` event (which never fires if the user navigates away during the 1.4s success
       // animation, which would otherwise leave the paid cart intact and re-sellable).
+      this.lastSettledOrderId.set(orderId); // kept for the modal's optional receipt print
       this.splitOrderId.set(null);
       this.cartService.clearCart();
       this.cartItems.set([]);
@@ -569,7 +572,30 @@ export class SellComponent implements OnInit, OnDestroy {
 
   /** Split collected (cart was already cleared on success in onSplitConfirm). */
   onSplitSettled(): void {
+    this.lastSettledOrderId.set(null);
     this.showNotification('Payment collected', 'success');
+  }
+
+  /**
+   * Optional receipt print from the split modal's success state. Best-effort:
+   * a print failure must not affect the settled order.
+   */
+  async onSplitPrintReceipt(paymentSummary: string): Promise<void> {
+    const orderId = this.lastSettledOrderId();
+    if (!orderId) return;
+    try {
+      const fullOrder = await this.ordersService.fetchOrderById(orderId);
+      if (!fullOrder) return;
+      const templateId = await this.printPreferences.getDefaultTemplateId();
+      await this.printService.printOrder(fullOrder, templateId, {
+        documentType: templateId === 'a4' ? 'invoice' : 'receipt',
+        paymentMethodName: paymentSummary || undefined,
+        servedBy: this.authService.user()?.firstName ?? undefined,
+      });
+    } catch (printError) {
+      console.error('Failed to print receipt:', printError);
+      this.showNotification('Receipt print failed', 'warning');
+    }
   }
 
   /**
@@ -814,6 +840,18 @@ export class SellComponent implements OnInit, OnDestroy {
    * Send to Cashier - Creates order with cash payment and approval metadata
    */
   async handleCompleteCashier(): Promise<void> {
+    await this.sendToCashier(false);
+  }
+
+  /**
+   * Send to Cashier and print a slip the customer carries to the cashier.
+   * The slip (order code) is the identifier the cashier matches against the queue.
+   */
+  async handleCompleteCashierAndPrint(): Promise<void> {
+    await this.sendToCashier(true);
+  }
+
+  private async sendToCashier(printSlip: boolean): Promise<void> {
     if (!this.salesSyncGuard.canSell()) {
       this.checkoutError.set(
         "Sync required. You've made 3 sales since last sync. Please check your connection and refresh the page, or wait for sync to complete.",
@@ -840,6 +878,22 @@ export class SellComponent implements OnInit, OnDestroy {
 
       console.log('✅ Order sent to cashier:', order.code);
       this.salesSyncGuard.recordSale();
+
+      // Optional cashier slip - best-effort; a print failure must not fail the send
+      if (printSlip && this.enablePrinter()) {
+        try {
+          const fullOrder = await this.ordersService.fetchOrderById(order.id);
+          if (fullOrder) {
+            const templateId = await this.printPreferences.getDefaultTemplateId();
+            await this.printService.printOrder(fullOrder, templateId, {
+              documentType: 'cashier-slip',
+              servedBy: this.authService.user()?.firstName ?? undefined,
+            });
+          }
+        } catch (printError) {
+          console.error('Failed to print cashier slip:', printError);
+        }
+      }
 
       // Show success animation first, then close modal after delay
       this.showNotification(`Order ${order.code} sent to cashier`, 'success');

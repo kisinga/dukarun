@@ -101,7 +101,7 @@ describe('ReconciliationService', () => {
         ...input,
         snapshotAt: new Date().toISOString().slice(0, 10),
         status: 'verified',
-        varianceAmount: '50', // 1000 - 950
+        varianceAmount: '-50', // declared - expected = 950 - 1000
         createdBy: 1,
       } as Reconciliation;
 
@@ -111,13 +111,16 @@ describe('ReconciliationService', () => {
       const result = await service.createReconciliation(ctx, input);
 
       expect(result).toEqual(createdReconciliation);
-      expect(result.varianceAmount).toBe('50');
+      expect(result.varianceAmount).toBe('-50');
       expect(result.status).toBe('verified');
-      expect(mockReconciliationRepo.create).toHaveBeenCalled();
+      // Header variance follows the per-account convention: declared - expected
+      expect(mockReconciliationRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ varianceAmount: '-50' })
+      );
       expect(mockReconciliationRepo.save).toHaveBeenCalled();
     });
 
-    it('should handle negative variance', async () => {
+    it('should handle positive variance (overage)', async () => {
       const input = {
         channelId: 1,
         scope: 'method' as const,
@@ -132,7 +135,7 @@ describe('ReconciliationService', () => {
         ...input,
         snapshotAt: new Date().toISOString().slice(0, 10),
         status: 'verified',
-        varianceAmount: '-50', // 1000 - 1050
+        varianceAmount: '50', // declared - expected = 1050 - 1000
         createdBy: 1,
       } as Reconciliation;
 
@@ -141,8 +144,11 @@ describe('ReconciliationService', () => {
 
       const result = await service.createReconciliation(ctx, input);
 
-      expect(result.varianceAmount).toBe('-50');
+      expect(result.varianceAmount).toBe('50');
       expect(result.status).toBe('verified');
+      expect(mockReconciliationRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ varianceAmount: '50' })
+      );
     });
 
     it('cash-session with expectedAmountCentsByAccountId persists expected and variance on junction rows (variance = declared - expected)', async () => {
@@ -263,7 +269,7 @@ describe('ReconciliationService', () => {
       );
       expect(result).toHaveLength(1);
       expect(result[0].expectedBalanceCents).toBe('1200');
-      expect(result[0].varianceCents).toBe(String(1200 - 1000));
+      expect(result[0].varianceCents).toBe(String(1000 - 1200));
     });
   });
 

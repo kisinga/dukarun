@@ -85,7 +85,9 @@ type CheckoutType = 'credit' | 'cashier' | null;
                   [itemCount]="itemCount()"
                   [total]="total()"
                   [isProcessing]="isProcessing()"
+                  [enablePrinter]="enablePrinter()"
                   (complete)="onCompleteCashier()"
+                  (completeAndPrint)="completeCashierAndPrint.emit()"
                 />
               }
 
@@ -171,6 +173,7 @@ export class CheckoutModalComponent implements OnInit, OnDestroy {
 
   // Outputs
   readonly completeCashier = output<void>();
+  readonly completeCashierAndPrint = output<void>();
   readonly completeCredit = output<void>();
   readonly completeCreditAndPrint = output<void>();
   readonly completeCash = output<void>();

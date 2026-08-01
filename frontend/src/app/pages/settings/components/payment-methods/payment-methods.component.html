@@ -40,11 +40,32 @@
             }
             <div class="min-w-0">
               <div class="font-medium text-sm truncate">{{ method.name }}</div>
-              <div class="text-xs opacity-60">{{ method.code }}</div>
+              <div class="text-xs opacity-60">
+                {{ method.code }}
+                @if (method.customFields?.isCashierControlled) {
+                  <span class="badge badge-xs badge-outline badge-info ml-1">Cashier</span>
+                }
+                @if (method.customFields?.ledgerAccountCode) {
+                  <span class="ml-1">→ {{ method.customFields?.ledgerAccountCode }}</span>
+                }
+              </div>
             </div>
           </div>
 
           <div class="flex items-center gap-2 shrink-0">
+            <label
+              class="flex items-center gap-1 cursor-pointer"
+              title="Cashier controlled: included in shift open/close counts"
+            >
+              <span class="text-xs opacity-60 hidden sm:inline">Cashier</span>
+              <input
+                type="checkbox"
+                class="toggle toggle-sm toggle-info"
+                [checked]="method.customFields?.isCashierControlled ?? false"
+                [disabled]="settingsService.loading()"
+                (change)="toggleCashierControlled(method, $event)"
+              />
+            </label>
             @if (!isDefaultMethod(method.code)) {
               <button
                 class="btn btn-ghost btn-xs"
@@ -130,6 +151,32 @@
             formControlName="isActive"
           />
         </label>
+
+        @if (isEditing()) {
+          <label
+            class="flex items-center justify-between bg-base-200 rounded-lg p-3 cursor-pointer"
+          >
+            <span class="text-sm">
+              Cashier controlled
+              <span class="block text-xs opacity-60">Included in shift open/close counts</span>
+            </span>
+            <input
+              type="checkbox"
+              class="toggle toggle-sm toggle-info"
+              formControlName="isCashierControlled"
+            />
+          </label>
+
+          <div>
+            <label class="text-sm opacity-70">Ledger account code</label>
+            <input
+              type="text"
+              placeholder="e.g., CASH_ON_HAND — empty = auto-derive"
+              class="input input-bordered input-sm w-full mt-1"
+              formControlName="ledgerAccountCode"
+            />
+          </div>
+        }
 
         <div class="flex gap-2 pt-2">
           <button type="button" class="btn btn-ghost btn-sm flex-1" (click)="closeModal()">

@@ -349,6 +349,8 @@ export const GET_PAYMENT_METHODS = graphql(`
             preview
           }
           isActive
+          isCashierControlled
+          ledgerAccountCode
         }
       }
     }
@@ -763,7 +765,12 @@ export const GET_ORDER_MARGIN: DocumentNode<GetOrderMarginResult, { id: string }
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
-                { kind: 'Field', name: { kind: 'Name', value: 'id' }, arguments: [], directives: [] },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'id' },
+                  arguments: [],
+                  directives: [],
+                },
                 {
                   kind: 'Field',
                   name: { kind: 'Name', value: 'margin' },
@@ -772,12 +779,42 @@ export const GET_ORDER_MARGIN: DocumentNode<GetOrderMarginResult, { id: string }
                   selectionSet: {
                     kind: 'SelectionSet',
                     selections: [
-                      { kind: 'Field', name: { kind: 'Name', value: 'netRevenueCents' }, arguments: [], directives: [] },
-                      { kind: 'Field', name: { kind: 'Name', value: 'cogsCents' }, arguments: [], directives: [] },
-                      { kind: 'Field', name: { kind: 'Name', value: 'marginCents' }, arguments: [], directives: [] },
-                      { kind: 'Field', name: { kind: 'Name', value: 'marginPercent' }, arguments: [], directives: [] },
-                      { kind: 'Field', name: { kind: 'Name', value: 'reliable' }, arguments: [], directives: [] },
-                      { kind: 'Field', name: { kind: 'Name', value: 'unreliableReasons' }, arguments: [], directives: [] },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'netRevenueCents' },
+                        arguments: [],
+                        directives: [],
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'cogsCents' },
+                        arguments: [],
+                        directives: [],
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'marginCents' },
+                        arguments: [],
+                        directives: [],
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'marginPercent' },
+                        arguments: [],
+                        directives: [],
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'reliable' },
+                        arguments: [],
+                        directives: [],
+                      },
+                      {
+                        kind: 'Field',
+                        name: { kind: 'Name', value: 'unreliableReasons' },
+                        arguments: [],
+                        directives: [],
+                      },
                     ],
                   },
                 },
@@ -826,12 +863,42 @@ export const RETRY_SKIPPED_COGS: DocumentNode<RetrySkippedCogsResult, { orderId:
             selectionSet: {
               kind: 'SelectionSet',
               selections: [
-                { kind: 'Field', name: { kind: 'Name', value: 'netRevenueCents' }, arguments: [], directives: [] },
-                { kind: 'Field', name: { kind: 'Name', value: 'cogsCents' }, arguments: [], directives: [] },
-                { kind: 'Field', name: { kind: 'Name', value: 'marginCents' }, arguments: [], directives: [] },
-                { kind: 'Field', name: { kind: 'Name', value: 'marginPercent' }, arguments: [], directives: [] },
-                { kind: 'Field', name: { kind: 'Name', value: 'reliable' }, arguments: [], directives: [] },
-                { kind: 'Field', name: { kind: 'Name', value: 'unreliableReasons' }, arguments: [], directives: [] },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'netRevenueCents' },
+                  arguments: [],
+                  directives: [],
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'cogsCents' },
+                  arguments: [],
+                  directives: [],
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'marginCents' },
+                  arguments: [],
+                  directives: [],
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'marginPercent' },
+                  arguments: [],
+                  directives: [],
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'reliable' },
+                  arguments: [],
+                  directives: [],
+                },
+                {
+                  kind: 'Field',
+                  name: { kind: 'Name', value: 'unreliableReasons' },
+                  arguments: [],
+                  directives: [],
+                },
               ],
             },
           },
@@ -840,4 +907,3 @@ export const RETRY_SKIPPED_COGS: DocumentNode<RetrySkippedCogsResult, { orderId:
     },
   ],
 } as unknown as DocumentNode<RetrySkippedCogsResult, { orderId: string }>;
-

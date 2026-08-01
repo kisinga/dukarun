@@ -141,9 +141,9 @@ export class DashboardLayoutComponent implements OnInit {
             visible: () => hasSettings,
           },
           {
-            label: 'Approvals',
+            label: 'Action Items',
             icon: 'approvals',
-            route: '/dashboard/approvals',
+            route: '/dashboard/action-items',
             visible: () => auth.hasManageApprovalsPermission(),
           },
         ],

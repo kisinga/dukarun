@@ -6,6 +6,7 @@ import {
   OnDestroy,
   computed,
   inject,
+  input,
   output,
   signal,
   viewChild,
@@ -77,12 +78,22 @@ interface MethodRef {
 
         @if (phase() === 'success') {
           <div class="alert alert-success">
-            <ng-icon name="heroCheckCircle" size="1.5rem" />
+            <ng-icon name="heroCheckCircle" size="1.25rem" class="shrink-0" />
             <div class="flex-1">
               <div class="font-semibold">Payment collected</div>
               <div class="text-xs mt-1">{{ formatCurrency(total()) }} settled in full</div>
             </div>
           </div>
+          @if (enablePrint()) {
+            <button
+              class="btn btn-outline btn-sm w-full mt-3 gap-1"
+              type="button"
+              (click)="onPrintRequested()"
+            >
+              <ng-icon name="heroPrinter" size="1rem" />
+              Print receipt
+            </button>
+          }
         } @else {
           <!-- Error -->
           @if (error(); as err) {
@@ -263,7 +274,16 @@ export class SettleOrderModalComponent implements OnDestroy {
   readonly confirm = output<OrderTenderInput[]>();
   /** Emitted after a successful settlement (parent called succeed()). */
   readonly settled = output<void>();
+  /**
+   * Emitted from the success state when the cashier taps "Print receipt".
+   * Carries a display summary of the tenders collected (e.g. "Cash + M-Pesa");
+   * the parent fetches the order and prints.
+   */
+  readonly printRequested = output<string>();
   readonly cancelled = output<void>();
+
+  /** Whether to offer receipt printing on the success state. */
+  readonly enablePrint = input<boolean>(false);
 
   private readonly modalRef = viewChild<ElementRef<HTMLDialogElement>>('modal');
 
@@ -277,6 +297,9 @@ export class SettleOrderModalComponent implements OnDestroy {
   /** Single source of truth: how much of the total goes to M-Pesa (cents). Cash is the rest. */
   readonly mpesaCents = signal(0);
   readonly reference = signal('');
+
+  /** Display summary of the tenders from the last confirm (e.g. "Cash + M-Pesa"). */
+  private readonly lastTenderSummary = signal('');
 
   readonly total = computed(() => this.data()?.total ?? 0);
   readonly cashCents = computed(() => Math.max(this.total() - this.mpesaCents(), 0));
@@ -396,8 +419,10 @@ export class SettleOrderModalComponent implements OnDestroy {
     const cash = this.cashMethod();
     const mpesa = this.mpesaMethod();
     const tenders: OrderTenderInput[] = [];
+    const names: string[] = [];
     if (this.cashCents() > 0 && cash) {
       tenders.push({ paymentMethodCode: cash.code, amount: this.cashCents() });
+      names.push(cash.name);
     }
     if (this.mpesaCents() > 0 && mpesa) {
       tenders.push({
@@ -405,11 +430,17 @@ export class SettleOrderModalComponent implements OnDestroy {
         amount: this.mpesaCents(),
         referenceNumber: this.reference().trim() || undefined,
       });
+      names.push(mpesa.name);
     }
     if (tenders.length === 0) return;
+    this.lastTenderSummary.set(names.join(' + '));
     this.phase.set('processing');
     this.error.set(null);
     this.confirm.emit(tenders);
+  }
+
+  onPrintRequested(): void {
+    this.printRequested.emit(this.lastTenderSummary());
   }
 
   onCancel(): void {

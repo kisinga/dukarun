@@ -73,7 +73,7 @@ export interface OrderData {
 /**
  * Document type for print - drives header and payment/fulfillment visibility.
  */
-export type DocumentType = 'receipt' | 'invoice' | 'proforma' | 'purchase-order';
+export type DocumentType = 'receipt' | 'invoice' | 'proforma' | 'purchase-order' | 'cashier-slip';
 
 /**
  * Contextual metadata for print rendering that isn't part of the order itself.
@@ -238,7 +238,7 @@ export class Receipt52mmTemplate extends PrintTemplate {
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
     const docType = printMeta?.documentType ?? 'receipt';
-    const showPayment = docType !== 'proforma';
+    const showPayment = docType !== 'proforma' && docType !== 'cashier-slip';
     const paymentMethod = showPayment ? (printMeta?.paymentMethodName ?? 'N/A') : '';
     const name = companyName?.trim() || 'Your Company';
 
@@ -247,6 +247,7 @@ export class Receipt52mmTemplate extends PrintTemplate {
                 <div class="receipt-header">
                     ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
                     <h1 class="company-name">${name}</h1>
+                    ${docType === 'cashier-slip' ? '<p style="text-align:center;font-weight:bold;letter-spacing:1px;margin:4px 0;">PAY AT CASHIER</p>' : ''}
                     <p class="receipt-meta">
                         <span>Order: ${order.code}</span><br>
                         <span>Date: ${date}</span>
@@ -419,7 +420,7 @@ export class Receipt80mmTemplate extends PrintTemplate {
       : this.formatDate(order.createdAt);
     const total = order.totalWithTax;
     const docType = printMeta?.documentType ?? 'receipt';
-    const showPayment = docType !== 'proforma';
+    const showPayment = docType !== 'proforma' && docType !== 'cashier-slip';
     const paymentMethod = showPayment ? (printMeta?.paymentMethodName ?? 'N/A') : '';
     const name = companyName?.trim() || 'Your Company';
 
@@ -428,6 +429,7 @@ export class Receipt80mmTemplate extends PrintTemplate {
                 <div class="receipt-header">
                     ${companyLogo ? `<img src="${companyLogo}" alt="Logo" class="company-logo" />` : ''}
                     <h1 class="company-name">${name}</h1>
+                    ${docType === 'cashier-slip' ? '<p style="text-align:center;font-weight:bold;letter-spacing:1px;margin:4px 0;">PAY AT CASHIER</p>' : ''}
                     <p class="receipt-meta">
                         <span>Order: ${order.code}</span><br>
                         <span>Date: ${date}</span>
@@ -600,11 +602,19 @@ export class A4Template extends PrintTemplate {
     const total = order.totalWithTax;
     const docType = printMeta?.documentType ?? 'invoice';
     const header =
-      docType === 'proforma' ? 'PROFORMA INVOICE' : docType === 'invoice' ? 'INVOICE' : 'INVOICE';
-    const showPayment = docType !== 'proforma' && (order.payments?.length ?? 0) > 0;
+      docType === 'proforma'
+        ? 'PROFORMA INVOICE'
+        : docType === 'cashier-slip'
+          ? 'CASHIER SLIP'
+          : 'INVOICE';
+    const showPayment =
+      docType !== 'proforma' && docType !== 'cashier-slip' && (order.payments?.length ?? 0) > 0;
     const paymentMethod = printMeta?.paymentMethodName ?? 'N/A';
     const hasFulfillment =
-      docType !== 'proforma' && order.fulfillments && order.fulfillments.length > 0;
+      docType !== 'proforma' &&
+      docType !== 'cashier-slip' &&
+      order.fulfillments &&
+      order.fulfillments.length > 0;
     const hasShipping = order.shippingAddress && !isWalkIn;
     const name = companyName?.trim() || 'Your Company';
 
