@@ -10,10 +10,10 @@ const RESEND_COOLDOWN_SECONDS = 60;
   selector: 'app-login',
   imports: [ReactiveFormsModule],
   template: `
-    <main class="flex min-h-screen items-center justify-center bg-base-200 p-4">
-      <div class="card w-full max-w-sm bg-base-100 shadow-xl">
+    <main class="dashboard-main flex min-h-screen items-center justify-center bg-base-200 p-4">
+      <div class="card w-full max-w-sm bg-base-100">
         <div class="card-body">
-          <h1 class="card-title text-2xl">Dukarun</h1>
+          <h1 class="type-title">Dukarun</h1>
           <p class="text-sm text-base-content/70">Sign in with your phone number</p>
 
           @if (step() === 'phone') {

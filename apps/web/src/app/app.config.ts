@@ -6,6 +6,21 @@ import {
 } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideServiceWorker } from '@angular/service-worker';
+import { provideNgIconsConfig, provideIcons } from '@ng-icons/core';
+import {
+  heroArchiveBox,
+  heroBanknotes,
+  heroCheckCircle,
+  heroChevronLeft,
+  heroClipboardDocumentList,
+  heroCube,
+  heroMoon,
+  heroPlus,
+  heroShoppingCart,
+  heroSun,
+  heroUsers,
+  heroXMark,
+} from '@ng-icons/heroicons/outline';
 
 import { routes } from './app.routes';
 
@@ -14,6 +29,22 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
     provideRouter(routes),
+    // Icon registry (design system: heroicons outline via <ng-icon name="hero…">)
+    provideNgIconsConfig({ size: '1rem' }),
+    provideIcons({
+      heroArchiveBox,
+      heroBanknotes,
+      heroCheckCircle,
+      heroChevronLeft,
+      heroClipboardDocumentList,
+      heroCube,
+      heroMoon,
+      heroPlus,
+      heroShoppingCart,
+      heroSun,
+      heroUsers,
+      heroXMark,
+    }),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',

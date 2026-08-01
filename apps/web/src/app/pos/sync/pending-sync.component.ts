@@ -1,5 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { formatKes } from '../../core/money';
 import { ConnectivityService } from '../offline/connectivity.service';
 import type { OutboxEntry } from '../offline/offline-db';
@@ -13,42 +15,39 @@ import { SyncService } from '../offline/sync.service';
  */
 @Component({
   selector: 'app-pending-sync',
-  imports: [RouterLink],
+  imports: [RouterLink, PageHeaderComponent, EmptyStateComponent],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <header class="mb-4 flex flex-wrap items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Pending Sync</h1>
+        <app-page-header title="Pending Sync" backLink="/dashboard" backLabel="Dashboard">
           @if (!connectivity.online()) {
-            <span class="badge badge-warning">Offline</span>
+            <span actions class="badge badge-warning">Offline</span>
           }
           <button
+            actions
             class="btn btn-primary btn-sm ml-auto"
             [disabled]="!connectivity.online() || sync.syncing() || sync.queuedCount() === 0"
             (click)="syncNow()"
           >
             {{ sync.syncing() ? 'Syncing…' : 'Sync now' }}
           </button>
-        </header>
+        </app-page-header>
 
         @if (notice()) {
           <p class="mb-2 text-sm text-success">{{ notice() }}</p>
         }
 
         @if (sync.entries().length === 0) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <p class="text-center text-base-content/60">
-                Nothing waiting — all sales are synced.
-              </p>
-            </div>
-          </div>
+          <app-empty-state
+            icon="heroCheckCircle"
+            title="Nothing waiting"
+            description="All sales are synced."
+          />
         } @else {
           <div class="flex flex-col gap-2">
             @for (entry of sync.entries(); track entry.client_ref) {
               <div
-                class="card bg-base-100 shadow"
+                class="card bg-base-100"
                 [class.border]="entry.status === 'failed'"
                 [class.border-error]="entry.status === 'failed'"
               >
@@ -64,7 +63,7 @@ import { SyncService } from '../offline/sync.service';
                     } @else {
                       <span class="badge badge-outline">awaiting sync</span>
                     }
-                    <span class="ml-auto font-bold">{{ fmt(total(entry)) }}</span>
+                    <span class="ml-auto font-bold tabular-nums">{{ fmt(total(entry)) }}</span>
                     @if (entry.status === 'failed') {
                       <button class="btn btn-outline btn-sm" (click)="retry(entry.client_ref)">
                         Retry

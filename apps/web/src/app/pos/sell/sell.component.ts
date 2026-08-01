@@ -8,6 +8,9 @@ import { CartService } from '../cart.service';
 import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
 import { ConnectivityService } from '../offline/connectivity.service';
 import { SyncService } from '../offline/sync.service';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
+import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { NgIcon } from '@ng-icons/core';
 import {
   Customer,
   PaymentInput,
@@ -19,35 +22,65 @@ import {
 
 @Component({
   selector: 'app-sell',
-  imports: [RouterLink, FormsModule, ReactiveFormsModule, CheckoutPanelComponent],
+  imports: [
+    RouterLink,
+    FormsModule,
+    ReactiveFormsModule,
+    CheckoutPanelComponent,
+    NgIcon,
+    PageHeaderComponent,
+    EmptyStateComponent,
+  ],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4 pb-24 lg:pb-4">
       <div class="mx-auto max-w-6xl">
-        <header class="mb-4 flex items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Sell</h1>
+        <app-page-header title="Sell" backLink="/dashboard" backLabel="Dashboard">
           @if (cart.draftId()) {
-            <span class="badge badge-info">Editing proforma</span>
+            <span actions class="badge badge-info">Editing proforma</span>
           }
           @if (!connectivity.online()) {
-            <span class="badge badge-warning">Offline — sales will queue</span>
+            <span actions class="badge badge-warning">Offline — sales will queue</span>
           }
           @if (sync.queuedCount() > 0 || sync.failedCount() > 0) {
             <a
+              actions
               routerLink="/pos/sync"
               class="badge"
               [class.badge-error]="sync.failedCount() > 0"
-              [class.badge-outline]="sync.failedCount() === 0"
+              [class.badge-warning]="sync.failedCount() === 0"
             >
               {{ sync.queuedCount() + sync.failedCount() }} pending sync
             </a>
           }
-        </header>
+        </app-page-header>
+
+        <!-- Success / queued celebration (colour + icon, not oversized type) -->
+        @if (success(); as s) {
+          <div class="card mb-4 bg-base-100">
+            <div class="card-body flex-row items-center gap-4 p-4">
+              <ng-icon
+                name="heroCheckCircle"
+                size="2.5rem"
+                [class.text-success]="s.tone === 'success'"
+                [class.text-warning]="s.tone === 'warning'"
+              />
+              <div class="flex-1">
+                <p class="type-heading">{{ s.text }}</p>
+                @if (s.tone === 'warning') {
+                  <p class="text-sm text-base-content/60">
+                    It's in the pending sync list, not in Today's Sales yet.
+                  </p>
+                }
+              </div>
+              <button class="btn btn-primary min-h-11" (click)="newSale()">New sale</button>
+            </div>
+          </div>
+        }
 
         <div class="grid gap-4 lg:grid-cols-3">
           <section class="flex flex-col gap-4 lg:col-span-2">
             <!-- Product search / barcode -->
-            <div class="card bg-base-100 shadow">
+            <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="relative">
                   <input
@@ -58,11 +91,11 @@ import {
                   />
                   @if (results().length > 0) {
                     <ul
-                      class="menu absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-box bg-base-100 shadow-lg"
+                      class="menu absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-box bg-base-100 shadow-overlay"
                     >
                       @for (v of results(); track v.variant_id) {
                         <li>
-                          <a (click)="addVariant(v)">
+                          <a class="min-h-11" (click)="addVariant(v)">
                             <span class="flex-1">{{ label(v) }}</span>
                             <span class="text-xs text-base-content/60">{{ v.sku }}</span>
                             <span class="badge badge-xs badge-outline">
@@ -72,7 +105,7 @@ import {
                                   : (v.stock ?? 0) + ' in stock'
                               }}
                             </span>
-                            <span class="font-semibold">{{ fmt(v.price ?? 0) }}</span>
+                            <span class="font-semibold tabular-nums">{{ fmt(v.price ?? 0) }}</span>
                           </a>
                         </li>
                       }
@@ -83,19 +116,22 @@ import {
             </div>
 
             <!-- Cart -->
-            <div class="card bg-base-100 shadow">
+            <div class="card bg-base-100">
               <div class="card-body p-4">
                 @if (cart.isEmpty()) {
-                  <p class="py-8 text-center text-base-content/60">
-                    Cart is empty — search or scan a product to begin.
-                  </p>
+                  <app-empty-state
+                    [embedded]="true"
+                    icon="heroShoppingCart"
+                    title="Cart is empty"
+                    description="Search or scan a product to start a sale."
+                  />
                 } @else {
                   <table class="table">
                     <thead>
                       <tr>
-                        <th>Product</th>
-                        <th class="w-36">Qty</th>
-                        <th>Price</th>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th class="text-right">Price</th>
                         <th class="text-right">Total</th>
                         <th></th>
                       </tr>
@@ -104,34 +140,34 @@ import {
                       @for (line of cart.lines(); track line.variant.variant_id) {
                         <tr>
                           <td>
-                            <div class="font-medium">{{ cart.lineLabel(line) }}</div>
+                            <div class="text-sm font-medium">{{ cart.lineLabel(line) }}</div>
                             <div class="text-xs text-base-content/60">{{ line.variant.sku }}</div>
                           </td>
                           <td>
                             <div class="join">
                               <button
-                                class="btn btn-sm join-item"
+                                class="btn btn-sm join-item min-h-11 min-w-11"
                                 (click)="stepQty(line.variant.variant_id!, -1)"
                               >
                                 −
                               </button>
                               <input
                                 type="number"
-                                class="input input-bordered input-sm join-item w-16 text-center"
+                                class="input input-bordered input-sm join-item min-h-11 w-16 text-center tabular-nums"
                                 [min]="line.variant.allow_fractional ? 0.5 : 1"
                                 [step]="line.variant.allow_fractional ? 0.5 : 1"
                                 [ngModel]="line.quantity"
                                 (ngModelChange)="onQtyInput(line.variant.variant_id!, $event)"
                               />
                               <button
-                                class="btn btn-sm join-item"
+                                class="btn btn-sm join-item min-h-11 min-w-11"
                                 (click)="stepQty(line.variant.variant_id!, 1)"
                               >
                                 +
                               </button>
                             </div>
                           </td>
-                          <td>
+                          <td class="text-right tabular-nums">
                             @if (line.customPrice !== null) {
                               <span class="font-semibold text-accent">{{
                                 fmt(line.customPrice)
@@ -146,13 +182,15 @@ import {
                               override
                             </button>
                           </td>
-                          <td class="text-right font-semibold">{{ fmt(lineTotal(line)) }}</td>
+                          <td class="text-right type-heading tabular-nums">
+                            {{ fmt(lineTotal(line)) }}
+                          </td>
                           <td>
                             <button
-                              class="btn btn-ghost btn-sm"
+                              class="btn btn-ghost btn-sm min-h-11 min-w-11"
                               (click)="cart.removeLine(line.variant.variant_id!)"
                             >
-                              ✕
+                              <ng-icon name="heroXMark" />
                             </button>
                           </td>
                         </tr>
@@ -201,12 +239,12 @@ import {
 
           <aside class="flex flex-col gap-4">
             <!-- Customer -->
-            <div class="card bg-base-100 shadow">
+            <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="flex items-center justify-between">
                   <div>
-                    <div class="text-xs text-base-content/60">Customer</div>
-                    <div class="font-semibold">{{ cart.customerName() }}</div>
+                    <div class="type-caption">Customer</div>
+                    <div class="type-heading">{{ cart.customerName() }}</div>
                   </div>
                   <button class="btn btn-ghost btn-sm" (click)="toggleCustomerPicker()">
                     Change
@@ -230,7 +268,7 @@ import {
                       <ul class="menu mt-1 rounded-box bg-base-200">
                         @for (c of customerResults(); track c.id) {
                           <li>
-                            <a (click)="selectCustomer(c.id, customerName(c))">
+                            <a class="min-h-11" (click)="selectCustomer(c.id, customerName(c))">
                               <span class="flex-1">{{ customerName(c) }}</span>
                               <span class="text-xs text-base-content/60">{{ c.phone }}</span>
                             </a>
@@ -243,12 +281,12 @@ import {
               </div>
             </div>
 
-            <!-- Totals + actions -->
-            <div class="card bg-base-100 shadow">
+            <!-- Totals + secondary actions (desktop; mobile uses the bottom bar) -->
+            <div class="card hidden bg-base-100 lg:block">
               <div class="card-body p-4">
-                <div class="flex items-center justify-between text-xl font-bold">
-                  <span>Total</span>
-                  <span>{{ fmt(cart.total()) }}</span>
+                <div class="flex items-center justify-between">
+                  <span class="type-caption">Total</span>
+                  <span class="type-hero">{{ fmt(cart.total()) }}</span>
                 </div>
 
                 @if (error()) {
@@ -260,21 +298,21 @@ import {
 
                 <div class="mt-3 flex flex-col gap-2">
                   <button
-                    class="btn btn-primary"
+                    class="btn btn-primary min-h-11"
                     [disabled]="cart.isEmpty() || busy()"
                     (click)="checkoutOpen.set(true)"
                   >
                     Complete Sale
                   </button>
                   <button
-                    class="btn btn-outline"
+                    class="btn btn-outline min-h-11"
                     [disabled]="cart.isEmpty() || busy()"
                     (click)="park()"
                   >
                     Park (cashier queue)
                   </button>
                   <button
-                    class="btn btn-outline"
+                    class="btn btn-outline min-h-11"
                     [disabled]="cart.isEmpty() || busy()"
                     (click)="saveProforma()"
                   >
@@ -290,7 +328,61 @@ import {
                 </div>
               </div>
             </div>
+
+            <!-- Secondary actions, mobile (primary lives in the bottom bar) -->
+            <div class="card bg-base-100 lg:hidden">
+              <div class="card-body p-4">
+                @if (error()) {
+                  <p class="text-sm text-error">{{ error() }}</p>
+                }
+                @if (notice()) {
+                  <p class="text-sm text-success">{{ notice() }}</p>
+                }
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    class="btn btn-outline btn-sm min-h-11"
+                    [disabled]="cart.isEmpty() || busy()"
+                    (click)="park()"
+                  >
+                    Park
+                  </button>
+                  <button
+                    class="btn btn-outline btn-sm min-h-11"
+                    [disabled]="cart.isEmpty() || busy()"
+                    (click)="saveProforma()"
+                  >
+                    Proforma
+                  </button>
+                  <button
+                    class="btn btn-ghost btn-sm min-h-11"
+                    [disabled]="cart.isEmpty() || busy()"
+                    (click)="clearCart()"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </div>
           </aside>
+        </div>
+      </div>
+
+      <!-- One primary action, bottom-anchored on mobile; total is the hero -->
+      <div
+        class="fixed inset-x-0 bottom-0 z-30 border-t border-base-300/60 bg-base-100 p-3 lg:hidden"
+      >
+        <div class="mx-auto flex max-w-6xl items-center gap-3">
+          <div class="flex-1">
+            <div class="type-caption">Total</div>
+            <div class="type-hero">{{ fmt(cart.total()) }}</div>
+          </div>
+          <button
+            class="btn btn-primary min-h-11 flex-1"
+            [disabled]="cart.isEmpty() || busy()"
+            (click)="checkoutOpen.set(true)"
+          >
+            Complete Sale
+          </button>
         </div>
       </div>
 
@@ -334,6 +426,8 @@ export class SellComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  /** Post-sale celebration: success = completed, warning = queued offline. */
+  protected readonly success = signal<{ text: string; tone: 'success' | 'warning' } | null>(null);
   /** Set when a real (non-walk-in) customer is picked; gates the credit tab. */
   protected readonly creditAllowed = computed(() => this.cart.customerId() !== null);
 
@@ -459,6 +553,7 @@ export class SellComponent implements OnInit {
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
+    this.success.set(null);
     const customerId = this.cart.customerId();
     const lines = this.cart.toSaleLines();
     // Offline: complete locally into the outbox — never claim "completed".
@@ -471,7 +566,7 @@ export class SellComponent implements OnInit {
       await this.pos.postSale(customerId, lines, payments, false);
       this.checkoutOpen.set(false);
       this.cart.clear();
-      this.notice.set('Sale completed');
+      this.success.set({ text: 'Sale completed', tone: 'success' });
     } catch (err) {
       if (!(err instanceof PosRpcError)) {
         // Network failure mid-request: the outcome is unknown but safe —
@@ -495,7 +590,14 @@ export class SellComponent implements OnInit {
     await this.sync.enqueue({ customer_id: customerId, lines, payments });
     this.checkoutOpen.set(false);
     this.cart.clear();
-    this.notice.set('Sale queued — will sync when online');
+    this.success.set({ text: 'Sale queued — will sync when online', tone: 'warning' });
+  }
+
+  /** One-tap reset after the success/queued celebration. */
+  protected newSale(): void {
+    this.success.set(null);
+    this.error.set(null);
+    this.notice.set(null);
   }
 
   protected async park(): Promise<void> {

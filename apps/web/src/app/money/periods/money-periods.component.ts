@@ -1,20 +1,24 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../../core/money';
 import { AccountingPeriod, CashierAccount, MoneyService, PeriodLock } from '../money.service';
 
 @Component({
   selector: 'app-money-periods',
-  imports: [RouterLink, FormsModule, ReactiveFormsModule],
+  imports: [RouterLink, FormsModule, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <header class="mb-4 flex items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Reconciliation &amp; Periods</h1>
-          <button class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </header>
+        <app-page-header
+          title="Reconciliation &amp; Periods"
+          backLink="/dashboard"
+          backLabel="Dashboard"
+        >
+          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
+        </app-page-header>
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
@@ -33,7 +37,7 @@ import { AccountingPeriod, CashierAccount, MoneyService, PeriodLock } from '../m
         }
 
         <!-- Manual reconciliation -->
-        <div class="card mb-4 bg-base-100 shadow">
+        <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
             <h2 class="card-title text-lg">Manual reconciliation</h2>
             <p class="text-xs text-base-content/60">
@@ -77,7 +81,7 @@ import { AccountingPeriod, CashierAccount, MoneyService, PeriodLock } from '../m
         </div>
 
         <!-- Close period -->
-        <div class="card mb-4 bg-base-100 shadow">
+        <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
             <h2 class="card-title text-lg">Close accounting period</h2>
             <p class="text-xs text-base-content/60">
@@ -113,13 +117,9 @@ import { AccountingPeriod, CashierAccount, MoneyService, PeriodLock } from '../m
         <!-- Periods list -->
         <h2 class="mb-2 text-lg font-semibold">Periods</h2>
         @if (periods().length === 0) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <p class="text-center text-base-content/60">No periods yet.</p>
-            </div>
-          </div>
+          <app-empty-state icon="heroClipboardDocumentList" title="No periods yet." />
         } @else {
-          <div class="card bg-base-100 shadow">
+          <div class="card bg-base-100">
             <table class="table table-sm">
               <thead>
                 <tr>

@@ -1,5 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../shared/ui/page-header.component';
+import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -10,20 +12,18 @@ type StockInfo = { stock: number; stock_value: number };
 
 @Component({
   selector: 'app-products',
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-5xl">
-        <header class="mb-4 flex flex-wrap items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Products</h1>
-          <span class="text-sm text-base-content/60">
+        <app-page-header title="Products" backLink="/dashboard" backLabel="Dashboard">
+          <span actions class="text-sm text-base-content/60">
             total stock value {{ fmt(totalStockValue()) }}
           </span>
-          <button class="btn btn-primary btn-sm ml-auto" (click)="startFamilyCreate()">
+          <button actions class="btn btn-primary btn-sm ml-auto" (click)="startFamilyCreate()">
             + New product
           </button>
-        </header>
+        </app-page-header>
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
@@ -34,7 +34,7 @@ type StockInfo = { stock: number; stock_value: number };
 
         <!-- Family create / edit panel -->
         @if (familyFormOpen()) {
-          <div class="card mb-4 bg-base-100 shadow">
+          <div class="card mb-4 bg-base-100">
             <div class="card-body p-4">
               <h2 class="card-title text-lg">
                 {{ editingFamily() ? 'Edit ' + editingFamily()!.name : 'New product family' }}
@@ -86,7 +86,7 @@ type StockInfo = { stock: number; stock_value: number };
 
         <!-- Variant create / edit panel -->
         @if (variantForm(); as vf) {
-          <div class="card mb-4 bg-base-100 shadow">
+          <div class="card mb-4 bg-base-100">
             <div class="card-body p-4">
               <h2 class="card-title text-lg">
                 {{ vf.editing ? 'Edit ' + label(vf.editing) : 'New variant' }}
@@ -209,15 +209,11 @@ type StockInfo = { stock: number; stock_value: number };
 
         <!-- Grouped list -->
         @if (grouped().length === 0) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <p class="text-center text-base-content/60">No products found.</p>
-            </div>
-          </div>
+          <app-empty-state icon="heroCube" title="No products found." />
         } @else {
           <div class="flex flex-col gap-2">
             @for (group of grouped(); track group.family.id) {
-              <div class="card bg-base-100 shadow">
+              <div class="card bg-base-100">
                 <div class="card-body p-4">
                   <!-- Family row -->
                   <div class="flex flex-wrap items-center gap-3">

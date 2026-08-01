@@ -1,17 +1,15 @@
 import { Component, input } from '@angular/core';
+import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { formatKes } from '../core/money';
 import type { JournalEntryWithLines } from './money.service';
 
 /** Read-only list of journal entries with their account lines (DR/CR). */
 @Component({
   selector: 'app-journal-list',
+  imports: [EmptyStateComponent],
   template: `
     @if (entries().length === 0) {
-      <div class="card bg-base-100 shadow">
-        <div class="card-body">
-          <p class="text-center text-base-content/60">{{ emptyText() }}</p>
-        </div>
-      </div>
+      <app-empty-state icon="heroBanknotes" [title]="emptyText()" />
     } @else {
       <div class="flex flex-col gap-2">
         @for (entry of entries(); track entry.id) {
@@ -20,7 +18,7 @@ import type { JournalEntryWithLines } from './money.service';
               <div class="flex flex-wrap items-center gap-3">
                 <span class="text-sm font-semibold">{{ entry.entry_date }}</span>
                 <span class="text-sm text-base-content/70">{{ entry.memo ?? '—' }}</span>
-                <span class="ml-auto font-bold">{{ fmt(total(entry)) }}</span>
+                <span class="ml-auto font-bold tabular-nums">{{ fmt(total(entry)) }}</span>
               </div>
               <table class="table table-xs mt-2">
                 <tbody>

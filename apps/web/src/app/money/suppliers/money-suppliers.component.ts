@@ -1,7 +1,10 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../../core/money';
+import { NgIcon } from '@ng-icons/core';
 import { PosService, Variant, variantLabel } from '../../pos/pos.service';
 import { LedgerAccount, MoneyCustomer, MoneyService } from '../money.service';
 
@@ -25,15 +28,20 @@ interface PurchaseLineForm {
 
 @Component({
   selector: 'app-money-suppliers',
-  imports: [RouterLink, FormsModule, ReactiveFormsModule],
+  imports: [
+    RouterLink,
+    FormsModule,
+    ReactiveFormsModule,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    NgIcon,
+  ],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <header class="mb-4 flex items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Suppliers</h1>
-          <button class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </header>
+        <app-page-header title="Suppliers" backLink="/dashboard" backLabel="Dashboard">
+          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
+        </app-page-header>
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
@@ -43,7 +51,7 @@ interface PurchaseLineForm {
         }
 
         <!-- Supplier list -->
-        <div class="card mb-4 bg-base-100 shadow">
+        <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
             <div class="flex items-center justify-between">
               <h2 class="card-title text-lg">Suppliers</h2>
@@ -105,7 +113,7 @@ interface PurchaseLineForm {
         </div>
 
         <!-- Record purchase -->
-        <div class="card mb-4 bg-base-100 shadow">
+        <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
             <h2 class="card-title text-lg">Record purchase</h2>
             <form
@@ -203,7 +211,7 @@ interface PurchaseLineForm {
                       [disabled]="lines.length === 1"
                       (click)="removeLine($index)"
                     >
-                      ✕
+                      <ng-icon name="heroXMark" />
                     </button>
                   </div>
                 }
@@ -225,7 +233,7 @@ interface PurchaseLineForm {
         </div>
 
         <!-- Pay supplier -->
-        <div class="card mb-4 bg-base-100 shadow">
+        <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
             <h2 class="card-title text-lg">Pay supplier</h2>
             <form
@@ -271,15 +279,11 @@ interface PurchaseLineForm {
         <!-- Purchases list -->
         <h2 class="mb-2 text-lg font-semibold">Recent purchases</h2>
         @if (purchases().length === 0) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <p class="text-center text-base-content/60">No purchases recorded.</p>
-            </div>
-          </div>
+          <app-empty-state icon="heroBanknotes" title="No purchases recorded." />
         } @else {
           <div class="flex flex-col gap-2">
             @for (p of purchases(); track p.id) {
-              <div class="card bg-base-100 shadow">
+              <div class="card bg-base-100">
                 <div class="card-body flex-row flex-wrap items-center gap-3 p-4">
                   <span class="text-sm">{{ time(p.created_at) }}</span>
                   <span class="text-sm font-medium">{{ supplierName(p.supplier_id) }}</span>
@@ -289,7 +293,7 @@ interface PurchaseLineForm {
                   @if (p.is_credit) {
                     <span class="badge badge-warning">credit</span>
                   }
-                  <span class="ml-auto font-bold">{{ fmt(p.total_cost) }}</span>
+                  <span class="ml-auto font-bold tabular-nums">{{ fmt(p.total_cost) }}</span>
                   @if (p.paid >= p.total_cost) {
                     <span class="badge badge-success">paid</span>
                   } @else {

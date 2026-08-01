@@ -1,5 +1,6 @@
 import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { formatKes, parseKesToCents } from '../../core/money';
 import type { PaymentInput } from '../pos.service';
 
@@ -17,13 +18,20 @@ interface Tender {
  */
 @Component({
   selector: 'app-checkout-panel',
-  imports: [FormsModule],
+  imports: [FormsModule, NgIcon],
   template: `
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div class="card w-full max-w-md bg-base-100 shadow-xl">
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 md:p-4">
+      <div
+        class="card h-full max-h-dvh w-full max-w-full overflow-y-auto rounded-none bg-base-100 shadow-overlay md:h-auto md:max-h-[90vh] md:w-full md:max-w-md md:rounded-box"
+      >
         <div class="card-body">
-          <h2 class="card-title">{{ title() }}</h2>
-          <p class="text-lg font-bold">{{ fmt(total()) }}</p>
+          <div class="flex items-center justify-between">
+            <h2 class="type-title">{{ title() }}</h2>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="cancelled.emit()">
+              <ng-icon name="heroXMark" />
+            </button>
+          </div>
+          <p class="type-hero mt-1">{{ fmt(total()) }}</p>
 
           <div role="tablist" class="tabs tabs-boxed mt-2">
             @for (m of methods(); track m) {
@@ -89,15 +97,15 @@ interface Tender {
                     [disabled]="tenders().length === 1"
                     (click)="removeTender($index)"
                   >
-                    ✕
+                    <ng-icon name="heroXMark" />
                   </button>
                 </div>
               }
               <button type="button" class="btn btn-ghost btn-sm self-start" (click)="addTender()">
-                + Split payment
+                <ng-icon name="heroPlus" /> Split payment
               </button>
 
-              <div class="text-sm">
+              <div class="text-sm tabular-nums">
                 <span [class.text-error]="paidCents() !== total()">
                   Paid {{ fmt(paidCents()) }} of {{ fmt(total()) }}
                 </span>
@@ -115,10 +123,12 @@ interface Tender {
           }
 
           <div class="card-actions mt-4 justify-end">
-            <button type="button" class="btn btn-ghost" (click)="cancelled.emit()">Cancel</button>
+            <button type="button" class="btn btn-ghost min-h-11" (click)="cancelled.emit()">
+              Cancel
+            </button>
             <button
               type="button"
-              class="btn btn-primary"
+              class="btn btn-primary min-h-11"
               [disabled]="!canConfirm() || busy()"
               (click)="confirm()"
             >

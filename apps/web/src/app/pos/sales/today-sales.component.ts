@@ -1,5 +1,7 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes } from '../../core/money';
@@ -7,30 +9,24 @@ import { OrderLineWithProduct, OrderWithCustomer, Payment, PosService } from '..
 
 @Component({
   selector: 'app-today-sales',
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <header class="mb-4 flex items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Today's Sales</h1>
-          <button class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </header>
+        <app-page-header title="Today's Sales" backLink="/dashboard" backLabel="Dashboard">
+          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
+        </app-page-header>
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
         }
 
         @if (orders().length === 0) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <p class="text-center text-base-content/60">No sales yet today.</p>
-            </div>
-          </div>
+          <app-empty-state icon="heroBanknotes" title="No sales yet today." />
         } @else {
           <div class="flex flex-col gap-2">
             @for (order of orders(); track order.id) {
-              <div class="card bg-base-100 shadow">
+              <div class="card bg-base-100">
                 <div class="card-body p-4">
                   <div class="flex flex-wrap items-center gap-3">
                     <button class="font-mono font-semibold link" (click)="toggle(order.id)">
@@ -44,7 +40,7 @@ import { OrderLineWithProduct, OrderWithCustomer, Payment, PosService } from '..
                     @if (order.status === 'voided') {
                       <span class="badge badge-error">voided</span>
                     }
-                    <span class="ml-auto font-bold">{{ fmt(order.total) }}</span>
+                    <span class="ml-auto font-bold tabular-nums">{{ fmt(order.total) }}</span>
                     @if (order.status !== 'voided') {
                       <button
                         class="btn btn-error btn-outline btn-sm"

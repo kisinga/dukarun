@@ -1,10 +1,194 @@
 /* ============================================
    dukarun web — Global Styles
+   "The Counter" design system (docs/DESIGN_SYSTEM.md)
    ============================================ */
 
 @use 'tailwindcss';
 
+@theme {
+  --font-sans: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+
+  // Depth tokens: `shadow-card` = whisper shadow for surfaces;
+  // `shadow-overlay` = the only heavy shadow, reserved for menus/modals/popovers.
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 2px 8px -2px rgb(0 0 0 / 0.06);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 2px 8px -2px rgb(0 0 0 / 0.06);
+  --shadow-overlay: 0 8px 24px -8px rgb(0 0 0 / 0.18), 0 2px 8px -2px rgb(0 0 0 / 0.08);
+}
+
+/* Type roles — dashboard text never exceeds 24px. */
+@utility type-hero {
+  font-size: 1.5rem; // 24px — stat numbers, totals (the dashboard cap)
+  line-height: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility type-title {
+  font-size: 1.25rem; // 20px — page titles only
+  line-height: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+@utility type-heading {
+  font-size: 0.875rem; // 14px — section headings
+  line-height: 1.25rem;
+  font-weight: 600;
+}
+
+@utility type-body {
+  font-size: 0.875rem; // 14px — values, rows
+  line-height: 1.375;
+}
+
+@utility type-caption {
+  font-size: 0.75rem; // 12px — labels, timestamps
+  line-height: 1rem;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+
+@layer components {
+  /* ONE card recipe: hairline border + whisper shadow, never shadow alone. */
+  .card {
+    border-width: 1px;
+    border-style: solid;
+    border-color: color-mix(in oklab, var(--color-base-300) 60%, transparent);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Modals are full-screen on phones; desktop restores the floating box. */
+  .modal-box {
+    height: 100%;
+    max-height: 100vh;
+    max-height: 100dvh;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+
+    @media (min-width: 768px) {
+      height: auto;
+      max-height: 90vh;
+      width: auto;
+      border-radius: var(--radius-box);
+    }
+  }
+
+  /* Table language: calm uppercase headers, middle-aligned cells,
+     tabular-nums on right-aligned (amount) cells. */
+  .dashboard-main .table {
+    thead th {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+      border-bottom: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
+    }
+
+    tbody td {
+      vertical-align: middle;
+    }
+
+    td.text-right,
+    th.text-right {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Expanded detail row: inset surface, hairline edges. */
+    tr.row-detail td {
+      background: color-mix(in oklab, var(--color-base-content) 3%, transparent);
+      border-bottom: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
+      padding: 1rem;
+    }
+  }
+}
+
 @plugin "daisyui" {
-  themes: light --default;
+  themes: false;
   logs: false;
+}
+
+// Warm & Bold (light) — default theme; soft gray anchors, orange accents
+@plugin "daisyui/theme" {
+  name: light;
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: #fafafa;
+  --color-base-200: #ebebeb;
+  --color-base-300: #dedede;
+  --color-base-content: #2b2b2f;
+  --color-primary: #e85d2f;
+  --color-primary-content: #ffffff;
+  --color-secondary: #5a5a5a;
+  --color-secondary-content: #fafafa;
+  --color-accent: #f17a54;
+  --color-accent-content: #ffffff;
+  --color-neutral: #2b2b2f;
+  --color-neutral-content: #fafafa;
+  --color-info: #3b82f6;
+  --color-info-content: #ffffff;
+  --color-success: #22c55e;
+  --color-success-content: #ffffff;
+  --color-warning: #eab308;
+  --color-warning-content: #1a1a1a;
+  --color-error: #ef4444;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 0.375rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+// Dark — depth comes from lighter surfaces, not shadows (--depth: 0)
+@plugin "daisyui/theme" {
+  name: dark;
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: #1c1c1f;
+  --color-base-200: #131316;
+  --color-base-300: #2a2a2e;
+  --color-base-content: #e8e8e6;
+  --color-primary: #e85d2f;
+  --color-primary-content: #ffffff;
+  --color-secondary: #71717a;
+  --color-secondary-content: #f4f4f2;
+  --color-accent: #f17a54;
+  --color-accent-content: #ffffff;
+  --color-neutral: #3f3f46;
+  --color-neutral-content: #f4f4f2;
+  --color-info: #3b82f6;
+  --color-info-content: #ffffff;
+  --color-success: #22c55e;
+  --color-success-content: #ffffff;
+  --color-warning: #eab308;
+  --color-warning-content: #1a1a1a;
+  --color-error: #ef4444;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 0.375rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 0.875rem; // Counter body role
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

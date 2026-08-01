@@ -1,5 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../../core/money';
 import { MoneyCustomer, MoneyService } from '../money.service';
@@ -15,15 +17,13 @@ type CreditOrder = {
 
 @Component({
   selector: 'app-money-credit',
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <header class="mb-4 flex items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Customer Credit</h1>
-          <button class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </header>
+        <app-page-header title="Customer Credit" backLink="/dashboard" backLabel="Dashboard">
+          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
+        </app-page-header>
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
@@ -33,7 +33,7 @@ type CreditOrder = {
         }
 
         <!-- Create customer -->
-        <div class="card mb-4 bg-base-100 shadow">
+        <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
             <button class="btn btn-ghost btn-sm self-start" (click)="toggleCreate()">
               {{ createOpen() ? '− Cancel' : '+ New customer' }}
@@ -75,15 +75,11 @@ type CreditOrder = {
 
         <!-- Customers with AR -->
         @if (customers().length === 0) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <p class="text-center text-base-content/60">No customers yet.</p>
-            </div>
-          </div>
+          <app-empty-state icon="heroUsers" title="No customers yet." />
         } @else {
           <div class="flex flex-col gap-2">
             @for (c of customers(); track c.id) {
-              <div class="card bg-base-100 shadow">
+              <div class="card bg-base-100">
                 <div class="card-body p-4">
                   <div class="flex flex-wrap items-center gap-3">
                     <button class="font-semibold link" (click)="toggle(c)">

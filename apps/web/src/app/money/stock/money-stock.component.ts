@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -18,14 +19,12 @@ function parseSignedKes(raw: string): number | null {
 
 @Component({
   selector: 'app-money-stock',
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule, PageHeaderComponent],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <header class="mb-4 flex items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Stock Adjustments</h1>
-        </header>
+        <app-page-header title="Stock Adjustments" backLink="/dashboard" backLabel="Dashboard">
+        </app-page-header>
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
@@ -35,7 +34,7 @@ function parseSignedKes(raw: string): number | null {
         }
 
         <!-- Product search (shared by both forms) -->
-        <div class="card mb-4 bg-base-100 shadow">
+        <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
             <h2 class="card-title text-lg">Product</h2>
             @if (selected(); as v) {
@@ -58,7 +57,7 @@ function parseSignedKes(raw: string): number | null {
                 />
                 @if (results().length > 0) {
                   <ul
-                    class="menu absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-box bg-base-100 shadow-lg"
+                    class="menu absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-box bg-base-100 shadow-overlay"
                   >
                     @for (v of results(); track v.variant_id) {
                       <li>
@@ -77,7 +76,7 @@ function parseSignedKes(raw: string): number | null {
 
         <div class="grid gap-4 lg:grid-cols-2">
           <!-- Write-off -->
-          <div class="card bg-base-100 shadow">
+          <div class="card bg-base-100">
             <div class="card-body p-4">
               <h2 class="card-title text-lg">Write off stock</h2>
               <form (submit)="$event.preventDefault(); writeOff()" class="mt-2 flex flex-col gap-3">
@@ -115,7 +114,7 @@ function parseSignedKes(raw: string): number | null {
           </div>
 
           <!-- Value adjustment -->
-          <div class="card bg-base-100 shadow">
+          <div class="card bg-base-100">
             <div class="card-body p-4">
               <h2 class="card-title text-lg">Value adjustment</h2>
               <form (submit)="$event.preventDefault(); adjust()" class="mt-2 flex flex-col gap-3">

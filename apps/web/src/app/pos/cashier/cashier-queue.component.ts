@@ -1,20 +1,20 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { formatKes } from '../../core/money';
 import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
 import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
 
 @Component({
   selector: 'app-cashier-queue',
-  imports: [RouterLink, CheckoutPanelComponent],
+  imports: [RouterLink, CheckoutPanelComponent, PageHeaderComponent, EmptyStateComponent],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <header class="mb-4 flex items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Cashier Queue</h1>
-          <button class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </header>
+        <app-page-header title="Cashier Queue" backLink="/dashboard" backLabel="Dashboard">
+          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
+        </app-page-header>
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
@@ -24,20 +24,16 @@ import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
         }
 
         @if (parked().length === 0) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <p class="text-center text-base-content/60">No parked orders waiting for payment.</p>
-            </div>
-          </div>
+          <app-empty-state icon="heroBanknotes" title="No parked orders waiting for payment." />
         } @else {
           <div class="flex flex-col gap-2">
             @for (order of parked(); track order.id) {
-              <div class="card bg-base-100 shadow">
+              <div class="card bg-base-100">
                 <div class="card-body flex-row flex-wrap items-center gap-3 p-4">
                   <span class="font-mono font-semibold">{{ order.code }}</span>
                   <span class="text-sm text-base-content/60">{{ time(order.created_at) }}</span>
                   <span class="text-sm">{{ customerName(order) }}</span>
-                  <span class="ml-auto font-bold">{{ fmt(order.total) }}</span>
+                  <span class="ml-auto font-bold tabular-nums">{{ fmt(order.total) }}</span>
                   <button class="btn btn-primary btn-sm" (click)="settling.set(order)">
                     Settle
                   </button>

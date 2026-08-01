@@ -1,20 +1,20 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../../core/money';
 import { CashierAccount, CashierSession, MoneyService, SessionWithCounts } from '../money.service';
 
 @Component({
   selector: 'app-money-cashier',
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, PageHeaderComponent, EmptyStateComponent],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <header class="mb-4 flex items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Cashier Sessions</h1>
-          <button class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </header>
+        <app-page-header title="Cashier Sessions" backLink="/dashboard" backLabel="Dashboard">
+          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
+        </app-page-header>
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
@@ -24,7 +24,7 @@ import { CashierAccount, CashierSession, MoneyService, SessionWithCounts } from 
         }
 
         <!-- Current open session / open-close forms -->
-        <div class="card mb-4 bg-base-100 shadow">
+        <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
             @if (openSession(); as session) {
               <h2 class="card-title text-lg">Open session</h2>
@@ -88,15 +88,11 @@ import { CashierAccount, CashierSession, MoneyService, SessionWithCounts } from 
         <!-- Recent sessions -->
         <h2 class="mb-2 text-lg font-semibold">Recent sessions</h2>
         @if (sessions().length === 0) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <p class="text-center text-base-content/60">No sessions yet.</p>
-            </div>
-          </div>
+          <app-empty-state icon="heroBanknotes" title="No sessions yet." />
         } @else {
           <div class="flex flex-col gap-2">
             @for (session of sessions(); track session.id) {
-              <div class="card bg-base-100 shadow">
+              <div class="card bg-base-100">
                 <div class="card-body p-4">
                   <div class="flex flex-wrap items-center gap-3">
                     <span class="text-sm font-semibold">{{ time(session.opened_at) }}</span>

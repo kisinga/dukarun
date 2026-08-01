@@ -7,10 +7,10 @@ import { SupabaseService } from '../../core/supabase.service';
   selector: 'app-register',
   imports: [ReactiveFormsModule],
   template: `
-    <main class="flex min-h-screen items-center justify-center bg-base-200 p-4">
-      <div class="card w-full max-w-sm bg-base-100 shadow-xl">
+    <main class="dashboard-main flex min-h-screen items-center justify-center bg-base-200 p-4">
+      <div class="card w-full max-w-sm bg-base-100">
         <div class="card-body">
-          <h1 class="card-title text-2xl">Set up your business</h1>
+          <h1 class="type-title">Set up your business</h1>
           <p class="text-sm text-base-content/70">Create your company and first store</p>
 
           <form (submit)="$event.preventDefault(); provision()" class="mt-4 flex flex-col gap-4">

@@ -1,5 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../shared/ui/page-header.component';
+import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes } from '../core/money';
 import { OrderLineWithProduct, OrderWithCustomer, Payment, PosService } from '../pos/pos.service';
@@ -8,18 +10,16 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'pending_payment'];
 
 @Component({
   selector: 'app-orders',
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <header class="mb-4 flex items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Orders</h1>
-          <button class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </header>
+        <app-page-header title="Orders" backLink="/dashboard" backLabel="Dashboard">
+          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
+        </app-page-header>
 
         <!-- Filters -->
-        <div class="card mb-4 bg-base-100 shadow">
+        <div class="card mb-4 bg-base-100">
           <div class="card-body flex-row flex-wrap items-end gap-3 p-4">
             <label class="form-control">
               <span class="label-text text-xs">Status</span>
@@ -48,15 +48,11 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'pending_payment'];
         }
 
         @if (orders().length === 0) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <p class="text-center text-base-content/60">No orders in this range.</p>
-            </div>
-          </div>
+          <app-empty-state icon="heroClipboardDocumentList" title="No orders in this range." />
         } @else {
           <div class="flex flex-col gap-2">
             @for (order of orders(); track order.id) {
-              <div class="card bg-base-100 shadow">
+              <div class="card bg-base-100">
                 <div class="card-body p-4">
                   <div class="flex flex-wrap items-center gap-3">
                     <button class="link font-mono font-semibold" (click)="toggle(order.id)">
@@ -76,7 +72,7 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'pending_payment'];
                     @if (order.is_credit_sale) {
                       <span class="badge badge-warning">credit</span>
                     }
-                    <span class="ml-auto font-bold">{{ fmt(order.total) }}</span>
+                    <span class="ml-auto font-bold tabular-nums">{{ fmt(order.total) }}</span>
                   </div>
 
                   @if (order.status === 'voided' && order.void_reason) {

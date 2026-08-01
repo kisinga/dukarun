@@ -1,20 +1,20 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { formatKes } from '../../core/money';
 import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
 import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
 
 @Component({
   selector: 'app-proformas',
-  imports: [RouterLink, CheckoutPanelComponent],
+  imports: [RouterLink, CheckoutPanelComponent, PageHeaderComponent, EmptyStateComponent],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <header class="mb-4 flex items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Proformas</h1>
-          <button class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </header>
+        <app-page-header title="Proformas" backLink="/dashboard" backLabel="Dashboard">
+          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
+        </app-page-header>
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
@@ -24,20 +24,16 @@ import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
         }
 
         @if (drafts().length === 0) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <p class="text-center text-base-content/60">No proformas.</p>
-            </div>
-          </div>
+          <app-empty-state icon="heroClipboardDocumentList" title="No proformas." />
         } @else {
           <div class="flex flex-col gap-2">
             @for (draft of drafts(); track draft.id) {
-              <div class="card bg-base-100 shadow">
+              <div class="card bg-base-100">
                 <div class="card-body flex-row flex-wrap items-center gap-3 p-4">
                   <span class="font-mono font-semibold">{{ draft.code }}</span>
                   <span class="text-sm text-base-content/60">{{ time(draft.created_at) }}</span>
                   <span class="text-sm">{{ customerName(draft) }}</span>
-                  <span class="ml-auto font-bold">{{ fmt(draft.total) }}</span>
+                  <span class="ml-auto font-bold tabular-nums">{{ fmt(draft.total) }}</span>
                   <button class="btn btn-outline btn-sm" (click)="edit(draft.id)">Edit</button>
                   <button class="btn btn-primary btn-sm" (click)="converting.set(draft)">
                     Convert to Sale

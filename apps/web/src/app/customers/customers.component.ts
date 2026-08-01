@@ -1,5 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../shared/ui/page-header.component';
+import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -11,17 +13,15 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
 
 @Component({
   selector: 'app-customers',
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <header class="mb-4 flex flex-wrap items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Customers</h1>
-          <button class="btn btn-primary btn-sm ml-auto" (click)="startCreate()">
+        <app-page-header title="Customers" backLink="/dashboard" backLabel="Dashboard">
+          <button actions class="btn btn-primary btn-sm ml-auto" (click)="startCreate()">
             + New customer
           </button>
-        </header>
+        </app-page-header>
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
@@ -32,7 +32,7 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
 
         <!-- Create / edit panel -->
         @if (formOpen()) {
-          <div class="card mb-4 bg-base-100 shadow">
+          <div class="card mb-4 bg-base-100">
             <div class="card-body p-4">
               <h2 class="card-title text-lg">
                 {{ editing() ? 'Edit ' + name(editing()!) : 'New customer' }}
@@ -96,15 +96,11 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
 
         <!-- List -->
         @if (filtered().length === 0) {
-          <div class="card bg-base-100 shadow">
-            <div class="card-body">
-              <p class="text-center text-base-content/60">No customers found.</p>
-            </div>
-          </div>
+          <app-empty-state icon="heroUsers" title="No customers found." />
         } @else {
           <div class="flex flex-col gap-2">
             @for (c of filtered(); track c.id) {
-              <div class="card bg-base-100 shadow">
+              <div class="card bg-base-100">
                 <div class="card-body p-4">
                   <div class="flex flex-wrap items-center gap-3">
                     <button class="link font-semibold" (click)="toggle(c.id)">{{ name(c) }}</button>

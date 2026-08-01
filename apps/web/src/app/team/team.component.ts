@@ -1,20 +1,19 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { normalizeKenyanPhone } from '../core/phone';
 import { ALL_PERMISSIONS, MembershipWithRole, Role, TeamService } from './team.service';
 
 @Component({
   selector: 'app-team',
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule, PageHeaderComponent],
   template: `
-    <main class="min-h-screen bg-base-200 p-4">
+    <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <header class="mb-4 flex items-center gap-3">
-          <a routerLink="/dashboard" class="btn btn-ghost btn-sm">← Dashboard</a>
-          <h1 class="text-2xl font-bold">Team</h1>
-          <button class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </header>
+        <app-page-header title="Team" backLink="/dashboard" backLabel="Dashboard">
+          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
+        </app-page-header>
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
@@ -24,7 +23,7 @@ import { ALL_PERMISSIONS, MembershipWithRole, Role, TeamService } from './team.s
         }
 
         <!-- Add member -->
-        <div class="card mb-4 bg-base-100 shadow">
+        <div class="card mb-4 bg-base-100">
           <div class="card-body p-4">
             <h2 class="card-title text-lg">Add member</h2>
             <p class="text-xs text-base-content/60">
@@ -64,7 +63,7 @@ import { ALL_PERMISSIONS, MembershipWithRole, Role, TeamService } from './team.s
 
         <!-- Members -->
         <h2 class="mb-2 text-lg font-semibold">Members</h2>
-        <div class="card mb-4 bg-base-100 shadow">
+        <div class="card mb-4 bg-base-100">
           <table class="table table-sm">
             <thead>
               <tr>
@@ -141,7 +140,7 @@ import { ALL_PERMISSIONS, MembershipWithRole, Role, TeamService } from './team.s
         </div>
 
         @if (roleFormOpen()) {
-          <div class="card mb-4 bg-base-100 shadow">
+          <div class="card mb-4 bg-base-100">
             <div class="card-body p-4">
               <h3 class="card-title text-base">
                 {{ editingRole() ? 'Edit ' + editingRole()!.name : 'New role' }}
@@ -187,7 +186,7 @@ import { ALL_PERMISSIONS, MembershipWithRole, Role, TeamService } from './team.s
 
         <div class="flex flex-col gap-2">
           @for (r of roles(); track r.id) {
-            <div class="card bg-base-100 shadow">
+            <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="flex items-center gap-3">
                   <span class="font-semibold">{{ r.name }}</span>
