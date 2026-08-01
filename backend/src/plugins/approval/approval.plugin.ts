@@ -130,7 +130,14 @@ class ApprovalResolver {
 @VendurePlugin({
   imports: [PluginCommonModule],
   entities: [ApprovalRequest],
-  providers: [ApprovalHandlerRegistry, ApprovalService, ApprovalResolver],
+  // NOTE: ApprovalResolver is deliberately NOT in providers. LedgerPlugin imports this
+  // plugin and also declares shopApiExtensions — any resolver in providers here would be
+  // reachable from the shop GraphQL module scan and crash bootstrap with
+  // "Query.getApprovalRequests defined in resolvers, but not in schema" (the shop schema
+  // lacks these admin-only operations). Vendure's dynamic admin API module re-provides
+  // the resolver itself, so admin resolution is unaffected; it only requires this
+  // plugin to EXPORT the resolver's dependencies (auto-exported from providers).
+  providers: [ApprovalHandlerRegistry, ApprovalService],
   exports: [ApprovalService, ApprovalHandlerRegistry],
   adminApiExtensions: {
     resolvers: [ApprovalResolver],
