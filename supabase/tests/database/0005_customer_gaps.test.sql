@@ -49,7 +49,13 @@ select throws_ok(
   'credit sale without a customer is rejected'
 );
 
--- 4. Credit sale with a real customer still works.
+-- 4. Credit sale with a real (credit-approved) customer still works.
+reset role;
+update public.customers set is_credit_approved = true
+where id = (select customer_id from new_customer);
+set local role authenticated;
+select set_config('request.jwt.claims', (select claims from gaps_claims), true);
+
 select lives_ok(
   format(
     $$select public.post_sale(

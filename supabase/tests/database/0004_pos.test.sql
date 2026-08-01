@@ -36,8 +36,8 @@ select 'b0000000-0000-0000-0000-000000000001', company_id, 'a0000000-0000-0000-0
 insert into public.inventory_batches (id, company_id, product_id, quantity, remaining, unit_cost, purchased_at)
 select 'b0000000-0000-0000-0000-000000000002', company_id, 'a0000000-0000-0000-0000-000000000001', 10, 10, 15000, now() - interval '1 day' from pos_company;
 
-insert into public.customers (id, company_id, first_name, phone)
-select 'c0000000-0000-0000-0000-000000000001', company_id, 'Walk-in', '0712345678' from pos_company;
+insert into public.customers (id, company_id, first_name, phone, is_credit_approved, credit_limit)
+select 'c0000000-0000-0000-0000-000000000001', company_id, 'Walk-in', '0712345678', true, 0 from pos_company;
 
 -- Helper claims for the admin (member of the company).
 create temp table admin_claims as

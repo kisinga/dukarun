@@ -1112,6 +1112,15 @@ export type Database = {
         }
         Returns: string
       }
+      post_payment_allocation: {
+        Args: {
+          p_amount: number
+          p_method_code: string
+          p_order_id: string
+          p_reference?: string
+        }
+        Returns: string
+      }
       post_payment_reversal: { Args: { p_payment_id: string }; Returns: string }
       post_refund: {
         Args: {
