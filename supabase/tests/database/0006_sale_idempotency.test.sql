@@ -10,8 +10,10 @@ set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","r
 create temp table idem_company as select public.provision_company('Idem Co', 'Main') as company_id;
 reset role;
 
-insert into public.products (id, company_id, name, sku, price, track_inventory)
-select 'a0000000-0000-0000-0000-0000000000aa', company_id, 'Service', 'SVC', 5000, false from idem_company;
+insert into public.products (id, company_id, name)
+select 'a0000000-0000-0000-0000-0000000000aa', company_id, 'Service' from idem_company;
+insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
+select 'aa000000-0000-0000-0000-0000000000aa', 'a0000000-0000-0000-0000-0000000000aa', company_id, 'Default', 'service', 'SVC', 5000, false from idem_company;
 
 create temp table idem_claims as
 select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
@@ -25,7 +27,7 @@ select set_config('request.jwt.claims', (select claims from idem_claims), true);
 create temp table sale_a as
 select public.post_sale(
   null,
-  '[{"product_id":"a0000000-0000-0000-0000-0000000000aa","quantity":1,"unit_price":5000}]',
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000aa","quantity":1,"unit_price":5000}]',
   '[{"method":"cash","amount":5000}]',
   false,
   'device-0001-sale-0001'
@@ -41,7 +43,7 @@ select is(
 select is(
   public.post_sale(
     null,
-    '[{"product_id":"a0000000-0000-0000-0000-0000000000aa","quantity":1,"unit_price":5000}]',
+    '[{"variant_id":"aa000000-0000-0000-0000-0000000000aa","quantity":1,"unit_price":5000}]',
     '[{"method":"cash","amount":5000}]',
     false,
     'device-0001-sale-0001'
@@ -62,7 +64,7 @@ select is(
 select ok(
   public.post_sale(
     null,
-    '[{"product_id":"a0000000-0000-0000-0000-0000000000aa","quantity":1,"unit_price":5000}]',
+    '[{"variant_id":"aa000000-0000-0000-0000-0000000000aa","quantity":1,"unit_price":5000}]',
     '[{"method":"cash","amount":5000}]',
     false,
     'device-0001-sale-0002'

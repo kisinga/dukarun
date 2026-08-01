@@ -30,7 +30,7 @@ set local role authenticated;
 select set_config('request.jwt.claims', (select claims from au_claims), true);
 
 create temp table au_prod as
-select public.create_product('Audit Bread', 5000, 'AB1') as id;
+select public.create_product('Audit Bread') as id;
 
 select is(
   (select new_data ->> 'name' from public.audit_log
@@ -40,14 +40,18 @@ select is(
   'product insert captured with new_data snapshot'
 );
 
-select public.update_product((select id from au_prod), null, 6000);
+-- Price lives on the variant now: update it there and check the old snapshot.
+create temp table au_var as
+select public.upsert_variant((select id from au_prod), 'Default', 5000, null, 'AB1') as id;
+
+select public.upsert_variant((select id from au_prod), 'Default', 6000, (select id from au_var));
 
 select is(
   (select (old_data ->> 'price')::bigint from public.audit_log
-   where table_name = 'products' and operation = 'UPDATE'
-     and row_id = (select id::text from au_prod)),
+   where table_name = 'product_variants' and operation = 'UPDATE'
+     and row_id = (select id::text from au_var)),
   5000::bigint,
-  'product update captured with old_data snapshot'
+  'variant update captured with old_data snapshot'
 );
 
 -- 4. Deletes captured (via superuser path — proves no path bypasses it).
@@ -67,10 +71,13 @@ set local role authenticated;
 select set_config('request.jwt.claims', (select claims from au_claims), true);
 
 create temp table au_svc as
-select public.create_product('Svc', 5000, 'SVCAE', null, null, false, false) as id;
+select public.create_product('Svc') as id;
+
+create temp table au_svc_var as
+select public.upsert_variant((select id from au_svc), 'Default', 5000, null, 'SVCAE', null, null, null, null, null, 'service') as id;
 
 select public.post_sale(null,
-  format('[{"product_id":"%s","quantity":1,"unit_price":5000}]', (select id from au_svc))::jsonb,
+  format('[{"variant_id":"%s","quantity":1,"unit_price":5000}]', (select id from au_svc_var))::jsonb,
   '[{"method":"cash","amount":5000}]');
 
 select is(

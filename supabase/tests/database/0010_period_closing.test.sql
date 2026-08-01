@@ -19,8 +19,10 @@ insert into public.company_memberships (company_id, user_id, role_id, authorizat
 select p.company_id, '22222222-2222-2222-2222-222222222222', r.id, 'approved'
 from pc_company p, public.roles r where r.company_id = p.company_id and r.name = 'Cashier';
 
-insert into public.products (id, company_id, name, sku, price, track_inventory)
-select 'a0000000-0000-0000-0000-0000000000ee', company_id, 'Service', 'SVC', 10000, false from pc_company;
+insert into public.products (id, company_id, name)
+select 'a0000000-0000-0000-0000-0000000000ee', company_id, 'Service' from pc_company;
+insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
+select 'aa000000-0000-0000-0000-0000000000ee', 'a0000000-0000-0000-0000-0000000000ee', company_id, 'Default', 'service', 'SVC', 10000, false from pc_company;
 
 create temp table pc_claims as
 select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
@@ -32,7 +34,7 @@ select set_config('request.jwt.claims', (select claims from pc_claims), true);
 
 -- Seed activity.
 select public.post_sale(null,
-  '[{"product_id":"a0000000-0000-0000-0000-0000000000ee","quantity":1,"unit_price":10000}]',
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000ee","quantity":1,"unit_price":10000}]',
   '[{"method":"cash","amount":10000}]');
 
 -- 1. Close without any verified reconciliation fails.

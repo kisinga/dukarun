@@ -25,16 +25,21 @@ select p.company_id, '22222222-2222-2222-2222-222222222222', r.id, 'approved'
 from pos_company p, public.roles r
 where r.company_id = p.company_id and r.name = 'Cashier';
 
--- Products: A (tracked, two FIFO batches 10 @ 100c and 10 @ 150c), B (untracked service).
-insert into public.products (id, company_id, name, sku, price, wholesale_price)
-select 'a0000000-0000-0000-0000-000000000001', company_id, 'Sugar 1kg', 'SUG1', 20000, 18000 from pos_company;
-insert into public.products (id, company_id, name, sku, price, track_inventory)
-select 'a0000000-0000-0000-0000-000000000002', company_id, 'Delivery', 'DEL', 5000, false from pos_company;
+-- Products: A (tracked good, two FIFO batches 10 @ 100c and 10 @ 150c),
+-- B (untracked service). Family rows + one sellable variant each.
+insert into public.products (id, company_id, name)
+select 'a0000000-0000-0000-0000-000000000001', company_id, 'Sugar 1kg' from pos_company;
+insert into public.product_variants (id, product_id, company_id, name, sku, price, wholesale_price)
+select 'aa000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', company_id, 'Default', 'SUG1', 20000, 18000 from pos_company;
+insert into public.products (id, company_id, name)
+select 'a0000000-0000-0000-0000-000000000002', company_id, 'Delivery' from pos_company;
+insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
+select 'aa000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', company_id, 'Default', 'service', 'DEL', 5000, false from pos_company;
 
-insert into public.inventory_batches (id, company_id, product_id, quantity, remaining, unit_cost, purchased_at)
-select 'b0000000-0000-0000-0000-000000000001', company_id, 'a0000000-0000-0000-0000-000000000001', 10, 10, 10000, now() - interval '2 days' from pos_company;
-insert into public.inventory_batches (id, company_id, product_id, quantity, remaining, unit_cost, purchased_at)
-select 'b0000000-0000-0000-0000-000000000002', company_id, 'a0000000-0000-0000-0000-000000000001', 10, 10, 15000, now() - interval '1 day' from pos_company;
+insert into public.inventory_batches (id, company_id, variant_id, quantity, remaining, unit_cost, purchased_at)
+select 'b0000000-0000-0000-0000-000000000001', company_id, 'aa000000-0000-0000-0000-000000000001', 10, 10, 10000, now() - interval '2 days' from pos_company;
+insert into public.inventory_batches (id, company_id, variant_id, quantity, remaining, unit_cost, purchased_at)
+select 'b0000000-0000-0000-0000-000000000002', company_id, 'aa000000-0000-0000-0000-000000000001', 10, 10, 15000, now() - interval '1 day' from pos_company;
 
 insert into public.customers (id, company_id, first_name, phone, is_credit_approved, credit_limit)
 select 'c0000000-0000-0000-0000-000000000001', company_id, 'Walk-in', '0712345678', true, 0 from pos_company;
@@ -57,8 +62,8 @@ create temp table sale1 as
 select public.post_sale(
   'c0000000-0000-0000-0000-000000000001',
   '[
-    {"product_id":"a0000000-0000-0000-0000-000000000001","quantity":12,"unit_price":20000},
-    {"product_id":"a0000000-0000-0000-0000-000000000002","quantity":1,"unit_price":5000}
+    {"variant_id":"aa000000-0000-0000-0000-000000000001","quantity":12,"unit_price":20000},
+    {"variant_id":"aa000000-0000-0000-0000-000000000002","quantity":1,"unit_price":5000}
   ]',
   '[
     {"method":"cash","amount":200000},
@@ -134,7 +139,7 @@ select is(
 create temp table sale2 as
 select public.post_sale(
   'c0000000-0000-0000-0000-000000000001',
-  '[{"product_id":"a0000000-0000-0000-0000-000000000002","quantity":2,"unit_price":5000}]',
+  '[{"variant_id":"aa000000-0000-0000-0000-000000000002","quantity":2,"unit_price":5000}]',
   '[]'
 ) as order_id;
 
@@ -162,7 +167,7 @@ select ok(
 select throws_ok(
   $$select public.post_sale(
     'c0000000-0000-0000-0000-000000000001',
-    '[{"product_id":"a0000000-0000-0000-0000-000000000001","quantity":999,"unit_price":20000}]',
+    '[{"variant_id":"aa000000-0000-0000-0000-000000000001","quantity":999,"unit_price":20000}]',
     '[{"method":"cash","amount":19980000}]'
   )$$,
   'P0001', null,
@@ -172,7 +177,7 @@ select throws_ok(
 select throws_ok(
   $$select public.post_sale(
     'c0000000-0000-0000-0000-000000000001',
-    '[{"product_id":"a0000000-0000-0000-0000-000000000002","quantity":1,"unit_price":5000}]',
+    '[{"variant_id":"aa000000-0000-0000-0000-000000000002","quantity":1,"unit_price":5000}]',
     '[{"method":"cash","amount":4000}]'
   )$$,
   'P0001', 'payment_mismatch: paid 4000 <> order total 5000',
@@ -191,7 +196,7 @@ select set_config('request.jwt.claims', (
 select throws_ok(
   $$select public.post_sale(
     'c0000000-0000-0000-0000-000000000001',
-    '[{"product_id":"a0000000-0000-0000-0000-000000000002","quantity":1,"unit_price":5000,"custom_price":4000,"override_reason":"regular customer"}]',
+    '[{"variant_id":"aa000000-0000-0000-0000-000000000002","quantity":1,"unit_price":5000,"custom_price":4000,"override_reason":"regular customer"}]',
     '[{"method":"cash","amount":4000}]'
   )$$,
   'P0001', 'permission_denied: OverridePrice required',
@@ -203,7 +208,7 @@ select set_config('request.jwt.claims', (select claims from admin_claims), true)
 select lives_ok(
   $$select public.post_sale(
     'c0000000-0000-0000-0000-000000000001',
-    '[{"product_id":"a0000000-0000-0000-0000-000000000002","quantity":1,"unit_price":5000,"custom_price":4000,"override_reason":"regular customer"}]',
+    '[{"variant_id":"aa000000-0000-0000-0000-000000000002","quantity":1,"unit_price":5000,"custom_price":4000,"override_reason":"regular customer"}]',
     '[{"method":"cash","amount":4000}]'
   )$$,
   'admin overrides price with OverridePrice'
@@ -215,7 +220,7 @@ select lives_ok(
 create temp table draft1 as
 select public.save_draft(
   'c0000000-0000-0000-0000-000000000001',
-  '[{"product_id":"a0000000-0000-0000-0000-000000000002","quantity":1,"unit_price":5000}]'
+  '[{"variant_id":"aa000000-0000-0000-0000-000000000002","quantity":1,"unit_price":5000}]'
 ) as order_id;
 
 select is(

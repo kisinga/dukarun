@@ -11,8 +11,10 @@ set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","r
 create temp table cs_company as select public.provision_company('Cashier Co', 'Main') as company_id;
 reset role;
 
-insert into public.products (id, company_id, name, sku, price, track_inventory)
-select 'a0000000-0000-0000-0000-0000000000dd', company_id, 'Service', 'SVC', 10000, false from cs_company;
+insert into public.products (id, company_id, name)
+select 'a0000000-0000-0000-0000-0000000000dd', company_id, 'Service' from cs_company;
+insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
+select 'aa000000-0000-0000-0000-0000000000dd', 'a0000000-0000-0000-0000-0000000000dd', company_id, 'Default', 'service', 'SVC', 10000, false from cs_company;
 
 create temp table cs_claims as
 select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
@@ -58,7 +60,7 @@ select throws_ok(
 -- 4. Sale during the session gets tagged with the session id.
 create temp table cs_sale as
 select public.post_sale(null,
-  '[{"product_id":"a0000000-0000-0000-0000-0000000000dd","quantity":1,"unit_price":10000}]',
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000dd","quantity":1,"unit_price":10000}]',
   '[{"method":"cash","amount":10000}]') as order_id;
 
 select is(

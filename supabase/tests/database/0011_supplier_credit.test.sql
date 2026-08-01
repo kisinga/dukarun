@@ -11,8 +11,10 @@ set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","r
 create temp table sp_company as select public.provision_company('Supplier Co', 'Main') as company_id;
 reset role;
 
-insert into public.products (id, company_id, name, sku, price)
-select 'a0000000-0000-0000-0000-0000000000f1', company_id, 'Bread', 'BRD', 5000 from sp_company;
+insert into public.products (id, company_id, name)
+select 'a0000000-0000-0000-0000-0000000000f1', company_id, 'Bread' from sp_company;
+insert into public.product_variants (id, product_id, company_id, name, sku, price)
+select 'aa000000-0000-0000-0000-0000000000f1', 'a0000000-0000-0000-0000-0000000000f1', company_id, 'Default', 'BRD', 5000 from sp_company;
 
 insert into public.customers (id, company_id, first_name, is_supplier, supplier_credit_limit)
 select 'c0000000-0000-0000-0000-0000000000f1', company_id, 'Brookside', true, 100000 from sp_company;
@@ -28,11 +30,11 @@ select set_config('request.jwt.claims', (select claims from sp_claims), true);
 -- 1-3. Cash purchase: batch created, movement recorded, DR INVENTORY/CR CASH_ON_HAND.
 create temp table pur1 as
 select public.record_purchase('c0000000-0000-0000-0000-0000000000f1',
-  '[{"product_id":"a0000000-0000-0000-0000-0000000000f1","quantity":20,"unit_cost":3000}]',
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000f1","quantity":20,"unit_cost":3000}]',
   false, 'PO-001') as purchase_id;
 
 select is(
-  (select remaining from public.inventory_batches where product_id = 'a0000000-0000-0000-0000-0000000000f1'),
+  (select remaining from public.inventory_batches where variant_id = 'aa000000-0000-0000-0000-0000000000f1'),
   20::numeric,
   'purchase creates inventory batch'
 );
@@ -53,7 +55,7 @@ select results_eq(
 -- 4. Credit purchase beyond supplier limit (limit 100000): 40 * 3000 = 120000.
 select throws_ok(
   $$select public.record_purchase('c0000000-0000-0000-0000-0000000000f1',
-    '[{"product_id":"a0000000-0000-0000-0000-0000000000f1","quantity":40,"unit_cost":3000}]',
+    '[{"variant_id":"aa000000-0000-0000-0000-0000000000f1","quantity":40,"unit_cost":3000}]',
     true, 'PO-002')$$,
   'P0001', 'supplier_credit_limit_exceeded: balance 0 + 120000 > limit 100000',
   'credit purchase beyond supplier limit is rejected'
@@ -62,7 +64,7 @@ select throws_ok(
 -- 5. Credit purchase within limit posts to AP.
 create temp table pur2 as
 select public.record_purchase('c0000000-0000-0000-0000-0000000000f1',
-  '[{"product_id":"a0000000-0000-0000-0000-0000000000f1","quantity":30,"unit_cost":3000}]',
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000f1","quantity":30,"unit_cost":3000}]',
   true, 'PO-003') as purchase_id;
 
 select results_eq(
@@ -109,7 +111,7 @@ select throws_ok(
 
 -- 9-10. Write-off with expiry reason: FIFO consume + DR EXPIRY_LOSS.
 create temp table wo1 as
-select public.post_inventory_write_off('a0000000-0000-0000-0000-0000000000f1', 5, 'expired stock') as entry_id;
+select public.post_inventory_write_off('aa000000-0000-0000-0000-0000000000f1', 5, 'expired stock') as entry_id;
 
 select results_eq(
   $$select a.code::text, l.debit, l.credit
@@ -124,14 +126,14 @@ select results_eq(
 );
 
 select is(
-  (select coalesce(sum(remaining), 0) from public.inventory_batches where product_id = 'a0000000-0000-0000-0000-0000000000f1'),
+  (select coalesce(sum(remaining), 0) from public.inventory_batches where variant_id = 'aa000000-0000-0000-0000-0000000000f1'),
   45::numeric,
   'write-off consumes batches FIFO (50 - 5)'
 );
 
 -- 11-12. Value adjustments.
 create temp table adj1 as
-select public.post_inventory_adjustment('a0000000-0000-0000-0000-0000000000f1', 2000, 'recount gain') as entry_id;
+select public.post_inventory_adjustment('aa000000-0000-0000-0000-0000000000f1', 2000, 'recount gain') as entry_id;
 
 select results_eq(
   $$select a.code::text, l.debit, l.credit
@@ -146,7 +148,7 @@ select results_eq(
 );
 
 select ok(
-  public.post_inventory_adjustment('a0000000-0000-0000-0000-0000000000f1', 0, 'no-op') is null,
+  public.post_inventory_adjustment('aa000000-0000-0000-0000-0000000000f1', 0, 'no-op') is null,
   'zero adjustment is a no-op'
 );
 

@@ -10,8 +10,10 @@ set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","r
 create temp table gaps_company as select public.provision_company('Gaps Co', 'Main') as company_id;
 reset role;
 
-insert into public.products (id, company_id, name, sku, price, track_inventory)
-select 'a0000000-0000-0000-0000-000000000009', company_id, 'Service', 'SVC', 5000, false from gaps_company;
+insert into public.products (id, company_id, name)
+select 'a0000000-0000-0000-0000-000000000009', company_id, 'Service' from gaps_company;
+insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
+select 'aa000000-0000-0000-0000-000000000009', 'a0000000-0000-0000-0000-000000000009', company_id, 'Default', 'service', 'SVC', 5000, false from gaps_company;
 
 -- Claims with tenant + role for RPC calls.
 create temp table gaps_claims as
@@ -42,7 +44,7 @@ select ok(
 select throws_ok(
   $$select public.post_sale(
     null,
-    '[{"product_id":"a0000000-0000-0000-0000-000000000009","quantity":1,"unit_price":5000}]',
+    '[{"variant_id":"aa000000-0000-0000-0000-000000000009","quantity":1,"unit_price":5000}]',
     '[]'
   )$$,
   'P0001', 'credit_requires_customer',
@@ -60,7 +62,7 @@ select lives_ok(
   format(
     $$select public.post_sale(
       '%s',
-      '[{"product_id":"a0000000-0000-0000-0000-000000000009","quantity":1,"unit_price":5000}]',
+      '[{"variant_id":"aa000000-0000-0000-0000-000000000009","quantity":1,"unit_price":5000}]',
       '[]'
     )$$,
     (select customer_id from new_customer)

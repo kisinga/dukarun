@@ -11,8 +11,10 @@ set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","r
 create temp table vd_company as select public.provision_company('Void Co', 'Main') as company_id;
 reset role;
 
-insert into public.products (id, company_id, name, sku, price, track_inventory)
-select 'a0000000-0000-0000-0000-0000000000dd', company_id, 'Service', 'SVC', 13000, false from vd_company;
+insert into public.products (id, company_id, name)
+select 'a0000000-0000-0000-0000-0000000000dd', company_id, 'Service' from vd_company;
+insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
+select 'aa000000-0000-0000-0000-0000000000dd', 'a0000000-0000-0000-0000-0000000000dd', company_id, 'Default', 'service', 'SVC', 13000, false from vd_company;
 
 insert into public.customers (id, company_id, first_name, is_credit_approved, credit_limit)
 select 'c0000000-0000-0000-0000-0000000000dd', company_id, 'Credit Jane', true, 0 from vd_company;
@@ -28,7 +30,7 @@ select set_config('request.jwt.claims', (select claims from vd_claims), true);
 -- Credit sale 13000 + partial repayment 5000 -> AR has D 13000 AND C 5000.
 create temp table vd_sale as
 select public.post_sale('c0000000-0000-0000-0000-0000000000dd',
-  '[{"product_id":"a0000000-0000-0000-0000-0000000000dd","quantity":1,"unit_price":13000}]', '[]') as order_id;
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000dd","quantity":1,"unit_price":13000}]', '[]') as order_id;
 
 select public.post_payment_allocation((select order_id from vd_sale), 5000, 'cash', null);
 

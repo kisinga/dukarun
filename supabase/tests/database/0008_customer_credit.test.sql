@@ -11,8 +11,10 @@ set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","r
 create temp table cr_company as select public.provision_company('Credit Co', 'Main') as company_id;
 reset role;
 
-insert into public.products (id, company_id, name, sku, price, track_inventory)
-select 'a0000000-0000-0000-0000-0000000000cc', company_id, 'Service', 'SVC', 10000, false from cr_company;
+insert into public.products (id, company_id, name)
+select 'a0000000-0000-0000-0000-0000000000cc', company_id, 'Service' from cr_company;
+insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
+select 'aa000000-0000-0000-0000-0000000000cc', 'a0000000-0000-0000-0000-0000000000cc', company_id, 'Default', 'service', 'SVC', 10000, false from cr_company;
 
 -- Customers: approved-with-limit, unapproved, zero-limit (unlimited).
 insert into public.customers (id, company_id, first_name, is_credit_approved, credit_limit)
@@ -31,7 +33,7 @@ select set_config('request.jwt.claims', (select claims from cr_claims), true);
 -- 1. Unapproved customer cannot take credit.
 select throws_ok(
   $$select public.post_sale('c0000000-0000-0000-0000-0000000000c2',
-    '[{"product_id":"a0000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":10000}]', '[]')$$,
+    '[{"variant_id":"aa000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":10000}]', '[]')$$,
   'P0001', 'credit_not_approved: customer c0000000-0000-0000-0000-0000000000c2',
   'unapproved customer cannot make a credit sale'
 );
@@ -39,7 +41,7 @@ select throws_ok(
 -- 2. Over-limit credit sale is rejected (limit 15000, sale 20000).
 select throws_ok(
   $$select public.post_sale('c0000000-0000-0000-0000-0000000000c1',
-    '[{"product_id":"a0000000-0000-0000-0000-0000000000cc","quantity":2,"unit_price":10000}]', '[]')$$,
+    '[{"variant_id":"aa000000-0000-0000-0000-0000000000cc","quantity":2,"unit_price":10000}]', '[]')$$,
   'P0001', 'credit_limit_exceeded: balance 0 + 20000 > limit 15000',
   'credit sale beyond the limit is rejected'
 );
@@ -47,7 +49,7 @@ select throws_ok(
 -- 3. Within-limit credit sale works.
 create temp table cr_sale as
 select public.post_sale('c0000000-0000-0000-0000-0000000000c1',
-  '[{"product_id":"a0000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":10000}]', '[]') as order_id;
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":10000}]', '[]') as order_id;
 
 select ok(
   (select is_credit_sale from public.orders where id = (select order_id from cr_sale)),
@@ -57,7 +59,7 @@ select ok(
 -- 4. Cumulative limit: balance 10000 + 10000 > 15000.
 select throws_ok(
   $$select public.post_sale('c0000000-0000-0000-0000-0000000000c1',
-    '[{"product_id":"a0000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":10000}]', '[]')$$,
+    '[{"variant_id":"aa000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":10000}]', '[]')$$,
   'P0001', 'credit_limit_exceeded: balance 10000 + 10000 > limit 15000',
   'credit limit is enforced cumulatively against AR balance'
 );
@@ -82,7 +84,7 @@ select results_eq(
 -- 6. Allocation reduces AR exposure: balance now 6000, sale of 8000 fits limit.
 select lives_ok(
   $$select public.post_sale('c0000000-0000-0000-0000-0000000000c1',
-    '[{"product_id":"a0000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":8000}]', '[]')$$,
+    '[{"variant_id":"aa000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":8000}]', '[]')$$,
   'repayment frees up credit limit'
 );
 
@@ -98,7 +100,7 @@ select throws_ok(
 -- 8. Allocation against an order with no AR debit fails.
 create temp table cash_sale as
 select public.post_sale(null,
-  '[{"product_id":"a0000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":5000}]',
+  '[{"variant_id":"aa000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":5000}]',
   '[{"method":"cash","amount":5000}]') as order_id;
 
 select throws_ok(
