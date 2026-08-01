@@ -149,6 +149,33 @@ export class PosService {
     return data;
   }
 
+  /**
+   * Coupled create: family + >= 1 variant in one transaction.
+   * A single unlabeled variant becomes 'Default' server-side; sku auto-generates when blank.
+   */
+  async createProductWithVariants(input: {
+    name: string;
+    barcode?: string;
+    variants: {
+      name?: string;
+      price: number;
+      sku?: string;
+      barcode?: string;
+      wholesale_price?: number;
+      kind?: string;
+      allow_fractional?: boolean;
+      track_inventory?: boolean;
+    }[];
+  }): Promise<string> {
+    const { data, error } = await this.client.rpc('create_product_with_variants', {
+      p_name: input.name,
+      p_variants: input.variants as never,
+      ...(input.barcode ? { p_barcode: input.barcode } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
   /** null/undefined fields are left unchanged by the backend. */
   async updateProduct(
     productId: string,

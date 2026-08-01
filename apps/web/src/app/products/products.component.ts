@@ -2,7 +2,8 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { NgIcon } from '@ng-icons/core';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { formatKes, parseKesToCents } from '../core/money';
@@ -10,9 +11,28 @@ import { InventoryBatch, PosService, Product, Variant, variantLabel } from '../p
 
 type StockInfo = { stock: number; stock_value: number };
 
+/** One row of the create form's inline variants editor. */
+interface CreateRow {
+  name: string;
+  price: string; // KES text
+  sku: string;
+  barcode: string;
+  wholesale: string; // KES text
+  kind: string;
+  trackInventory: boolean;
+  allowFractional: boolean;
+}
+
 @Component({
   selector: 'app-products',
-  imports: [RouterLink, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
+  imports: [
+    RouterLink,
+    FormsModule,
+    ReactiveFormsModule,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    NgIcon,
+  ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-5xl">
@@ -33,12 +53,168 @@ type StockInfo = { stock: number; stock_value: number };
         }
 
         <!-- Family create / edit panel -->
+        <!-- Create panel: family + inline variants editor (one coupled RPC) -->
+        @if (createOpen()) {
+          <div class="card mb-4 bg-base-100">
+            <div class="card-body p-4">
+              <h2 class="card-title text-lg">New product</h2>
+              <form
+                (submit)="$event.preventDefault(); saveCreate()"
+                class="mt-2 flex flex-col gap-3"
+              >
+                <div class="flex flex-wrap items-end gap-3">
+                  <label class="form-control">
+                    <span class="label-text">Family name *</span>
+                    <input
+                      type="text"
+                      class="input input-bordered input-sm"
+                      [formControl]="familyName"
+                    />
+                  </label>
+                  <label class="form-control">
+                    <span class="label-text">Barcode (family default)</span>
+                    <input
+                      type="text"
+                      class="input input-bordered input-sm"
+                      [formControl]="familyBarcode"
+                    />
+                  </label>
+                </div>
+
+                <!-- Variant rows (min 1) -->
+                <div class="flex flex-col gap-2">
+                  @for (row of createRows; track $index) {
+                    <div class="flex flex-wrap items-end gap-2 rounded-field bg-base-200 p-2">
+                      <label class="form-control w-28">
+                        <span class="label-text text-xs">Label</span>
+                        <input
+                          type="text"
+                          class="input input-bordered input-xs"
+                          placeholder="e.g. 1kg, S — leave blank for single-variant"
+                          [(ngModel)]="row.name"
+                          [ngModelOptions]="{ standalone: true }"
+                        />
+                      </label>
+                      <label class="form-control w-24">
+                        <span class="label-text text-xs">Price (KES) *</span>
+                        <input
+                          type="text"
+                          inputmode="decimal"
+                          class="input input-bordered input-xs"
+                          placeholder="0.00"
+                          [(ngModel)]="row.price"
+                          [ngModelOptions]="{ standalone: true }"
+                        />
+                      </label>
+                      <label class="form-control w-24">
+                        <span class="label-text text-xs">SKU</span>
+                        <input
+                          type="text"
+                          class="input input-bordered input-xs"
+                          placeholder="auto"
+                          [(ngModel)]="row.sku"
+                          [ngModelOptions]="{ standalone: true }"
+                        />
+                      </label>
+                      <label class="form-control w-28">
+                        <span class="label-text text-xs">Barcode override</span>
+                        <input
+                          type="text"
+                          class="input input-bordered input-xs"
+                          [(ngModel)]="row.barcode"
+                          [ngModelOptions]="{ standalone: true }"
+                        />
+                      </label>
+                      <label class="form-control w-24">
+                        <span class="label-text text-xs">Wholesale (KES)</span>
+                        <input
+                          type="text"
+                          inputmode="decimal"
+                          class="input input-bordered input-xs"
+                          placeholder="0.00"
+                          [(ngModel)]="row.wholesale"
+                          [ngModelOptions]="{ standalone: true }"
+                        />
+                      </label>
+                      <label class="form-control w-24">
+                        <span class="label-text text-xs">Kind</span>
+                        <select
+                          class="select select-bordered select-xs"
+                          [(ngModel)]="row.kind"
+                          [ngModelOptions]="{ standalone: true }"
+                        >
+                          <option value="good">Good</option>
+                          <option value="service">Service</option>
+                        </select>
+                      </label>
+                      @if (row.kind !== 'service') {
+                        <label class="label cursor-pointer justify-start gap-1 py-0">
+                          <input
+                            type="checkbox"
+                            class="checkbox checkbox-xs"
+                            [(ngModel)]="row.trackInventory"
+                            [ngModelOptions]="{ standalone: true }"
+                          />
+                          <span class="label-text text-xs">Track stock</span>
+                        </label>
+                        <label class="label cursor-pointer justify-start gap-1 py-0">
+                          <input
+                            type="checkbox"
+                            class="checkbox checkbox-xs"
+                            [(ngModel)]="row.allowFractional"
+                            [ngModelOptions]="{ standalone: true }"
+                          />
+                          <span class="label-text text-xs">Fractional</span>
+                        </label>
+                      }
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-xs"
+                        [disabled]="createRows.length === 1"
+                        (click)="removeCreateRow($index)"
+                      >
+                        <ng-icon name="heroXMark" />
+                      </button>
+                    </div>
+                  }
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm self-start"
+                    (click)="addCreateRow()"
+                  >
+                    <ng-icon name="heroPlus" /> Add variant
+                  </button>
+                  @if (duplicateLabels()) {
+                    <p class="text-xs text-warning">Two variants share the same label.</p>
+                  }
+                </div>
+
+                <div class="flex gap-2">
+                  <button
+                    type="submit"
+                    class="btn btn-primary btn-sm min-h-11"
+                    [disabled]="busy() || familyName.value.trim().length === 0"
+                  >
+                    {{ busy() ? 'Creating…' : 'Create product' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    (click)="createOpen.set(false)"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        }
+
+        <!-- Family edit panel -->
         @if (familyFormOpen()) {
           <div class="card mb-4 bg-base-100">
             <div class="card-body p-4">
-              <h2 class="card-title text-lg">
-                {{ editingFamily() ? 'Edit ' + editingFamily()!.name : 'New product family' }}
-              </h2>
+              <h2 class="card-title text-lg">Edit {{ editingFamily()!.name }}</h2>
               <form
                 (submit)="$event.preventDefault(); saveFamily()"
                 class="mt-2 flex flex-wrap items-end gap-3"
@@ -59,22 +235,20 @@ type StockInfo = { stock: number; stock_value: number };
                     [formControl]="familyBarcode"
                   />
                 </label>
-                @if (editingFamily()) {
-                  <label class="label cursor-pointer justify-start gap-2">
-                    <input
-                      type="checkbox"
-                      class="checkbox checkbox-sm"
-                      [formControl]="familyActive"
-                    />
-                    <span class="label-text">Active</span>
-                  </label>
-                }
+                <label class="label cursor-pointer justify-start gap-2">
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm"
+                    [formControl]="familyActive"
+                  />
+                  <span class="label-text">Active</span>
+                </label>
                 <button
                   type="submit"
                   class="btn btn-primary btn-sm"
                   [disabled]="busy() || familyName.value.trim().length === 0"
                 >
-                  {{ busy() ? 'Saving…' : editingFamily() ? 'Save changes' : 'Create' }}
+                  {{ busy() ? 'Saving…' : 'Save changes' }}
                 </button>
                 <button type="button" class="btn btn-ghost btn-sm" (click)="closeFamilyForm()">
                   Cancel
@@ -268,7 +442,8 @@ type StockInfo = { stock: number; stock_value: number };
                   @if (expandedFamily() === group.family.id) {
                     @if (group.variants.length === 0) {
                       <p class="mt-2 text-xs text-base-content/60">
-                        No variants yet — add one to sell this product.
+                        No variants (legacy data — new products always create with variants). Add
+                        one via + Variant to sell this product.
                       </p>
                     } @else {
                       <table class="table table-sm mt-2">
@@ -430,6 +605,10 @@ export class ProductsComponent implements OnInit {
   protected readonly familyBarcode = new FormControl('', { nonNullable: true });
   protected readonly familyActive = new FormControl(true, { nonNullable: true });
 
+  /** Create flow: family + inline variant rows (one coupled RPC). */
+  protected readonly createOpen = signal(false);
+  protected createRows: CreateRow[] = [this.emptyCreateRow()];
+
   protected readonly variantForm = signal<{ productId: string; editing: Variant | null } | null>(
     null
   );
@@ -519,14 +698,107 @@ export class ProductsComponent implements OnInit {
     }
   }
 
-  // --- Family form ---
+  // --- Create flow: family + inline variants editor (coupled RPC) ---
 
   protected startFamilyCreate(): void {
-    this.editingFamily.set(null);
     this.familyName.setValue('');
     this.familyBarcode.setValue('');
-    this.familyFormOpen.set(true);
+    this.createRows = [this.emptyCreateRow()];
+    this.createOpen.set(true);
   }
+
+  protected addCreateRow(): void {
+    this.createRows = [...this.createRows, this.emptyCreateRow()];
+  }
+
+  protected removeCreateRow(index: number): void {
+    if (this.createRows.length === 1) return;
+    this.createRows = this.createRows.filter((_, i) => i !== index);
+  }
+
+  /** Pre-warn on duplicate labels (the server would create them anyway). */
+  protected duplicateLabels(): boolean {
+    const labels = this.createRows.map(r => r.name.trim().toLowerCase()).filter(l => l.length > 0);
+    return new Set(labels).size !== labels.length;
+  }
+
+  protected async saveCreate(): Promise<void> {
+    if (this.familyName.value.trim().length === 0) return;
+    const variants: {
+      name?: string;
+      price: number;
+      sku?: string;
+      barcode?: string;
+      wholesale_price?: number;
+      kind?: string;
+      allow_fractional?: boolean;
+      track_inventory?: boolean;
+    }[] = [];
+    for (const row of this.createRows) {
+      const priceCents = parseKesToCents(row.price);
+      if (priceCents === null) {
+        this.error.set('Every variant needs a valid price');
+        return;
+      }
+      const wholesaleCents = row.wholesale.trim()
+        ? (parseKesToCents(row.wholesale) ?? undefined)
+        : undefined;
+      if (row.wholesale.trim() && wholesaleCents === undefined) {
+        this.error.set('Enter a valid wholesale price on every variant');
+        return;
+      }
+      const isService = row.kind === 'service';
+      variants.push({
+        // Unlabeled single variant becomes 'Default' server-side.
+        ...(row.name.trim() ? { name: row.name.trim() } : {}),
+        price: priceCents,
+        ...(row.sku.trim() ? { sku: row.sku.trim() } : {}),
+        ...(row.barcode.trim() ? { barcode: row.barcode.trim() } : {}),
+        ...(wholesaleCents !== undefined ? { wholesale_price: wholesaleCents } : {}),
+        kind: row.kind,
+        // Services carry no inventory flags.
+        ...(isService
+          ? {}
+          : {
+              track_inventory: row.trackInventory,
+              allow_fractional: row.allowFractional,
+            }),
+      });
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.pos.createProductWithVariants({
+        name: this.familyName.value.trim(),
+        barcode: this.familyBarcode.value.trim() || undefined,
+        variants,
+      });
+      this.notice.set(`Created ${this.familyName.value.trim()}`);
+      this.createOpen.set(false);
+      await this.load();
+    } catch (err) {
+      // variants_required / invalid_price / invalid_kind — shown verbatim.
+      this.error.set(err instanceof Error ? err.message : 'Create failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  private emptyCreateRow(): CreateRow {
+    return {
+      name: '',
+      price: '',
+      sku: '',
+      barcode: '',
+      wholesale: '',
+      kind: 'good',
+      trackInventory: true,
+      allowFractional: false,
+    };
+  }
+
+  // --- Family edit form ---
 
   protected startFamilyEdit(family: Product): void {
     this.editingFamily.set(family);
@@ -542,26 +814,18 @@ export class ProductsComponent implements OnInit {
   }
 
   protected async saveFamily(): Promise<void> {
-    if (this.familyName.value.trim().length === 0) return;
+    const editing = this.editingFamily();
+    if (!editing || this.familyName.value.trim().length === 0) return;
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
     try {
-      const editing = this.editingFamily();
-      if (editing) {
-        await this.pos.updateProduct(editing.id, {
-          name: this.familyName.value.trim(),
-          barcode: this.familyBarcode.value.trim() || undefined,
-          active: this.familyActive.value,
-        });
-        this.notice.set(`Updated ${this.familyName.value.trim()}`);
-      } else {
-        await this.pos.createProduct({
-          name: this.familyName.value.trim(),
-          barcode: this.familyBarcode.value.trim() || undefined,
-        });
-        this.notice.set(`Created ${this.familyName.value.trim()} — now add a variant`);
-      }
+      await this.pos.updateProduct(editing.id, {
+        name: this.familyName.value.trim(),
+        barcode: this.familyBarcode.value.trim() || undefined,
+        active: this.familyActive.value,
+      });
+      this.notice.set(`Updated ${this.familyName.value.trim()}`);
       this.closeFamilyForm();
       await this.load();
     } catch (err) {
