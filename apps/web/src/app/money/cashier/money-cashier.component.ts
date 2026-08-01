@@ -5,6 +5,8 @@ import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../../core/money';
 import { CashierAccount, CashierSession, MoneyService, SessionWithCounts } from '../money.service';
+import { PrintService } from '../../shared/print/print.service';
+import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 
 @Component({
   selector: 'app-money-cashier',
@@ -21,6 +23,13 @@ import { CashierAccount, CashierSession, MoneyService, SessionWithCounts } from 
         }
         @if (notice()) {
           <p class="mb-2 text-sm text-success">{{ notice() }}</p>
+        }
+        @if (lastClosedSessionId(); as sid) {
+          @if (printerEnabled()) {
+            <button class="btn btn-outline btn-sm mb-4 min-h-11" (click)="printSlip(sid)">
+              Print cashier slip
+            </button>
+          }
         }
 
         <!-- Current open session / open-close forms -->
@@ -147,6 +156,8 @@ import { CashierAccount, CashierSession, MoneyService, SessionWithCounts } from 
 })
 export class MoneyCashierComponent implements OnInit {
   private readonly money = inject(MoneyService);
+  private readonly receiptData = inject(ReceiptDataService);
+  private readonly print = inject(PrintService);
 
   protected readonly fmt = formatKes;
   protected readonly accounts = signal<CashierAccount[]>([]);
@@ -156,8 +167,11 @@ export class MoneyCashierComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly printerEnabled = signal(false);
+  protected readonly lastClosedSessionId = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
+    this.printerEnabled.set(await this.receiptData.printerEnabled());
     await this.load();
   }
 
@@ -184,19 +198,23 @@ export class MoneyCashierComponent implements OnInit {
   }
 
   protected async closeSession(sessionId: string): Promise<void> {
-    await this.submit(decls => this.money.closeCashierSession(sessionId, decls), 'Session closed');
+    const done = await this.submit(
+      decls => this.money.closeCashierSession(sessionId, decls),
+      'Session closed'
+    );
+    if (done) this.lastClosedSessionId.set(sessionId);
   }
 
   private async submit(
     action: (decls: { account_code: string; declared: number }[]) => Promise<string>,
     successMessage: string
-  ): Promise<void> {
+  ): Promise<boolean> {
     const decls: { account_code: string; declared: number }[] = [];
     for (const account of this.accounts()) {
       const cents = parseKesToCents(this.declared[account.account_code] ?? '');
       if (cents === null) {
         this.error.set(`Enter a valid amount for ${account.label}`);
-        return;
+        return false;
       }
       decls.push({ account_code: account.account_code, declared: cents });
     }
@@ -208,10 +226,24 @@ export class MoneyCashierComponent implements OnInit {
       this.notice.set(successMessage);
       for (const a of this.accounts()) this.declared[a.account_code] = '0.00';
       await this.load();
+      return true;
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Request failed');
+      return false;
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  protected async printSlip(sessionId: string): Promise<void> {
+    try {
+      const [{ order, meta }, company] = await Promise.all([
+        this.receiptData.buildCashierSlipData(sessionId),
+        this.receiptData.companyPrintInfo(),
+      ]);
+      await this.print.printOrder(order, company.name, company.logoUrl, meta);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Print failed');
     }
   }
 

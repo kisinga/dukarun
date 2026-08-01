@@ -10,6 +10,8 @@ import { ConnectivityService } from '../offline/connectivity.service';
 import { SyncService } from '../offline/sync.service';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { PrintService, type PrintFormat } from '../../shared/print/print.service';
+import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { NgIcon } from '@ng-icons/core';
 import {
   Customer,
@@ -57,7 +59,7 @@ import {
         <!-- Success / queued celebration (colour + icon, not oversized type) -->
         @if (success(); as s) {
           <div class="card mb-4 bg-base-100">
-            <div class="card-body flex-row items-center gap-4 p-4">
+            <div class="card-body flex-row flex-wrap items-center gap-4 p-4">
               <ng-icon
                 name="heroCheckCircle"
                 size="2.5rem"
@@ -72,6 +74,27 @@ import {
                   </p>
                 }
               </div>
+              @if (s.orderId && printerEnabled()) {
+                <select
+                  class="select select-bordered select-sm"
+                  [value]="print.format()"
+                  (change)="onFormatChange($event)"
+                  title="Receipt format"
+                >
+                  @for (t of print.getAvailableTemplates(); track t.id) {
+                    <option [value]="t.id" [selected]="t.id === print.format()">
+                      {{ t.name }}
+                    </option>
+                  }
+                </select>
+                <button
+                  class="btn btn-outline min-h-11"
+                  [disabled]="busy()"
+                  (click)="printReceipt(s.orderId)"
+                >
+                  Print receipt
+                </button>
+              }
               <button class="btn btn-primary min-h-11" (click)="newSale()">New sale</button>
             </div>
           </div>
@@ -404,6 +427,8 @@ export class SellComponent implements OnInit {
   protected readonly cart = inject(CartService);
   protected readonly connectivity = inject(ConnectivityService);
   protected readonly sync = inject(SyncService);
+  protected readonly print = inject(PrintService);
+  private readonly receiptData = inject(ReceiptDataService);
   private readonly pos = inject(PosService);
   private readonly route = inject(ActivatedRoute);
 
@@ -427,7 +452,12 @@ export class SellComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   /** Post-sale celebration: success = completed, warning = queued offline. */
-  protected readonly success = signal<{ text: string; tone: 'success' | 'warning' } | null>(null);
+  protected readonly success = signal<{
+    text: string;
+    tone: 'success' | 'warning';
+    orderId?: string;
+  } | null>(null);
+  protected readonly printerEnabled = signal(false);
   /** Set when a real (non-walk-in) customer is picked; gates the credit tab. */
   protected readonly creditAllowed = computed(() => this.cart.customerId() !== null);
 
@@ -446,6 +476,7 @@ export class SellComponent implements OnInit {
     } catch {
       // keep defaults
     }
+    this.printerEnabled.set(await this.receiptData.printerEnabled());
     // Keep the offline product snapshot fresh (fire-and-forget).
     void this.sync.refreshProductSnapshot();
     const draftId = this.route.snapshot.queryParamMap.get('draft');
@@ -563,10 +594,10 @@ export class SellComponent implements OnInit {
       return;
     }
     try {
-      await this.pos.postSale(customerId, lines, payments, false);
+      const orderId = await this.pos.postSale(customerId, lines, payments, false);
       this.checkoutOpen.set(false);
       this.cart.clear();
-      this.success.set({ text: 'Sale completed', tone: 'success' });
+      this.success.set({ text: 'Sale completed', tone: 'success', orderId });
     } catch (err) {
       if (!(err instanceof PosRpcError)) {
         // Network failure mid-request: the outcome is unknown but safe —
@@ -598,6 +629,25 @@ export class SellComponent implements OnInit {
     this.success.set(null);
     this.error.set(null);
     this.notice.set(null);
+  }
+
+  protected onFormatChange(event: Event): void {
+    this.print.setFormat((event.target as HTMLSelectElement).value as PrintFormat);
+  }
+
+  protected async printReceipt(orderId: string): Promise<void> {
+    this.busy.set(true);
+    try {
+      const [{ order, meta }, company] = await Promise.all([
+        this.receiptData.buildOrderData(orderId),
+        this.receiptData.companyPrintInfo(),
+      ]);
+      await this.print.printOrder(order, company.name, company.logoUrl, meta);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Print failed');
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected async park(): Promise<void> {

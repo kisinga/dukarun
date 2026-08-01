@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SupabaseService } from '../../core/supabase.service';
@@ -49,7 +49,7 @@ import { SupabaseService } from '../../core/supabase.service';
     </main>
   `,
 })
-export class RegisterComponent {
+export class RegisterComponent implements OnInit {
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);
 
@@ -64,6 +64,16 @@ export class RegisterComponent {
     nonNullable: true,
     validators: [Validators.required],
   });
+
+  /** Already-provisioned users have no business here — send them to the dashboard. */
+  async ngOnInit(): Promise<void> {
+    try {
+      const company = await this.supabase.currentCompany();
+      if (company) await this.router.navigate(['/dashboard']);
+    } catch {
+      // Stay put; a failed lookup must not strand the user either.
+    }
+  }
 
   protected async provision(): Promise<void> {
     if (this.companyName.invalid || this.storeName.invalid) return;

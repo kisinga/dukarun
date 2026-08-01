@@ -5,6 +5,8 @@ import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../../core/money';
 import { NgIcon } from '@ng-icons/core';
+import { PrintService } from '../../shared/print/print.service';
+import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { PosService, Variant, variantLabel } from '../../pos/pos.service';
 import { LedgerAccount, MoneyCustomer, MoneyService } from '../money.service';
 
@@ -299,6 +301,11 @@ interface PurchaseLineForm {
                   } @else {
                     <span class="badge badge-error">unpaid ({{ fmt(p.total_cost - p.paid) }})</span>
                   }
+                  @if (printerEnabled()) {
+                    <button class="btn btn-ghost btn-xs" (click)="printPurchase(p.id)">
+                      Print PO
+                    </button>
+                  }
                 </div>
               </div>
             }
@@ -311,6 +318,8 @@ interface PurchaseLineForm {
 export class MoneySuppliersComponent implements OnInit {
   private readonly money = inject(MoneyService);
   private readonly pos = inject(PosService);
+  private readonly receiptData = inject(ReceiptDataService);
+  private readonly print = inject(PrintService);
 
   protected readonly fmt = formatKes;
   protected readonly suppliers = signal<SupplierWithAp[]>([]);
@@ -336,8 +345,10 @@ export class MoneySuppliersComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly printerEnabled = signal(false);
 
   async ngOnInit(): Promise<void> {
+    this.printerEnabled.set(await this.receiptData.printerEnabled());
     await this.load();
   }
 
@@ -472,6 +483,18 @@ export class MoneySuppliersComponent implements OnInit {
       this.error.set(err instanceof Error ? err.message : 'Create failed');
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  protected async printPurchase(purchaseId: string): Promise<void> {
+    try {
+      const [purchase, company] = await Promise.all([
+        this.receiptData.buildPurchaseData(purchaseId),
+        this.receiptData.companyPrintInfo(),
+      ]);
+      await this.print.printPurchase(purchase, company.name, company.logoUrl);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Print failed');
     }
   }
 

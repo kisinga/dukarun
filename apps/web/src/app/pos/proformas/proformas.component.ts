@@ -5,6 +5,8 @@ import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { formatKes } from '../../core/money';
 import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
 import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
+import { PrintService } from '../../shared/print/print.service';
+import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 
 @Component({
   selector: 'app-proformas',
@@ -35,6 +37,11 @@ import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
                   <span class="text-sm">{{ customerName(draft) }}</span>
                   <span class="ml-auto font-bold tabular-nums">{{ fmt(draft.total) }}</span>
                   <button class="btn btn-outline btn-sm" (click)="edit(draft.id)">Edit</button>
+                  @if (printerEnabled()) {
+                    <button class="btn btn-ghost btn-sm" (click)="printProforma(draft.id)">
+                      Print
+                    </button>
+                  }
                   <button class="btn btn-primary btn-sm" (click)="converting.set(draft)">
                     Convert to Sale
                   </button>
@@ -62,6 +69,8 @@ import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
 export class ProformasComponent implements OnInit {
   private readonly pos = inject(PosService);
   private readonly router = inject(Router);
+  private readonly receiptData = inject(ReceiptDataService);
+  private readonly print = inject(PrintService);
 
   protected readonly fmt = formatKes;
   protected readonly drafts = signal<OrderWithCustomer[]>([]);
@@ -70,8 +79,10 @@ export class ProformasComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly printerEnabled = signal(false);
 
   async ngOnInit(): Promise<void> {
+    this.printerEnabled.set(await this.receiptData.printerEnabled());
     try {
       this.methods.set(await this.pos.enabledPaymentMethods());
     } catch {
@@ -86,6 +97,21 @@ export class ProformasComponent implements OnInit {
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load proformas');
+    }
+  }
+
+  protected async printProforma(orderId: string): Promise<void> {
+    try {
+      const [{ order, meta }, company] = await Promise.all([
+        this.receiptData.buildOrderData(orderId),
+        this.receiptData.companyPrintInfo(),
+      ]);
+      await this.print.printOrder(order, company.name, company.logoUrl, {
+        ...meta,
+        documentType: 'proforma',
+      });
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Print failed');
     }
   }
 

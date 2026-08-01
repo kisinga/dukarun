@@ -6,6 +6,8 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes } from '../../core/money';
 import { OrderLineWithProduct, OrderWithCustomer, Payment, PosService } from '../pos.service';
+import { PrintService } from '../../shared/print/print.service';
+import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 
 @Component({
   selector: 'app-today-sales',
@@ -117,6 +119,11 @@ import { OrderLineWithProduct, OrderWithCustomer, Payment, PosService } from '..
                       } @else {
                         <p class="mt-2 text-xs text-base-content/60">Credit sale — no payments.</p>
                       }
+                      @if (printerEnabled()) {
+                        <button class="btn btn-outline btn-xs mt-2" (click)="printOrder(order.id)">
+                          Print receipt
+                        </button>
+                      }
                     </div>
                   }
                 </div>
@@ -130,6 +137,8 @@ import { OrderLineWithProduct, OrderWithCustomer, Payment, PosService } from '..
 })
 export class TodaySalesComponent implements OnInit, OnDestroy {
   private readonly pos = inject(PosService);
+  private readonly receiptData = inject(ReceiptDataService);
+  private readonly print = inject(PrintService);
 
   protected readonly fmt = formatKes;
   protected readonly orders = signal<OrderWithCustomer[]>([]);
@@ -140,10 +149,12 @@ export class TodaySalesComponent implements OnInit, OnDestroy {
   protected readonly voidReason = new FormControl('', { nonNullable: true });
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly printerEnabled = signal(false);
 
   private channel: RealtimeChannel | null = null;
 
   async ngOnInit(): Promise<void> {
+    this.printerEnabled.set(await this.receiptData.printerEnabled());
     await this.load();
     // Realtime: today's list refreshes on any order/payment change.
     this.channel = this.pos.client
@@ -189,6 +200,18 @@ export class TodaySalesComponent implements OnInit, OnDestroy {
       this.payments.set(payments);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load order details');
+    }
+  }
+
+  protected async printOrder(orderId: string): Promise<void> {
+    try {
+      const [{ order, meta }, company] = await Promise.all([
+        this.receiptData.buildOrderData(orderId),
+        this.receiptData.companyPrintInfo(),
+      ]);
+      await this.print.printOrder(order, company.name, company.logoUrl, meta);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Print failed');
     }
   }
 
