@@ -72,6 +72,42 @@ export type Database = {
           },
         ]
       }
+      audit_log: {
+        Row: {
+          actor: string | null
+          changed_at: string
+          company_id: string | null
+          id: number
+          new_data: Json | null
+          old_data: Json | null
+          operation: string
+          row_id: string | null
+          table_name: string
+        }
+        Insert: {
+          actor?: string | null
+          changed_at?: string
+          company_id?: string | null
+          id?: never
+          new_data?: Json | null
+          old_data?: Json | null
+          operation: string
+          row_id?: string | null
+          table_name: string
+        }
+        Update: {
+          actor?: string | null
+          changed_at?: string
+          company_id?: string | null
+          id?: never
+          new_data?: Json | null
+          old_data?: Json | null
+          operation?: string
+          row_id?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
       cash_drawer_counts: {
         Row: {
           company_id: string
