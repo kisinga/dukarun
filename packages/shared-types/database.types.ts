@@ -34,6 +34,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounting_periods: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string
+          id: string
+          start_date: string
+          status: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          id?: string
+          start_date: string
+          status?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          id?: string
+          start_date?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_periods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cash_drawer_counts: {
         Row: {
           company_id: string
@@ -957,6 +995,32 @@ export type Database = {
           },
         ]
       }
+      period_locks: {
+        Row: {
+          company_id: string
+          lock_end_date: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          lock_end_date: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          lock_end_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "period_locks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_admins: {
         Row: {
           created_at: string
@@ -1270,6 +1334,7 @@ export type Database = {
         Args: { p_code: string; p_company_id: string }
         Returns: number
       }
+      close_accounting_period: { Args: { p_end_date: string }; Returns: string }
       close_cashier_session: {
         Args: { p_declarations: Json; p_session_id: string }
         Returns: string
@@ -1406,6 +1471,10 @@ export type Database = {
           p_currency?: string
           p_store_name?: string
         }
+        Returns: string
+      }
+      record_manual_reconciliation: {
+        Args: { p_declarations: Json }
         Returns: string
       }
       record_mpesa_verification: {
