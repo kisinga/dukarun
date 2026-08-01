@@ -2077,6 +2077,15 @@ export type Database = {
         Args: { p_barcode?: string; p_image_path?: string; p_name: string }
         Returns: string
       }
+      create_product_with_variants: {
+        Args: {
+          p_barcode?: string
+          p_image_path?: string
+          p_name: string
+          p_variants: Json
+        }
+        Returns: string
+      }
       current_company_id: { Args: never; Returns: string }
       current_role_name: { Args: never; Returns: string }
       current_user_has_permission: {
