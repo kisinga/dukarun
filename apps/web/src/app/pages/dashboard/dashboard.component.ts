@@ -1,6 +1,7 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Company, SupabaseService } from '../../core/supabase.service';
+import { SyncService } from '../../pos/offline/sync.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -33,6 +34,20 @@ import { Company, SupabaseService } from '../../core/supabase.service';
               <a routerLink="/pos/proformas" class="btn btn-outline">Proformas</a>
               <a routerLink="/pos/cashier" class="btn btn-outline">Cashier Queue</a>
             </nav>
+
+            @if (pendingCount() > 0) {
+              <a
+                routerLink="/pos/sync"
+                class="btn btn-sm mt-3 w-full"
+                [class.btn-error]="sync.failedCount() > 0"
+                [class.btn-outline]="sync.failedCount() === 0"
+              >
+                {{ pendingCount() }} sale(s) awaiting sync
+                @if (sync.failedCount() > 0) {
+                  — {{ sync.failedCount() }} failed
+                }
+              </a>
+            }
           } @else if (error()) {
             <p class="mt-4 text-sm text-error">{{ error() }}</p>
           } @else {
@@ -48,10 +63,14 @@ import { Company, SupabaseService } from '../../core/supabase.service';
 export class DashboardComponent implements OnInit {
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);
+  protected readonly sync = inject(SyncService);
 
   protected readonly company = signal<Company | null>(null);
   protected readonly role = signal<string | null>(null);
   protected readonly error = signal<string | null>(null);
+  protected readonly pendingCount = computed(
+    () => this.sync.queuedCount() + this.sync.failedCount()
+  );
 
   async ngOnInit(): Promise<void> {
     this.role.set(this.supabase.claims()?.user_role ?? null);

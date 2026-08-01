@@ -1,4 +1,5 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, effect, signal } from '@angular/core';
+import { offlineDb, type PersistedCart } from './offline/offline-db';
 import type { Product, SaleLineInput } from './pos.service';
 
 export interface CartLine {
@@ -17,6 +18,42 @@ export class CartService {
   readonly customerName = signal('Walk-in');
   /** Set when editing an existing proforma. */
   readonly draftId = signal<string | null>(null);
+
+  /** True once the persisted cart has been restored from IndexedDB. */
+  private restored = false;
+
+  constructor() {
+    void this.restore().then(() => {
+      this.restored = true;
+    });
+    // Persist the in-progress cart on every change so a refresh or a
+    // mid-sale connectivity drop doesn't lose it.
+    effect(() => {
+      if (!this.restored) return;
+      const persisted: PersistedCart = {
+        key: 'current',
+        lines: this.lines(),
+        customerId: this.customerId(),
+        customerName: this.customerName(),
+        draftId: this.draftId(),
+      };
+      void offlineDb().then(db => db.put('cart', persisted));
+    });
+  }
+
+  private async restore(): Promise<void> {
+    try {
+      const db = await offlineDb();
+      const saved = await db.get('cart', 'current');
+      if (!saved) return;
+      this.lines.set(saved.lines);
+      this.customerId.set(saved.customerId);
+      this.customerName.set(saved.customerName);
+      this.draftId.set(saved.draftId);
+    } catch {
+      // Persistence is best-effort; an empty cart beats a crashed app.
+    }
+  }
 
   readonly total = computed(() =>
     this.lines().reduce((sum, line) => sum + this.lineTotal(line), 0)
