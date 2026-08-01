@@ -204,6 +204,128 @@ export type Database = {
           },
         ]
       }
+      ledger_accounts: {
+        Row: {
+          code: string
+          company_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_parent: boolean
+          is_system: boolean
+          name: string
+          parent_id: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          company_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_parent?: boolean
+          is_system?: boolean
+          name: string
+          parent_id?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_parent?: boolean
+          is_system?: boolean
+          name?: string
+          parent_id?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ledger_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_accounts_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_methods: {
+        Row: {
+          code: string
+          company_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          is_cashier_controlled: boolean
+          ledger_account_code: string
+          name: string
+          reconciliation_type: string
+          requires_reconciliation: boolean
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          company_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          is_cashier_controlled?: boolean
+          ledger_account_code: string
+          name: string
+          reconciliation_type: string
+          requires_reconciliation?: boolean
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          company_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          is_cashier_controlled?: boolean
+          ledger_account_code?: string
+          name?: string
+          reconciliation_type?: string
+          requires_reconciliation?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_admins: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       roles: {
         Row: {
           company_id: string | null
@@ -235,6 +357,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "roles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_locations: {
+        Row: {
+          code: string
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_locations_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -288,7 +445,17 @@ export type Database = {
     Functions: {
       current_company_id: { Args: never; Returns: string }
       current_role_name: { Args: never; Returns: string }
+      custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       is_platform_admin: { Args: never; Returns: boolean }
+      provision_company: {
+        Args: {
+          p_company_name: string
+          p_currency?: string
+          p_store_name?: string
+        }
+        Returns: string
+      }
+      send_sms_hook: { Args: { event: Json }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
