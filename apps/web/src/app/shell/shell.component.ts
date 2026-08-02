@@ -116,7 +116,7 @@ const ROUTE_LABELS: [RegExp, string][] = [
 
         <!-- Mobile bottom tab bar -->
         <nav
-          class="fixed bottom-0 left-0 right-0 z-50 border-t border-base-300 bg-base-100 lg:hidden"
+          class="fixed bottom-0 left-0 right-0 z-50 border-t border-base-300 bg-base-100 pb-[env(safe-area-inset-bottom,0px)] lg:hidden"
           role="navigation"
         >
           <div class="flex h-14 items-center justify-around px-2">
@@ -259,7 +259,7 @@ export class ShellComponent implements OnInit {
       label: 'Money',
       items: [
         { route: '/money/cashier', label: 'Cashier', icon: 'heroBanknotes' },
-        { route: '/money/expenses', label: 'Expenses', icon: 'heroReceipt' },
+        { route: '/money/expenses', label: 'Expenses', icon: 'heroReceiptRefund' },
         { route: '/money/transfers', label: 'Transfers', icon: 'heroArrowsRightLeft' },
         { route: '/money/credit', label: 'Credit', icon: 'heroCreditCard' },
         { route: '/money/suppliers', label: 'Suppliers', icon: 'heroTruck' },

@@ -72,65 +72,67 @@ import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
         <!-- Members -->
         <h2 class="mb-2 text-lg font-semibold">Members</h2>
         <div class="card mb-4 bg-base-100">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Joined</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (m of members(); track m.id) {
+          <div class="table-scroll">
+            <table class="table table-sm">
+              <thead>
                 <tr>
-                  <td>
-                    <div class="flex items-center gap-2">
-                      <app-entity-avatar size="sm" [firstName]="m.roles?.name ?? '?'" />
-                      <span class="font-mono text-xs" [title]="m.user_id">
-                        User …{{ shortId(m.user_id) }}
-                      </span>
-                    </div>
-                  </td>
-                  <td>{{ m.roles?.name ?? '—' }}</td>
-                  <td>
-                    <app-status-badge
-                      [type]="memberStatusType(m.authorization_status)"
-                      [label]="m.authorization_status"
-                    />
-                  </td>
-                  <td class="text-xs">{{ date(m.created_at) }}</td>
-                  <td class="whitespace-nowrap text-right">
-                    @if (m.authorization_status === 'disabled') {
-                      <button
-                        class="btn btn-success btn-outline btn-xs"
-                        [disabled]="busy()"
-                        (click)="setStatus(m, 'approved')"
-                      >
-                        Enable
-                      </button>
-                    } @else {
-                      <button
-                        class="btn btn-warning btn-outline btn-xs"
-                        [disabled]="busy()"
-                        (click)="setStatus(m, 'disabled')"
-                      >
-                        Disable
-                      </button>
-                    }
-                    <button
-                      class="btn btn-error btn-outline btn-xs"
-                      [disabled]="busy()"
-                      (click)="startRemove(m)"
-                    >
-                      Remove
-                    </button>
-                  </td>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th class="hidden sm:table-cell">Joined</th>
+                  <th></th>
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (m of members(); track m.id) {
+                  <tr>
+                    <td>
+                      <div class="flex items-center gap-2">
+                        <app-entity-avatar size="sm" [firstName]="m.roles?.name ?? '?'" />
+                        <span class="font-mono text-xs" [title]="m.user_id">
+                          User …{{ shortId(m.user_id) }}
+                        </span>
+                      </div>
+                    </td>
+                    <td>{{ m.roles?.name ?? '—' }}</td>
+                    <td>
+                      <app-status-badge
+                        [type]="memberStatusType(m.authorization_status)"
+                        [label]="m.authorization_status"
+                      />
+                    </td>
+                    <td class="hidden text-xs sm:table-cell">{{ date(m.created_at) }}</td>
+                    <td class="whitespace-nowrap text-right">
+                      @if (m.authorization_status === 'disabled') {
+                        <button
+                          class="btn btn-success btn-outline btn-xs"
+                          [disabled]="busy()"
+                          (click)="setStatus(m, 'approved')"
+                        >
+                          Enable
+                        </button>
+                      } @else {
+                        <button
+                          class="btn btn-warning btn-outline btn-xs"
+                          [disabled]="busy()"
+                          (click)="setStatus(m, 'disabled')"
+                        >
+                          Disable
+                        </button>
+                      }
+                      <button
+                        class="btn btn-error btn-outline btn-xs"
+                        [disabled]="busy()"
+                        (click)="startRemove(m)"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Roles -->

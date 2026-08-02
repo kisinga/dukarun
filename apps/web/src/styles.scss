@@ -296,3 +296,31 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ============================================
+   Mobile sweep: touch targets + scroll affordance
+   ============================================ */
+@media (max-width: 767px) {
+  /* 44px minimum touch target for small/ghost buttons and tab items */
+  .btn-sm,
+  .btn-xs {
+    min-height: 2.75rem;
+  }
+
+  .tabs .tab {
+    min-height: 2.75rem;
+  }
+}
+
+/* Right-edge fade for horizontally scrollable strips (money tabs etc.) */
+.scroll-fade-r {
+  mask-image: linear-gradient(to right, black 88%, transparent);
+  -webkit-mask-image: linear-gradient(to right, black 88%, transparent);
+}
+
+/* Mobile: tables that can't shrink scroll horizontally instead of overflowing */
+.table-scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}

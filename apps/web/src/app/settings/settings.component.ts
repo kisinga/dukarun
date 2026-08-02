@@ -195,50 +195,52 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                   Billing &amp; plan →
                 </a>
               </div>
-              <table class="table table-sm mt-2">
-                <thead>
-                  <tr>
-                    <th>Method</th>
-                    <th>Enabled</th>
-                    <th>Reconciliation</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (pm of paymentMethods(); track pm.code) {
+              <div class="table-scroll">
+                <table class="table table-sm mt-2">
+                  <thead>
                     <tr>
-                      <td>
-                        <span class="text-sm font-medium">{{ pm.name }}</span>
-                        @if (pm.is_cashier_controlled) {
-                          <span class="badge badge-xs badge-info ml-1">cashier</span>
-                        }
-                        <span class="ml-1 font-mono text-xs text-base-content/60">
-                          {{ pm.code }}
-                        </span>
-                      </td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="toggle toggle-sm"
-                          [checked]="pm.enabled"
-                          (change)="toggleMethod(pm, 'enabled', $event)"
-                          [disabled]="busy()"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="toggle toggle-sm"
-                          [checked]="pm.requires_reconciliation"
-                          (change)="toggleMethod(pm, 'requires_reconciliation', $event)"
-                          [disabled]="busy()"
-                        />
-                      </td>
-                      <td class="type-caption">requires recon</td>
+                      <th>Method</th>
+                      <th>Enabled</th>
+                      <th>Reconciliation</th>
+                      <th></th>
                     </tr>
-                  }
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    @for (pm of paymentMethods(); track pm.code) {
+                      <tr>
+                        <td>
+                          <span class="text-sm font-medium">{{ pm.name }}</span>
+                          @if (pm.is_cashier_controlled) {
+                            <span class="badge badge-xs badge-info ml-1">cashier</span>
+                          }
+                          <span class="ml-1 font-mono text-xs text-base-content/60">
+                            {{ pm.code }}
+                          </span>
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-sm"
+                            [checked]="pm.enabled"
+                            (change)="toggleMethod(pm, 'enabled', $event)"
+                            [disabled]="busy()"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-sm"
+                            [checked]="pm.requires_reconciliation"
+                            (change)="toggleMethod(pm, 'requires_reconciliation', $event)"
+                            [disabled]="busy()"
+                          />
+                        </td>
+                        <td class="type-caption">requires recon</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
               @if (pmMsg(); as m) {
                 <p class="mt-2 text-sm" [class.text-success]="m.ok" [class.text-error]="!m.ok">
                   {{ m.text }}

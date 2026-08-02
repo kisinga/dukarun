@@ -89,47 +89,49 @@ type CustomerRow = {
             />
           } @else {
             <div class="card bg-base-100">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Day</th>
-                    <th class="text-right">Orders</th>
-                    <th class="text-right">Revenue</th>
-                    <th class="text-right">COGS</th>
-                    <th class="text-right">Margin</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (d of pagedSummary(); track d.day) {
+              <div class="table-scroll">
+                <table class="table table-sm">
+                  <thead>
                     <tr>
-                      <td class="text-sm">{{ d.day }}</td>
-                      <td class="text-right">{{ d.orders }}</td>
-                      <td class="text-right">{{ fmt(d.revenue ?? 0) }}</td>
-                      <td class="text-right">{{ fmt(d.cogs ?? 0) }}</td>
+                      <th>Day</th>
+                      <th class="text-right">Orders</th>
+                      <th class="text-right">Revenue</th>
+                      <th class="text-right">COGS</th>
+                      <th class="text-right">Margin</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (d of pagedSummary(); track d.day) {
+                      <tr>
+                        <td class="text-sm">{{ d.day }}</td>
+                        <td class="text-right">{{ d.orders }}</td>
+                        <td class="text-right">{{ fmt(d.revenue ?? 0) }}</td>
+                        <td class="text-right">{{ fmt(d.cogs ?? 0) }}</td>
+                        <td
+                          class="text-right font-medium"
+                          [class.text-success]="(d.margin ?? 0) > 0"
+                          [class.text-error]="(d.margin ?? 0) < 0"
+                        >
+                          {{ fmt(d.margin ?? 0) }}
+                        </td>
+                      </tr>
+                    }
+                    <tr class="font-semibold">
+                      <td>Total</td>
+                      <td class="text-right">{{ totals().orders }}</td>
+                      <td class="text-right">{{ fmt(totals().revenue) }}</td>
+                      <td class="text-right">{{ fmt(totals().cogs) }}</td>
                       <td
-                        class="text-right font-medium"
-                        [class.text-success]="(d.margin ?? 0) > 0"
-                        [class.text-error]="(d.margin ?? 0) < 0"
+                        class="text-right"
+                        [class.text-success]="totals().margin > 0"
+                        [class.text-error]="totals().margin < 0"
                       >
-                        {{ fmt(d.margin ?? 0) }}
+                        {{ fmt(totals().margin) }}
                       </td>
                     </tr>
-                  }
-                  <tr class="font-semibold">
-                    <td>Total</td>
-                    <td class="text-right">{{ totals().orders }}</td>
-                    <td class="text-right">{{ fmt(totals().revenue) }}</td>
-                    <td class="text-right">{{ fmt(totals().cogs) }}</td>
-                    <td
-                      class="text-right"
-                      [class.text-success]="totals().margin > 0"
-                      [class.text-error]="totals().margin < 0"
-                    >
-                      {{ fmt(totals().margin) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
               <div class="p-3">
                 <app-pagination
                   [currentPage]="page()"
@@ -155,34 +157,36 @@ type CustomerRow = {
             />
           } @else {
             <div class="card bg-base-100">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Variant</th>
-                    <th class="text-right">Qty</th>
-                    <th class="text-right">Revenue</th>
-                    <th class="text-right">COGS</th>
-                    <th class="text-right">Margin</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (p of products(); track p.variantId) {
+              <div class="table-scroll">
+                <table class="table table-sm">
+                  <thead>
                     <tr>
-                      <td class="text-sm font-medium">{{ p.label }}</td>
-                      <td class="text-right">{{ p.quantity }}</td>
-                      <td class="text-right">{{ fmt(p.revenue) }}</td>
-                      <td class="text-right">{{ fmt(p.cogs) }}</td>
-                      <td
-                        class="text-right font-medium"
-                        [class.text-success]="p.margin > 0"
-                        [class.text-error]="p.margin < 0"
-                      >
-                        {{ fmt(p.margin) }}
-                      </td>
+                      <th>Variant</th>
+                      <th class="text-right">Qty</th>
+                      <th class="text-right">Revenue</th>
+                      <th class="text-right">COGS</th>
+                      <th class="text-right">Margin</th>
                     </tr>
-                  }
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    @for (p of products(); track p.variantId) {
+                      <tr>
+                        <td class="text-sm font-medium">{{ p.label }}</td>
+                        <td class="text-right">{{ p.quantity }}</td>
+                        <td class="text-right">{{ fmt(p.revenue) }}</td>
+                        <td class="text-right">{{ fmt(p.cogs) }}</td>
+                        <td
+                          class="text-right font-medium"
+                          [class.text-success]="p.margin > 0"
+                          [class.text-error]="p.margin < 0"
+                        >
+                          {{ fmt(p.margin) }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             </div>
           }
         }
@@ -198,32 +202,34 @@ type CustomerRow = {
             />
           } @else {
             <div class="card bg-base-100">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Customer</th>
-                    <th class="text-right">Orders</th>
-                    <th class="text-right">Revenue</th>
-                    <th class="text-right">AR Δ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (c of customers(); track c.customerId) {
+              <div class="table-scroll">
+                <table class="table table-sm">
+                  <thead>
                     <tr>
-                      <td class="text-sm font-medium">{{ c.name }}</td>
-                      <td class="text-right">{{ c.orders }}</td>
-                      <td class="text-right">{{ fmt(c.revenue) }}</td>
-                      <td
-                        class="text-right font-medium"
-                        [class.text-error]="c.arDelta > 0"
-                        [class.text-success]="c.arDelta < 0"
-                      >
-                        {{ fmt(c.arDelta) }}
-                      </td>
+                      <th>Customer</th>
+                      <th class="text-right">Orders</th>
+                      <th class="text-right">Revenue</th>
+                      <th class="text-right">AR Δ</th>
                     </tr>
-                  }
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    @for (c of customers(); track c.customerId) {
+                      <tr>
+                        <td class="text-sm font-medium">{{ c.name }}</td>
+                        <td class="text-right">{{ c.orders }}</td>
+                        <td class="text-right">{{ fmt(c.revenue) }}</td>
+                        <td
+                          class="text-right font-medium"
+                          [class.text-error]="c.arDelta > 0"
+                          [class.text-success]="c.arDelta < 0"
+                        >
+                          {{ fmt(c.arDelta) }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             </div>
           }
         }

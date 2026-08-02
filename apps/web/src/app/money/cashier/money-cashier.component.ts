@@ -158,72 +158,74 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                   }
                   @if (reconFor(session.id).length > 0) {
                     <h3 class="type-heading mt-3">Variance review</h3>
-                    <table class="table table-sm mt-1">
-                      <thead>
-                        <tr>
-                          <th>Account</th>
-                          <th class="text-right">Declared</th>
-                          <th class="text-right">Expected</th>
-                          <th class="text-right">Variance</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (ra of reconFor(session.id); track ra.id) {
+                    <div class="table-scroll">
+                      <table class="table table-sm mt-1">
+                        <thead>
                           <tr>
-                            <td class="font-mono text-xs">{{ ra.account_code }}</td>
-                            <td class="text-right">{{ fmt(ra.declared) }}</td>
-                            <td class="text-right">{{ fmt(ra.expected) }}</td>
-                            <td
-                              class="text-right font-semibold"
-                              [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
-                            >
-                              {{ fmt(ra.variance) }}
-                            </td>
-                            <td class="text-right">
-                              @if (ra.reviewed_at) {
-                                <span class="type-caption">
-                                  Reviewed · User …{{ shortId(ra.reviewed_by) }} ·
-                                  {{ date(ra.reviewed_at) }}
-                                </span>
-                              } @else if (ra.variance !== 0) {
-                                @if (revertingFor() === ra.id) {
-                                  <div class="flex items-center justify-end gap-1">
-                                    <input
-                                      type="text"
-                                      class="input input-bordered input-xs w-36"
-                                      placeholder="Reason (optional)"
-                                      [formControl]="revertReason"
-                                    />
-                                    <button
-                                      class="btn btn-warning btn-xs"
-                                      [disabled]="busy()"
-                                      (click)="confirmRevert(ra.id)"
-                                    >
-                                      Confirm
-                                    </button>
-                                    <button
-                                      class="btn btn-ghost btn-xs"
-                                      (click)="revertingFor.set(null)"
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                } @else {
-                                  <button
-                                    class="btn btn-warning btn-outline btn-xs"
-                                    [disabled]="busy()"
-                                    (click)="startRevert(ra.id)"
-                                  >
-                                    Revert
-                                  </button>
-                                }
-                              }
-                            </td>
+                            <th>Account</th>
+                            <th class="text-right">Declared</th>
+                            <th class="text-right">Expected</th>
+                            <th class="text-right">Variance</th>
+                            <th></th>
                           </tr>
-                        }
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          @for (ra of reconFor(session.id); track ra.id) {
+                            <tr>
+                              <td class="font-mono text-xs">{{ ra.account_code }}</td>
+                              <td class="text-right">{{ fmt(ra.declared) }}</td>
+                              <td class="text-right">{{ fmt(ra.expected) }}</td>
+                              <td
+                                class="text-right font-semibold"
+                                [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
+                              >
+                                {{ fmt(ra.variance) }}
+                              </td>
+                              <td class="text-right">
+                                @if (ra.reviewed_at) {
+                                  <span class="type-caption">
+                                    Reviewed · User …{{ shortId(ra.reviewed_by) }} ·
+                                    {{ date(ra.reviewed_at) }}
+                                  </span>
+                                } @else if (ra.variance !== 0) {
+                                  @if (revertingFor() === ra.id) {
+                                    <div class="flex items-center justify-end gap-1">
+                                      <input
+                                        type="text"
+                                        class="input input-bordered input-xs w-36"
+                                        placeholder="Reason (optional)"
+                                        [formControl]="revertReason"
+                                      />
+                                      <button
+                                        class="btn btn-warning btn-xs"
+                                        [disabled]="busy()"
+                                        (click)="confirmRevert(ra.id)"
+                                      >
+                                        Confirm
+                                      </button>
+                                      <button
+                                        class="btn btn-ghost btn-xs"
+                                        (click)="revertingFor.set(null)"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  } @else {
+                                    <button
+                                      class="btn btn-warning btn-outline btn-xs"
+                                      [disabled]="busy()"
+                                      (click)="startRevert(ra.id)"
+                                    >
+                                      Revert
+                                    </button>
+                                  }
+                                }
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
                   }
                 </div>
               </div>

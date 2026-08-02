@@ -16,7 +16,10 @@ interface MoneyTab {
   imports: [RouterOutlet, RouterLink, RouterLinkActive, PageHeaderComponent],
   template: `
     <app-page-header title="Money" backLink="/dashboard" backLabel="Dashboard" />
-    <div role="tablist" class="tabs tabs-boxed mb-4 w-full flex-nowrap overflow-x-auto">
+    <div
+      role="tablist"
+      class="tabs tabs-boxed scroll-fade-r mb-4 w-full flex-nowrap overflow-x-auto"
+    >
       @for (tab of tabs; track tab.route) {
         <a
           role="tab"

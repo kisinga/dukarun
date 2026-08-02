@@ -20,7 +20,7 @@ interface Tender {
   selector: 'app-checkout-panel',
   imports: [FormsModule, NgIcon],
   template: `
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 md:p-4">
+    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 md:p-4">
       <div
         class="card h-full max-h-dvh w-full max-w-full overflow-y-auto rounded-none bg-base-100 shadow-overlay md:h-auto md:max-h-[90vh] md:w-full md:max-w-md md:rounded-box"
       >

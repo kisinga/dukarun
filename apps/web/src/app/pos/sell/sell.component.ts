@@ -418,7 +418,7 @@ import {
 
       <!-- One primary action, bottom-anchored on mobile; total is the hero -->
       <div
-        class="fixed inset-x-0 bottom-14 z-30 border-t border-base-300/60 bg-base-100 p-3 lg:hidden"
+        class="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-30 border-t border-base-300/60 bg-base-100 p-3 lg:hidden"
       >
         <div class="mx-auto flex max-w-6xl items-center gap-3">
           <div class="flex-1">
