@@ -43,6 +43,11 @@ export type OrderLineWithProduct = OrderLine & {
   label: string;
 };
 
+/** void_sale result: voided immediately, or parked for approval (supervisor path). */
+export type VoidResult =
+  | { status: 'voided'; entry_id?: string }
+  | { status: 'approval_required'; approval_id?: string };
+
 /**
  * RPC failure with the PostgREST/PostgreSQL error code preserved.
  * 'P0001' = business rejection from a raise exception (insufficient_stock,
@@ -387,12 +392,12 @@ export class PosService {
     return data;
   }
 
-  async voidSale(orderId: string, reason: string): Promise<string> {
+  async voidSale(orderId: string, reason: string): Promise<VoidResult> {
     const { data, error } = await this.client.rpc('void_sale', {
       p_order_id: orderId,
       p_reason: reason,
     });
     if (error) throw rpcError(error);
-    return data;
+    return data as VoidResult;
   }
 }

@@ -21,6 +21,12 @@ import { ReceiptDataService } from '../../shared/print/receipt-data.service';
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
         }
+        @if (approvalPending()) {
+          <p class="mb-2 text-sm text-warning">
+            This sale is waiting for a below-wholesale approval in the
+            <a routerLink="/approvals" class="link font-medium">Approvals inbox</a>.
+          </p>
+        }
         @if (notice()) {
           <p class="mb-2 text-sm text-success">{{ notice() }}</p>
         }
@@ -79,6 +85,7 @@ export class ProformasComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly approvalPending = signal(false);
   protected readonly printerEnabled = signal(false);
 
   async ngOnInit(): Promise<void> {
@@ -129,7 +136,10 @@ export class ProformasComponent implements OnInit {
       this.notice.set('Proforma converted to a sale');
       await this.load();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Conversion failed');
+      const message = err instanceof Error ? err.message : 'Conversion failed';
+      this.error.set(message);
+      // Below-wholesale drafts wait on an approval before they can complete.
+      this.approvalPending.set(message.includes('below_wholesale_approval_required'));
       this.converting.set(null);
     } finally {
       this.busy.set(false);

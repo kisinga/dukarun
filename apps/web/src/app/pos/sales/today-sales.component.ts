@@ -22,6 +22,9 @@ import { ReceiptDataService } from '../../shared/print/receipt-data.service';
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
         }
+        @if (warning()) {
+          <p class="mb-2 text-sm text-warning">{{ warning() }}</p>
+        }
 
         @if (orders().length === 0) {
           <app-empty-state icon="heroBanknotes" title="No sales yet today." />
@@ -149,6 +152,7 @@ export class TodaySalesComponent implements OnInit, OnDestroy {
   protected readonly voidReason = new FormControl('', { nonNullable: true });
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly warning = signal<string | null>(null);
   protected readonly printerEnabled = signal(false);
 
   private channel: RealtimeChannel | null = null;
@@ -223,10 +227,16 @@ export class TodaySalesComponent implements OnInit, OnDestroy {
   protected async confirmVoid(orderId: string): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
+    this.warning.set(null);
     try {
-      await this.pos.voidSale(orderId, this.voidReason.value.trim());
+      const result = await this.pos.voidSale(orderId, this.voidReason.value.trim());
       this.voidingFor.set(null);
-      this.expandedFor.set(null);
+      if (result.status === 'approval_required') {
+        // Not voided — the request waits in the Approvals inbox. Not an error.
+        this.warning.set('Void request sent for approval');
+      } else {
+        this.expandedFor.set(null);
+      }
       await this.load();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Void failed');

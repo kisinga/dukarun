@@ -4,6 +4,7 @@ import { NgIcon } from '@ng-icons/core';
 import { formatKes } from '../../core/money';
 import { Company, SupabaseService } from '../../core/supabase.service';
 import { ThemeService } from '../../core/theme.service';
+import { ApprovalsService } from '../../approvals/approvals.service';
 import { SyncService } from '../../pos/offline/sync.service';
 import { PosService, variantLabel, type Variant } from '../../pos/pos.service';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
@@ -229,6 +230,12 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
           <a routerLink="/products" class="btn btn-outline min-h-11">Products</a>
           <a routerLink="/customers" class="btn btn-outline min-h-11">Customers</a>
           <a routerLink="/reports" class="btn btn-outline min-h-11">Reports</a>
+          <a routerLink="/approvals" class="btn btn-outline min-h-11">
+            Approvals
+            @if (approvals.pending().length > 0) {
+              <span class="badge badge-warning">{{ approvals.pending().length }}</span>
+            }
+          </a>
           <a routerLink="/team" class="btn btn-outline min-h-11">Team</a>
         </nav>
 
@@ -257,6 +264,7 @@ export class DashboardComponent implements OnInit {
   private readonly pos = inject(PosService);
   protected readonly sync = inject(SyncService);
   protected readonly theme = inject(ThemeService);
+  protected readonly approvals = inject(ApprovalsService);
 
   protected readonly fmt = formatKes;
   protected readonly String = String;

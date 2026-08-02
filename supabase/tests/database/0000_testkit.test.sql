@@ -9,9 +9,18 @@ create schema if not exists testkit;
 -- create_user: id + email (+optional phone, confirmed)
 create or replace function testkit.create_user(p_id uuid, p_email text, p_phone text default null)
 returns void language sql set search_path = '' as $$
-  insert into auth.users (id, instance_id, aud, role, email, phone, phone_confirmed_at, encrypted_password, created_at, updated_at)
-  values (p_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', p_email, p_phone,
-          case when p_phone is not null then now() end, '', now(), now())
+  insert into auth.users (
+    id, instance_id, aud, role, email, phone, phone_confirmed_at, encrypted_password,
+    confirmation_token, recovery_token, email_change, email_change_token_current,
+    email_change_token_new, phone_change, phone_change_token, reauthentication_token,
+    created_at, updated_at
+  )
+  values (
+    p_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', p_email, p_phone,
+    case when p_phone is not null then now() end, '',
+    '', '', '', '', '', '', '', '',
+    now(), now()
+  )
   on conflict (id) do nothing;
 $$;
 

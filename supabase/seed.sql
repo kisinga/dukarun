@@ -16,15 +16,18 @@ on conflict (code) do nothing;
 -- Demo auth user (matches [auth.sms.test_otp] in config.toml)
 -- ---------------------------------------------------------------------------
 insert into auth.users (
-  id, instance_id, aud, role, email, phone, phone_confirmed_at,
-  encrypted_password, created_at, updated_at
+  id, instance_id, aud, role, email, phone, phone_confirmed_at, encrypted_password,
+  confirmation_token, recovery_token, email_change, email_change_token_current,
+  email_change_token_new, phone_change, phone_change_token, reauthentication_token,
+  created_at, updated_at
 )
 values (
   '5877ac73-ff8d-457c-afcd-791e66229d17',
   '00000000-0000-0000-0000-000000000000',
   'authenticated', 'authenticated',
-  'demo@dukarun.local', '254700000001', now(),
-  '', now(), now()
+  'demo@dukarun.local', '254700000001', now(), '',
+  '', '', '', '', '', '', '', '',
+  now(), now()
 )
 on conflict (id) do nothing;
 
