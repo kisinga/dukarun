@@ -464,6 +464,59 @@ export type Database = {
           },
         ]
       }
+      credit_notification_checkpoints: {
+        Row: {
+          bucket: string
+          company_id: string
+          customer_id: string
+          id: string
+          notified_at: string
+        }
+        Insert: {
+          bucket: string
+          company_id: string
+          customer_id: string
+          id?: string
+          notified_at?: string
+        }
+        Update: {
+          bucket?: string
+          company_id?: string
+          customer_id?: string
+          id?: string
+          notified_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_notification_checkpoints_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notification_checkpoints_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_ar_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "credit_notification_checkpoints_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notification_checkpoints_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_ap_balances"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           company_id: string
@@ -960,6 +1013,50 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          body: string | null
+          company_id: string
+          created_at: string
+          id: string
+          link: string | null
+          read_at: string | null
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          body?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          link?: string | null
+          read_at?: string | null
+          title: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          body?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          link?: string | null
+          read_at?: string | null
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_lines: {
         Row: {
           company_id: string
@@ -1125,6 +1222,59 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "supplier_ap_balances"
             referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
+      outbox: {
+        Row: {
+          attempts: number
+          body: string
+          channel: string
+          company_id: string
+          created_at: string
+          error: string | null
+          id: string
+          recipient: string
+          scheduled_after: string
+          sent_at: string | null
+          status: string
+          subject: string | null
+        }
+        Insert: {
+          attempts?: number
+          body: string
+          channel: string
+          company_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          recipient: string
+          scheduled_after?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+        }
+        Update: {
+          attempts?: number
+          body?: string
+          channel?: string
+          company_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          recipient?: string
+          scheduled_after?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outbox_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2302,6 +2452,7 @@ export type Database = {
         }
         Returns: string
       }
+      credit_reminder_scan: { Args: never; Returns: number }
       current_company_id: { Args: never; Returns: string }
       current_role_name: { Args: never; Returns: string }
       current_user_has_permission: {
@@ -2317,7 +2468,23 @@ export type Database = {
         Args: { p_order_id: string; p_reason: string }
         Returns: string
       }
+      flush_outbox_trigger: { Args: never; Returns: undefined }
+      increment_sms_usage: {
+        Args: { p_company_id: string }
+        Returns: undefined
+      }
       is_platform_admin: { Args: never; Returns: boolean }
+      notify: {
+        Args: {
+          p_body?: string
+          p_company_id: string
+          p_link?: string
+          p_title: string
+          p_type: string
+          p_user_id?: string
+        }
+        Returns: string
+      }
       open_cashier_session: { Args: { p_declarations: Json }; Returns: string }
       pay_supplier: {
         Args: {
@@ -2430,6 +2597,20 @@ export type Database = {
           p_company_name: string
           p_currency?: string
           p_store_name?: string
+        }
+        Returns: string
+      }
+      queue_batch_message: {
+        Args: { p_audience?: string; p_body: string; p_channel: string }
+        Returns: number
+      }
+      queue_message: {
+        Args: {
+          p_body: string
+          p_channel: string
+          p_company_id: string
+          p_recipient: string
+          p_subject?: string
         }
         Returns: string
       }
