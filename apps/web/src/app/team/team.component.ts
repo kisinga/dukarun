@@ -1,12 +1,21 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, viewChild } from '@angular/core';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { normalizeKenyanPhone } from '../core/phone';
 import { ALL_PERMISSIONS, MembershipWithRole, Role, TeamService } from './team.service';
+import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
+import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
+import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 
 @Component({
   selector: 'app-team',
-  imports: [ReactiveFormsModule, PageHeaderComponent],
+  imports: [
+    ReactiveFormsModule,
+    PageHeaderComponent,
+    StatusBadgeComponent,
+    DeleteConfirmationModalComponent,
+    EntityAvatarComponent,
+  ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
@@ -76,19 +85,20 @@ import { ALL_PERMISSIONS, MembershipWithRole, Role, TeamService } from './team.s
             <tbody>
               @for (m of members(); track m.id) {
                 <tr>
-                  <td class="font-mono text-xs" [title]="m.user_id">
-                    User …{{ shortId(m.user_id) }}
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <app-entity-avatar size="sm" [firstName]="m.roles?.name ?? '?'" />
+                      <span class="font-mono text-xs" [title]="m.user_id">
+                        User …{{ shortId(m.user_id) }}
+                      </span>
+                    </div>
                   </td>
                   <td>{{ m.roles?.name ?? '—' }}</td>
                   <td>
-                    <span
-                      class="badge"
-                      [class.badge-success]="m.authorization_status === 'approved'"
-                      [class.badge-warning]="m.authorization_status === 'pending'"
-                      [class.badge-outline]="m.authorization_status === 'disabled'"
-                    >
-                      {{ m.authorization_status }}
-                    </span>
+                    <app-status-badge
+                      [type]="memberStatusType(m.authorization_status)"
+                      [label]="m.authorization_status"
+                    />
                   </td>
                   <td class="text-xs">{{ date(m.created_at) }}</td>
                   <td class="whitespace-nowrap text-right">
@@ -109,22 +119,13 @@ import { ALL_PERMISSIONS, MembershipWithRole, Role, TeamService } from './team.s
                         Disable
                       </button>
                     }
-                    @if (removing() === m.id) {
-                      <button class="btn btn-error btn-xs" [disabled]="busy()" (click)="remove(m)">
-                        Confirm
-                      </button>
-                      <button class="btn btn-ghost btn-xs" (click)="removing.set(null)">
-                        Keep
-                      </button>
-                    } @else {
-                      <button
-                        class="btn btn-error btn-outline btn-xs"
-                        [disabled]="busy()"
-                        (click)="removing.set(m.id)"
-                      >
-                        Remove
-                      </button>
-                    }
+                    <button
+                      class="btn btn-error btn-outline btn-xs"
+                      [disabled]="busy()"
+                      (click)="startRemove(m)"
+                    >
+                      Remove
+                    </button>
                   </td>
                 </tr>
               }
@@ -206,6 +207,15 @@ import { ALL_PERMISSIONS, MembershipWithRole, Role, TeamService } from './team.s
           }
         </div>
       </div>
+
+      <app-delete-confirmation-modal
+        [data]="removeData()"
+        title="Remove team member?"
+        entityType="member"
+        verb="remove"
+        confirmButtonText="Remove"
+        (confirm)="confirmRemove()"
+      />
     </main>
   `,
 })
@@ -215,7 +225,8 @@ export class TeamComponent implements OnInit {
   protected readonly allPermissions = ALL_PERMISSIONS;
   protected readonly members = signal<MembershipWithRole[]>([]);
   protected readonly roles = signal<Role[]>([]);
-  protected readonly removing = signal<string | null>(null);
+  protected readonly removingMember = signal<MembershipWithRole | null>(null);
+  private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
 
   protected readonly memberPhone = new FormControl('', { nonNullable: true });
   protected readonly memberRole = new FormControl('', { nonNullable: true });
@@ -282,17 +293,33 @@ export class TeamComponent implements OnInit {
     }
   }
 
-  protected async remove(m: MembershipWithRole): Promise<void> {
+  protected startRemove(m: MembershipWithRole): void {
+    this.removingMember.set(m);
+    this.deleteModal()?.show();
+  }
+
+  protected removeData() {
+    const m = this.removingMember();
+    return {
+      entityName: m ? `User …${this.shortId(m.user_id)} (${m.roles?.name ?? 'no role'})` : '',
+    };
+  }
+
+  protected async confirmRemove(): Promise<void> {
+    const m = this.removingMember();
+    if (!m) return;
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
-    this.removing.set(null);
     try {
       await this.team.removeTeamMember(m.id);
       this.notice.set('Member removed');
+      this.removingMember.set(null);
+      this.deleteModal()?.hide();
       await this.load();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Remove failed');
+      this.deleteModal()?.hide();
     } finally {
       this.busy.set(false);
     }
@@ -346,6 +373,10 @@ export class TeamComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected memberStatusType(status: string): 'success' | 'warning' | 'neutral' {
+    return status === 'approved' ? 'success' : status === 'pending' ? 'warning' : 'neutral';
   }
 
   protected shortId(userId: string): string {

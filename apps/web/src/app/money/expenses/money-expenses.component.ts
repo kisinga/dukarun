@@ -11,7 +11,7 @@ import { JournalEntryWithLines, LedgerAccount, MoneyService } from '../money.ser
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <app-page-header title="Expenses" backLink="/dashboard" backLabel="Dashboard">
+        <app-page-header title="Expenses">
           <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
         </app-page-header>
 

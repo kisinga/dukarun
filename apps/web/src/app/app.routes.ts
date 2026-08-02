@@ -26,11 +26,7 @@ export const routes: Routes = [
         path: 'pos/sell',
         loadComponent: () => import('./pos/sell/sell.component').then(m => m.SellComponent),
       },
-      {
-        path: 'pos/sales',
-        loadComponent: () =>
-          import('./pos/sales/today-sales.component').then(m => m.TodaySalesComponent),
-      },
+      { path: 'pos/sales', redirectTo: 'orders' },
       {
         path: 'pos/proformas',
         loadComponent: () =>
@@ -47,43 +43,53 @@ export const routes: Routes = [
           import('./pos/sync/pending-sync.component').then(m => m.PendingSyncComponent),
       },
       {
-        path: 'money/cashier',
+        path: 'money',
         loadComponent: () =>
-          import('./money/cashier/money-cashier.component').then(m => m.MoneyCashierComponent),
-      },
-      {
-        path: 'money/expenses',
-        loadComponent: () =>
-          import('./money/expenses/money-expenses.component').then(m => m.MoneyExpensesComponent),
-      },
-      {
-        path: 'money/transfers',
-        loadComponent: () =>
-          import('./money/transfers/money-transfers.component').then(
-            m => m.MoneyTransfersComponent
-          ),
-      },
-      {
-        path: 'money/credit',
-        loadComponent: () =>
-          import('./money/credit/money-credit.component').then(m => m.MoneyCreditComponent),
-      },
-      {
-        path: 'money/suppliers',
-        loadComponent: () =>
-          import('./money/suppliers/money-suppliers.component').then(
-            m => m.MoneySuppliersComponent
-          ),
-      },
-      {
-        path: 'money/periods',
-        loadComponent: () =>
-          import('./money/periods/money-periods.component').then(m => m.MoneyPeriodsComponent),
-      },
-      {
-        path: 'money/stock',
-        loadComponent: () =>
-          import('./money/stock/money-stock.component').then(m => m.MoneyStockComponent),
+          import('./money/money-layout.component').then(m => m.MoneyLayoutComponent),
+        children: [
+          {
+            path: 'cashier',
+            loadComponent: () =>
+              import('./money/cashier/money-cashier.component').then(m => m.MoneyCashierComponent),
+          },
+          {
+            path: 'expenses',
+            loadComponent: () =>
+              import('./money/expenses/money-expenses.component').then(
+                m => m.MoneyExpensesComponent
+              ),
+          },
+          {
+            path: 'transfers',
+            loadComponent: () =>
+              import('./money/transfers/money-transfers.component').then(
+                m => m.MoneyTransfersComponent
+              ),
+          },
+          {
+            path: 'credit',
+            loadComponent: () =>
+              import('./money/credit/money-credit.component').then(m => m.MoneyCreditComponent),
+          },
+          {
+            path: 'suppliers',
+            loadComponent: () =>
+              import('./money/suppliers/money-suppliers.component').then(
+                m => m.MoneySuppliersComponent
+              ),
+          },
+          {
+            path: 'periods',
+            loadComponent: () =>
+              import('./money/periods/money-periods.component').then(m => m.MoneyPeriodsComponent),
+          },
+          {
+            path: 'stock',
+            loadComponent: () =>
+              import('./money/stock/money-stock.component').then(m => m.MoneyStockComponent),
+          },
+          { path: '', pathMatch: 'full', redirectTo: 'cashier' },
+        ],
       },
       {
         path: 'products',

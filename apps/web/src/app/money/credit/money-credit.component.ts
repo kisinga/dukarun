@@ -4,6 +4,7 @@ import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../../core/money';
 import { AgingInfo, MoneyCustomer, MoneyService } from '../money.service';
+import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 
 type CustomerWithAr = MoneyCustomer & { ar_balance: number } & AgingInfo;
 type CreditOrder = {
@@ -16,11 +17,11 @@ type CreditOrder = {
 
 @Component({
   selector: 'app-money-credit',
-  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
+  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, StatusBadgeComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <app-page-header title="Customer Credit" backLink="/dashboard" backLabel="Dashboard">
+        <app-page-header title="Customer Credit">
           <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
         </app-page-header>
 
@@ -97,11 +98,10 @@ type CreditOrder = {
                       {{ name(c) }}
                     </button>
                     <span class="text-xs text-base-content/60">{{ c.phone }}</span>
-                    @if (c.is_credit_approved) {
-                      <span class="badge badge-success">approved</span>
-                    } @else {
-                      <span class="badge badge-outline">not approved</span>
-                    }
+                    <app-status-badge
+                      [type]="c.is_credit_approved ? 'success' : 'neutral'"
+                      [label]="c.is_credit_approved ? 'approved' : 'not approved'"
+                    />
                     <span class="text-xs text-base-content/60">
                       limit {{ fmt(c.credit_limit) }}
                     </span>

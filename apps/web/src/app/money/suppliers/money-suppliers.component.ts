@@ -8,6 +8,7 @@ import { PrintService } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { PosService, Variant, variantLabel } from '../../pos/pos.service';
 import { AgingInfo, LedgerAccount, MoneyCustomer, MoneyService } from '../money.service';
+import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 
 type SupplierWithAp = MoneyCustomer & { ap_balance: number } & AgingInfo;
 type PurchaseRow = {
@@ -29,11 +30,18 @@ interface PurchaseLineForm {
 
 @Component({
   selector: 'app-money-suppliers',
-  imports: [FormsModule, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, NgIcon],
+  imports: [
+    FormsModule,
+    ReactiveFormsModule,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    NgIcon,
+    StatusBadgeComponent,
+  ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <app-page-header title="Suppliers" backLink="/dashboard" backLabel="Dashboard">
+        <app-page-header title="Suppliers">
           <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
         </app-page-header>
 
@@ -296,14 +304,17 @@ interface PurchaseLineForm {
                     <span class="text-xs text-base-content/60">ref {{ p.reference }}</span>
                   }
                   @if (p.is_credit) {
-                    <span class="badge badge-warning">credit</span>
+                    <app-status-badge type="warning" label="credit" />
                   }
                   <span class="ml-auto font-bold tabular-nums">{{ fmt(p.total_cost) }}</span>
-                  @if (p.paid >= p.total_cost) {
-                    <span class="badge badge-success">paid</span>
-                  } @else {
-                    <span class="badge badge-error">unpaid ({{ fmt(p.total_cost - p.paid) }})</span>
-                  }
+                  <app-status-badge
+                    [type]="p.paid >= p.total_cost ? 'success' : 'error'"
+                    [label]="
+                      p.paid >= p.total_cost
+                        ? 'paid'
+                        : 'unpaid (' + fmt(p.total_cost - p.paid) + ')'
+                    "
+                  />
                   @if (printerEnabled()) {
                     <button class="btn btn-ghost btn-xs" (click)="printPurchase(p.id)">
                       Print PO

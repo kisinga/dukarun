@@ -1,11 +1,9 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { NgIcon } from '@ng-icons/core';
-import { debounceTime, distinctUntilChanged } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { formatKes, parseKesToCents } from '../core/money';
 import { SupabaseService } from '../core/supabase.service';
 import {
@@ -17,10 +15,18 @@ import {
   variantLabel,
 } from '../pos/pos.service';
 import { imageExtension, resizeImage } from '../shared/ui/image.util';
+import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
+import { MobileFabComponent } from '../shared/ui/mobile-fab.component';
+import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
+import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 
 type StockInfo = { stock: number; stock_value: number };
 
 /** One row of the create form's inline variants editor. */
+type DeactivateTarget =
+  | { kind: 'family'; family: Product; variants: number }
+  | { kind: 'variant'; variant: Variant };
+
 interface CreateRow {
   name: string;
   price: string; // KES text
@@ -41,6 +47,10 @@ interface CreateRow {
     PageHeaderComponent,
     EmptyStateComponent,
     NgIcon,
+    DeleteConfirmationModalComponent,
+    MobileFabComponent,
+    StatusBadgeComponent,
+    ListSearchBarComponent,
   ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
@@ -141,13 +151,11 @@ interface CreateRow {
                         <td class="font-mono text-xs">{{ c.slug }}</td>
                         <td class="text-right">{{ c.product_count }}</td>
                         <td>
-                          <span
-                            class="badge badge-xs"
-                            [class.badge-success]="c.active"
-                            [class.badge-outline]="!c.active"
-                          >
-                            {{ c.active ? 'active' : 'inactive' }}
-                          </span>
+                          <app-status-badge
+                            size="xs"
+                            [type]="c.active ? 'success' : 'neutral'"
+                            [label]="c.active ? 'active' : 'inactive'"
+                          />
                         </td>
                         <td class="whitespace-nowrap text-right">
                           <button class="btn btn-ghost btn-xs" (click)="startCollectionEdit(c)">
@@ -573,12 +581,12 @@ interface CreateRow {
         }
 
         <!-- Search -->
-        <input
-          type="text"
-          class="input input-bordered input-sm mb-3 w-full max-w-sm"
-          placeholder="Search product, variant, SKU, or barcode…"
-          [formControl]="search"
-        />
+        <div class="mb-3">
+          <app-list-search-bar
+            placeholder="Search product, variant, SKU, or barcode…"
+            [(searchQuery)]="query"
+          />
+        </div>
 
         <!-- Grouped list -->
         @if (grouped().length === 0) {
@@ -608,13 +616,10 @@ interface CreateRow {
                         group.family.barcode
                       }}</span>
                     }
-                    <span
-                      class="badge"
-                      [class.badge-success]="group.family.active"
-                      [class.badge-outline]="!group.family.active"
-                    >
-                      {{ group.family.active ? 'active' : 'inactive' }}
-                    </span>
+                    <app-status-badge
+                      [type]="group.family.active ? 'success' : 'neutral'"
+                      [label]="group.family.active ? 'active' : 'inactive'"
+                    />
                     <span class="text-xs text-base-content/60">
                       {{ group.variants.length }} variant(s)
                     </span>
@@ -632,7 +637,13 @@ interface CreateRow {
                       <button
                         class="btn btn-error btn-outline btn-xs"
                         [disabled]="busy()"
-                        (click)="setFamilyActive(group.family, false)"
+                        (click)="
+                          confirmDeactivate({
+                            kind: 'family',
+                            family: group.family,
+                            variants: group.variants.length,
+                          })
+                        "
                       >
                         Deactivate
                       </button>
@@ -704,13 +715,11 @@ interface CreateRow {
                                 </span>
                               </td>
                               <td>
-                                <span
-                                  class="badge badge-xs"
-                                  [class.badge-success]="v.variant_active"
-                                  [class.badge-outline]="!v.variant_active"
-                                >
-                                  {{ v.variant_active ? 'active' : 'inactive' }}
-                                </span>
+                                <app-status-badge
+                                  size="xs"
+                                  [type]="v.variant_active ? 'success' : 'neutral'"
+                                  [label]="v.variant_active ? 'active' : 'inactive'"
+                                />
                               </td>
                               <td class="whitespace-nowrap text-right">
                                 <button
@@ -723,7 +732,7 @@ interface CreateRow {
                                   <button
                                     class="btn btn-error btn-outline btn-xs"
                                     [disabled]="busy()"
-                                    (click)="setVariantActive(v, false)"
+                                    (click)="confirmDeactivate({ kind: 'variant', variant: v })"
                                   >
                                     Deactivate
                                   </button>
@@ -791,6 +800,15 @@ interface CreateRow {
           </div>
         }
       </div>
+
+      <app-mobile-fab ariaLabel="New product" (fabClick)="startFamilyCreate()" />
+      <app-delete-confirmation-modal
+        [data]="deactivateData()"
+        title="Deactivate?"
+        verb="deactivate"
+        confirmButtonText="Deactivate"
+        (confirm)="executeDeactivate()"
+      />
     </main>
   `,
 })
@@ -807,7 +825,7 @@ export class ProductsComponent implements OnInit {
   protected readonly batchesFor = signal<string | null>(null);
   protected readonly batches = signal<InventoryBatch[]>([]);
 
-  protected readonly search = new FormControl('', { nonNullable: true });
+  protected readonly query = signal('');
 
   protected readonly familyFormOpen = signal(false);
   protected readonly editingFamily = signal<Product | null>(null);
@@ -849,9 +867,13 @@ export class ProductsComponent implements OnInit {
   protected readonly collectionDescription = new FormControl('', { nonNullable: true });
   protected readonly familyCollections = signal<Set<string>>(new Set());
 
+  /** Deactivate confirmation (family or variant). */
+  protected readonly deactivateTarget = signal<DeactivateTarget | null>(null);
+  private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
+
   /** Families with their variants; families with no variants only show when not searching. */
   protected readonly grouped = computed(() => {
-    const q = this.search.value.trim().toLowerCase();
+    const q = this.query().trim().toLowerCase();
     const byProduct = new Map<string, Variant[]>();
     for (const v of this.catalog()) {
       if (!v.product_id) continue;
@@ -874,10 +896,15 @@ export class ProductsComponent implements OnInit {
     return sum;
   });
 
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor() {
-    this.search.valueChanges
-      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed())
-      .subscribe(() => void this.load());
+    // Debounced search (list-search-bar model → reload).
+    effect(() => {
+      this.query();
+      if (this.searchTimer) clearTimeout(this.searchTimer);
+      this.searchTimer = setTimeout(() => void this.load(), 200);
+    });
   }
 
   async ngOnInit(): Promise<void> {
@@ -888,7 +915,7 @@ export class ProductsComponent implements OnInit {
     try {
       const [families, catalog, stock, collections] = await Promise.all([
         this.pos.listFamilies(),
-        this.pos.listCatalog(this.search.value),
+        this.pos.listCatalog(this.query()),
         this.pos.productStock(),
         this.pos.listCollections(),
       ]);
@@ -1189,6 +1216,40 @@ export class ProductsComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected confirmDeactivate(target: DeactivateTarget): void {
+    this.deactivateTarget.set(target);
+    this.deleteModal()?.show();
+  }
+
+  protected deactivateData() {
+    const t = this.deactivateTarget();
+    if (!t) return { entityName: '' };
+    if (t.kind === 'family') {
+      return {
+        entityName: t.family.name,
+        relatedCount: t.variants,
+        relatedLabel: 'variant',
+        warningDetails: ['Deactivated products disappear from the Sell screen search.'],
+      };
+    }
+    return {
+      entityName: this.label(t.variant),
+      warningDetails: ['Deactivated variants disappear from the Sell screen search.'],
+    };
+  }
+
+  protected async executeDeactivate(): Promise<void> {
+    const t = this.deactivateTarget();
+    if (!t) return;
+    this.deleteModal()?.hide();
+    if (t.kind === 'family') {
+      await this.setFamilyActive(t.family, false);
+    } else {
+      await this.setVariantActive(t.variant, false);
+    }
+    this.deactivateTarget.set(null);
   }
 
   protected async setFamilyActive(family: Product, active: boolean): Promise<void> {

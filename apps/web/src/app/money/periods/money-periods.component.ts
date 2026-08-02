@@ -3,6 +3,7 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../../core/money';
+import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 import {
   AccountingPeriod,
   CashierAccount,
@@ -14,15 +15,17 @@ import {
 
 @Component({
   selector: 'app-money-periods',
-  imports: [FormsModule, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
+  imports: [
+    FormsModule,
+    ReactiveFormsModule,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    StatusBadgeComponent,
+  ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <app-page-header
-          title="Reconciliation &amp; Periods"
-          backLink="/dashboard"
-          backLabel="Dashboard"
-        >
+        <app-page-header title="Reconciliation &amp; Periods">
           <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
         </app-page-header>
 
@@ -225,13 +228,10 @@ import {
                     <td>{{ p.start_date }}</td>
                     <td>{{ p.end_date }}</td>
                     <td>
-                      <span
-                        class="badge"
-                        [class.badge-success]="p.status === 'open'"
-                        [class.badge-outline]="p.status !== 'open'"
-                      >
-                        {{ p.status }}
-                      </span>
+                      <app-status-badge
+                        [type]="p.status === 'open' ? 'success' : 'neutral'"
+                        [label]="p.status"
+                      />
                     </td>
                   </tr>
                 }

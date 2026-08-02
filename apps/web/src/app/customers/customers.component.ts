@@ -2,9 +2,10 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
+import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
+import { MobileFabComponent } from '../shared/ui/mobile-fab.component';
+import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { debounceTime, distinctUntilChanged } from 'rxjs';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { formatKes } from '../core/money';
 import { MoneyCustomer, MoneyService } from '../money/money.service';
 import { OrderWithCustomer, PosService } from '../pos/pos.service';
@@ -13,7 +14,15 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
 
 @Component({
   selector: 'app-customers',
-  imports: [RouterLink, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
+  imports: [
+    RouterLink,
+    ReactiveFormsModule,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    EntityAvatarComponent,
+    MobileFabComponent,
+    ListSearchBarComponent,
+  ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
@@ -87,12 +96,9 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
         }
 
         <!-- Search -->
-        <input
-          type="text"
-          class="input input-bordered input-sm mb-3 w-full max-w-sm"
-          placeholder="Search name or phone…"
-          [formControl]="search"
-        />
+        <div class="mb-3">
+          <app-list-search-bar placeholder="Search name or phone…" [(searchQuery)]="query" />
+        </div>
 
         <!-- List -->
         @if (filtered().length === 0) {
@@ -103,6 +109,11 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
               <div class="card bg-base-100">
                 <div class="card-body p-4">
                   <div class="flex flex-wrap items-center gap-3">
+                    <app-entity-avatar
+                      size="sm"
+                      [firstName]="c.first_name"
+                      [lastName]="c.last_name ?? ''"
+                    />
                     <button class="link font-semibold" (click)="toggle(c.id)">{{ name(c) }}</button>
                     <span class="text-xs text-base-content/60">{{ c.phone ?? '' }}</span>
                     <span class="ml-auto font-bold" [class.text-error]="c.ar_balance > 0">
@@ -152,6 +163,8 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
           </div>
         }
       </div>
+
+      <app-mobile-fab ariaLabel="New customer" (fabClick)="startCreate()" />
     </main>
   `,
 })
@@ -164,8 +177,7 @@ export class CustomersComponent implements OnInit {
   protected readonly expandedFor = signal<string | null>(null);
   protected readonly orders = signal<OrderWithCustomer[]>([]);
 
-  protected readonly search = new FormControl('', { nonNullable: true });
-  private readonly query = signal('');
+  protected readonly query = signal('');
   protected readonly formOpen = signal(false);
   protected readonly editing = signal<CustomerWithAr | null>(null);
 
@@ -186,12 +198,6 @@ export class CustomersComponent implements OnInit {
       c => this.name(c).toLowerCase().includes(q) || (c.phone ?? '').toLowerCase().includes(q)
     );
   });
-
-  constructor() {
-    this.search.valueChanges
-      .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed())
-      .subscribe(v => this.query.set(v.trim()));
-  }
 
   async ngOnInit(): Promise<void> {
     await this.load();

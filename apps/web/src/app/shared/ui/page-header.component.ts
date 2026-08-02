@@ -22,7 +22,12 @@ import { NgIcon } from '@ng-icons/core';
             {{ backLabel() }}
           </a>
         }
-        <h1 class="type-title truncate">{{ title() }}</h1>
+        <h1 class="type-title truncate">
+          {{ title() }}
+          @if (badge(); as b) {
+            <span class="badge badge-warning ml-1 align-middle">{{ b }}</span>
+          }
+        </h1>
         @if (subtitle()) {
           <p class="mt-0.5 truncate text-sm text-base-content/60">{{ subtitle() }}</p>
         }
@@ -36,6 +41,8 @@ import { NgIcon } from '@ng-icons/core';
 export class PageHeaderComponent {
   readonly title = input.required<string>();
   readonly subtitle = input<string>();
+  /** Optional count badge next to the title (e.g. pending items). */
+  readonly badge = input<string | number>();
   /** Route for the back affordance (e.g. '/dashboard'). */
   readonly backLink = input<string | string[]>();
   readonly backLabel = input('Back');

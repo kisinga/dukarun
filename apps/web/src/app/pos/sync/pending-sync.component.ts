@@ -1,10 +1,12 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, viewChild } from '@angular/core';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
+import { DeleteConfirmationModalComponent } from '../../shared/ui/delete-confirmation-modal.component';
 import { formatKes } from '../../core/money';
 import { ConnectivityService } from '../offline/connectivity.service';
 import type { OutboxEntry } from '../offline/offline-db';
 import { SyncService } from '../offline/sync.service';
+import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 
 /**
  * Pending sync — the offline outbox. Queued sales are local-only until the
@@ -14,7 +16,12 @@ import { SyncService } from '../offline/sync.service';
  */
 @Component({
   selector: 'app-pending-sync',
-  imports: [PageHeaderComponent, EmptyStateComponent],
+  imports: [
+    PageHeaderComponent,
+    EmptyStateComponent,
+    StatusBadgeComponent,
+    DeleteConfirmationModalComponent,
+  ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
@@ -57,31 +64,21 @@ import { SyncService } from '../offline/sync.service';
                       queued {{ time(entry.queued_at) }}
                     </span>
                     <span class="text-sm">{{ entry.lines.length }} item(s)</span>
-                    @if (entry.status === 'failed') {
-                      <span class="badge badge-error">failed</span>
-                    } @else {
-                      <span class="badge badge-outline">awaiting sync</span>
-                    }
+                    <app-status-badge
+                      [type]="entry.status === 'failed' ? 'error' : 'warning'"
+                      [label]="entry.status === 'failed' ? 'failed' : 'awaiting sync'"
+                    />
                     <span class="ml-auto font-bold tabular-nums">{{ fmt(total(entry)) }}</span>
                     @if (entry.status === 'failed') {
                       <button class="btn btn-outline btn-sm" (click)="retry(entry.client_ref)">
                         Retry
                       </button>
-                      @if (discarding() === entry.client_ref) {
-                        <button class="btn btn-error btn-sm" (click)="discard(entry.client_ref)">
-                          Confirm discard
-                        </button>
-                        <button class="btn btn-ghost btn-sm" (click)="discarding.set(null)">
-                          Keep
-                        </button>
-                      } @else {
-                        <button
-                          class="btn btn-error btn-outline btn-sm"
-                          (click)="discarding.set(entry.client_ref)"
-                        >
-                          Discard
-                        </button>
-                      }
+                      <button
+                        class="btn btn-error btn-outline btn-sm"
+                        (click)="startDiscard(entry)"
+                      >
+                        Discard
+                      </button>
                     }
                   </div>
                   @if (entry.status === 'failed' && entry.error) {
@@ -97,6 +94,15 @@ import { SyncService } from '../offline/sync.service';
           </div>
         }
       </div>
+
+      <app-delete-confirmation-modal
+        [data]="discardData()"
+        title="Discard queued sale?"
+        entityType="sale"
+        verb="discard"
+        confirmButtonText="Discard"
+        (confirm)="confirmDiscard()"
+      />
     </main>
   `,
 })
@@ -105,7 +111,8 @@ export class PendingSyncComponent {
   protected readonly connectivity = inject(ConnectivityService);
 
   protected readonly fmt = formatKes;
-  protected readonly discarding = signal<string | null>(null);
+  protected readonly discarding = signal<OutboxEntry | null>(null);
+  private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
   protected readonly notice = signal<string | null>(null);
 
   protected total(entry: OutboxEntry): number {
@@ -141,8 +148,26 @@ export class PendingSyncComponent {
     await this.sync.retry(clientRef);
   }
 
-  protected async discard(clientRef: string): Promise<void> {
+  protected startDiscard(entry: OutboxEntry): void {
+    this.discarding.set(entry);
+    this.deleteModal()?.show();
+  }
+
+  protected discardData() {
+    const entry = this.discarding();
+    return {
+      entityName: entry
+        ? `${this.shortRef(entry.client_ref)} · ${this.fmt(this.total(entry))}`
+        : '',
+      warningDetails: ['This sale was never posted to the server.'],
+    };
+  }
+
+  protected async confirmDiscard(): Promise<void> {
+    const entry = this.discarding();
+    if (!entry) return;
     this.discarding.set(null);
-    await this.sync.discard(clientRef);
+    this.deleteModal()?.hide();
+    await this.sync.discard(entry.client_ref);
   }
 }

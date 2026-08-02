@@ -102,15 +102,19 @@ interface NavSection {
               <span class="bottom-nav-ico"><ng-icon name="heroShoppingCart" size="1.25rem" /></span>
               <span class="bottom-nav-label">Sell</span>
             </a>
-            <a routerLink="/pos/sales" routerLinkActive="bottom-nav-active" class="bottom-nav-item">
-              <span class="bottom-nav-ico"><ng-icon name="heroBanknotes" size="1.25rem" /></span>
-              <span class="bottom-nav-label">Sales</span>
-            </a>
             <a routerLink="/orders" routerLinkActive="bottom-nav-active" class="bottom-nav-item">
               <span class="bottom-nav-ico"
                 ><ng-icon name="heroClipboardDocumentList" size="1.25rem"
               /></span>
               <span class="bottom-nav-label">Orders</span>
+            </a>
+            <a
+              routerLink="/money/cashier"
+              routerLinkActive="bottom-nav-active"
+              class="bottom-nav-item"
+            >
+              <span class="bottom-nav-ico"><ng-icon name="heroBanknotes" size="1.25rem" /></span>
+              <span class="bottom-nav-label">Money</span>
             </a>
             <label for="app-drawer" class="bottom-nav-item cursor-pointer">
               <span class="bottom-nav-ico"><ng-icon name="heroBars3" size="1.25rem" /></span>
@@ -190,20 +194,27 @@ export class ShellComponent implements OnInit {
 
   protected readonly sections: NavSection[] = [
     {
-      items: [
-        { route: '/dashboard', label: 'Dashboard', icon: 'heroHome' },
-        { route: '/reports', label: 'Reports', icon: 'heroChartBar' },
-      ],
+      items: [{ route: '/dashboard', label: 'Dashboard', icon: 'heroHome' }],
     },
     {
       label: 'Sell',
       items: [
-        { route: '/pos/sell', label: 'Sell', icon: 'heroShoppingCart' },
-        { route: '/pos/sales', label: "Today's Sales", icon: 'heroBanknotes' },
+        { route: '/pos/sell', label: 'POS', icon: 'heroShoppingCart' },
         { route: '/pos/proformas', label: 'Proformas', icon: 'heroClipboardDocumentList' },
         { route: '/pos/cashier', label: 'Cashier Queue', icon: 'heroCreditCard' },
-        { route: '/orders', label: 'Orders', icon: 'heroArchiveBox' },
+        { route: '/pos/sync', label: 'Pending Sync', icon: 'heroArchiveBox' },
       ],
+    },
+    {
+      label: 'Sales',
+      items: [
+        { route: '/orders', label: 'Orders', icon: 'heroClipboardDocumentList' },
+        { route: '/reports', label: 'Reports', icon: 'heroChartBar' },
+      ],
+    },
+    {
+      label: 'Money',
+      items: [{ route: '/money/cashier', label: 'Money', icon: 'heroBanknotes' }],
     },
     {
       label: 'Manage',
@@ -217,18 +228,6 @@ export class ShellComponent implements OnInit {
           icon: 'heroCheckBadge',
           badge: () => this.approvals.pending().length,
         },
-      ],
-    },
-    {
-      label: 'Money',
-      items: [
-        { route: '/money/cashier', label: 'Cashier Sessions', icon: 'heroBanknotes' },
-        { route: '/money/expenses', label: 'Expenses', icon: 'heroBanknotes' },
-        { route: '/money/transfers', label: 'Transfers', icon: 'heroArrowsRightLeft' },
-        { route: '/money/credit', label: 'Customer Credit', icon: 'heroUsers' },
-        { route: '/money/suppliers', label: 'Suppliers', icon: 'heroTruck' },
-        { route: '/money/periods', label: 'Reconciliation', icon: 'heroCalendarDays' },
-        { route: '/money/stock', label: 'Stock Adjustments', icon: 'heroCube' },
       ],
     },
   ];

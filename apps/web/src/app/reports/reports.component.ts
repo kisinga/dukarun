@@ -3,6 +3,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes } from '../core/money';
 import { PosService, variantLabel } from '../pos/pos.service';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
+import { PaginationComponent } from '../shared/ui/pagination.component';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { DailySummary, ReportsService } from './reports.service';
 
@@ -27,7 +28,7 @@ type CustomerRow = {
 
 @Component({
   selector: 'app-reports',
-  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
+  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, PaginationComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
@@ -98,7 +99,7 @@ type CustomerRow = {
                   </tr>
                 </thead>
                 <tbody>
-                  @for (d of summary(); track d.day) {
+                  @for (d of pagedSummary(); track d.day) {
                     <tr>
                       <td class="text-sm">{{ d.day }}</td>
                       <td class="text-right">{{ d.orders }}</td>
@@ -128,6 +129,16 @@ type CustomerRow = {
                   </tr>
                 </tbody>
               </table>
+              <div class="p-3">
+                <app-pagination
+                  [currentPage]="page()"
+                  [totalPages]="totalPages()"
+                  [totalItems]="summary().length"
+                  [itemsPerPage]="pageSize"
+                  itemLabel="days"
+                  (pageChange)="page.set($event)"
+                />
+              </div>
             </div>
           }
         }
@@ -230,6 +241,16 @@ export class ReportsComponent implements OnInit {
   protected readonly products = signal<ProductRow[]>([]);
   protected readonly customers = signal<CustomerRow[]>([]);
   protected readonly error = signal<string | null>(null);
+  protected readonly page = signal(1);
+  protected readonly pageSize = 15;
+
+  protected readonly totalPages = computed(() =>
+    Math.max(1, Math.ceil(this.summary().length / this.pageSize))
+  );
+  protected readonly pagedSummary = computed(() => {
+    const page = Math.min(this.page(), this.totalPages());
+    return this.summary().slice((page - 1) * this.pageSize, page * this.pageSize);
+  });
 
   protected readonly totals = computed(() =>
     this.summary().reduce(
@@ -249,6 +270,7 @@ export class ReportsComponent implements OnInit {
 
   protected async load(): Promise<void> {
     this.error.set(null);
+    this.page.set(1);
     try {
       const since = this.from.value;
       const [summary, productSales, customerStats] = await Promise.all([

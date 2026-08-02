@@ -22,8 +22,7 @@ function parseSignedKes(raw: string): number | null {
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <app-page-header title="Stock Adjustments" backLink="/dashboard" backLabel="Dashboard">
-        </app-page-header>
+        <app-page-header title="Stock Adjustments"> </app-page-header>
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
