@@ -13,6 +13,12 @@ export type PeriodLock = Database['public']['Tables']['period_locks']['Row'];
 export type Purchase = Database['public']['Tables']['purchases']['Row'];
 export type PurchasePayment = Database['public']['Tables']['purchase_payments']['Row'];
 export type MoneyCustomer = Database['public']['Tables']['customers']['Row'];
+export type ReconAccount = Database['public']['Tables']['reconciliation_accounts']['Row'];
+export type Reconciliation = Database['public']['Tables']['reconciliations']['Row'];
+
+export type ReconAccountWithParent = ReconAccount & {
+  reconciliations: Pick<Reconciliation, 'scope' | 'scope_ref_id' | 'created_at'> | null;
+};
 
 export type JournalLineWithAccount = JournalLine & {
   ledger_accounts: Pick<LedgerAccount, 'code' | 'name'> | null;
@@ -126,6 +132,43 @@ export class MoneyService {
   async periodLock(): Promise<PeriodLock | null> {
     const { data, error } = await this.db.from('period_locks').select('*').limit(1).maybeSingle();
     if (error) throw error;
+    return data;
+  }
+
+  /** Reconciliation account rows for a set of cashier session ids (variance review). */
+  async sessionReconAccounts(sessionIds: string[]): Promise<ReconAccountWithParent[]> {
+    if (sessionIds.length === 0) return [];
+    // Session reconciliations use scope 'cash-session' with ref '<id>:opening|closing'.
+    const keys = sessionIds.flatMap(id => [`${id}:opening`, `${id}:closing`]);
+    const { data, error } = await this.db
+      .from('reconciliation_accounts')
+      .select('*, reconciliations!inner(scope, scope_ref_id, created_at)')
+      .eq('reconciliations.scope', 'cash-session')
+      .in('reconciliations.scope_ref_id', keys);
+    if (error) throw error;
+    return data;
+  }
+
+  /** Recent reconciliations with their account rows (periods screen variance review). */
+  async recentReconciliations(
+    limit = 10
+  ): Promise<(Reconciliation & { reconciliation_accounts: ReconAccount[] })[]> {
+    const { data, error } = await this.db
+      .from('reconciliations')
+      .select('*, reconciliation_accounts(*)')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data;
+  }
+
+  /** ManageReconciliation-gated: post the reversal and mark the row reviewed. */
+  async revertVariance(reconAccountId: string, reason?: string): Promise<string> {
+    const { data, error } = await this.db.rpc('revert_variance', {
+      p_recon_account_id: reconAccountId,
+      ...(reason ? { p_reason: reason } : {}),
+    });
+    if (error) throw rpcError(error);
     return data;
   }
 

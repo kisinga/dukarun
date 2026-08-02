@@ -4,7 +4,14 @@ import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../../core/money';
-import { AccountingPeriod, CashierAccount, MoneyService, PeriodLock } from '../money.service';
+import {
+  AccountingPeriod,
+  CashierAccount,
+  MoneyService,
+  PeriodLock,
+  ReconAccount,
+  Reconciliation,
+} from '../money.service';
 
 @Component({
   selector: 'app-money-periods',
@@ -114,6 +121,91 @@ import { AccountingPeriod, CashierAccount, MoneyService, PeriodLock } from '../m
           </div>
         </div>
 
+        <!-- Recent reconciliations (variance review) -->
+        <h2 class="mb-2 text-lg font-semibold">Recent reconciliations</h2>
+        @if (recons().length === 0) {
+          <p class="mb-4 text-sm text-base-content/60">No reconciliations recorded yet.</p>
+        } @else {
+          <div class="mb-4 flex flex-col gap-2">
+            @for (recon of recons(); track recon.id) {
+              <div class="card bg-base-100">
+                <div class="card-body p-4">
+                  <div class="flex items-center gap-3">
+                    <span class="badge badge-outline">{{ recon.scope }}</span>
+                    <span class="type-caption">{{ time(recon.created_at) }}</span>
+                  </div>
+                  <table class="table table-sm mt-2">
+                    <thead>
+                      <tr>
+                        <th>Account</th>
+                        <th class="text-right">Declared</th>
+                        <th class="text-right">Expected</th>
+                        <th class="text-right">Variance</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (ra of recon.reconciliation_accounts; track ra.id) {
+                        <tr>
+                          <td class="font-mono text-xs">{{ ra.account_code }}</td>
+                          <td class="text-right">{{ fmt(ra.declared) }}</td>
+                          <td class="text-right">{{ fmt(ra.expected) }}</td>
+                          <td
+                            class="text-right font-semibold"
+                            [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
+                          >
+                            {{ fmt(ra.variance) }}
+                          </td>
+                          <td class="text-right">
+                            @if (ra.reviewed_at) {
+                              <span class="type-caption">
+                                Reviewed · User …{{ shortId(ra.reviewed_by) }} ·
+                                {{ date(ra.reviewed_at) }}
+                              </span>
+                            } @else if (ra.variance !== 0) {
+                              @if (revertingFor() === ra.id) {
+                                <div class="flex items-center justify-end gap-1">
+                                  <input
+                                    type="text"
+                                    class="input input-bordered input-xs w-36"
+                                    placeholder="Reason (optional)"
+                                    [formControl]="revertReason"
+                                  />
+                                  <button
+                                    class="btn btn-warning btn-xs"
+                                    [disabled]="busy()"
+                                    (click)="confirmRevert(ra.id)"
+                                  >
+                                    Confirm
+                                  </button>
+                                  <button
+                                    class="btn btn-ghost btn-xs"
+                                    (click)="revertingFor.set(null)"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              } @else {
+                                <button
+                                  class="btn btn-warning btn-outline btn-xs"
+                                  [disabled]="busy()"
+                                  (click)="startRevert(ra.id)"
+                                >
+                                  Revert
+                                </button>
+                              }
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
         <!-- Periods list -->
         <h2 class="mb-2 text-lg font-semibold">Periods</h2>
         @if (periods().length === 0) {
@@ -156,12 +248,18 @@ export class MoneyPeriodsComponent implements OnInit {
   private readonly money = inject(MoneyService);
 
   protected readonly accounts = signal<CashierAccount[]>([]);
+  protected readonly fmt = formatKes;
   protected readonly periods = signal<AccountingPeriod[]>([]);
   protected readonly lock = signal<PeriodLock | null>(null);
   protected readonly declared: Record<string, string> = {};
   protected readonly reasons: Record<string, string> = {};
   protected readonly endDate = new FormControl(this.yesterday(), { nonNullable: true });
   protected readonly confirmClose = signal(false);
+  protected readonly recons = signal<
+    (Reconciliation & { reconciliation_accounts: ReconAccount[] })[]
+  >([]);
+  protected readonly revertingFor = signal<string | null>(null);
+  protected readonly revertReason = new FormControl('', { nonNullable: true });
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
@@ -172,14 +270,16 @@ export class MoneyPeriodsComponent implements OnInit {
 
   protected async load(): Promise<void> {
     try {
-      const [accounts, periods, lock] = await Promise.all([
+      const [accounts, periods, lock, recons] = await Promise.all([
         this.money.cashierAccounts(),
         this.money.periods(),
         this.money.periodLock(),
+        this.money.recentReconciliations(),
       ]);
       this.accounts.set(accounts);
       this.periods.set(periods);
       this.lock.set(lock);
+      this.recons.set(recons);
       for (const a of accounts) this.declared[a.account_code] ??= '';
       this.error.set(null);
     } catch (err) {
@@ -242,6 +342,44 @@ export class MoneyPeriodsComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected startRevert(reconAccountId: string): void {
+    this.revertingFor.set(reconAccountId);
+    this.revertReason.setValue('');
+  }
+
+  protected async confirmRevert(reconAccountId: string): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.money.revertVariance(reconAccountId, this.revertReason.value.trim() || undefined);
+      this.notice.set('Variance reverted and marked reviewed');
+      this.revertingFor.set(null);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Revert failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected shortId(userId: string | null): string {
+    return userId ? userId.slice(-4) : '????';
+  }
+
+  protected date(iso: string): string {
+    return new Date(iso).toLocaleDateString('en-KE', { month: 'short', day: 'numeric' });
+  }
+
+  protected time(iso: string): string {
+    return new Date(iso).toLocaleString('en-KE', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   }
 
   private yesterday(): string {

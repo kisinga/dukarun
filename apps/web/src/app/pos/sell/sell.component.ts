@@ -119,6 +119,16 @@ import {
                       @for (v of results(); track v.variant_id) {
                         <li>
                           <a class="min-h-11" (click)="addVariant(v)">
+                            @if (imageUrl(v.image_path); as thumb) {
+                              @if (!brokenImages().has(v.image_path!)) {
+                                <img
+                                  [src]="thumb"
+                                  alt=""
+                                  class="h-8 w-8 rounded-field object-cover"
+                                  (error)="markBroken(v.image_path!)"
+                                />
+                              }
+                            }
                             <span class="flex-1">{{ label(v) }}</span>
                             <span class="text-xs text-base-content/60">{{ v.sku }}</span>
                             <span class="badge badge-xs badge-outline">
@@ -458,6 +468,15 @@ export class SellComponent implements OnInit {
     orderId?: string;
   } | null>(null);
   protected readonly printerEnabled = signal(false);
+  protected readonly brokenImages = signal<Set<string>>(new Set());
+
+  protected imageUrl(path: string | null | undefined): string | null {
+    return this.pos.imageUrl(path);
+  }
+
+  protected markBroken(path: string): void {
+    this.brokenImages.update(set => new Set(set).add(path));
+  }
   /** Set when a real (non-walk-in) customer is picked; gates the credit tab. */
   protected readonly creditAllowed = computed(() => this.cart.customerId() !== null);
 

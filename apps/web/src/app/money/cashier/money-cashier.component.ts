@@ -2,15 +2,21 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
-import { FormsModule } from '@angular/forms';
+import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../../core/money';
-import { CashierAccount, CashierSession, MoneyService, SessionWithCounts } from '../money.service';
+import {
+  CashierAccount,
+  CashierSession,
+  MoneyService,
+  ReconAccountWithParent,
+  SessionWithCounts,
+} from '../money.service';
 import { PrintService } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 
 @Component({
   selector: 'app-money-cashier',
-  imports: [RouterLink, FormsModule, PageHeaderComponent, EmptyStateComponent],
+  imports: [RouterLink, FormsModule, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
@@ -145,6 +151,75 @@ import { ReceiptDataService } from '../../shared/print/receipt-data.service';
                       </tbody>
                     </table>
                   }
+                  @if (reconFor(session.id).length > 0) {
+                    <h3 class="type-heading mt-3">Variance review</h3>
+                    <table class="table table-sm mt-1">
+                      <thead>
+                        <tr>
+                          <th>Account</th>
+                          <th class="text-right">Declared</th>
+                          <th class="text-right">Expected</th>
+                          <th class="text-right">Variance</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (ra of reconFor(session.id); track ra.id) {
+                          <tr>
+                            <td class="font-mono text-xs">{{ ra.account_code }}</td>
+                            <td class="text-right">{{ fmt(ra.declared) }}</td>
+                            <td class="text-right">{{ fmt(ra.expected) }}</td>
+                            <td
+                              class="text-right font-semibold"
+                              [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
+                            >
+                              {{ fmt(ra.variance) }}
+                            </td>
+                            <td class="text-right">
+                              @if (ra.reviewed_at) {
+                                <span class="type-caption">
+                                  Reviewed · User …{{ shortId(ra.reviewed_by) }} ·
+                                  {{ date(ra.reviewed_at) }}
+                                </span>
+                              } @else if (ra.variance !== 0) {
+                                @if (revertingFor() === ra.id) {
+                                  <div class="flex items-center justify-end gap-1">
+                                    <input
+                                      type="text"
+                                      class="input input-bordered input-xs w-36"
+                                      placeholder="Reason (optional)"
+                                      [formControl]="revertReason"
+                                    />
+                                    <button
+                                      class="btn btn-warning btn-xs"
+                                      [disabled]="busy()"
+                                      (click)="confirmRevert(ra.id)"
+                                    >
+                                      Confirm
+                                    </button>
+                                    <button
+                                      class="btn btn-ghost btn-xs"
+                                      (click)="revertingFor.set(null)"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                } @else {
+                                  <button
+                                    class="btn btn-warning btn-outline btn-xs"
+                                    [disabled]="busy()"
+                                    (click)="startRevert(ra.id)"
+                                  >
+                                    Revert
+                                  </button>
+                                }
+                              }
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  }
                 </div>
               </div>
             }
@@ -169,6 +244,9 @@ export class MoneyCashierComponent implements OnInit {
   protected readonly notice = signal<string | null>(null);
   protected readonly printerEnabled = signal(false);
   protected readonly lastClosedSessionId = signal<string | null>(null);
+  protected readonly reconAccounts = signal<ReconAccountWithParent[]>([]);
+  protected readonly revertingFor = signal<string | null>(null);
+  protected readonly revertReason = new FormControl('', { nonNullable: true });
 
   async ngOnInit(): Promise<void> {
     this.printerEnabled.set(await this.receiptData.printerEnabled());
@@ -185,6 +263,7 @@ export class MoneyCashierComponent implements OnInit {
       this.accounts.set(accounts);
       this.openSession.set(open);
       this.sessions.set(sessions);
+      this.reconAccounts.set(await this.money.sessionReconAccounts(sessions.map(x => x.id)));
       // Pre-fill zeroes for any new account.
       for (const a of accounts) this.declared[a.account_code] ??= '0.00';
       this.error.set(null);
@@ -233,6 +312,41 @@ export class MoneyCashierComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected reconFor(sessionId: string): ReconAccountWithParent[] {
+    return this.reconAccounts().filter(ra =>
+      ra.reconciliations?.scope_ref_id.startsWith(`${sessionId}:`)
+    );
+  }
+
+  protected startRevert(reconAccountId: string): void {
+    this.revertingFor.set(reconAccountId);
+    this.revertReason.setValue('');
+  }
+
+  protected async confirmRevert(reconAccountId: string): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.money.revertVariance(reconAccountId, this.revertReason.value.trim() || undefined);
+      this.notice.set('Variance reverted and marked reviewed');
+      this.revertingFor.set(null);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Revert failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected shortId(userId: string | null): string {
+    return userId ? userId.slice(-4) : '????';
+  }
+
+  protected date(iso: string): string {
+    return new Date(iso).toLocaleDateString('en-KE', { month: 'short', day: 'numeric' });
   }
 
   protected async printSlip(sessionId: string): Promise<void> {

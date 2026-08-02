@@ -1,8 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import type { Database } from '@dukarun/shared-types';
 import { SupabaseService } from '../core/supabase.service';
+import { environment } from '../../environments/environment';
 
 export type Product = Database['public']['Tables']['products']['Row'];
+export type Collection = Database['public']['Tables']['collections']['Row'];
+export type CollectionWithCount = Collection & { product_count: number };
 export type Variant = Database['public']['Views']['variant_catalog']['Row'];
 export type Customer = Database['public']['Tables']['customers']['Row'];
 export type Order = Database['public']['Tables']['orders']['Row'];
@@ -184,13 +187,14 @@ export class PosService {
   /** null/undefined fields are left unchanged by the backend. */
   async updateProduct(
     productId: string,
-    changes: { name?: string; barcode?: string; active?: boolean }
+    changes: { name?: string; barcode?: string; active?: boolean; image_path?: string }
   ): Promise<string> {
     const { data, error } = await this.client.rpc('update_product', {
       p_product_id: productId,
       ...(changes.name !== undefined ? { p_name: changes.name } : {}),
       ...(changes.barcode !== undefined ? { p_barcode: changes.barcode } : {}),
       ...(changes.active !== undefined ? { p_active: changes.active } : {}),
+      ...(changes.image_path !== undefined ? { p_image_path: changes.image_path } : {}),
     });
     if (error) throw rpcError(error);
     return data;
@@ -240,6 +244,85 @@ export class PosService {
       .limit(500);
     if (error) throw error;
     return data;
+  }
+
+  // --- Product images (bucket: product-images, public) ---
+
+  /** Public URL for a stored image path. */
+  imageUrl(path: string | null | undefined): string | null {
+    if (!path) return null;
+    return `${environment.supabaseUrl}/storage/v1/object/public/product-images/${path}`;
+  }
+
+  /**
+   * Upload under the mandatory <company_id>/ prefix (RLS allows writes only
+   * under the caller's company). Returns the storage PATH (not a URL).
+   */
+  async uploadProductImage(companyId: string, blob: Blob, ext: string): Promise<string> {
+    const path = `${companyId}/${crypto.randomUUID()}.${ext}`;
+    const { error } = await this.client.storage.from('product-images').upload(path, blob, {
+      contentType: ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg',
+      upsert: false,
+    });
+    if (error) throw new Error(error.message);
+    return path;
+  }
+
+  async removeProductImage(path: string): Promise<void> {
+    const { error } = await this.client.storage.from('product-images').remove([path]);
+    if (error) throw new Error(error.message);
+  }
+
+  // --- Collections ---
+
+  async listCollections(): Promise<CollectionWithCount[]> {
+    const [{ data: collections, error: e1 }, { data: links, error: e2 }] = await Promise.all([
+      this.client.from('collections').select('*').order('name'),
+      this.client.from('product_collections').select('collection_id'),
+    ]);
+    if (e1) throw e1;
+    if (e2) throw e2;
+    const counts = new Map<string, number>();
+    for (const l of links ?? [])
+      counts.set(l.collection_id, (counts.get(l.collection_id) ?? 0) + 1);
+    return (collections ?? []).map(c => ({ ...c, product_count: counts.get(c.id) ?? 0 }));
+  }
+
+  async upsertCollection(input: {
+    name: string;
+    slug?: string;
+    description?: string;
+    collection_id?: string;
+    active?: boolean;
+  }): Promise<string> {
+    const { data, error } = await this.client.rpc('upsert_collection', {
+      p_name: input.name,
+      ...(input.slug ? { p_slug: input.slug } : {}),
+      ...(input.description ? { p_description: input.description } : {}),
+      ...(input.collection_id ? { p_collection_id: input.collection_id } : {}),
+      ...(input.active !== undefined ? { p_active: input.active } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  /** Replace a family's collection set with exactly `collectionIds`. */
+  async setProductCollections(productId: string, collectionIds: string[]): Promise<string> {
+    const { data, error } = await this.client.rpc('set_product_collections', {
+      p_product_id: productId,
+      p_collection_ids: collectionIds,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async productCollectionIds(productId: string): Promise<string[]> {
+    const { data, error } = await this.client
+      .from('product_collections')
+      .select('collection_id')
+      .eq('product_id', productId);
+    if (error) throw error;
+    return (data ?? []).map(r => r.collection_id);
   }
 
   async searchCustomers(query: string): Promise<Customer[]> {

@@ -7,7 +7,16 @@ import { NgIcon } from '@ng-icons/core';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { formatKes, parseKesToCents } from '../core/money';
-import { InventoryBatch, PosService, Product, Variant, variantLabel } from '../pos/pos.service';
+import { SupabaseService } from '../core/supabase.service';
+import {
+  CollectionWithCount,
+  InventoryBatch,
+  PosService,
+  Product,
+  Variant,
+  variantLabel,
+} from '../pos/pos.service';
+import { imageExtension, resizeImage } from '../shared/ui/image.util';
 
 type StockInfo = { stock: number; stock_value: number };
 
@@ -40,10 +49,136 @@ interface CreateRow {
           <span actions class="text-sm text-base-content/60">
             total stock value {{ fmt(totalStockValue()) }}
           </span>
-          <button actions class="btn btn-primary btn-sm ml-auto" (click)="startFamilyCreate()">
+          <button
+            actions
+            class="btn btn-outline btn-sm"
+            (click)="collectionsOpen.set(!collectionsOpen())"
+          >
+            Collections
+          </button>
+          <button actions class="btn btn-primary btn-sm" (click)="startFamilyCreate()">
             + New product
           </button>
         </app-page-header>
+
+        <!-- Collections panel -->
+        @if (collectionsOpen()) {
+          <div class="card mb-4 bg-base-100">
+            <div class="card-body p-4">
+              <div class="flex items-center justify-between">
+                <h2 class="card-title text-lg">Collections</h2>
+                <button class="btn btn-ghost btn-sm" (click)="startCollectionCreate()">
+                  + New collection
+                </button>
+              </div>
+
+              @if (collectionForm(); as cf) {
+                <form
+                  (submit)="$event.preventDefault(); saveCollection()"
+                  class="mt-2 flex flex-wrap items-end gap-3 rounded-field bg-base-200 p-2"
+                >
+                  <label class="form-control">
+                    <span class="label-text text-xs">Name *</span>
+                    <input
+                      type="text"
+                      class="input input-bordered input-sm"
+                      [formControl]="collectionName"
+                    />
+                  </label>
+                  <label class="form-control">
+                    <span class="label-text text-xs">Slug</span>
+                    <input
+                      type="text"
+                      class="input input-bordered input-sm"
+                      placeholder="auto"
+                      [formControl]="collectionSlug"
+                    />
+                  </label>
+                  <label class="form-control flex-1">
+                    <span class="label-text text-xs">Description</span>
+                    <input
+                      type="text"
+                      class="input input-bordered input-sm"
+                      [formControl]="collectionDescription"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    class="btn btn-primary btn-sm"
+                    [disabled]="busy() || collectionName.value.trim().length === 0"
+                  >
+                    {{ busy() ? 'Saving…' : cf.editing ? 'Save' : 'Create' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    (click)="collectionForm.set(null)"
+                  >
+                    Cancel
+                  </button>
+                </form>
+              }
+
+              @if (collections().length === 0) {
+                <p class="mt-2 text-sm text-base-content/60">
+                  No collections yet — group products for the storefront or reports.
+                </p>
+              } @else {
+                <table class="table table-sm mt-2">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Slug</th>
+                      <th class="text-right">Products</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (c of collections(); track c.id) {
+                      <tr>
+                        <td class="text-sm font-medium">{{ c.name }}</td>
+                        <td class="font-mono text-xs">{{ c.slug }}</td>
+                        <td class="text-right">{{ c.product_count }}</td>
+                        <td>
+                          <span
+                            class="badge badge-xs"
+                            [class.badge-success]="c.active"
+                            [class.badge-outline]="!c.active"
+                          >
+                            {{ c.active ? 'active' : 'inactive' }}
+                          </span>
+                        </td>
+                        <td class="whitespace-nowrap text-right">
+                          <button class="btn btn-ghost btn-xs" (click)="startCollectionEdit(c)">
+                            Edit
+                          </button>
+                          @if (c.active) {
+                            <button
+                              class="btn btn-error btn-outline btn-xs"
+                              [disabled]="busy()"
+                              (click)="setCollectionActive(c, false)"
+                            >
+                              Deactivate
+                            </button>
+                          } @else {
+                            <button
+                              class="btn btn-success btn-outline btn-xs"
+                              [disabled]="busy()"
+                              (click)="setCollectionActive(c, true)"
+                            >
+                              Reactivate
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+            </div>
+          </div>
+        }
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
@@ -254,6 +389,70 @@ interface CreateRow {
                   Cancel
                 </button>
               </form>
+
+              <!-- Image -->
+              <div class="mt-3 flex items-center gap-3 border-t border-base-300/60 pt-3">
+                @if (imageUrl(editingFamily()!.image_path); as url) {
+                  @if (!brokenImages().has(editingFamily()!.image_path!)) {
+                    <img
+                      [src]="url"
+                      alt="Product image"
+                      class="h-16 w-16 rounded-field object-cover"
+                      (error)="markBroken(editingFamily()!.image_path!)"
+                    />
+                  }
+                }
+                <div class="flex flex-col gap-1">
+                  <span class="type-caption">
+                    {{ editingFamily()!.image_path ? 'Replace image' : 'Add image' }} (resized to
+                    800px)
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    class="file-input file-input-bordered file-input-sm w-full max-w-xs"
+                    [disabled]="imageBusy()"
+                    (change)="uploadImage($event)"
+                  />
+                  @if (imageBusy()) {
+                    <span class="type-caption">Uploading…</span>
+                  }
+                </div>
+                @if (editingFamily()!.image_path) {
+                  <button
+                    class="btn btn-error btn-outline btn-xs"
+                    [disabled]="imageBusy() || busy()"
+                    (click)="removeImage()"
+                  >
+                    Remove
+                  </button>
+                }
+              </div>
+
+              <!-- Collections -->
+              <div class="mt-3 border-t border-base-300/60 pt-3">
+                <span class="type-caption">Collections</span>
+                <div class="mt-1 flex flex-wrap gap-2">
+                  @for (c of collections(); track c.id) {
+                    @if (c.active) {
+                      <label class="label cursor-pointer justify-start gap-2 py-0">
+                        <input
+                          type="checkbox"
+                          class="checkbox checkbox-sm"
+                          [checked]="familyCollections().has(c.id)"
+                          (change)="toggleFamilyCollection(c.id)"
+                        />
+                        <span class="label-text text-sm">{{ c.name }}</span>
+                      </label>
+                    }
+                  }
+                  @if (collections().length === 0) {
+                    <span class="text-xs text-base-content/60">
+                      No collections yet — create some from the Collections panel.
+                    </span>
+                  }
+                </div>
+              </div>
             </div>
           </div>
         }
@@ -391,6 +590,16 @@ interface CreateRow {
                 <div class="card-body p-4">
                   <!-- Family row -->
                   <div class="flex flex-wrap items-center gap-3">
+                    @if (imageUrl(group.family.image_path); as thumb) {
+                      @if (!brokenImages().has(group.family.image_path!)) {
+                        <img
+                          [src]="thumb"
+                          alt=""
+                          class="h-10 w-10 rounded-field object-cover"
+                          (error)="markBroken(group.family.image_path!)"
+                        />
+                      }
+                    }
                     <button class="link font-semibold" (click)="toggleFamily(group.family.id)">
                       {{ group.family.name }}
                     </button>
@@ -587,6 +796,7 @@ interface CreateRow {
 })
 export class ProductsComponent implements OnInit {
   private readonly pos = inject(PosService);
+  private readonly supabase = inject(SupabaseService);
 
   protected readonly fmt = formatKes;
   protected readonly label = variantLabel;
@@ -626,6 +836,19 @@ export class ProductsComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
 
+  /** Image picker state (family edit panel). */
+  protected readonly imageBusy = signal(false);
+  protected readonly brokenImages = signal<Set<string>>(new Set());
+
+  /** Collections panel + per-family checkbox editor. */
+  protected readonly collectionsOpen = signal(false);
+  protected readonly collections = signal<CollectionWithCount[]>([]);
+  protected readonly collectionForm = signal<{ editing: CollectionWithCount | null } | null>(null);
+  protected readonly collectionName = new FormControl('', { nonNullable: true });
+  protected readonly collectionSlug = new FormControl('', { nonNullable: true });
+  protected readonly collectionDescription = new FormControl('', { nonNullable: true });
+  protected readonly familyCollections = signal<Set<string>>(new Set());
+
   /** Families with their variants; families with no variants only show when not searching. */
   protected readonly grouped = computed(() => {
     const q = this.search.value.trim().toLowerCase();
@@ -663,18 +886,143 @@ export class ProductsComponent implements OnInit {
 
   protected async load(): Promise<void> {
     try {
-      const [families, catalog, stock] = await Promise.all([
+      const [families, catalog, stock, collections] = await Promise.all([
         this.pos.listFamilies(),
         this.pos.listCatalog(this.search.value),
         this.pos.productStock(),
+        this.pos.listCollections(),
       ]);
       this.families.set(families);
       this.catalog.set(catalog);
       this.stock.set(stock);
+      this.collections.set(collections);
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load products');
     }
+  }
+
+  // --- Images ---
+
+  protected imageUrl(path: string | null | undefined): string | null {
+    return this.pos.imageUrl(path);
+  }
+
+  protected markBroken(path: string): void {
+    this.brokenImages.update(set => new Set(set).add(path));
+  }
+
+  protected async uploadImage(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const family = this.editingFamily();
+    if (!file || !family) return;
+    const companyId = this.supabase.claims()?.company_id;
+    if (!companyId) {
+      this.error.set('No company in session — re-login');
+      return;
+    }
+    this.imageBusy.set(true);
+    this.error.set(null);
+    try {
+      const resized = await resizeImage(file, 800);
+      const path = await this.pos.uploadProductImage(companyId, resized, imageExtension(file));
+      // Save the storage PATH (not the URL) on the family.
+      await this.pos.updateProduct(family.id, { image_path: path });
+      this.editingFamily.set({ ...family, image_path: path });
+      this.notice.set('Image uploaded');
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      this.imageBusy.set(false);
+      input.value = '';
+    }
+  }
+
+  protected async removeImage(): Promise<void> {
+    const family = this.editingFamily();
+    if (!family?.image_path) return;
+    this.imageBusy.set(true);
+    this.error.set(null);
+    try {
+      await this.pos.updateProduct(family.id, { image_path: '' });
+      await this.pos.removeProductImage(family.image_path).catch(() => undefined);
+      this.editingFamily.set({ ...family, image_path: null });
+      this.notice.set('Image removed');
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Remove failed');
+    } finally {
+      this.imageBusy.set(false);
+    }
+  }
+
+  // --- Collections ---
+
+  protected startCollectionCreate(): void {
+    this.collectionForm.set({ editing: null });
+    this.collectionName.setValue('');
+    this.collectionSlug.setValue('');
+    this.collectionDescription.setValue('');
+  }
+
+  protected startCollectionEdit(c: CollectionWithCount): void {
+    this.collectionForm.set({ editing: c });
+    this.collectionName.setValue(c.name);
+    this.collectionSlug.setValue(c.slug);
+    this.collectionDescription.setValue(c.description ?? '');
+  }
+
+  protected async saveCollection(): Promise<void> {
+    if (this.collectionName.value.trim().length === 0) return;
+    const cf = this.collectionForm();
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.pos.upsertCollection({
+        name: this.collectionName.value.trim(),
+        slug: this.collectionSlug.value.trim() || undefined,
+        description: this.collectionDescription.value.trim() || undefined,
+        ...(cf?.editing ? { collection_id: cf.editing.id } : {}),
+      });
+      this.notice.set(cf?.editing ? 'Collection updated' : 'Collection created');
+      this.collectionForm.set(null);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async setCollectionActive(c: CollectionWithCount, active: boolean): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.pos.upsertCollection({
+        name: c.name,
+        slug: c.slug,
+        collection_id: c.id,
+        active,
+      });
+      this.notice.set(`${c.name} ${active ? 'reactivated' : 'deactivated'}`);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Update failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected toggleFamilyCollection(collectionId: string): void {
+    this.familyCollections.update(set => {
+      const next = new Set(set);
+      if (next.has(collectionId)) next.delete(collectionId);
+      else next.add(collectionId);
+      return next;
+    });
   }
 
   protected stockOf(variantId: string): StockInfo | undefined {
@@ -806,6 +1154,12 @@ export class ProductsComponent implements OnInit {
     this.familyBarcode.setValue(family.barcode ?? '');
     this.familyActive.setValue(family.active);
     this.familyFormOpen.set(true);
+    // Load the family's current collection set for the checkbox editor.
+    this.familyCollections.set(new Set());
+    void this.pos
+      .productCollectionIds(family.id)
+      .then(ids => this.familyCollections.set(new Set(ids)))
+      .catch(() => undefined);
   }
 
   protected closeFamilyForm(): void {
@@ -825,6 +1179,8 @@ export class ProductsComponent implements OnInit {
         barcode: this.familyBarcode.value.trim() || undefined,
         active: this.familyActive.value,
       });
+      // Replace the collection set with exactly what the checkboxes say.
+      await this.pos.setProductCollections(editing.id, [...this.familyCollections()]);
       this.notice.set(`Updated ${this.familyName.value.trim()}`);
       this.closeFamilyForm();
       await this.load();
