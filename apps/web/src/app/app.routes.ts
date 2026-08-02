@@ -119,6 +119,11 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./approvals/approvals.component').then(m => m.ApprovalsComponent),
   },
+  {
+    path: 'settings',
+    canActivate: [authGuard],
+    loadComponent: () => import('./settings/settings.component').then(m => m.SettingsComponent),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   { path: '**', redirectTo: 'dashboard' },
 ];

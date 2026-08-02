@@ -1,12 +1,12 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../../core/money';
-import { MoneyCustomer, MoneyService } from '../money.service';
+import { AgingInfo, MoneyCustomer, MoneyService } from '../money.service';
 
-type CustomerWithAr = MoneyCustomer & { ar_balance: number };
+type CustomerWithAr = MoneyCustomer & { ar_balance: number } & AgingInfo;
 type CreditOrder = {
   id: string;
   code: string;
@@ -74,11 +74,23 @@ type CreditOrder = {
         </div>
 
         <!-- Customers with AR -->
-        @if (customers().length === 0) {
+        <div class="mb-2 flex items-center gap-2">
+          <span class="type-caption">Sort</span>
+          <select
+            class="select select-bordered select-xs"
+            [value]="sortBy()"
+            (change)="sortBy.set($any($event.target).value)"
+          >
+            <option value="name">Name</option>
+            <option value="days">Days outstanding</option>
+          </select>
+        </div>
+
+        @if (sortedCustomers().length === 0) {
           <app-empty-state icon="heroUsers" title="No customers yet." />
         } @else {
           <div class="flex flex-col gap-2">
-            @for (c of customers(); track c.id) {
+            @for (c of sortedCustomers(); track c.id) {
               <div class="card bg-base-100">
                 <div class="card-body p-4">
                   <div class="flex flex-wrap items-center gap-3">
@@ -94,7 +106,16 @@ type CreditOrder = {
                     <span class="text-xs text-base-content/60">
                       limit {{ fmt(c.credit_limit) }}
                     </span>
-                    <span class="ml-auto font-bold" [class.text-error]="c.ar_balance > 0">
+                    @if (c.days_outstanding !== null) {
+                      <span class="type-caption">{{ c.days_outstanding }}d</span>
+                      <span class="badge badge-xs" [class]="bucketBadge(c.bucket)">
+                        {{ c.bucket }}
+                      </span>
+                    }
+                    <span
+                      class="ml-auto font-bold tabular-nums"
+                      [class.text-error]="c.ar_balance > 0"
+                    >
                       {{ fmt(c.ar_balance) }} owed
                     </span>
                   </div>
@@ -269,6 +290,29 @@ export class MoneyCreditComponent implements OnInit {
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load customers');
+    }
+  }
+
+  protected readonly sortBy = signal<'name' | 'days'>('name');
+
+  protected readonly sortedCustomers = computed(() => {
+    const list = this.customers();
+    if (this.sortBy() === 'days') {
+      return [...list].sort((a, b) => (b.days_outstanding ?? -1) - (a.days_outstanding ?? -1));
+    }
+    return list;
+  });
+
+  protected bucketBadge(bucket: string | null): string {
+    switch (bucket) {
+      case '8-30':
+        return 'badge-info';
+      case '31-60':
+        return 'badge-warning';
+      case '60+':
+        return 'badge-error';
+      default:
+        return 'badge-ghost';
     }
   }
 

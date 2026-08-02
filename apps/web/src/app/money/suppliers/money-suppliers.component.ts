@@ -8,9 +8,9 @@ import { NgIcon } from '@ng-icons/core';
 import { PrintService } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { PosService, Variant, variantLabel } from '../../pos/pos.service';
-import { LedgerAccount, MoneyCustomer, MoneyService } from '../money.service';
+import { AgingInfo, LedgerAccount, MoneyCustomer, MoneyService } from '../money.service';
 
-type SupplierWithAp = MoneyCustomer & { ap_balance: number };
+type SupplierWithAp = MoneyCustomer & { ap_balance: number } & AgingInfo;
 type PurchaseRow = {
   id: string;
   supplier_id: string;
@@ -103,8 +103,19 @@ interface PurchaseLineForm {
                     <tr>
                       <td class="font-medium">{{ name(s) }}</td>
                       <td class="text-xs text-base-content/60">{{ s.phone }}</td>
-                      <td class="text-right font-semibold" [class.text-error]="s.ap_balance > 0">
+                      <td
+                        class="text-right font-semibold tabular-nums"
+                        [class.text-error]="s.ap_balance > 0"
+                      >
                         {{ fmt(s.ap_balance) }}
+                        @if (s.days_outstanding !== null) {
+                          <div class="flex items-center justify-end gap-1">
+                            <span class="type-caption">{{ s.days_outstanding }}d</span>
+                            <span class="badge badge-xs" [class]="bucketBadge(s.bucket)">
+                              {{ s.bucket }}
+                            </span>
+                          </div>
+                        }
                       </td>
                     </tr>
                   }
@@ -495,6 +506,19 @@ export class MoneySuppliersComponent implements OnInit {
       await this.print.printPurchase(purchase, company.name, company.logoUrl);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Print failed');
+    }
+  }
+
+  protected bucketBadge(bucket: string | null): string {
+    switch (bucket) {
+      case '8-30':
+        return 'badge-info';
+      case '31-60':
+        return 'badge-warning';
+      case '60+':
+        return 'badge-error';
+      default:
+        return 'badge-ghost';
     }
   }
 

@@ -20,6 +20,11 @@ export type ReconAccountWithParent = ReconAccount & {
   reconciliations: Pick<Reconciliation, 'scope' | 'scope_ref_id' | 'created_at'> | null;
 };
 
+export type AgingInfo = {
+  days_outstanding: number | null;
+  bucket: string | null;
+};
+
 export type JournalLineWithAccount = JournalLine & {
   ledger_accounts: Pick<LedgerAccount, 'code' | 'name'> | null;
 };
@@ -172,27 +177,55 @@ export class MoneyService {
     return data;
   }
 
-  /** Non-supplier customers joined with their AR balance (client-side join on the view). */
-  async customersWithAr(): Promise<(MoneyCustomer & { ar_balance: number })[]> {
-    const [{ data: customers, error: e1 }, { data: balances, error: e2 }] = await Promise.all([
+  /** Non-supplier customers joined with their AR balance + credit aging (client-side joins). */
+  async customersWithAr(): Promise<(MoneyCustomer & { ar_balance: number } & AgingInfo)[]> {
+    const [
+      { data: customers, error: e1 },
+      { data: balances, error: e2 },
+      { data: aging, error: e3 },
+    ] = await Promise.all([
       this.db.from('customers').select('*').eq('is_supplier', false).order('first_name'),
       this.db.from('customer_ar_balances').select('*'),
+      this.db.from('customer_credit_aging').select('customer_id, days_outstanding, bucket'),
     ]);
     if (e1) throw e1;
     if (e2) throw e2;
+    if (e3) throw e3;
     const byCustomer = new Map((balances ?? []).map(b => [b.customer_id, b.balance ?? 0]));
-    return (customers ?? []).map(c => ({ ...c, ar_balance: byCustomer.get(c.id) ?? 0 }));
+    const agingByCustomer = new Map(
+      (aging ?? []).filter(a => a.customer_id !== null).map(a => [a.customer_id!, a])
+    );
+    return (customers ?? []).map(c => ({
+      ...c,
+      ar_balance: byCustomer.get(c.id) ?? 0,
+      days_outstanding: agingByCustomer.get(c.id)?.days_outstanding ?? null,
+      bucket: agingByCustomer.get(c.id)?.bucket ?? null,
+    }));
   }
 
-  async suppliersWithAp(): Promise<(MoneyCustomer & { ap_balance: number })[]> {
-    const [{ data: suppliers, error: e1 }, { data: balances, error: e2 }] = await Promise.all([
+  async suppliersWithAp(): Promise<(MoneyCustomer & { ap_balance: number } & AgingInfo)[]> {
+    const [
+      { data: suppliers, error: e1 },
+      { data: balances, error: e2 },
+      { data: aging, error: e3 },
+    ] = await Promise.all([
       this.db.from('customers').select('*').eq('is_supplier', true).order('first_name'),
       this.db.from('supplier_ap_balances').select('*'),
+      this.db.from('supplier_ap_aging').select('supplier_id, days_outstanding, bucket'),
     ]);
     if (e1) throw e1;
     if (e2) throw e2;
+    if (e3) throw e3;
     const bySupplier = new Map((balances ?? []).map(b => [b.supplier_id, b.balance ?? 0]));
-    return (suppliers ?? []).map(s => ({ ...s, ap_balance: bySupplier.get(s.id) ?? 0 }));
+    const agingBySupplier = new Map(
+      (aging ?? []).filter(a => a.supplier_id !== null).map(a => [a.supplier_id!, a])
+    );
+    return (suppliers ?? []).map(s => ({
+      ...s,
+      ap_balance: bySupplier.get(s.id) ?? 0,
+      days_outstanding: agingBySupplier.get(s.id)?.days_outstanding ?? null,
+      bucket: agingBySupplier.get(s.id)?.bucket ?? null,
+    }));
   }
 
   async creditOrders(customerId: string) {

@@ -237,6 +237,7 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
             }
           </a>
           <a routerLink="/team" class="btn btn-outline min-h-11">Team</a>
+          <a routerLink="/settings" class="btn btn-outline min-h-11">Settings</a>
         </nav>
 
         <h2 class="type-heading mt-6">Money</h2>
