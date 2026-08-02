@@ -1795,6 +1795,25 @@ export type Database = {
           },
         ]
       }
+      customer_credit_aging: {
+        Row: {
+          balance: number | null
+          bucket: string | null
+          company_id: string | null
+          customer_id: string | null
+          days_outstanding: number | null
+          oldest_unpaid_date: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ledger_journal_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expiring_batches: {
         Row: {
           batch_id: string | null
@@ -2131,6 +2150,25 @@ export type Database = {
           },
         ]
       }
+      supplier_ap_aging: {
+        Row: {
+          balance: number | null
+          bucket: string | null
+          company_id: string | null
+          days_outstanding: number | null
+          oldest_unpaid_date: string | null
+          supplier_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ledger_journal_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_ap_balances: {
         Row: {
           balance: number | null
@@ -2440,6 +2478,14 @@ export type Database = {
           p_customer_id: string
           p_is_approved: boolean
           p_terms_days?: number
+        }
+        Returns: string
+      }
+      update_payment_method: {
+        Args: {
+          p_code: string
+          p_enabled?: boolean
+          p_requires_reconciliation?: boolean
         }
         Returns: string
       }
