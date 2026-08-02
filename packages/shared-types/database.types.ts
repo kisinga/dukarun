@@ -304,6 +304,7 @@ export type Database = {
           id: string
           last_payment_amount: number | null
           last_payment_date: string | null
+          last_payment_reference: string | null
           logo_path: string | null
           low_stock_threshold: number
           name: string
@@ -342,6 +343,7 @@ export type Database = {
           id?: string
           last_payment_amount?: number | null
           last_payment_date?: string | null
+          last_payment_reference?: string | null
           logo_path?: string | null
           low_stock_threshold?: number
           name: string
@@ -380,6 +382,7 @@ export type Database = {
           id?: string
           last_payment_amount?: number | null
           last_payment_date?: string | null
+          last_payment_reference?: string | null
           logo_path?: string | null
           low_stock_threshold?: number
           name?: string
@@ -2220,6 +2223,16 @@ export type Database = {
         Args: { p_code: string; p_company_id: string }
         Returns: number
       }
+      activate_subscription: {
+        Args: {
+          p_amount: number
+          p_billing_cycle: string
+          p_company_id: string
+          p_reference: string
+          p_tier_id: string
+        }
+        Returns: string
+      }
       add_team_member: {
         Args: { p_phone: string; p_role_id: string }
         Returns: string
@@ -2228,6 +2241,10 @@ export type Database = {
       approve_request: {
         Args: { p_approval_id: string; p_reason?: string }
         Returns: string
+      }
+      assert_entitled: {
+        Args: { p_check?: string; p_company_id: string }
+        Returns: undefined
       }
       close_accounting_period: { Args: { p_end_date: string }; Returns: string }
       close_cashier_session: {
@@ -2462,6 +2479,7 @@ export type Database = {
         Args: { p_order_id: string; p_payments: Json }
         Returns: string
       }
+      subscription_expiry_scan: { Args: never; Returns: number }
       update_customer: {
         Args: {
           p_customer_id: string
