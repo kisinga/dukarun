@@ -32,7 +32,7 @@ const PAGE_SIZE = 20;
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
-        <app-page-header title="Orders" backLink="/dashboard" backLabel="Dashboard">
+        <app-page-header title="Orders">
           @if (isLive()) {
             <span actions class="badge badge-success gap-1">
               <span class="h-2 w-2 animate-pulse rounded-full bg-success"></span>

@@ -1,101 +1,86 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { PageHeaderComponent } from '../../shared/ui/page-header.component';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { parseKesToCents } from '../../core/money';
+import { ButtonComponent } from '../../shared/ui/button.component';
+import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { JournalListComponent } from '../journal-list.component';
 import { JournalEntryWithLines, LedgerAccount, MoneyService } from '../money.service';
 
 @Component({
   selector: 'app-money-transfers',
-  imports: [ReactiveFormsModule, JournalListComponent, PageHeaderComponent],
+  imports: [ReactiveFormsModule, JournalListComponent, FormFieldComponent, ButtonComponent],
   template: `
-    <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="page">
-        <app-page-header title="Transfers">
-          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </app-page-header>
+    <div class="mb-3 flex items-center justify-end">
+      <button appButton variant="ghost" (click)="load()">Refresh</button>
+    </div>
 
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <h2 class="card-title text-lg">New transfer</h2>
-            <form
-              (submit)="$event.preventDefault(); submit()"
-              class="mt-2 grid gap-3 sm:grid-cols-2"
-            >
-              <label class="form-control">
-                <span class="label-text">From</span>
-                <select class="select select-bordered select-sm" [formControl]="from">
-                  @for (a of accounts(); track a.code) {
-                    <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
-                  }
-                </select>
-              </label>
-              <label class="form-control">
-                <span class="label-text">To</span>
-                <select class="select select-bordered select-sm" [formControl]="to">
-                  @for (a of accounts(); track a.code) {
-                    <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
-                  }
-                </select>
-              </label>
-              <label class="form-control">
-                <span class="label-text">Principal (KES)</span>
-                <input
-                  type="text"
-                  inputmode="decimal"
-                  class="input input-bordered input-sm"
-                  placeholder="0.00"
-                  [formControl]="principal"
-                />
-              </label>
-              <label class="form-control">
-                <span class="label-text">Fee (KES, optional)</span>
-                <input
-                  type="text"
-                  inputmode="decimal"
-                  class="input input-bordered input-sm"
-                  placeholder="0.00"
-                  [formControl]="fee"
-                />
-              </label>
-              <label class="form-control sm:col-span-2">
-                <span class="label-text">Memo</span>
-                <input
-                  type="text"
-                  class="input input-bordered input-sm"
-                  placeholder="e.g. Bank the day's cash"
-                  [formControl]="memo"
-                />
-              </label>
-              @if (sameAccount()) {
-                <p class="text-sm text-warning sm:col-span-2">
-                  Source and destination are the same account.
-                </p>
+    <div class="card mb-4 bg-base-100">
+      <div class="card-body p-4">
+        <h2 class="section-title mb-2">New transfer</h2>
+        <form (submit)="$event.preventDefault(); submit()" class="grid gap-3 sm:grid-cols-2">
+          <app-form-field label="From">
+            <select class="select select-bordered select-sm w-full" [formControl]="from">
+              @for (a of accounts(); track a.code) {
+                <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
               }
-              <div class="sm:col-span-2">
-                <button
-                  type="submit"
-                  class="btn btn-primary btn-sm"
-                  [disabled]="busy() || sameAccount()"
-                >
-                  {{ busy() ? 'Posting…' : 'Post transfer' }}
-                </button>
-              </div>
-            </form>
-            @if (error()) {
-              <p class="mt-2 text-sm text-error">{{ error() }}</p>
-            }
-            @if (notice()) {
-              <p class="mt-2 text-sm text-success">{{ notice() }}</p>
-            }
+            </select>
+          </app-form-field>
+          <app-form-field label="To">
+            <select class="select select-bordered select-sm w-full" [formControl]="to">
+              @for (a of accounts(); track a.code) {
+                <option [value]="a.code">{{ a.code }} — {{ a.name }}</option>
+              }
+            </select>
+          </app-form-field>
+          <app-form-field label="Principal (KES)">
+            <input
+              type="text"
+              inputmode="decimal"
+              class="input input-bordered input-sm w-full"
+              placeholder="0.00"
+              [formControl]="principal"
+            />
+          </app-form-field>
+          <app-form-field label="Fee (KES, optional)">
+            <input
+              type="text"
+              inputmode="decimal"
+              class="input input-bordered input-sm w-full"
+              placeholder="0.00"
+              [formControl]="fee"
+            />
+          </app-form-field>
+          <app-form-field label="Memo" class="sm:col-span-2">
+            <input
+              type="text"
+              class="input input-bordered input-sm w-full"
+              placeholder="e.g. Bank the day's cash"
+              [formControl]="memo"
+            />
+          </app-form-field>
+          @if (sameAccount()) {
+            <p class="text-sm text-warning sm:col-span-2">
+              Source and destination are the same account.
+            </p>
+          }
+          <div class="sm:col-span-2">
+            <button appButton type="submit" [loading]="busy()" [disabled]="sameAccount()">
+              Post transfer
+            </button>
           </div>
-        </div>
-
-        <h2 class="mb-2 text-lg font-semibold">Recent transfers</h2>
-        <app-journal-list [entries]="entries()" emptyText="No transfers posted yet." />
+        </form>
+        @if (error()) {
+          <p class="mt-2 text-sm text-error">{{ error() }}</p>
+        }
+        @if (notice()) {
+          <p class="mt-2 text-sm text-success">{{ notice() }}</p>
+        }
       </div>
-    </main>
+    </div>
+
+    <h2 class="section-title mb-2">Recent transfers</h2>
+    <app-journal-list [entries]="entries()" emptyText="No transfers posted yet." />
   `,
 })
 export class MoneyTransfersComponent implements OnInit {
@@ -132,7 +117,7 @@ export class MoneyTransfersComponent implements OnInit {
   protected async load(): Promise<void> {
     try {
       const [accounts, entries] = await Promise.all([
-        this.money.assetAccounts(),
+        this.money.transactableAccounts(),
         this.money.journalBySource('InterAccountTransfer'),
       ]);
       this.accounts.set(accounts);

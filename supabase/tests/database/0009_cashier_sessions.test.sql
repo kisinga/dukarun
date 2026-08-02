@@ -19,7 +19,7 @@ select testkit.as_user((select company_id from cs_company), '11111111-1111-1111-
 --    (cash + mpesa are cashier-controlled by provisioning).
 select throws_ok(
   $$select public.open_cashier_session('[{"account_code":"CASH_ON_HAND","declared":0}]')$$,
-  'P0001', 'missing_declaration: CLEARING_MPESA',
+  'P0001', 'missing_declaration: MPESA',
   'opening requires declarations for all cashier-controlled accounts'
 );
 
@@ -27,7 +27,7 @@ select throws_ok(
 create temp table sess1 as
 select public.open_cashier_session('[
   {"account_code":"CASH_ON_HAND","declared":0},
-  {"account_code":"CLEARING_MPESA","declared":0}
+  {"account_code":"MPESA","declared":0}
 ]') as session_id;
 
 select ok((select session_id from sess1) is not null, 'session opens');
@@ -42,7 +42,7 @@ select is(
 select throws_ok(
   $$select public.open_cashier_session('[
     {"account_code":"CASH_ON_HAND","declared":0},
-    {"account_code":"CLEARING_MPESA","declared":0}
+    {"account_code":"MPESA","declared":0}
   ]')$$,
   'P0001', 'session_already_open',
   'cannot open a second session while one is open'
@@ -63,7 +63,7 @@ select is(
 -- 5-8. Close with a 1000 shortage (expected 10000, declared 9000).
 select public.close_cashier_session((select session_id from sess1), '[
   {"account_code":"CASH_ON_HAND","declared":9000},
-  {"account_code":"CLEARING_MPESA","declared":0}
+  {"account_code":"MPESA","declared":0}
 ]');
 
 select results_eq(
@@ -96,7 +96,7 @@ select is(
 create temp table sess2 as
 select public.open_cashier_session('[
   {"account_code":"CASH_ON_HAND","declared":9500},
-  {"account_code":"CLEARING_MPESA","declared":0}
+  {"account_code":"MPESA","declared":0}
 ]') as session_id;
 
 select results_eq(

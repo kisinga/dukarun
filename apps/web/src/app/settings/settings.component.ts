@@ -13,7 +13,7 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
-        <app-page-header title="Settings" backLink="/dashboard" backLabel="Dashboard" />
+        <app-page-header title="Settings" />
 
         @if (loadError()) {
           <p class="mb-2 text-sm text-error">{{ loadError() }}</p>

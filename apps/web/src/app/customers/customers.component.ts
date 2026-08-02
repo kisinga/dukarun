@@ -26,7 +26,7 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
-        <app-page-header title="Customers" backLink="/dashboard" backLabel="Dashboard">
+        <app-page-header title="Customers">
           <button actions class="btn btn-primary btn-sm ml-auto" (click)="startCreate()">
             + New customer
           </button>
@@ -128,7 +128,7 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
                     >
                       {{ fmt(c.ar_balance) }} owed
                     </span>
-                    <a routerLink="/money/credit" class="btn btn-ghost btn-xs">Credit →</a>
+                    <a routerLink="/credit" class="btn btn-ghost btn-xs">Credit →</a>
                     <button class="btn btn-ghost btn-xs" (click)="startEdit(c)">Edit</button>
                   </div>
 

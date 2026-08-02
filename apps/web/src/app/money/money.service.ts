@@ -56,20 +56,19 @@ export class MoneyService {
 
   // --- Reads ---
 
-  /** Leaf active asset accounts — the account picker source. */
-  async assetAccounts(): Promise<LedgerAccount[]> {
+  /** Real money accounts (allow_manual_posting) — the account picker source. */
+  async transactableAccounts(): Promise<LedgerAccount[]> {
     const { data, error } = await this.db
       .from('ledger_accounts')
       .select('*')
-      .eq('is_parent', false)
+      .eq('allow_manual_posting', true)
       .eq('is_active', true)
-      .eq('type', 'asset')
       .order('code');
     if (error) throw error;
     return data;
   }
 
-  /** Cashier-controlled accounts from enabled payment methods (cash→CASH_ON_HAND, mpesa→CLEARING_MPESA). */
+  /** Cashier-controlled accounts from enabled payment methods (cash→CASH_ON_HAND, mpesa→MPESA). */
   async cashierAccounts(): Promise<CashierAccount[]> {
     const { data, error } = await this.db
       .from('payment_methods')

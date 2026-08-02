@@ -17,7 +17,7 @@ const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> =
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
-        <app-page-header title="Messaging" backLink="/dashboard" backLabel="Dashboard" />
+        <app-page-header title="Messaging" />
 
         <!-- Compose -->
         <div class="card mb-4 bg-base-100">

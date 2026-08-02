@@ -160,7 +160,7 @@ begin
     -- assets: cash-based sub-accounts under CASH
     (v_company_id, 'CASH_ON_HAND', 'Cash on Hand', 'asset', v_cash_parent, true),
     (v_company_id, 'BANK_MAIN', 'Bank - Main', 'asset', v_cash_parent, true),
-    (v_company_id, 'CLEARING_MPESA', 'Clearing - M-Pesa', 'asset', v_cash_parent, true),
+    (v_company_id, 'MPESA', 'M-Pesa', 'asset', v_cash_parent, true),
     -- standalone assets
     (v_company_id, 'CLEARING_CREDIT', 'Clearing - Customer Credit', 'asset', null, true),
     (v_company_id, 'CLEARING_GENERIC', 'Clearing - Generic', 'asset', null, true),
@@ -184,13 +184,19 @@ begin
     -- equity
     (v_company_id, 'BALANCE_ADJUSTMENT', 'Balance Adjustment', 'equity', null, true);
 
+  -- Real money accounts are manually transactable; everything else is
+  -- system-only. (Column added in 0029; plpgsql resolves it at execution.)
+  update public.ledger_accounts
+  set allow_manual_posting = true
+  where company_id = v_company_id and code in ('CASH_ON_HAND', 'BANK_MAIN', 'MPESA');
+
   -- Payment methods (payment-provisioner.service.ts defaults).
   insert into public.payment_methods (
     company_id, code, name, ledger_account_code, reconciliation_type, is_cashier_controlled
   )
   values
     (v_company_id, 'cash', 'Cash', 'CASH_ON_HAND', 'blind_count', true),
-    (v_company_id, 'mpesa', 'M-Pesa', 'CLEARING_MPESA', 'transaction_verification', true),
+    (v_company_id, 'mpesa', 'M-Pesa', 'MPESA', 'transaction_verification', true),
     (v_company_id, 'bank', 'Bank Transfer', 'BANK_MAIN', 'statement_match', false),
     (v_company_id, 'credit', 'Customer Credit', 'CLEARING_CREDIT', 'credit_ledger', false);
 

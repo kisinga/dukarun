@@ -27,8 +27,6 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
       <div class="page">
         <app-page-header
           title="Pending Sync"
-          backLink="/dashboard"
-          backLabel="Dashboard"
           subtitle="Posted when you're back online. Until then they're only on this device — not in Today's Sales, not in the books."
         >
           @if (!connectivity.online()) {

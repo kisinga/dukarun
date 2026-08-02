@@ -6,6 +6,7 @@ This directory contains the living documentation for Dukarun. Implementation det
 
 - [Infrastructure & Deployment](./INFRASTRUCTURE.md) — Docker, environment variables, network setup, and deployment.
 - [Troubleshooting](./GENERAL_TROUBLESHOOTING.md) — Common fixes and reset procedures.
+- [V1 → V2 Migration Plan](./V1_V2_MIGRATION.md) — Vendure → Supabase cutover runbook, phases, gates, and rollback.
 
 ## For customers and non-engineers
 

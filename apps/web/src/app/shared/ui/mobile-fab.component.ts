@@ -1,6 +1,6 @@
 import { Component, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { NgIcon } from '@ng-icons/core';
+import { IconComponent } from './icon.component';
 
 /**
  * Floating action button for the mobile primary action (ported from the
@@ -8,7 +8,7 @@ import { NgIcon } from '@ng-icons/core';
  */
 @Component({
   selector: 'app-mobile-fab',
-  imports: [NgIcon, RouterLink],
+  imports: [IconComponent, RouterLink],
   template: `
     @if (routerLink()) {
       <a
@@ -20,7 +20,7 @@ import { NgIcon } from '@ng-icons/core';
         [attr.aria-label]="ariaLabel()"
         [attr.title]="title()"
       >
-        <ng-icon [name]="icon()" size="1.55rem" />
+        <app-icon [name]="icon()" size="lg" />
         @if (label()) {
           <span>{{ label() }}</span>
         }
@@ -37,7 +37,7 @@ import { NgIcon } from '@ng-icons/core';
         [disabled]="disabled()"
         type="button"
       >
-        <ng-icon [name]="icon()" size="1.55rem" />
+        <app-icon [name]="icon()" size="lg" />
         @if (label()) {
           <span>{{ label() }}</span>
         }

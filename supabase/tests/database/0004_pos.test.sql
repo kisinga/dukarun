@@ -66,7 +66,7 @@ select is(
 );
 
 -- Payment entries (one per payment row): DR CASH_ON_HAND 200000,
--- DR CLEARING_MPESA 45000, CR SALES 245000 across both entries.
+-- DR MPESA 45000, CR SALES 245000 across both entries.
 select results_eq(
   $$select a.code::text, l.debit, l.credit
     from public.ledger_journal_lines l
@@ -76,7 +76,7 @@ select results_eq(
     order by a.code, l.credit desc$$,
   $$values
     ('CASH_ON_HAND', 200000::bigint, 0::bigint),
-    ('CLEARING_MPESA', 45000::bigint, 0::bigint),
+    ('MPESA', 45000::bigint, 0::bigint),
     ('SALES', 0::bigint, 200000::bigint),
     ('SALES', 0::bigint, 45000::bigint)$$,
   'payment entries post DR clearing per method / CR SALES gross (one entry per payment)'
@@ -234,9 +234,9 @@ select results_eq(
     order by a.code$$,
   $$values
     ('CASH_ON_HAND', 0::bigint, 200000::bigint),
-    ('CLEARING_MPESA', 0::bigint, 45000::bigint),
     ('COGS', 0::bigint, 130000::bigint),
     ('INVENTORY', 130000::bigint, 0::bigint),
+    ('MPESA', 0::bigint, 45000::bigint),
     ('SALES', 245000::bigint, 0::bigint)$$,
   'reversal entry swaps per-account totals of revenue + COGS entries'
 );

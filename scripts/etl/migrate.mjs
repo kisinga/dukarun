@@ -2,8 +2,9 @@
 // Usage: node scripts/etl/migrate.mjs --channel <id> [--apply] [--name "Company Name"] [--prod]
 //   default   dry-run: prints the plan + per-entity counts, writes nothing.
 //   --apply   writes to the TARGET in a single transaction.
-//   --prod    switches auth-user creation to the Supabase Admin API (TODO: not implemented;
-//             rehearsal uses direct auth.users inserts mirroring testkit.create_user).
+//   --prod    switches auth-user creation to the Supabase Admin API
+//             (POST /auth/v1/admin/users, phone_confirm). Without it, rehearsal
+//             inserts auth.users directly, mirroring testkit.create_user.
 //
 // Idempotent: public.etl_id_map (old_type, old_id, company_id) -> new_id is consulted
 // before every insert; ledger entries additionally rely on
@@ -12,9 +13,24 @@
 // Money is integer cents everywhere. int8 is parsed to Number (all values << 2^53).
 // SOURCE is read-only; TARGET writes bypass RPCs deliberately (migration, not app traffic).
 import pg from 'pg';
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const SRC_DSN = 'postgres://vendure:changeme-secure-password@localhost:5432/vendure';
 const TGT_DSN = 'postgres://postgres:postgres@127.0.0.1:54322/postgres';
+
+// Supabase API config for the --prod auth branch and asset uploads.
+// Defaults are the LOCAL dev stack (demo keys, per `npx supabase status -o env`);
+// override via env for real environments.
+const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+  ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+// Vendure asset store root (asset.source is relative to this).
+const VENDURE_ASSET_DIR = process.env.VENDURE_ASSET_DIR
+  ?? path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'backend', 'static', 'assets');
+const ETL_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 // int8 -> Number, float8 -> Number (source creditLimit etc. are float8 cents)
 pg.types.setTypeParser(20, v => (v === null ? null : Number(v)));
@@ -79,6 +95,63 @@ async function mapPut(companyId, type, oldId, newId) {
   await tgt.query(
     'insert into public.etl_id_map (old_type, old_id, new_id, company_id) values ($1,$2,$3,$4) on conflict do nothing',
     [type, String(oldId), newId, companyId]);
+}
+
+// ---------------------------------------------------------------------------
+// Supabase API helpers (service role). Used by the --prod auth branch and by
+// copyAssets(). 429 -> exponential backoff retry.
+// ---------------------------------------------------------------------------
+async function supaApi(pathname, init = {}, attempt = 0) {
+  const res = await fetch(SUPABASE_URL + pathname, {
+    ...init,
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      ...(init.body && !init.headers?.['content-type'] ? { 'content-type': 'application/json' } : {}),
+      ...(init.headers ?? {}),
+    },
+  });
+  if (res.status === 429 && attempt < 5) {
+    const wait = 1000 * 2 ** attempt;
+    console.log(`  WARN: Supabase API rate-limited (429); retrying in ${wait}ms`);
+    await new Promise(r => setTimeout(r, wait));
+    return supaApi(pathname, init, attempt + 1);
+  }
+  return res;
+}
+
+// --prod: create an auth user via the GoTrue Admin API. Falls back to an
+// admin-API lookup when the user is already registered.
+async function createAuthUserProd(u) {
+  const res = await supaApi('/auth/v1/admin/users', {
+    method: 'POST',
+    body: JSON.stringify({
+      phone: u.identifier,
+      phone_confirm: true,
+      ...(u.email ? { email: u.email, email_confirm: true } : {}),
+      user_metadata: { migrated_from: 'vendure', vendure_identifier: u.identifier },
+    }),
+  });
+  if (res.ok) return (await res.json()).id;
+  const body = await res.text();
+  if (res.status === 422 || /already|exists/i.test(body)) {
+    const found = await findAuthUserByPhone(u.identifier);
+    if (found) return found;
+  }
+  throw new Error(`admin create user failed: ${res.status} ${body}`);
+}
+
+async function findAuthUserByPhone(phone) {
+  for (let page = 1; page <= 50; page++) {
+    const res = await supaApi(`/auth/v1/admin/users?page=${page}&per_page=200`);
+    if (!res.ok) throw new Error(`admin list users failed: ${res.status} ${await res.text()}`);
+    const j = await res.json();
+    const users = Array.isArray(j) ? j : j.users ?? [];
+    const hit = users.find(x => x.phone === phone);
+    if (hit) return hit.id;
+    if (users.length < 200) return null;
+  }
+  return null;
 }
 
 const parseJsonText = (v, label) => {
@@ -222,11 +295,10 @@ try {
         if (byEmail.rows.length) return byEmail.rows[0].id;
       }
       if (FLAGS.prod) {
-        // TODO(prod): replace the direct insert below with the Supabase Admin API:
-        //   POST /auth/v1/admin/users { phone, phone_confirm: true, user_metadata: {...} }
-        //   using the service-role key, then map the returned id. Direct inserts into
-        //   auth.users are a LOCAL-REHEARSAL shortcut only.
-        throw new Error('--prod: auth user creation via Admin API not implemented yet (TODO)');
+        // Supabase Admin API (service role). Existing users were already
+        // matched by phone/email above; createAuthUserProd additionally
+        // resolves already-registered conflicts via an admin-API lookup.
+        return await createAuthUserProd(u);
       }
       const id = crypto.randomUUID();
       // mirrors testkit.create_user (supabase/tests/database/0000_testkit.test.sql)
@@ -884,32 +956,111 @@ try {
   }
 
   // -------------------------------------------------------------------------
-  // 10. assets: no file copy in rehearsal — count + log; copyAssets() is the
-  //     production hook (disk -> Supabase Storage upload).
+  // 10. assets: disk (Vendure asset store) -> Supabase Storage bucket
+  //     'product-images' under <company_id>/, then set products.image_path /
+  //     companies.logo_path. v2 keeps ONE image per product family: the
+  //     featured asset (else position 0); gallery extras and variant-level
+  //     assets have no v2 target field and are noted + skipped.
+  //     Skip-safe: a missing source file or failed upload warns + continues.
   // -------------------------------------------------------------------------
   {
-    const { rows: a } = await src.query(
-      `select a.id, a.source, a."mimeType" from asset a
-       where a.id in (
-         select pa."assetId" from product_asset pa
-           join product_channels_channel pcc on pcc."productId"=pa."productId" where pcc."channelId"=$1
-         union
-         select pva."assetId" from product_variant_asset pva
-           join product_variant_channels_channel vcc on vcc."productVariantId"=pva."productVariantId" where vcc."channelId"=$1
-         union
-         select $1::int where null -- placeholder keeps union shape simple
-       ) or a.id = (select "customFieldsCompanylogoassetid" from channel where id=$1)`,
-      [channel.id]);
-    const assets = a.filter(x => x.id != null);
-    stats.assets = { inserted: 0, existing: 0, skipped: assets.length };
-    console.log(`  assets: ${assets.length} source file(s) NOT copied (rehearsal); paths logged`);
-    for (const x of assets) console.log(`    asset ${x.id}: ${x.source} (${x.mimeType})`);
-    // TODO(prod): implement copyAssets(assets, companyId): read each source
-    // file from the Vendure asset store (disk), upload to the Supabase Storage
-    // bucket under <company_id>/..., then set products.image_path /
-    // companies.logo_path to the storage path. Not needed for rehearsal.
-    async function copyAssets() { throw new Error('not implemented (rehearsal skips asset copy)'); }
-    void copyAssets;
+    const s = stat('assets');
+    const { rows: prodAssets } = await src.query(
+      `select pa."productId", pa."assetId", pa.position,
+              (p."featuredAssetId" = pa."assetId") as featured,
+              a.source, a."mimeType"
+       from product_asset pa
+       join product_channels_channel pcc on pcc."productId" = pa."productId"
+       join product p on p.id = pa."productId"
+       join asset a on a.id = pa."assetId"
+       where pcc."channelId"=$1 and p."deletedAt" is null
+       order by pa."productId", pa.position`, [channel.id]);
+    const { rows: varAssets } = await src.query(
+      `select pva."assetId" from product_variant_asset pva
+       join product_variant_channels_channel vcc on vcc."productVariantId"=pva."productVariantId"
+       where vcc."channelId"=$1`, [channel.id]);
+    const { rows: logoRows } = await src.query(
+      `select a.id, a.source, a."mimeType" from channel c
+       join asset a on a.id = c."customFieldsCompanylogoassetid" where c.id=$1`, [channel.id]);
+
+    // chosen upload per product: featured asset, else lowest position
+    const byProduct = new Map(); // productId -> {assetId, source, mimeType, extras}
+    for (const a of prodAssets) {
+      const cur = byProduct.get(a.productId);
+      if (!cur) byProduct.set(a.productId, { ...a, extras: 0 });
+      else if (a.featured && !cur.featured) { cur.extras++; byProduct.set(a.productId, { ...a, extras: cur.extras }); }
+      else cur.extras++;
+    }
+    const logo = logoRows[0] ?? null;
+    if (varAssets.length) {
+      s.skipped += varAssets.length;
+      console.log(`  assets: ${varAssets.length} variant-level asset(s) have no v2 target field; skipped`);
+    }
+
+    const storagePath = asset => `${companyId}/asset-${asset.assetId ?? asset.id}${path.extname(asset.source)}`;
+    const filePath = asset => path.join(VENDURE_ASSET_DIR, asset.source);
+
+    if (DRY) {
+      for (const [pid, a] of byProduct) {
+        if (fs.existsSync(filePath(a))) { s.inserted++; console.log(`  plan asset: product ${pid} <- ${a.source} -> ${storagePath(a)}`); }
+        else { s.skipped++; console.log(`  WARN: asset file missing on disk: ${filePath(a)}`); }
+        if (a.extras) console.log(`  NOTE: product ${pid} has ${a.extras} gallery image(s) beyond the featured one; no v2 field, skipped`);
+      }
+      if (logo) {
+        if (fs.existsSync(filePath(logo))) { s.inserted++; console.log(`  plan asset: company logo <- ${logo.source} -> ${storagePath(logo)}`); }
+        else { s.skipped++; console.log(`  WARN: asset file missing on disk: ${filePath(logo)}`); }
+      }
+      if (!byProduct.size && !logo) console.log('  assets: none in source');
+    } else {
+      const mappedP = await mapAll(companyId, 'product');
+      // bucket is provisioned by migration 0022; create if missing (e.g. fresh env)
+      const bk = await supaApi('/storage/v1/bucket', {
+        method: 'POST',
+        body: JSON.stringify({ id: 'product-images', name: 'product-images', public: true }),
+      });
+      if (!bk.ok) {
+        const body = await bk.text();
+        if (!/already|duplicate|exist/i.test(body)) warn(`bucket create: ${bk.status} ${body}`);
+      }
+
+      async function copyAsset(asset, setPath, label) {
+        const file = filePath(asset);
+        if (!fs.existsSync(file)) { warn(`${label}: source file missing on disk (${file}); skipped`); s.skipped++; return; }
+        const target = storagePath(asset);
+        const up = await supaApi(`/storage/v1/object/product-images/${target}`, {
+          method: 'POST',
+          headers: { 'content-type': asset.mimeType ?? 'application/octet-stream', 'x-upsert': 'true' },
+          body: fs.readFileSync(file),
+        });
+        if (!up.ok) { warn(`${label}: storage upload failed (${up.status} ${await up.text()}); skipped`); s.skipped++; return; }
+        const changed = await setPath(target);
+        changed ? s.inserted++ : s.existing++;
+      }
+
+      for (const [pid, a] of byProduct) {
+        const newPid = mappedP.get(String(pid));
+        if (!newPid) { warn(`asset ${a.assetId}: product ${pid} not migrated; skipped`); s.skipped++; continue; }
+        await copyAsset(a, async target => {
+          const r = await tgt.query(
+            'update public.products set image_path=$1 where id=$2 and image_path is distinct from $1',
+            [target, newPid]);
+          return r.rowCount > 0;
+        }, `asset ${a.assetId} (product ${pid})`);
+        if (a.extras) {
+          s.skipped += a.extras;
+          console.log(`  NOTE: product ${pid} has ${a.extras} gallery image(s) beyond the featured one; no v2 field, skipped`);
+        }
+      }
+      if (logo) {
+        await copyAsset(logo, async target => {
+          const r = await tgt.query(
+            'update public.companies set logo_path=$1 where id=$2 and logo_path is distinct from $1',
+            [target, companyId]);
+          return r.rowCount > 0;
+        }, `asset ${logo.id} (company logo)`);
+      }
+      if (!byProduct.size && !logo) console.log('  assets: none in source');
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -918,6 +1069,15 @@ try {
   if (FLAGS.apply) {
     await tgt.query('commit');
     console.log('\nCOMMITTED.');
+    // audit: export this company's etl_id_map (scripts/etl/export-map.mjs)
+    try {
+      const out = execFileSync(process.execPath,
+        [path.join(ETL_DIR, 'export-map.mjs'), '--channel', String(channel.id)],
+        { encoding: 'utf8' });
+      process.stdout.write(out);
+    } catch (e) {
+      warn('etl_id_map export failed: ' + e.message);
+    }
   } else {
     console.log('\nDRY RUN — nothing written.');
   }

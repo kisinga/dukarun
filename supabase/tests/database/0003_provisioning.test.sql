@@ -41,7 +41,7 @@ select is(
    join public.ledger_accounts p on a.parent_id = p.id
    where a.company_id = (select company_id from provision_result) and p.code = 'CASH'),
   3,
-  'CASH parent has 3 sub-accounts (CASH_ON_HAND, BANK_MAIN, CLEARING_MPESA)'
+  'CASH parent has 3 sub-accounts (CASH_ON_HAND, BANK_MAIN, MPESA)'
 );
 
 select is(
@@ -53,8 +53,8 @@ select is(
 select is(
   (select ledger_account_code from public.payment_methods
    where company_id = (select company_id from provision_result) and code = 'mpesa'),
-  'CLEARING_MPESA',
-  'mpesa payment method maps to CLEARING_MPESA'
+  'MPESA',
+  'mpesa payment method maps to MPESA'
 );
 
 select is(

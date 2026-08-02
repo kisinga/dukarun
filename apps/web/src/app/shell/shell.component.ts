@@ -1,6 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { filter } from 'rxjs';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { Company, SupabaseService } from '../core/supabase.service';
 import { ThemeService } from '../core/theme.service';
@@ -24,24 +23,6 @@ interface NavSection {
  * sidebar always open on desktop, slide-over on mobile — plus a mobile
  * bottom tab bar for the core destinations.
  */
-const ROUTE_LABELS: [RegExp, string][] = [
-  [/^\/dashboard$/, 'Dashboard'],
-  [/^\/pos\/sell/, 'Sell'],
-  [/^\/pos\/proformas/, 'Proformas'],
-  [/^\/pos\/cashier/, 'Cashier Queue'],
-  [/^\/pos\/sync/, 'Pending Sync'],
-  [/^\/orders/, 'Orders'],
-  [/^\/reports/, 'Reports'],
-  [/^\/money/, 'Money'],
-  [/^\/products/, 'Products'],
-  [/^\/customers/, 'Customers'],
-  [/^\/team/, 'Team'],
-  [/^\/approvals/, 'Approvals'],
-  [/^\/messaging/, 'Messaging'],
-  [/^\/notifications/, 'Notifications'],
-  [/^\/settings/, 'Settings'],
-  [/^\/billing/, 'Billing'],
-];
 
 @Component({
   selector: 'app-shell',
@@ -59,10 +40,8 @@ const ROUTE_LABELS: [RegExp, string][] = [
             </label>
           </div>
 
-          <div class="flex min-w-0 flex-1 items-center gap-2.5 px-2">
-            <!-- Page context (brand lives in the sidebar, not duplicated here) -->
-            <span class="truncate text-sm font-semibold">{{ pageContext() }}</span>
-          </div>
+          <!-- Page titles live in the pages; the navbar stays out of the way. -->
+          <div class="flex-1"></div>
 
           <div class="flex flex-none items-center gap-1.5">
             <!-- Notifications -->
@@ -223,63 +202,44 @@ export class ShellComponent implements OnInit {
 
   protected readonly company = signal<Company | null>(null);
   protected readonly tillOpen = signal(false);
-  protected readonly pageContext = signal('Dashboard');
-
-  constructor() {
-    this.router.events
-      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
-      .subscribe(e => {
-        const path = e.urlAfterRedirects.split('?')[0];
-        const match = ROUTE_LABELS.find(([re]) => re.test(path));
-        this.pageContext.set(match ? match[1] : 'Dashboard');
-      });
-  }
 
   protected readonly sections: NavSection[] = [
     {
       items: [{ route: '/dashboard', label: 'Dashboard', icon: 'heroHome' }],
     },
     {
-      label: 'Sell',
+      label: 'Operations',
       items: [
-        { route: '/pos/sell', label: 'POS', icon: 'heroShoppingCart' },
-        { route: '/pos/proformas', label: 'Proformas', icon: 'heroClipboardDocumentList' },
-        { route: '/pos/cashier', label: 'Cashier Queue', icon: 'heroCreditCard' },
-        { route: '/pos/sync', label: 'Pending Sync', icon: 'heroArchiveBox' },
-      ],
-    },
-    {
-      label: 'Sales',
-      items: [
+        { route: '/pos/sell', label: 'Sell', icon: 'heroShoppingCart' },
+        { route: '/pos/cashier', label: 'Cashier Queue', icon: 'heroQueueList' },
         { route: '/orders', label: 'Orders', icon: 'heroClipboardDocumentList' },
-        { route: '/reports', label: 'Reports', icon: 'heroChartBar' },
-      ],
-    },
-    {
-      label: 'Money',
-      items: [
-        { route: '/money/cashier', label: 'Cashier', icon: 'heroBanknotes' },
-        { route: '/money/expenses', label: 'Expenses', icon: 'heroReceiptRefund' },
-        { route: '/money/transfers', label: 'Transfers', icon: 'heroArrowsRightLeft' },
-        { route: '/money/credit', label: 'Credit', icon: 'heroCreditCard' },
-        { route: '/money/suppliers', label: 'Suppliers', icon: 'heroTruck' },
-        { route: '/money/periods', label: 'Periods', icon: 'heroCalendarDays' },
-        { route: '/money/stock', label: 'Stock', icon: 'heroArchiveBox' },
-      ],
-    },
-    {
-      label: 'Manage',
-      items: [
+        { route: '/pos/proformas', label: 'Proformas', icon: 'heroDocumentText' },
         { route: '/products', label: 'Products', icon: 'heroCube' },
-        { route: '/customers', label: 'Customers', icon: 'heroUsers' },
-        { route: '/team', label: 'Team', icon: 'heroUserGroup' },
+        { route: '/stock-adjustments', label: 'Stock Adjustments', icon: 'heroArchiveBox' },
+        { route: '/pos/sync', label: 'Pending Sync', icon: 'heroArrowPath' },
+      ],
+    },
+    {
+      label: 'Finance',
+      items: [
+        { route: '/money/cashier', label: 'Money', icon: 'heroBanknotes' },
+        { route: '/credit', label: 'Credit', icon: 'heroCreditCard' },
+        { route: '/reports', label: 'Reports', icon: 'heroChartBar' },
         {
           route: '/approvals',
           label: 'Approvals',
           icon: 'heroCheckBadge',
           badge: () => this.approvals.pending().length,
         },
-        { route: '/messaging', label: 'Messaging', icon: 'heroBell' },
+      ],
+    },
+    {
+      label: 'People',
+      items: [
+        { route: '/customers', label: 'Customers', icon: 'heroUsers' },
+        { route: '/suppliers', label: 'Suppliers', icon: 'heroTruck' },
+        { route: '/team', label: 'Team', icon: 'heroUserGroup' },
+        { route: '/messaging', label: 'Messaging', icon: 'heroChatBubbleLeftRight' },
       ],
     },
   ];

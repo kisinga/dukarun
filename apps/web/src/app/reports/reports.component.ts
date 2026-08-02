@@ -32,7 +32,7 @@ type CustomerRow = {
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
-        <app-page-header title="Reports" backLink="/dashboard" backLabel="Dashboard" />
+        <app-page-header title="Reports" />
 
         <!-- Date range -->
         <div class="card mb-4 bg-base-100">

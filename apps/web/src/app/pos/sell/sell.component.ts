@@ -36,7 +36,7 @@ import {
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4 pb-24 lg:pb-4">
       <div class="page page-wide">
-        <app-page-header title="Sell" backLink="/dashboard" backLabel="Dashboard">
+        <app-page-header title="Sell">
           @if (cart.draftId()) {
             <span actions class="badge badge-info">Editing proforma</span>
           }

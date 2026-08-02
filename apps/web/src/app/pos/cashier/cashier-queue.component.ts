@@ -11,7 +11,7 @@ import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
-        <app-page-header title="Cashier Queue" backLink="/dashboard" backLabel="Dashboard">
+        <app-page-header title="Cashier Queue">
           <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
         </app-page-header>
 

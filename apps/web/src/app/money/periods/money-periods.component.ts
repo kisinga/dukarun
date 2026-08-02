@@ -1,8 +1,10 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { PageHeaderComponent } from '../../shared/ui/page-header.component';
-import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { formatKes, parseKesToCents } from '../../core/money';
+import { parseKesToCents } from '../../core/money';
+import { ButtonComponent } from '../../shared/ui/button.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
+import { FormFieldComponent } from '../../shared/ui/form-field.component';
+import { MoneyComponent } from '../../shared/ui/money.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 import {
   AccountingPeriod,
@@ -18,239 +20,236 @@ import {
   imports: [
     FormsModule,
     ReactiveFormsModule,
-    PageHeaderComponent,
+    FormFieldComponent,
+    ButtonComponent,
+    MoneyComponent,
     EmptyStateComponent,
     StatusBadgeComponent,
   ],
   template: `
-    <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="page">
-        <app-page-header title="Reconciliation &amp; Periods">
-          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </app-page-header>
+    <div class="mb-3 flex items-center justify-end">
+      <button appButton variant="ghost" (click)="load()">Refresh</button>
+    </div>
 
-        @if (error()) {
-          <p class="mb-2 text-sm text-error">{{ error() }}</p>
-        }
-        @if (notice()) {
-          <p class="mb-2 text-sm text-success">{{ notice() }}</p>
-        }
+    @if (error()) {
+      <p class="mb-2 text-sm text-error">{{ error() }}</p>
+    }
+    @if (notice()) {
+      <p class="mb-2 text-sm text-success">{{ notice() }}</p>
+    }
 
-        @if (lock(); as l) {
-          <div class="alert alert-warning mb-4">
-            <span
-              >Books are locked through <strong>{{ l.lock_end_date }}</strong
-              >.</span
-            >
-          </div>
-        }
+    @if (lock(); as l) {
+      <div class="alert alert-warning mb-4">
+        <span
+          >Books are locked through <strong>{{ l.lock_end_date }}</strong
+          >.</span
+        >
+      </div>
+    }
 
-        <!-- Manual reconciliation -->
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <h2 class="card-title text-lg">Manual reconciliation</h2>
-            <p class="text-xs text-base-content/60">
-              Declare actual balances per cashier-controlled account (e.g. after checking the M-Pesa
-              statement or the bank). A reason is required for accounts with variance.
-            </p>
-            <div class="mt-2 flex flex-col gap-2">
-              @for (account of accounts(); track account.account_code) {
-                <div class="flex flex-wrap items-end gap-2">
-                  <label class="form-control w-48">
-                    <span class="label-text text-xs">
-                      {{ account.label }} ({{ account.account_code }})
-                    </span>
-                    <input
-                      type="text"
-                      inputmode="decimal"
-                      class="input input-bordered input-sm"
-                      placeholder="0.00"
-                      [(ngModel)]="declared[account.account_code]"
-                    />
-                  </label>
-                  <label class="form-control flex-1">
-                    <span class="label-text text-xs">Reason (optional)</span>
-                    <input
-                      type="text"
-                      class="input input-bordered input-sm"
-                      [(ngModel)]="reasons[account.account_code]"
-                    />
-                  </label>
-                </div>
-              }
-              <button
-                class="btn btn-primary btn-sm mt-2 self-start"
-                [disabled]="busy() || accounts().length === 0"
-                (click)="reconcile()"
+    <!-- Manual reconciliation -->
+    <div class="card mb-4 bg-base-100">
+      <div class="card-body p-4">
+        <h2 class="section-title mb-2">Manual reconciliation</h2>
+        <p class="text-xs text-base-content/60">
+          Declare actual balances per cashier-controlled account (e.g. after checking the M-Pesa
+          statement or the bank). A reason is required for accounts with variance.
+        </p>
+        <div class="mt-2 flex flex-col gap-2">
+          @for (account of accounts(); track account.account_code) {
+            <div class="flex flex-wrap items-end gap-2">
+              <app-form-field
+                class="w-48"
+                [label]="account.label + ' (' + account.account_code + ')'"
               >
-                {{ busy() ? 'Recording…' : 'Record reconciliation' }}
-              </button>
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  class="input input-bordered input-sm w-full"
+                  placeholder="0.00"
+                  [(ngModel)]="declared[account.account_code]"
+                />
+              </app-form-field>
+              <app-form-field label="Reason (optional)" class="flex-1">
+                <input
+                  type="text"
+                  class="input input-bordered input-sm w-full"
+                  [(ngModel)]="reasons[account.account_code]"
+                />
+              </app-form-field>
             </div>
-          </div>
+          }
+          <button
+            appButton
+            class="mt-2 self-start"
+            [loading]="busy()"
+            [disabled]="accounts().length === 0"
+            (click)="reconcile()"
+          >
+            Record reconciliation
+          </button>
         </div>
+      </div>
+    </div>
 
-        <!-- Close period -->
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <h2 class="card-title text-lg">Close accounting period</h2>
-            <p class="text-xs text-base-content/60">
-              Closing locks all posting through the end date. The backend gates this on
-              reconciliations and open sessions — its messages are shown verbatim.
-            </p>
-            <form
-              (submit)="$event.preventDefault(); askClose()"
-              class="mt-2 flex flex-wrap items-end gap-2"
-            >
-              <label class="form-control">
-                <span class="label-text text-xs">Period end date</span>
-                <input type="date" class="input input-bordered input-sm" [formControl]="endDate" />
-              </label>
-              @if (confirmClose()) {
-                <button type="submit" class="btn btn-error btn-sm" [disabled]="busy()">
-                  {{ busy() ? 'Closing…' : 'Confirm close' }}
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-sm"
-                  (click)="confirmClose.set(false)"
-                >
-                  Cancel
-                </button>
-              } @else {
-                <button type="submit" class="btn btn-outline btn-sm">Close period</button>
-              }
-            </form>
-          </div>
-        </div>
+    <!-- Close period -->
+    <div class="card mb-4 bg-base-100">
+      <div class="card-body p-4">
+        <h2 class="section-title mb-2">Close accounting period</h2>
+        <p class="text-xs text-base-content/60">
+          Closing locks all posting through the end date. The backend gates this on
+          reconciliations and open sessions — its messages are shown verbatim.
+        </p>
+        <form
+          (submit)="$event.preventDefault(); askClose()"
+          class="mt-2 flex flex-wrap items-end gap-2"
+        >
+          <app-form-field label="Period end date">
+            <input
+              type="date"
+              class="input input-bordered input-sm w-full"
+              [formControl]="endDate"
+            />
+          </app-form-field>
+          @if (confirmClose()) {
+            <button appButton variant="error" type="submit" [loading]="busy()">
+              Confirm close
+            </button>
+            <button appButton variant="ghost" type="button" (click)="confirmClose.set(false)">
+              Cancel
+            </button>
+          } @else {
+            <button appButton variant="outline" type="submit">Close period</button>
+          }
+        </form>
+      </div>
+    </div>
 
-        <!-- Recent reconciliations (variance review) -->
-        <h2 class="mb-2 text-lg font-semibold">Recent reconciliations</h2>
-        @if (recons().length === 0) {
-          <p class="mb-4 text-sm text-base-content/60">No reconciliations recorded yet.</p>
-        } @else {
-          <div class="mb-4 flex flex-col gap-2">
-            @for (recon of recons(); track recon.id) {
-              <div class="card bg-base-100">
-                <div class="card-body p-4">
-                  <div class="flex items-center gap-3">
-                    <span class="badge badge-outline">{{ recon.scope }}</span>
-                    <span class="type-caption">{{ time(recon.created_at) }}</span>
-                  </div>
-                  <div class="table-scroll">
-                    <table class="table table-sm mt-2">
-                      <thead>
-                        <tr>
-                          <th>Account</th>
-                          <th class="text-right">Declared</th>
-                          <th class="text-right">Expected</th>
-                          <th class="text-right">Variance</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (ra of recon.reconciliation_accounts; track ra.id) {
-                          <tr>
-                            <td class="font-mono text-xs">{{ ra.account_code }}</td>
-                            <td class="text-right">{{ fmt(ra.declared) }}</td>
-                            <td class="text-right">{{ fmt(ra.expected) }}</td>
-                            <td
-                              class="text-right font-semibold"
-                              [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
-                            >
-                              {{ fmt(ra.variance) }}
-                            </td>
-                            <td class="text-right">
-                              @if (ra.reviewed_at) {
-                                <span class="type-caption">
-                                  Reviewed · User …{{ shortId(ra.reviewed_by) }} ·
-                                  {{ date(ra.reviewed_at) }}
-                                </span>
-                              } @else if (ra.variance !== 0) {
-                                @if (revertingFor() === ra.id) {
-                                  <div class="flex items-center justify-end gap-1">
-                                    <input
-                                      type="text"
-                                      class="input input-bordered input-xs w-36"
-                                      placeholder="Reason (optional)"
-                                      [formControl]="revertReason"
-                                    />
-                                    <button
-                                      class="btn btn-warning btn-xs"
-                                      [disabled]="busy()"
-                                      (click)="confirmRevert(ra.id)"
-                                    >
-                                      Confirm
-                                    </button>
-                                    <button
-                                      class="btn btn-ghost btn-xs"
-                                      (click)="revertingFor.set(null)"
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                } @else {
-                                  <button
-                                    class="btn btn-warning btn-outline btn-xs"
-                                    [disabled]="busy()"
-                                    (click)="startRevert(ra.id)"
-                                  >
-                                    Revert
-                                  </button>
-                                }
-                              }
-                            </td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            }
-          </div>
-        }
-
-        <!-- Periods list -->
-        <h2 class="mb-2 text-lg font-semibold">Periods</h2>
-        @if (periods().length === 0) {
-          <app-empty-state
-            icon="heroClipboardDocumentList"
-            title="No periods yet"
-            description="Reconcile, then close your first accounting period below."
-          />
-        } @else {
+    <!-- Recent reconciliations (variance review) -->
+    <h2 class="section-title mb-2">Recent reconciliations</h2>
+    @if (recons().length === 0) {
+      <p class="mb-4 text-sm text-base-content/60">No reconciliations recorded yet.</p>
+    } @else {
+      <div class="mb-4 flex flex-col gap-2">
+        @for (recon of recons(); track recon.id) {
           <div class="card bg-base-100">
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>Start</th>
-                  <th>End</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (p of periods(); track p.id) {
-                  <tr>
-                    <td>{{ p.start_date }}</td>
-                    <td>{{ p.end_date }}</td>
-                    <td>
-                      <app-status-badge type="neutral" [label]="p.status" />
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+            <div class="card-body p-4">
+              <div class="flex items-center gap-3">
+                <span class="badge badge-outline">{{ recon.scope }}</span>
+                <span class="type-caption">{{ time(recon.created_at) }}</span>
+              </div>
+              <div class="table-scroll">
+                <table class="table table-sm mt-2">
+                  <thead>
+                    <tr>
+                      <th>Account</th>
+                      <th class="text-right">Declared</th>
+                      <th class="text-right">Expected</th>
+                      <th class="text-right">Variance</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (ra of recon.reconciliation_accounts; track ra.id) {
+                      <tr>
+                        <td class="font-mono text-xs">{{ ra.account_code }}</td>
+                        <td class="text-right"><app-money [cents]="ra.declared" /></td>
+                        <td class="text-right"><app-money [cents]="ra.expected" /></td>
+                        <td
+                          class="text-right font-semibold"
+                          [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
+                        >
+                          <app-money [cents]="ra.variance" />
+                        </td>
+                        <td class="text-right">
+                          @if (ra.reviewed_at) {
+                            <span class="type-caption">
+                              Reviewed · User …{{ shortId(ra.reviewed_by) }} ·
+                              {{ date(ra.reviewed_at) }}
+                            </span>
+                          } @else if (ra.variance !== 0) {
+                            @if (revertingFor() === ra.id) {
+                              <div class="flex items-center justify-end gap-1">
+                                <input
+                                  type="text"
+                                  class="input input-bordered input-xs w-36"
+                                  placeholder="Reason (optional)"
+                                  [formControl]="revertReason"
+                                />
+                                <button
+                                  class="btn btn-warning btn-xs"
+                                  [disabled]="busy()"
+                                  (click)="confirmRevert(ra.id)"
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  class="btn btn-ghost btn-xs"
+                                  (click)="revertingFor.set(null)"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            } @else {
+                              <button
+                                class="btn btn-warning btn-outline btn-xs"
+                                [disabled]="busy()"
+                                (click)="startRevert(ra.id)"
+                              >
+                                Revert
+                              </button>
+                            }
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         }
       </div>
-    </main>
+    }
+
+    <!-- Periods list -->
+    <h2 class="section-title mb-2">Periods</h2>
+    @if (periods().length === 0) {
+      <app-empty-state
+        icon="heroClipboardDocumentList"
+        title="No periods yet"
+        description="Reconcile, then close your first accounting period below."
+      />
+    } @else {
+      <div class="card bg-base-100">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Start</th>
+              <th>End</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of periods(); track p.id) {
+              <tr>
+                <td>{{ p.start_date }}</td>
+                <td>{{ p.end_date }}</td>
+                <td>
+                  <app-status-badge type="neutral" [label]="p.status" />
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
   `,
 })
 export class MoneyPeriodsComponent implements OnInit {
   private readonly money = inject(MoneyService);
 
   protected readonly accounts = signal<CashierAccount[]>([]);
-  protected readonly fmt = formatKes;
   protected readonly periods = signal<AccountingPeriod[]>([]);
   protected readonly lock = signal<PeriodLock | null>(null);
   protected readonly declared: Record<string, string> = {};

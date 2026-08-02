@@ -103,6 +103,42 @@
       padding: 1rem;
     }
   }
+
+  /* ONE form-field recipe: caption label above the control, consistent gap.
+     Used by app-form-field; keeps labels/hints/errors aligned without per-page CSS. */
+  .form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+
+  .form-field-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1rem;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  }
+
+  .form-field-hint {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  }
+
+  .form-field-error {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--color-error);
+  }
+
+  /* ONE section-heading recipe ("Recent expenses", card section titles). */
+  .section-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
+  }
 }
 
 @layer components {
@@ -164,6 +200,14 @@
 
     ng-icon {
       color: var(--color-primary);
+    }
+  }
+
+  /* Desktop pointer: denser nav rows (touch keeps the 44px target). */
+  @media (min-width: 1024px) {
+    .nav-item {
+      min-height: 2.25rem;
+      padding: 0.375rem 0.75rem;
     }
   }
 
@@ -259,9 +303,9 @@
   prefersdark: true;
   color-scheme: dark;
 
-  --color-base-100: #1c1c1f;
+  --color-base-100: #212126;
   --color-base-200: #131316;
-  --color-base-300: #2a2a2e;
+  --color-base-300: #2c2c31;
   --color-base-content: #e8e8e6;
   --color-primary: #e85d2f;
   --color-primary-content: #ffffff;

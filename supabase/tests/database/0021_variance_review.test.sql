@@ -23,7 +23,7 @@ select testkit.as_user((select company_id from vr_company), '11111111-1111-1111-
 create temp table vr_session as
 select public.open_cashier_session('[
   {"account_code":"CASH_ON_HAND","declared":0},
-  {"account_code":"CLEARING_MPESA","declared":0}
+  {"account_code":"MPESA","declared":0}
 ]') as session_id;
 
 select public.post_sale(null,
@@ -32,7 +32,7 @@ select public.post_sale(null,
 
 select public.close_cashier_session((select session_id from vr_session), '[
   {"account_code":"CASH_ON_HAND","declared":9000},
-  {"account_code":"CLEARING_MPESA","declared":0}
+  {"account_code":"MPESA","declared":0}
 ]');
 
 -- Baseline: CASH_ON_HAND balance is 9000 (10000 - 1000 variance).

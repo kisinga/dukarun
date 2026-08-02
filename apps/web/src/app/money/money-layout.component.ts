@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { PageHeaderComponent } from '../shared/ui/page-header.component';
+import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 
 interface MoneyTab {
   route: string;
@@ -13,25 +13,26 @@ interface MoneyTab {
  */
 @Component({
   selector: 'app-money-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, PageHeaderComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, PageLayoutComponent],
   template: `
-    <app-page-header title="Money" backLink="/dashboard" backLabel="Dashboard" />
-    <div
-      role="tablist"
-      class="tabs tabs-boxed scroll-fade-r mb-4 w-full flex-nowrap overflow-x-auto"
-    >
-      @for (tab of tabs; track tab.route) {
-        <a
-          role="tab"
-          class="tab min-h-11 shrink-0"
-          [routerLink]="tab.route"
-          routerLinkActive="tab-active"
-        >
-          {{ tab.label }}
-        </a>
-      }
-    </div>
-    <router-outlet />
+    <app-page title="Money">
+      <div
+        role="tablist"
+        class="tabs tabs-boxed scroll-fade-r mb-4 w-full flex-nowrap overflow-x-auto"
+      >
+        @for (tab of tabs; track tab.route) {
+          <a
+            role="tab"
+            class="tab min-h-11 shrink-0"
+            [routerLink]="tab.route"
+            routerLinkActive="tab-active"
+          >
+            {{ tab.label }}
+          </a>
+        }
+      </div>
+      <router-outlet />
+    </app-page>
   `,
 })
 export class MoneyLayoutComponent {
@@ -39,9 +40,6 @@ export class MoneyLayoutComponent {
     { route: '/money/cashier', label: 'Cashier' },
     { route: '/money/expenses', label: 'Expenses' },
     { route: '/money/transfers', label: 'Transfers' },
-    { route: '/money/credit', label: 'Credit' },
-    { route: '/money/suppliers', label: 'Suppliers' },
     { route: '/money/periods', label: 'Periods' },
-    { route: '/money/stock', label: 'Stock' },
   ];
 }

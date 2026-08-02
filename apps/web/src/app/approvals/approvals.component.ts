@@ -23,8 +23,6 @@ const TYPE_BADGE: Record<string, string> = {
       <div class="page">
         <app-page-header
           title="Approvals"
-          backLink="/dashboard"
-          backLabel="Dashboard"
           [subtitle]="approvals.pending().length + ' pending'"
         />
 

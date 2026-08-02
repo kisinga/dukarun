@@ -14,7 +14,7 @@ import { ReceiptDataService } from '../../shared/print/receipt-data.service';
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
-        <app-page-header title="Proformas" backLink="/dashboard" backLabel="Dashboard">
+        <app-page-header title="Proformas">
           <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
         </app-page-header>
 

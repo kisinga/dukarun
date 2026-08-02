@@ -1,10 +1,11 @@
 # Dukarun Design Language — "The Counter"
 
 This document is the normative spec for all Dukarun dashboard UI. It is short on purpose:
-the real enforcement lives in code — tokens in `frontend/src/styles.scss` (`@theme`), shared
-components in `frontend/src/app/shared/`, and the `design-guard` CI gate
-(`frontend/scripts/design-guard.mjs`). If this doc and the code disagree, **the code is
-wrong** — fix the code or update this doc in the same PR.
+the real enforcement lives in code — tokens in `apps/web/src/styles.scss` (`@theme` + global
+recipes), shared components in `apps/web/src/app/shared/ui/`, and the `design-guard` CI gate
+(`apps/web/scripts/design-guard.mjs`, run via `npm run design-guard` in `apps/web`). The legacy
+`frontend/` app follows the same language with its own guard. If this doc and the code
+disagree, **the code is wrong** — fix the code or update this doc in the same PR.
 
 ---
 
@@ -73,36 +74,37 @@ The orange is a spice, not a sauce.
 
 ## Type scale — 5 roles (dashboard)
 
-Dashboard text never exceeds 24px. Use these roles (Tailwind classes shown):
+Dashboard text never exceeds 24px. The roles are encoded as Tailwind utilities in
+`apps/web/src/styles.scss` — use them, not raw size classes:
 
-| Role | Classes | Use |
+| Role | Utility | Use |
 |---|---|---|
-| `hero` | `text-2xl font-bold tracking-tight tabular-nums` | Stat numbers, totals |
-| `title` | `text-xl font-bold tracking-tight` | Page titles only (via `PageHeaderComponent`) |
-| `heading` | `text-sm font-semibold` | Section headings |
-| `body` | `text-sm` | Values, rows |
-| `caption` | `text-xs text-base-content/60` | Labels, timestamps |
+| `hero` | `type-hero` (24px bold, `tracking-tight`, `tabular-nums`) | Stat numbers, totals |
+| `title` | `type-title` (20px bold tight) | Page titles only (via `PageHeaderComponent`) |
+| `heading` | `type-heading` / `.section-title` (14px semibold) | Section headings |
+| `body` | `type-body` (14px) | Values, rows |
+| `caption` | `type-caption` (12px, `/60` muted) | Labels, timestamps |
 
 - No arbitrary sizes (`text-[10px]`, `text-[11px]`) — the guard rejects them.
-- Marketing pages (`home`, `pricing`, `features`, `about`, `contact`, auth) have their own
-  scale in `frontend/src/styles/_marketing.scss`; this scale governs the dashboard.
+- Marketing pages in the legacy `frontend/` app have their own scale
+  (`frontend/src/styles/_marketing.scss`); this scale governs the dashboard.
 
 ## Spacing
 
 - 4-point system: Tailwind steps `1, 1.5, 2, 3, 4, 6, 8`. No arbitrary px spacing.
-- Page content lives in the standard `dashboard-main` wrapper — pages add only vertical
-  rhythm: `space-y-6` between sections, `gap-2`/`gap-3` within a group. Do not nest
-  `container-app` inside dashboard pages.
+- Page content lives in `<app-page>` (`PageLayoutComponent`), which owns the
+  `dashboard-main` + `.page` wrapper — pages add only vertical rhythm: `space-y-6`
+  between sections, `gap-2`/`gap-3` within a group. Never hand-roll the
+  `dashboard-main`/`.page` boilerplate in a page template.
 
 ## Icons
 
-- System: `@ng-icons/heroicons` (outline), registered in
-  `frontend/src/app/shared/icons/app-icons.ts`. Use `<ng-icon name="hero…">`.
-- **No inline `<svg>`, no emoji, ever** — the guard rejects them. Add missing icons to the
-  registry.
-- Sizes: use the `AppIconComponent` wrapper — `sm` (14px, with `text-xs`), `md` (16px, with
-  `text-sm`, the default), `lg` (20px, standalone), `xl` (40px, decorative only: empty states
-  and large placeholders). No other values.
+- System: `@ng-icons/heroicons` (outline), registered via `provideIcons()` in
+  `apps/web/src/app/app.config.ts`. Add missing icons to that registry.
+- **No inline `<svg>`, no emoji, ever** — the guard rejects them.
+- Always use `<app-icon name="hero…">` (`IconComponent`) — sizes: `sm` (14px, with
+  `text-xs`), `md` (16px, with `text-sm`, the default), `lg` (20px, standalone),
+  `xl` (40px, decorative only: empty states and large placeholders). No other values.
 
 ## Depth & colour tokens
 
@@ -110,16 +112,41 @@ Dashboard text never exceeds 24px. Use these roles (Tailwind classes shown):
 - Radius: `--radius-box` for cards, `--radius-field` for inputs/buttons, `--radius-selector`
   for chips/toggles. No `rounded-xl/2xl/3xl` on cards.
 - Colours come from the daisyUI theme only. No hardcoded hex in component styles.
+- Dark mode: card surfaces (`base-100`) sit lighter than the page (`base-200`) so depth
+  reads without shadows; keep `--depth: 0`.
+
+## Shared primitives (`apps/web/src/app/shared/ui/`)
+
+Compose pages from these — never hand-roll what a primitive owns:
+
+- **`<app-page>`** — the page shell. Owns `dashboard-main` + `.page`; pass `title` (+
+  optional `subtitle`, `badge`, `backLink`) for the standard header and project header
+  actions into the `[actions]` slot. `wide` bumps the wrapper to max-w-7xl.
+- **`<app-form-field label="…">`** — one field recipe (label above the control, optional
+  `hint` / `error`, `required` marker). Wrap every input/select in forms; add `w-full` to
+  the projected control. No bare `form-control`/`label-text` blocks.
+- **`<button appButton>`** — one button idiom: `variant="primary|outline|ghost|error"`,
+  `size="sm|md"`, `[loading]` swaps in a spinner and disables. No raw `btn btn-*` strings
+  for standard actions (tight table-row clusters may stay raw by exception).
+- **`<app-money [cents]>`** — the only way to render money: tabular-nums KES formatting,
+  `direction="in|out"` for money-meaning colour, `masked` for hidden figures. Never
+  `{{ formatKes(...) }}` in templates (string composition in TS, e.g. option labels, is fine).
+- **`<app-icon>`** — icons on the 4-size scale (see Icons).
+- Plus the existing shells: `app-page-header` (inside `app-page`), `app-stat-bar`,
+  `app-stat-card`, `app-status-badge`, `app-empty-state`, `app-list-search-bar`,
+  `app-pagination`, `app-entity-avatar`, `app-mobile-fab`, `app-delete-confirmation-modal`.
+
+Global recipes in `styles.scss` complement them: `.card`, `.form-field` (used by
+`app-form-field`), `.section-title`, `.modal-box`, `.nav-item`, table header chrome.
 
 ## The List Page (canonical layout)
 
 Every list page is the same four blocks, top to bottom — no improvisation:
 
-1. **`<app-page-header>`** — title (+ subtitle). Stats strip in the `[header-stats]` slot via a
-   per-domain `*-stats` wrapper over `app-stat-bar` (pills; tones are money-meaning only —
-   neutral totals, warning/error for states that need action; the bar's zero-guard handles
-   the rest, wrappers don't re-implement it). **The create action lives in the `[actions]`
-   slot**: one `btn btn-primary btn-sm gap-2` with a `heroPlus` icon ("Add Customer",
+1. **`<app-page title="…">`** — the shell + header. Stats strip via `app-stat-bar` pills
+   (tones are money-meaning only — neutral totals, warning/error for states that need
+   action; the bar's zero-guard handles the rest). **The create action lives in the
+   `[actions]` slot**: one `<button appButton>` with a `heroPlus` icon ("Add Customer",
    "Record Adjustment"…). Never in the table footer, never a bare floating row.
 2. **`<app-list-search-bar>`** — search input + `[badges]` + `[filters]` slots. No custom
    search rows, no bare `input-bordered`.
@@ -131,10 +158,10 @@ Every list page is the same four blocks, top to bottom — no improvisation:
 Pages without countable state may omit stats (rare); pages whose entities originate
 elsewhere (orders from the POS) omit the create action.
 
-**Trend/insight cards** — any time-series or analytics panel on a list page uses
-`<app-trend-card>` (shared/components/dashboard/trend-card.component.ts): collapsible,
-lazy-loaded, `type-heading` title, hairline divider, standard card recipe. One per page,
-between the header and the search bar. Never hand-roll the collapse chrome.
+**Trend/insight cards** — the legacy app used a collapsible `<app-trend-card>` for analytics
+panels on list pages; it has not been ported to `apps/web` yet. Until it is, keep analytics
+panels in a standard `card` with a `.section-title` heading, one per page, between the
+header and the search bar.
 
 ## Navigation chrome (sidebar / bottom nav)
 
@@ -168,11 +195,12 @@ vocabulary — same meaning, same shape; different data, different cells:
   single full-width `td` (inset surface is encoded). No second zebra inside, no nested
   bordered boxes.
 
-## Enforcement checklist (review + `npm run design-guard`)
+## Enforcement checklist (review + `npm run design-guard` in `apps/web`)
 
 - [ ] No dashboard text > `text-2xl`; titles/hero numbers are `tracking-tight`; amounts are `tabular-nums`.
 - [ ] One card recipe; no nested bordered boxes; heavy shadows only on overlays.
 - [ ] Semantic colour only with money meaning; muted text via `base-content/xx`.
-- [ ] Icons via `AppIconComponent`/`<ng-icon>`; zero inline `<svg>`; zero emoji.
-- [ ] Page titles via `PageHeaderComponent`; modals via the shared shell (full-screen on mobile).
+- [ ] Icons via `<app-icon>`; zero inline `<svg>`; zero emoji.
+- [ ] Pages composed via `<app-page>`; forms via `<app-form-field>`; actions via `<button appButton>`; money via `<app-money>`.
+- [ ] Modals via the shared shell (`.modal-box`, full-screen on mobile).
 - [ ] Loading, empty, and error states present; touch targets ≥ 44px; phone layout first.

@@ -68,15 +68,11 @@ export const routes: Routes = [
           },
           {
             path: 'credit',
-            loadComponent: () =>
-              import('./money/credit/money-credit.component').then(m => m.MoneyCreditComponent),
+            redirectTo: '/credit',
           },
           {
             path: 'suppliers',
-            loadComponent: () =>
-              import('./money/suppliers/money-suppliers.component').then(
-                m => m.MoneySuppliersComponent
-              ),
+            redirectTo: '/suppliers',
           },
           {
             path: 'periods',
@@ -85,8 +81,7 @@ export const routes: Routes = [
           },
           {
             path: 'stock',
-            loadComponent: () =>
-              import('./money/stock/money-stock.component').then(m => m.MoneyStockComponent),
+            redirectTo: '/stock-adjustments',
           },
           { path: '', pathMatch: 'full', redirectTo: 'cashier' },
         ],
@@ -99,6 +94,22 @@ export const routes: Routes = [
         path: 'customers',
         loadComponent: () =>
           import('./customers/customers.component').then(m => m.CustomersComponent),
+      },
+      {
+        path: 'suppliers',
+        loadComponent: () =>
+          import('./suppliers/suppliers.component').then(m => m.SuppliersComponent),
+      },
+      {
+        path: 'credit',
+        loadComponent: () => import('./credit/credit.component').then(m => m.CreditComponent),
+      },
+      {
+        path: 'stock-adjustments',
+        loadComponent: () =>
+          import('./stock-adjustments/stock-adjustments.component').then(
+            m => m.StockAdjustmentsComponent
+          ),
       },
       {
         path: 'team',

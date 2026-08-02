@@ -1,8 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { PageHeaderComponent } from '../../shared/ui/page-header.component';
-import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { formatKes, parseKesToCents } from '../../core/money';
+import { parseKesToCents } from '../../core/money';
 import {
   CashierAccount,
   CashierSession,
@@ -12,6 +10,10 @@ import {
 } from '../money.service';
 import { PrintService } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
+import { ButtonComponent } from '../../shared/ui/button.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
+import { FormFieldComponent } from '../../shared/ui/form-field.component';
+import { MoneyComponent } from '../../shared/ui/money.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 
 @Component({
@@ -19,221 +21,222 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
   imports: [
     FormsModule,
     ReactiveFormsModule,
-    PageHeaderComponent,
+    FormFieldComponent,
+    ButtonComponent,
+    MoneyComponent,
     EmptyStateComponent,
     StatusBadgeComponent,
   ],
   template: `
-    <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="page">
-        <app-page-header title="Cashier Sessions">
-          <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
-        </app-page-header>
+    <div class="mb-3 flex items-center justify-end">
+      <button appButton variant="ghost" (click)="load()">Refresh</button>
+    </div>
 
-        @if (error()) {
-          <p class="mb-2 text-sm text-error">{{ error() }}</p>
-        }
-        @if (notice()) {
-          <p class="mb-2 text-sm text-success">{{ notice() }}</p>
-        }
-        @if (lastClosedSessionId(); as sid) {
-          @if (printerEnabled()) {
-            <button class="btn btn-outline btn-sm mb-4 min-h-11" (click)="printSlip(sid)">
-              Print cashier slip
+    @if (error()) {
+      <p class="mb-2 text-sm text-error">{{ error() }}</p>
+    }
+    @if (notice()) {
+      <p class="mb-2 text-sm text-success">{{ notice() }}</p>
+    }
+    @if (lastClosedSessionId(); as sid) {
+      @if (printerEnabled()) {
+        <button appButton variant="outline" class="mb-4 min-h-11" (click)="printSlip(sid)">
+          Print cashier slip
+        </button>
+      }
+    }
+
+    <!-- Current open session / open-close forms -->
+    <div class="card mb-4 bg-base-100">
+      <div class="card-body p-4">
+        @if (openSession(); as session) {
+          <h2 class="section-title mb-2">Open session</h2>
+          <p class="text-sm text-base-content/70">Opened {{ time(session.opened_at) }}</p>
+
+          <h3 class="mt-4 font-semibold">Close session — blind count</h3>
+          <p class="text-xs text-base-content/60">
+            This count is blind — you won't see the expected amount. Count what's actually in
+            the drawer and enter it per account.
+          </p>
+          <div class="mt-2 flex flex-col gap-2">
+            @for (account of accounts(); track account.account_code) {
+              <app-form-field [label]="account.label + ' (' + account.account_code + ')'">
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  class="input input-bordered input-sm w-full"
+                  placeholder="0.00"
+                  [(ngModel)]="declared[account.account_code]"
+                />
+              </app-form-field>
+            }
+            <button
+              appButton
+              variant="error"
+              class="mt-2 self-start"
+              [loading]="busy()"
+              (click)="closeSession(session.id)"
+            >
+              Close session
             </button>
-          }
-        }
-
-        <!-- Current open session / open-close forms -->
-        <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            @if (openSession(); as session) {
-              <h2 class="card-title text-lg">Open session</h2>
-              <p class="text-sm text-base-content/70">Opened {{ time(session.opened_at) }}</p>
-
-              <h3 class="mt-4 font-semibold">Close session — blind count</h3>
-              <p class="text-xs text-base-content/60">
-                This count is blind — you won't see the expected amount. Count what's actually in
-                the drawer and enter it per account.
-              </p>
-              <div class="mt-2 flex flex-col gap-2">
-                @for (account of accounts(); track account.account_code) {
-                  <label class="form-control">
-                    <span class="label-text">{{ account.label }} ({{ account.account_code }})</span>
-                    <input
-                      type="text"
-                      inputmode="decimal"
-                      class="input input-bordered input-sm"
-                      placeholder="0.00"
-                      [(ngModel)]="declared[account.account_code]"
-                    />
-                  </label>
-                }
-                <button
-                  class="btn btn-error btn-outline mt-2 self-start"
-                  [disabled]="busy()"
-                  (click)="closeSession(session.id)"
-                >
-                  {{ busy() ? 'Closing…' : 'Close session' }}
-                </button>
-              </div>
-            } @else {
-              <h2 class="card-title text-lg">No open session</h2>
-              <p class="text-sm text-base-content/70">
-                Declare the opening float per account to start a session.
-              </p>
-              <div class="mt-2 flex flex-col gap-2">
-                @for (account of accounts(); track account.account_code) {
-                  <label class="form-control">
-                    <span class="label-text">{{ account.label }} ({{ account.account_code }})</span>
-                    <input
-                      type="text"
-                      inputmode="decimal"
-                      class="input input-bordered input-sm"
-                      placeholder="0.00"
-                      [(ngModel)]="declared[account.account_code]"
-                    />
-                  </label>
-                }
-                <button
-                  class="btn btn-primary mt-2 self-start"
-                  [disabled]="busy() || accounts().length === 0"
-                  (click)="openNewSession()"
-                >
-                  {{ busy() ? 'Opening…' : 'Open session' }}
-                </button>
-              </div>
-            }
           </div>
-        </div>
-
-        <!-- Recent sessions -->
-        <h2 class="mb-2 text-lg font-semibold">Recent sessions</h2>
-        @if (sessions().length === 0) {
-          <app-empty-state
-            icon="heroBanknotes"
-            title="No sessions yet"
-            description="Open a session above to start counting the till."
-          />
         } @else {
-          <div class="flex flex-col gap-2">
-            @for (session of sessions(); track session.id) {
-              <div class="card bg-base-100">
-                <div class="card-body p-4">
-                  <div class="flex flex-wrap items-center gap-3">
-                    <span class="text-sm font-semibold">{{ time(session.opened_at) }}</span>
-                    <app-status-badge type="neutral" [label]="session.status" />
-                    @if (session.closed_at) {
-                      <span class="text-xs text-base-content/60">
-                        closed {{ time(session.closed_at) }}
-                      </span>
-                    }
-                  </div>
-                  @if (session.cash_drawer_counts.length > 0) {
-                    <table class="table table-sm mt-2">
-                      <thead>
-                        <tr>
-                          <th>Count</th>
-                          <th class="text-right">Declared</th>
-                          <th class="text-right">Expected</th>
-                          <th class="text-right">Variance</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (count of session.cash_drawer_counts; track count.id) {
-                          <tr>
-                            <td>{{ count.count_type }}</td>
-                            <td class="text-right">{{ fmt(count.declared_cash) }}</td>
-                            <td class="text-right">{{ fmt(count.expected_cash) }}</td>
-                            <td
-                              class="text-right font-semibold"
-                              [class.text-error]="count.variance !== 0"
-                            >
-                              {{ fmt(count.variance) }}
-                            </td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  }
-                  @if (reconFor(session.id).length > 0) {
-                    <h3 class="type-heading mt-3">Variance review</h3>
-                    <div class="table-scroll">
-                      <table class="table table-sm mt-1">
-                        <thead>
-                          <tr>
-                            <th>Account</th>
-                            <th class="text-right">Declared</th>
-                            <th class="text-right">Expected</th>
-                            <th class="text-right">Variance</th>
-                            <th></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @for (ra of reconFor(session.id); track ra.id) {
-                            <tr>
-                              <td class="font-mono text-xs">{{ ra.account_code }}</td>
-                              <td class="text-right">{{ fmt(ra.declared) }}</td>
-                              <td class="text-right">{{ fmt(ra.expected) }}</td>
-                              <td
-                                class="text-right font-semibold"
-                                [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
-                              >
-                                {{ fmt(ra.variance) }}
-                              </td>
-                              <td class="text-right">
-                                @if (ra.reviewed_at) {
-                                  <span class="type-caption">
-                                    Reviewed · User …{{ shortId(ra.reviewed_by) }} ·
-                                    {{ date(ra.reviewed_at) }}
-                                  </span>
-                                } @else if (ra.variance !== 0) {
-                                  @if (revertingFor() === ra.id) {
-                                    <div class="flex items-center justify-end gap-1">
-                                      <input
-                                        type="text"
-                                        class="input input-bordered input-xs w-36"
-                                        placeholder="Reason (optional)"
-                                        [formControl]="revertReason"
-                                      />
-                                      <button
-                                        class="btn btn-warning btn-xs"
-                                        [disabled]="busy()"
-                                        (click)="confirmRevert(ra.id)"
-                                      >
-                                        Confirm
-                                      </button>
-                                      <button
-                                        class="btn btn-ghost btn-xs"
-                                        (click)="revertingFor.set(null)"
-                                      >
-                                        Cancel
-                                      </button>
-                                    </div>
-                                  } @else {
-                                    <button
-                                      class="btn btn-warning btn-outline btn-xs"
-                                      [disabled]="busy()"
-                                      (click)="startRevert(ra.id)"
-                                    >
-                                      Revert
-                                    </button>
-                                  }
-                                }
-                              </td>
-                            </tr>
-                          }
-                        </tbody>
-                      </table>
-                    </div>
-                  }
-                </div>
-              </div>
+          <h2 class="section-title mb-2">No open session</h2>
+          <p class="text-sm text-base-content/70">
+            Declare the opening float per account to start a session.
+          </p>
+          <div class="mt-2 flex flex-col gap-2">
+            @for (account of accounts(); track account.account_code) {
+              <app-form-field [label]="account.label + ' (' + account.account_code + ')'">
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  class="input input-bordered input-sm w-full"
+                  placeholder="0.00"
+                  [(ngModel)]="declared[account.account_code]"
+                />
+              </app-form-field>
             }
+            <button
+              appButton
+              size="md"
+              class="mt-2 self-start"
+              [loading]="busy()"
+              [disabled]="accounts().length === 0"
+              (click)="openNewSession()"
+            >
+              Open session
+            </button>
           </div>
         }
       </div>
-    </main>
+    </div>
+
+    <!-- Recent sessions -->
+    <h2 class="section-title mb-2">Recent sessions</h2>
+    @if (sessions().length === 0) {
+      <app-empty-state
+        icon="heroBanknotes"
+        title="No sessions yet"
+        description="Open a session above to start counting the till."
+      />
+    } @else {
+      <div class="flex flex-col gap-2">
+        @for (session of sessions(); track session.id) {
+          <div class="card bg-base-100">
+            <div class="card-body p-4">
+              <div class="flex flex-wrap items-center gap-3">
+                <span class="text-sm font-semibold">{{ time(session.opened_at) }}</span>
+                <app-status-badge type="neutral" [label]="session.status" />
+                @if (session.closed_at) {
+                  <span class="text-xs text-base-content/60">
+                    closed {{ time(session.closed_at) }}
+                  </span>
+                }
+              </div>
+              @if (session.cash_drawer_counts.length > 0) {
+                <table class="table table-sm mt-2">
+                  <thead>
+                    <tr>
+                      <th>Count</th>
+                      <th class="text-right">Declared</th>
+                      <th class="text-right">Expected</th>
+                      <th class="text-right">Variance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (count of session.cash_drawer_counts; track count.id) {
+                      <tr>
+                        <td>{{ count.count_type }}</td>
+                        <td class="text-right"><app-money [cents]="count.declared_cash" /></td>
+                        <td class="text-right"><app-money [cents]="count.expected_cash" /></td>
+                        <td
+                          class="text-right font-semibold"
+                          [class.text-error]="count.variance !== 0"
+                        >
+                          <app-money [cents]="count.variance" />
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+              @if (reconFor(session.id).length > 0) {
+                <h3 class="type-heading mt-3">Variance review</h3>
+                <div class="table-scroll">
+                  <table class="table table-sm mt-1">
+                    <thead>
+                      <tr>
+                        <th>Account</th>
+                        <th class="text-right">Declared</th>
+                        <th class="text-right">Expected</th>
+                        <th class="text-right">Variance</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (ra of reconFor(session.id); track ra.id) {
+                        <tr>
+                          <td class="font-mono text-xs">{{ ra.account_code }}</td>
+                          <td class="text-right"><app-money [cents]="ra.declared" /></td>
+                          <td class="text-right"><app-money [cents]="ra.expected" /></td>
+                          <td
+                            class="text-right font-semibold"
+                            [class.text-error]="ra.variance !== 0 && !ra.reviewed_at"
+                          >
+                            <app-money [cents]="ra.variance" />
+                          </td>
+                          <td class="text-right">
+                            @if (ra.reviewed_at) {
+                              <span class="type-caption">
+                                Reviewed · User …{{ shortId(ra.reviewed_by) }} ·
+                                {{ date(ra.reviewed_at) }}
+                              </span>
+                            } @else if (ra.variance !== 0) {
+                              @if (revertingFor() === ra.id) {
+                                <div class="flex items-center justify-end gap-1">
+                                  <input
+                                    type="text"
+                                    class="input input-bordered input-xs w-36"
+                                    placeholder="Reason (optional)"
+                                    [formControl]="revertReason"
+                                  />
+                                  <button
+                                    class="btn btn-warning btn-xs"
+                                    [disabled]="busy()"
+                                    (click)="confirmRevert(ra.id)"
+                                  >
+                                    Confirm
+                                  </button>
+                                  <button
+                                    class="btn btn-ghost btn-xs"
+                                    (click)="revertingFor.set(null)"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              } @else {
+                                <button
+                                  class="btn btn-warning btn-outline btn-xs"
+                                  [disabled]="busy()"
+                                  (click)="startRevert(ra.id)"
+                                >
+                                  Revert
+                                </button>
+                              }
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
   `,
 })
 export class MoneyCashierComponent implements OnInit {
@@ -241,7 +244,6 @@ export class MoneyCashierComponent implements OnInit {
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
 
-  protected readonly fmt = formatKes;
   protected readonly accounts = signal<CashierAccount[]>([]);
   protected readonly openSession = signal<CashierSession | null>(null);
   protected readonly sessions = signal<SessionWithCounts[]>([]);

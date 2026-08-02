@@ -56,7 +56,7 @@ interface CreateRow {
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
-        <app-page-header title="Products" backLink="/dashboard" backLabel="Dashboard">
+        <app-page-header title="Products">
           <span actions class="text-sm text-base-content/60">
             total stock value {{ fmt(totalStockValue()) }}
           </span>
@@ -753,7 +753,7 @@ interface CreateRow {
                                   <div class="p-2">
                                     <div class="mb-1 flex items-center justify-between">
                                       <h3 class="text-sm font-semibold">Batch history</h3>
-                                      <a routerLink="/money/suppliers" class="link text-xs">
+                                      <a routerLink="/suppliers" class="link text-xs">
                                         Restock via Suppliers → record purchase
                                       </a>
                                     </div>

@@ -1,12 +1,12 @@
 import { Component, input } from '@angular/core';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
-import { formatKes } from '../core/money';
+import { MoneyComponent } from '../shared/ui/money.component';
 import type { JournalEntryWithLines } from './money.service';
 
 /** Read-only list of journal entries with their account lines (DR/CR). */
 @Component({
   selector: 'app-journal-list',
-  imports: [EmptyStateComponent],
+  imports: [EmptyStateComponent, MoneyComponent],
   template: `
     @if (entries().length === 0) {
       <app-empty-state icon="heroBanknotes" [title]="emptyText()" />
@@ -18,7 +18,9 @@ import type { JournalEntryWithLines } from './money.service';
               <div class="flex flex-wrap items-center gap-3">
                 <span class="text-sm font-semibold">{{ entry.entry_date }}</span>
                 <span class="text-sm text-base-content/70">{{ entry.memo ?? '—' }}</span>
-                <span class="ml-auto font-bold tabular-nums">{{ fmt(total(entry)) }}</span>
+                <span class="ml-auto font-bold tabular-nums"
+                  ><app-money [cents]="total(entry)"
+                /></span>
               </div>
               <table class="table table-xs mt-2">
                 <tbody>
@@ -27,10 +29,14 @@ import type { JournalEntryWithLines } from './money.service';
                       <td class="font-mono text-xs">{{ line.ledger_accounts?.code }}</td>
                       <td class="text-xs text-base-content/60">{{ line.ledger_accounts?.name }}</td>
                       <td class="text-right text-xs">
-                        {{ line.debit > 0 ? 'DR ' + fmt(line.debit) : '' }}
+                        @if (line.debit > 0) {
+                          DR <app-money [cents]="line.debit" />
+                        }
                       </td>
                       <td class="text-right text-xs">
-                        {{ line.credit > 0 ? 'CR ' + fmt(line.credit) : '' }}
+                        @if (line.credit > 0) {
+                          CR <app-money [cents]="line.credit" />
+                        }
                       </td>
                     </tr>
                   }
@@ -46,8 +52,6 @@ import type { JournalEntryWithLines } from './money.service';
 export class JournalListComponent {
   readonly entries = input.required<JournalEntryWithLines[]>();
   readonly emptyText = input('Nothing posted yet.');
-
-  protected readonly fmt = formatKes;
 
   protected total(entry: JournalEntryWithLines): number {
     return entry.ledger_journal_lines.reduce((sum, l) => sum + l.debit, 0);

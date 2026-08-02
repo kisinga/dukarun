@@ -19,7 +19,7 @@ const TYPE_ICON: Record<string, string> = {
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
-        <app-page-header title="Notifications" backLink="/dashboard" backLabel="Dashboard">
+        <app-page-header title="Notifications">
           @if (notifications.unreadCount() > 0) {
             <button
               actions
