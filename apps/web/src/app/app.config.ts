@@ -9,6 +9,8 @@ import { provideServiceWorker } from '@angular/service-worker';
 import { provideNgIconsConfig, provideIcons } from '@ng-icons/core';
 import {
   heroArchiveBox,
+  heroBell,
+  heroBellSlash,
   heroChevronDoubleLeft,
   heroChevronDoubleRight,
   heroChevronRight,
@@ -50,6 +52,8 @@ export const appConfig: ApplicationConfig = {
     provideNgIconsConfig({ size: '1rem' }),
     provideIcons({
       heroArchiveBox,
+      heroBell,
+      heroBellSlash,
       heroChevronDoubleLeft,
       heroChevronDoubleRight,
       heroChevronRight,

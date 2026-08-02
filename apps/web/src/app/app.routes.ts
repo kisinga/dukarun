@@ -125,6 +125,16 @@ export const routes: Routes = [
         path: 'billing',
         loadComponent: () => import('./billing/billing.component').then(m => m.BillingComponent),
       },
+      {
+        path: 'notifications',
+        loadComponent: () =>
+          import('./notifications/notifications.component').then(m => m.NotificationsComponent),
+      },
+      {
+        path: 'messaging',
+        loadComponent: () =>
+          import('./messaging/messaging.component').then(m => m.MessagingComponent),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
     ],
   },

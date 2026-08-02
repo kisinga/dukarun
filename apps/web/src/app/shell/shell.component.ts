@@ -4,6 +4,7 @@ import { NgIcon } from '@ng-icons/core';
 import { Company, SupabaseService } from '../core/supabase.service';
 import { ThemeService } from '../core/theme.service';
 import { ApprovalsService } from '../approvals/approvals.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 interface NavItem {
   route: string;
@@ -48,6 +49,20 @@ interface NavSection {
           </div>
 
           <div class="flex flex-none items-center gap-1.5">
+            <!-- Notifications -->
+            <a
+              routerLink="/notifications"
+              class="btn btn-square btn-ghost btn-sm indicator min-h-11 min-w-11"
+              title="Notifications"
+            >
+              <ng-icon name="heroBell" size="1.25rem" />
+              @if (notifications.unreadCount() > 0) {
+                <span class="badge indicator-item badge-primary badge-xs">
+                  {{ notifications.unreadCount() }}
+                </span>
+              }
+            </a>
+
             <!-- Till status -->
             <a
               routerLink="/money/cashier"
@@ -188,6 +203,7 @@ export class ShellComponent implements OnInit {
   private readonly router = inject(Router);
   protected readonly theme = inject(ThemeService);
   protected readonly approvals = inject(ApprovalsService);
+  protected readonly notifications = inject(NotificationsService);
 
   protected readonly company = signal<Company | null>(null);
   protected readonly tillOpen = signal(false);
@@ -228,6 +244,7 @@ export class ShellComponent implements OnInit {
           icon: 'heroCheckBadge',
           badge: () => this.approvals.pending().length,
         },
+        { route: '/messaging', label: 'Messaging', icon: 'heroBell' },
       ],
     },
   ];
