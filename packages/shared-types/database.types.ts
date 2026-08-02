@@ -3040,7 +3040,7 @@ export type Database = {
         Returns: string
       }
       storefront_catalog: {
-        Args: { p_slug: string }
+        Args: { p_collection_id?: string; p_slug: string }
         Returns: {
           allow_fractional: boolean | null
           barcode: string | null
