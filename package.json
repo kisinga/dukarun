@@ -23,6 +23,8 @@
     "build:web": "npm run build -w @dukarun/web",
     "dev:storefront-new": "npm start --workspace apps/storefront-new",
     "build:storefront-new": "npm run build --workspace apps/storefront-new",
+    "dev:super-admin-new": "npm start --workspace apps/super-admin-new",
+    "build:super-admin-new": "npm run build --workspace apps/super-admin-new",
     "codegen": "npm run codegen -w @dukarun/frontend && npm run codegen -w super-admin",
     "codegen:watch": "npm run codegen:watch -w @dukarun/frontend",
     "codegen:super-admin": "npm run codegen -w super-admin",

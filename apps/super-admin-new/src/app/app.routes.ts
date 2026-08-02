@@ -1,0 +1,35 @@
+import { Routes } from '@angular/router';
+import { platformGuard } from './core/auth.guard';
+
+export const routes: Routes = [
+  {
+    path: 'login',
+    loadComponent: () => import('./pages/login/login.component').then(m => m.LoginComponent),
+  },
+  {
+    path: '',
+    canActivate: [platformGuard],
+    loadComponent: () => import('./shell/shell.component').then(m => m.ShellComponent),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent),
+      },
+      {
+        path: 'companies',
+        loadComponent: () =>
+          import('./pages/companies/companies.component').then(m => m.CompaniesComponent),
+      },
+      {
+        path: 'tiers',
+        loadComponent: () => import('./pages/tiers/tiers.component').then(m => m.TiersComponent),
+      },
+      {
+        path: 'audit',
+        loadComponent: () => import('./pages/audit/audit.component').then(m => m.AuditComponent),
+      },
+    ],
+  },
+  { path: '**', redirectTo: '' },
+];
