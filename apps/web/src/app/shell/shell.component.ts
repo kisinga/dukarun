@@ -257,7 +257,15 @@ export class ShellComponent implements OnInit {
     },
     {
       label: 'Money',
-      items: [{ route: '/money/cashier', label: 'Money', icon: 'heroBanknotes' }],
+      items: [
+        { route: '/money/cashier', label: 'Cashier', icon: 'heroBanknotes' },
+        { route: '/money/expenses', label: 'Expenses', icon: 'heroReceipt' },
+        { route: '/money/transfers', label: 'Transfers', icon: 'heroArrowsRightLeft' },
+        { route: '/money/credit', label: 'Credit', icon: 'heroCreditCard' },
+        { route: '/money/suppliers', label: 'Suppliers', icon: 'heroTruck' },
+        { route: '/money/periods', label: 'Periods', icon: 'heroCalendarDays' },
+        { route: '/money/stock', label: 'Stock', icon: 'heroArchiveBox' },
+      ],
     },
     {
       label: 'Manage',
