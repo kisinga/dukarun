@@ -250,6 +250,47 @@ export type Database = {
           },
         ]
       }
+      collections: {
+        Row: {
+          active: boolean
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           batch_expiry_enabled: boolean
@@ -1225,6 +1266,56 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      product_collections: {
+        Row: {
+          collection_id: string
+          company_id: string
+          created_at: string
+          product_id: string
+        }
+        Insert: {
+          collection_id: string
+          company_id: string
+          created_at?: string
+          product_id: string
+        }
+        Update: {
+          collection_id?: string
+          company_id?: string
+          created_at?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_collections_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_collections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_collections_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_collections_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "variant_catalog"
+            referencedColumns: ["product_id"]
+          },
+        ]
       }
       product_variants: {
         Row: {
@@ -2324,6 +2415,10 @@ export type Database = {
         Returns: string
       }
       send_sms_hook: { Args: { event: Json }; Returns: Json }
+      set_product_collections: {
+        Args: { p_collection_ids: string[]; p_product_id: string }
+        Returns: string
+      }
       settle_order: {
         Args: { p_order_id: string; p_payments: Json }
         Returns: string
@@ -2363,6 +2458,16 @@ export type Database = {
           p_authorization_status?: string
           p_membership_id: string
           p_role_id?: string
+        }
+        Returns: string
+      }
+      upsert_collection: {
+        Args: {
+          p_active?: boolean
+          p_collection_id?: string
+          p_description?: string
+          p_name: string
+          p_slug?: string
         }
         Returns: string
       }
