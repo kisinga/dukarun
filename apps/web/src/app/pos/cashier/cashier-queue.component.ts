@@ -1,5 +1,4 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { formatKes } from '../../core/money';
@@ -8,7 +7,7 @@ import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
 
 @Component({
   selector: 'app-cashier-queue',
-  imports: [RouterLink, CheckoutPanelComponent, PageHeaderComponent, EmptyStateComponent],
+  imports: [CheckoutPanelComponent, PageHeaderComponent, EmptyStateComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">

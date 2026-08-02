@@ -1,5 +1,4 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes } from '../core/money';
 import { PosService, variantLabel } from '../pos/pos.service';
@@ -18,7 +17,7 @@ const TYPE_BADGE: Record<string, string> = {
 
 @Component({
   selector: 'app-approvals',
-  imports: [RouterLink, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
+  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">

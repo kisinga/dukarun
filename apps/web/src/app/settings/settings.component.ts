@@ -1,5 +1,4 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes, parseKesToCents } from '../core/money';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
@@ -9,7 +8,7 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash' | 'notifications';
 
 @Component({
   selector: 'app-settings',
-  imports: [RouterLink, ReactiveFormsModule, PageHeaderComponent],
+  imports: [ReactiveFormsModule, PageHeaderComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-3xl">

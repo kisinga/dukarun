@@ -105,6 +105,87 @@
   }
 }
 
+@layer components {
+  /* ONE nav-item recipe (sidebar, drawer, footer links). Ghost by default;
+     exactly ONE active signifier: the tinted container. 44px touch target. */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    min-height: 2.75rem;
+    border-radius: var(--radius-field);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-base-content);
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+    -webkit-tap-highlight-color: transparent;
+
+    ng-icon {
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+      transition: color 150ms ease;
+    }
+
+    &:hover {
+      background-color: color-mix(in oklab, var(--color-base-content) 6%, transparent);
+    }
+  }
+
+  .nav-item-active,
+  .nav-item-active:hover {
+    background-color: color-mix(in oklab, var(--color-primary) 10%, transparent);
+    color: var(--color-primary);
+    font-weight: 600;
+
+    ng-icon {
+      color: var(--color-primary);
+    }
+  }
+
+  /* Mobile bottom nav item — same language, one signifier (icon pill). */
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    min-width: 4rem;
+    min-height: 2.75rem;
+    border-radius: var(--radius-field);
+    color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+    transition: color 150ms ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .bottom-nav-ico {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 1rem;
+    border-radius: 9999px;
+    transition: background-color 150ms ease;
+  }
+
+  .bottom-nav-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .bottom-nav-active {
+    color: var(--color-primary);
+
+    .bottom-nav-ico {
+      background-color: color-mix(in oklab, var(--color-primary) 12%, transparent);
+    }
+
+    .bottom-nav-label {
+      font-weight: 600;
+    }
+  }
+}
+
 @plugin "daisyui" {
   themes: false;
   logs: false;

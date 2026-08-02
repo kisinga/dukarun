@@ -3,7 +3,6 @@ import { Router, RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { formatKes } from '../../core/money';
 import { Company, SupabaseService } from '../../core/supabase.service';
-import { ThemeService } from '../../core/theme.service';
 import { ApprovalsService } from '../../approvals/approvals.service';
 import { SyncService } from '../../pos/offline/sync.service';
 import { PosService, variantLabel, type Variant } from '../../pos/pos.service';
@@ -26,19 +25,7 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
-        <app-page-header [title]="company()?.name ?? 'Dukarun'" subtitle="Dashboard">
-          <button
-            actions
-            class="btn btn-ghost btn-sm min-h-11 min-w-11"
-            [title]="theme.theme() === 'light' ? 'Switch to dark mode' : 'Switch to light mode'"
-            (click)="theme.toggle()"
-          >
-            <ng-icon [name]="theme.theme() === 'light' ? 'heroMoon' : 'heroSun'" />
-          </button>
-          <button actions class="btn btn-outline btn-sm min-h-11" (click)="signOut()">
-            Sign out
-          </button>
-        </app-page-header>
+        <app-page-header [title]="company()?.name ?? 'Dukarun'" subtitle="Dashboard" />
 
         @if (loadError()) {
           <p class="mb-2 text-sm text-error">{{ loadError() }}</p>
@@ -219,38 +206,6 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
           </div>
         </div>
 
-        <!-- Navigation -->
-        <h2 class="type-heading mt-6">Sell</h2>
-        <nav class="mt-2 grid grid-cols-2 gap-2">
-          <a routerLink="/pos/sell" class="btn btn-primary min-h-11">Sell</a>
-          <a routerLink="/pos/sales" class="btn btn-outline min-h-11">Today's Sales</a>
-          <a routerLink="/orders" class="btn btn-outline min-h-11">Orders</a>
-          <a routerLink="/pos/proformas" class="btn btn-outline min-h-11">Proformas</a>
-          <a routerLink="/pos/cashier" class="btn btn-outline min-h-11">Cashier Queue</a>
-          <a routerLink="/products" class="btn btn-outline min-h-11">Products</a>
-          <a routerLink="/customers" class="btn btn-outline min-h-11">Customers</a>
-          <a routerLink="/reports" class="btn btn-outline min-h-11">Reports</a>
-          <a routerLink="/approvals" class="btn btn-outline min-h-11">
-            Approvals
-            @if (approvals.pending().length > 0) {
-              <span class="badge badge-warning">{{ approvals.pending().length }}</span>
-            }
-          </a>
-          <a routerLink="/team" class="btn btn-outline min-h-11">Team</a>
-          <a routerLink="/settings" class="btn btn-outline min-h-11">Settings</a>
-        </nav>
-
-        <h2 class="type-heading mt-6">Money</h2>
-        <nav class="mt-2 grid grid-cols-2 gap-2">
-          <a routerLink="/money/cashier" class="btn btn-outline min-h-11">Cashier Sessions</a>
-          <a routerLink="/money/expenses" class="btn btn-outline min-h-11">Expenses</a>
-          <a routerLink="/money/transfers" class="btn btn-outline min-h-11">Transfers</a>
-          <a routerLink="/money/credit" class="btn btn-outline min-h-11">Customer Credit</a>
-          <a routerLink="/money/suppliers" class="btn btn-outline min-h-11">Suppliers</a>
-          <a routerLink="/money/periods" class="btn btn-outline min-h-11">Reconciliation</a>
-          <a routerLink="/money/stock" class="btn btn-outline min-h-11">Stock Adjustments</a>
-        </nav>
-
         @if (company(); as c) {
           <p class="type-caption mt-6">{{ c.code }} · {{ role() ?? '—' }}</p>
         }
@@ -264,7 +219,6 @@ export class DashboardComponent implements OnInit {
   private readonly reports = inject(ReportsService);
   private readonly pos = inject(PosService);
   protected readonly sync = inject(SyncService);
-  protected readonly theme = inject(ThemeService);
   protected readonly approvals = inject(ApprovalsService);
 
   protected readonly fmt = formatKes;
@@ -372,10 +326,5 @@ export class DashboardComponent implements OnInit {
     const d = new Date();
     d.setDate(d.getDate() - n);
     return d.toISOString().slice(0, 10);
-  }
-
-  protected async signOut(): Promise<void> {
-    await this.supabase.client.auth.signOut();
-    await this.router.navigate(['/login']);
   }
 }

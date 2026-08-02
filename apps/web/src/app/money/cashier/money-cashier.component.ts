@@ -1,5 +1,4 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -16,7 +15,7 @@ import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 
 @Component({
   selector: 'app-money-cashier',
-  imports: [RouterLink, FormsModule, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
+  imports: [FormsModule, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">

@@ -1,5 +1,4 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -12,7 +11,7 @@ const ALL_STATUSES = ['completed', 'voided', 'draft', 'pending_payment'];
 
 @Component({
   selector: 'app-orders',
-  imports: [RouterLink, ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
+  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-4xl">
