@@ -6,8 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const API = 'http://localhost:3000/admin-api';
-const CHANNEL_TOKEN = 'tieout-9160';
-const CHANNEL_ID = 8;
+const CHANNEL_TOKEN = 'tieout-fresh-2';
+const CHANNEL_ID = 11;
 const STOCK_LOCATION_ID = '2';
 const OUT = path.join(path.dirname(new URL(import.meta.url).pathname), 'out');
 fs.mkdirSync(OUT, { recursive: true });
@@ -254,12 +254,12 @@ out.ops.push(await capture('a-purchase-batches'));
     input: {
       supplierId: fixture.supplierId,
       purchaseDate: new Date().toISOString(),
-      paymentStatus: 'unpaid',
+      paymentStatus: 'pending',
       lines: [{ variantId: fixture.variantWidget, quantity: 8, unitCost: 9000, stockLocationId: STOCK_LOCATION_ID }],
     },
   });
   fixture.purchaseG = p.recordPurchase.id;
-  await gql(`mutation($input: PaySinglePurchaseInput!) { paySinglePurchase(input:$input) { purchaseId } }`, {
+  await gql(`mutation($input: PaySinglePurchaseInput!) { paySinglePurchase(input:$input) { purchasesPaid { purchaseId } } }`, {
     input: { purchaseId: fixture.purchaseG, paymentAmount: 36000, debitAccountCode: 'CASH_ON_HAND' },
   });
   out.ops.push(await capture('g-credit-purchase-and-payment'));
@@ -294,7 +294,7 @@ out.ops.push(await capture('a-purchase-batches'));
 
 // --- j. void sale (b) --------------------------------------------------------
 {
-  const r = await gql(`mutation($orderId: ID!) { voidOrder(orderId:$orderId) { ... on Order { id state } ... on ErrorResult { errorCode message } } }`, {
+  const r = await gql(`mutation($orderId: ID!) { voidOrder(orderId:$orderId) { order { id state } hadPayments } }`, {
     orderId: fixture.orderB,
   });
   fixture.voidResult = r.voidOrder;

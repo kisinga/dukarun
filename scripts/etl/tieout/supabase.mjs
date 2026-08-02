@@ -8,7 +8,7 @@ import path from 'node:path';
 
 const API = 'http://127.0.0.1:54321';
 const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
-const COMPANY_ID = 'dced8491-8c39-4601-a864-1f9e99871bb4'; // TieOut Co (fresh)
+const COMPANY_ID = '22ea6e9e-9794-4f67-9cc9-8f87f57e80d3'; // TieOut Co (fresh)
 const TOKEN = fs.readFileSync('/tmp/sb-tok.txt', 'utf8').trim();
 const OUT = path.join(path.dirname(new URL(import.meta.url).pathname), 'out');
 fs.mkdirSync(OUT, { recursive: true });

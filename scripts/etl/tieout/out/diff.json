@@ -1,0 +1,524 @@
+[
+  {
+    "op": "pre-close-lingering-session",
+    "grossDiffs": [],
+    "netDiffs": [],
+    "vendureGross": {},
+    "supabaseGross": {},
+    "vendureNet": {},
+    "supabaseNet": {}
+  },
+  {
+    "op": "fixture",
+    "grossDiffs": [],
+    "netDiffs": [],
+    "vendureGross": {},
+    "supabaseGross": {},
+    "vendureNet": {},
+    "supabaseNet": {}
+  },
+  {
+    "op": "i1-session-open",
+    "grossDiffs": [],
+    "netDiffs": [],
+    "vendureGross": {
+      "VarianceAdjustment|CASH_ON_HAND": {
+        "debit": 500000,
+        "credit": 0
+      },
+      "VarianceAdjustment|CASH_SHORT_OVER": {
+        "debit": 0,
+        "credit": 500000
+      }
+    },
+    "supabaseGross": {
+      "VarianceAdjustment|CASH_ON_HAND": {
+        "debit": 500000,
+        "credit": 0
+      },
+      "VarianceAdjustment|CASH_SHORT_OVER": {
+        "debit": 0,
+        "credit": 500000
+      }
+    },
+    "vendureNet": {
+      "CASH_ON_HAND": 500000,
+      "CASH_SHORT_OVER": -500000
+    },
+    "supabaseNet": {
+      "CASH_ON_HAND": 500000,
+      "CASH_SHORT_OVER": -500000
+    }
+  },
+  {
+    "op": "a-purchase-batches",
+    "grossDiffs": [],
+    "netDiffs": [],
+    "vendureGross": {
+      "InventoryPurchase|ACCOUNTS_PAYABLE": {
+        "debit": 0,
+        "credit": 250000
+      },
+      "InventoryPurchase|INVENTORY": {
+        "debit": 250000,
+        "credit": 0
+      },
+      "SupplierPayment|ACCOUNTS_PAYABLE": {
+        "debit": 250000,
+        "credit": 0
+      },
+      "SupplierPayment|CASH_ON_HAND": {
+        "debit": 0,
+        "credit": 250000
+      }
+    },
+    "supabaseGross": {
+      "InventoryPurchase|ACCOUNTS_PAYABLE": {
+        "debit": 0,
+        "credit": 250000
+      },
+      "InventoryPurchase|INVENTORY": {
+        "debit": 250000,
+        "credit": 0
+      },
+      "SupplierPayment|ACCOUNTS_PAYABLE": {
+        "debit": 250000,
+        "credit": 0
+      },
+      "SupplierPayment|CASH_ON_HAND": {
+        "debit": 0,
+        "credit": 250000
+      }
+    },
+    "vendureNet": {
+      "ACCOUNTS_PAYABLE": 0,
+      "INVENTORY": 250000,
+      "CASH_ON_HAND": -250000
+    },
+    "supabaseNet": {
+      "ACCOUNTS_PAYABLE": 0,
+      "INVENTORY": 250000,
+      "CASH_ON_HAND": -250000
+    }
+  },
+  {
+    "op": "b-cash-sale-split",
+    "grossDiffs": [
+      "CreditSale|ACCOUNTS_RECEIVABLE",
+      "CreditSale|SALES",
+      "InventorySaleCogs|COGS",
+      "InventorySaleCogs|INVENTORY",
+      "PaymentAllocation|ACCOUNTS_RECEIVABLE",
+      "PaymentAllocation|CASH_ON_HAND",
+      "PaymentAllocation|CLEARING_MPESA",
+      "Payment|CASH_ON_HAND",
+      "Payment|CLEARING_MPESA",
+      "Payment|SALES"
+    ],
+    "netDiffs": [
+      "COGS",
+      "INVENTORY"
+    ],
+    "vendureGross": {
+      "CreditSale|ACCOUNTS_RECEIVABLE": {
+        "debit": 245000,
+        "credit": 0
+      },
+      "CreditSale|SALES": {
+        "debit": 0,
+        "credit": 245000
+      },
+      "PaymentAllocation|ACCOUNTS_RECEIVABLE": {
+        "debit": 0,
+        "credit": 245000
+      },
+      "PaymentAllocation|CLEARING_MPESA": {
+        "debit": 45000,
+        "credit": 0
+      },
+      "PaymentAllocation|CASH_ON_HAND": {
+        "debit": 200000,
+        "credit": 0
+      }
+    },
+    "supabaseGross": {
+      "Payment|CLEARING_MPESA": {
+        "debit": 45000,
+        "credit": 0
+      },
+      "Payment|SALES": {
+        "debit": 0,
+        "credit": 245000
+      },
+      "Payment|CASH_ON_HAND": {
+        "debit": 200000,
+        "credit": 0
+      },
+      "InventorySaleCogs|COGS": {
+        "debit": 130000,
+        "credit": 0
+      },
+      "InventorySaleCogs|INVENTORY": {
+        "debit": 0,
+        "credit": 130000
+      }
+    },
+    "vendureNet": {
+      "ACCOUNTS_RECEIVABLE": 0,
+      "SALES": -245000,
+      "CLEARING_MPESA": 45000,
+      "CASH_ON_HAND": 200000
+    },
+    "supabaseNet": {
+      "CLEARING_MPESA": 45000,
+      "SALES": -245000,
+      "CASH_ON_HAND": 200000,
+      "COGS": 130000,
+      "INVENTORY": -130000
+    }
+  },
+  {
+    "op": "c-credit-sale",
+    "grossDiffs": [],
+    "netDiffs": [],
+    "vendureGross": {
+      "CreditSale|ACCOUNTS_RECEIVABLE": {
+        "debit": 10000,
+        "credit": 0
+      },
+      "CreditSale|SALES": {
+        "debit": 0,
+        "credit": 10000
+      }
+    },
+    "supabaseGross": {
+      "CreditSale|ACCOUNTS_RECEIVABLE": {
+        "debit": 10000,
+        "credit": 0
+      },
+      "CreditSale|SALES": {
+        "debit": 0,
+        "credit": 10000
+      }
+    },
+    "vendureNet": {
+      "ACCOUNTS_RECEIVABLE": 10000,
+      "SALES": -10000
+    },
+    "supabaseNet": {
+      "ACCOUNTS_RECEIVABLE": 10000,
+      "SALES": -10000
+    }
+  },
+  {
+    "op": "d-ar-repayment",
+    "grossDiffs": [],
+    "netDiffs": [],
+    "vendureGross": {
+      "PaymentAllocation|ACCOUNTS_RECEIVABLE": {
+        "debit": 0,
+        "credit": 3000
+      },
+      "PaymentAllocation|CASH_ON_HAND": {
+        "debit": 3000,
+        "credit": 0
+      }
+    },
+    "supabaseGross": {
+      "PaymentAllocation|ACCOUNTS_RECEIVABLE": {
+        "debit": 0,
+        "credit": 3000
+      },
+      "PaymentAllocation|CASH_ON_HAND": {
+        "debit": 3000,
+        "credit": 0
+      }
+    },
+    "vendureNet": {
+      "ACCOUNTS_RECEIVABLE": -3000,
+      "CASH_ON_HAND": 3000
+    },
+    "supabaseNet": {
+      "ACCOUNTS_RECEIVABLE": -3000,
+      "CASH_ON_HAND": 3000
+    }
+  },
+  {
+    "op": "e-expense",
+    "grossDiffs": [],
+    "netDiffs": [],
+    "vendureGross": {
+      "Expense|CASH_ON_HAND": {
+        "debit": 0,
+        "credit": 5000
+      },
+      "Expense|EXPENSES": {
+        "debit": 5000,
+        "credit": 0
+      }
+    },
+    "supabaseGross": {
+      "Expense|CASH_ON_HAND": {
+        "debit": 0,
+        "credit": 5000
+      },
+      "Expense|EXPENSES": {
+        "debit": 5000,
+        "credit": 0
+      }
+    },
+    "vendureNet": {
+      "CASH_ON_HAND": -5000,
+      "EXPENSES": 5000
+    },
+    "supabaseNet": {
+      "CASH_ON_HAND": -5000,
+      "EXPENSES": 5000
+    }
+  },
+  {
+    "op": "f-transfer",
+    "grossDiffs": [],
+    "netDiffs": [],
+    "vendureGross": {
+      "InterAccountTransfer|BANK_MAIN": {
+        "debit": 30000,
+        "credit": 0
+      },
+      "InterAccountTransfer|CASH_ON_HAND": {
+        "debit": 0,
+        "credit": 30500
+      },
+      "InterAccountTransfer|PROCESSOR_FEES": {
+        "debit": 500,
+        "credit": 0
+      }
+    },
+    "supabaseGross": {
+      "InterAccountTransfer|BANK_MAIN": {
+        "debit": 30000,
+        "credit": 0
+      },
+      "InterAccountTransfer|CASH_ON_HAND": {
+        "debit": 0,
+        "credit": 30500
+      },
+      "InterAccountTransfer|PROCESSOR_FEES": {
+        "debit": 500,
+        "credit": 0
+      }
+    },
+    "vendureNet": {
+      "BANK_MAIN": 30000,
+      "CASH_ON_HAND": -30500,
+      "PROCESSOR_FEES": 500
+    },
+    "supabaseNet": {
+      "BANK_MAIN": 30000,
+      "CASH_ON_HAND": -30500,
+      "PROCESSOR_FEES": 500
+    }
+  },
+  {
+    "op": "g-credit-purchase-and-payment",
+    "grossDiffs": [],
+    "netDiffs": [],
+    "vendureGross": {
+      "InventoryPurchase|ACCOUNTS_PAYABLE": {
+        "debit": 0,
+        "credit": 72000
+      },
+      "InventoryPurchase|INVENTORY": {
+        "debit": 72000,
+        "credit": 0
+      },
+      "SupplierPayment|ACCOUNTS_PAYABLE": {
+        "debit": 36000,
+        "credit": 0
+      },
+      "SupplierPayment|CASH_ON_HAND": {
+        "debit": 0,
+        "credit": 36000
+      }
+    },
+    "supabaseGross": {
+      "InventoryPurchase|ACCOUNTS_PAYABLE": {
+        "debit": 0,
+        "credit": 72000
+      },
+      "InventoryPurchase|INVENTORY": {
+        "debit": 72000,
+        "credit": 0
+      },
+      "SupplierPayment|ACCOUNTS_PAYABLE": {
+        "debit": 36000,
+        "credit": 0
+      },
+      "SupplierPayment|CASH_ON_HAND": {
+        "debit": 0,
+        "credit": 36000
+      }
+    },
+    "vendureNet": {
+      "ACCOUNTS_PAYABLE": -36000,
+      "INVENTORY": 72000,
+      "CASH_ON_HAND": -36000
+    },
+    "supabaseNet": {
+      "ACCOUNTS_PAYABLE": -36000,
+      "INVENTORY": 72000,
+      "CASH_ON_HAND": -36000
+    }
+  },
+  {
+    "op": "h-write-off",
+    "grossDiffs": [
+      "InventoryAdjustment|INVENTORY",
+      "InventoryAdjustment|INVENTORY_ADJUSTMENT",
+      "InventoryWriteOff|INVENTORY",
+      "InventoryWriteOff|INVENTORY_WRITE_OFF"
+    ],
+    "netDiffs": [
+      "INVENTORY",
+      "INVENTORY_ADJUSTMENT",
+      "INVENTORY_WRITE_OFF"
+    ],
+    "vendureGross": {
+      "InventoryAdjustment|INVENTORY": {
+        "debit": 0,
+        "credit": 10000
+      },
+      "InventoryAdjustment|INVENTORY_ADJUSTMENT": {
+        "debit": 10000,
+        "credit": 0
+      }
+    },
+    "supabaseGross": {
+      "InventoryWriteOff|INVENTORY": {
+        "debit": 0,
+        "credit": 15000
+      },
+      "InventoryWriteOff|INVENTORY_WRITE_OFF": {
+        "debit": 15000,
+        "credit": 0
+      }
+    },
+    "vendureNet": {
+      "INVENTORY": -10000,
+      "INVENTORY_ADJUSTMENT": 10000
+    },
+    "supabaseNet": {
+      "INVENTORY": -15000,
+      "INVENTORY_WRITE_OFF": 15000
+    }
+  },
+  {
+    "op": "i2-session-close-short",
+    "grossDiffs": [
+      "VarianceAdjustment|CASH_SHORT_OVER",
+      "VarianceAdjustment|CLEARING_MPESA"
+    ],
+    "netDiffs": [
+      "CASH_SHORT_OVER",
+      "CLEARING_MPESA"
+    ],
+    "vendureGross": {
+      "VarianceAdjustment|CASH_ON_HAND": {
+        "debit": 0,
+        "credit": 1000
+      },
+      "VarianceAdjustment|CASH_SHORT_OVER": {
+        "debit": 1000,
+        "credit": 45000
+      },
+      "VarianceAdjustment|CLEARING_MPESA": {
+        "debit": 45000,
+        "credit": 0
+      }
+    },
+    "supabaseGross": {
+      "VarianceAdjustment|CASH_ON_HAND": {
+        "debit": 0,
+        "credit": 1000
+      },
+      "VarianceAdjustment|CASH_SHORT_OVER": {
+        "debit": 1000,
+        "credit": 0
+      }
+    },
+    "vendureNet": {
+      "CASH_ON_HAND": -1000,
+      "CASH_SHORT_OVER": -44000,
+      "CLEARING_MPESA": 45000
+    },
+    "supabaseNet": {
+      "CASH_ON_HAND": -1000,
+      "CASH_SHORT_OVER": 1000
+    }
+  },
+  {
+    "op": "j-void-sale-b",
+    "grossDiffs": [
+      "OrderReversal|ACCOUNTS_RECEIVABLE",
+      "OrderReversal|COGS",
+      "OrderReversal|INVENTORY"
+    ],
+    "netDiffs": [
+      "COGS",
+      "INVENTORY"
+    ],
+    "vendureGross": {
+      "OrderReversal|ACCOUNTS_RECEIVABLE": {
+        "debit": 245000,
+        "credit": 245000
+      },
+      "OrderReversal|CASH_ON_HAND": {
+        "debit": 0,
+        "credit": 200000
+      },
+      "OrderReversal|CLEARING_MPESA": {
+        "debit": 0,
+        "credit": 45000
+      },
+      "OrderReversal|SALES": {
+        "debit": 245000,
+        "credit": 0
+      }
+    },
+    "supabaseGross": {
+      "OrderReversal|CASH_ON_HAND": {
+        "debit": 0,
+        "credit": 200000
+      },
+      "OrderReversal|CLEARING_MPESA": {
+        "debit": 0,
+        "credit": 45000
+      },
+      "OrderReversal|COGS": {
+        "debit": 0,
+        "credit": 130000
+      },
+      "OrderReversal|INVENTORY": {
+        "debit": 130000,
+        "credit": 0
+      },
+      "OrderReversal|SALES": {
+        "debit": 245000,
+        "credit": 0
+      }
+    },
+    "vendureNet": {
+      "ACCOUNTS_RECEIVABLE": 0,
+      "CASH_ON_HAND": -200000,
+      "CLEARING_MPESA": -45000,
+      "SALES": 245000
+    },
+    "supabaseNet": {
+      "CASH_ON_HAND": -200000,
+      "CLEARING_MPESA": -45000,
+      "COGS": -130000,
+      "INVENTORY": 130000,
+      "SALES": 245000
+    }
+  }
+]
