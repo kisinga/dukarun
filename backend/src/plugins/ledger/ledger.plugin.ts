@@ -108,9 +108,7 @@ const COMBINED_SCHEMA = gql`
 `;
 
 @VendurePlugin({
-  // TIE-OUT TEMP PATCH (uncommitted): ApprovalPlugin removed — its admin-only
-  // resolver crashes SHOP API schema generation via this module's shopApiExtensions.
-  imports: [PluginCommonModule, AuditCorePlugin],
+  imports: [PluginCommonModule, AuditCorePlugin, ApprovalPlugin],
   entities: [
     Account,
     JournalEntry,
@@ -165,8 +163,7 @@ const COMBINED_SCHEMA = gql`
     FinancialService,
     OrderMarginService,
     OpenSessionService,
-    // TIE-OUT TEMP PATCH: CashVarianceApprovalSubscriber disabled (needs ApprovalPlugin DI).
-    // CashVarianceApprovalSubscriber,
+    CashVarianceApprovalSubscriber,
     LedgerConsistencyGuard,
     OrderArProjection,
     PurchaseApProjection,
