@@ -202,7 +202,10 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
         </div>
 
         @if (company(); as c) {
-          <p class="type-caption mt-6">{{ c.code }} · {{ role() ?? '—' }}</p>
+          <p class="type-caption mt-6">
+            {{ c.code }} · {{ role() ?? '—' }} ·
+            <a routerLink="/billing" class="link">Billing &amp; plan</a>
+          </p>
         }
       </div>
     </main>

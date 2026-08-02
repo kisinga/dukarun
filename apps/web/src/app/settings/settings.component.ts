@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { formatKes, parseKesToCents } from '../core/money';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { CompanySettings, PaymentMethodRow, SettingsService } from './settings.service';
@@ -8,7 +9,7 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
 
 @Component({
   selector: 'app-settings',
-  imports: [ReactiveFormsModule, PageHeaderComponent],
+  imports: [ReactiveFormsModule, RouterLink, PageHeaderComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="mx-auto max-w-3xl">
@@ -188,7 +189,12 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
           <!-- Payment methods -->
           <div class="card mb-4 bg-base-100">
             <div class="card-body p-4">
-              <h2 class="card-title text-lg">Payment methods</h2>
+              <div class="flex items-center justify-between">
+                <h2 class="card-title text-lg">Payment methods</h2>
+                <a routerLink="/billing" class="btn btn-outline btn-sm min-h-11">
+                  Billing &amp; plan →
+                </a>
+              </div>
               <table class="table table-sm mt-2">
                 <thead>
                   <tr>

@@ -121,6 +121,10 @@ export const routes: Routes = [
         path: 'settings',
         loadComponent: () => import('./settings/settings.component').then(m => m.SettingsComponent),
       },
+      {
+        path: 'billing',
+        loadComponent: () => import('./billing/billing.component').then(m => m.BillingComponent),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
     ],
   },
