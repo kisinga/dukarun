@@ -32,7 +32,11 @@ import { ReceiptDataService } from '../../shared/print/receipt-data.service';
         }
 
         @if (drafts().length === 0) {
-          <app-empty-state icon="heroClipboardDocumentList" title="No proformas." />
+          <app-empty-state
+            icon="heroClipboardDocumentList"
+            title="No proformas"
+            description="Save a sale as proforma from the Sell screen and it waits here to convert."
+          />
         } @else {
           <div class="flex flex-col gap-2">
             @for (draft of drafts(); track draft.id) {

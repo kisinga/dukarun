@@ -102,7 +102,11 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
 
         <!-- List -->
         @if (filtered().length === 0) {
-          <app-empty-state icon="heroUsers" title="No customers found." />
+          <app-empty-state
+            icon="heroUsers"
+            title="No customers found"
+            description="Add a customer with the + button to sell on credit, or clear the search."
+          />
         } @else {
           <div class="flex flex-col gap-2">
             @for (c of filtered(); track c.id) {
@@ -117,7 +121,7 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
                     <button class="link font-semibold" (click)="toggle(c.id)">{{ name(c) }}</button>
                     <span class="text-xs text-base-content/60">{{ c.phone ?? '' }}</span>
                     <span class="ml-auto font-bold" [class.text-error]="c.ar_balance > 0">
-                      {{ fmt(c.ar_balance) }} owed
+                      <span class="tabular-nums">{{ fmt(c.ar_balance) }}</span> owed
                     </span>
                     <a routerLink="/money/credit" class="btn btn-ghost btn-xs">Credit →</a>
                     <button class="btn btn-ghost btn-xs" (click)="startEdit(c)">Edit</button>

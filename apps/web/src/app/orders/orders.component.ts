@@ -153,8 +153,8 @@ const PAGE_SIZE = 20;
                         <thead>
                           <tr>
                             <th>Item</th>
-                            <th>Qty</th>
-                            <th>Price</th>
+                            <th class="text-right">Qty</th>
+                            <th class="text-right">Price</th>
                             <th class="text-right">Total</th>
                           </tr>
                         </thead>
@@ -162,8 +162,10 @@ const PAGE_SIZE = 20;
                           @for (line of lines(); track line.id) {
                             <tr>
                               <td>{{ line.label }}</td>
-                              <td>{{ line.quantity }}</td>
-                              <td>{{ fmt(line.custom_price ?? line.unit_price) }}</td>
+                              <td class="text-right">{{ line.quantity }}</td>
+                              <td class="text-right">
+                                {{ fmt(line.custom_price ?? line.unit_price) }}
+                              </td>
                               <td class="text-right">{{ fmt(line.line_total) }}</td>
                             </tr>
                           }

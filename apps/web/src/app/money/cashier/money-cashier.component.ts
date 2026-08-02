@@ -53,7 +53,8 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 
               <h3 class="mt-4 font-semibold">Close session — blind count</h3>
               <p class="text-xs text-base-content/60">
-                Count each drawer/account and enter what you actually have.
+                This count is blind — you won't see the expected amount. Count what's actually in
+                the drawer and enter it per account.
               </p>
               <div class="mt-2 flex flex-col gap-2">
                 @for (account of accounts(); track account.account_code) {
@@ -109,7 +110,11 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
         <!-- Recent sessions -->
         <h2 class="mb-2 text-lg font-semibold">Recent sessions</h2>
         @if (sessions().length === 0) {
-          <app-empty-state icon="heroBanknotes" title="No sessions yet." />
+          <app-empty-state
+            icon="heroBanknotes"
+            title="No sessions yet"
+            description="Open a session above to start counting the till."
+          />
         } @else {
           <div class="flex flex-col gap-2">
             @for (session of sessions(); track session.id) {
@@ -132,8 +137,8 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                       <thead>
                         <tr>
                           <th>Count</th>
-                          <th>Declared</th>
-                          <th>Expected</th>
+                          <th class="text-right">Declared</th>
+                          <th class="text-right">Expected</th>
                           <th class="text-right">Variance</th>
                         </tr>
                       </thead>
@@ -141,8 +146,8 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                         @for (count of session.cash_drawer_counts; track count.id) {
                           <tr>
                             <td>{{ count.count_type }}</td>
-                            <td>{{ fmt(count.declared_cash) }}</td>
-                            <td>{{ fmt(count.expected_cash) }}</td>
+                            <td class="text-right">{{ fmt(count.declared_cash) }}</td>
+                            <td class="text-right">{{ fmt(count.expected_cash) }}</td>
                             <td
                               class="text-right font-semibold"
                               [class.text-error]="count.variance !== 0"

@@ -77,7 +77,7 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
               <thead>
                 <tr>
                   <th>Day</th>
-                  <th></th>
+                  <th class="text-right">Orders</th>
                   <th class="text-right">Revenue</th>
                   <th class="text-right">Margin</th>
                 </tr>
@@ -86,12 +86,7 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
                 @for (d of week(); track d.day) {
                   <tr>
                     <td class="text-sm">{{ shortDay(d.day) }}</td>
-                    <td class="w-full">
-                      <div
-                        class="h-2 rounded-full bg-primary/70"
-                        [style.width.%]="barWidth(d.revenue ?? 0)"
-                      ></div>
-                    </td>
+                    <td class="text-right">{{ d.orders ?? 0 }}</td>
                     <td class="text-right">{{ fmt(d.revenue ?? 0) }}</td>
                     <td
                       class="text-right font-medium"
@@ -241,10 +236,6 @@ export class DashboardComponent implements OnInit {
   protected readonly today = computed(() => this.summary().find(d => d.day === this.todayIso()));
   protected readonly week = computed(() => this.summary());
 
-  private readonly maxRevenue = computed(() =>
-    Math.max(1, ...this.summary().map(d => d.revenue ?? 0))
-  );
-
   async ngOnInit(): Promise<void> {
     this.role.set(this.supabase.claims()?.user_role ?? null);
     try {
@@ -304,10 +295,6 @@ export class DashboardComponent implements OnInit {
         margin: acc.margin,
       }))
     );
-  }
-
-  protected barWidth(revenue: number): number {
-    return Math.max(2, Math.round((revenue / this.maxRevenue()) * 100));
   }
 
   protected shortDay(day: string | null): string {

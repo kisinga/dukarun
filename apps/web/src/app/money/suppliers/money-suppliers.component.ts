@@ -233,7 +233,9 @@ interface PurchaseLineForm {
                 </button>
               </div>
 
-              <div class="text-sm font-semibold">Total: {{ fmt(purchaseTotal()) }}</div>
+              <div class="text-sm font-semibold tabular-nums">
+                Total: {{ fmt(purchaseTotal()) }}
+              </div>
               <button
                 type="submit"
                 class="btn btn-primary btn-sm self-start"
@@ -292,7 +294,11 @@ interface PurchaseLineForm {
         <!-- Purchases list -->
         <h2 class="mb-2 text-lg font-semibold">Recent purchases</h2>
         @if (purchases().length === 0) {
-          <app-empty-state icon="heroBanknotes" title="No purchases recorded." />
+          <app-empty-state
+            icon="heroBanknotes"
+            title="No purchases recorded"
+            description="Record a purchase above to stock in from a supplier."
+          />
         } @else {
           <div class="flex flex-col gap-2">
             @for (p of purchases(); track p.id) {

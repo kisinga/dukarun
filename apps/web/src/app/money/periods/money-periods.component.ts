@@ -211,7 +211,11 @@ import {
         <!-- Periods list -->
         <h2 class="mb-2 text-lg font-semibold">Periods</h2>
         @if (periods().length === 0) {
-          <app-empty-state icon="heroClipboardDocumentList" title="No periods yet." />
+          <app-empty-state
+            icon="heroClipboardDocumentList"
+            title="No periods yet"
+            description="Reconcile, then close your first accounting period below."
+          />
         } @else {
           <div class="card bg-base-100">
             <table class="table table-sm">

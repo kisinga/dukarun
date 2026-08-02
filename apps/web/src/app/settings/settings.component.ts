@@ -4,7 +4,7 @@ import { formatKes, parseKesToCents } from '../core/money';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { CompanySettings, PaymentMethodRow, SettingsService } from './settings.service';
 
-type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash' | 'notifications';
+type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
 
 @Component({
   selector: 'app-settings',
@@ -35,6 +35,9 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash' | 'notifications';
                   <span class="label-text">Public slug</span>
                   <input type="text" class="input input-bordered input-sm" [formControl]="slug" />
                 </label>
+                <p class="type-caption sm:col-span-2">
+                  Storefront fields are used by your public storefront (launching separately).
+                </p>
                 <label class="form-control">
                   <span class="label-text">WhatsApp number (storefront)</span>
                   <input
@@ -237,53 +240,6 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash' | 'notifications';
               }
             </div>
           </div>
-
-          <!-- Notifications -->
-          <div class="card mb-4 bg-base-100">
-            <div class="card-body p-4">
-              <h2 class="card-title text-lg">Notifications</h2>
-              @if (notificationKeys().length === 0) {
-                <p class="mt-1 text-sm text-base-content/60">
-                  Managed per category later — no notification preferences set yet.
-                </p>
-              } @else {
-                <form
-                  (submit)="$event.preventDefault(); saveSection('notifications')"
-                  class="mt-2 flex flex-col gap-2"
-                >
-                  @for (key of notificationKeys(); track key) {
-                    <label class="label cursor-pointer justify-start gap-2 py-0">
-                      <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        [checked]="notificationPrefs()[key]"
-                        (change)="toggleNotificationPref(key)"
-                      />
-                      <span class="label-text">{{ key }}</span>
-                    </label>
-                  }
-                  <div>
-                    @if (msg('notifications'); as m) {
-                      <p
-                        class="mb-2 text-sm"
-                        [class.text-success]="m.ok"
-                        [class.text-error]="!m.ok"
-                      >
-                        {{ m.text }}
-                      </p>
-                    }
-                    <button
-                      type="submit"
-                      class="btn btn-primary btn-sm min-h-11"
-                      [disabled]="busy()"
-                    >
-                      Save notifications
-                    </button>
-                  </div>
-                </form>
-              }
-            </div>
-          </div>
         } @else {
           <p class="text-sm text-base-content/60">Loading…</p>
         }
@@ -317,9 +273,6 @@ export class SettingsComponent implements OnInit {
 
   protected readonly varianceThreshold = new FormControl('', { nonNullable: true });
 
-  protected readonly notificationKeys = signal<string[]>([]);
-  protected readonly notificationPrefs = signal<Record<string, boolean>>({});
-
   async ngOnInit(): Promise<void> {
     try {
       const [settings, methods] = await Promise.all([
@@ -339,9 +292,6 @@ export class SettingsComponent implements OnInit {
       this.lowStock.setValue(settings.low_stock_threshold);
       this.batchExpiry.setValue(settings.batch_expiry_enabled);
       this.varianceThreshold.setValue((settings.variance_notification_threshold / 100).toFixed(2));
-      const prefs = settings.notification_category_preferences ?? {};
-      this.notificationPrefs.set({ ...prefs });
-      this.notificationKeys.set(Object.keys(prefs));
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load settings');
     }
@@ -391,9 +341,6 @@ export class SettingsComponent implements OnInit {
         patch = { variance_notification_threshold: cents };
         break;
       }
-      case 'notifications':
-        patch = { notification_category_preferences: this.notificationPrefs() };
-        break;
     }
     this.busy.set(true);
     try {
@@ -426,9 +373,5 @@ export class SettingsComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
-  }
-
-  protected toggleNotificationPref(key: string): void {
-    this.notificationPrefs.update(prefs => ({ ...prefs, [key]: !prefs[key] }));
   }
 }

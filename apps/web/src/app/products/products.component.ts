@@ -25,7 +25,8 @@ type StockInfo = { stock: number; stock_value: number };
 /** One row of the create form's inline variants editor. */
 type DeactivateTarget =
   | { kind: 'family'; family: Product; variants: number }
-  | { kind: 'variant'; variant: Variant };
+  | { kind: 'variant'; variant: Variant }
+  | { kind: 'collection'; collection: CollectionWithCount };
 
 interface CreateRow {
   name: string;
@@ -165,7 +166,7 @@ interface CreateRow {
                             <button
                               class="btn btn-error btn-outline btn-xs"
                               [disabled]="busy()"
-                              (click)="setCollectionActive(c, false)"
+                              (click)="confirmDeactivate({ kind: 'collection', collection: c })"
                             >
                               Deactivate
                             </button>
@@ -590,7 +591,11 @@ interface CreateRow {
 
         <!-- Grouped list -->
         @if (grouped().length === 0) {
-          <app-empty-state icon="heroCube" title="No products found." />
+          <app-empty-state
+            icon="heroCube"
+            title="No products found"
+            description="Create your first product with + New product, or clear the search."
+          />
         } @else {
           <div class="flex flex-col gap-2">
             @for (group of grouped(); track group.family.id) {
@@ -1234,6 +1239,14 @@ export class ProductsComponent implements OnInit {
         warningDetails: ['Deactivated products disappear from the Sell screen search.'],
       };
     }
+    if (t.kind === 'collection') {
+      return {
+        entityName: t.collection.name,
+        relatedCount: t.collection.product_count,
+        relatedLabel: 'product',
+        warningDetails: ['Products stay; only the collection grouping is deactivated.'],
+      };
+    }
     return {
       entityName: this.label(t.variant),
       warningDetails: ['Deactivated variants disappear from the Sell screen search.'],
@@ -1246,6 +1259,8 @@ export class ProductsComponent implements OnInit {
     this.deleteModal()?.hide();
     if (t.kind === 'family') {
       await this.setFamilyActive(t.family, false);
+    } else if (t.kind === 'collection') {
+      await this.setCollectionActive(t.collection, false);
     } else {
       await this.setVariantActive(t.variant, false);
     }

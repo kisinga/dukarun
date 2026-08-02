@@ -23,7 +23,11 @@ import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
         }
 
         @if (parked().length === 0) {
-          <app-empty-state icon="heroBanknotes" title="No parked orders waiting for payment." />
+          <app-empty-state
+            icon="heroBanknotes"
+            title="No parked orders"
+            description="When a sale is parked from the Sell screen, it waits here for payment."
+          />
         } @else {
           <div class="flex flex-col gap-2">
             @for (order of parked(); track order.id) {

@@ -87,7 +87,11 @@ type CreditOrder = {
         </div>
 
         @if (sortedCustomers().length === 0) {
-          <app-empty-state icon="heroUsers" title="No customers yet." />
+          <app-empty-state
+            icon="heroUsers"
+            title="No customers yet"
+            description="Credit customers and what they owe appear here."
+          />
         } @else {
           <div class="flex flex-col gap-2">
             @for (c of sortedCustomers(); track c.id) {
@@ -103,7 +107,7 @@ type CreditOrder = {
                       [label]="c.is_credit_approved ? 'approved' : 'not approved'"
                     />
                     <span class="text-xs text-base-content/60">
-                      limit {{ fmt(c.credit_limit) }}
+                      limit <span class="tabular-nums">{{ fmt(c.credit_limit) }}</span>
                     </span>
                     @if (c.days_outstanding !== null) {
                       <span class="type-caption">{{ c.days_outstanding }}d</span>
@@ -134,7 +138,9 @@ type CreditOrder = {
                                 time(o.created_at)
                               }}</span>
                               <span class="badge badge-xs badge-outline">{{ o.status }}</span>
-                              <span class="ml-auto font-semibold">{{ fmt(o.total) }}</span>
+                              <span class="ml-auto font-semibold tabular-nums">{{
+                                fmt(o.total)
+                              }}</span>
                               <button
                                 class="btn btn-primary btn-xs"
                                 (click)="startRepay(o.id, o.total)"

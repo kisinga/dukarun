@@ -35,6 +35,18 @@ const TYPE_BADGE: Record<string, string> = {
           <p class="mb-2 text-sm text-success">{{ notice() }}</p>
         }
 
+        <div class="type-caption mb-3 space-y-0.5">
+          <p>
+            <span class="font-semibold">below wholesale</span> — a price below wholesale needs
+            sign-off.
+          </p>
+          <p><span class="font-semibold">order reversal</span> — a void needs sign-off.</p>
+          <p>
+            <span class="font-semibold">overdraft</span> — a record of who authorized credit over
+            the limit.
+          </p>
+        </div>
+
         <!-- Pending inbox -->
         @if (approvals.pending().length === 0) {
           <app-empty-state
