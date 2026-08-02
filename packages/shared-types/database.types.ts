@@ -1454,6 +1454,8 @@ export type Database = {
           expected: number
           id: string
           reconciliation_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           variance: number
         }
         Insert: {
@@ -1462,6 +1464,8 @@ export type Database = {
           expected: number
           id?: string
           reconciliation_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           variance: number
         }
         Update: {
@@ -1470,6 +1474,8 @@ export type Database = {
           expected?: number
           id?: string
           reconciliation_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           variance?: number
         }
         Relationships: [
@@ -2307,6 +2313,10 @@ export type Database = {
       remove_team_member: { Args: { p_membership_id: string }; Returns: string }
       require_asset_leaf_account: {
         Args: { p_code: string; p_company_id: string }
+        Returns: string
+      }
+      revert_variance: {
+        Args: { p_reason?: string; p_recon_account_id: string }
         Returns: string
       }
       save_draft: {
