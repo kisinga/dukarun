@@ -41,7 +41,7 @@ $$;
 
 -- add_member: role + approved membership
 create or replace function testkit.add_member(p_company_id uuid, p_user_id uuid, p_role_name text, p_permissions text[])
-returns uuid language plpgsql set search_path = '' as $$
+returns uuid language plpgsql security definer set search_path = '' as $$
 declare v_role_id uuid;
 begin
   insert into public.roles (company_id, name, permissions)

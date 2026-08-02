@@ -2224,6 +2224,7 @@ export type Database = {
         Args: { p_phone: string; p_role_id: string }
         Returns: string
       }
+      apply_role_template: { Args: { p_template_id: string }; Returns: string }
       approve_request: {
         Args: { p_approval_id: string; p_reason?: string }
         Returns: string

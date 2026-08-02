@@ -1,7 +1,7 @@
 -- Tenancy isolation tests for migration 0001.
 -- Simulates JWT claims via request.jwt.claims, exactly as auth.jwt() reads them.
 begin;
-select plan(10);
+select plan(11);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test superuser, which bypasses RLS)
@@ -39,9 +39,15 @@ select is(
 );
 
 select is(
-  (select count(*)::int from public.roles),
+  (select count(*)::int from public.roles where not is_template),
   1,
   'member sees only their own company roles'
+);
+
+select is(
+  (select count(*)::int from public.roles where is_template),
+  4,
+  'member also sees the platform role templates'
 );
 
 select is(

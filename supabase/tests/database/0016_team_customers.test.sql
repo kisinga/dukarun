@@ -17,11 +17,12 @@ select ok(
   'provisioned Admin role includes ManageTeam'
 );
 
--- 2. Create a Cashier role.
+-- 2. The provisioned Cashier role is available (0023: seeded at provision).
 create temp table cashier_role as
-select public.upsert_role('Cashier', '{SettleOrder}') as role_id;
+select id as role_id from public.roles
+where company_id = (select company_id from tm_company) and name = 'Cashier';
 
-select ok((select role_id from cashier_role) is not null, 'upsert_role creates a role');
+select ok((select role_id from cashier_role) is not null, 'Cashier role exists from provisioning');
 
 -- 3. Add member by phone (07-normalized).
 select public.add_team_member('0722 222 222', (select role_id from cashier_role));
