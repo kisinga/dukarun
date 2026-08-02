@@ -65,6 +65,17 @@ Env for all: `SUPABASE_URL=https://supa.dukarun.com`, `SUPABASE_ANON_KEY=<anon k
 Self-hosted GitHub Actions runner on the Coolify host (repo Settings → Actions → Runners → New). Then `.github/workflows/supabase.yml` deploys on merge with `SUPABASE_DB_URL` pointing at `127.0.0.1:5432` — Postgres never exposed publicly.
 Interim manual deploys: `scripts/deploy-db.sh` (SSH tunnel, always closes).
 
+## Lint findings (accepted, by design)
+
+- `security_definer_view` on `rpt_daily_*` (4): MVs cannot have RLS; definer
+  views with the JWT company filter in WHERE are the tenant boundary
+  (pgTAP-proven isolation; direct MV reads revoked). Do not "fix".
+- `security_definer_view` on `public_storefronts`: intended public projection
+  (approved+opted-in, 5 columns only). An RLS policy on companies would leak
+  billing columns to anon.
+- `function_search_path_mutable` on the 3 JWT helpers: FIXED in
+  `20260801024000_0028_search_path_hardening.sql`.
+
 ## Re-run notes
 
 - Migrations are append-only; `supabase db push` applies only new files.
