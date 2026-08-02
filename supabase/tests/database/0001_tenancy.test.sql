@@ -6,11 +6,9 @@ select plan(10);
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the test superuser, which bypasses RLS)
 -- ---------------------------------------------------------------------------
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values
-  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'owner-a@test.local', '', now(), now()),
-  ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'owner-b@test.local', '', now(), now()),
-  ('99999999-9999-9999-9999-999999999999', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@platform.local', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'owner-a@test.local');
+select testkit.create_user('22222222-2222-2222-2222-222222222222', 'owner-b@test.local');
+select testkit.create_user('99999999-9999-9999-9999-999999999999', 'admin@platform.local');
 
 insert into public.subscription_tiers (id, code, name, price_monthly, price_yearly)
 values ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'test-fixture-tier', 'Test Fixture Tier', 100000, 1000000);
@@ -20,21 +18,13 @@ values
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'TESTCOMPA', 'Company A', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'trial'),
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'TESTCOMPB', 'Company B', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'trial');
 
-insert into public.roles (id, company_id, name, permissions)
-values
-  ('aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Admin', '{ViewFinancials,SettleOrder}'),
-  ('bbbbbbb1-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Admin', '{ViewFinancials}');
-
-insert into public.company_memberships (company_id, user_id, role_id, authorization_status)
-values
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'approved'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'bbbbbbb1-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'approved');
+select testkit.add_member('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'Admin', '{ViewFinancials,SettleOrder}');
+select testkit.add_member('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'Admin', '{ViewFinancials}');
 
 -- ---------------------------------------------------------------------------
 -- As an authenticated member of company A
 -- ---------------------------------------------------------------------------
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","user_role":"Admin"}';
+select testkit.as_user('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'Admin');
 
 select is(
   (select count(*)::int from public.companies),
@@ -79,18 +69,25 @@ select is(
 -- ---------------------------------------------------------------------------
 -- As a platform admin
 -- ---------------------------------------------------------------------------
+-- True totals captured as superuser (seed adds a demo company; the assertion
+-- is "platform admin sees ALL rows", not a hardcoded count).
+create temp table true_counts as
+select (select count(*)::int from public.companies) as companies,
+       (select count(*)::int from public.company_memberships) as memberships;
+grant select on pg_temp.true_counts to authenticated;
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"99999999-9999-9999-9999-999999999999","role":"authenticated","is_platform_admin":true}';
 
 select is(
   (select count(*)::int from public.companies),
-  2,
+  (select companies from true_counts),
   'platform admin sees all companies'
 );
 
 select is(
   (select count(*)::int from public.company_memberships),
-  2,
+  (select memberships from true_counts),
   'platform admin sees all memberships'
 );
 

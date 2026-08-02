@@ -2,9 +2,7 @@
 begin;
 select plan(10);
 
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values
-  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'founder@test.local', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'founder@test.local');
 
 -- Provision as the authenticated founder.
 set local role authenticated;

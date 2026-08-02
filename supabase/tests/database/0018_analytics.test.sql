@@ -3,20 +3,11 @@
 begin;
 select plan(8);
 
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values
-  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'a@rpt.local', '', now(), now()),
-  ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'b@rpt.local', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'a@rpt.local');
+select testkit.create_user('22222222-2222-2222-2222-222222222222', 'b@rpt.local');
 
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-create temp table rpt_company as select public.provision_company('Rpt Co', 'Main') as company_id;
-reset role;
-
-create temp table rpt_claims as
-select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
-from rpt_company;
-grant select on pg_temp.rpt_claims to authenticated;
+create temp table rpt_company as select testkit.provision('11111111-1111-1111-1111-111111111111', 'Rpt Co') as company_id;
+grant select on pg_temp.rpt_company to authenticated;
 
 -- Product + variant + batch.
 insert into public.products (id, company_id, name)
@@ -26,8 +17,7 @@ select 'aa000000-0000-0000-0000-0000000000a1', 'a0000000-0000-0000-0000-00000000
 insert into public.inventory_batches (company_id, variant_id, quantity, remaining, unit_cost)
 select company_id, 'aa000000-0000-0000-0000-0000000000a1', 10, 10, 12000 from rpt_company;
 
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from rpt_claims), true);
+select testkit.as_user((select company_id from rpt_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- Two sales today: 2x Rice (revenue 40000, cogs 24000) + split payment.
 select public.post_sale(null,
@@ -77,16 +67,10 @@ select is(
 );
 
 -- 6-7. Tenant isolation: company B sees nothing through the wrapper views.
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
-create temp table rpt_company2 as select public.provision_company('Rpt Other', 'Main') as company_id2;
+create temp table rpt_company2 as select testkit.provision('22222222-2222-2222-2222-222222222222', 'Rpt Other') as company_id2;
+grant select on pg_temp.rpt_company2 to authenticated;
 
-create temp table rpt_claims2 as
-select format('{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id2) as claims
-from rpt_company2;
-grant select on pg_temp.rpt_claims2 to authenticated;
-
-select set_config('request.jwt.claims', (select claims from rpt_claims2), true);
+select testkit.as_user((select company_id2 from rpt_company2), '22222222-2222-2222-2222-222222222222', 'Admin');
 
 select is(
   (select count(*)::int from public.rpt_daily_sales_summary),

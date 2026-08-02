@@ -3,21 +3,12 @@
 begin;
 select plan(15);
 
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@prod.local', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@prod.local');
 
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-create temp table pr_company as select public.provision_company('Prod Co', 'Main') as company_id;
-reset role;
+create temp table pr_company as select testkit.provision('11111111-1111-1111-1111-111111111111', 'Prod Co') as company_id;
+grant select on pg_temp.pr_company to authenticated;
 
-create temp table pr_claims as
-select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
-from pr_company;
-grant select on pg_temp.pr_claims to authenticated;
-
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from pr_claims), true);
+select testkit.as_user((select company_id from pr_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 1. create_product creates the family row (no sellable fields).
 create temp table prod1 as
@@ -86,8 +77,7 @@ select is(
 reset role;
 insert into public.inventory_batches (company_id, variant_id, quantity, remaining, unit_cost)
 select company_id, (select id from var1), 10, 4, 15000 from pr_company;
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from pr_claims), true);
+select testkit.as_user((select company_id from pr_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 select is(
   (select stock from public.product_stock where variant_id = (select id from var1)),
@@ -112,8 +102,7 @@ select is(
 reset role;
 insert into public.customers (id, company_id, first_name, is_supplier)
 select 'c0000000-0000-0000-0000-0000000000aa', company_id, 'Supplier', true from pr_company;
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from pr_claims), true);
+select testkit.as_user((select company_id from pr_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 select throws_ok(
   format(
@@ -157,8 +146,7 @@ select public.upsert_variant((select id from flour), '1kg', 12000, null, 'FLR1',
 reset role;
 insert into public.inventory_batches (id, company_id, variant_id, quantity, remaining, unit_cost)
 select 'b0000000-0000-0000-0000-0000000000aa', company_id, (select id from flour_var), 10, 10, 10000 from pr_company;
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from pr_claims), true);
+select testkit.as_user((select company_id from pr_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 create temp table frac_sale as
 select public.post_sale(null,

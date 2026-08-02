@@ -3,13 +3,10 @@
 begin;
 select plan(9);
 
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@credit.local', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@credit.local');
 
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-create temp table cr_company as select public.provision_company('Credit Co', 'Main') as company_id;
-reset role;
+create temp table cr_company as select testkit.provision('11111111-1111-1111-1111-111111111111', 'Credit Co') as company_id;
+grant select on pg_temp.cr_company to authenticated;
 
 insert into public.products (id, company_id, name)
 select 'a0000000-0000-0000-0000-0000000000cc', company_id, 'Service' from cr_company;
@@ -22,13 +19,13 @@ select 'c0000000-0000-0000-0000-0000000000c1', company_id, 'Ltd Customer', true,
 insert into public.customers (id, company_id, first_name, is_credit_approved)
 select 'c0000000-0000-0000-0000-0000000000c2', company_id, 'Not Approved', false from cr_company;
 
-create temp table cr_claims as
-select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
-from cr_company;
-grant select on pg_temp.cr_claims to authenticated;
+-- Staff role without ApproveCustomerCredit (post-0020: over-limit succeeds
+-- for ApproveCustomerCredit holders with an audit record; staff hard-fails).
+select testkit.create_user('22222222-2222-2222-2222-222222222222', 'staff@credit.local');
 
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from cr_claims), true);
+select testkit.add_member((select company_id from cr_company), '22222222-2222-2222-2222-222222222222', 'Staff', '{SettleOrder,OverridePrice}');
+
+select testkit.as_user((select company_id from cr_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 1. Unapproved customer cannot take credit.
 select throws_ok(
@@ -38,13 +35,19 @@ select throws_ok(
   'unapproved customer cannot make a credit sale'
 );
 
--- 2. Over-limit credit sale is rejected (limit 15000, sale 20000).
+-- 2. Over-limit credit sale is rejected FOR STAFF (limit 15000, sale 20000).
+-- Note: ApproveCustomerCredit holders (Admin) now succeed with an approved
+-- overdraft audit record — the hard fail applies to roles without it.
+select testkit.as_user((select company_id from cr_company), '22222222-2222-2222-2222-222222222222', 'Staff');
+
 select throws_ok(
   $$select public.post_sale('c0000000-0000-0000-0000-0000000000c1',
     '[{"variant_id":"aa000000-0000-0000-0000-0000000000cc","quantity":2,"unit_price":10000}]', '[]')$$,
   'P0001', 'credit_limit_exceeded: balance 0 + 20000 > limit 15000',
-  'credit sale beyond the limit is rejected'
+  'credit sale beyond the limit is rejected for staff'
 );
+
+select testkit.as_user((select company_id from cr_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 3. Within-limit credit sale works.
 create temp table cr_sale as
@@ -56,13 +59,17 @@ select ok(
   'within-limit credit sale completes'
 );
 
--- 4. Cumulative limit: balance 10000 + 10000 > 15000.
+-- 4. Cumulative limit: balance 10000 + 10000 > 15000 (staff).
+select testkit.as_user((select company_id from cr_company), '22222222-2222-2222-2222-222222222222', 'Staff');
+
 select throws_ok(
   $$select public.post_sale('c0000000-0000-0000-0000-0000000000c1',
     '[{"variant_id":"aa000000-0000-0000-0000-0000000000cc","quantity":1,"unit_price":10000}]', '[]')$$,
   'P0001', 'credit_limit_exceeded: balance 10000 + 10000 > limit 15000',
   'credit limit is enforced cumulatively against AR balance'
 );
+
+select testkit.as_user((select company_id from cr_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 5. Allocation: repay 4000 cash against the credit order.
 create temp table alloc1 as

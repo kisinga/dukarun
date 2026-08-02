@@ -2,27 +2,17 @@
 begin;
 select plan(4);
 
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@gaps.local', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@gaps.local');
 
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-create temp table gaps_company as select public.provision_company('Gaps Co', 'Main') as company_id;
-reset role;
+create temp table gaps_company as select testkit.provision('11111111-1111-1111-1111-111111111111', 'Gaps Co') as company_id;
+grant select on pg_temp.gaps_company to authenticated;
 
 insert into public.products (id, company_id, name)
 select 'a0000000-0000-0000-0000-000000000009', company_id, 'Service' from gaps_company;
 insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
 select 'aa000000-0000-0000-0000-000000000009', 'a0000000-0000-0000-0000-000000000009', company_id, 'Default', 'service', 'SVC', 5000, false from gaps_company;
 
--- Claims with tenant + role for RPC calls.
-create temp table gaps_claims as
-select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
-from gaps_company;
-grant select on pg_temp.gaps_claims to authenticated;
-
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from gaps_claims), true);
+select testkit.as_user((select company_id from gaps_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 1. create_customer works and scopes to the caller's company.
 create temp table new_customer as
@@ -55,8 +45,7 @@ select throws_ok(
 reset role;
 update public.customers set is_credit_approved = true
 where id = (select customer_id from new_customer);
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from gaps_claims), true);
+select testkit.as_user((select company_id from gaps_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 select lives_ok(
   format(

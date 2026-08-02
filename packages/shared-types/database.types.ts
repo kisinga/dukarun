@@ -72,6 +72,56 @@ export type Database = {
           },
         ]
       }
+      approvals: {
+        Row: {
+          company_id: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          due_at: string | null
+          id: string
+          metadata: Json
+          requested_by: string | null
+          status: string
+          type: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          due_at?: string | null
+          id?: string
+          metadata?: Json
+          requested_by?: string | null
+          status?: string
+          type: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          due_at?: string | null
+          id?: string
+          metadata?: Json
+          requested_by?: string | null
+          status?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approvals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           actor: string | null
@@ -2039,6 +2089,10 @@ export type Database = {
         Args: { p_phone: string; p_role_id: string }
         Returns: string
       }
+      approve_request: {
+        Args: { p_approval_id: string; p_reason?: string }
+        Returns: string
+      }
       close_accounting_period: { Args: { p_end_date: string }; Returns: string }
       close_cashier_session: {
         Args: { p_declarations: Json; p_session_id: string }
@@ -2061,6 +2115,15 @@ export type Database = {
       }
       convert_draft: {
         Args: { p_order_id: string; p_payments: Json }
+        Returns: string
+      }
+      create_approval: {
+        Args: {
+          p_company_id: string
+          p_due_at?: string
+          p_metadata: Json
+          p_type: string
+        }
         Returns: string
       }
       create_customer: {
@@ -2093,6 +2156,14 @@ export type Database = {
         Returns: boolean
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      deny_request: {
+        Args: { p_approval_id: string; p_reason?: string }
+        Returns: string
+      }
+      do_void: {
+        Args: { p_order_id: string; p_reason: string }
+        Returns: string
+      }
       is_platform_admin: { Args: never; Returns: boolean }
       open_cashier_session: { Args: { p_declarations: Json }; Returns: string }
       pay_supplier: {
@@ -2307,7 +2378,7 @@ export type Database = {
       }
       void_sale: {
         Args: { p_order_id: string; p_reason: string }
-        Returns: string
+        Returns: Json
       }
     }
     Enums: {

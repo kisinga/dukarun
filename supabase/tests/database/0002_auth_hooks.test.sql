@@ -3,20 +3,14 @@ begin;
 select plan(6);
 
 -- Fixtures
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values
-  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'member@test.local', '', now(), now()),
-  ('33333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'loner@test.local', '', now(), now()),
-  ('99999999-9999-9999-9999-999999999999', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'root@platform.local', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'member@test.local');
+select testkit.create_user('33333333-3333-3333-3333-333333333333', 'loner@test.local');
+select testkit.create_user('99999999-9999-9999-9999-999999999999', 'root@platform.local');
 
 insert into public.companies (id, code, name)
 values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'HOOKCO', 'Hook Co');
 
-insert into public.roles (id, company_id, name, permissions)
-values ('aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Admin', '{ViewFinancials}');
-
-insert into public.company_memberships (company_id, user_id, role_id, authorization_status)
-values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'approved');
+select testkit.add_member('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'Admin', '{ViewFinancials}');
 
 insert into public.platform_admins (user_id)
 values ('99999999-9999-9999-9999-999999999999');

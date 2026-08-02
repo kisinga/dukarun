@@ -2,23 +2,13 @@
 begin;
 select plan(9);
 
-insert into auth.users (id, instance_id, aud, role, email, phone, encrypted_password, created_at, updated_at)
-values
-  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'owner@team.local', '254711111111', '', now(), now()),
-  ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'cashier@team.local', '254722222222', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'owner@team.local', '254711111111');
+select testkit.create_user('22222222-2222-2222-2222-222222222222', 'cashier@team.local', '254722222222');
 
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-create temp table tm_company as select public.provision_company('Team Co', 'Main') as company_id;
-reset role;
+create temp table tm_company as select testkit.provision('11111111-1111-1111-1111-111111111111', 'Team Co') as company_id;
+grant select on pg_temp.tm_company to authenticated;
 
-create temp table tm_claims as
-select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
-from tm_company;
-grant select on pg_temp.tm_claims to authenticated;
-
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from tm_claims), true);
+select testkit.as_user((select company_id from tm_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 1. Admin role has ManageTeam after provisioning.
 select ok(
@@ -54,8 +44,7 @@ select is(
   'added member gets role claims via token hook'
 );
 
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from tm_claims), true);
+select testkit.as_user((select company_id from tm_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 5. Adding an unregistered phone fails.
 select throws_ok(
@@ -103,8 +92,7 @@ select throws_ok(
 reset role;
 insert into public.customers (id, company_id, first_name, phone)
 select 'c0000000-0000-0000-0000-0000000000ee', company_id, 'Jane', '0711000000' from tm_company;
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from tm_claims), true);
+select testkit.as_user((select company_id from tm_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 select public.update_customer('c0000000-0000-0000-0000-0000000000ee', null, 'Mwangi');
 

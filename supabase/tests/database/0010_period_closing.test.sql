@@ -3,34 +3,20 @@
 begin;
 select plan(9);
 
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values
-  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@period.local', '', now(), now()),
-  ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'cashier@period.local', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@period.local');
+select testkit.create_user('22222222-2222-2222-2222-222222222222', 'cashier@period.local');
 
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-create temp table pc_company as select public.provision_company('Period Co', 'Main') as company_id;
-reset role;
+create temp table pc_company as select testkit.provision('11111111-1111-1111-1111-111111111111', 'Period Co') as company_id;
+grant select on pg_temp.pc_company to authenticated;
 
-insert into public.roles (company_id, name, permissions)
-select company_id, 'Cashier', '{SettleOrder}' from pc_company;
-insert into public.company_memberships (company_id, user_id, role_id, authorization_status)
-select p.company_id, '22222222-2222-2222-2222-222222222222', r.id, 'approved'
-from pc_company p, public.roles r where r.company_id = p.company_id and r.name = 'Cashier';
+select testkit.add_member((select company_id from pc_company), '22222222-2222-2222-2222-222222222222', 'Cashier', '{SettleOrder}');
 
 insert into public.products (id, company_id, name)
 select 'a0000000-0000-0000-0000-0000000000ee', company_id, 'Service' from pc_company;
 insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
 select 'aa000000-0000-0000-0000-0000000000ee', 'a0000000-0000-0000-0000-0000000000ee', company_id, 'Default', 'service', 'SVC', 10000, false from pc_company;
 
-create temp table pc_claims as
-select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
-from pc_company;
-grant select on pg_temp.pc_claims to authenticated;
-
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from pc_claims), true);
+select testkit.as_user((select company_id from pc_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- Seed activity.
 select public.post_sale(null,
@@ -45,9 +31,7 @@ select throws_ok(
 );
 
 -- 2. Cashier cannot close periods.
-select set_config('request.jwt.claims', (
-  select format('{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","company_id":"%s","user_role":"Cashier"}', company_id)
-  from pc_company), true);
+select testkit.as_user((select company_id from pc_company), '22222222-2222-2222-2222-222222222222', 'Cashier');
 
 select throws_ok(
   $$select public.close_accounting_period((now() at time zone 'Africa/Nairobi')::date)$$,
@@ -55,7 +39,7 @@ select throws_ok(
   'cashier cannot close accounting periods'
 );
 
-select set_config('request.jwt.claims', (select claims from pc_claims), true);
+select testkit.as_user((select company_id from pc_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 3-4. Manual reconciliation (matching declarations: verified, zero variance).
 create temp table recon1 as

@@ -3,34 +3,20 @@
 begin;
 select plan(15);
 
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values
-  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@mops.local', '', now(), now()),
-  ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'cashier@mops.local', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@mops.local');
+select testkit.create_user('22222222-2222-2222-2222-222222222222', 'cashier@mops.local');
 
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-create temp table mops_company as select public.provision_company('Mops Co', 'Main') as company_id;
-reset role;
+create temp table mops_company as select testkit.provision('11111111-1111-1111-1111-111111111111', 'Mops Co') as company_id;
+grant select on pg_temp.mops_company to authenticated;
 
-insert into public.roles (company_id, name, permissions)
-select company_id, 'Cashier', '{SettleOrder}' from mops_company;
-insert into public.company_memberships (company_id, user_id, role_id, authorization_status)
-select p.company_id, '22222222-2222-2222-2222-222222222222', r.id, 'approved'
-from mops_company p, public.roles r where r.company_id = p.company_id and r.name = 'Cashier';
+select testkit.add_member((select company_id from mops_company), '22222222-2222-2222-2222-222222222222', 'Cashier', '{SettleOrder}');
 
 insert into public.products (id, company_id, name)
 select 'a0000000-0000-0000-0000-0000000000bb', company_id, 'Service' from mops_company;
 insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
 select 'aa000000-0000-0000-0000-0000000000bb', 'a0000000-0000-0000-0000-0000000000bb', company_id, 'Default', 'service', 'SVC', 10000, false from mops_company;
 
-create temp table mops_claims as
-select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
-from mops_company;
-grant select on pg_temp.mops_claims to authenticated;
-
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from mops_claims), true);
+select testkit.as_user((select company_id from mops_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- Seed cash via a sale so transfer/expense sources have balances (not required
 -- by the ledger, but keeps scenarios realistic).
@@ -89,9 +75,7 @@ select is(
 );
 
 -- 6. Transfer permission.
-select set_config('request.jwt.claims', (
-  select format('{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","company_id":"%s","user_role":"Cashier"}', company_id)
-  from mops_company), true);
+select testkit.as_user((select company_id from mops_company), '22222222-2222-2222-2222-222222222222', 'Cashier');
 
 select throws_ok(
   $$select public.post_transfer('CASH_ON_HAND', 'BANK_MAIN', 1000, 0, 'tr-denied')$$,
@@ -99,7 +83,7 @@ select throws_ok(
   'cashier cannot create transfers'
 );
 
-select set_config('request.jwt.claims', (select claims from mops_claims), true);
+select testkit.as_user((select company_id from mops_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 7-9. Refund against the earlier sale.
 create temp table sale_m as
@@ -158,8 +142,7 @@ reset role;
 insert into public.customers (id, company_id, first_name)
 select 'c0000000-0000-0000-0000-0000000000bb', company_id, 'Credit Jane' from mops_company;
 
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from mops_claims), true);
+select testkit.as_user((select company_id from mops_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 create temp table badj as
 select public.post_balance_adjustment('c0000000-0000-0000-0000-0000000000bb', 15000, 'correction') as entry_id;
@@ -191,9 +174,7 @@ select results_eq(
   'negative adjustment (forgive): DR BALANCE_ADJUSTMENT / CR AR'
 );
 
-select set_config('request.jwt.claims', (
-  select format('{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","company_id":"%s","user_role":"Cashier"}', company_id)
-  from mops_company), true);
+select testkit.as_user((select company_id from mops_company), '22222222-2222-2222-2222-222222222222', 'Cashier');
 
 select throws_ok(
   $$select public.post_balance_adjustment('c0000000-0000-0000-0000-0000000000bb', 1000, 'nope')$$,
@@ -201,7 +182,7 @@ select throws_ok(
   'cashier cannot adjust customer balances'
 );
 
-select set_config('request.jwt.claims', (select claims from mops_claims), true);
+select testkit.as_user((select company_id from mops_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 16. Global invariant after everything.
 select is(

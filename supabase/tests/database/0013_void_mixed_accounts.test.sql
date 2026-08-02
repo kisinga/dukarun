@@ -3,13 +3,10 @@
 begin;
 select plan(5);
 
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@void.local', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@void.local');
 
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-create temp table vd_company as select public.provision_company('Void Co', 'Main') as company_id;
-reset role;
+create temp table vd_company as select testkit.provision('11111111-1111-1111-1111-111111111111', 'Void Co') as company_id;
+grant select on pg_temp.vd_company to authenticated;
 
 insert into public.products (id, company_id, name)
 select 'a0000000-0000-0000-0000-0000000000dd', company_id, 'Service' from vd_company;
@@ -19,13 +16,7 @@ select 'aa000000-0000-0000-0000-0000000000dd', 'a0000000-0000-0000-0000-00000000
 insert into public.customers (id, company_id, first_name, is_credit_approved, credit_limit)
 select 'c0000000-0000-0000-0000-0000000000dd', company_id, 'Credit Jane', true, 0 from vd_company;
 
-create temp table vd_claims as
-select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
-from vd_company;
-grant select on pg_temp.vd_claims to authenticated;
-
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from vd_claims), true);
+select testkit.as_user((select company_id from vd_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- Credit sale 13000 + partial repayment 5000 -> AR has D 13000 AND C 5000.
 create temp table vd_sale as

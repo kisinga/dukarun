@@ -3,26 +3,17 @@
 begin;
 select plan(12);
 
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@cashier.local', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@cashier.local');
 
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-create temp table cs_company as select public.provision_company('Cashier Co', 'Main') as company_id;
-reset role;
+create temp table cs_company as select testkit.provision('11111111-1111-1111-1111-111111111111', 'Cashier Co') as company_id;
+grant select on pg_temp.cs_company to authenticated;
 
 insert into public.products (id, company_id, name)
 select 'a0000000-0000-0000-0000-0000000000dd', company_id, 'Service' from cs_company;
 insert into public.product_variants (id, product_id, company_id, name, kind, sku, price, track_inventory)
 select 'aa000000-0000-0000-0000-0000000000dd', 'a0000000-0000-0000-0000-0000000000dd', company_id, 'Default', 'service', 'SVC', 10000, false from cs_company;
 
-create temp table cs_claims as
-select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
-from cs_company;
-grant select on pg_temp.cs_claims to authenticated;
-
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from cs_claims), true);
+select testkit.as_user((select company_id from cs_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 1. Opening without declaring all cashier-controlled accounts fails
 --    (cash + mpesa are cashier-controlled by provisioning).

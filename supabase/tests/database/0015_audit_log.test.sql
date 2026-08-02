@@ -2,18 +2,10 @@
 begin;
 select plan(7);
 
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@audit.local', '', now(), now());
+select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@audit.local');
 
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
-create temp table au_company as select public.provision_company('Audit Co', 'Main') as company_id;
-reset role;
-
-create temp table au_claims as
-select format('{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id) as claims
-from au_company;
-grant select on pg_temp.au_claims to authenticated;
+create temp table au_company as select testkit.provision('11111111-1111-1111-1111-111111111111', 'Audit Co') as company_id;
+grant select on pg_temp.au_company to authenticated;
 
 -- 1. Provisioning itself was audited (companies insert with actor).
 select ok(
@@ -26,8 +18,7 @@ select ok(
 );
 
 -- 2-3. Product create/update captured with new/old snapshots.
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from au_claims), true);
+select testkit.as_user((select company_id from au_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 create temp table au_prod as
 select public.create_product('Audit Bread') as id;
@@ -67,8 +58,7 @@ select ok(
 );
 
 -- 5. Journal tables are NOT audited (immutable — they are the audit).
-set local role authenticated;
-select set_config('request.jwt.claims', (select claims from au_claims), true);
+select testkit.as_user((select company_id from au_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 create temp table au_svc as
 select public.create_product('Svc') as id;
@@ -88,19 +78,12 @@ select is(
 
 -- 6-7. RLS: member reads their company audit; second company sees nothing of it.
 reset role;
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'other@audit.local', '', now(), now());
+select testkit.create_user('22222222-2222-2222-2222-222222222222', 'other@audit.local');
 
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
-create temp table au_company2 as select public.provision_company('Other Co', 'Main') as company_id2;
+create temp table au_company2 as select testkit.provision('22222222-2222-2222-2222-222222222222', 'Other Co') as company_id2;
+grant select on pg_temp.au_company2 to authenticated;
 
-create temp table au_claims2 as
-select format('{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","company_id":"%s","user_role":"Admin"}', company_id2) as claims
-from au_company2;
-grant select on pg_temp.au_claims2 to authenticated;
-
-select set_config('request.jwt.claims', (select claims from au_claims2), true);
+select testkit.as_user((select company_id2 from au_company2), '22222222-2222-2222-2222-222222222222', 'Admin');
 
 select is(
   (select count(*)::int from public.audit_log
