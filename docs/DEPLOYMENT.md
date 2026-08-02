@@ -60,10 +60,29 @@ Env for all: `SUPABASE_URL=https://supa.dukarun.com`, `SUPABASE_ANON_KEY=<anon k
 2. Remove `GOTRUE_SMS_TEST_OTP`, request OTP to a real phone → verify TextSMS delivery via the send_sms hook.
 3. Kenyan-network latency check on a phone over 4G.
 
-## CI/CD (target state)
+## CI/CD (implemented)
 
-Self-hosted GitHub Actions runner on the Coolify host (repo Settings → Actions → Runners → New). Then `.github/workflows/supabase.yml` deploys on merge with `SUPABASE_DB_URL` pointing at `127.0.0.1:5432` — Postgres never exposed publicly.
-Interim manual deploys: `scripts/deploy-db.sh` (SSH tunnel, always closes).
+`.github/workflows/supabase.yml`: tests on GitHub runners (lint + pgTAP +
+type-freshness), deploy on a **self-hosted runner on the Coolify host**
+(`runs-on: [self-hosted, coolify]`, `environment: production`) on every push
+to `pilot/supabase`/`main`: applies migrations via `localhost` and syncs edge
+functions into the edge-runtime volume (hot-reload; docker-cp fallback).
+
+### One-time runner setup (on the Coolify host)
+
+1. GitHub → repo **Settings → Actions → Runners → New self-hosted runner** →
+   Linux x64 → follow the download/config steps on the host.
+2. During `config.sh`, add labels `self-hosted,coolify`, default work folder.
+3. Install as a service: `sudo ./svc.sh install && sudo ./svc.sh start`.
+4. Repo **Settings → Secrets and variables → Actions**:
+   - secret `SUPABASE_DB_URL` = `postgresql://postgres:<password>@127.0.0.1:5432/postgres?sslmode=disable`
+   - variable `FUNCTIONS_VOLUME` = the edge-runtime functions dir on the host
+     (Coolify → Supabase service → volumes; e.g. `/data/coolify/services/<id>/storage/functions`)
+   - (optional) variable `EDGE_RUNTIME_CONTAINER` for the docker-cp fallback.
+5. Protect `main`: require the `test` job green + `environment: production`
+   approval for deploys if you want a manual gate.
+
+Frontends stay on Cloudflare Pages auto-builds — no CI needed there.
 
 ## Lint findings (accepted, by design)
 

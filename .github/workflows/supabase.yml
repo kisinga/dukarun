@@ -2,7 +2,7 @@ name: Supabase
 
 on:
   push:
-    branches: [pilot/supabase]
+    branches: [pilot/supabase, main]
     paths: ['supabase/**', 'packages/shared-types/**', '.github/workflows/supabase.yml']
   pull_request:
     paths: ['supabase/**', 'packages/shared-types/**']
@@ -10,6 +10,9 @@ on:
 concurrency:
   group: supabase-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  DEPLOY_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
 jobs:
   test:
@@ -43,14 +46,14 @@ jobs:
           fi
 
   deploy:
-    name: Deploy to pilot project
-    if: github.ref == 'refs/heads/pilot/supabase' && github.event_name == 'push'
+    name: Deploy to Coolify instance
+    # Runs on the self-hosted runner ON the Coolify host — Postgres stays
+    # private (runner reaches it via localhost), edge functions are copied
+    # straight into the edge-runtime container.
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/pilot/supabase' || github.ref == 'refs/heads/main')
     needs: test
-    runs-on: ubuntu-latest
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    runs-on: [self-hosted, coolify]
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
@@ -58,11 +61,41 @@ jobs:
         with:
           version: 2.111.0
 
-      - name: Link pilot project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
-
       - name: Apply migrations
-        run: supabase db push --linked
+        run: supabase db push --db-url "$DEPLOY_DB_URL"
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
       - name: Deploy edge functions
-        run: supabase functions deploy
+        # Preferred: sync into the edge-runtime's functions VOLUME (hot-reload,
+        # no restart). Set vars.FUNCTIONS_VOLUME on the repo to the host path of
+        # the edge-runtime functions dir (check the service's volumes in Coolify).
+        # Fallback: docker cp into the container + restart.
+        run: |
+          set -e
+          if [ -n "${{ vars.FUNCTIONS_VOLUME }}" ]; then
+            echo "Syncing functions into volume ${{ vars.FUNCTIONS_VOLUME }}"
+            for fn in paystack-charge paystack-webhook notification-flush; do
+              rm -rf "${{ vars.FUNCTIONS_VOLUME }}/$fn"
+              cp -r "supabase/functions/$fn" "${{ vars.FUNCTIONS_VOLUME }}/$fn"
+            done
+            echo "✓ functions synced (hot-reload)"
+          else
+            CONTAINER=$(docker ps --format '{{.Names}}' | grep -i 'edge-runtime' | head -1)
+            if [ -z "$CONTAINER" ]; then
+              echo "::error::edge-runtime not found; set vars.FUNCTIONS_VOLUME or vars.EDGE_RUNTIME_CONTAINER"
+              exit 1
+            fi
+            echo "Deploying functions into container $CONTAINER"
+            docker exec "$CONTAINER" mkdir -p /home/deno/functions
+            for fn in paystack-charge paystack-webhook notification-flush; do
+              docker cp "supabase/functions/$fn" "$CONTAINER:/home/deno/functions/$fn"
+            done
+            docker restart "$CONTAINER" >/dev/null
+            echo "✓ functions deployed (container restart)"
+          fi
+
+      - name: Smoke check
+        run: |
+          curl -sf -o /dev/null -w "rest: %{http_code}\n" https://supa.dukarun.com/rest/v1/ || true
+          curl -s -o /dev/null -w "functions: %{http_code}\n" https://supa.dukarun.com/functions/v1/
