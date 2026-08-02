@@ -20,7 +20,7 @@ const TYPE_BADGE: Record<string, string> = {
   imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-4xl">
+      <div class="page">
         <app-page-header
           title="Approvals"
           backLink="/dashboard"

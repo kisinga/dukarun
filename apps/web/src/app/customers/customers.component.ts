@@ -25,7 +25,7 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
   ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-4xl">
+      <div class="page">
         <app-page-header title="Customers" backLink="/dashboard" backLabel="Dashboard">
           <button actions class="btn btn-primary btn-sm ml-auto" (click)="startCreate()">
             + New customer
@@ -120,8 +120,13 @@ type CustomerWithAr = MoneyCustomer & { ar_balance: number };
                     />
                     <button class="link font-semibold" (click)="toggle(c.id)">{{ name(c) }}</button>
                     <span class="text-xs text-base-content/60">{{ c.phone ?? '' }}</span>
-                    <span class="ml-auto font-bold" [class.text-error]="c.ar_balance > 0">
-                      <span class="tabular-nums">{{ fmt(c.ar_balance) }}</span> owed
+                    <span
+                      class="ml-auto tabular-nums"
+                      [class.font-bold]="c.ar_balance > 0"
+                      [class.text-error]="c.ar_balance > 0"
+                      [class.text-base-content/60]="c.ar_balance === 0"
+                    >
+                      {{ fmt(c.ar_balance) }} owed
                     </span>
                     <a routerLink="/money/credit" class="btn btn-ghost btn-xs">Credit →</a>
                     <button class="btn btn-ghost btn-xs" (click)="startEdit(c)">Edit</button>

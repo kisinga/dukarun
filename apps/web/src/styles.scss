@@ -106,6 +106,29 @@
 }
 
 @layer components {
+  /* Page content wrapper: centered, padded, never edge-to-edge. */
+  .page {
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    max-width: 72rem; // max-w-6xl; reports/tables may bump to max-w-7xl via .page-wide
+    padding-left: 1rem;
+    padding-right: 1rem;
+
+    @media (min-width: 640px) {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+    @media (min-width: 1024px) {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+  }
+
+  .page-wide {
+    max-width: 80rem; // max-w-7xl
+  }
+
   /* ONE nav-item recipe (sidebar, drawer, footer links). Ghost by default;
      exactly ONE active signifier: the tinted container. 44px touch target. */
   .nav-item {

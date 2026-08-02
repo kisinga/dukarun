@@ -20,7 +20,7 @@ type CreditOrder = {
   imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, StatusBadgeComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-4xl">
+      <div class="page">
         <app-page-header title="Customer Credit">
           <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
         </app-page-header>
@@ -103,10 +103,10 @@ type CreditOrder = {
                     </button>
                     <span class="text-xs text-base-content/60">{{ c.phone }}</span>
                     <app-status-badge
-                      [type]="c.is_credit_approved ? 'success' : 'neutral'"
+                      type="neutral"
                       [label]="c.is_credit_approved ? 'approved' : 'not approved'"
                     />
-                    <span class="text-xs text-base-content/60">
+                    <span class="type-caption">
                       limit <span class="tabular-nums">{{ fmt(c.credit_limit) }}</span>
                     </span>
                     @if (c.days_outstanding !== null) {
@@ -116,8 +116,10 @@ type CreditOrder = {
                       </span>
                     }
                     <span
-                      class="ml-auto font-bold tabular-nums"
+                      class="ml-auto tabular-nums"
+                      [class.font-bold]="c.ar_balance > 0"
                       [class.text-error]="c.ar_balance > 0"
+                      [class.text-base-content/60]="c.ar_balance === 0"
                     >
                       {{ fmt(c.ar_balance) }} owed
                     </span>

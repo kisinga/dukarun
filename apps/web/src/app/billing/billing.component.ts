@@ -25,7 +25,7 @@ const POLL_TIMEOUT_MS = 60_000;
   imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, StatusBadgeComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-3xl">
+      <div class="page">
         <app-page-header title="Billing" backLink="/settings" backLabel="Settings" />
 
         @if (loadError()) {

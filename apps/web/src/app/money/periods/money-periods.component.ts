@@ -24,7 +24,7 @@ import {
   ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-4xl">
+      <div class="page">
         <app-page-header title="Reconciliation &amp; Periods">
           <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
         </app-page-header>
@@ -232,10 +232,7 @@ import {
                     <td>{{ p.start_date }}</td>
                     <td>{{ p.end_date }}</td>
                     <td>
-                      <app-status-badge
-                        [type]="p.status === 'open' ? 'success' : 'neutral'"
-                        [label]="p.status"
-                      />
+                      <app-status-badge type="neutral" [label]="p.status" />
                     </td>
                   </tr>
                 }

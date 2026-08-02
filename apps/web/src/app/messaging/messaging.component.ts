@@ -16,7 +16,7 @@ const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> =
   imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, StatusBadgeComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-3xl">
+      <div class="page">
         <app-page-header title="Messaging" backLink="/dashboard" backLabel="Dashboard" />
 
         <!-- Compose -->

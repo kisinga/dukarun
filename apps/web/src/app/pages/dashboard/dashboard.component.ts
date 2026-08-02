@@ -24,8 +24,8 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
   imports: [RouterLink, NgIcon, PageHeaderComponent, StatCardComponent, EmptyStateComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-4xl">
-        <app-page-header [title]="company()?.name ?? 'Dukarun'" subtitle="Dashboard" />
+      <div class="page">
+        <app-page-header [title]="company()?.name ?? 'Dukarun'" />
 
         @if (loadError()) {
           <p class="mb-2 text-sm text-error">{{ loadError() }}</p>
@@ -38,7 +38,13 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
           <app-stat-card
             label="Today's margin"
             [value]="fmt(today()?.margin ?? 0)"
-            [tone]="(today()?.margin ?? 0) >= 0 ? 'success' : 'error'"
+            [tone]="
+              (today()?.margin ?? 0) > 0
+                ? 'success'
+                : (today()?.margin ?? 0) < 0
+                  ? 'error'
+                  : 'neutral'
+            "
           />
           <app-stat-card
             label="Pending sync"
@@ -68,9 +74,10 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
           @if (week().length === 0) {
             <app-empty-state
               [embedded]="true"
+              [compact]="true"
               icon="heroBanknotes"
               title="No sales this week"
-              description="Revenue and margin show up here once you start selling."
+              description="— revenue and margin land here once you sell."
             />
           } @else {
             <table class="table table-sm">
@@ -108,9 +115,10 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
           @if (topVariants().length === 0) {
             <app-empty-state
               [embedded]="true"
+              [compact]="true"
               icon="heroCube"
               title="Nothing sold yet"
-              description="Your best-margin variants rank here after a week of sales."
+              description="— best-margin variants rank here after a week of sales."
             />
           } @else {
             <table class="table table-sm">
@@ -151,9 +159,10 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
               @if (lowStock().length === 0) {
                 <app-empty-state
                   [embedded]="true"
+                  [compact]="true"
                   icon="heroCheckCircle"
                   title="All stocked up"
-                  description="Nothing below its low-stock threshold."
+                  description="— nothing below its low-stock threshold."
                 />
               } @else {
                 <div class="mt-1 flex flex-col gap-2">
@@ -178,9 +187,10 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
               @if (expiring().length === 0) {
                 <app-empty-state
                   [embedded]="true"
+                  [compact]="true"
                   icon="heroCheckCircle"
                   title="Nothing expiring"
-                  description="No batches nearing their expiry date."
+                  description="— no batches nearing their expiry date."
                 />
               } @else {
                 <div class="mt-1 flex flex-col gap-2">

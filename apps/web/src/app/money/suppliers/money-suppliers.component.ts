@@ -40,7 +40,7 @@ interface PurchaseLineForm {
   ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-4xl">
+      <div class="page">
         <app-page-header title="Suppliers">
           <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
         </app-page-header>

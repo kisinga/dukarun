@@ -55,7 +55,7 @@ interface CreateRow {
   ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-5xl">
+      <div class="page">
         <app-page-header title="Products" backLink="/dashboard" backLabel="Dashboard">
           <span actions class="text-sm text-base-content/60">
             total stock value {{ fmt(totalStockValue()) }}
@@ -152,11 +152,9 @@ interface CreateRow {
                         <td class="font-mono text-xs">{{ c.slug }}</td>
                         <td class="text-right">{{ c.product_count }}</td>
                         <td>
-                          <app-status-badge
-                            size="xs"
-                            [type]="c.active ? 'success' : 'neutral'"
-                            [label]="c.active ? 'active' : 'inactive'"
-                          />
+                          @if (!c.active) {
+                            <app-status-badge size="xs" type="neutral" label="inactive" />
+                          }
                         </td>
                         <td class="whitespace-nowrap text-right">
                           <button class="btn btn-ghost btn-xs" (click)="startCollectionEdit(c)">
@@ -621,10 +619,9 @@ interface CreateRow {
                         group.family.barcode
                       }}</span>
                     }
-                    <app-status-badge
-                      [type]="group.family.active ? 'success' : 'neutral'"
-                      [label]="group.family.active ? 'active' : 'inactive'"
-                    />
+                    @if (!group.family.active) {
+                      <app-status-badge type="neutral" label="inactive" />
+                    }
                     <span class="text-xs text-base-content/60">
                       {{ group.variants.length }} variant(s)
                     </span>
@@ -720,11 +717,9 @@ interface CreateRow {
                                 </span>
                               </td>
                               <td>
-                                <app-status-badge
-                                  size="xs"
-                                  [type]="v.variant_active ? 'success' : 'neutral'"
-                                  [label]="v.variant_active ? 'active' : 'inactive'"
-                                />
+                                @if (!v.variant_active) {
+                                  <app-status-badge size="xs" type="neutral" label="inactive" />
+                                }
                               </td>
                               <td class="whitespace-nowrap text-right">
                                 <button

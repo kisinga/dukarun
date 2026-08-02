@@ -233,6 +233,20 @@ export class PosService {
     return data;
   }
 
+  /** Top active variants for the Sell quick-pick grid. */
+  async topVariants(limit = 24): Promise<Variant[]> {
+    const { data, error } = await this.client
+      .from('variant_catalog')
+      .select('*')
+      .eq('variant_active', true)
+      .eq('product_active', true)
+      .order('product_name')
+      .order('variant_name')
+      .limit(limit);
+    if (error) throw error;
+    return data;
+  }
+
   /** Full active catalog for the offline snapshot (IndexedDB cache). */
   async fetchActiveVariants(): Promise<Variant[]> {
     const { data, error } = await this.client

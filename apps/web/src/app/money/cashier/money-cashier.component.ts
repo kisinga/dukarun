@@ -25,7 +25,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
   ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-4xl">
+      <div class="page">
         <app-page-header title="Cashier Sessions">
           <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
         </app-page-header>
@@ -122,10 +122,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
                 <div class="card-body p-4">
                   <div class="flex flex-wrap items-center gap-3">
                     <span class="text-sm font-semibold">{{ time(session.opened_at) }}</span>
-                    <app-status-badge
-                      [type]="session.status === 'open' ? 'success' : 'neutral'"
-                      [label]="session.status"
-                    />
+                    <app-status-badge type="neutral" [label]="session.status" />
                     @if (session.closed_at) {
                       <span class="text-xs text-base-content/60">
                         closed {{ time(session.closed_at) }}

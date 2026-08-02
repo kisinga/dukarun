@@ -18,7 +18,7 @@ const TYPE_ICON: Record<string, string> = {
   imports: [NgIcon, PageHeaderComponent, EmptyStateComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-3xl">
+      <div class="page">
         <app-page-header title="Notifications" backLink="/dashboard" backLabel="Dashboard">
           @if (notifications.unreadCount() > 0) {
             <button

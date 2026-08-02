@@ -31,7 +31,7 @@ type CustomerRow = {
   imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, PaginationComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-4xl">
+      <div class="page">
         <app-page-header title="Reports" backLink="/dashboard" backLabel="Dashboard" />
 
         <!-- Date range -->
@@ -82,6 +82,7 @@ type CustomerRow = {
         @if (tab() === 'sales') {
           @if (summary().length === 0) {
             <app-empty-state
+              [compact]="true"
               icon="heroBanknotes"
               title="No sales in this range"
               description="Daily revenue, COGS, and margin appear here."
@@ -147,6 +148,7 @@ type CustomerRow = {
         @if (tab() === 'products') {
           @if (products().length === 0) {
             <app-empty-state
+              [compact]="true"
               icon="heroCube"
               title="No product sales in this range"
               description="Variants rank here by revenue once you sell."
@@ -189,6 +191,7 @@ type CustomerRow = {
         @if (tab() === 'customers') {
           @if (customers().length === 0) {
             <app-empty-state
+              [compact]="true"
               icon="heroUsers"
               title="No customer sales in this range"
               description="Customers rank here by revenue, with their AR movement."

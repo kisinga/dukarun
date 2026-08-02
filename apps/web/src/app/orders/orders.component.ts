@@ -31,7 +31,7 @@ const PAGE_SIZE = 20;
   ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-4xl">
+      <div class="page">
         <app-page-header title="Orders" backLink="/dashboard" backLabel="Dashboard">
           @if (isLive()) {
             <span actions class="badge badge-success gap-1">
@@ -79,9 +79,10 @@ const PAGE_SIZE = 20;
         @if (paged().length === 0) {
           <div class="mt-3">
             <app-empty-state
+              [compact]="true"
               icon="heroClipboardDocumentList"
               title="No orders in this range"
-              description="Try widening the dates or clearing the status filter."
+              description="— widen the dates or clear the status filter."
             />
           </div>
         } @else {

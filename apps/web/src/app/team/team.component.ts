@@ -18,7 +18,7 @@ import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
   ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="mx-auto max-w-4xl">
+      <div class="page">
         <app-page-header title="Team" backLink="/dashboard" backLabel="Dashboard">
           <button actions class="btn btn-ghost btn-sm ml-auto" (click)="load()">Refresh</button>
         </app-page-header>
@@ -376,7 +376,8 @@ export class TeamComponent implements OnInit {
   }
 
   protected memberStatusType(status: string): 'success' | 'warning' | 'neutral' {
-    return status === 'approved' ? 'success' : status === 'pending' ? 'warning' : 'neutral';
+    // approved is the normal state — quiet; only pending warns (needs action)
+    return status === 'pending' ? 'warning' : 'neutral';
   }
 
   protected shortId(userId: string): string {

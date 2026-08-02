@@ -35,7 +35,7 @@ import {
   ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4 pb-24 lg:pb-4">
-      <div class="mx-auto max-w-6xl">
+      <div class="page page-wide">
         <app-page-header title="Sell" backLink="/dashboard" backLabel="Dashboard">
           @if (cart.draftId()) {
             <span actions class="badge badge-info">Editing proforma</span>
@@ -101,50 +101,60 @@ import {
         }
 
         <div class="grid gap-4 lg:grid-cols-3">
-          <section class="flex flex-col gap-4 lg:col-span-2">
-            <!-- Product search / barcode -->
+          <section class="flex min-w-0 flex-col gap-4 lg:col-span-2">
+            <!-- Product search / barcode + quick-pick grid -->
             <div class="card bg-base-100">
               <div class="card-body p-4">
-                <div class="relative">
-                  <input
-                    type="text"
-                    class="input input-bordered w-full"
-                    placeholder="Search by name, SKU, or scan barcode…"
-                    [formControl]="search"
-                  />
-                  @if (results().length > 0) {
-                    <ul
-                      class="menu absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-box bg-base-100 shadow-overlay"
+                <input
+                  type="text"
+                  class="input input-bordered w-full"
+                  placeholder="Search by name, SKU, or scan barcode…"
+                  [formControl]="search"
+                />
+
+                <!-- Quick-pick grid: top variants; typing filters via search -->
+                <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                  @for (v of gridItems(); track v.variant_id) {
+                    <button
+                      type="button"
+                      class="flex min-h-11 flex-col items-start gap-1 rounded-box border border-base-300/60 bg-base-100 p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                      (click)="addVariant(v)"
                     >
-                      @for (v of results(); track v.variant_id) {
-                        <li>
-                          <a class="min-h-11" (click)="addVariant(v)">
-                            @if (imageUrl(v.image_path); as thumb) {
-                              @if (!brokenImages().has(v.image_path!)) {
-                                <img
-                                  [src]="thumb"
-                                  alt=""
-                                  class="h-8 w-8 rounded-field object-cover"
-                                  (error)="markBroken(v.image_path!)"
-                                />
-                              }
-                            }
-                            <span class="flex-1">{{ label(v) }}</span>
-                            <span class="text-xs text-base-content/60">{{ v.sku }}</span>
-                            <span class="badge badge-xs badge-outline">
-                              {{
-                                v.kind === 'service' || !v.track_inventory
-                                  ? '—'
-                                  : (v.stock ?? 0) + ' in stock'
-                              }}
-                            </span>
-                            <span class="font-semibold tabular-nums">{{ fmt(v.price ?? 0) }}</span>
-                          </a>
-                        </li>
+                      @if (imageUrl(v.image_path); as thumb) {
+                        @if (!brokenImages().has(v.image_path!)) {
+                          <img
+                            [src]="thumb"
+                            alt=""
+                            class="h-10 w-10 rounded-field object-cover"
+                            (error)="markBroken(v.image_path!)"
+                          />
+                        }
                       }
-                    </ul>
+                      <span class="line-clamp-2 text-sm leading-tight font-medium">{{
+                        label(v)
+                      }}</span>
+                      <span class="mt-auto flex w-full items-center justify-between gap-1">
+                        <span class="text-sm font-bold whitespace-nowrap tabular-nums">{{
+                          fmt(v.price ?? 0)
+                        }}</span>
+                        <span class="badge shrink-0 badge-ghost badge-xs">
+                          {{
+                            v.kind === 'service'
+                              ? 'service'
+                              : !v.track_inventory
+                                ? '—'
+                                : (v.stock ?? 0) + ' left'
+                          }}
+                        </span>
+                      </span>
+                    </button>
                   }
                 </div>
+                @if (gridItems().length === 0) {
+                  <p class="py-4 text-center text-sm text-base-content/60">
+                    No products match — check the spelling or scan the barcode.
+                  </p>
+                }
               </div>
             </div>
 
@@ -154,123 +164,129 @@ import {
                 @if (cart.isEmpty()) {
                   <app-empty-state
                     [embedded]="true"
+                    [compact]="true"
                     icon="heroShoppingCart"
                     title="Cart is empty"
-                    description="Search or scan a product to start a sale."
+                    description="— tap a product above to start a sale."
                   />
                 } @else {
-                  <table class="table">
-                    <thead>
-                      <tr>
-                        <th>Item</th>
-                        <th>Qty</th>
-                        <th class="text-right">Price</th>
-                        <th class="text-right">Total</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (line of cart.lines(); track line.variant.variant_id) {
+                  <div class="w-full min-w-0 overflow-x-auto">
+                    <table class="table">
+                      <thead>
                         <tr>
-                          <td>
-                            <div class="text-sm font-medium">{{ cart.lineLabel(line) }}</div>
-                            <div class="text-xs text-base-content/60">{{ line.variant.sku }}</div>
-                          </td>
-                          <td>
-                            <div class="join">
-                              <button
-                                class="btn btn-sm join-item min-h-11 min-w-11"
-                                (click)="stepQty(line.variant.variant_id!, -1)"
-                              >
-                                −
-                              </button>
-                              <input
-                                type="number"
-                                class="input input-bordered input-sm join-item min-h-11 w-16 text-center tabular-nums"
-                                [min]="line.variant.allow_fractional ? 0.5 : 1"
-                                [step]="line.variant.allow_fractional ? 0.5 : 1"
-                                [ngModel]="line.quantity"
-                                (ngModelChange)="onQtyInput(line.variant.variant_id!, $event)"
-                              />
-                              <button
-                                class="btn btn-sm join-item min-h-11 min-w-11"
-                                (click)="stepQty(line.variant.variant_id!, 1)"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </td>
-                          <td class="text-right tabular-nums">
-                            @if (line.customPrice !== null) {
-                              <span class="font-semibold text-accent">{{
-                                fmt(line.customPrice)
-                              }}</span>
-                              <div class="text-xs text-base-content/60">
-                                was {{ fmt(line.unitPrice) }}
-                              </div>
-                            } @else {
-                              {{ fmt(line.unitPrice) }}
-                            }
-                            <button class="btn btn-ghost btn-xs" (click)="startOverride(line)">
-                              override
-                            </button>
-                          </td>
-                          <td class="text-right type-heading tabular-nums">
-                            {{ fmt(lineTotal(line)) }}
-                          </td>
-                          <td>
-                            <button
-                              class="btn btn-ghost btn-sm min-h-11 min-w-11"
-                              (click)="cart.removeLine(line.variant.variant_id!)"
-                            >
-                              <ng-icon name="heroXMark" />
-                            </button>
-                          </td>
+                          <th>Item</th>
+                          <th>Qty</th>
+                          <th class="text-right">Price</th>
+                          <th class="text-right">Total</th>
+                          <th></th>
                         </tr>
-                        @if (overrideFor() === line.variant.variant_id) {
+                      </thead>
+                      <tbody>
+                        @for (line of cart.lines(); track line.variant.variant_id) {
                           <tr>
-                            <td colspan="5">
-                              <div class="flex flex-wrap items-end gap-2 rounded bg-base-200 p-2">
-                                <label class="form-control">
-                                  <span class="label-text">New price (KES)</span>
-                                  <input
-                                    type="text"
-                                    inputmode="decimal"
-                                    class="input input-bordered input-sm w-28"
-                                    [formControl]="overridePrice"
-                                  />
-                                </label>
-                                <label class="form-control flex-1">
-                                  <span class="label-text">Reason</span>
-                                  <input
-                                    type="text"
-                                    class="input input-bordered input-sm"
-                                    placeholder="e.g. Damaged packaging"
-                                    [formControl]="overrideReason"
-                                  />
-                                </label>
-                                <button class="btn btn-primary btn-sm" (click)="applyOverride()">
-                                  Apply
-                                </button>
+                            <td>
+                              <div class="text-sm font-medium">{{ cart.lineLabel(line) }}</div>
+                              <div class="text-xs text-base-content/60">{{ line.variant.sku }}</div>
+                            </td>
+                            <td>
+                              <div class="join">
                                 <button
-                                  class="btn btn-ghost btn-sm"
-                                  (click)="overrideFor.set(null)"
+                                  class="btn btn-sm join-item min-h-11 min-w-11"
+                                  (click)="stepQty(line.variant.variant_id!, -1)"
                                 >
-                                  Cancel
+                                  −
+                                </button>
+                                <input
+                                  type="number"
+                                  class="input input-bordered input-sm join-item min-h-11 w-16 text-center tabular-nums"
+                                  [min]="line.variant.allow_fractional ? 0.5 : 1"
+                                  [step]="line.variant.allow_fractional ? 0.5 : 1"
+                                  [ngModel]="line.quantity"
+                                  (ngModelChange)="onQtyInput(line.variant.variant_id!, $event)"
+                                />
+                                <button
+                                  class="btn btn-sm join-item min-h-11 min-w-11"
+                                  (click)="stepQty(line.variant.variant_id!, 1)"
+                                >
+                                  +
                                 </button>
                               </div>
                             </td>
+                            <td class="text-right tabular-nums">
+                              @if (line.customPrice !== null) {
+                                <span class="font-semibold text-accent">{{
+                                  fmt(line.customPrice)
+                                }}</span>
+                                <div class="text-xs text-base-content/60">
+                                  was {{ fmt(line.unitPrice) }}
+                                </div>
+                              } @else {
+                                {{ fmt(line.unitPrice) }}
+                              }
+                              <button
+                                class="btn btn-ghost btn-xs text-base-content/40"
+                                (click)="startOverride(line)"
+                              >
+                                override
+                              </button>
+                            </td>
+                            <td class="text-right type-heading tabular-nums">
+                              {{ fmt(lineTotal(line)) }}
+                            </td>
+                            <td>
+                              <button
+                                class="btn btn-ghost btn-sm min-h-11 min-w-11"
+                                (click)="cart.removeLine(line.variant.variant_id!)"
+                              >
+                                <ng-icon name="heroXMark" />
+                              </button>
+                            </td>
                           </tr>
+                          @if (overrideFor() === line.variant.variant_id) {
+                            <tr>
+                              <td colspan="5">
+                                <div class="flex flex-wrap items-end gap-2 rounded bg-base-200 p-2">
+                                  <label class="form-control">
+                                    <span class="label-text">New price (KES)</span>
+                                    <input
+                                      type="text"
+                                      inputmode="decimal"
+                                      class="input input-bordered input-sm w-28"
+                                      [formControl]="overridePrice"
+                                    />
+                                  </label>
+                                  <label class="form-control flex-1">
+                                    <span class="label-text">Reason</span>
+                                    <input
+                                      type="text"
+                                      class="input input-bordered input-sm"
+                                      placeholder="e.g. Damaged packaging"
+                                      [formControl]="overrideReason"
+                                    />
+                                  </label>
+                                  <button class="btn btn-primary btn-sm" (click)="applyOverride()">
+                                    Apply
+                                  </button>
+                                  <button
+                                    class="btn btn-ghost btn-sm"
+                                    (click)="overrideFor.set(null)"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          }
                         }
-                      }
-                    </tbody>
-                  </table>
+                      </tbody>
+                    </table>
+                  </div>
                 }
               </div>
             </div>
           </section>
 
-          <aside class="flex flex-col gap-4">
+          <aside class="flex min-w-0 flex-col gap-4">
             <!-- Customer -->
             <div class="card bg-base-100">
               <div class="card-body p-4">
@@ -402,7 +418,7 @@ import {
 
       <!-- One primary action, bottom-anchored on mobile; total is the hero -->
       <div
-        class="fixed inset-x-0 bottom-0 z-30 border-t border-base-300/60 bg-base-100 p-3 lg:hidden"
+        class="fixed inset-x-0 bottom-14 z-30 border-t border-base-300/60 bg-base-100 p-3 lg:hidden"
       >
         <div class="mx-auto flex max-w-6xl items-center gap-3">
           <div class="flex-1">
@@ -448,6 +464,12 @@ export class SellComponent implements OnInit {
 
   protected readonly search = new FormControl('', { nonNullable: true });
   protected readonly results = signal<Variant[]>([]);
+  /** Top variants for the quick-pick grid (before any search text). */
+  protected readonly topVariants = signal<Variant[]>([]);
+  /** What the quick-pick grid shows: search results while typing, else top variants. */
+  protected readonly gridItems = computed(() =>
+    this.search.value.trim().length >= 2 ? this.results() : this.topVariants()
+  );
   protected readonly customerSearch = new FormControl('', { nonNullable: true });
   protected readonly customerResults = signal<Customer[]>([]);
   protected readonly customerPickerOpen = signal(false);
@@ -498,6 +520,16 @@ export class SellComponent implements OnInit {
     this.printerEnabled.set(await this.receiptData.printerEnabled());
     // Keep the offline product snapshot fresh (fire-and-forget).
     void this.sync.refreshProductSnapshot();
+    // Quick-pick grid source (offline: first rows of the snapshot).
+    try {
+      this.topVariants.set(
+        this.connectivity.online()
+          ? await this.pos.topVariants(24)
+          : await this.sync.offlineTopVariants(24)
+      );
+    } catch {
+      // grid just stays empty; search still works
+    }
     const draftId = this.route.snapshot.queryParamMap.get('draft');
     if (draftId) await this.loadDraft(draftId);
   }

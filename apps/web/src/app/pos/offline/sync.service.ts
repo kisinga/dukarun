@@ -144,6 +144,13 @@ export class SyncService {
     }
   }
 
+  /** Offline quick-pick source: first rows of the snapshot. */
+  async offlineTopVariants(limit: number): Promise<Variant[]> {
+    const db = await offlineDb();
+    const snapshot = await db.get('products', 'latest');
+    return (snapshot?.products ?? []).slice(0, limit);
+  }
+
   /** Offline product search over the last successful snapshot. */
   async searchProductsOffline(query: string): Promise<Variant[]> {
     const db = await offlineDb();

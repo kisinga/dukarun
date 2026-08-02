@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs';
 import { NgIcon } from '@ng-icons/core';
 import { Company, SupabaseService } from '../core/supabase.service';
 import { ThemeService } from '../core/theme.service';
@@ -23,6 +24,25 @@ interface NavSection {
  * sidebar always open on desktop, slide-over on mobile — plus a mobile
  * bottom tab bar for the core destinations.
  */
+const ROUTE_LABELS: [RegExp, string][] = [
+  [/^\/dashboard$/, 'Dashboard'],
+  [/^\/pos\/sell/, 'Sell'],
+  [/^\/pos\/proformas/, 'Proformas'],
+  [/^\/pos\/cashier/, 'Cashier Queue'],
+  [/^\/pos\/sync/, 'Pending Sync'],
+  [/^\/orders/, 'Orders'],
+  [/^\/reports/, 'Reports'],
+  [/^\/money/, 'Money'],
+  [/^\/products/, 'Products'],
+  [/^\/customers/, 'Customers'],
+  [/^\/team/, 'Team'],
+  [/^\/approvals/, 'Approvals'],
+  [/^\/messaging/, 'Messaging'],
+  [/^\/notifications/, 'Notifications'],
+  [/^\/settings/, 'Settings'],
+  [/^\/billing/, 'Billing'],
+];
+
 @Component({
   selector: 'app-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, NgIcon],
@@ -40,12 +60,8 @@ interface NavSection {
           </div>
 
           <div class="flex min-w-0 flex-1 items-center gap-2.5 px-2">
-            <div class="avatar">
-              <div class="h-8 w-8 rounded-lg ring-1 ring-base-300/50">
-                <img src="/assets/logo/dukarun-icon-dark.svg" alt="Dukarun" />
-              </div>
-            </div>
-            <span class="truncate text-sm font-bold">{{ company()?.name ?? 'Dukarun' }}</span>
+            <!-- Page context (brand lives in the sidebar, not duplicated here) -->
+            <span class="truncate text-sm font-semibold">{{ pageContext() }}</span>
           </div>
 
           <div class="flex flex-none items-center gap-1.5">
@@ -146,7 +162,7 @@ interface NavSection {
           class="drawer-overlay bg-base-content/50"
           aria-label="Close menu"
         ></label>
-        <aside class="flex min-h-screen w-64 flex-col border-r border-base-300 bg-base-100">
+        <aside class="flex min-h-screen w-64 flex-col border-r border-base-300 bg-base-200">
           <div class="flex min-h-16 items-center gap-2.5 border-b border-base-300 px-4">
             <img src="/assets/logo/dukarun-icon-dark.svg" alt="Dukarun" class="h-8 w-8" />
             <span class="truncate text-sm font-bold">{{ company()?.name ?? 'Dukarun' }}</span>
@@ -207,6 +223,17 @@ export class ShellComponent implements OnInit {
 
   protected readonly company = signal<Company | null>(null);
   protected readonly tillOpen = signal(false);
+  protected readonly pageContext = signal('Dashboard');
+
+  constructor() {
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe(e => {
+        const path = e.urlAfterRedirects.split('?')[0];
+        const match = ROUTE_LABELS.find(([re]) => re.test(path));
+        this.pageContext.set(match ? match[1] : 'Dashboard');
+      });
+  }
 
   protected readonly sections: NavSection[] = [
     {
