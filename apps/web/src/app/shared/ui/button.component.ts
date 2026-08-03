@@ -8,7 +8,7 @@ import { Component, input } from '@angular/core';
  * Usage: <button appButton variant="primary" [loading]="busy()" (click)="save()">Save</button>
  */
 @Component({
-  selector: 'button[appButton]',
+  selector: 'button[appButton], a[appButton]',
   template: `
     @if (loading()) {
       <span class="loading loading-spinner loading-xs"></span>

@@ -6,7 +6,12 @@ import { IconComponent } from './icon.component';
   selector: 'app-session-required-notice',
   imports: [RouterLink, IconComponent],
   template: `
-    <div role="alert" class="alert alert-warning mb-3 items-start text-sm sm:items-center">
+    <div
+      role="alert"
+      class="alert alert-warning items-start text-sm sm:items-center"
+      [class.mb-3]="!compact()"
+      [class.py-2]="compact()"
+    >
       <app-icon name="heroExclamationTriangle" class="mt-0.5 sm:mt-0" />
       <div class="min-w-0 flex-1">
         <p class="font-semibold">Cashier session required</p>
@@ -18,4 +23,5 @@ import { IconComponent } from './icon.component';
 })
 export class SessionRequiredNoticeComponent {
   readonly action = input('recording this transaction');
+  readonly compact = input(false);
 }

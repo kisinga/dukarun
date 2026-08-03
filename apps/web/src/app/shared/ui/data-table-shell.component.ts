@@ -7,7 +7,9 @@ import { Component, input } from '@angular/core';
 @Component({
   selector: 'app-data-table-shell',
   template: `
-    <section class="overflow-hidden rounded-box border border-base-300/70 bg-base-100">
+    <section
+      class="data-table-shell overflow-hidden rounded-box border border-base-300/70 bg-base-100"
+    >
       @if (title() || description()) {
         <header
           class="flex flex-col gap-2 border-b border-base-300/70 px-4 py-3 sm:flex-row sm:items-center"
@@ -24,7 +26,7 @@ import { Component, input } from '@angular/core';
         </header>
       }
       <div class="overflow-x-auto"><ng-content /></div>
-      <footer class="px-4 pb-3"><ng-content select="[tableFooter]" /></footer>
+      <footer><ng-content select="[tableFooter]" /></footer>
     </section>
   `,
 })

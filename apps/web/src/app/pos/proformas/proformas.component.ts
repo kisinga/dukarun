@@ -96,7 +96,7 @@ import { DeleteConfirmationModalComponent } from '../../shared/ui/delete-confirm
           [creditAllowed]="draft.customer_id !== null"
           [methods]="methods()"
           [busy]="busy()"
-          [title]="'Convert ' + draft.code"
+          [heading]="'Convert ' + draft.code"
           (confirmed)="convert(draft.id, $event)"
           (cancelled)="converting.set(null)"
         />

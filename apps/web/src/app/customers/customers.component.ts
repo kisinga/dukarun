@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { parseKesToCents } from '../core/money';
+import { formatKes, formatKesInput, parseKesToCents } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
 import {
   AgingInfo,
@@ -15,13 +15,14 @@ import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
-import { MobileFabComponent } from '../shared/ui/mobile-fab.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { SessionRequiredNoticeComponent } from '../shared/ui/session-required-notice.component';
+import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
+import { StatBarComponent } from '../shared/ui/stat-bar.component';
 
 type CustomerWithAr = MoneyCustomer & { ar_balance: number } & AgingInfo;
 type CreditOrder = {
@@ -43,93 +44,119 @@ type CreditOrder = {
     IconComponent,
     EmptyStateComponent,
     EntityAvatarComponent,
-    MobileFabComponent,
     ListSearchBarComponent,
     StatusBadgeComponent,
     SessionRequiredNoticeComponent,
     PaginationComponent,
+    DataTableShellComponent,
+    StatBarComponent,
   ],
   template: `
-    <app-page title="Customers">
-      <button actions appButton (click)="startCreate()">
-        <app-icon name="heroPlus" /> New customer
+    <app-page
+      title="Customers"
+      subtitle="Manage customer details, credit access, balances, and repayment history."
+    >
+      <button
+        actions
+        appButton
+        variant="ghost"
+        [iconOnly]="true"
+        [loading]="loading()"
+        type="button"
+        title="Refresh customers"
+        aria-label="Refresh customers"
+        (click)="load()"
+      >
+        <app-icon name="heroArrowPath" />
+      </button>
+      <button actions appButton type="button" (click)="startCreate()">
+        <app-icon name="heroPlus" /> Add customer
       </button>
 
       @if (error()) {
-        <p class="mb-2 text-sm text-error">{{ error() }}</p>
+        <div role="alert" class="alert alert-error mb-3 text-sm">{{ error() }}</div>
       }
       @if (notice()) {
-        <p class="mb-2 text-sm text-success">{{ notice() }}</p>
+        <div role="status" class="alert alert-success mb-3 text-sm">{{ notice() }}</div>
       }
 
       <!-- Create / edit panel -->
       @if (formOpen()) {
         <div class="card mb-4 bg-base-100">
-          <div class="card-body p-4">
-            <h2 class="section-title mb-2">
-              {{ editing() ? 'Edit ' + name(editing()!) : 'New customer' }}
-            </h2>
-            <form (submit)="$event.preventDefault(); save()" class="grid gap-3 sm:grid-cols-2">
-              <app-form-field label="First name" [required]="true">
-                <input
-                  type="text"
-                  class="input input-bordered input-sm w-full"
-                  [formControl]="firstName"
-                />
-              </app-form-field>
-              <app-form-field label="Last name">
-                <input
-                  type="text"
-                  class="input input-bordered input-sm w-full"
-                  [formControl]="lastName"
-                />
-              </app-form-field>
-              <app-form-field label="Phone">
-                <input
-                  type="text"
-                  class="input input-bordered input-sm w-full"
-                  [formControl]="phone"
-                />
-              </app-form-field>
-              <app-form-field label="Email">
-                <input
-                  type="email"
-                  class="input input-bordered input-sm w-full"
-                  [formControl]="email"
-                />
-              </app-form-field>
-              <app-form-field label="Notes" class="sm:col-span-2">
-                <input
-                  type="text"
-                  class="input input-bordered input-sm w-full"
-                  [formControl]="notes"
-                />
-              </app-form-field>
-              <div class="flex gap-2 sm:col-span-2">
-                <button
-                  appButton
-                  type="submit"
-                  [loading]="busy()"
-                  [disabled]="firstName.value.trim().length === 0"
-                >
-                  {{ editing() ? 'Save changes' : 'Create customer' }}
-                </button>
-                <button appButton variant="ghost" type="button" (click)="closeForm()">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
+          <form
+            (submit)="$event.preventDefault(); save()"
+            class="card-body grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4"
+          >
+            <div class="sm:col-span-2 lg:col-span-4">
+              <h2 class="section-title">{{ editing() ? 'Edit customer' : 'New customer' }}</h2>
+              <p class="type-caption mt-1">
+                Contact details are kept separate from credit, sales, and repayment history.
+              </p>
+            </div>
+            <app-form-field label="First name" [required]="true">
+              <input
+                type="text"
+                class="input input-bordered input-sm w-full"
+                autocomplete="given-name"
+                [formControl]="firstName"
+              />
+            </app-form-field>
+            <app-form-field label="Last name">
+              <input
+                type="text"
+                class="input input-bordered input-sm w-full"
+                autocomplete="family-name"
+                [formControl]="lastName"
+              />
+            </app-form-field>
+            <app-form-field label="Phone">
+              <input
+                type="tel"
+                class="input input-bordered input-sm w-full"
+                autocomplete="tel"
+                [formControl]="phone"
+              />
+            </app-form-field>
+            <app-form-field label="Email">
+              <input
+                type="email"
+                class="input input-bordered input-sm w-full"
+                autocomplete="email"
+                [formControl]="email"
+              />
+            </app-form-field>
+            <app-form-field label="Notes" class="sm:col-span-2 lg:col-span-4">
+              <input
+                type="text"
+                class="input input-bordered input-sm w-full"
+                placeholder="Preferences, delivery notes, or context…"
+                [formControl]="notes"
+              />
+            </app-form-field>
+            <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
+              <button
+                appButton
+                type="submit"
+                [loading]="busy()"
+                [disabled]="firstName.value.trim().length === 0"
+              >
+                {{ editing() ? 'Save changes' : 'Create customer' }}
+              </button>
+              <button appButton variant="ghost" type="button" (click)="closeForm()">Cancel</button>
+            </div>
+          </form>
         </div>
       }
 
-      <!-- Search -->
-      <div class="mb-3">
+      <!-- Shared list summary and search toolbar -->
+      <div class="mb-4">
         <app-list-search-bar
           placeholder="Search name or phone…"
           [searchQuery]="query()"
           (searchQueryChange)="query.set($event); customerPage.set(1)"
-        />
+        >
+          <app-stat-bar summary [stats]="customerStats()" />
+        </app-list-search-bar>
       </div>
 
       <!-- List -->
@@ -140,9 +167,107 @@ type CreditOrder = {
           description="Add a customer with the + button to sell on credit, or clear the search."
         />
       } @else {
+        <div class="mb-3 hidden lg:block">
+          <app-data-table-shell
+            title="Customer accounts"
+            [description]="filtered().length + ' matching customers'"
+          >
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Contact</th>
+                  <th>Credit</th>
+                  <th>Aging</th>
+                  <th class="text-right">Owed to us</th>
+                  <th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (c of pagedCustomers(); track c.id) {
+                  <tr
+                    role="button"
+                    tabindex="0"
+                    [attr.aria-expanded]="expandedFor() === c.id"
+                    [class.table-row-active]="expandedFor() === c.id"
+                    (click)="toggle(c.id)"
+                    (keydown.enter)="toggle(c.id)"
+                  >
+                    <td>
+                      <div class="table-entity">
+                        <app-entity-avatar
+                          size="sm"
+                          [firstName]="c.first_name"
+                          [lastName]="c.last_name ?? ''"
+                        />
+                        <div class="min-w-0">
+                          <p class="table-primary truncate">{{ name(c) }}</p>
+                          <p class="table-secondary truncate">{{ c.notes || 'No notes' }}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <p class="table-primary">{{ c.phone || '—' }}</p>
+                      <p class="table-secondary">{{ c.email || 'No email' }}</p>
+                    </td>
+                    <td>
+                      <div class="flex flex-wrap items-center gap-1">
+                        <app-status-badge
+                          size="xs"
+                          [type]="c.is_credit_approved ? 'success' : 'neutral'"
+                          [label]="c.is_credit_approved ? 'Approved' : 'Not approved'"
+                        />
+                      </div>
+                      <p class="table-secondary">
+                        @if (c.credit_limit > 0) {
+                          Limit <app-money [cents]="c.credit_limit" />
+                        } @else {
+                          No credit cap
+                        }
+                      </p>
+                    </td>
+                    <td>
+                      @if (c.days_outstanding !== null) {
+                        <p class="table-primary">{{ c.days_outstanding }} days</p>
+                        <p class="table-secondary">{{ c.bucket }}</p>
+                      } @else {
+                        <span class="text-base-content/40">—</span>
+                      }
+                    </td>
+                    <td
+                      class="table-number"
+                      [class.text-error]="c.ar_balance > 0"
+                      [class.text-base-content/50]="c.ar_balance === 0"
+                    >
+                      <app-money [cents]="c.ar_balance" [masked]="!perms.has('ViewFinancials')" />
+                    </td>
+                    <td class="table-actions" (click)="$event.stopPropagation()">
+                      <button
+                        appButton
+                        variant="ghost"
+                        [iconOnly]="true"
+                        type="button"
+                        title="Edit customer"
+                        aria-label="Edit customer"
+                        (click)="startEdit(c)"
+                      >
+                        <app-icon name="heroPencilSquare" />
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </app-data-table-shell>
+        </div>
+
         <div class="flex flex-col gap-2">
           @for (c of pagedCustomers(); track c.id) {
-            <div class="card bg-base-100">
+            <div
+              class="card bg-base-100"
+              [class.lg:hidden]="expandedFor() !== c.id"
+              [class.lg:block]="expandedFor() === c.id"
+            >
               <div class="card-body p-4">
                 <div class="flex flex-wrap items-center gap-3">
                   <app-entity-avatar
@@ -159,7 +284,7 @@ type CreditOrder = {
                     [class.text-base-content/60]="c.ar_balance === 0"
                   >
                     <app-money [cents]="c.ar_balance" [masked]="!perms.has('ViewFinancials')" />
-                    owed
+                    owed to us
                   </span>
                   <button appButton variant="ghost" (click)="startEdit(c)">Edit</button>
                 </div>
@@ -175,11 +300,21 @@ type CreditOrder = {
                           [label]="c.is_credit_approved ? 'approved' : 'not approved'"
                         />
                         <span class="type-caption">
-                          limit
-                          <app-money
-                            [cents]="c.credit_limit"
-                            [masked]="!perms.has('ViewFinancials')"
-                          />
+                          @if (c.credit_limit > 0) {
+                            limit
+                            <app-money
+                              [cents]="c.credit_limit"
+                              [masked]="!perms.has('ViewFinancials')"
+                            />
+                            ·
+                            <app-money
+                              [cents]="customerCreditAvailable(c)"
+                              [masked]="!perms.has('ViewFinancials')"
+                            />
+                            available
+                          } @else {
+                            no configured cap
+                          }
                         </span>
                         <span class="type-caption">{{ c.credit_terms_days ?? 0 }}d terms</span>
                         @if (c.days_outstanding !== null) {
@@ -196,10 +331,13 @@ type CreditOrder = {
                           (submit)="$event.preventDefault(); saveCredit(c)"
                           class="mt-3 flex flex-col gap-2"
                         >
-                          <app-form-field label="Credit limit (KES)">
+                          <app-form-field
+                            label="Credit limit (KES)"
+                            hint="Use 0 for no configured cap. Credit approval is controlled separately."
+                          >
                             <input
                               type="text"
-                              inputmode="decimal"
+                              inputmode="numeric"
                               class="input input-bordered input-sm w-full"
                               [formControl]="creditLimit"
                             />
@@ -234,7 +372,7 @@ type CreditOrder = {
 
                     <!-- Credit orders + repayment -->
                     <div>
-                      <h3 class="section-title mb-2">Credit orders</h3>
+                      <h3 class="section-title mb-2">Credit sales</h3>
                       @if (!cashierSession.isOpen() && creditOrders().length > 0) {
                         <app-session-required-notice action="collecting a repayment" />
                       }
@@ -249,7 +387,7 @@ type CreditOrder = {
                             <app-form-field label="Payment received (KES)"
                               ><input
                                 class="input input-bordered input-sm"
-                                inputmode="decimal"
+                                inputmode="numeric"
                                 [formControl]="bulkAmount"
                             /></app-form-field>
                             <app-form-field label="Method"
@@ -305,7 +443,7 @@ type CreditOrder = {
                               <app-form-field label="Amount (KES)">
                                 <input
                                   type="text"
-                                  inputmode="decimal"
+                                  inputmode="numeric"
                                   class="input input-bordered input-xs w-24"
                                   [formControl]="repayAmount"
                                 />
@@ -349,11 +487,11 @@ type CreditOrder = {
                     </div>
                   </div>
 
-                  <!-- Order history -->
+                  <!-- Sales history -->
                   <div class="mt-3 border-t pt-3">
-                    <h3 class="section-title mb-2">Order history</h3>
+                    <h3 class="section-title mb-2">Sales history</h3>
                     @if (orders().length === 0) {
-                      <p class="text-xs text-base-content/60">No orders yet.</p>
+                      <p class="text-xs text-base-content/60">No sales yet.</p>
                     } @else {
                       <table class="table table-xs">
                         <thead>
@@ -470,8 +608,6 @@ type CreditOrder = {
           />
         </div>
       }
-
-      <app-mobile-fab ariaLabel="New customer" (fabClick)="startCreate()" />
     </app-page>
   `,
 })
@@ -515,6 +651,7 @@ export class CustomersComponent implements OnInit {
   protected readonly approved = new FormControl(false, { nonNullable: true });
 
   protected readonly busy = signal(false);
+  protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
 
@@ -533,6 +670,27 @@ export class CustomersComponent implements OnInit {
     const start = (page - 1) * this.customerPageSize();
     return this.filtered().slice(start, start + this.customerPageSize());
   });
+  protected readonly customerStats = computed(() => {
+    const rows = this.customers();
+    const outstanding = rows.reduce((sum, customer) => sum + Math.max(0, customer.ar_balance), 0);
+    const overdue = rows.filter(
+      customer =>
+        customer.ar_balance > 0 && customer.bucket !== null && customer.bucket !== 'current'
+    ).length;
+    return [
+      { label: 'Customers', value: rows.length },
+      {
+        label: 'Owed to us',
+        value: this.perms.has('ViewFinancials') ? formatKes(outstanding) : 'Hidden',
+        tone: outstanding > 0 ? ('warning' as const) : ('neutral' as const),
+      },
+      {
+        label: 'Credit approved',
+        value: rows.filter(customer => customer.is_credit_approved).length,
+      },
+      { label: 'Overdue to us', value: overdue, tone: 'error' as const },
+    ];
+  });
 
   async ngOnInit(): Promise<void> {
     try {
@@ -544,11 +702,14 @@ export class CustomersComponent implements OnInit {
   }
 
   protected async load(): Promise<void> {
+    this.loading.set(true);
     try {
       this.customers.set(await this.money.customersWithAr());
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load customers');
+    } finally {
+      this.loading.set(false);
     }
   }
 
@@ -561,7 +722,7 @@ export class CustomersComponent implements OnInit {
     this.repayFor.set(null);
     const customer = this.customers().find(c => c.id === customerId);
     if (customer) {
-      this.creditLimit.setValue((customer.credit_limit / 100).toFixed(2));
+      this.creditLimit.setValue(formatKesInput(customer.credit_limit));
       this.termsDays.setValue(customer.credit_terms_days ?? 0);
       this.approved.setValue(customer.is_credit_approved);
     }
@@ -575,7 +736,7 @@ export class CustomersComponent implements OnInit {
       this.creditOrders.set(creditOrders);
       this.statement.set(statement);
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Failed to load orders');
+      this.error.set(err instanceof Error ? err.message : 'Failed to load sales');
     }
   }
 
@@ -621,12 +782,15 @@ export class CustomersComponent implements OnInit {
         });
         this.notice.set(`Updated ${this.firstName.value.trim()}`);
       } else {
-        await this.money.createCustomer(
+        const customerId = await this.money.createCustomer(
           this.firstName.value.trim(),
           this.lastName.value.trim() || undefined,
           this.phone.value.trim() || undefined,
           this.email.value.trim() || undefined
         );
+        if (this.notes.value.trim()) {
+          await this.money.updateCustomer(customerId, { notes: this.notes.value.trim() });
+        }
         this.notice.set(`Created ${this.firstName.value.trim()}`);
       }
       this.closeForm();
@@ -644,7 +808,7 @@ export class CustomersComponent implements OnInit {
       return;
     }
     this.repayFor.set(orderId);
-    this.repayAmount.setValue((total / 100).toFixed(2));
+    this.repayAmount.setValue(formatKesInput(total));
     this.repayReference.setValue('');
   }
 
@@ -706,7 +870,7 @@ export class CustomersComponent implements OnInit {
       );
       this.bulkAmount.setValue('');
       this.bulkReference.setValue('');
-      this.notice.set('Payment allocated to the oldest outstanding orders');
+      this.notice.set('Payment allocated to the oldest outstanding credit sales');
       await this.load();
       this.creditOrders.set(await this.money.creditOrders(customerId));
       this.statement.set(await this.money.customerStatement(customerId));
@@ -772,6 +936,10 @@ export class CustomersComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected customerCreditAvailable(customer: CustomerWithAr): number {
+    return Math.max(0, customer.credit_limit - customer.ar_balance);
   }
 
   protected bucketBadge(bucket: string | null): string {

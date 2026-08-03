@@ -40,9 +40,9 @@ import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required
           <app-form-field label="Amount (KES)">
             <input
               type="text"
-              inputmode="decimal"
+              inputmode="numeric"
               class="input input-bordered input-sm w-full"
-              placeholder="0.00"
+              placeholder="0"
               [formControl]="amount"
             />
           </app-form-field>

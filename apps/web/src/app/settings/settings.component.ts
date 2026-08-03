@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { formatKes, parseKesToCents } from '../core/money';
+import { formatKes, formatKesInput, parseKesToCents } from '../core/money';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import {
   CompanySettings,
@@ -103,7 +103,7 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                 </label>
                 <label class="label cursor-pointer justify-start gap-2 py-0">
                   <input type="checkbox" class="checkbox checkbox-sm" [formControl]="cashierFlow" />
-                  <span class="label-text">Cashier flow (park to cashier queue)</span>
+                  <span class="label-text">Cashier flow (send sales to cashier)</span>
                 </label>
                 <label class="label cursor-pointer justify-start gap-2 py-0">
                   <input type="checkbox" class="checkbox checkbox-sm" [formControl]="cashControl" />
@@ -337,7 +337,7 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
                   <span class="label-text">Threshold (KES)</span>
                   <input
                     type="text"
-                    inputmode="decimal"
+                    inputmode="numeric"
                     class="input input-bordered input-sm"
                     [formControl]="varianceThreshold"
                   />
@@ -505,7 +505,7 @@ export class SettingsComponent implements OnInit {
       this.requireOpening.setValue(settings.require_opening_count);
       this.lowStock.setValue(settings.low_stock_threshold);
       this.batchExpiry.setValue(settings.batch_expiry_enabled);
-      this.varianceThreshold.setValue((settings.variance_notification_threshold / 100).toFixed(2));
+      this.varianceThreshold.setValue(formatKesInput(settings.variance_notification_threshold));
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load settings');
     }

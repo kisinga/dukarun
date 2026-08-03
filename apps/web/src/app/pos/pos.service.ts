@@ -7,12 +7,32 @@ export type Product = Database['public']['Tables']['products']['Row'];
 export type Collection = Database['public']['Tables']['collections']['Row'];
 export type CollectionWithCount = Collection & { product_count: number };
 export type Variant = Database['public']['Views']['variant_catalog']['Row'];
+export type ProductVariant = Database['public']['Tables']['product_variants']['Row'];
 export type Customer = Database['public']['Tables']['customers']['Row'];
+export type CustomerWithCredit = Customer & { ar_balance: number };
 export type Order = Database['public']['Tables']['orders']['Row'];
 export type OrderLine = Database['public']['Tables']['order_lines']['Row'];
 export type Payment = Database['public']['Tables']['payments']['Row'];
 export type InventoryBatch = Database['public']['Tables']['inventory_batches']['Row'];
 export type StockLocation = Database['public']['Tables']['stock_locations']['Row'];
+
+export interface CatalogVariantInput {
+  variant_id?: string;
+  name?: string;
+  price: number;
+  sku?: string;
+  barcode?: string | null;
+  wholesale_price?: number | null;
+  kind?: string;
+  allow_fractional?: boolean;
+  track_inventory?: boolean;
+  active?: boolean;
+  opening_quantity?: number;
+  opening_unit_cost?: number;
+  opening_location_id?: string;
+  batch_number?: string;
+  expiry_date?: string;
+}
 
 /** Display name for a catalog row; hides the synthetic 'Default' variant name. */
 export function variantLabel(v: Pick<Variant, 'product_name' | 'variant_name'>): string {
@@ -124,6 +144,17 @@ export class PosService {
     return data;
   }
 
+  /** Raw variants for one product editor; unlike variant_catalog, barcodes are not family-coalesced. */
+  async variantsForProduct(productId: string): Promise<ProductVariant[]> {
+    const { data, error } = await this.client
+      .from('product_variants')
+      .select('*')
+      .eq('product_id', productId)
+      .order('created_at');
+    if (error) throw error;
+    return data;
+  }
+
   /** Stock per variant from the product_stock view (client-side join). */
   async productStock(): Promise<Map<string, { stock: number; stock_value: number }>> {
     const { data, error } = await this.client.from('product_stock').select('*');
@@ -164,26 +195,31 @@ export class PosService {
   async createProductWithVariants(input: {
     name: string;
     barcode?: string;
-    variants: {
-      name?: string;
-      price: number;
-      sku?: string;
-      barcode?: string;
-      wholesale_price?: number;
-      kind?: string;
-      allow_fractional?: boolean;
-      track_inventory?: boolean;
-      opening_quantity?: number;
-      opening_unit_cost?: number;
-      opening_location_id?: string;
-      batch_number?: string;
-      expiry_date?: string;
-    }[];
+    variants: CatalogVariantInput[];
   }): Promise<string> {
     const { data, error } = await this.client.rpc('create_catalog_product', {
       p_name: input.name,
       p_variants: input.variants as never,
       ...(input.barcode ? { p_barcode: input.barcode } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  /** Coupled edit: product details plus existing/new variants in one database transaction. */
+  async updateProductWithVariants(input: {
+    product_id: string;
+    name: string;
+    barcode: string;
+    active: boolean;
+    variants: CatalogVariantInput[];
+  }): Promise<string> {
+    const { data, error } = await this.client.rpc('update_catalog_product', {
+      p_product_id: input.product_id,
+      p_name: input.name,
+      p_barcode: input.barcode,
+      p_active: input.active,
+      p_variants: input.variants as never,
     });
     if (error) throw rpcError(error);
     return data;
@@ -354,15 +390,43 @@ export class PosService {
     return (data ?? []).map(r => r.collection_id);
   }
 
-  async searchCustomers(query: string): Promise<Customer[]> {
+  async searchCustomers(query: string): Promise<CustomerWithCredit[]> {
     const pattern = `%${query.trim().replace(/[%_,()]/g, ' ')}%`;
     const { data, error } = await this.client
       .from('customers')
       .select('*')
+      .eq('is_supplier', false)
       .or(`first_name.ilike.${pattern},last_name.ilike.${pattern},phone.ilike.${pattern}`)
       .limit(10);
     if (error) throw error;
-    return data;
+    return this.withCustomerBalances(data);
+  }
+
+  async customerWithCredit(customerId: string): Promise<CustomerWithCredit | null> {
+    const { data, error } = await this.client
+      .from('customers')
+      .select('*')
+      .eq('id', customerId)
+      .eq('is_supplier', false)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return (await this.withCustomerBalances([data]))[0] ?? null;
+  }
+
+  private async withCustomerBalances(customers: Customer[]): Promise<CustomerWithCredit[]> {
+    if (customers.length === 0) return [];
+    const ids = customers.map(customer => customer.id);
+    const { data, error } = await this.client
+      .from('customer_ar_balances')
+      .select('customer_id, balance')
+      .in('customer_id', ids);
+    if (error) throw error;
+    const balances = new Map((data ?? []).map(row => [row.customer_id, row.balance ?? 0]));
+    return customers.map(customer => ({
+      ...customer,
+      ar_balance: balances.get(customer.id) ?? 0,
+    }));
   }
 
   /** Enabled non-credit payment method codes (credit is handled as its own checkout mode). */

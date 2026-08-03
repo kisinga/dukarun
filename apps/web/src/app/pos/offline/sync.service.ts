@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { PosRpcError, PosService, Variant } from '../pos.service';
 import { ConnectivityService } from './connectivity.service';
 import { OutboxEntry, ProductSnapshot, offlineDb } from './offline-db';
@@ -39,7 +39,8 @@ export class SyncService {
     void this.refresh();
     // App start + reconnect triggers.
     effect(() => {
-      if (this.connectivity.online()) void this.sync();
+      const online = this.connectivity.online();
+      if (online) untracked(() => void this.sync());
     });
     // Periodic retry while online.
     if (typeof setInterval !== 'undefined') {

@@ -26,7 +26,7 @@ export const routes: Routes = [
         path: 'pos/sell',
         loadComponent: () => import('./pos/sell/sell.component').then(m => m.SellComponent),
       },
-      { path: 'pos/sales', redirectTo: 'orders' },
+      { path: 'pos/sales', redirectTo: 'sales' },
       {
         path: 'pos/proformas',
         loadComponent: () =>
@@ -106,6 +106,12 @@ export const routes: Routes = [
           import('./suppliers/suppliers.component').then(m => m.SuppliersComponent),
       },
       {
+        path: 'purchases',
+        data: { purchasePage: true },
+        loadComponent: () =>
+          import('./suppliers/suppliers.component').then(m => m.SuppliersComponent),
+      },
+      {
         path: 'credit',
         redirectTo: '/customers',
       },
@@ -121,9 +127,10 @@ export const routes: Routes = [
         loadComponent: () => import('./team/team.component').then(m => m.TeamComponent),
       },
       {
-        path: 'orders',
+        path: 'sales',
         loadComponent: () => import('./orders/orders.component').then(m => m.OrdersComponent),
       },
+      { path: 'orders', redirectTo: 'sales' },
       {
         path: 'reports',
         loadComponent: () => import('./reports/reports.component').then(m => m.ReportsComponent),

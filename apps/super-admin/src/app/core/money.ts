@@ -3,10 +3,17 @@
  * format to KES only at display time.
  */
 export function formatKes(cents: number): string {
+  const hasSubunits = Math.abs(Math.round(cents)) % 100 !== 0;
   return `KES ${(cents / 100).toLocaleString('en-KE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: hasSubunits ? 2 : 0,
+    maximumFractionDigits: hasSubunits ? 2 : 0,
   })}`;
+}
+
+/** Editable/computed amount text: whole KES unless real cents must be preserved. */
+export function formatKesInput(cents: number): string {
+  const amount = cents / 100;
+  return Math.abs(Math.round(cents)) % 100 === 0 ? String(Math.round(amount)) : amount.toFixed(2);
 }
 
 /** Parse a user-typed KES amount ("2450", "2,450.50") into cents. Null when invalid. */

@@ -1,19 +1,19 @@
 import { Component, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
+import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { NgIcon } from '@ng-icons/core';
-import { formatKes, parseKesToCents } from '../core/money';
+import { formatKes, formatKesInput, parseKesToCents } from '../core/money';
 import { SupabaseService } from '../core/supabase.service';
 import {
+  CatalogVariantInput,
   CollectionWithCount,
   InventoryBatch,
   PosService,
   Product,
+  ProductVariant,
   StockLocation,
   Variant,
-  variantLabel,
 } from '../pos/pos.service';
 import { imageExtension, resizeImage } from '../shared/ui/image.util';
 import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
@@ -23,16 +23,18 @@ import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { PaginationComponent } from '../shared/ui/pagination.component';
 import { DataTableShellComponent } from '../shared/ui/data-table-shell.component';
 import { ButtonComponent } from '../shared/ui/button.component';
+import { FormFieldComponent } from '../shared/ui/form-field.component';
+import { IconComponent } from '../shared/ui/icon.component';
+import { MoneyComponent } from '../shared/ui/money.component';
 
 type StockInfo = { stock: number; stock_value: number };
 
-/** One row of the create form's inline variants editor. */
-type DeactivateTarget =
-  | { kind: 'family'; family: Product; variants: number }
-  | { kind: 'variant'; variant: Variant }
-  | { kind: 'collection'; collection: CollectionWithCount };
+/** One variant in the coupled create/edit product editor. */
+type DeactivateTarget = { kind: 'collection'; collection: CollectionWithCount };
 
-interface CreateRow {
+interface ProductEditorRow {
+  key: string;
+  variantId: string | null;
   name: string;
   price: string; // KES text
   sku: string;
@@ -46,6 +48,7 @@ interface CreateRow {
   openingLocationId: string;
   batchNumber: string;
   expiryDate: string;
+  active: boolean;
 }
 
 @Component({
@@ -54,9 +57,8 @@ interface CreateRow {
     RouterLink,
     FormsModule,
     ReactiveFormsModule,
-    PageHeaderComponent,
     EmptyStateComponent,
-    NgIcon,
+    PageHeaderComponent,
     DeleteConfirmationModalComponent,
     MobileFabComponent,
     StatusBadgeComponent,
@@ -64,6 +66,9 @@ interface CreateRow {
     PaginationComponent,
     DataTableShellComponent,
     ButtonComponent,
+    FormFieldComponent,
+    IconComponent,
+    MoneyComponent,
   ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
@@ -74,13 +79,14 @@ interface CreateRow {
           </span>
           <button
             actions
-            class="btn btn-outline btn-sm"
+            appButton
+            variant="outline"
             (click)="collectionsOpen.set(!collectionsOpen())"
           >
             Collections
           </button>
-          <button actions class="btn btn-primary btn-sm" (click)="startFamilyCreate()">
-            + New product
+          <button actions appButton variant="primary" (click)="startFamilyCreate()">
+            <app-icon name="heroPlus" /> New product
           </button>
         </app-page-header>
 
@@ -206,462 +212,471 @@ interface CreateRow {
           <p class="mb-2 text-sm text-success">{{ notice() }}</p>
         }
 
-        <!-- Family create / edit panel -->
-        <!-- Create panel: family + inline variants editor (one coupled RPC) -->
-        @if (createOpen()) {
-          <div class="card mb-4 bg-base-100">
-            <div class="card-body p-4">
-              <h2 class="card-title text-lg">New product</h2>
+        <!-- Coupled product editor: details and every variant save together. -->
+        @if (editorMode(); as mode) {
+          <dialog class="modal modal-open" (cancel)="$event.preventDefault(); closeProductEditor()">
+            <div class="modal-box product-editor p-0">
               <form
-                (submit)="$event.preventDefault(); saveCreate()"
-                class="mt-2 flex flex-col gap-3"
+                class="flex h-full flex-col md:h-auto"
+                (submit)="$event.preventDefault(); saveProductEditor()"
               >
-                <div class="flex flex-wrap items-end gap-3">
-                  <label class="form-control">
-                    <span class="label-text">Product name *</span>
-                    <input
-                      type="text"
-                      class="input input-bordered input-sm"
-                      [formControl]="familyName"
-                    />
-                  </label>
-                  <label class="form-control">
-                    <span class="label-text">Product barcode</span>
-                    <input
-                      type="text"
-                      class="input input-bordered input-sm"
-                      [formControl]="familyBarcode"
-                    />
-                  </label>
-                </div>
+                <header class="flex items-start justify-between gap-3 border-b border-base-300 p-4">
+                  <div>
+                    <h2 class="type-title">
+                      {{ mode === 'create' ? 'New product' : 'Edit ' + editingFamily()!.name }}
+                    </h2>
+                    <p class="type-caption mt-1">
+                      Product details and variants are saved together.
+                    </p>
+                  </div>
+                  <button
+                    appButton
+                    type="button"
+                    variant="ghost"
+                    [iconOnly]="true"
+                    aria-label="Close product editor"
+                    (click)="closeProductEditor()"
+                  >
+                    <app-icon name="heroXMark" />
+                  </button>
+                </header>
 
-                <!-- Variant rows (min 1) -->
-                <div class="flex flex-col gap-2">
-                  @for (row of createRows; track $index) {
-                    <div class="flex flex-wrap items-end gap-2 rounded-field bg-base-200 p-2">
-                      <label class="form-control w-28">
-                        <span class="label-text text-xs">Label</span>
-                        <input
-                          type="text"
-                          class="input input-bordered input-xs"
-                          placeholder="e.g. 1kg, S — leave blank for single-variant"
-                          [(ngModel)]="row.name"
-                          [ngModelOptions]="{ standalone: true }"
-                        />
-                      </label>
-                      <label class="form-control w-24">
-                        <span class="label-text text-xs">Price (KES) *</span>
-                        <input
-                          type="text"
-                          inputmode="decimal"
-                          class="input input-bordered input-xs"
-                          placeholder="0.00"
-                          [(ngModel)]="row.price"
-                          [ngModelOptions]="{ standalone: true }"
-                        />
-                      </label>
-                      <label class="form-control w-24">
-                        <span class="label-text text-xs">SKU</span>
-                        <input
-                          type="text"
-                          class="input input-bordered input-xs"
-                          placeholder="auto"
-                          [(ngModel)]="row.sku"
-                          [ngModelOptions]="{ standalone: true }"
-                        />
-                      </label>
-                      <label class="form-control w-28">
-                        <span class="label-text text-xs">Barcode override</span>
-                        <input
-                          type="text"
-                          class="input input-bordered input-xs"
-                          [(ngModel)]="row.barcode"
-                          [ngModelOptions]="{ standalone: true }"
-                        />
-                      </label>
-                      <label class="form-control w-24">
-                        <span class="label-text text-xs">Wholesale (KES)</span>
-                        <input
-                          type="text"
-                          inputmode="decimal"
-                          class="input input-bordered input-xs"
-                          placeholder="0.00"
-                          [(ngModel)]="row.wholesale"
-                          [ngModelOptions]="{ standalone: true }"
-                        />
-                      </label>
-                      <label class="form-control w-24">
-                        <span class="label-text text-xs">Kind</span>
-                        <select
-                          class="select select-bordered select-xs"
-                          [(ngModel)]="row.kind"
-                          [ngModelOptions]="{ standalone: true }"
-                        >
-                          <option value="good">Good</option>
-                          <option value="service">Service</option>
-                        </select>
-                      </label>
-                      @if (row.kind !== 'service') {
-                        <label class="label cursor-pointer justify-start gap-1 py-0">
-                          <input
-                            type="checkbox"
-                            class="checkbox checkbox-xs"
-                            [(ngModel)]="row.trackInventory"
-                            [ngModelOptions]="{ standalone: true }"
-                          />
-                          <span class="label-text text-xs">Track stock</span>
-                        </label>
-                        <label class="label cursor-pointer justify-start gap-1 py-0">
-                          <input
-                            type="checkbox"
-                            class="checkbox checkbox-xs"
-                            [(ngModel)]="row.allowFractional"
-                            [ngModelOptions]="{ standalone: true }"
-                          />
-                          <span class="label-text text-xs">Fractional</span>
-                        </label>
-                      }
-                      <button
-                        type="button"
-                        class="btn btn-ghost btn-xs"
-                        [disabled]="createRows.length === 1"
-                        (click)="removeCreateRow($index)"
-                      >
-                        <ng-icon name="heroXMark" />
-                      </button>
-                      @if (row.kind !== 'service' && row.trackInventory) {
-                        <div
-                          class="grid basis-full gap-2 border-t border-base-300/70 pt-2 sm:grid-cols-2 lg:grid-cols-5"
-                        >
-                          <label class="form-control">
-                            <span class="label-text text-xs">Opening quantity</span>
-                            <input
-                              type="number"
-                              min="0"
-                              [step]="row.allowFractional ? '0.001' : '1'"
-                              class="input input-bordered input-xs"
-                              placeholder="0"
-                              [(ngModel)]="row.openingQuantity"
-                              [ngModelOptions]="{ standalone: true }"
-                            />
-                          </label>
-                          <label class="form-control">
-                            <span class="label-text text-xs">Unit cost (KES)</span>
-                            <input
-                              type="text"
-                              inputmode="decimal"
-                              class="input input-bordered input-xs"
-                              placeholder="0.00"
-                              [(ngModel)]="row.openingUnitCost"
-                              [ngModelOptions]="{ standalone: true }"
-                            />
-                          </label>
-                          <label class="form-control">
-                            <span class="label-text text-xs">Stock location</span>
-                            <select
-                              class="select select-bordered select-xs"
-                              [(ngModel)]="row.openingLocationId"
-                              [ngModelOptions]="{ standalone: true }"
-                            >
-                              <option value="">Main store</option>
-                              @for (location of stockLocations(); track location.id) {
-                                <option [value]="location.id">{{ location.name }}</option>
-                              }
-                            </select>
-                          </label>
-                          <label class="form-control">
-                            <span class="label-text text-xs">Batch number</span>
-                            <input
-                              type="text"
-                              class="input input-bordered input-xs"
-                              placeholder="optional"
-                              [(ngModel)]="row.batchNumber"
-                              [ngModelOptions]="{ standalone: true }"
-                            />
-                          </label>
-                          <label class="form-control">
-                            <span class="label-text text-xs">Expiry date</span>
-                            <input
-                              type="date"
-                              class="input input-bordered input-xs"
-                              [(ngModel)]="row.expiryDate"
-                              [ngModelOptions]="{ standalone: true }"
-                            />
-                          </label>
-                          @if (row.openingQuantity && row.openingUnitCost) {
-                            <p class="self-end text-xs text-base-content/60 lg:col-span-5">
-                              Opening value:
-                              <strong class="text-base-content">
-                                {{
-                                  fmt(
-                                    +row.openingQuantity * (parseAmount(row.openingUnitCost) ?? 0)
-                                  )
-                                }}
-                              </strong>
-                            </p>
-                          }
-                        </div>
-                      }
+                <nav
+                  class="grid grid-cols-2 gap-2 border-b border-base-300 px-4 py-3"
+                  aria-label="Product editor steps"
+                >
+                  <button
+                    appButton
+                    type="button"
+                    [variant]="editorStep() === 1 ? 'soft' : 'ghost'"
+                    (click)="editorStep.set(1)"
+                  >
+                    1. Details
+                  </button>
+                  <button
+                    appButton
+                    type="button"
+                    [variant]="editorStep() === 2 ? 'soft' : 'ghost'"
+                    [disabled]="familyName.value.trim().length === 0"
+                    (click)="editorStep.set(2)"
+                  >
+                    2. Variants ({{ editorRows.length }})
+                  </button>
+                </nav>
+
+                <div class="min-h-0 flex-1 overflow-y-auto p-4">
+                  @if (error()) {
+                    <div role="alert" class="alert alert-error mb-4 py-2 text-sm">
+                      <app-icon name="heroExclamationTriangle" />
+                      <span>{{ error() }}</span>
                     </div>
                   }
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-sm self-start"
-                    (click)="addCreateRow()"
-                  >
-                    <ng-icon name="heroPlus" /> Add variant
-                  </button>
-                  @if (duplicateLabels()) {
-                    <p class="text-xs text-warning">Two variants share the same label.</p>
-                  }
-                </div>
 
-                <div class="flex gap-2">
-                  <button
-                    type="submit"
-                    class="btn btn-primary btn-sm min-h-11"
-                    [disabled]="busy() || familyName.value.trim().length === 0"
-                  >
-                    {{ busy() ? 'Creating…' : 'Create product' }}
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-sm"
-                    (click)="createOpen.set(false)"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        }
-
-        <!-- Family edit panel -->
-        @if (familyFormOpen()) {
-          <div class="card mb-4 bg-base-100">
-            <div class="card-body p-4">
-              <h2 class="card-title text-lg">Edit {{ editingFamily()!.name }}</h2>
-              <form
-                (submit)="$event.preventDefault(); saveFamily()"
-                class="mt-2 flex flex-wrap items-end gap-3"
-              >
-                <label class="form-control">
-                  <span class="label-text">Name *</span>
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm"
-                    [formControl]="familyName"
-                  />
-                </label>
-                <label class="form-control">
-                  <span class="label-text">Product barcode</span>
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm"
-                    [formControl]="familyBarcode"
-                  />
-                </label>
-                <label class="label cursor-pointer justify-start gap-2">
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-sm"
-                    [formControl]="familyActive"
-                  />
-                  <span class="label-text">Active</span>
-                </label>
-                <button
-                  type="submit"
-                  class="btn btn-primary btn-sm"
-                  [disabled]="busy() || familyName.value.trim().length === 0"
-                >
-                  {{ busy() ? 'Saving…' : 'Save changes' }}
-                </button>
-                <button type="button" class="btn btn-ghost btn-sm" (click)="closeFamilyForm()">
-                  Cancel
-                </button>
-              </form>
-
-              <!-- Image -->
-              <div class="mt-3 flex items-center gap-3 border-t border-base-300/60 pt-3">
-                @if (imageUrl(editingFamily()!.image_path); as url) {
-                  @if (!brokenImages().has(editingFamily()!.image_path!)) {
-                    <img
-                      [src]="url"
-                      alt="Product image"
-                      class="h-16 w-16 rounded-field object-cover"
-                      (error)="markBroken(editingFamily()!.image_path!)"
-                    />
-                  }
-                }
-                <div class="flex flex-col gap-1">
-                  <span class="type-caption">
-                    {{ editingFamily()!.image_path ? 'Replace image' : 'Add image' }} (resized to
-                    800px)
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    class="file-input file-input-bordered file-input-sm w-full max-w-xs"
-                    [disabled]="imageBusy()"
-                    (change)="uploadImage($event)"
-                  />
-                  @if (imageBusy()) {
-                    <span class="type-caption">Uploading…</span>
-                  }
-                </div>
-                @if (editingFamily()!.image_path) {
-                  <button
-                    class="btn btn-error btn-outline btn-xs"
-                    [disabled]="imageBusy() || busy()"
-                    (click)="removeImage()"
-                  >
-                    Remove
-                  </button>
-                }
-              </div>
-
-              <!-- Collections -->
-              <div class="mt-3 border-t border-base-300/60 pt-3">
-                <span class="type-caption">Collections</span>
-                <div class="mt-1 flex flex-wrap gap-2">
-                  @for (c of collections(); track c.id) {
-                    @if (c.active) {
-                      <label class="label cursor-pointer justify-start gap-2 py-0">
+                  @if (editorStep() === 1) {
+                    <section class="grid gap-4 sm:grid-cols-2">
+                      <app-form-field label="Product name" [required]="true">
                         <input
-                          type="checkbox"
-                          class="checkbox checkbox-sm"
-                          [checked]="familyCollections().has(c.id)"
-                          (change)="toggleFamilyCollection(c.id)"
+                          type="text"
+                          class="input input-bordered w-full"
+                          autocomplete="off"
+                          [formControl]="familyName"
                         />
-                        <span class="label-text text-sm">{{ c.name }}</span>
-                      </label>
-                    }
-                  }
-                  @if (collections().length === 0) {
-                    <span class="text-xs text-base-content/60">
-                      No collections yet — create some from the Collections panel.
-                    </span>
-                  }
-                </div>
-              </div>
-            </div>
-          </div>
-        }
+                      </app-form-field>
+                      <app-form-field
+                        label="Shared barcode"
+                        hint="Used when a variant does not have its own barcode."
+                      >
+                        <input
+                          type="text"
+                          class="input input-bordered w-full"
+                          inputmode="numeric"
+                          autocomplete="off"
+                          placeholder="Optional"
+                          [formControl]="familyBarcode"
+                        />
+                      </app-form-field>
+                    </section>
 
-        <!-- Variant create / edit panel -->
-        @if (variantForm(); as vf) {
-          <div class="card mb-4 bg-base-100">
-            <div class="card-body p-4">
-              <h2 class="card-title text-lg">
-                {{ vf.editing ? 'Edit ' + label(vf.editing) : 'New variant' }}
-              </h2>
-              <form
-                (submit)="$event.preventDefault(); saveVariant()"
-                class="mt-2 grid gap-3 sm:grid-cols-3"
-              >
-                <label class="form-control">
-                  <span class="label-text">Label * (e.g. 1kg, S)</span>
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm"
-                    [formControl]="variantName"
-                  />
-                </label>
-                <label class="form-control">
-                  <span class="label-text">Price (KES) *</span>
-                  <input
-                    type="text"
-                    inputmode="decimal"
-                    class="input input-bordered input-sm"
-                    placeholder="0.00"
-                    [formControl]="variantPrice"
-                  />
-                </label>
-                <label class="form-control">
-                  <span class="label-text">Kind</span>
-                  <select class="select select-bordered select-sm" [formControl]="variantKind">
-                    <option value="good">Good</option>
-                    <option value="service">Service</option>
-                  </select>
-                </label>
-                <label class="form-control">
-                  <span class="label-text">SKU</span>
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm"
-                    placeholder="auto"
-                    [disabled]="vf.editing !== null"
-                    [formControl]="variantSku"
-                  />
-                </label>
-                <label class="form-control">
-                  <span class="label-text">Barcode override</span>
-                  <input
-                    type="text"
-                    class="input input-bordered input-sm"
-                    [formControl]="variantBarcode"
-                  />
-                </label>
-                <label class="form-control">
-                  <span class="label-text">Wholesale (KES, optional)</span>
-                  <input
-                    type="text"
-                    inputmode="decimal"
-                    class="input input-bordered input-sm"
-                    placeholder="0.00"
-                    [formControl]="variantWholesale"
-                  />
-                </label>
-                @if (variantKind.value !== 'service') {
-                  <div class="flex items-center gap-4">
-                    <label class="label cursor-pointer justify-start gap-2 py-0">
-                      <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        [formControl]="variantTrackInventory"
-                      />
-                      <span class="label-text">Track inventory</span>
-                    </label>
-                    <label class="label cursor-pointer justify-start gap-2 py-0">
-                      <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        [formControl]="variantAllowFractional"
-                      />
-                      <span class="label-text">Allow fractional</span>
-                    </label>
-                  </div>
-                }
-                @if (vf.editing) {
-                  <label class="label cursor-pointer justify-start gap-2 py-0">
-                    <input
-                      type="checkbox"
-                      class="checkbox checkbox-sm"
-                      [formControl]="variantActive"
-                    />
-                    <span class="label-text">Active</span>
-                  </label>
-                }
-                <div class="flex gap-2 sm:col-span-3">
-                  <button
-                    type="submit"
-                    class="btn btn-primary btn-sm"
-                    [disabled]="busy() || variantName.value.trim().length === 0"
-                  >
-                    {{ busy() ? 'Saving…' : vf.editing ? 'Save variant' : 'Create variant' }}
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-sm"
-                    (click)="variantForm.set(null)"
-                  >
-                    Cancel
-                  </button>
+                    @if (mode === 'edit') {
+                      <section class="mt-6 border-t border-base-300 pt-4">
+                        <label
+                          class="flex min-h-11 cursor-pointer items-center justify-between gap-4"
+                        >
+                          <span>
+                            <span class="type-heading block">Product available for sale</span>
+                            <span class="type-caption block"
+                              >Turn this off to hide every variant from Sell.</span
+                            >
+                          </span>
+                          <input
+                            type="checkbox"
+                            class="toggle toggle-primary"
+                            [formControl]="familyActive"
+                          />
+                        </label>
+                      </section>
+
+                      <section class="mt-6 border-t border-base-300 pt-4">
+                        <h3 class="section-title">Product image</h3>
+                        <div class="mt-3 flex flex-wrap items-center gap-3">
+                          @if (imageUrl(editingFamily()!.image_path); as url) {
+                            @if (!brokenImages().has(editingFamily()!.image_path!)) {
+                              <img
+                                [src]="url"
+                                alt="Product"
+                                class="h-16 w-16 rounded-field object-cover"
+                                (error)="markBroken(editingFamily()!.image_path!)"
+                              />
+                            }
+                          }
+                          <input
+                            type="file"
+                            accept="image/*"
+                            class="file-input file-input-bordered file-input-sm max-w-xs"
+                            [disabled]="imageBusy()"
+                            (change)="uploadImage($event)"
+                          />
+                          @if (editingFamily()!.image_path) {
+                            <button
+                              appButton
+                              type="button"
+                              variant="error"
+                              [disabled]="imageBusy() || busy()"
+                              (click)="removeImage()"
+                            >
+                              Remove image
+                            </button>
+                          }
+                        </div>
+                        <p class="type-caption mt-2">
+                          {{ imageBusy() ? 'Uploading…' : 'Images are resized to 800px.' }}
+                        </p>
+                      </section>
+
+                      <section class="mt-6 border-t border-base-300 pt-4">
+                        <h3 class="section-title">Collections</h3>
+                        <div class="mt-3 flex flex-wrap gap-4">
+                          @for (c of collections(); track c.id) {
+                            @if (c.active) {
+                              <label class="flex min-h-11 cursor-pointer items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  class="checkbox checkbox-sm"
+                                  [checked]="familyCollections().has(c.id)"
+                                  (change)="toggleFamilyCollection(c.id)"
+                                />
+                                <span class="text-sm">{{ c.name }}</span>
+                              </label>
+                            }
+                          } @empty {
+                            <p class="type-caption">No collections yet.</p>
+                          }
+                        </div>
+                      </section>
+                    }
+                  } @else {
+                    <section>
+                      <div class="mb-4 flex items-start justify-between gap-3">
+                        <div>
+                          <h3 class="section-title">Sellable variants</h3>
+                          <p class="type-caption mt-1">
+                            Use one variant for a simple item, or add sizes and pack options.
+                          </p>
+                        </div>
+                        <button
+                          appButton
+                          type="button"
+                          variant="outline"
+                          [disabled]="editorLoading()"
+                          (click)="addEditorRow()"
+                        >
+                          <app-icon name="heroPlus" /> Add variant
+                        </button>
+                      </div>
+
+                      @if (editorLoading()) {
+                        <div
+                          class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
+                        >
+                          <span class="loading loading-spinner loading-sm"></span>
+                          Loading variants…
+                        </div>
+                      } @else {
+                        <div class="space-y-2">
+                          @for (row of editorRows; track row.key; let index = $index) {
+                            <section class="rounded-box bg-base-200/60 p-3">
+                              <div class="mb-3 flex min-h-11 items-center justify-between gap-3">
+                                <h4 class="type-heading">
+                                  {{
+                                    row.name.trim() ||
+                                      (editorRows.length === 1
+                                        ? 'Default variant'
+                                        : 'Variant ' + (index + 1))
+                                  }}
+                                </h4>
+                                @if (row.variantId) {
+                                  <label class="flex cursor-pointer items-center gap-2">
+                                    <span class="type-caption">
+                                      {{ row.active ? 'Available' : 'Hidden' }}
+                                    </span>
+                                    <input
+                                      type="checkbox"
+                                      class="toggle toggle-primary toggle-sm"
+                                      [(ngModel)]="row.active"
+                                      [ngModelOptions]="{ standalone: true }"
+                                    />
+                                  </label>
+                                } @else {
+                                  <button
+                                    appButton
+                                    type="button"
+                                    variant="ghost"
+                                    [iconOnly]="true"
+                                    [disabled]="editorRows.length === 1"
+                                    aria-label="Remove variant"
+                                    (click)="removeEditorRow(index)"
+                                  >
+                                    <app-icon name="heroXMark" />
+                                  </button>
+                                }
+                              </div>
+
+                              <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                <app-form-field label="Variant label">
+                                  <input
+                                    type="text"
+                                    class="input input-bordered w-full"
+                                    placeholder="{{
+                                      editorRows.length === 1 ? 'Default' : 'e.g. 1 kg'
+                                    }}"
+                                    [(ngModel)]="row.name"
+                                    [ngModelOptions]="{ standalone: true }"
+                                  />
+                                </app-form-field>
+                                <app-form-field label="Retail price (KES)" [required]="true">
+                                  <input
+                                    type="text"
+                                    inputmode="numeric"
+                                    class="input input-bordered w-full"
+                                    placeholder="0"
+                                    [(ngModel)]="row.price"
+                                    [ngModelOptions]="{ standalone: true }"
+                                  />
+                                </app-form-field>
+                                <app-form-field label="Item type">
+                                  <select
+                                    class="select select-bordered w-full"
+                                    [(ngModel)]="row.kind"
+                                    [ngModelOptions]="{ standalone: true }"
+                                  >
+                                    <option value="good">Physical good</option>
+                                    <option value="service">Service</option>
+                                  </select>
+                                </app-form-field>
+                              </div>
+
+                              <details class="mt-3 border-t border-base-300/70">
+                                <summary
+                                  class="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 py-2 text-sm font-medium"
+                                >
+                                  More options
+                                  <span class="type-caption font-mono">
+                                    SKU {{ row.sku || 'auto' }}
+                                    @if (row.barcode) {
+                                      · barcode set
+                                    }
+                                    @if (row.wholesale) {
+                                      · wholesale set
+                                    }
+                                  </span>
+                                </summary>
+                                <div class="grid gap-3 pb-3 sm:grid-cols-2 lg:grid-cols-3">
+                                  <app-form-field label="SKU" hint="Leave blank to generate one.">
+                                    <input
+                                      type="text"
+                                      class="input input-bordered w-full font-mono"
+                                      placeholder="Auto"
+                                      [(ngModel)]="row.sku"
+                                      [ngModelOptions]="{ standalone: true }"
+                                    />
+                                  </app-form-field>
+                                  <app-form-field
+                                    label="Variant barcode"
+                                    hint="Overrides the shared barcode."
+                                  >
+                                    <input
+                                      type="text"
+                                      inputmode="numeric"
+                                      class="input input-bordered w-full"
+                                      placeholder="Optional"
+                                      [(ngModel)]="row.barcode"
+                                      [ngModelOptions]="{ standalone: true }"
+                                    />
+                                  </app-form-field>
+                                  <app-form-field label="Wholesale price (KES)" hint="Optional">
+                                    <input
+                                      type="text"
+                                      inputmode="numeric"
+                                      class="input input-bordered w-full"
+                                      placeholder="0"
+                                      [(ngModel)]="row.wholesale"
+                                      [ngModelOptions]="{ standalone: true }"
+                                    />
+                                  </app-form-field>
+                                </div>
+                              </details>
+
+                              @if (row.kind !== 'service') {
+                                <div
+                                  class="flex flex-wrap gap-x-6 gap-y-1 border-t border-base-300/70 pt-2"
+                                >
+                                  <label class="flex min-h-11 cursor-pointer items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      class="checkbox checkbox-sm"
+                                      [(ngModel)]="row.trackInventory"
+                                      [ngModelOptions]="{ standalone: true }"
+                                    />
+                                    <span class="text-sm">Track stock</span>
+                                  </label>
+                                  <label class="flex min-h-11 cursor-pointer items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      class="checkbox checkbox-sm"
+                                      [(ngModel)]="row.allowFractional"
+                                      [ngModelOptions]="{ standalone: true }"
+                                    />
+                                    <span class="text-sm">Allow fractional quantities</span>
+                                  </label>
+                                  @if (row.variantId && row.trackInventory) {
+                                    <span class="ml-auto self-center text-sm text-base-content/60">
+                                      Current stock {{ stockOf(row.variantId)?.stock ?? 0 }}
+                                    </span>
+                                  }
+                                </div>
+                              }
+
+                              @if (!row.variantId && row.kind !== 'service' && row.trackInventory) {
+                                <details class="mt-3 border-t border-base-300 pt-3">
+                                  <summary class="min-h-11 cursor-pointer py-3 text-sm font-medium">
+                                    Opening stock
+                                    <span class="font-normal text-base-content/60">(optional)</span>
+                                  </summary>
+                                  <div class="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
+                                    <app-form-field label="Quantity">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        [step]="row.allowFractional ? '0.001' : '1'"
+                                        class="input input-bordered w-full"
+                                        placeholder="0"
+                                        [(ngModel)]="row.openingQuantity"
+                                        [ngModelOptions]="{ standalone: true }"
+                                      />
+                                    </app-form-field>
+                                    <app-form-field label="Unit cost (KES)">
+                                      <input
+                                        type="text"
+                                        inputmode="numeric"
+                                        class="input input-bordered w-full"
+                                        placeholder="0"
+                                        [(ngModel)]="row.openingUnitCost"
+                                        [ngModelOptions]="{ standalone: true }"
+                                      />
+                                    </app-form-field>
+                                    <app-form-field label="Stock location">
+                                      <select
+                                        class="select select-bordered w-full"
+                                        [(ngModel)]="row.openingLocationId"
+                                        [ngModelOptions]="{ standalone: true }"
+                                      >
+                                        @for (location of stockLocations(); track location.id) {
+                                          <option [value]="location.id">{{ location.name }}</option>
+                                        }
+                                      </select>
+                                    </app-form-field>
+                                    <app-form-field label="Batch number" hint="Optional">
+                                      <input
+                                        type="text"
+                                        class="input input-bordered w-full"
+                                        [(ngModel)]="row.batchNumber"
+                                        [ngModelOptions]="{ standalone: true }"
+                                      />
+                                    </app-form-field>
+                                    <app-form-field label="Expiry date" hint="Optional">
+                                      <input
+                                        type="date"
+                                        class="input input-bordered w-full"
+                                        [(ngModel)]="row.expiryDate"
+                                        [ngModelOptions]="{ standalone: true }"
+                                      />
+                                    </app-form-field>
+                                    @if (row.openingQuantity && row.openingUnitCost) {
+                                      <div class="self-end pb-3 text-sm text-base-content/60">
+                                        Opening value
+                                        <strong class="ml-1 text-base-content">
+                                          <app-money
+                                            [cents]="
+                                              +row.openingQuantity *
+                                              (parseAmount(row.openingUnitCost) ?? 0)
+                                            "
+                                          />
+                                        </strong>
+                                      </div>
+                                    }
+                                  </div>
+                                </details>
+                              }
+                            </section>
+                          }
+                        </div>
+                        @if (duplicateLabels()) {
+                          <p class="mt-3 text-sm text-warning">Variant labels must be unique.</p>
+                        }
+                      }
+                    </section>
+                  }
                 </div>
+
+                <footer
+                  class="flex items-center justify-between gap-3 border-t border-base-300 bg-base-100 p-4"
+                >
+                  @if (editorStep() === 1) {
+                    <button appButton type="button" variant="ghost" (click)="closeProductEditor()">
+                      Cancel
+                    </button>
+                    <button
+                      appButton
+                      type="button"
+                      variant="primary"
+                      [disabled]="familyName.value.trim().length === 0"
+                      (click)="editorStep.set(2)"
+                    >
+                      Continue to variants
+                    </button>
+                  } @else {
+                    <button appButton type="button" variant="ghost" (click)="editorStep.set(1)">
+                      Back to details
+                    </button>
+                    <button
+                      appButton
+                      type="submit"
+                      variant="primary"
+                      [loading]="busy()"
+                      [disabled]="
+                        editorLoading() || duplicateLabels() || familyName.value.trim().length === 0
+                      "
+                    >
+                      {{ mode === 'create' ? 'Create product' : 'Save product' }}
+                    </button>
+                  }
+                </footer>
               </form>
             </div>
-          </div>
+            <form method="dialog" class="modal-backdrop">
+              <button type="button" aria-label="Close" (click)="closeProductEditor()">close</button>
+            </form>
+          </dialog>
         }
 
         <!-- Search -->
@@ -709,7 +724,7 @@ interface CreateRow {
                       </span>
                     </button>
                     @if (!group.family.active) {
-                      <app-status-badge type="neutral" label="inactive" />
+                      <app-status-badge type="warning" label="inactive" />
                     }
                     <button
                       appButton
@@ -729,55 +744,19 @@ interface CreateRow {
                   <div class="mt-3 flex flex-wrap gap-1.5 border-t border-base-200 pt-3">
                     <button
                       appButton
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       (click)="startFamilyEdit(group.family)"
                     >
                       Edit product
                     </button>
-                    <button
-                      appButton
-                      variant="outline"
-                      size="sm"
-                      (click)="startVariantCreate(group.family.id)"
-                    >
-                      + Variant
-                    </button>
-                    @if (group.family.active) {
-                      <button
-                        appButton
-                        variant="error"
-                        size="sm"
-                        [disabled]="busy()"
-                        (click)="
-                          confirmDeactivate({
-                            kind: 'family',
-                            family: group.family,
-                            variants: group.variants.length,
-                          })
-                        "
-                      >
-                        Deactivate
-                      </button>
-                    } @else {
-                      <button
-                        appButton
-                        variant="outline"
-                        size="sm"
-                        [disabled]="busy()"
-                        (click)="setFamilyActive(group.family, true)"
-                      >
-                        Reactivate
-                      </button>
-                    }
                   </div>
 
                   <!-- Variants -->
                   @if (expandedFamily() === group.family.id) {
                     @if (group.variants.length === 0) {
                       <p class="mt-2 text-xs text-base-content/60">
-                        No variants (legacy data — new products always create with variants). Add
-                        one via + Variant to sell this product.
+                        No variants yet. Edit the product to add one before selling it.
                       </p>
                     } @else {
                       <div class="mt-3 grid gap-2">
@@ -791,7 +770,7 @@ interface CreateRow {
                               <div class="shrink-0 text-right">
                                 <p class="font-semibold tabular-nums">{{ fmt(v.price ?? 0) }}</p>
                                 @if (!v.variant_active) {
-                                  <app-status-badge size="xs" type="neutral" label="inactive" />
+                                  <app-status-badge size="xs" type="warning" label="inactive" />
                                 }
                               </div>
                             </div>
@@ -834,7 +813,7 @@ interface CreateRow {
                                 appButton
                                 variant="ghost"
                                 size="sm"
-                                (click)="startVariantEdit(group.family.id, v)"
+                                (click)="startVariantEdit(group.family.id)"
                               >
                                 Edit
                               </button>
@@ -846,27 +825,6 @@ interface CreateRow {
                                   (click)="toggleBatches(v.variant_id!)"
                                 >
                                   {{ batchesFor() === v.variant_id ? 'Hide batches' : 'Batches' }}
-                                </button>
-                              }
-                              @if (v.variant_active) {
-                                <button
-                                  appButton
-                                  variant="error"
-                                  size="sm"
-                                  [disabled]="busy()"
-                                  (click)="confirmDeactivate({ kind: 'variant', variant: v })"
-                                >
-                                  Deactivate
-                                </button>
-                              } @else {
-                                <button
-                                  appButton
-                                  variant="outline"
-                                  size="sm"
-                                  [disabled]="busy()"
-                                  (click)="setVariantActive(v, true)"
-                                >
-                                  Reactivate
                                 </button>
                               }
                             </div>
@@ -907,18 +865,13 @@ interface CreateRow {
             }
           </div>
           <div class="hidden lg:block">
-            <app-data-table-shell
-              title="Catalog"
-              [description]="grouped().length + (grouped().length === 1 ? ' product' : ' products')"
-            >
+            <app-data-table-shell>
               <table class="table table-sm">
                 <thead>
                   <tr>
                     <th>Product</th>
-                    <th>Barcode</th>
                     <th class="text-right">Variants</th>
-                    <th class="text-right">Stock</th>
-                    <th class="text-right">Stock value</th>
+                    <th class="text-right">Inventory</th>
                     <th>Status</th>
                     <th class="text-right">Actions</th>
                   </tr>
@@ -930,130 +883,158 @@ interface CreateRow {
                         <button class="link font-semibold" (click)="toggleFamily(group.family.id)">
                           {{ group.family.name }}
                         </button>
+                        <p class="type-caption mt-0.5 font-mono">
+                          {{ group.family.barcode || 'No shared barcode' }}
+                        </p>
                       </td>
-                      <td class="font-mono text-xs">{{ group.family.barcode || '—' }}</td>
-                      <td class="text-right">{{ group.variants.length }}</td>
-                      <td class="text-right">{{ familyStock(group.variants) }}</td>
                       <td class="text-right font-medium">
-                        {{ fmt(familyStockValue(group.variants)) }}
+                        {{ group.variants.length }}
+                      </td>
+                      <td class="text-right">
+                        @if (familyTracksInventory(group.variants)) {
+                          <p class="font-medium tabular-nums">{{ familyStock(group.variants) }}</p>
+                          <p class="type-caption tabular-nums">
+                            <app-money [cents]="familyStockValue(group.variants)" /> value
+                          </p>
+                        } @else {
+                          <span class="text-sm text-base-content/50">Not tracked</span>
+                        }
                       </td>
                       <td>
                         @if (group.family.active) {
-                          <app-status-badge size="xs" type="success" label="active" />
+                          <app-status-badge size="xs" type="neutral" label="active" />
                         } @else {
-                          <app-status-badge size="xs" type="neutral" label="inactive" />
+                          <app-status-badge size="xs" type="warning" label="inactive" />
                         }
                       </td>
                       <td class="whitespace-nowrap text-right">
                         <button
-                          class="btn btn-ghost btn-xs"
+                          appButton
+                          variant="outline"
+                          size="sm"
                           (click)="startFamilyEdit(group.family)"
                         >
-                          Edit</button
-                        ><button
-                          class="btn btn-primary btn-outline btn-xs"
-                          (click)="startVariantCreate(group.family.id)"
-                        >
-                          + Variant
+                          Edit product
                         </button>
-                        @if (group.family.active) {
-                          <button
-                            class="btn btn-error btn-outline btn-xs"
-                            (click)="
-                              confirmDeactivate({
-                                kind: 'family',
-                                family: group.family,
-                                variants: group.variants.length,
-                              })
-                            "
-                          >
-                            Deactivate
-                          </button>
-                        } @else {
-                          <button
-                            class="btn btn-success btn-outline btn-xs"
-                            (click)="setFamilyActive(group.family, true)"
-                          >
-                            Reactivate
-                          </button>
-                        }
                       </td>
                     </tr>
                     @if (expandedFamily() === group.family.id) {
                       <tr class="row-detail">
-                        <td colspan="7">
+                        <td colspan="5">
                           @if (group.variants.length === 0) {
-                            <p class="text-sm text-base-content/60">No variants yet.</p>
+                            <p class="text-sm text-base-content/60">
+                              No variants yet. Edit the product to add one.
+                            </p>
                           } @else {
-                            <table class="table table-xs">
-                              <thead>
-                                <tr>
-                                  <th>Variant</th>
-                                  <th>SKU</th>
-                                  <th>Barcode</th>
-                                  <th>Kind</th>
-                                  <th class="text-right">Price</th>
-                                  <th class="text-right">Stock</th>
-                                  <th class="text-right">Value</th>
-                                  <th class="text-right">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                @for (v of group.variants; track v.variant_id) {
-                                  <tr>
-                                    <td>{{ v.variant_name }}</td>
-                                    <td class="font-mono">{{ v.sku }}</td>
-                                    <td class="font-mono">{{ v.barcode || '—' }}</td>
-                                    <td>{{ v.kind }}</td>
-                                    <td class="text-right">{{ fmt(v.price ?? 0) }}</td>
-                                    <td class="text-right">
-                                      {{
-                                        v.kind === 'service' || !v.track_inventory
-                                          ? '—'
-                                          : (stockOf(v.variant_id!)?.stock ?? 0)
-                                      }}
-                                    </td>
-                                    <td class="text-right">
-                                      {{
-                                        v.kind === 'service' || !v.track_inventory
-                                          ? '—'
-                                          : fmt(stockOf(v.variant_id!)?.stock_value ?? 0)
-                                      }}
-                                    </td>
-                                    <td class="text-right">
-                                      <button
-                                        class="btn btn-ghost btn-xs"
-                                        (click)="startVariantEdit(group.family.id, v)"
-                                      >
-                                        Edit</button
-                                      ><button
-                                        class="btn btn-ghost btn-xs"
-                                        (click)="toggleBatches(v.variant_id!)"
-                                      >
-                                        Batches
-                                      </button>
-                                    </td>
-                                  </tr>
-                                  @if (batchesFor() === v.variant_id) {
-                                    <tr class="row-detail">
-                                      <td colspan="8">
-                                        @for (batch of batches(); track batch.id) {
-                                          <span class="badge badge-ghost mr-2"
-                                            >{{ batch.batch_number || 'Batch' }} ·
-                                            {{ batch.remaining }} left ·
-                                            {{ fmt(batch.unit_cost) }} cost</span
-                                          >
-                                        } @empty {
-                                          <span class="text-sm text-base-content/60"
-                                            >No stock batches.</span
-                                          >
+                            <div class="divide-y divide-base-300/70">
+                              @for (v of group.variants; track v.variant_id) {
+                                <div>
+                                  <div class="grid grid-cols-12 items-center gap-4 py-3">
+                                    <div class="col-span-3 min-w-0">
+                                      <div class="flex items-center gap-2">
+                                        <span class="truncate font-medium">{{
+                                          v.variant_name
+                                        }}</span>
+                                        @if (!v.variant_active) {
+                                          <app-status-badge
+                                            size="xs"
+                                            type="warning"
+                                            label="inactive"
+                                          />
                                         }
-                                      </td>
-                                    </tr>
+                                      </div>
+                                      <p class="type-caption mt-0.5 font-mono">{{ v.sku }}</p>
+                                    </div>
+                                    <div class="col-span-3 min-w-0">
+                                      <p class="text-sm">
+                                        {{ v.kind === 'service' ? 'Service' : 'Physical good' }}
+                                      </p>
+                                      <p class="type-caption mt-0.5 truncate font-mono">
+                                        {{ v.barcode || 'No barcode' }}
+                                      </p>
+                                    </div>
+                                    <div class="col-span-2 text-right">
+                                      <p class="type-caption">Retail price</p>
+                                      <p class="font-medium">
+                                        <app-money [cents]="v.price ?? 0" />
+                                      </p>
+                                    </div>
+                                    <div class="col-span-2 text-right">
+                                      @if (v.kind !== 'service' && v.track_inventory) {
+                                        <p class="font-medium tabular-nums">
+                                          {{ stockOf(v.variant_id!)?.stock ?? 0 }} in stock
+                                        </p>
+                                        <p class="type-caption tabular-nums">
+                                          <app-money
+                                            [cents]="stockOf(v.variant_id!)?.stock_value ?? 0"
+                                          />
+                                          value
+                                        </p>
+                                      } @else {
+                                        <span class="text-sm text-base-content/50"
+                                          >Not tracked</span
+                                        >
+                                      }
+                                    </div>
+                                    <div class="col-span-2 flex justify-end gap-1">
+                                      <button
+                                        appButton
+                                        variant="ghost"
+                                        size="sm"
+                                        (click)="startVariantEdit(group.family.id)"
+                                      >
+                                        Edit
+                                      </button>
+                                      @if (v.kind !== 'service' && v.track_inventory) {
+                                        <button
+                                          appButton
+                                          variant="ghost"
+                                          size="sm"
+                                          (click)="toggleBatches(v.variant_id!)"
+                                        >
+                                          {{
+                                            batchesFor() === v.variant_id
+                                              ? 'Hide batches'
+                                              : 'Batches'
+                                          }}
+                                        </button>
+                                      }
+                                    </div>
+                                  </div>
+
+                                  @if (batchesFor() === v.variant_id) {
+                                    <div class="border-t border-base-300/60 pb-3 pt-3">
+                                      <div class="mb-2 flex items-center justify-between gap-2">
+                                        <h3 class="type-heading">Batch history</h3>
+                                        <a routerLink="/suppliers" class="link text-xs">Restock</a>
+                                      </div>
+                                      <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                        @for (batch of batches(); track batch.id) {
+                                          <div class="rounded-field bg-base-100 px-3 py-2 text-xs">
+                                            <div class="flex justify-between gap-3">
+                                              <span class="font-medium">{{
+                                                batch.batch_number || 'Batch'
+                                              }}</span>
+                                              <span>{{ batch.remaining }} left</span>
+                                            </div>
+                                            <p class="mt-1 text-base-content/60">
+                                              Cost <app-money [cents]="batch.unit_cost" /> ·
+                                              {{
+                                                batch.expiry_date
+                                                  ? 'Expires ' + batch.expiry_date
+                                                  : 'No expiry'
+                                              }}
+                                            </p>
+                                          </div>
+                                        } @empty {
+                                          <p class="type-caption">No stock batches yet.</p>
+                                        }
+                                      </div>
+                                    </div>
                                   }
-                                }
-                              </tbody>
-                            </table>
+                                </div>
+                              }
+                            </div>
                           }
                         </td>
                       </tr>
@@ -1076,17 +1057,29 @@ interface CreateRow {
             />
           </div>
         }
+        <app-mobile-fab ariaLabel="New product" (fabClick)="startFamilyCreate()" />
+        <app-delete-confirmation-modal
+          [data]="deactivateData()"
+          title="Deactivate?"
+          verb="deactivate"
+          confirmButtonText="Deactivate"
+          (confirm)="executeDeactivate()"
+        />
       </div>
-
-      <app-mobile-fab ariaLabel="New product" (fabClick)="startFamilyCreate()" />
-      <app-delete-confirmation-modal
-        [data]="deactivateData()"
-        title="Deactivate?"
-        verb="deactivate"
-        confirmButtonText="Deactivate"
-        (confirm)="executeDeactivate()"
-      />
     </main>
+  `,
+  styles: `
+    .product-editor {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    @media (min-width: 768px) {
+      .product-editor {
+        width: min(48rem, calc(100vw - 3rem));
+        max-width: 48rem;
+      }
+    }
   `,
 })
 export class ProductsComponent implements OnInit {
@@ -1094,7 +1087,6 @@ export class ProductsComponent implements OnInit {
   private readonly supabase = inject(SupabaseService);
 
   protected readonly fmt = formatKes;
-  protected readonly label = variantLabel;
   protected readonly families = signal<Product[]>([]);
   protected readonly catalog = signal<Variant[]>([]);
   protected readonly stock = signal<Map<string, StockInfo>>(new Map());
@@ -1104,28 +1096,17 @@ export class ProductsComponent implements OnInit {
 
   protected readonly query = signal('');
 
-  protected readonly familyFormOpen = signal(false);
   protected readonly editingFamily = signal<Product | null>(null);
   protected readonly familyName = new FormControl('', { nonNullable: true });
   protected readonly familyBarcode = new FormControl('', { nonNullable: true });
   protected readonly familyActive = new FormControl(true, { nonNullable: true });
 
-  /** Create flow: family + inline variant rows (one coupled RPC). */
-  protected readonly createOpen = signal(false);
-  protected createRows: CreateRow[] = [this.emptyCreateRow()];
-
-  protected readonly variantForm = signal<{ productId: string; editing: Variant | null } | null>(
-    null
-  );
-  protected readonly variantName = new FormControl('', { nonNullable: true });
-  protected readonly variantPrice = new FormControl('', { nonNullable: true });
-  protected readonly variantKind = new FormControl('good', { nonNullable: true });
-  protected readonly variantSku = new FormControl('', { nonNullable: true });
-  protected readonly variantBarcode = new FormControl('', { nonNullable: true });
-  protected readonly variantWholesale = new FormControl('', { nonNullable: true });
-  protected readonly variantTrackInventory = new FormControl(true, { nonNullable: true });
-  protected readonly variantAllowFractional = new FormControl(false, { nonNullable: true });
-  protected readonly variantActive = new FormControl(true, { nonNullable: true });
+  /** Coupled create/edit flow: product details and every variant share one editor. */
+  protected readonly editorMode = signal<'create' | 'edit' | null>(null);
+  protected readonly editorStep = signal<1 | 2>(1);
+  protected readonly editorLoading = signal(false);
+  private editorRowSequence = 0;
+  protected editorRows: ProductEditorRow[] = [];
 
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -1220,7 +1201,7 @@ export class ProductsComponent implements OnInit {
       this.collections.set(collections);
       this.stockLocations.set(locations);
       const defaultLocationId = locations[0]?.id ?? '';
-      this.createRows = this.createRows.map(row => ({
+      this.editorRows = this.editorRows.map(row => ({
         ...row,
         openingLocationId: row.openingLocationId || defaultLocationId,
       }));
@@ -1368,6 +1349,10 @@ export class ProductsComponent implements OnInit {
     );
   }
 
+  protected familyTracksInventory(variants: Variant[]): boolean {
+    return variants.some(variant => variant.kind !== 'service' && variant.track_inventory);
+  }
+
   protected familyStockValue(variants: Variant[]): number {
     return variants.reduce(
       (sum, variant) => sum + (this.stockOf(variant.variant_id!)?.stock_value ?? 0),
@@ -1392,131 +1377,191 @@ export class ProductsComponent implements OnInit {
     }
   }
 
-  // --- Create flow: family + inline variants editor (coupled RPC) ---
+  // --- Coupled product editor ---
 
   protected startFamilyCreate(): void {
+    this.error.set(null);
+    this.editorLoading.set(false);
+    this.editingFamily.set(null);
     this.familyName.setValue('');
     this.familyBarcode.setValue('');
-    this.createRows = [this.emptyCreateRowWithDefaultLocation()];
-    this.createOpen.set(true);
+    this.familyActive.setValue(true);
+    this.familyCollections.set(new Set());
+    this.editorRows = [this.emptyEditorRow()];
+    this.editorStep.set(1);
+    this.editorMode.set('create');
   }
 
-  protected addCreateRow(): void {
-    this.createRows = [...this.createRows, this.emptyCreateRowWithDefaultLocation()];
+  protected startFamilyEdit(family: Product, step: 1 | 2 = 1): void {
+    this.error.set(null);
+    this.editingFamily.set(family);
+    this.familyName.setValue(family.name);
+    this.familyBarcode.setValue(family.barcode ?? '');
+    this.familyActive.setValue(family.active);
+    this.familyCollections.set(new Set());
+    this.editorRows = [];
+    this.editorStep.set(step);
+    this.editorLoading.set(true);
+    this.editorMode.set('edit');
+
+    void Promise.all([
+      this.pos.variantsForProduct(family.id),
+      this.pos.productCollectionIds(family.id),
+    ])
+      .then(([variants, collectionIds]) => {
+        if (this.editingFamily()?.id !== family.id || this.editorMode() !== 'edit') return;
+        this.editorRows = variants.map(variant =>
+          this.editorRowFromVariant(variant, variants.length)
+        );
+        if (this.editorRows.length === 0) this.addEditorRow();
+        this.familyCollections.set(new Set(collectionIds));
+      })
+      .catch(err => {
+        if (this.editingFamily()?.id !== family.id || this.editorMode() !== 'edit') return;
+        this.error.set(err instanceof Error ? err.message : 'Failed to load product variants');
+      })
+      .finally(() => {
+        if (this.editingFamily()?.id === family.id) this.editorLoading.set(false);
+      });
   }
 
-  protected removeCreateRow(index: number): void {
-    if (this.createRows.length === 1) return;
-    this.createRows = this.createRows.filter((_, i) => i !== index);
+  protected closeProductEditor(): void {
+    if (this.busy()) return;
+    this.editorLoading.set(false);
+    this.editorMode.set(null);
+    this.editingFamily.set(null);
+    this.error.set(null);
   }
 
-  /** Pre-warn on duplicate labels (the server would create them anyway). */
+  protected addEditorRow(): void {
+    this.editorRows = [...this.editorRows, this.emptyEditorRow()];
+  }
+
+  protected removeEditorRow(index: number): void {
+    if (this.editorRows.length === 1 || this.editorRows[index]?.variantId) return;
+    this.editorRows = this.editorRows.filter((_, rowIndex) => rowIndex !== index);
+  }
+
   protected duplicateLabels(): boolean {
-    const labels = this.createRows.map(r => r.name.trim().toLowerCase()).filter(l => l.length > 0);
+    const labels = this.editorRows
+      .map(row => row.name.trim().toLowerCase())
+      .filter(label => label.length > 0);
     return new Set(labels).size !== labels.length;
   }
 
-  protected async saveCreate(): Promise<void> {
-    if (this.familyName.value.trim().length === 0) return;
-    const variants: {
-      name?: string;
-      price: number;
-      sku?: string;
-      barcode?: string;
-      wholesale_price?: number;
-      kind?: string;
-      allow_fractional?: boolean;
-      track_inventory?: boolean;
-      opening_quantity?: number;
-      opening_unit_cost?: number;
-      opening_location_id?: string;
-      batch_number?: string;
-      expiry_date?: string;
-    }[] = [];
-    for (const row of this.createRows) {
-      const priceCents = parseKesToCents(row.price);
-      if (priceCents === null) {
-        this.error.set('Every variant needs a valid price');
-        return;
-      }
-      const wholesaleCents = row.wholesale.trim()
-        ? (parseKesToCents(row.wholesale) ?? undefined)
-        : undefined;
-      if (row.wholesale.trim() && wholesaleCents === undefined) {
-        this.error.set('Enter a valid wholesale price on every variant');
-        return;
-      }
-      const isService = row.kind === 'service';
-      const openingQuantity = row.openingQuantity.trim() ? Number(row.openingQuantity) : 0;
-      if (!Number.isFinite(openingQuantity) || openingQuantity < 0) {
-        this.error.set('Opening quantity must be zero or greater');
-        return;
-      }
-      if (openingQuantity > 0 && !row.trackInventory) {
-        this.error.set('Opening stock requires inventory tracking');
-        return;
-      }
-      if (openingQuantity > 0 && !row.allowFractional && !Number.isInteger(openingQuantity)) {
-        this.error.set('Enable fractional quantities or enter a whole opening quantity');
-        return;
-      }
-      const openingUnitCost = row.openingUnitCost.trim()
-        ? parseKesToCents(row.openingUnitCost)
-        : null;
-      if (openingQuantity > 0 && openingUnitCost === null) {
-        this.error.set('Enter a valid unit cost for opening stock');
-        return;
-      }
-      variants.push({
-        // Unlabeled single variant becomes 'Default' server-side.
-        ...(row.name.trim() ? { name: row.name.trim() } : {}),
-        price: priceCents,
-        ...(row.sku.trim() ? { sku: row.sku.trim() } : {}),
-        ...(row.barcode.trim() ? { barcode: row.barcode.trim() } : {}),
-        ...(wholesaleCents !== undefined ? { wholesale_price: wholesaleCents } : {}),
-        kind: row.kind,
-        // Services carry no inventory flags.
-        ...(isService
-          ? {}
-          : {
-              track_inventory: row.trackInventory,
-              allow_fractional: row.allowFractional,
-              ...(openingQuantity > 0
-                ? {
-                    opening_quantity: openingQuantity,
-                    opening_unit_cost: openingUnitCost!,
-                    ...(row.openingLocationId
-                      ? { opening_location_id: row.openingLocationId }
-                      : {}),
-                    ...(row.batchNumber.trim() ? { batch_number: row.batchNumber.trim() } : {}),
-                    ...(row.expiryDate ? { expiry_date: row.expiryDate } : {}),
-                  }
-                : {}),
-            }),
-      });
-    }
+  protected async saveProductEditor(): Promise<void> {
+    const mode = this.editorMode();
+    const editing = this.editingFamily();
+    const name = this.familyName.value.trim();
+    if (!mode || !name || this.editorLoading() || this.duplicateLabels()) return;
+
+    const variants = this.buildVariantInputs();
+    if (!variants) return;
+
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
     try {
-      await this.pos.createProductWithVariants({
-        name: this.familyName.value.trim(),
-        barcode: this.familyBarcode.value.trim() || undefined,
-        variants,
-      });
-      this.notice.set(`Created ${this.familyName.value.trim()}`);
-      this.createOpen.set(false);
+      if (mode === 'create') {
+        await this.pos.createProductWithVariants({
+          name,
+          barcode: this.familyBarcode.value.trim() || undefined,
+          variants,
+        });
+        this.notice.set(`Created ${name}`);
+      } else if (editing) {
+        await this.pos.updateProductWithVariants({
+          product_id: editing.id,
+          name,
+          barcode: this.familyBarcode.value.trim(),
+          active: this.familyActive.value,
+          variants,
+        });
+        await this.pos.setProductCollections(editing.id, [...this.familyCollections()]);
+        this.notice.set(
+          `Updated ${name} and ${variants.length} variant${variants.length === 1 ? '' : 's'}`
+        );
+      }
+      this.editorMode.set(null);
+      this.editingFamily.set(null);
       await this.load();
     } catch (err) {
-      // variants_required / invalid_price / invalid_kind — shown verbatim.
-      this.error.set(err instanceof Error ? err.message : 'Create failed');
+      this.error.set(err instanceof Error ? err.message : 'Save failed');
     } finally {
       this.busy.set(false);
     }
   }
 
-  private emptyCreateRow(): CreateRow {
+  private buildVariantInputs(): CatalogVariantInput[] | null {
+    const variants: CatalogVariantInput[] = [];
+    for (const row of this.editorRows) {
+      const price = parseKesToCents(row.price);
+      if (price === null) {
+        this.error.set('Every variant needs a valid retail price.');
+        return null;
+      }
+
+      const wholesalePrice = row.wholesale.trim() ? parseKesToCents(row.wholesale) : null;
+      if (row.wholesale.trim() && wholesalePrice === null) {
+        this.error.set('Enter a valid wholesale price on every variant.');
+        return null;
+      }
+
+      const isService = row.kind === 'service';
+      const openingQuantity =
+        !row.variantId && !isService && row.openingQuantity.trim()
+          ? Number(row.openingQuantity)
+          : 0;
+      if (!Number.isFinite(openingQuantity) || openingQuantity < 0) {
+        this.error.set('Opening quantity must be zero or greater.');
+        return null;
+      }
+      if (openingQuantity > 0 && !row.trackInventory) {
+        this.error.set('Opening stock requires stock tracking.');
+        return null;
+      }
+      if (openingQuantity > 0 && !row.allowFractional && !Number.isInteger(openingQuantity)) {
+        this.error.set('Enable fractional quantities or enter a whole opening quantity.');
+        return null;
+      }
+
+      const openingUnitCost = row.openingUnitCost.trim()
+        ? parseKesToCents(row.openingUnitCost)
+        : null;
+      if (openingQuantity > 0 && openingUnitCost === null) {
+        this.error.set('Enter a valid unit cost for opening stock.');
+        return null;
+      }
+
+      variants.push({
+        ...(row.variantId ? { variant_id: row.variantId } : {}),
+        ...(row.name.trim() ? { name: row.name.trim() } : {}),
+        price,
+        ...(row.sku.trim() ? { sku: row.sku.trim() } : {}),
+        barcode: row.barcode.trim() || null,
+        wholesale_price: wholesalePrice,
+        kind: row.kind,
+        track_inventory: isService ? false : row.trackInventory,
+        allow_fractional: isService ? false : row.allowFractional,
+        active: row.active,
+        ...(openingQuantity > 0
+          ? {
+              opening_quantity: openingQuantity,
+              opening_unit_cost: openingUnitCost!,
+              ...(row.openingLocationId ? { opening_location_id: row.openingLocationId } : {}),
+              ...(row.batchNumber.trim() ? { batch_number: row.batchNumber.trim() } : {}),
+              ...(row.expiryDate ? { expiry_date: row.expiryDate } : {}),
+            }
+          : {}),
+      });
+    }
+    return variants;
+  }
+
+  private emptyEditorRow(): ProductEditorRow {
     return {
+      key: `new-${++this.editorRowSequence}`,
+      variantId: null,
       name: '',
       price: '',
       sku: '',
@@ -1527,63 +1572,32 @@ export class ProductsComponent implements OnInit {
       allowFractional: false,
       openingQuantity: '',
       openingUnitCost: '',
-      openingLocationId: '',
+      openingLocationId: this.stockLocations()[0]?.id ?? '',
       batchNumber: '',
       expiryDate: '',
+      active: true,
     };
   }
 
-  private emptyCreateRowWithDefaultLocation(): CreateRow {
-    return { ...this.emptyCreateRow(), openingLocationId: this.stockLocations()[0]?.id ?? '' };
+  private editorRowFromVariant(variant: ProductVariant, variantCount: number): ProductEditorRow {
+    return {
+      ...this.emptyEditorRow(),
+      key: `variant-${variant.id}`,
+      variantId: variant.id,
+      name: variant.name === 'Default' && variantCount === 1 ? '' : variant.name,
+      price: formatKesInput(variant.price),
+      sku: variant.sku,
+      barcode: variant.barcode ?? '',
+      wholesale: variant.wholesale_price === null ? '' : formatKesInput(variant.wholesale_price),
+      kind: variant.kind,
+      trackInventory: variant.track_inventory,
+      allowFractional: variant.allow_fractional,
+      active: variant.active,
+    };
   }
 
   protected parseAmount(value: string): number | null {
     return parseKesToCents(value);
-  }
-
-  // --- Family edit form ---
-
-  protected startFamilyEdit(family: Product): void {
-    this.editingFamily.set(family);
-    this.familyName.setValue(family.name);
-    this.familyBarcode.setValue(family.barcode ?? '');
-    this.familyActive.setValue(family.active);
-    this.familyFormOpen.set(true);
-    // Load the family's current collection set for the checkbox editor.
-    this.familyCollections.set(new Set());
-    void this.pos
-      .productCollectionIds(family.id)
-      .then(ids => this.familyCollections.set(new Set(ids)))
-      .catch(() => undefined);
-  }
-
-  protected closeFamilyForm(): void {
-    this.familyFormOpen.set(false);
-    this.editingFamily.set(null);
-  }
-
-  protected async saveFamily(): Promise<void> {
-    const editing = this.editingFamily();
-    if (!editing || this.familyName.value.trim().length === 0) return;
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      await this.pos.updateProduct(editing.id, {
-        name: this.familyName.value.trim(),
-        barcode: this.familyBarcode.value.trim() || undefined,
-        active: this.familyActive.value,
-      });
-      // Replace the collection set with exactly what the checkboxes say.
-      await this.pos.setProductCollections(editing.id, [...this.familyCollections()]);
-      this.notice.set(`Updated ${this.familyName.value.trim()}`);
-      this.closeFamilyForm();
-      await this.load();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Save failed');
-    } finally {
-      this.busy.set(false);
-    }
   }
 
   protected confirmDeactivate(target: DeactivateTarget): void {
@@ -1594,25 +1608,11 @@ export class ProductsComponent implements OnInit {
   protected deactivateData() {
     const t = this.deactivateTarget();
     if (!t) return { entityName: '' };
-    if (t.kind === 'family') {
-      return {
-        entityName: t.family.name,
-        relatedCount: t.variants,
-        relatedLabel: 'variant',
-        warningDetails: ['Deactivated products disappear from the Sell screen search.'],
-      };
-    }
-    if (t.kind === 'collection') {
-      return {
-        entityName: t.collection.name,
-        relatedCount: t.collection.product_count,
-        relatedLabel: 'product',
-        warningDetails: ['Products stay; only the collection grouping is deactivated.'],
-      };
-    }
     return {
-      entityName: this.label(t.variant),
-      warningDetails: ['Deactivated variants disappear from the Sell screen search.'],
+      entityName: t.collection.name,
+      relatedCount: t.collection.product_count,
+      relatedLabel: 'product',
+      warningDetails: ['Products stay; only the collection grouping is deactivated.'],
     };
   }
 
@@ -1620,127 +1620,14 @@ export class ProductsComponent implements OnInit {
     const t = this.deactivateTarget();
     if (!t) return;
     this.deleteModal()?.hide();
-    if (t.kind === 'family') {
-      await this.setFamilyActive(t.family, false);
-    } else if (t.kind === 'collection') {
-      await this.setCollectionActive(t.collection, false);
-    } else {
-      await this.setVariantActive(t.variant, false);
-    }
+    await this.setCollectionActive(t.collection, false);
     this.deactivateTarget.set(null);
   }
 
-  protected async setFamilyActive(family: Product, active: boolean): Promise<void> {
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      await this.pos.updateProduct(family.id, { active });
-      this.notice.set(`${family.name} ${active ? 'reactivated' : 'deactivated'}`);
-      await this.load();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Update failed');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  // --- Variant form ---
-
-  protected startVariantCreate(productId: string): void {
-    this.variantForm.set({ productId, editing: null });
-    this.variantName.setValue('');
-    this.variantPrice.setValue('');
-    this.variantKind.setValue('good');
-    this.variantSku.setValue('');
-    this.variantBarcode.setValue('');
-    this.variantWholesale.setValue('');
-    this.variantTrackInventory.setValue(true);
-    this.variantAllowFractional.setValue(false);
-  }
-
-  protected startVariantEdit(productId: string, v: Variant): void {
-    this.variantForm.set({ productId, editing: v });
-    this.variantName.setValue(v.variant_name ?? '');
-    this.variantPrice.setValue(((v.price ?? 0) / 100).toFixed(2));
-    this.variantKind.setValue(v.kind ?? 'good');
-    this.variantSku.setValue(v.sku ?? '');
-    this.variantBarcode.setValue(v.barcode ?? '');
-    this.variantWholesale.setValue(
-      v.wholesale_price !== null ? ((v.wholesale_price ?? 0) / 100).toFixed(2) : ''
-    );
-    this.variantTrackInventory.setValue(v.track_inventory ?? true);
-    this.variantAllowFractional.setValue(v.allow_fractional ?? false);
-    this.variantActive.setValue(v.variant_active ?? true);
-  }
-
-  protected async saveVariant(): Promise<void> {
-    const vf = this.variantForm();
-    if (!vf || this.variantName.value.trim().length === 0) return;
-    const priceCents = parseKesToCents(this.variantPrice.value);
-    if (priceCents === null) {
-      this.error.set('Enter a valid price');
-      return;
-    }
-    const wholesaleCents = this.variantWholesale.value.trim()
-      ? (parseKesToCents(this.variantWholesale.value) ?? undefined)
-      : undefined;
-    if (this.variantWholesale.value.trim() && wholesaleCents === undefined) {
-      this.error.set('Enter a valid wholesale price');
-      return;
-    }
-    const isService = this.variantKind.value === 'service';
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      await this.pos.upsertVariant({
-        product_id: vf.productId,
-        name: this.variantName.value.trim(),
-        price: priceCents,
-        kind: this.variantKind.value,
-        ...(vf.editing?.variant_id ? { variant_id: vf.editing.variant_id } : {}),
-        ...(vf.editing ? {} : { sku: this.variantSku.value.trim() || undefined }),
-        barcode: this.variantBarcode.value.trim() || undefined,
-        wholesale_price: wholesaleCents,
-        // Services carry no inventory flags.
-        ...(isService
-          ? {}
-          : {
-              track_inventory: this.variantTrackInventory.value,
-              allow_fractional: this.variantAllowFractional.value,
-            }),
-        ...(vf.editing ? { active: this.variantActive.value } : {}),
-      });
-      this.notice.set(vf.editing ? 'Variant updated' : 'Variant created');
-      this.variantForm.set(null);
-      await this.load();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Save failed');
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected async setVariantActive(v: Variant, active: boolean): Promise<void> {
-    this.busy.set(true);
-    this.error.set(null);
-    this.notice.set(null);
-    try {
-      await this.pos.upsertVariant({
-        product_id: v.product_id!,
-        variant_id: v.variant_id!,
-        name: v.variant_name ?? '',
-        price: v.price ?? 0,
-        active,
-      });
-      this.notice.set(`${this.label(v)} ${active ? 'reactivated' : 'deactivated'}`);
-      await this.load();
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Update failed');
-    } finally {
-      this.busy.set(false);
-    }
+  protected startVariantEdit(productId: string): void {
+    const family = this.families().find(product => product.id === productId);
+    if (!family) return;
+    this.startFamilyEdit(family, 2);
   }
 
   protected date(iso: string): string {

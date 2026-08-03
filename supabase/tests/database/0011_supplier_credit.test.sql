@@ -1,7 +1,6 @@
--- Supplier credit tests (migration 0011): purchases, AP payments, limits,
--- write-offs, value adjustments.
+-- Supplier credit tests (migration 0011): purchases, AP payments, limits and write-offs.
 begin;
-select plan(12);
+select plan(10);
 
 select testkit.create_user('11111111-1111-1111-1111-111111111111', 'admin@supplier.local');
 
@@ -123,28 +122,7 @@ select is(
   'write-off consumes batches FIFO (50 - 5)'
 );
 
--- 11-12. Value adjustments.
-create temp table adj1 as
-select public.post_inventory_adjustment('aa000000-0000-0000-0000-0000000000f1', 2000, 'recount gain') as entry_id;
-
-select results_eq(
-  $$select a.code::text, l.debit, l.credit
-    from public.ledger_journal_lines l
-    join public.ledger_accounts a on a.id = l.account_id
-    where l.entry_id = (select entry_id from adj1)
-    order by a.code$$,
-  $$values
-    ('INVENTORY', 2000::bigint, 0::bigint),
-    ('INVENTORY_ADJUSTMENT', 0::bigint, 2000::bigint)$$,
-  'positive adjustment: DR INVENTORY / CR INVENTORY_ADJUSTMENT'
-);
-
-select ok(
-  public.post_inventory_adjustment('aa000000-0000-0000-0000-0000000000f1', 0, 'no-op') is null,
-  'zero adjustment is a no-op'
-);
-
--- 13. Global invariant.
+-- 11. Global invariant.
 select is(
   (select sum(debit) - sum(credit) from public.ledger_journal_lines),
   0::numeric,

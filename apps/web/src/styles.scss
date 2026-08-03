@@ -79,6 +79,18 @@
      tabular-nums on right-aligned (amount) cells. */
   .dashboard-main .table {
     width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+
+    th,
+    td {
+      padding: 0.75rem 1rem;
+    }
+
+    &.table-xs th,
+    &.table-xs td {
+      padding: 0.5rem 0.75rem;
+    }
 
     thead th {
       font-size: 0.75rem;
@@ -89,6 +101,11 @@
       background: color-mix(in oklab, var(--color-base-200) 72%, var(--color-base-100));
       border-bottom: 1px solid var(--color-base-300);
       white-space: nowrap;
+    }
+
+    tbody {
+      font-size: 0.875rem;
+      line-height: 1.375;
     }
 
     tbody td {
@@ -108,6 +125,16 @@
       background: color-mix(in oklab, var(--color-primary) 4%, var(--color-base-100));
     }
 
+    tbody tr[role='button'],
+    tbody tr.cursor-pointer {
+      cursor: pointer;
+    }
+
+    tbody tr[aria-expanded='true'] > td,
+    tbody tr.table-row-active > td {
+      background: color-mix(in oklab, var(--color-primary) 7%, var(--color-base-100));
+    }
+
     td.text-right,
     th.text-right {
       font-variant-numeric: tabular-nums;
@@ -119,6 +146,50 @@
       border-bottom: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
       padding: 1rem;
     }
+
+    tfoot th,
+    tfoot td {
+      border-top: 1px solid var(--color-base-300);
+      background: color-mix(in oklab, var(--color-base-200) 50%, var(--color-base-100));
+      font-weight: 600;
+    }
+  }
+
+  .data-table-shell > footer:not(:empty) {
+    padding: 0 1rem 0.75rem;
+  }
+
+  .table-entity {
+    display: flex;
+    min-width: 12rem;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .table-primary {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    color: var(--color-base-content);
+  }
+
+  .table-secondary {
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  }
+
+  .table-number {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .table-actions {
+    text-align: right;
+    white-space: nowrap;
   }
 
   /* ONE form-field recipe: caption label above the control, consistent gap.

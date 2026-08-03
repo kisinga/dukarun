@@ -25,8 +25,19 @@ stock, fractional quantities follow the variant setting, and stock locations are
   marks the draft confirmed if receiving and accounting succeed.
 - `record_purchase` retains purchase lines, receiving location, batch/expiry metadata, notes,
   reference, and purchase date. It creates batches, movements and the balanced journal.
+- `record_purchase_with_prices` validates optional wholesale/retail changes first, posts the
+  purchase through `record_purchase`, and updates only the selected variant prices in the same
+  transaction. Drafts retain these choices and use the same path when confirmed.
+- `record_purchase_with_payment` and `confirm_purchase_draft_with_payment` accept the initial
+  amount paid. Zero records credit, the full total records paid now, and an in-between amount
+  records a credit purchase plus its allocated supplier payment atomically.
 - `pay_purchase` allocates payment to one purchase; `pay_supplier` remains the oldest-first
   supplier-level shortcut.
+
+`supplier_variant_performance` derives weighted average, latest and range costs from durable
+purchase lines. It powers supplier comparisons without maintaining a second mutable score.
+Suppliers are archived rather than deleted because purchases, inventory batches and journal
+history retain their identity. Archiving is blocked while AP or an open purchase draft exists.
 
 Paid purchases and supplier payments require an open cashier session at the journal boundary.
 Credit purchases do not move money and remain available with the till closed.

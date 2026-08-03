@@ -48,18 +48,18 @@ import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required
           <app-form-field label="Principal (KES)">
             <input
               type="text"
-              inputmode="decimal"
+              inputmode="numeric"
               class="input input-bordered input-sm w-full"
-              placeholder="0.00"
+              placeholder="0"
               [formControl]="principal"
             />
           </app-form-field>
           <app-form-field label="Fee (KES, optional)">
             <input
               type="text"
-              inputmode="decimal"
+              inputmode="numeric"
               class="input input-bordered input-sm w-full"
-              placeholder="0.00"
+              placeholder="0"
               [formControl]="fee"
             />
           </app-form-field>

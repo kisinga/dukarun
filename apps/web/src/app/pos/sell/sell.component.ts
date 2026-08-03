@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -23,6 +23,7 @@ import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required
 import { BarcodeScannerComponent } from '../../shared/ui/barcode-scanner.component';
 import {
   Customer,
+  CustomerWithCredit,
   PaymentInput,
   PosRpcError,
   PosService,
@@ -33,7 +34,6 @@ import {
 @Component({
   selector: 'app-sell',
   imports: [
-    RouterLink,
     ReactiveFormsModule,
     CheckoutPanelComponent,
     ButtonComponent,
@@ -57,17 +57,6 @@ import {
       }
       @if (!connectivity.online()) {
         <span actions class="badge badge-warning">Offline — sales will queue</span>
-      }
-      @if (sync.queuedCount() > 0 || sync.failedCount() > 0) {
-        <a
-          actions
-          routerLink="/pos/sync"
-          class="badge"
-          [class.badge-error]="sync.failedCount() > 0"
-          [class.badge-warning]="sync.failedCount() === 0"
-        >
-          {{ sync.queuedCount() + sync.failedCount() }} pending sync
-        </a>
       }
 
       @if (!cashierSession.isOpen()) {
@@ -430,6 +419,17 @@ import {
                   <div class="min-w-0">
                     <p class="type-caption">Customer</p>
                     <p class="truncate font-semibold">{{ cart.customerName() }}</p>
+                    @if (selectedCustomer(); as customer) {
+                      <p class="type-caption mt-0.5">
+                        @if (!customer.is_credit_approved) {
+                          Credit not approved
+                        } @else if (customer.credit_limit > 0) {
+                          <app-money [cents]="customerCreditAvailable(customer)" /> available
+                        } @else {
+                          Credit has no configured cap
+                        }
+                      </p>
+                    }
                   </div>
                   <button appButton variant="ghost" size="md" (click)="toggleCustomerPicker()">
                     {{ customerPickerOpen() ? 'Close' : 'Change' }}
@@ -452,7 +452,7 @@ import {
                         variant="ghost"
                         size="sm"
                         class="mt-1"
-                        (click)="selectCustomer(null, 'Walk-in')"
+                        (click)="selectCustomer(null)"
                       >
                         Use Walk-in customer
                       </button>
@@ -461,15 +461,20 @@ import {
                       <ul class="menu mt-2 rounded-box bg-base-200 p-1">
                         @for (c of customerResults(); track c.id) {
                           <li>
-                            <button
-                              type="button"
-                              class="min-h-11"
-                              (click)="selectCustomer(c.id, customerName(c))"
-                            >
+                            <button type="button" class="min-h-11" (click)="selectCustomer(c)">
                               <span class="min-w-0 flex-1 truncate text-left">
                                 {{ customerName(c) }}
                               </span>
                               <span class="text-xs text-base-content/60">{{ c.phone }}</span>
+                              <span class="text-xs" [class.text-error]="!c.is_credit_approved">
+                                @if (!c.is_credit_approved) {
+                                  No credit
+                                } @else if (c.credit_limit > 0) {
+                                  <app-money [cents]="customerCreditAvailable(c)" /> left
+                                } @else {
+                                  No cap
+                                }
+                              </span>
                             </button>
                           </li>
                         }
@@ -510,9 +515,9 @@ import {
                     size="md"
                     class="flex-1"
                     [disabled]="cart.isEmpty() || busy()"
-                    (click)="park()"
+                    (click)="sendToCashier()"
                   >
-                    Park sale
+                    Send to cashier
                   </button>
                   <button
                     appButton
@@ -560,7 +565,7 @@ import {
           [creditAllowed]="creditAllowed()"
           [methods]="methods()"
           [busy]="busy()"
-          title="Take payment"
+          heading="Take payment"
           (confirmed)="completeSale($event)"
           (cancelled)="checkoutOpen.set(false)"
         />
@@ -613,7 +618,8 @@ export class SellComponent implements OnInit {
   protected readonly canOverridePrices = computed(() => this.perms.has('OverridePrice'));
 
   protected readonly customerSearch = new FormControl('', { nonNullable: true });
-  protected readonly customerResults = signal<Customer[]>([]);
+  protected readonly customerResults = signal<CustomerWithCredit[]>([]);
+  protected readonly selectedCustomer = signal<CustomerWithCredit | null>(null);
   protected readonly customerPickerOpen = signal(false);
 
   protected readonly overrideFor = signal<string | null>(null);
@@ -638,7 +644,14 @@ export class SellComponent implements OnInit {
   } | null>(null);
   protected readonly printerEnabled = signal(false);
   protected readonly brokenImages = signal<Set<string>>(new Set());
-  protected readonly creditAllowed = computed(() => this.cart.customerId() !== null);
+  protected readonly creditAllowed = computed(() => {
+    const customer = this.selectedCustomer();
+    if (!customer?.is_credit_approved) return false;
+    return (
+      customer.credit_limit === 0 ||
+      customer.ar_balance + this.cart.total() <= customer.credit_limit
+    );
+  });
   private priceFloorTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -672,6 +685,14 @@ export class SellComponent implements OnInit {
     }
     const draftId = this.route.snapshot.queryParamMap.get('draft');
     if (draftId) await this.loadDraft(draftId);
+    const customerId = this.cart.customerId();
+    if (customerId) {
+      try {
+        this.selectedCustomer.set(await this.pos.customerWithCredit(customerId));
+      } catch {
+        this.selectedCustomer.set(null);
+      }
+    }
   }
 
   protected imageUrl(path: string | null | undefined): string | null {
@@ -771,6 +792,7 @@ export class SellComponent implements OnInit {
     const next = Math.max(wholesaleFloor, currentWhole + direction * step);
 
     if (next === currentWhole) return;
+    this.clearPriceFloorFeedback();
     const customPrice = next === line.unitPrice ? null : next;
     const verb = direction > 0 ? 'increased' : 'reduced';
     this.cart.setCustomPrice(
@@ -814,6 +836,7 @@ export class SellComponent implements OnInit {
     }
 
     const customPrice = wholeCents === line.unitPrice ? null : wholeCents;
+    this.clearPriceFloorFeedback();
     this.cart.setCustomPrice(
       variantId,
       customPrice,
@@ -825,6 +848,7 @@ export class SellComponent implements OnInit {
   }
 
   protected resetPrice(line: CartLine): void {
+    this.clearPriceFloorFeedback();
     this.cart.setCustomPrice(line.variant.variant_id!, null, '');
     if (this.overrideFor() === line.variant.variant_id) this.overrideFor.set(null);
   }
@@ -834,8 +858,7 @@ export class SellComponent implements OnInit {
   }
 
   private rejectBelowWholesale(line: CartLine, floor: number): void {
-    if (this.priceFloorTimer) clearTimeout(this.priceFloorTimer);
-    this.priceFloorFeedback.set(null);
+    this.clearPriceFloorFeedback();
     requestAnimationFrame(() => {
       this.priceFloorFeedback.set({
         variantId: line.variant.variant_id!,
@@ -845,6 +868,14 @@ export class SellComponent implements OnInit {
       });
       this.priceFloorTimer = setTimeout(() => this.priceFloorFeedback.set(null), 3000);
     });
+  }
+
+  private clearPriceFloorFeedback(): void {
+    if (this.priceFloorTimer) {
+      clearTimeout(this.priceFloorTimer);
+      this.priceFloorTimer = null;
+    }
+    this.priceFloorFeedback.set(null);
   }
 
   protected toggleCustomerPicker(): void {
@@ -868,9 +899,14 @@ export class SellComponent implements OnInit {
     }
   }
 
-  protected selectCustomer(id: string | null, name: string): void {
-    this.cart.setCustomer(id, name);
+  protected selectCustomer(customer: CustomerWithCredit | null): void {
+    this.selectedCustomer.set(customer);
+    this.cart.setCustomer(customer?.id ?? null, customer ? this.customerName(customer) : 'Walk-in');
     this.toggleCustomerPicker();
+  }
+
+  protected customerCreditAvailable(customer: CustomerWithCredit): number {
+    return Math.max(0, customer.credit_limit - customer.ar_balance);
   }
 
   protected customerName(customer: Customer): string {
@@ -910,6 +946,7 @@ export class SellComponent implements OnInit {
       const orderId = await this.pos.postSale(customerId, lines, payments, false);
       this.checkoutOpen.set(false);
       this.cart.clear();
+      this.selectedCustomer.set(null);
       this.success.set({ text: 'Sale completed', tone: 'success', orderId });
     } catch (err) {
       if (!(err instanceof PosRpcError)) {
@@ -931,6 +968,7 @@ export class SellComponent implements OnInit {
     await this.sync.enqueue({ customer_id: customerId, lines, payments });
     this.checkoutOpen.set(false);
     this.cart.clear();
+    this.selectedCustomer.set(null);
     this.success.set({ text: 'Sale queued — will sync when online', tone: 'warning' });
   }
 
@@ -959,16 +997,17 @@ export class SellComponent implements OnInit {
     }
   }
 
-  protected async park(): Promise<void> {
+  protected async sendToCashier(): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
     try {
       await this.pos.postSale(this.cart.customerId(), this.cart.toSaleLines(), [], true);
       this.cart.clear();
-      this.notice.set('Parked to the cashier queue');
+      this.selectedCustomer.set(null);
+      this.notice.set('Sent to the cashier queue');
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Park failed');
+      this.error.set(err instanceof Error ? err.message : 'Failed to send sale to cashier');
     } finally {
       this.busy.set(false);
     }
@@ -995,6 +1034,7 @@ export class SellComponent implements OnInit {
 
   protected clearCart(): void {
     this.cart.clear();
+    this.selectedCustomer.set(null);
     this.overrideFor.set(null);
     this.error.set(null);
     this.notice.set(null);

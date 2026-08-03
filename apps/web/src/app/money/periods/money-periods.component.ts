@@ -64,9 +64,9 @@ import {
               >
                 <input
                   type="text"
-                  inputmode="decimal"
+                  inputmode="numeric"
                   class="input input-bordered input-sm w-full"
-                  placeholder="0.00"
+                  placeholder="0"
                   [(ngModel)]="declared[account.account_code]"
                 />
               </app-form-field>
@@ -97,8 +97,8 @@ import {
       <div class="card-body p-4">
         <h2 class="section-title mb-2">Close accounting period</h2>
         <p class="text-xs text-base-content/60">
-          Closing locks all posting through the end date. The backend gates this on
-          reconciliations and open sessions — its messages are shown verbatim.
+          Closing locks all posting through the end date. The backend gates this on reconciliations
+          and open sessions — its messages are shown verbatim.
         </p>
         <form
           (submit)="$event.preventDefault(); askClose()"

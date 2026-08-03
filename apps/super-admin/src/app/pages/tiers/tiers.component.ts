@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { formatKes, parseKesToCents } from '../../core/money';
+import { formatKes, formatKesInput, parseKesToCents } from '../../core/money';
 import { PlatformService, Tier } from '../../core/platform.service';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
@@ -59,7 +59,7 @@ const FEATURE_KEYS = [['multipleLocations', 'Multiple stock locations']] as cons
               <span class="label-text">Monthly price (KES)</span>
               <input
                 type="text"
-                inputmode="decimal"
+                inputmode="numeric"
                 class="input input-bordered input-sm"
                 [formControl]="priceMonthly"
               />
@@ -68,7 +68,7 @@ const FEATURE_KEYS = [['multipleLocations', 'Multiple stock locations']] as cons
               <span class="label-text">Yearly price (KES)</span>
               <input
                 type="text"
-                inputmode="decimal"
+                inputmode="numeric"
                 class="input input-bordered input-sm"
                 [formControl]="priceYearly"
               />
@@ -225,8 +225,8 @@ export class TiersComponent implements OnInit {
     this.editing.set(tier);
     this.code.setValue(tier.code);
     this.name.setValue(tier.name);
-    this.priceMonthly.setValue((tier.price_monthly / 100).toFixed(2));
-    this.priceYearly.setValue((tier.price_yearly / 100).toFixed(2));
+    this.priceMonthly.setValue(formatKesInput(tier.price_monthly));
+    this.priceYearly.setValue(formatKesInput(tier.price_yearly));
     this.isActive.setValue(tier.is_active);
     this.limits.set({ ...(tier.limits as Record<string, number>) });
     this.features.set({ ...(tier.features as Record<string, boolean>) });

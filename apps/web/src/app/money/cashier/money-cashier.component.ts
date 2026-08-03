@@ -64,9 +64,9 @@ import { CashierSessionService } from '../../core/cashier-session.service';
               <app-form-field [label]="account.label + ' (' + account.account_code + ')'">
                 <input
                   type="text"
-                  inputmode="decimal"
+                  inputmode="numeric"
                   class="input input-bordered input-sm w-full"
-                  placeholder="0.00"
+                  placeholder="0"
                   [(ngModel)]="declared[account.account_code]"
                 />
               </app-form-field>
@@ -91,9 +91,9 @@ import { CashierSessionService } from '../../core/cashier-session.service';
               <app-form-field [label]="account.label + ' (' + account.account_code + ')'">
                 <input
                   type="text"
-                  inputmode="decimal"
+                  inputmode="numeric"
                   class="input input-bordered input-sm w-full"
-                  placeholder="0.00"
+                  placeholder="0"
                   [(ngModel)]="declared[account.account_code]"
                 />
               </app-form-field>
@@ -276,7 +276,7 @@ export class MoneyCashierComponent implements OnInit {
       this.sessions.set(sessions);
       this.reconAccounts.set(await this.money.sessionReconAccounts(sessions.map(x => x.id)));
       // Pre-fill zeroes for any new account.
-      for (const a of accounts) this.declared[a.account_code] ??= '0.00';
+      for (const a of accounts) this.declared[a.account_code] ??= '0';
       this.error.set(null);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load sessions');
@@ -314,7 +314,7 @@ export class MoneyCashierComponent implements OnInit {
     try {
       await action(decls);
       this.notice.set(successMessage);
-      for (const a of this.accounts()) this.declared[a.account_code] = '0.00';
+      for (const a of this.accounts()) this.declared[a.account_code] = '0';
       await this.load();
       await this.cashierSessionState.refresh();
       return true;

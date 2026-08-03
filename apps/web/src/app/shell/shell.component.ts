@@ -7,6 +7,7 @@ import { ThemeService } from '../core/theme.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CashierSessionService } from '../core/cashier-session.service';
+import { SyncService } from '../pos/offline/sync.service';
 
 interface NavItem {
   route: string;
@@ -48,6 +49,38 @@ interface NavSection {
           <div class="flex-1"></div>
 
           <div class="flex flex-none items-center gap-1.5">
+            @if (pendingSyncCount() > 0 || sync.syncing()) {
+              <a
+                routerLink="/pos/sync"
+                class="btn btn-square btn-ghost btn-sm indicator min-h-11 min-w-11"
+                [title]="syncStatusLabel()"
+                [attr.aria-label]="syncStatusLabel()"
+              >
+                <ng-icon
+                  [name]="
+                    sync.syncing()
+                      ? 'heroArrowPath'
+                      : sync.failedCount() > 0
+                        ? 'heroExclamationTriangle'
+                        : 'heroArrowPath'
+                  "
+                  size="1.25rem"
+                  [class.animate-spin]="sync.syncing()"
+                  [class.text-error]="sync.failedCount() > 0"
+                  [class.text-warning]="sync.failedCount() === 0"
+                />
+                @if (pendingSyncCount() > 0) {
+                  <span
+                    class="badge indicator-item badge-xs"
+                    [class.badge-error]="sync.failedCount() > 0"
+                    [class.badge-warning]="sync.failedCount() === 0"
+                  >
+                    {{ pendingSyncCount() }}
+                  </span>
+                }
+              </a>
+            }
+
             <!-- Notifications -->
             <a
               routerLink="/notifications"
@@ -116,7 +149,7 @@ interface NavSection {
               <span class="bottom-nav-ico"><ng-icon name="heroShoppingCart" size="1.25rem" /></span>
               <span class="bottom-nav-label">Sell</span>
             </a>
-            <a routerLink="/orders" routerLinkActive="bottom-nav-active" class="bottom-nav-item">
+            <a routerLink="/sales" routerLinkActive="bottom-nav-active" class="bottom-nav-item">
               <span class="bottom-nav-ico"
                 ><ng-icon name="heroClipboardDocumentList" size="1.25rem"
               /></span>
@@ -205,8 +238,12 @@ export class ShellComponent implements OnInit {
   protected readonly approvals = inject(ApprovalsService);
   protected readonly notifications = inject(NotificationsService);
   protected readonly cashierSession = inject(CashierSessionService);
+  protected readonly sync = inject(SyncService);
 
   protected readonly company = signal<Company | null>(null);
+  protected readonly pendingSyncCount = computed(
+    () => this.sync.queuedCount() + this.sync.failedCount()
+  );
 
   protected readonly sections: NavSection[] = [
     {
@@ -217,16 +254,16 @@ export class ShellComponent implements OnInit {
       items: [
         { route: '/pos/sell', label: 'Sell', icon: 'heroShoppingCart' },
         { route: '/pos/cashier', label: 'Cashier Queue', icon: 'heroQueueList' },
-        { route: '/orders', label: 'Sales', icon: 'heroClipboardDocumentList' },
+        { route: '/sales', label: 'Sales', icon: 'heroClipboardDocumentList' },
         { route: '/pos/proformas', label: 'Proformas', icon: 'heroDocumentText' },
         { route: '/products', label: 'Products', icon: 'heroCube' },
+        { route: '/purchases', label: 'Purchases', icon: 'heroTruck' },
         {
           route: '/stock-adjustments',
           label: 'Stock Adjustments',
           icon: 'heroArchiveBox',
           visible: () => this.perms.has('ManageStockAdjustments'),
         },
-        { route: '/pos/sync', label: 'Pending Sync', icon: 'heroArrowPath' },
       ],
     },
     {
@@ -275,6 +312,16 @@ export class ShellComponent implements OnInit {
       .map(s => ({ ...s, items: s.items.filter(i => !i.visible || i.visible()) }))
       .filter(s => s.items.length > 0)
   );
+
+  protected syncStatusLabel(): string {
+    if (this.sync.syncing()) return 'Syncing offline sales';
+    if (this.sync.failedCount() > 0) {
+      const count = this.sync.failedCount();
+      return `${count} sale${count === 1 ? '' : 's'} failed to sync`;
+    }
+    const count = this.sync.queuedCount();
+    return `${count} sale${count === 1 ? '' : 's'} waiting to sync`;
+  }
 
   async ngOnInit(): Promise<void> {
     try {

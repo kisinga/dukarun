@@ -160,8 +160,9 @@ Every list page is the same four blocks, top to bottom — no improvisation:
    action; the bar's zero-guard handles the rest). **The create action lives in the
    `[actions]` slot**: one `<button appButton>` with a `heroPlus` icon ("Add Customer",
    "Record Adjustment"…). Never in the table footer, never a bare floating row.
-2. **`<app-list-search-bar>`** — search input + `[badges]` + `[filters]` slots. No custom
-   search rows, no bare `input-bordered`.
+2. **`<app-list-search-bar>`** — the common list top bar. It hosts the compact
+   `app-stat-bar` in `[summary]`, then search + `[badges]` + `[filters]` in one responsive
+   surface. No detached stat-card grids, custom search rows, or bare `input-bordered`.
 3. **Data surface** — desktop: `<app-data-table-shell>` containing a semantic table with
    row-click navigation to the detail view (no "View" buttons); mobile: a per-domain card
    component. Empty state = `<app-empty-state>`.
@@ -231,6 +232,10 @@ vocabulary — same meaning, same shape; different data, different cells:
 - **Expanded detail rows** (line items, reconciliations): one `tr.row-detail` with a
   single full-width `td` (inset surface is encoded). No second zebra inside, no nested
   bordered boxes.
+- **Shared cell recipes**: `.table-entity` contains avatar + name, `.table-primary` and
+  `.table-secondary` form the allowed two-line hierarchy, `.table-number` owns right-aligned
+  tabular values, and `.table-actions` owns the final icon-action cell. These recipes and all
+  cell spacing/hover/selected/footer states live in `styles.scss`; pages do not restyle them.
 
 ## Enforcement checklist (review + `npm run design-guard` in `apps/web`)
 

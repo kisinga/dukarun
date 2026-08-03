@@ -9,9 +9,10 @@ import {
 
 /** Format cents as KES for display. */
 function formatKes(cents: number): string {
+  const hasSubunits = Math.abs(Math.round(cents)) % 100 !== 0;
   return `KES ${(cents / 100).toLocaleString('en-KE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: hasSubunits ? 2 : 0,
+    maximumFractionDigits: hasSubunits ? 2 : 0,
   })}`;
 }
 

@@ -581,6 +581,7 @@ export type Database = {
           phone: string | null;
           supplier_credit_limit: number;
           supplier_credit_terms_days: number | null;
+          supplier_active: boolean;
           updated_at: string;
         };
         Insert: {
@@ -603,6 +604,7 @@ export type Database = {
           phone?: string | null;
           supplier_credit_limit?: number;
           supplier_credit_terms_days?: number | null;
+          supplier_active?: boolean;
           updated_at?: string;
         };
         Update: {
@@ -625,6 +627,7 @@ export type Database = {
           phone?: string | null;
           supplier_credit_limit?: number;
           supplier_credit_terms_days?: number | null;
+          supplier_active?: boolean;
           updated_at?: string;
         };
         Relationships: [
@@ -2920,6 +2923,22 @@ export type Database = {
           },
         ];
       };
+      supplier_variant_performance: {
+        Row: {
+          average_unit_cost: number | null;
+          company_id: string | null;
+          highest_unit_cost: number | null;
+          last_purchase_date: string | null;
+          last_unit_cost: number | null;
+          lowest_unit_cost: number | null;
+          purchase_count: number | null;
+          supplier_id: string | null;
+          total_quantity: number | null;
+          total_spend: number | null;
+          variant_id: string | null;
+        };
+        Relationships: [];
+      };
       variant_catalog: {
         Row: {
           allow_fractional: boolean | null;
@@ -3005,6 +3024,15 @@ export type Database = {
           p_account_code?: string;
           p_draft_id: string;
           p_is_credit: boolean;
+          p_stock_location_id?: string;
+        };
+        Returns: string;
+      };
+      confirm_purchase_draft_with_payment: {
+        Args: {
+          p_account_code?: string;
+          p_draft_id: string;
+          p_payment_amount: number;
           p_stock_location_id?: string;
         };
         Returns: string;
@@ -3135,6 +3163,36 @@ export type Database = {
         Returns: number;
       };
       platform_operations_snapshot: { Args: never; Returns: Json };
+      record_purchase_with_prices: {
+        Args: {
+          p_account_code?: string;
+          p_is_credit: boolean;
+          p_lines: Json;
+          p_notes?: string;
+          p_purchase_date?: string;
+          p_reference?: string;
+          p_stock_location_id?: string;
+          p_supplier_id: string;
+        };
+        Returns: string;
+      };
+      record_purchase_with_payment: {
+        Args: {
+          p_account_code?: string;
+          p_lines: Json;
+          p_notes?: string;
+          p_payment_amount: number;
+          p_purchase_date?: string;
+          p_reference?: string;
+          p_stock_location_id?: string;
+          p_supplier_id: string;
+        };
+        Returns: string;
+      };
+      set_supplier_active: {
+        Args: { p_active: boolean; p_supplier_id: string };
+        Returns: string;
+      };
       platform_set_company_status: {
         Args: { p_company_id: string; p_status: string };
         Returns: string;
@@ -3186,12 +3244,18 @@ export type Database = {
         };
         Returns: string;
       };
-      post_inventory_adjustment: {
-        Args: { p_reason: string; p_value_change: number; p_variant_id: string };
-        Returns: string;
-      };
       post_inventory_write_off: {
         Args: { p_quantity: number; p_reason: string; p_variant_id: string };
+        Returns: string;
+      };
+      post_stock_adjustment: {
+        Args: {
+          p_expected_quantity: number;
+          p_new_quantity: number;
+          p_reason: string;
+          p_unit_cost?: number;
+          p_variant_id: string;
+        };
         Returns: string;
       };
       post_journal_entry: {
@@ -3428,11 +3492,29 @@ export type Database = {
         };
         Returns: string;
       };
+      update_supplier_credit: {
+        Args: {
+          p_credit_limit: number;
+          p_supplier_id: string;
+          p_terms_days?: number;
+        };
+        Returns: string;
+      };
       update_payment_method: {
         Args: {
           p_code: string;
           p_enabled?: boolean;
           p_requires_reconciliation?: boolean;
+        };
+        Returns: string;
+      };
+      update_catalog_product: {
+        Args: {
+          p_active?: boolean;
+          p_barcode?: string;
+          p_name: string;
+          p_product_id: string;
+          p_variants: Json;
         };
         Returns: string;
       };

@@ -14,6 +14,8 @@ export type Purchase = Database['public']['Tables']['purchases']['Row'];
 export type PurchasePayment = Database['public']['Tables']['purchase_payments']['Row'];
 export type PurchaseDraft = Database['public']['Tables']['purchase_drafts']['Row'];
 export type PurchaseLine = Database['public']['Tables']['purchase_lines']['Row'];
+export type SupplierVariantPerformance =
+  Database['public']['Views']['supplier_variant_performance']['Row'];
 export type MoneyCustomer = Database['public']['Tables']['customers']['Row'];
 export type ReconAccount = Database['public']['Tables']['reconciliation_accounts']['Row'];
 export type Reconciliation = Database['public']['Tables']['reconciliations']['Row'];
@@ -398,6 +400,15 @@ export class MoneyService {
     return data;
   }
 
+  async supplierVariantPerformance(): Promise<SupplierVariantPerformance[]> {
+    const { data, error } = await this.db
+      .from('supplier_variant_performance')
+      .select('*')
+      .order('last_purchase_date', { ascending: false });
+    if (error) throw error;
+    return data;
+  }
+
   // --- RPCs (errors are P0001 with human-readable messages — display verbatim) ---
 
   async postExpense(
@@ -560,6 +571,20 @@ export class MoneyService {
     return data;
   }
 
+  async updateSupplierCredit(
+    supplierId: string,
+    creditLimit: number,
+    termsDays?: number
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('update_supplier_credit', {
+      p_supplier_id: supplierId,
+      p_credit_limit: creditLimit,
+      ...(termsDays !== undefined ? { p_terms_days: termsDays } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
   async createCustomer(
     firstName: string,
     lastName?: string,
@@ -609,6 +634,8 @@ export class MoneyService {
       unit_cost: number;
       expiry_date?: string;
       batch_number?: string;
+      new_wholesale_price?: number;
+      new_retail_price?: number;
     }[],
     isCredit: boolean,
     reference?: string,
@@ -617,10 +644,42 @@ export class MoneyService {
     purchaseDate?: string,
     stockLocationId?: string
   ): Promise<string> {
-    const { data, error } = await this.db.rpc('record_purchase', {
+    const { data, error } = await this.db.rpc('record_purchase_with_prices', {
       p_supplier_id: supplierId,
       p_lines: lines as never,
       p_is_credit: isCredit,
+      ...(reference ? { p_reference: reference } : {}),
+      ...(accountCode ? { p_account_code: accountCode } : {}),
+      ...(notes ? { p_notes: notes } : {}),
+      ...(purchaseDate ? { p_purchase_date: purchaseDate } : {}),
+      ...(stockLocationId ? { p_stock_location_id: stockLocationId } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async recordPurchaseWithPayment(
+    supplierId: string,
+    lines: {
+      variant_id: string;
+      quantity: number;
+      unit_cost: number;
+      expiry_date?: string;
+      batch_number?: string;
+      new_wholesale_price?: number;
+      new_retail_price?: number;
+    }[],
+    paymentAmount: number,
+    reference?: string,
+    accountCode?: string,
+    notes?: string,
+    purchaseDate?: string,
+    stockLocationId?: string
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('record_purchase_with_payment', {
+      p_supplier_id: supplierId,
+      p_lines: lines as never,
+      p_payment_amount: paymentAmount,
       ...(reference ? { p_reference: reference } : {}),
       ...(accountCode ? { p_account_code: accountCode } : {}),
       ...(notes ? { p_notes: notes } : {}),
@@ -640,6 +699,8 @@ export class MoneyService {
       unit_cost: number;
       expiry_date?: string;
       batch_number?: string;
+      new_wholesale_price?: number;
+      new_retail_price?: number;
     }[];
     reference?: string;
     notes?: string;
@@ -673,6 +734,22 @@ export class MoneyService {
     return data;
   }
 
+  async confirmPurchaseDraftWithPayment(
+    draftId: string,
+    paymentAmount: number,
+    accountCode?: string,
+    stockLocationId?: string
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('confirm_purchase_draft_with_payment', {
+      p_draft_id: draftId,
+      p_payment_amount: paymentAmount,
+      ...(accountCode ? { p_account_code: accountCode } : {}),
+      ...(stockLocationId ? { p_stock_location_id: stockLocationId } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
   async cancelPurchaseDraft(draftId: string): Promise<void> {
     const { error } = await this.db.rpc('cancel_purchase_draft', { p_draft_id: draftId });
     if (error) throw rpcError(error);
@@ -698,29 +775,28 @@ export class MoneyService {
     return data;
   }
 
-  async postInventoryWriteOff(
-    variantId: string,
-    quantity: number,
-    reason: string
-  ): Promise<string> {
-    const { data, error } = await this.db.rpc('post_inventory_write_off', {
-      p_variant_id: variantId,
-      p_quantity: quantity,
-      p_reason: reason,
+  async setSupplierActive(supplierId: string, active: boolean): Promise<string> {
+    const { data, error } = await this.db.rpc('set_supplier_active', {
+      p_supplier_id: supplierId,
+      p_active: active,
     });
     if (error) throw rpcError(error);
     return data;
   }
 
-  async postInventoryAdjustment(
+  async postStockAdjustment(
     variantId: string,
-    valueChange: number,
-    reason: string
+    expectedQuantity: number,
+    newQuantity: number,
+    reason: string,
+    unitCost?: number
   ): Promise<string> {
-    const { data, error } = await this.db.rpc('post_inventory_adjustment', {
+    const { data, error } = await this.db.rpc('post_stock_adjustment', {
       p_variant_id: variantId,
-      p_value_change: valueChange,
+      p_expected_quantity: expectedQuantity,
+      p_new_quantity: newQuantity,
       p_reason: reason,
+      ...(unitCost !== undefined ? { p_unit_cost: unitCost } : {}),
     });
     if (error) throw rpcError(error);
     return data;

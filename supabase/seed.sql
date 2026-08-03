@@ -42,6 +42,25 @@ where not exists (
   where user_id = '5877ac73-ff8d-457c-afcd-791e66229d17'
 );
 
+-- Keep the seeded founder as a fully-capable shop administrator even when this
+-- seed is re-run against a database that already contained the membership.
+update public.roles r
+set permissions = array[
+  'ManageApprovals','OverridePrice','ManageStockAdjustments','ApproveCustomerCredit',
+  'ManageCustomerCreditLimit','ReverseOrder','OverrideCustomerBalance','SettleOrder',
+  'ManageSupplierCreditPurchases','ViewFinancials','ManageReconciliation',
+  'CloseAccountingPeriod','CreateInterAccountTransfer','ManageTeam'
+]::text[]
+from public.companies c
+where r.company_id = c.id and c.name = '<tenant> Stores' and r.name = 'Admin';
+
+update public.company_memberships m
+set role_id = r.id, authorization_status = 'approved'
+from public.roles r, public.companies c
+where m.user_id = '5877ac73-ff8d-457c-afcd-791e66229d17'
+  and m.company_id = c.id and c.name = '<tenant> Stores'
+  and r.company_id = c.id and r.name = 'Admin';
+
 -- ---------------------------------------------------------------------------
 -- Demo catalog: family + variants + stock
 -- ---------------------------------------------------------------------------
@@ -97,12 +116,12 @@ from public.companies c where c.name = '<tenant> Stores'
 on conflict do nothing;
 
 -- Customer + supplier
-insert into public.customers (id, company_id, first_name, phone, is_credit_approved, credit_limit)
-select 'dc000000-0000-0000-0000-000000000001', id, 'Jane Mwangi', '0712345678', true, 50000
+insert into public.customers (id, company_id, first_name, phone, is_credit_approved, credit_limit, credit_terms_days)
+select 'dc000000-0000-0000-0000-000000000001', id, 'Jane Mwangi', '0712345678', true, 50000, 30
 from public.companies where name = '<tenant> Stores'
 on conflict do nothing;
 
-insert into public.customers (id, company_id, first_name, phone, is_supplier)
-select 'dc000000-0000-0000-0000-000000000002', id, 'Brookside Distributors', '0700111222', true
+insert into public.customers (id, company_id, first_name, phone, is_supplier, supplier_credit_limit, supplier_credit_terms_days)
+select 'dc000000-0000-0000-0000-000000000002', id, 'Brookside Distributors', '0700111222', true, 200000, 30
 from public.companies where name = '<tenant> Stores'
 on conflict do nothing;
