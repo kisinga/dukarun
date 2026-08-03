@@ -1,29 +1,21 @@
 # ========================================
 # Public Storefront Production Dockerfile
 # Build context: repository root (.)
-# Uses root package-lock.json for deterministic installs.
-# Same pattern as frontend/super-admin: node build, nginx serve (port 4202).
+# Legacy standalone build; excluded from the active root workspace.
+# Vendure-era pattern: node build, nginx serve (port 4202).
 # ========================================
 
 # Stage 1: Build Angular application
 FROM node:22-alpine AS builder
 
-WORKDIR /app
+WORKDIR /app/storefront
 
-# Root workspace manifests (single source of truth for lockfile)
-COPY package.json package-lock.json ./
+COPY archive/vendure/storefront/package.json ./
+RUN npm install --quiet --no-audit --no-fund --include=dev
 
-# Every workspace package.json must exist before npm ci so workspaces resolve
-COPY backend/package.json backend/
-COPY frontend/package.json frontend/
-COPY super-admin/package.json super-admin/
-COPY storefront/package.json storefront/
+COPY archive/vendure/storefront/ ./
 
-RUN npm ci --quiet --no-audit --no-fund --include=dev
-
-COPY . .
-
-RUN npm run build -w @dukarun/storefront -- --configuration production
+RUN npm run build -- --configuration production
 
 # Angular application builder outputs to storefront/dist/storefront/browser
 RUN echo "Validating build output..." && \

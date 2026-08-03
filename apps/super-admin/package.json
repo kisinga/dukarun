@@ -1,9 +1,10 @@
 {
-  "name": "@dukarun/super-admin-new",
+  "name": "@dukarun/super-admin",
   "version": "2.0.0",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
+    "prebuild": "node ../../scripts/generate-environment.mjs super-admin",
     "build": "ng build",
     "watch": "ng build --watch --configuration development"
   },

@@ -11,22 +11,7 @@ export type MembershipWithRole = Membership & {
 };
 
 /** The 14 assignable permissions (role editor checkboxes). */
-export const ALL_PERMISSIONS = [
-  'ManageApprovals',
-  'OverridePrice',
-  'ManageStockAdjustments',
-  'ApproveCustomerCredit',
-  'ManageCustomerCreditLimit',
-  'ReverseOrder',
-  'OverrideCustomerBalance',
-  'SettleOrder',
-  'ManageSupplierCreditPurchases',
-  'ViewFinancials',
-  'ManageReconciliation',
-  'CloseAccountingPeriod',
-  'CreateInterAccountTransfer',
-  'ManageTeam',
-] as const;
+export { ALL_PERMISSIONS } from '../core/permissions.service';
 
 @Injectable({ providedIn: 'root' })
 export class TeamService {

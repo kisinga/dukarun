@@ -68,7 +68,7 @@ export const routes: Routes = [
           },
           {
             path: 'credit',
-            redirectTo: '/credit',
+            redirectTo: '/customers',
           },
           {
             path: 'suppliers',
@@ -102,7 +102,7 @@ export const routes: Routes = [
       },
       {
         path: 'credit',
-        loadComponent: () => import('./credit/credit.component').then(m => m.CreditComponent),
+        redirectTo: '/customers',
       },
       {
         path: 'stock-adjustments',

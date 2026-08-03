@@ -1,29 +1,21 @@
 # ========================================
 # Super Admin Production Dockerfile
 # Build context: repository root (.)
-# Uses root package-lock.json for deterministic installs.
+# Legacy standalone build; excluded from the active root workspace.
 # ========================================
 # Same pattern as main frontend: node build, nginx serve on port 4201.
 
 # Stage 1: Build Angular application
 FROM node:22-alpine AS builder
 
-WORKDIR /app
+WORKDIR /app/super-admin
 
-# Root workspace manifests (single source of truth for lockfile)
-COPY package.json package-lock.json ./
+COPY archive/vendure/super-admin/package.json ./
+RUN npm install --quiet --no-audit --no-fund --include=dev
 
-# Workspace package.json files must exist before npm ci so workspaces are resolved
-COPY backend/package.json backend/
-COPY frontend/package.json frontend/
-COPY super-admin/package.json super-admin/
-COPY storefront/package.json storefront/
+COPY archive/vendure/super-admin/ ./
 
-RUN npm ci --quiet --no-audit --no-fund --include=dev
-
-COPY . .
-
-RUN npm run build -w super-admin -- --configuration production
+RUN npm run build -- --configuration production
 
 # Angular application builder outputs to super-admin/dist/super-admin/browser
 RUN echo "Validating build output..." && \

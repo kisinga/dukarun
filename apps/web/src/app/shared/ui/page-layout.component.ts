@@ -37,6 +37,6 @@ export class PageLayoutComponent {
   /** Route for the back affordance (e.g. '/dashboard'). */
   readonly backLink = input<string | string[]>();
   readonly backLabel = input('Back');
-  /** Widen the content wrapper to max-w-7xl (reports, dense tables). */
+  /** Widen the content wrapper to max-w-7xl (dashboard, reports, dense tables). */
   readonly wide = input(false);
 }

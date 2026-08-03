@@ -1,6 +1,6 @@
 // paystack-webhook: receives Paystack events, activates subscriptions on
 // verified charge.success. HMAC-SHA512 signature check on the raw body.
-// Mirrors backend/src/plugins/subscriptions/subscription-webhook.controller.ts
+// Replaces archive/vendure/backend/src/plugins/subscriptions/subscription-webhook.controller.ts
 // (charge.success is the only event with logic upstream; others are log-only).
 //
 // Env: PAYSTACK_WEBHOOK_SECRET, PAYSTACK_SECRET_KEY,
@@ -22,10 +22,10 @@ async function hmacHex(secret: string, body: string): Promise<string> {
     ['sign']
   );
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body));
-  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async req => {
   if (req.method !== 'POST') {
     return Response.json({ error: 'method_not_allowed' }, { status: 405 });
   }

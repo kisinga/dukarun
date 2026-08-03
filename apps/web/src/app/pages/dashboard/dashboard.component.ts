@@ -1,14 +1,10 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
-import { NgIcon } from '@ng-icons/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes } from '../../core/money';
 import { Company, SupabaseService } from '../../core/supabase.service';
-import { ApprovalsService } from '../../approvals/approvals.service';
 import { SyncService } from '../../pos/offline/sync.service';
 import { PosService, variantLabel, type Variant } from '../../pos/pos.service';
-import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
-import { PageHeaderComponent } from '../../shared/ui/page-header.component';
-import { StatCardComponent } from '../../shared/ui/stat-card.component';
 import {
   DailyProductSales,
   DailySummary,
@@ -16,315 +12,546 @@ import {
   LowStockVariant,
   ReportsService,
 } from '../../reports/reports.service';
+import { ButtonComponent } from '../../shared/ui/button.component';
+import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
+import { IconComponent } from '../../shared/ui/icon.component';
+import { MoneyComponent } from '../../shared/ui/money.component';
+import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
+import { StatCardComponent } from '../../shared/ui/stat-card.component';
 
 type TopVariant = { variantId: string; label: string; revenue: number; margin: number };
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, NgIcon, PageHeaderComponent, StatCardComponent, EmptyStateComponent],
+  imports: [
+    ButtonComponent,
+    EmptyStateComponent,
+    IconComponent,
+    MoneyComponent,
+    PageLayoutComponent,
+    StatCardComponent,
+  ],
   template: `
-    <main class="dashboard-main min-h-screen bg-base-200 p-4">
-      <div class="page">
-        <app-page-header [title]="company()?.name ?? 'Dukarun'" />
+    <app-page title="Dashboard" [subtitle]="dashboardSubtitle()" [wide]="true">
+      <span
+        actions
+        class="badge gap-1.5"
+        [class.badge-success]="liveConnected()"
+        [class.badge-warning]="!liveConnected()"
+      >
+        <span class="h-2 w-2 rounded-full bg-current"></span>
+        {{ liveConnected() ? 'Live' : 'Connecting' }}
+      </span>
+      <button actions appButton variant="ghost" [loading]="loading()" (click)="refresh()">
+        <app-icon name="heroArrowPath" />
+        Refresh
+      </button>
 
+      <div class="space-y-6">
         @if (loadError()) {
-          <p class="mb-2 text-sm text-error">{{ loadError() }}</p>
+          <div role="alert" class="alert alert-error text-sm">
+            <app-icon name="heroExclamationTriangle" />
+            <span class="flex-1">{{ loadError() }}</span>
+            <button appButton variant="ghost" size="sm" (click)="refresh()">Try again</button>
+          </div>
         }
 
-        <!-- Hero stats — money talks first -->
-        <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          <app-stat-card label="Today's revenue" [value]="fmt(today()?.revenue ?? 0)" />
-          <app-stat-card label="Today's orders" [value]="String(today()?.orders ?? 0)" />
-          <app-stat-card
-            label="Today's margin"
-            [value]="fmt(today()?.margin ?? 0)"
-            [tone]="
-              (today()?.margin ?? 0) > 0
-                ? 'success'
-                : (today()?.margin ?? 0) < 0
-                  ? 'error'
-                  : 'neutral'
-            "
-          />
-          <app-stat-card
-            label="Pending sync"
-            [value]="String(pendingCount())"
-            [tone]="sync.failedCount() > 0 ? 'error' : pendingCount() > 0 ? 'warning' : 'neutral'"
-          />
-        </div>
-        <p class="type-caption mt-1">Figures refresh hourly.</p>
-
-        @if (pendingCount() > 0) {
-          <a
-            routerLink="/pos/sync"
-            class="btn mt-2 w-full min-h-11"
-            [class.btn-error]="sync.failedCount() > 0"
-            [class.btn-warning]="sync.failedCount() === 0"
-          >
-            {{ pendingCount() }} sale(s) awaiting sync
-            @if (sync.failedCount() > 0) {
-              — {{ sync.failedCount() }} failed
+        <section aria-labelledby="today-heading" class="space-y-3">
+          <div class="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 id="today-heading" class="section-title">Today</h2>
+              <p class="type-caption mt-1">Completed sales in Africa/Nairobi time.</p>
+            </div>
+            @if (lastUpdated(); as updated) {
+              <p class="type-caption">Updated {{ updatedTime(updated) }}</p>
             }
-          </a>
-        }
+          </div>
 
-        <!-- Last 7 days -->
-        <h2 class="type-heading mt-6">Last 7 days</h2>
-        <div class="card mt-2 bg-base-100">
-          @if (week().length === 0) {
-            <app-empty-state
-              [embedded]="true"
-              [compact]="true"
-              icon="heroBanknotes"
-              title="No sales this week"
-              description="— revenue and margin land here once you sell."
+          <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <app-stat-card
+              label="Revenue"
+              [value]="initialLoading() ? '—' : fmt(today()?.revenue ?? 0)"
+              sub="Completed sales"
             />
-          } @else {
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>Day</th>
-                  <th class="text-right">Orders</th>
-                  <th class="text-right">Revenue</th>
-                  <th class="text-right">Margin</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (d of week(); track d.day) {
-                  <tr>
-                    <td class="text-sm">{{ shortDay(d.day) }}</td>
-                    <td class="text-right">{{ d.orders ?? 0 }}</td>
-                    <td class="text-right">{{ fmt(d.revenue ?? 0) }}</td>
-                    <td
-                      class="text-right font-medium"
-                      [class.text-success]="(d.margin ?? 0) > 0"
-                      [class.text-error]="(d.margin ?? 0) < 0"
-                    >
-                      {{ fmt(d.margin ?? 0) }}
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          }
-        </div>
-
-        <!-- Top variants by margin -->
-        <h2 class="type-heading mt-6">Top variants by margin · 7 days</h2>
-        <div class="card mt-2 bg-base-100">
-          @if (topVariants().length === 0) {
-            <app-empty-state
-              [embedded]="true"
-              [compact]="true"
-              icon="heroCube"
-              title="Nothing sold yet"
-              description="— best-margin variants rank here after a week of sales."
+            <app-stat-card
+              label="Orders"
+              [value]="initialLoading() ? '—' : String(today()?.orders ?? 0)"
+              sub="Completed checkouts"
             />
-          } @else {
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Variant</th>
-                  <th class="text-right">Revenue</th>
-                  <th class="text-right">Margin</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (v of topVariants(); track v.variantId) {
-                  <tr>
-                    <td class="type-caption">{{ $index + 1 }}</td>
-                    <td class="text-sm font-medium">{{ v.label }}</td>
-                    <td class="text-right">{{ fmt(v.revenue) }}</td>
-                    <td
-                      class="text-right font-medium"
-                      [class.text-success]="v.margin > 0"
-                      [class.text-error]="v.margin < 0"
-                    >
-                      {{ fmt(v.margin) }}
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          }
-        </div>
+            <app-stat-card
+              label="Margin"
+              [value]="initialLoading() ? '—' : fmt(today()?.margin ?? 0)"
+              sub="Revenue less stock cost"
+              [tone]="
+                (today()?.margin ?? 0) > 0
+                  ? 'success'
+                  : (today()?.margin ?? 0) < 0
+                    ? 'error'
+                    : 'neutral'
+              "
+            />
+            <app-stat-card
+              label="Sales to sync"
+              [value]="String(pendingCount())"
+              [sub]="
+                sync.failedCount() > 0 ? sync.failedCount() + ' need attention' : 'Offline queue'
+              "
+              [tone]="sync.failedCount() > 0 ? 'error' : pendingCount() > 0 ? 'warning' : 'neutral'"
+            />
+          </div>
 
-        <!-- Needs attention (warning semantics — never decorative) -->
-        <h2 class="type-heading mt-6">Needs attention</h2>
-        <div class="mt-2 grid gap-2 lg:grid-cols-2">
-          <div class="card bg-base-100">
-            <div class="card-body p-4">
-              <h3 class="type-heading">Low stock</h3>
-              @if (lowStock().length === 0) {
-                <app-empty-state
-                  [embedded]="true"
-                  [compact]="true"
-                  icon="heroCheckCircle"
-                  title="All stocked up"
-                  description="— nothing below its low-stock threshold."
-                />
-              } @else {
-                <div class="mt-1 flex flex-col gap-2">
-                  @for (item of lowStock(); track item.variant_id) {
-                    <div class="flex items-center gap-2 text-sm">
-                      <ng-icon name="heroCube" class="text-warning" />
-                      <span class="flex-1">
-                        {{ item.product_name }} — {{ item.variant_name }}
-                      </span>
-                      <span class="font-medium tabular-nums text-warning">
-                        {{ item.stock }} / {{ item.low_stock_threshold }}
-                      </span>
-                    </div>
+          @if (pendingCount() > 0) {
+            <div
+              role="status"
+              class="alert text-sm"
+              [class.alert-error]="sync.failedCount() > 0"
+              [class.alert-warning]="sync.failedCount() === 0"
+            >
+              <app-icon
+                [name]="sync.failedCount() > 0 ? 'heroExclamationTriangle' : 'heroArrowPath'"
+              />
+              <span class="flex-1">
+                {{ pendingCount() }} sale(s) are waiting to sync.
+                @if (sync.failedCount() > 0) {
+                  {{ sync.failedCount() }} failed and need attention.
+                }
+              </span>
+              <button appButton variant="ghost" size="sm" (click)="reviewSync()">
+                Review sync
+              </button>
+            </div>
+          }
+        </section>
+
+        <section aria-label="Sales performance" class="grid gap-4 xl:grid-cols-12">
+          <article class="card h-full overflow-hidden bg-base-100 xl:col-span-7">
+            <div
+              class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
+            >
+              <div>
+                <h2 class="section-title">Sales performance</h2>
+                <p class="type-caption mt-1">Daily revenue and margin over the last 7 days.</p>
+              </div>
+              <span class="type-caption">Live totals</span>
+            </div>
+
+            @if (initialLoading()) {
+              <div
+                role="status"
+                class="flex min-h-52 items-center justify-center gap-2 text-sm text-base-content/60"
+              >
+                <span class="loading loading-spinner loading-sm"></span>
+                Loading sales
+              </div>
+            } @else if (week().length === 0) {
+              <app-empty-state
+                [embedded]="true"
+                [compact]="true"
+                icon="heroBanknotes"
+                title="No sales this week"
+                description="Revenue and margin appear after the first completed sale."
+              />
+            } @else {
+              <div class="table-scroll">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Day</th>
+                      <th class="text-right">Orders</th>
+                      <th class="text-right">Revenue</th>
+                      <th class="text-right">Margin</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (day of week(); track day.day) {
+                      <tr>
+                        <td class="font-medium">{{ shortDay(day.day) }}</td>
+                        <td class="text-right font-medium">{{ day.orders ?? 0 }}</td>
+                        <td class="text-right font-medium">
+                          <app-money [cents]="day.revenue ?? 0" />
+                        </td>
+                        <td
+                          class="text-right font-medium"
+                          [class.text-success]="(day.margin ?? 0) > 0"
+                          [class.text-error]="(day.margin ?? 0) < 0"
+                        >
+                          <app-money [cents]="day.margin ?? 0" />
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </article>
+
+          <article class="card h-full overflow-hidden bg-base-100 xl:col-span-5">
+            <div
+              class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
+            >
+              <div>
+                <h2 class="section-title">Best margin</h2>
+                <p class="type-caption mt-1">Top-performing variants over 7 days.</p>
+              </div>
+              <span class="type-caption">Top 5</span>
+            </div>
+
+            @if (initialLoading()) {
+              <div
+                role="status"
+                class="flex min-h-52 items-center justify-center gap-2 text-sm text-base-content/60"
+              >
+                <span class="loading loading-spinner loading-sm"></span>
+                Loading products
+              </div>
+            } @else if (topVariants().length === 0) {
+              <app-empty-state
+                [embedded]="true"
+                [compact]="true"
+                icon="heroCube"
+                title="Nothing sold yet"
+                description="Products rank here once completed sales have stock cost."
+              />
+            } @else {
+              <div class="table-scroll">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Variant</th>
+                      <th class="text-right">Revenue</th>
+                      <th class="text-right">Margin</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (variant of topVariants(); track variant.variantId) {
+                      <tr>
+                        <td>
+                          <span class="font-medium">{{ variant.label }}</span>
+                          <span class="type-caption ml-2">#{{ $index + 1 }}</span>
+                        </td>
+                        <td class="text-right font-medium">
+                          <app-money [cents]="variant.revenue" />
+                        </td>
+                        <td
+                          class="text-right font-medium"
+                          [class.text-success]="variant.margin > 0"
+                          [class.text-error]="variant.margin < 0"
+                        >
+                          <app-money [cents]="variant.margin" />
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </article>
+        </section>
+
+        <section aria-labelledby="attention-heading" class="space-y-3">
+          <div class="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 id="attention-heading" class="section-title">Needs attention</h2>
+              <p class="type-caption mt-1">Inventory exceptions that may affect the next sale.</p>
+            </div>
+            <span class="type-caption">Updates with stock activity</span>
+          </div>
+
+          <div class="grid gap-4 lg:grid-cols-2">
+            <article class="card h-full bg-base-100">
+              <div class="card-body p-4">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2">
+                    <app-icon name="heroCube" />
+                    <h3 class="section-title">Low stock</h3>
+                  </div>
+                  @if (lowStock().length > 0) {
+                    <span class="badge badge-warning badge-sm">{{ lowStock().length }}</span>
                   }
                 </div>
-              }
-            </div>
-          </div>
-          <div class="card bg-base-100">
-            <div class="card-body p-4">
-              <h3 class="type-heading">Expiring batches</h3>
-              @if (expiring().length === 0) {
-                <app-empty-state
-                  [embedded]="true"
-                  [compact]="true"
-                  icon="heroCheckCircle"
-                  title="Nothing expiring"
-                  description="— no batches nearing their expiry date."
-                />
-              } @else {
-                <div class="mt-1 flex flex-col gap-2">
-                  @for (batch of expiring(); track batch.batch_id) {
-                    <div class="flex items-center gap-2 text-sm">
-                      <span class="flex-1">
-                        {{ batch.product_name }} — {{ batch.variant_name }}
-                      </span>
-                      <span class="type-caption">{{ batch.expiry_date }}</span>
-                      <span class="font-medium tabular-nums text-warning">
-                        {{ batch.remaining }} left
-                      </span>
-                    </div>
+
+                @if (initialLoading()) {
+                  <div
+                    role="status"
+                    class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
+                  >
+                    <span class="loading loading-spinner loading-sm"></span>
+                    Loading stock
+                  </div>
+                } @else if (lowStock().length === 0) {
+                  <app-empty-state
+                    [embedded]="true"
+                    [compact]="true"
+                    icon="heroCheckCircle"
+                    title="All stocked up"
+                    description="Nothing is below its low-stock threshold."
+                  />
+                } @else {
+                  <div class="mt-2 flex flex-col divide-y divide-base-200">
+                    @for (item of lowStock(); track item.variant_id) {
+                      <div class="flex items-center gap-3 py-3">
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-sm font-medium">{{ item.product_name }}</p>
+                          <p class="type-caption truncate">{{ item.variant_name }}</p>
+                        </div>
+                        <div class="text-right">
+                          <p class="font-medium tabular-nums text-warning">{{ item.stock }}</p>
+                          <p class="type-caption">threshold {{ item.low_stock_threshold }}</p>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            </article>
+
+            <article class="card h-full bg-base-100">
+              <div class="card-body p-4">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2">
+                    <app-icon name="heroCalendarDays" />
+                    <h3 class="section-title">Expiring batches</h3>
+                  </div>
+                  @if (expiring().length > 0) {
+                    <span class="badge badge-warning badge-sm">{{ expiring().length }}</span>
                   }
                 </div>
-              }
-            </div>
-          </div>
-        </div>
 
-        @if (company(); as c) {
-          <p class="type-caption mt-6">
-            {{ c.code }} · {{ role() ?? '—' }} ·
-            <a routerLink="/billing" class="link">Billing &amp; plan</a>
-          </p>
-        }
+                @if (initialLoading()) {
+                  <div
+                    role="status"
+                    class="flex min-h-32 items-center justify-center gap-2 text-sm text-base-content/60"
+                  >
+                    <span class="loading loading-spinner loading-sm"></span>
+                    Loading batches
+                  </div>
+                } @else if (expiring().length === 0) {
+                  <app-empty-state
+                    [embedded]="true"
+                    [compact]="true"
+                    icon="heroCheckCircle"
+                    title="Nothing expiring"
+                    description="No batches expire in the next 30 days."
+                  />
+                } @else {
+                  <div class="mt-2 flex flex-col divide-y divide-base-200">
+                    @for (batch of expiring(); track batch.batch_id) {
+                      <div class="flex items-center gap-3 py-3">
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-sm font-medium">{{ batch.product_name }}</p>
+                          <p class="type-caption truncate">{{ batch.variant_name }}</p>
+                        </div>
+                        <div class="text-right">
+                          <p class="font-medium tabular-nums text-warning">
+                            {{ batch.remaining }} left
+                          </p>
+                          <p class="type-caption">expires {{ batch.expiry_date }}</p>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            </article>
+          </div>
+        </section>
       </div>
-    </main>
+    </app-page>
   `,
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);
   private readonly reports = inject(ReportsService);
   private readonly pos = inject(PosService);
   protected readonly sync = inject(SyncService);
-  protected readonly approvals = inject(ApprovalsService);
 
   protected readonly fmt = formatKes;
   protected readonly String = String;
 
   protected readonly company = signal<Company | null>(null);
-  protected readonly role = signal<string | null>(null);
   protected readonly loadError = signal<string | null>(null);
+  protected readonly loading = signal(false);
+  protected readonly liveConnected = signal(false);
+  protected readonly lastUpdated = signal<Date | null>(null);
 
   protected readonly summary = signal<DailySummary[]>([]);
-  protected readonly productSales = signal<DailyProductSales[]>([]);
   protected readonly topVariants = signal<TopVariant[]>([]);
   protected readonly lowStock = signal<LowStockVariant[]>([]);
   protected readonly expiring = signal<ExpiringBatch[]>([]);
 
+  protected readonly dashboardSubtitle = computed(() => {
+    const company = this.company();
+    return company
+      ? `${company.name} · Live trading and stock overview`
+      : 'Live trading and stock overview';
+  });
   protected readonly pendingCount = computed(
     () => this.sync.queuedCount() + this.sync.failedCount()
   );
-
-  protected readonly today = computed(() => this.summary().find(d => d.day === this.todayIso()));
+  protected readonly today = computed(() =>
+    this.summary().find(day => day.day === this.todayIso())
+  );
   protected readonly week = computed(() => this.summary());
+  protected readonly initialLoading = computed(() => this.loading() && !this.lastUpdated());
+
+  private liveChannel: RealtimeChannel | null = null;
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private fallbackTimer: ReturnType<typeof setInterval> | null = null;
+  private loadQueued = false;
 
   async ngOnInit(): Promise<void> {
-    this.role.set(this.supabase.claims()?.user_role ?? null);
     try {
       const company = await this.supabase.currentCompany();
       if (!company) {
-        // Authenticated but not provisioned — send to registration.
         await this.router.navigate(['/register']);
         return;
       }
       this.company.set(company);
+      this.connectLiveUpdates(company.id);
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load company');
       return;
     }
+
+    void this.loadReports();
+    this.fallbackTimer = setInterval(() => void this.loadReports(), 60_000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.liveChannel) void this.supabase.client.removeChannel(this.liveChannel);
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    if (this.fallbackTimer) clearInterval(this.fallbackTimer);
+  }
+
+  protected refresh(): void {
     void this.loadReports();
   }
 
+  protected reviewSync(): void {
+    void this.router.navigate(['/pos/sync']);
+  }
+
   private async loadReports(): Promise<void> {
+    if (this.loading()) {
+      this.loadQueued = true;
+      return;
+    }
+
+    this.loading.set(true);
     try {
-      const since = this.daysAgoIso(6); // today + 6 back = last 7 days
-      const [summary, productSales, lowStock, expiring] = await Promise.all([
-        this.reports.salesSummary(since),
-        this.reports.productSales(since),
+      const since = this.daysAgoIso(6);
+      const [sales, lowStock, expiring] = await Promise.all([
+        this.reports.dashboardSales(since),
         this.reports.lowStock(),
         this.reports.expiringBatches(),
       ]);
-      this.summary.set(summary);
-      this.productSales.set(productSales);
+      this.summary.set(sales.summary);
       this.lowStock.set(lowStock);
       this.expiring.set(expiring);
-      await this.computeTopVariants(productSales);
+      await this.computeTopVariants(sales.productSales);
+      this.lastUpdated.set(new Date());
+      this.loadError.set(null);
     } catch (err) {
-      this.loadError.set(err instanceof Error ? err.message : 'Failed to load reports');
+      this.loadError.set(err instanceof Error ? err.message : 'Failed to load dashboard');
+    } finally {
+      this.loading.set(false);
+      if (this.loadQueued) {
+        this.loadQueued = false;
+        void this.loadReports();
+      }
     }
   }
 
-  /** Aggregate 7-day product sales by variant, rank by margin, resolve labels. */
+  private connectLiveUpdates(companyId: string): void {
+    this.liveChannel = this.supabase.client
+      .channel(`dashboard-live-${companyId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders', filter: `company_id=eq.${companyId}` },
+        () => this.queueLiveRefresh()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'purchases',
+          filter: `company_id=eq.${companyId}`,
+        },
+        () => this.queueLiveRefresh()
+      )
+      .subscribe(status => this.liveConnected.set(status === 'SUBSCRIBED'));
+  }
+
+  private queueLiveRefresh(): void {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = null;
+      void this.loadReports();
+    }, 250);
+  }
+
   private async computeTopVariants(rows: DailyProductSales[]): Promise<void> {
     const byVariant = new Map<string, { revenue: number; margin: number }>();
-    for (const r of rows) {
-      if (!r.variant_id) continue;
-      const acc = byVariant.get(r.variant_id) ?? { revenue: 0, margin: 0 };
-      acc.revenue += r.revenue ?? 0;
-      acc.margin += (r.revenue ?? 0) - (r.cogs ?? 0);
-      byVariant.set(r.variant_id, acc);
+    for (const row of rows) {
+      if (!row.variant_id) continue;
+      const current = byVariant.get(row.variant_id) ?? { revenue: 0, margin: 0 };
+      current.revenue += row.revenue ?? 0;
+      current.margin += (row.revenue ?? 0) - (row.cogs ?? 0);
+      byVariant.set(row.variant_id, current);
     }
+
     const top = [...byVariant.entries()].sort((a, b) => b[1].margin - a[1].margin).slice(0, 5);
     const variants = await this.pos.variantsByIds(top.map(([id]) => id));
-    const byId = new Map(variants.map(v => [v.variant_id, v]));
+    const byId = new Map(variants.map(variant => [variant.variant_id, variant]));
     this.topVariants.set(
-      top.map(([variantId, acc]) => ({
+      top.map(([variantId, totals]) => ({
         variantId,
         label: byId.has(variantId)
           ? variantLabel(byId.get(variantId) as Variant)
           : variantId.slice(0, 8),
-        revenue: acc.revenue,
-        margin: acc.margin,
+        revenue: totals.revenue,
+        margin: totals.margin,
       }))
     );
   }
 
   protected shortDay(day: string | null): string {
     if (!day) return '—';
-    return new Date(`${day}T00:00:00`).toLocaleDateString('en-KE', {
+    return new Date(`${day}T12:00:00+03:00`).toLocaleDateString('en-KE', {
+      timeZone: 'Africa/Nairobi',
       weekday: 'short',
       day: 'numeric',
+      month: 'short',
+    });
+  }
+
+  protected updatedTime(value: Date): string {
+    return value.toLocaleTimeString('en-KE', {
+      timeZone: 'Africa/Nairobi',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   }
 
   private todayIso(): string {
-    return new Date().toISOString().slice(0, 10);
+    return this.nairobiDate(new Date());
   }
 
-  private daysAgoIso(n: number): string {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    return d.toISOString().slice(0, 10);
+  private daysAgoIso(days: number): string {
+    return this.nairobiDate(new Date(Date.now() - days * 86_400_000));
+  }
+
+  private nairobiDate(date: Date): string {
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: 'Africa/Nairobi',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+    const value = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find(part => part.type === type)?.value ?? '';
+    return `${value('year')}-${value('month')}-${value('day')}`;
   }
 }

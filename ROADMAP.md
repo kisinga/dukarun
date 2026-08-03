@@ -1,158 +1,37 @@
 # Roadmap
 
-All future plans consolidated.
+The active priority is a safe Vendure → Supabase production cutover. Detailed sequencing,
+verification, rollback, and sign-off gates live in `docs/V1_V2_MIGRATION.md`.
 
----
+## Before production cutover
 
-## Phase 1: Core POS
+- [ ] Complete production Auth user migration path and rate-limit handling.
+- [ ] Copy company/product assets into Supabase Storage and verify policies.
+- [ ] Finalize the historical-order void policy.
+- [ ] Prove teardown and a second messy-company rehearsal.
+- [ ] Export and retain `etl_id_map` audit mappings per company.
+- [ ] Finish Paystack repointing runbook and owner communications.
+- [ ] Clear remaining dashboard bundle-budget warning.
 
-### Product Management
+## Product hardening
 
-- [ ] Bulk import (CSV/Excel)
-- [ ] Product duplication
-- [ ] Variant combinations (Color × Size for apparel)
-- [ ] SKU-specific photos toggle
-- [ ] Product templates (quick setup for common types)
+- [ ] Add browser-level smoke coverage for sale, purchase, supplier payment, and credit flows.
+- [ ] Finish public storefront and platform-admin production journeys.
+- [ ] Add bulk catalog import and stock transfer workflows.
+- [ ] Expand reconciliation, exports, and scheduled owner reporting.
+- [ ] Validate offline outbox recovery on low-memory Android devices and long disconnects.
+- [ ] Add accessible confirmation for destructive cart/list actions.
 
-### POS Enhancements
+## After all companies pass retention
 
-- [ ] Cashier role (two-step: sell → pay)
-- [ ] Pro-forma invoice printing
-- [ ] Multiple payment methods per sale
-- [ ] Receipt customization
-- [ ] Offline queue sync
+- [ ] Export final Vendure database and asset snapshots.
+- [ ] Remove legacy npm workspaces, Dockerfiles, and migration-only dependencies.
+- [ ] Close the Vendure infrastructure and update the archive with final recovery instructions.
 
-### Inventory
+## Later
 
-- [ ] Stock adjustments
-- [ ] Stock transfers between locations
-- [ ] Low stock alerts
-- [ ] Reorder points
-- [ ] Batch/expiry tracking
-
----
-
-## Phase 2: Analytics (Q2 2026)
-
-### Reports
-
-- [ ] Sales trends (daily/weekly/monthly)
-- [ ] Top products
-- [ ] Revenue by location
-- [ ] Profit margins
-- [ ] Inventory valuation
-
-### Dashboard
-
-- [ ] Side-by-side shop comparison
-- [ ] Visual charts
-- [ ] Export to Excel
-- [ ] Scheduled email reports
-
----
-
-## Phase 3: Mobile PWA
-
-### Features
-
-- [ ] Install prompt
-- [ ] Offline mode with service worker
-- [ ] Push notifications (low stock, new orders)
-- [ ] Biometric login (fingerprint)
-- [ ] Pull-to-refresh
-- [ ] Swipe actions on cards
-- [ ] Haptic feedback
-
-### Optimization
-
-- [ ] Skeleton loading states
-- [ ] Virtual scrolling (large lists)
-- [ ] Image lazy loading
-- [ ] Prefetch next pagination page
-
----
-
-## Phase 4: ML & Automation
-
-### AI Features
-
-- [ ] Auto-training triggers (product changes)
-- [ ] SKU-level detection (variant-specific photos)
-- [ ] Performance tracking & auto-retrain
-- [ ] Voice commands for POS
-- [ ] Smart product categorization
-- [ ] Price suggestions based on cost
-
-### Model Improvements
-
-- [ ] Versioned model storage (rollback capability)
-- [ ] A/B testing model versions
-- [ ] Training history queries
-- [ ] Python microservice (for GPU acceleration)
-
----
-
-## Future Considerations
-
-### UX Enhancements
-
-- [ ] Voice search
-- [ ] Gesture navigation (swipe between pages)
-- [ ] Multi-language support (Swahili, English)
-- [ ] Custom theme colors per business
-- [ ] Dark mode toggle
-- [ ] Product preview (bottom sheet)
-- [ ] Quick filters (chips)
-- [ ] Batch actions (multi-select)
-
-### Business Features
-
-- [ ] Customer loyalty program
-- [ ] Promotions/discounts
-- [ ] Tax categories
-- [ ] Product collections
-- [ ] Facets (custom attributes)
-- [ ] Price history tracking
-- [ ] Cost tracking (profit calculation)
-
-### Enterprise
-
-- [ ] Multi-currency support
-- [ ] Advanced user permissions
-- [ ] Audit logs
-- [ ] API webhooks
-- [ ] Custom integrations
-- [ ] White-label options
-
----
-
-## Completed ✅
-
-See [CHANGELOG.md](./CHANGELOG.md)
-
----
-
-## Decisions Log
-
-### 2025-10-11: Variant Management KISS
-
-**Decision:** One option = one variant (no automatic combinations)  
-**Reasoning:** 80% use case, zero learning curve, can add complexity later  
-**Trade-off:** T-shirt sellers need workarounds until Phase 1 combinations
-
-### 2025-10-11: Product-Level Photos
-
-**Decision:** Photos at product level, barcodes at SKU level  
-**Reasoning:** Informal sector has identical packaging, pricing posters  
-**Future:** Add `useSkuSpecificPhotos` toggle in Phase 4
-
-### 2025-10-11: ML Model Storage
-
-**Decision:** Static files (no database), public URLs, IndexedDB cache  
-**Reasoning:** No DB overhead, offline support, models are not sensitive  
-**Security:** Only product IDs in model, prices/inventory at API level
-
----
-
-**Last Updated:** October 2025  
-**Next Review:** After MVP launch
+- Loyalty and promotions
+- Multi-currency and tax expansion
+- Voice and camera-assisted catalog workflows
+- Model-assisted product categorization and price suggestions
+- Public API/webhook integrations

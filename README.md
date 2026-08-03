@@ -1,104 +1,78 @@
 # Dukarun
 
-<p align="center">
-  <img src="./assets/logo/dukarun-withtext-light.svg" alt="Dukarun logo" width="280" />
-</p>
+Mobile-first point of sale, inventory, credit, purchasing, and accounting for Kenyan small
+businesses.
 
-> **AI-powered point-of-sale system for modern small businesses**
+The active system is Angular 21 on Supabase. PostgreSQL functions own transactional business
+logic; Row Level Security owns tenant isolation; Angular applications consume the database,
+Auth, Storage, Realtime, and Edge Functions through `supabase-js`.
 
-Dukarun helps shopkeepers ditch manual data entry and expensive barcode scanners. Use your phone's camera to instantly recognize products, process sales, and manage inventory—all powered by custom AI trained on your products.
+## Start locally
 
-[![Tests](https://github.com/kisinga/Dukarun/actions/workflows/test.yml/badge.svg)](https://github.com/kisinga/Dukarun/actions/workflows/test.yml)
-![Backend Coverage](./badges/backend-coverage.svg)
-![Frontend Coverage](./badges/frontend-coverage.svg)
-![Coverage](./badges/coverage.svg)
-
-## Quick Start
-
-> **First time?** Run `npm i` at the project root first.
+Prerequisites: Node 22, Docker, and the Supabase CLI.
 
 ```bash
-# 1. Install dependencies (required first time)
-npm i
-
-# 2. Start development (docker + all services)
+npm ci
+npm run sb:start
 npm run dev
-
-# Troubleshooting?
-npm run setup
 ```
 
-## Quick Links
+Open the dashboard at `http://localhost:4203`. Supabase Studio is available at
+`http://localhost:54323`.
 
-- 🚀 **[Setup & Deployment](./docs/INFRASTRUCTURE.md)** - Get started, deploy anywhere
-- 🆕 **[Fresh Setup](./docs/INFRASTRUCTURE.md#fresh-setup)** - First-time installation guide
-- 🏗️ **[Architecture](./ARCHITECTURE.md)** - System design and decisions
-- 📚 **[All Docs](./docs/README.md)** - Topic index and source-code entry points
-- 🗺️ **[Roadmap](./ROADMAP.md)** - Planned features
-
-- **[Frontend Architecture](./frontend/ARCHITECTURE.md)** - Angular app structure
-- **[POS Guide](./frontend/POS_README.md)** - Point-of-sale workflow
-- **[Feature Catalog](./docs/customer-features/FEATURE_CATALOG.md)** - Customer-facing capabilities
-
-## Current Status
-
-**Version:** 2.0 (Active Development)  
-**Stack:** Angular + Vendure + PostgreSQL  
-**V1 Archive:** See [V1 Migration](./archive/v1-migration/MIGRATION_SUMMARY.md)
-
-## Core Features
-
-- 🎯 **AI Product Recognition** - Camera and barcode product lookup
-- 💰 **POS (Sell)** - Checkout, payments, cashier flow
-- 📦 **Products & stock** - Catalog, variants, stock adjustments
-- 📊 **Sales, orders, payments** - Orders, payments, credit
-- 👥 **Customers & suppliers** - Unified people, statements, purchases
-- 📒 **Accounting** - Ledger, expenses, transfers, reconciliation
-- ✅ **Approvals** - User and channel approval flows
-- 🏪 **Multi-location** - Stock locations, channel-scoped data
-- 📱 **Mobile-first** - Responsive dashboard
-- 💬 **WhatsApp alerts** - Shift and balance notifications to admins and customers
-
-## Tech Stack
-
-| Component      | Technology                           |
-| -------------- | ------------------------------------ |
-| **Frontend**   | Angular 19 + daisyUI + Tailwind CSS  |
-| **Backend**    | Vendure (NestJS) + TypeScript        |
-| **Database**   | PostgreSQL 16                        |
-| **Cache**      | Redis 7                              |
-| **ML**         | On-device image embeddings           |
-| **Deployment** | Container images (platform-agnostic) |
-
-## Project Structure
-
-```
-dukarun/
-├── assets/           # Brand assets (logos in assets/logo/)
-├── backend/          # Vendure server & worker
-├── frontend/         # Angular SPA
-├── configs/          # Shared configuration
-└── docs/             # Documentation & assets
-```
-
-## Getting Started
+Useful commands:
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/dukarun.git
-cd dukarun
+npm run dev:all              # dashboard + storefront + platform admin
+npm run build:active         # production-build all active Angular apps
+npm run check:web            # design guard + dashboard production build
+npm run sb:test              # pgTAP database suite
+npm run sb:lint              # lint public database objects
+npm run sb:types             # refresh checked-in database TypeScript types
 ```
 
-**Next:** See [INFRASTRUCTURE.md](./docs/INFRASTRUCTURE.md) for complete setup instructions, including Docker Compose configuration, network architecture, and deployment guides.
+## Active structure
 
-## Contributing
+```text
+apps/
+  web/                 Business dashboard and POS
+  storefront/          Public merchant storefront
+  super-admin/         Platform administration
+packages/
+  shared-types/        Generated Supabase database contract
+supabase/
+  migrations/          Append-only schema and RPC history
+  functions/           Edge Functions for provider integrations
+  tests/database/      pgTAP behavior and isolation tests
+scripts/etl/           Vendure-to-Supabase migration and verification
+docs/                  Current architecture, operations, and design language
+archive/vendure/       Frozen Vendure-era dashboard, infra, and documentation
+```
 
-This is currently a private project. For questions or contributions, contact the maintainers.
+The complete Vendure stack is preserved under `archive/vendure/` for migration rehearsal,
+read-only retention, and incident recovery. It is not part of the active workspace or CI. See
+[V1 → V2 migration](docs/V1_V2_MIGRATION.md).
+
+## Documentation
+
+- [Architecture](ARCHITECTURE.md)
+- [Local infrastructure](docs/INFRASTRUCTURE.md)
+- [Production deployment](docs/DEPLOYMENT.md)
+- [Design system](docs/DESIGN_SYSTEM.md)
+- [Migration runbook](docs/V1_V2_MIGRATION.md)
+- [Documentation index](docs/README.md)
+
+## Production boundary
+
+- Cloudflare Pages builds the three Angular apps.
+- Self-hosted Supabase on Coolify runs PostgreSQL, Auth, Storage, Realtime, and Edge Runtime.
+- CI production-builds all active apps and runs the web design guard.
+- Database CI starts an ephemeral stack, runs lint + pgTAP, and verifies generated types.
+
+Production frontend builds require `SUPABASE_URL` and `SUPABASE_ANON_KEY`; the shared prebuild
+script generates an ignored Angular environment file. Service-role, provider, and database
+credentials must never enter frontend build variables.
 
 ## License
 
-Proprietary - All rights reserved
-
----
-
-**Built with ❤️ for African small businesses**
+Proprietary.

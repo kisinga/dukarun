@@ -14,7 +14,8 @@ build/
 .idea/
 .angular/
 .cursor/
+archive/
 
 # Generated GraphQL outputs (codegen)
-frontend/src/app/core/graphql/generated/
-
+super-admin/src/app/core/graphql/generated/
+storefront/src/app/core/graphql/generated/

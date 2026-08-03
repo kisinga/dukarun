@@ -1,7 +1,8 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { Company, SupabaseService } from '../core/supabase.service';
+import { PermissionsService } from '../core/permissions.service';
 import { ThemeService } from '../core/theme.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -11,6 +12,8 @@ interface NavItem {
   label: string;
   icon: string;
   badge?: () => number;
+  /** Permission predicate — item renders only when it returns true. */
+  visible?: () => boolean;
 }
 
 interface NavSection {
@@ -116,7 +119,7 @@ interface NavSection {
               <span class="bottom-nav-ico"
                 ><ng-icon name="heroClipboardDocumentList" size="1.25rem"
               /></span>
-              <span class="bottom-nav-label">Orders</span>
+              <span class="bottom-nav-label">Sales</span>
             </a>
             <a
               routerLink="/money/cashier"
@@ -149,7 +152,7 @@ interface NavSection {
 
           <div class="flex-1 overflow-y-auto px-2 py-2">
             <nav class="space-y-1">
-              @for (section of sections; track section.label ?? 'top') {
+              @for (section of visibleSections(); track section.label ?? 'top') {
                 @if (section.label) {
                   <div
                     class="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-base-content/40"
@@ -197,6 +200,7 @@ export class ShellComponent implements OnInit {
   private readonly supabase = inject(SupabaseService);
   private readonly router = inject(Router);
   protected readonly theme = inject(ThemeService);
+  protected readonly perms = inject(PermissionsService);
   protected readonly approvals = inject(ApprovalsService);
   protected readonly notifications = inject(NotificationsService);
 
@@ -212,24 +216,39 @@ export class ShellComponent implements OnInit {
       items: [
         { route: '/pos/sell', label: 'Sell', icon: 'heroShoppingCart' },
         { route: '/pos/cashier', label: 'Cashier Queue', icon: 'heroQueueList' },
-        { route: '/orders', label: 'Orders', icon: 'heroClipboardDocumentList' },
+        { route: '/orders', label: 'Sales', icon: 'heroClipboardDocumentList' },
         { route: '/pos/proformas', label: 'Proformas', icon: 'heroDocumentText' },
         { route: '/products', label: 'Products', icon: 'heroCube' },
-        { route: '/stock-adjustments', label: 'Stock Adjustments', icon: 'heroArchiveBox' },
+        {
+          route: '/stock-adjustments',
+          label: 'Stock Adjustments',
+          icon: 'heroArchiveBox',
+          visible: () => this.perms.has('ManageStockAdjustments'),
+        },
         { route: '/pos/sync', label: 'Pending Sync', icon: 'heroArrowPath' },
       ],
     },
     {
       label: 'Finance',
       items: [
-        { route: '/money/cashier', label: 'Money', icon: 'heroBanknotes' },
-        { route: '/credit', label: 'Credit', icon: 'heroCreditCard' },
-        { route: '/reports', label: 'Reports', icon: 'heroChartBar' },
+        {
+          route: '/money/cashier',
+          label: 'Money',
+          icon: 'heroBanknotes',
+          visible: () => this.perms.has('ViewFinancials'),
+        },
+        {
+          route: '/reports',
+          label: 'Reports',
+          icon: 'heroChartBar',
+          visible: () => this.perms.has('ViewFinancials'),
+        },
         {
           route: '/approvals',
           label: 'Approvals',
           icon: 'heroCheckBadge',
           badge: () => this.approvals.pending().length,
+          visible: () => this.perms.has('ManageApprovals'),
         },
       ],
     },
@@ -238,11 +257,23 @@ export class ShellComponent implements OnInit {
       items: [
         { route: '/customers', label: 'Customers', icon: 'heroUsers' },
         { route: '/suppliers', label: 'Suppliers', icon: 'heroTruck' },
-        { route: '/team', label: 'Team', icon: 'heroUserGroup' },
+        {
+          route: '/team',
+          label: 'Team',
+          icon: 'heroUserGroup',
+          visible: () => this.perms.has('ManageTeam'),
+        },
         { route: '/messaging', label: 'Messaging', icon: 'heroChatBubbleLeftRight' },
       ],
     },
   ];
+
+  /** Sections with invisible items filtered out; empty sections dropped. */
+  protected readonly visibleSections = computed(() =>
+    this.sections
+      .map(s => ({ ...s, items: s.items.filter(i => !i.visible || i.visible()) }))
+      .filter(s => s.items.length > 0)
+  );
 
   async ngOnInit(): Promise<void> {
     try {

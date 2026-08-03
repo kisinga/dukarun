@@ -30,6 +30,8 @@ yarn-error.log
 .cursorrules
 .cursorignore
 .gitnexus
+# Generated production frontend configuration (created by each app's prebuild).
+apps/*/src/environments/environment.generated.ts
 
-
-/spikes
+# Local ETL reports and dry-run captures.
+scripts/etl/out/

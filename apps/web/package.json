@@ -4,6 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
+    "prebuild": "node ../../scripts/generate-environment.mjs web",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "design-guard": "node scripts/design-guard.mjs"

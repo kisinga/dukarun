@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "storefront-new": {
+    "super-admin": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -18,7 +18,7 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
-            "outputPath": "dist/storefront-new",
+            "outputPath": "dist/super-admin",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
@@ -36,7 +36,7 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kB",
+                  "maximumWarning": "600kB",
                   "maximumError": "1MB"
                 }
               ],
@@ -51,7 +51,7 @@
               "fileReplacements": [
                 {
                   "replace": "src/environments/environment.ts",
-                  "with": "src/environments/environment.prod.ts"
+                  "with": "src/environments/environment.generated.ts"
                 }
               ]
             },
@@ -66,14 +66,14 @@
         "serve": {
           "builder": "@angular/build:dev-server",
           "options": {
-            "port": 4204
+            "port": 4205
           },
           "configurations": {
             "production": {
-              "buildTarget": "storefront-new:build:production"
+              "buildTarget": "super-admin:build:production"
             },
             "development": {
-              "buildTarget": "storefront-new:build:development"
+              "buildTarget": "super-admin:build:development"
             }
           },
           "defaultConfiguration": "development"
@@ -82,6 +82,9 @@
     }
   },
   "cli": {
-    "analytics": false
+    "analytics": false,
+    "cache": {
+      "enabled": false
+    }
   }
 }

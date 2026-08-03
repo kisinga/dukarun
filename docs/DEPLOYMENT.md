@@ -5,7 +5,7 @@ DB: `***REMOVED***:5432` (direct IP; Cloudflare does NOT proxy TCP/Postgres — 
 
 ## Done
 
-- [x] 28 migrations applied (`supabase db push --db-url …`)
+- [x] 31 migration files tracked (`supabase db push --db-url …` applies pending files)
 - [x] Verified: 5 cron jobs, product-images bucket, 4 role templates
 - [x] Subscription tiers seeded (trial / standard)
 
@@ -46,13 +46,16 @@ Webhook URL → `https://supa.dukarun.com/functions/v1/paystack-webhook` (uses P
 
 ### 5. Frontends (Cloudflare Pages, one project each)
 
-Env for all: `SUPABASE_URL=https://supa.dukarun.com`, `SUPABASE_ANON_KEY=<anon key from Coolify env>`
+Env for all: `SUPABASE_URL=https://supa.dukarun.com`,
+`SUPABASE_ANON_KEY=<anon key from Coolify env>`. Each app's `prebuild` invokes
+`scripts/generate-environment.mjs`; verify that line appears in the Pages build log. Do not add
+service-role or provider secrets to Pages.
 
-| App | Build command | Output dir |
-|---|---|---|
-| admin | `npm run build:web` | `apps/web/dist/web` |
-| storefront | `npm run build:storefront-new` | `apps/storefront-new/dist/storefront-new` |
-| super-admin | `npm run build:super-admin-new` | `apps/super-admin-new/dist/super-admin-new` |
+| App         | Build command               | Output dir                                  |
+| ----------- | --------------------------- | ------------------------------------------- |
+| admin       | `npm run build:web`         | `apps/web/dist/web/browser`                 |
+| storefront  | `npm run build:storefront`  | `apps/storefront/dist/storefront/browser`   |
+| super-admin | `npm run build:super-admin` | `apps/super-admin/dist/super-admin/browser` |
 
 ### 6. Smoke test
 
@@ -79,7 +82,8 @@ functions into the edge-runtime volume (hot-reload; docker-cp fallback).
    - variable `FUNCTIONS_VOLUME` = the edge-runtime functions dir on the host
      (Coolify → Supabase service → volumes; e.g. `/data/coolify/services/<id>/storage/functions`)
    - (optional) variable `EDGE_RUNTIME_CONTAINER` for the docker-cp fallback.
-5. Protect `main`: require the `test` job green + `environment: production`
+5. Protect `main`: require `Active apps / Build + design guard` and
+   `Supabase / Lint + pgTAP`, plus `environment: production`
    approval for deploys if you want a manual gate.
 
 Frontends stay on Cloudflare Pages auto-builds — no CI needed there.

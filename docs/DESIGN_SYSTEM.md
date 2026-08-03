@@ -3,9 +3,10 @@
 This document is the normative spec for all Dukarun dashboard UI. It is short on purpose:
 the real enforcement lives in code — tokens in `apps/web/src/styles.scss` (`@theme` + global
 recipes), shared components in `apps/web/src/app/shared/ui/`, and the `design-guard` CI gate
-(`apps/web/scripts/design-guard.mjs`, run via `npm run design-guard` in `apps/web`). The legacy
-`frontend/` app follows the same language with its own guard. If this doc and the code
-disagree, **the code is wrong** — fix the code or update this doc in the same PR.
+(`apps/web/scripts/design-guard.mjs`, run via `npm run design-guard` in `apps/web`). The frozen
+Vendure dashboard lives at `archive/vendure/frontend/` and is not an active reference. If this
+doc and the active code disagree, **the code is wrong** — fix the code or update this doc in the
+same PR.
 
 ---
 
@@ -77,17 +78,17 @@ The orange is a spice, not a sauce.
 Dashboard text never exceeds 24px. The roles are encoded as Tailwind utilities in
 `apps/web/src/styles.scss` — use them, not raw size classes:
 
-| Role | Utility | Use |
-|---|---|---|
-| `hero` | `type-hero` (24px bold, `tracking-tight`, `tabular-nums`) | Stat numbers, totals |
-| `title` | `type-title` (20px bold tight) | Page titles only (via `PageHeaderComponent`) |
-| `heading` | `type-heading` / `.section-title` (14px semibold) | Section headings |
-| `body` | `type-body` (14px) | Values, rows |
-| `caption` | `type-caption` (12px, `/60` muted) | Labels, timestamps |
+| Role      | Utility                                                   | Use                                          |
+| --------- | --------------------------------------------------------- | -------------------------------------------- |
+| `hero`    | `type-hero` (24px bold, `tracking-tight`, `tabular-nums`) | Stat numbers, totals                         |
+| `title`   | `type-title` (20px bold tight)                            | Page titles only (via `PageHeaderComponent`) |
+| `heading` | `type-heading` / `.section-title` (14px semibold)         | Section headings                             |
+| `body`    | `type-body` (14px)                                        | Values, rows                                 |
+| `caption` | `type-caption` (12px, `/60` muted)                        | Labels, timestamps                           |
 
 - No arbitrary sizes (`text-[10px]`, `text-[11px]`) — the guard rejects them.
-- Marketing pages in the legacy `frontend/` app have their own scale
-  (`frontend/src/styles/_marketing.scss`); this scale governs the dashboard.
+- Public marketing/storefront surfaces may define a separate documented scale; this five-role
+  scale governs the authenticated dashboard.
 
 ## Spacing
 
@@ -99,8 +100,9 @@ Dashboard text never exceeds 24px. The roles are encoded as Tailwind utilities i
 
 ## Icons
 
-- System: `@ng-icons/heroicons` (outline), registered via `provideIcons()` in
-  `apps/web/src/app/app.config.ts`. Add missing icons to that registry.
+- System: `@ng-icons/heroicons` (outline), registered via `provideIcons()`. Shared icons belong
+  in `apps/web/src/app/app.config.ts`; page-only icons should be provided at the closest lazy
+  component so they do not increase the initial bundle.
 - **No inline `<svg>`, no emoji, ever** — the guard rejects them.
 - Always use `<app-icon name="hero…">` (`IconComponent`) — sizes: `sm` (14px, with
   `text-xs`), `md` (16px, with `text-sm`, the default), `lg` (20px, standalone),
@@ -125,9 +127,13 @@ Compose pages from these — never hand-roll what a primitive owns:
 - **`<app-form-field label="…">`** — one field recipe (label above the control, optional
   `hint` / `error`, `required` marker). Wrap every input/select in forms; add `w-full` to
   the projected control. No bare `form-control`/`label-text` blocks.
-- **`<button appButton>`** — one button idiom: `variant="primary|outline|ghost|error"`,
-  `size="sm|md"`, `[loading]` swaps in a spinner and disables. No raw `btn btn-*` strings
-  for standard actions (tight table-row clusters may stay raw by exception).
+- **`<button appButton>`** — one button idiom: `variant="primary|secondary|soft|outline|ghost|error"`,
+  `size="sm|md"`, `[iconOnly]` for square icon actions, and `[loading]` to swap in a spinner
+  and disable. `primary` is the one page/sheet CTA; `secondary` is a quiet filled action;
+  `soft` is a low-emphasis primary-tinted action; `outline` and `ghost` step down from there.
+  Use `soft`, not `primary`, for a selected method/filter so the CTA remains singular.
+  Variants never change button geometry. No raw `btn btn-*` strings for standard actions
+  (tight table-row clusters may stay raw by exception).
 - **`<app-money [cents]>`** — the only way to render money: tabular-nums KES formatting,
   `direction="in|out"` for money-meaning colour, `masked` for hidden figures. Never
   `{{ formatKes(...) }}` in templates (string composition in TS, e.g. option labels, is fine).
@@ -162,6 +168,29 @@ elsewhere (orders from the POS) omit the create action.
 panels on list pages; it has not been ported to `apps/web` yet. Until it is, keep analytics
 panels in a standard `card` with a `.section-title` heading, one per page, between the
 header and the search bar.
+
+## The Dashboard Page (canonical layout)
+
+The operational dashboard is a dense owner view, so it uses `<app-page [wide]="true">` and
+the full `page-wide` canvas. It is not a narrow feed or a collection of floating widgets.
+
+1. **Page identity** — title is always “Dashboard”; business name and context belong in the
+   subtitle. Connection state and refresh are compact header actions.
+2. **Today first** — the first section is a four-card `app-stat-card` grid. Use `gap-3`, two
+   columns on phones and four from `lg`. Never show zero-value empty data while the initial
+   request is loading; use a dash or loading state.
+3. **Performance surfaces** — trend and ranking cards share one responsive 12-column grid.
+   Card titles and captions live inside a bordered card header, followed by one table or one
+   embedded empty/loading state. The primary trend may take seven columns and the supporting
+   ranking five; both collapse to one column below `xl`.
+4. **Exceptions last** — low stock, expiry, sync failures, and similar operational alerts use
+   warning/error only when action is required. Exception lists use the two-line row language
+   inside two equal cards; healthy states use `app-empty-state`.
+5. **Rhythm** — wrap dashboard sections in `space-y-6`; use `gap-4` between major desktop
+   surfaces and `gap-2`/`gap-3` within a component.
+
+Live dashboards must show the last successful refresh time, preserve existing data during a
+background refresh, and provide explicit initial loading, error, and empty states.
 
 ## Navigation chrome (sidebar / bottom nav)
 

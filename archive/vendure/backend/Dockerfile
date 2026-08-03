@@ -1,36 +1,30 @@
 # ========================================
 # Backend Production Dockerfile
 # Build context: repository root (.)
-# Uses root package-lock.json for deterministic installs.
+# Legacy standalone build; excluded from the active root workspace.
 # ========================================
 
 FROM node:22-alpine AS builder
 
-WORKDIR /app
+WORKDIR /app/backend
 
-# Root workspace manifests (single source of truth for lockfile)
-COPY package.json package-lock.json ./
-
-# Workspace package.json files must exist before npm ci so workspaces are resolved
-COPY backend/package.json backend/
-COPY frontend/package.json frontend/
-COPY storefront/package.json storefront/
+COPY archive/vendure/backend/package.json ./
 
 ENV NODE_ENV=development
 
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --quiet --no-audit --no-fund --include=dev --workspace=@dukarun/backend
+    npm install --quiet --no-audit --no-fund --include=dev
 
 # Only backend source; frontend excluded via dockerignore.backend
-COPY backend ./backend
+COPY archive/vendure/backend ./
 
-RUN npm run build -w @dukarun/backend
+RUN npm run build
 
 RUN echo "Build verification:" && \
-    ls -la backend/dist/ && \
-    if [ ! -f "backend/dist/src/index.js" ]; then echo "❌ backend/dist/src/index.js not found!"; exit 1; fi && \
-    if [ ! -f "backend/dist/src/index-worker.js" ]; then echo "❌ backend/dist/src/index-worker.js not found!"; exit 1; fi && \
-    if [ ! -f "backend/dist/src/entrypoint.js" ]; then echo "❌ backend/dist/src/entrypoint.js not found!"; exit 1; fi && \
+    ls -la dist/ && \
+    if [ ! -f "dist/src/index.js" ]; then echo "❌ dist/src/index.js not found!"; exit 1; fi && \
+    if [ ! -f "dist/src/index-worker.js" ]; then echo "❌ dist/src/index-worker.js not found!"; exit 1; fi && \
+    if [ ! -f "dist/src/entrypoint.js" ]; then echo "❌ dist/src/entrypoint.js not found!"; exit 1; fi && \
     echo "✅ Build verification successful"
 
 # Stage 2: Production runtime
@@ -44,7 +38,7 @@ ENV NODE_ENV=production
 
 # Preserve workspace layout so Node resolves backend/node_modules (p-limit, etc.)
 # Copy with ownership so we avoid slow chown -R over node_modules
-COPY --from=builder --chown=vendure:vendure /app/node_modules /usr/src/app/node_modules
+COPY --from=builder --chown=vendure:vendure /app/backend/node_modules /usr/src/app/backend/node_modules
 COPY --from=builder --chown=vendure:vendure /app/backend /usr/src/app/backend
 
 RUN mkdir -p /usr/src/app/backend/static/assets/cache /usr/src/app/backend/static/uploads && \

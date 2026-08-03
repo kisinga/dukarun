@@ -1,18 +1,23 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { formatKes, parseKesToCents } from '../../core/money';
-import { CartService } from '../cart.service';
+import { parseKesToCents } from '../../core/money';
+import { PermissionsService } from '../../core/permissions.service';
+import { CartService, type CartLine } from '../cart.service';
 import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
 import { ConnectivityService } from '../offline/connectivity.service';
 import { SyncService } from '../offline/sync.service';
+import { ButtonComponent } from '../../shared/ui/button.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
-import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { FormFieldComponent } from '../../shared/ui/form-field.component';
+import { IconComponent } from '../../shared/ui/icon.component';
+import { MoneyComponent } from '../../shared/ui/money.component';
+import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { PrintService, type PrintFormat } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
-import { NgIcon } from '@ng-icons/core';
+import { SellCartLineComponent } from './sell-cart-line.component';
 import {
   Customer,
   PaymentInput,
@@ -26,57 +31,61 @@ import {
   selector: 'app-sell',
   imports: [
     RouterLink,
-    FormsModule,
     ReactiveFormsModule,
     CheckoutPanelComponent,
-    NgIcon,
-    PageHeaderComponent,
+    ButtonComponent,
     EmptyStateComponent,
+    FormFieldComponent,
+    IconComponent,
+    MoneyComponent,
+    PageLayoutComponent,
+    SellCartLineComponent,
   ],
   template: `
-    <main class="dashboard-main min-h-screen bg-base-200 p-4 pb-24 lg:pb-4">
-      <div class="page page-wide">
-        <app-page-header title="Sell">
-          @if (cart.draftId()) {
-            <span actions class="badge badge-info">Editing proforma</span>
-          }
-          @if (!connectivity.online()) {
-            <span actions class="badge badge-warning">Offline — sales will queue</span>
-          }
-          @if (sync.queuedCount() > 0 || sync.failedCount() > 0) {
-            <a
-              actions
-              routerLink="/pos/sync"
-              class="badge"
-              [class.badge-error]="sync.failedCount() > 0"
-              [class.badge-warning]="sync.failedCount() === 0"
-            >
-              {{ sync.queuedCount() + sync.failedCount() }} pending sync
-            </a>
-          }
-        </app-page-header>
+    <app-page
+      title="Sell"
+      subtitle="Find an item, adjust it, and take payment without leaving the counter."
+      [wide]="true"
+    >
+      @if (cart.draftId()) {
+        <span actions class="badge badge-info">Editing proforma</span>
+      }
+      @if (!connectivity.online()) {
+        <span actions class="badge badge-warning">Offline — sales will queue</span>
+      }
+      @if (sync.queuedCount() > 0 || sync.failedCount() > 0) {
+        <a
+          actions
+          routerLink="/pos/sync"
+          class="badge"
+          [class.badge-error]="sync.failedCount() > 0"
+          [class.badge-warning]="sync.failedCount() === 0"
+        >
+          {{ sync.queuedCount() + sync.failedCount() }} pending sync
+        </a>
+      }
 
-        <!-- Success / queued celebration (colour + icon, not oversized type) -->
+      <div class="pb-24 lg:pb-0">
         @if (success(); as s) {
-          <div class="card mb-4 bg-base-100">
+          <section class="card mb-4 bg-base-100" aria-live="polite">
             <div class="card-body flex-row flex-wrap items-center gap-4 p-4">
-              <ng-icon
+              <app-icon
                 name="heroCheckCircle"
-                size="2.5rem"
+                size="xl"
                 [class.text-success]="s.tone === 'success'"
                 [class.text-warning]="s.tone === 'warning'"
               />
-              <div class="flex-1">
+              <div class="min-w-48 flex-1">
                 <p class="type-heading">{{ s.text }}</p>
                 @if (s.tone === 'warning') {
                   <p class="text-sm text-base-content/60">
-                    It's in the pending sync list, not in Today's Sales yet.
+                    It is safely queued and will appear in Today's Sales after syncing.
                   </p>
                 }
               </div>
               @if (s.orderId && printerEnabled()) {
                 <select
-                  class="select select-bordered select-sm"
+                  class="select select-bordered select-sm min-h-11"
                   [value]="print.format()"
                   (change)="onFormatChange($event)"
                   title="Receipt format"
@@ -88,239 +97,354 @@ import {
                   }
                 </select>
                 <button
-                  class="btn btn-outline min-h-11"
+                  appButton
+                  variant="outline"
+                  size="md"
                   [disabled]="busy()"
                   (click)="printReceipt(s.orderId)"
                 >
+                  <app-icon name="heroPrinter" />
                   Print receipt
                 </button>
               }
-              <button class="btn btn-primary min-h-11" (click)="newSale()">New sale</button>
+              <button appButton size="md" (click)="newSale()">
+                <app-icon name="heroPlus" />
+                New sale
+              </button>
             </div>
+          </section>
+        }
+
+        @if (error()) {
+          <div class="alert alert-error mb-4 py-3" role="alert">
+            <app-icon name="heroExclamationTriangle" />
+            <span>{{ error() }}</span>
+            <button
+              appButton
+              variant="ghost"
+              size="sm"
+              [iconOnly]="true"
+              aria-label="Dismiss error"
+              (click)="error.set(null)"
+            >
+              <app-icon name="heroXMark" />
+            </button>
+          </div>
+        }
+        @if (notice()) {
+          <div class="alert alert-success mb-4 py-3" aria-live="polite">
+            <app-icon name="heroCheckCircle" />
+            <span>{{ notice() }}</span>
           </div>
         }
 
-        <div class="grid gap-4 lg:grid-cols-3">
+        <div class="grid items-start gap-4 lg:grid-cols-3">
           <section class="flex min-w-0 flex-col gap-4 lg:col-span-2">
-            <!-- Product search / barcode + quick-pick grid -->
             <div class="card bg-base-100">
               <div class="card-body p-4">
-                <input
-                  type="text"
-                  class="input input-bordered w-full"
-                  placeholder="Search by name, SKU, or scan barcode…"
-                  [formControl]="search"
-                />
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 class="type-heading">Add products</h2>
+                    <p class="mt-0.5 text-sm text-base-content/60">
+                      Search by name or SKU, or scan a barcode.
+                    </p>
+                  </div>
+                  @if (!cart.isEmpty()) {
+                    <span class="badge badge-primary shrink-0">
+                      {{ cartItemCount() }} in cart
+                    </span>
+                  }
+                </div>
 
-                <!-- Quick-pick grid: top variants; typing filters via search -->
-                <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                <div class="relative mt-3">
+                  <span
+                    class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base-content/50"
+                  >
+                    <app-icon name="heroMagnifyingGlass" size="lg" />
+                  </span>
+                  <input
+                    type="search"
+                    class="input input-bordered min-h-11 w-full pr-12 pl-11"
+                    placeholder="Search or scan barcode…"
+                    autocomplete="off"
+                    [formControl]="search"
+                  />
+                  @if (search.value) {
+                    <button
+                      appButton
+                      variant="ghost"
+                      size="md"
+                      [iconOnly]="true"
+                      type="button"
+                      class="absolute inset-y-0 right-0 my-auto mr-1"
+                      aria-label="Clear product search"
+                      (click)="clearSearch()"
+                    >
+                      <app-icon name="heroXMark" />
+                    </button>
+                  }
+                </div>
+
+                <div class="mt-4 flex items-center justify-between gap-2">
+                  <p class="type-caption">
+                    {{ searchMode() ? 'Search results' : 'Quick add' }}
+                  </p>
+                  @if (!searchMode()) {
+                    <p class="text-xs text-base-content/50 sm:hidden">Swipe for more</p>
+                  }
+                </div>
+
+                <div
+                  class="mt-2 snap-x gap-2 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 xl:grid-cols-4"
+                  [class.flex]="!searchMode()"
+                  [class.grid]="searchMode()"
+                  [class.grid-cols-2]="searchMode()"
+                >
                   @for (v of gridItems(); track v.variant_id) {
                     <button
                       type="button"
-                      class="flex min-h-11 flex-col items-start gap-1 rounded-box border border-base-300/60 bg-base-100 p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                      class="group relative flex min-h-28 shrink-0 snap-start flex-col items-start gap-1 rounded-box border border-base-300/70 bg-base-100 p-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
+                      [class.w-36]="!searchMode()"
+                      [class.w-full]="searchMode()"
+                      [disabled]="unavailable(v)"
                       (click)="addVariant(v)"
                     >
-                      @if (imageUrl(v.image_path); as thumb) {
-                        @if (!brokenImages().has(v.image_path!)) {
-                          <img
-                            [src]="thumb"
-                            alt=""
-                            class="h-10 w-10 rounded-field object-cover"
-                            (error)="markBroken(v.image_path!)"
-                          />
+                      <div class="flex w-full items-start justify-between gap-2">
+                        @if (imageUrl(v.image_path); as thumb) {
+                          @if (!brokenImages().has(v.image_path!)) {
+                            <img
+                              [src]="thumb"
+                              alt=""
+                              class="h-10 w-10 rounded-field object-cover"
+                              (error)="markBroken(v.image_path!)"
+                            />
+                          } @else {
+                            <span
+                              class="flex h-10 w-10 items-center justify-center rounded-field bg-base-200"
+                            >
+                              <app-icon name="heroCube" size="lg" />
+                            </span>
+                          }
+                        } @else {
+                          <span
+                            class="flex h-10 w-10 items-center justify-center rounded-field bg-base-200"
+                          >
+                            <app-icon name="heroCube" size="lg" />
+                          </span>
                         }
-                      }
-                      <span class="line-clamp-2 text-sm leading-tight font-medium">{{
-                        label(v)
-                      }}</span>
-                      <span class="mt-auto flex w-full items-center justify-between gap-1">
-                        <span class="text-sm font-bold whitespace-nowrap tabular-nums">{{
-                          fmt(v.price ?? 0)
-                        }}</span>
-                        <span class="badge shrink-0 badge-ghost badge-xs">
-                          {{
-                            v.kind === 'service'
-                              ? 'service'
-                              : !v.track_inventory
-                                ? '—'
-                                : (v.stock ?? 0) + ' left'
-                          }}
+                        @if (quantityInCart(v.variant_id) > 0) {
+                          <span class="badge badge-primary badge-sm">
+                            {{ quantityInCart(v.variant_id) }}
+                          </span>
+                        } @else {
+                          <span class="badge badge-ghost gap-1 text-primary">
+                            <app-icon name="heroPlus" />
+                            Add
+                          </span>
+                        }
+                      </div>
+                      <span class="line-clamp-2 text-sm leading-tight font-semibold">
+                        {{ label(v) }}
+                      </span>
+                      <span class="mt-auto flex w-full items-end justify-between gap-1">
+                        <span class="text-sm font-bold whitespace-nowrap">
+                          <app-money [cents]="v.price ?? 0" />
+                        </span>
+                        <span
+                          class="text-right text-xs"
+                          [class.text-error]="unavailable(v)"
+                          [class.text-base-content/50]="!unavailable(v)"
+                        >
+                          {{ stockLabel(v) }}
                         </span>
                       </span>
                     </button>
                   }
                 </div>
+
                 @if (gridItems().length === 0) {
-                  <p class="py-4 text-center text-sm text-base-content/60">
-                    No products match — check the spelling or scan the barcode.
-                  </p>
+                  <div class="py-6 text-center">
+                    <p class="text-sm font-medium">No matching products</p>
+                    <p class="mt-1 text-sm text-base-content/60">
+                      Check the spelling or scan the item's barcode.
+                    </p>
+                  </div>
                 }
               </div>
             </div>
 
-            <!-- Cart -->
-            <div class="card bg-base-100">
-              <div class="card-body p-4">
-                @if (cart.isEmpty()) {
+            <div id="current-sale" class="card scroll-mt-4 bg-base-100">
+              <div
+                class="flex items-center justify-between gap-3 border-b border-base-content/15 px-3 py-2.5 sm:px-4 sm:py-3"
+              >
+                <div>
+                  <h2 class="type-heading">Current sale</h2>
+                  @if (!cart.isEmpty()) {
+                    <p class="type-caption">
+                      {{ cart.lines().length }} {{ cart.lines().length === 1 ? 'line' : 'lines' }}
+                    </p>
+                  }
+                </div>
+                @if (!cart.isEmpty()) {
+                  <button
+                    appButton
+                    variant="ghost"
+                    size="sm"
+                    class="text-base-content/60 hover:text-error"
+                    [disabled]="busy()"
+                    (click)="clearCart()"
+                  >
+                    Clear cart
+                  </button>
+                }
+              </div>
+
+              @if (cart.isEmpty()) {
+                <div class="p-4">
                   <app-empty-state
                     [embedded]="true"
                     [compact]="true"
                     icon="heroShoppingCart"
                     title="Cart is empty"
-                    description="— tap a product above to start a sale."
+                    description="Tap a quick product or search above to start the sale."
                   />
-                } @else {
-                  <div class="w-full min-w-0 overflow-x-auto">
-                    <table class="table">
-                      <thead>
-                        <tr>
-                          <th>Item</th>
-                          <th>Qty</th>
-                          <th class="text-right">Price</th>
-                          <th class="text-right">Total</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (line of cart.lines(); track line.variant.variant_id) {
-                          <tr>
-                            <td>
-                              <div class="text-sm font-medium">{{ cart.lineLabel(line) }}</div>
-                              <div class="text-xs text-base-content/60">{{ line.variant.sku }}</div>
-                            </td>
-                            <td>
-                              <div class="join">
-                                <button
-                                  class="btn btn-sm join-item min-h-11 min-w-11"
-                                  (click)="stepQty(line.variant.variant_id!, -1)"
-                                >
-                                  −
-                                </button>
-                                <input
-                                  type="number"
-                                  class="input input-bordered input-sm join-item min-h-11 w-16 text-center tabular-nums"
-                                  [min]="line.variant.allow_fractional ? 0.5 : 1"
-                                  [step]="line.variant.allow_fractional ? 0.5 : 1"
-                                  [ngModel]="line.quantity"
-                                  (ngModelChange)="onQtyInput(line.variant.variant_id!, $event)"
-                                />
-                                <button
-                                  class="btn btn-sm join-item min-h-11 min-w-11"
-                                  (click)="stepQty(line.variant.variant_id!, 1)"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </td>
-                            <td class="text-right tabular-nums">
-                              @if (line.customPrice !== null) {
-                                <span class="font-semibold text-accent">{{
-                                  fmt(line.customPrice)
-                                }}</span>
-                                <div class="text-xs text-base-content/60">
-                                  was {{ fmt(line.unitPrice) }}
-                                </div>
-                              } @else {
-                                {{ fmt(line.unitPrice) }}
-                              }
+                </div>
+              } @else {
+                <div>
+                  @for (line of cart.lines(); track line.variant.variant_id) {
+                    <div
+                      class="border-b-2 border-base-content/15 bg-base-100 last:border-b-0 even:bg-base-200/20"
+                    >
+                      <app-sell-cart-line
+                        [line]="line"
+                        [label]="cart.lineLabel(line)"
+                        [canOverridePrice]="canOverridePrices()"
+                        (quantityStep)="stepQty(line.variant.variant_id!, $event)"
+                        (quantityChanged)="onQtyInput(line.variant.variant_id!, $event)"
+                        (priceStep)="adjustPrice(line, $event)"
+                        (priceEdit)="startOverride(line)"
+                        (priceReset)="resetPrice(line)"
+                        (removed)="cart.removeLine(line.variant.variant_id!)"
+                      />
+
+                      @if (overrideFor() === line.variant.variant_id) {
+                        <div class="border-t border-base-content/15 bg-base-200/70 p-3 sm:p-4">
+                          <div class="flex items-start justify-between gap-3">
+                            <div>
+                              <p class="text-sm font-semibold">Set exact unit price</p>
+                              <p class="mt-0.5 text-xs text-base-content/60">
+                                Whole KES only. Quick arrows remain the fastest option.
+                              </p>
+                            </div>
+                            <button
+                              appButton
+                              variant="ghost"
+                              size="sm"
+                              [iconOnly]="true"
+                              aria-label="Close price editor"
+                              (click)="overrideFor.set(null)"
+                            >
+                              <app-icon name="heroXMark" />
+                            </button>
+                          </div>
+                          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                            <app-form-field label="Unit price (KES)" [required]="true">
+                              <input
+                                type="text"
+                                inputmode="numeric"
+                                class="input input-bordered min-h-11 w-full"
+                                [formControl]="overridePrice"
+                              />
+                            </app-form-field>
+                            <app-form-field label="Reason" hint="Optional; saved on the sale line.">
+                              <input
+                                type="text"
+                                class="input input-bordered min-h-11 w-full"
+                                placeholder="e.g. Damaged packaging"
+                                [formControl]="overrideReason"
+                              />
+                            </app-form-field>
+                          </div>
+                          <div class="mt-3 flex flex-wrap justify-end gap-2">
+                            @if (line.customPrice !== null) {
                               <button
-                                class="btn btn-ghost btn-xs text-base-content/40"
-                                (click)="startOverride(line)"
+                                appButton
+                                variant="ghost"
+                                size="md"
+                                (click)="resetPrice(line)"
                               >
-                                override
+                                Use base price
                               </button>
-                            </td>
-                            <td class="text-right type-heading tabular-nums">
-                              {{ fmt(lineTotal(line)) }}
-                            </td>
-                            <td>
-                              <button
-                                class="btn btn-ghost btn-sm min-h-11 min-w-11"
-                                (click)="cart.removeLine(line.variant.variant_id!)"
-                              >
-                                <ng-icon name="heroXMark" />
-                              </button>
-                            </td>
-                          </tr>
-                          @if (overrideFor() === line.variant.variant_id) {
-                            <tr>
-                              <td colspan="5">
-                                <div class="flex flex-wrap items-end gap-2 rounded bg-base-200 p-2">
-                                  <label class="form-control">
-                                    <span class="label-text">New price (KES)</span>
-                                    <input
-                                      type="text"
-                                      inputmode="decimal"
-                                      class="input input-bordered input-sm w-28"
-                                      [formControl]="overridePrice"
-                                    />
-                                  </label>
-                                  <label class="form-control flex-1">
-                                    <span class="label-text">Reason</span>
-                                    <input
-                                      type="text"
-                                      class="input input-bordered input-sm"
-                                      placeholder="e.g. Damaged packaging"
-                                      [formControl]="overrideReason"
-                                    />
-                                  </label>
-                                  <button class="btn btn-primary btn-sm" (click)="applyOverride()">
-                                    Apply
-                                  </button>
-                                  <button
-                                    class="btn btn-ghost btn-sm"
-                                    (click)="overrideFor.set(null)"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          }
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                }
-              </div>
+                            }
+                            <button
+                              appButton
+                              variant="outline"
+                              size="md"
+                              (click)="overrideFor.set(null)"
+                            >
+                              Cancel
+                            </button>
+                            <button appButton size="md" (click)="applyOverride()">
+                              Apply price
+                            </button>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
             </div>
           </section>
 
-          <aside class="flex min-w-0 flex-col gap-4">
-            <!-- Customer -->
+          <aside class="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4">
             <div class="card bg-base-100">
               <div class="card-body p-4">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <div class="type-caption">Customer</div>
-                    <div class="type-heading">{{ cart.customerName() }}</div>
+                <div class="flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="type-caption">Customer</p>
+                    <p class="truncate font-semibold">{{ cart.customerName() }}</p>
                   </div>
-                  <button class="btn btn-ghost btn-sm" (click)="toggleCustomerPicker()">
-                    Change
+                  <button appButton variant="ghost" size="md" (click)="toggleCustomerPicker()">
+                    {{ customerPickerOpen() ? 'Close' : 'Change' }}
                   </button>
                 </div>
+
                 @if (customerPickerOpen()) {
-                  <div class="mt-2">
-                    <input
-                      type="text"
-                      class="input input-bordered input-sm w-full"
-                      placeholder="Search name or phone…"
-                      [formControl]="customerSearch"
-                    />
-                    <button
-                      class="btn btn-ghost btn-xs mt-1"
-                      (click)="selectCustomer(null, 'Walk-in')"
-                    >
-                      Reset to Walk-in
-                    </button>
+                  <div class="mt-3 border-t border-base-300/60 pt-3">
+                    <app-form-field label="Find customer" hint="Required only for credit sales.">
+                      <input
+                        type="search"
+                        class="input input-bordered min-h-11 w-full"
+                        placeholder="Name or phone…"
+                        [formControl]="customerSearch"
+                      />
+                    </app-form-field>
+                    @if (cart.customerId()) {
+                      <button
+                        appButton
+                        variant="ghost"
+                        size="sm"
+                        class="mt-1"
+                        (click)="selectCustomer(null, 'Walk-in')"
+                      >
+                        Use Walk-in customer
+                      </button>
+                    }
                     @if (customerResults().length > 0) {
-                      <ul class="menu mt-1 rounded-box bg-base-200">
+                      <ul class="menu mt-2 rounded-box bg-base-200 p-1">
                         @for (c of customerResults(); track c.id) {
                           <li>
-                            <a class="min-h-11" (click)="selectCustomer(c.id, customerName(c))">
-                              <span class="flex-1">{{ customerName(c) }}</span>
+                            <button
+                              type="button"
+                              class="min-h-11"
+                              (click)="selectCustomer(c.id, customerName(c))"
+                            >
+                              <span class="min-w-0 flex-1 truncate text-left">
+                                {{ customerName(c) }}
+                              </span>
                               <span class="text-xs text-base-content/60">{{ c.phone }}</span>
-                            </a>
+                            </button>
                           </li>
                         }
                       </ul>
@@ -330,84 +454,49 @@ import {
               </div>
             </div>
 
-            <!-- Totals + secondary actions (desktop; mobile uses the bottom bar) -->
-            <div class="card hidden bg-base-100 lg:block">
+            <div class="card bg-base-100">
               <div class="card-body p-4">
-                <div class="flex items-center justify-between">
-                  <span class="type-caption">Total</span>
-                  <span class="type-hero">{{ fmt(cart.total()) }}</span>
+                <div class="hidden items-end justify-between gap-3 lg:flex">
+                  <div>
+                    <p class="type-caption">Amount due</p>
+                    <p class="mt-1 type-hero"><app-money [cents]="cart.total()" /></p>
+                  </div>
+                  <span class="badge badge-ghost">
+                    {{ cartItemCount() }} {{ cartItemCount() === 1 ? 'item' : 'items' }}
+                  </span>
                 </div>
 
-                @if (error()) {
-                  <p class="mt-2 text-sm text-error">{{ error() }}</p>
-                }
-                @if (notice()) {
-                  <p class="mt-2 text-sm text-success">{{ notice() }}</p>
-                }
+                <button
+                  appButton
+                  size="md"
+                  class="mt-4 hidden w-full lg:flex"
+                  [disabled]="cart.isEmpty() || busy()"
+                  (click)="checkoutOpen.set(true)"
+                >
+                  <app-icon name="heroBanknotes" />
+                  Take payment
+                </button>
 
-                <div class="mt-3 flex flex-col gap-2">
+                <div class="flex flex-wrap gap-2 lg:mt-2 lg:flex-col">
                   <button
-                    class="btn btn-primary min-h-11"
-                    [disabled]="cart.isEmpty() || busy()"
-                    (click)="checkoutOpen.set(true)"
-                  >
-                    Complete Sale
-                  </button>
-                  <button
-                    class="btn btn-outline min-h-11"
+                    appButton
+                    variant="secondary"
+                    size="md"
+                    class="flex-1"
                     [disabled]="cart.isEmpty() || busy()"
                     (click)="park()"
                   >
-                    Park (cashier queue)
+                    Park sale
                   </button>
                   <button
-                    class="btn btn-outline min-h-11"
+                    appButton
+                    variant="secondary"
+                    size="md"
+                    class="flex-1"
                     [disabled]="cart.isEmpty() || busy()"
                     (click)="saveProforma()"
                   >
-                    Save as Proforma
-                  </button>
-                  <button
-                    class="btn btn-ghost btn-sm"
-                    [disabled]="cart.isEmpty() || busy()"
-                    (click)="clearCart()"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Secondary actions, mobile (primary lives in the bottom bar) -->
-            <div class="card bg-base-100 lg:hidden">
-              <div class="card-body p-4">
-                @if (error()) {
-                  <p class="text-sm text-error">{{ error() }}</p>
-                }
-                @if (notice()) {
-                  <p class="text-sm text-success">{{ notice() }}</p>
-                }
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    class="btn btn-outline btn-sm min-h-11"
-                    [disabled]="cart.isEmpty() || busy()"
-                    (click)="park()"
-                  >
-                    Park
-                  </button>
-                  <button
-                    class="btn btn-outline btn-sm min-h-11"
-                    [disabled]="cart.isEmpty() || busy()"
-                    (click)="saveProforma()"
-                  >
-                    Proforma
-                  </button>
-                  <button
-                    class="btn btn-ghost btn-sm min-h-11"
-                    [disabled]="cart.isEmpty() || busy()"
-                    (click)="clearCart()"
-                  >
-                    Clear
+                    Save proforma
                   </button>
                 </div>
               </div>
@@ -416,21 +505,25 @@ import {
         </div>
       </div>
 
-      <!-- One primary action, bottom-anchored on mobile; total is the hero -->
       <div
-        class="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-30 border-t border-base-300/60 bg-base-100 p-3 lg:hidden"
+        class="shadow-overlay fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-30 border-t border-base-300/60 bg-base-100 p-3 lg:hidden"
       >
         <div class="mx-auto flex max-w-6xl items-center gap-3">
-          <div class="flex-1">
-            <div class="type-caption">Total</div>
-            <div class="type-hero">{{ fmt(cart.total()) }}</div>
-          </div>
+          <a href="#current-sale" class="min-w-0 flex-1 rounded-field focus:outline-primary">
+            <p class="type-caption">
+              {{ cartItemCount() }} {{ cartItemCount() === 1 ? 'item' : 'items' }}
+            </p>
+            <p class="truncate text-lg font-bold"><app-money [cents]="cart.total()" /></p>
+          </a>
           <button
-            class="btn btn-primary min-h-11 flex-1"
+            appButton
+            size="md"
+            class="min-w-40 flex-1"
             [disabled]="cart.isEmpty() || busy()"
             (click)="checkoutOpen.set(true)"
           >
-            Complete Sale
+            Take payment
+            <app-icon name="heroChevronRight" />
           </button>
         </div>
       </div>
@@ -441,12 +534,12 @@ import {
           [creditAllowed]="creditAllowed()"
           [methods]="methods()"
           [busy]="busy()"
-          title="Complete sale"
+          title="Take payment"
           (confirmed)="completeSale($event)"
           (cancelled)="checkoutOpen.set(false)"
         />
       }
-    </main>
+    </app-page>
   `,
 })
 export class SellComponent implements OnInit {
@@ -454,22 +547,24 @@ export class SellComponent implements OnInit {
   protected readonly connectivity = inject(ConnectivityService);
   protected readonly sync = inject(SyncService);
   protected readonly print = inject(PrintService);
+  protected readonly perms = inject(PermissionsService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly pos = inject(PosService);
   private readonly route = inject(ActivatedRoute);
 
-  protected readonly fmt = formatKes;
-  protected readonly lineTotal = (line: Parameters<CartService['lineTotal']>[0]) =>
-    this.cart.lineTotal(line);
-
   protected readonly search = new FormControl('', { nonNullable: true });
+  protected readonly searchQuery = signal('');
   protected readonly results = signal<Variant[]>([]);
-  /** Top variants for the quick-pick grid (before any search text). */
   protected readonly topVariants = signal<Variant[]>([]);
-  /** What the quick-pick grid shows: search results while typing, else top variants. */
+  protected readonly searchMode = computed(() => this.searchQuery().trim().length >= 2);
   protected readonly gridItems = computed(() =>
-    this.search.value.trim().length >= 2 ? this.results() : this.topVariants()
+    this.searchMode() ? this.results() : this.topVariants()
   );
+  protected readonly cartItemCount = computed(() =>
+    this.cart.lines().reduce((total, line) => total + line.quantity, 0)
+  );
+  protected readonly canOverridePrices = computed(() => this.perms.has('OverridePrice'));
+
   protected readonly customerSearch = new FormControl('', { nonNullable: true });
   protected readonly customerResults = signal<Customer[]>([]);
   protected readonly customerPickerOpen = signal(false);
@@ -483,7 +578,6 @@ export class SellComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
-  /** Post-sale celebration: success = completed, warning = queued offline. */
   protected readonly success = signal<{
     text: string;
     tone: 'success' | 'warning';
@@ -491,21 +585,15 @@ export class SellComponent implements OnInit {
   } | null>(null);
   protected readonly printerEnabled = signal(false);
   protected readonly brokenImages = signal<Set<string>>(new Set());
-
-  protected imageUrl(path: string | null | undefined): string | null {
-    return this.pos.imageUrl(path);
-  }
-
-  protected markBroken(path: string): void {
-    this.brokenImages.update(set => new Set(set).add(path));
-  }
-  /** Set when a real (non-walk-in) customer is picked; gates the credit tab. */
   protected readonly creditAllowed = computed(() => this.cart.customerId() !== null);
 
   constructor() {
     this.search.valueChanges
       .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed())
-      .subscribe(q => void this.onSearch(q));
+      .subscribe(q => {
+        this.searchQuery.set(q);
+        void this.onSearch(q);
+      });
     this.customerSearch.valueChanges
       .pipe(debounceTime(200), distinctUntilChanged(), takeUntilDestroyed())
       .subscribe(q => void this.onCustomerSearch(q));
@@ -515,23 +603,29 @@ export class SellComponent implements OnInit {
     try {
       this.methods.set(await this.pos.enabledPaymentMethods());
     } catch {
-      // keep defaults
+      // Keep safe payment defaults when configuration cannot be loaded.
     }
     this.printerEnabled.set(await this.receiptData.printerEnabled());
-    // Keep the offline product snapshot fresh (fire-and-forget).
     void this.sync.refreshProductSnapshot();
-    // Quick-pick grid source (offline: first rows of the snapshot).
     try {
       this.topVariants.set(
         this.connectivity.online()
-          ? await this.pos.topVariants(24)
-          : await this.sync.offlineTopVariants(24)
+          ? await this.pos.topVariants(8)
+          : await this.sync.offlineTopVariants(8)
       );
     } catch {
-      // grid just stays empty; search still works
+      // The quick list can stay empty; product search still works.
     }
     const draftId = this.route.snapshot.queryParamMap.get('draft');
     if (draftId) await this.loadDraft(draftId);
+  }
+
+  protected imageUrl(path: string | null | undefined): string | null {
+    return this.pos.imageUrl(path);
+  }
+
+  protected markBroken(path: string): void {
+    this.brokenImages.update(set => new Set(set).add(path));
   }
 
   protected async onSearch(query: string): Promise<void> {
@@ -541,16 +635,13 @@ export class SellComponent implements OnInit {
       return;
     }
     try {
-      // Offline: search the IndexedDB snapshot of the active catalog instead.
       const variants = this.connectivity.online()
         ? await this.pos.searchVariants(q)
         : await this.sync.searchProductsOffline(q);
-      // Scanner-style entry: an exact barcode match goes straight to the cart.
       const exact = variants.find(v => v.barcode === q);
       if (exact) {
         this.cart.addVariant(exact);
-        this.search.setValue('', { emitEvent: false });
-        this.results.set([]);
+        this.clearSearch();
         return;
       }
       this.results.set(variants);
@@ -559,14 +650,35 @@ export class SellComponent implements OnInit {
     }
   }
 
-  protected addVariant(variant: Variant): void {
-    this.cart.addVariant(variant);
+  protected clearSearch(): void {
     this.search.setValue('', { emitEvent: false });
+    this.searchQuery.set('');
     this.results.set([]);
+  }
+
+  protected addVariant(variant: Variant): void {
+    if (this.unavailable(variant)) return;
+    this.cart.addVariant(variant);
   }
 
   protected label(variant: Variant): string {
     return variantLabel(variant);
+  }
+
+  protected quantityInCart(variantId: string | null): number {
+    if (!variantId) return 0;
+    return this.cart.lines().find(line => line.variant.variant_id === variantId)?.quantity ?? 0;
+  }
+
+  protected unavailable(variant: Variant): boolean {
+    return variant.kind !== 'service' && !!variant.track_inventory && (variant.stock ?? 0) <= 0;
+  }
+
+  protected stockLabel(variant: Variant): string {
+    if (variant.kind === 'service') return 'Service';
+    if (!variant.track_inventory) return 'In stock';
+    const stock = variant.stock ?? 0;
+    return stock > 0 ? `${stock} left` : 'Out of stock';
   }
 
   protected stepQty(variantId: string, direction: 1 | -1): void {
@@ -579,26 +691,79 @@ export class SellComponent implements OnInit {
   }
 
   protected onQtyInput(variantId: string, value: number | string): void {
-    const qty = Number(value);
-    if (Number.isFinite(qty)) this.cart.setQuantity(variantId, qty);
+    const quantity = Number(value);
+    if (Number.isFinite(quantity)) this.cart.setQuantity(variantId, quantity);
   }
 
-  protected startOverride(line: { variant: Variant; unitPrice: number }): void {
+  /**
+   * Adjust by a stable ~3% of the base unit price, rounded to whole KES.
+   * A fixed step makes up/down reversible and avoids the decimal drift in the old POS.
+   */
+  protected adjustPrice(line: CartLine, direction: 1 | -1): void {
+    if (!this.canOverridePrices()) return;
+    const baseWhole = Math.round(line.unitPrice / 100) * 100;
+    const currentWhole = Math.round((line.customPrice ?? line.unitPrice) / 100) * 100;
+    const step = Math.max(100, Math.round((line.unitPrice * 0.03) / 100) * 100);
+    const wholesaleFloor = Math.ceil((line.variant.wholesale_price ?? 0) / 100) * 100;
+    const next = Math.max(wholesaleFloor, currentWhole + direction * step);
+
+    if (next === currentWhole) return;
+    const customPrice = next === line.unitPrice ? null : next;
+    const verb = direction > 0 ? 'increased' : 'reduced';
+    this.cart.setCustomPrice(
+      line.variant.variant_id!,
+      customPrice,
+      customPrice === null ? '' : `Quick price ${verb} by KES ${step / 100}`
+    );
+
+    // When a whole-KES base is reached, remove the override entirely.
+    if (next === baseWhole && baseWhole === line.unitPrice) {
+      this.cart.setCustomPrice(line.variant.variant_id!, null, '');
+    }
+  }
+
+  protected startOverride(line: CartLine): void {
+    if (!this.canOverridePrices()) return;
+    const effectivePrice = line.customPrice ?? line.unitPrice;
+    const kes = effectivePrice / 100;
     this.overrideFor.set(line.variant.variant_id!);
-    this.overridePrice.setValue((line.unitPrice / 100).toFixed(2));
-    this.overrideReason.setValue('');
+    this.overridePrice.setValue(Number.isInteger(kes) ? String(kes) : kes.toFixed(2));
+    this.overrideReason.setValue(line.overrideReason);
   }
 
   protected applyOverride(): void {
-    const productId = this.overrideFor();
-    if (!productId) return;
-    const cents = parseKesToCents(this.overridePrice.value);
-    if (cents === null) {
-      this.error.set('Enter a valid override price');
+    if (!this.canOverridePrices()) return;
+    const variantId = this.overrideFor();
+    if (!variantId) return;
+    const enteredCents = parseKesToCents(this.overridePrice.value);
+    if (enteredCents === null || enteredCents <= 0) {
+      this.error.set('Enter a valid price greater than zero');
       return;
     }
-    this.cart.setCustomPrice(productId, cents, this.overrideReason.value.trim());
+
+    const line = this.cart.lines().find(item => item.variant.variant_id === variantId);
+    if (!line) return;
+    const wholeCents = Math.round(enteredCents / 100) * 100;
+    const wholesaleFloor = Math.ceil((line.variant.wholesale_price ?? 0) / 100) * 100;
+    if (wholeCents < wholesaleFloor) {
+      this.error.set(`Price cannot be lower than wholesale (KES ${wholesaleFloor / 100})`);
+      return;
+    }
+
+    const customPrice = wholeCents === line.unitPrice ? null : wholeCents;
+    this.cart.setCustomPrice(
+      variantId,
+      customPrice,
+      customPrice === null ? '' : this.overrideReason.value.trim() || 'Manual price adjustment'
+    );
     this.overrideFor.set(null);
+    this.error.set(null);
+    if (wholeCents !== enteredCents) this.notice.set('Price rounded to the nearest whole KES');
+  }
+
+  protected resetPrice(line: CartLine): void {
+    this.cart.setCustomPrice(line.variant.variant_id!, null, '');
+    if (this.overrideFor() === line.variant.variant_id) this.overrideFor.set(null);
   }
 
   protected toggleCustomerPicker(): void {
@@ -627,8 +792,8 @@ export class SellComponent implements OnInit {
     this.toggleCustomerPicker();
   }
 
-  protected customerName(c: Customer): string {
-    return [c.first_name, c.last_name].filter(Boolean).join(' ');
+  protected customerName(customer: Customer): string {
+    return [customer.first_name, customer.last_name].filter(Boolean).join(' ');
   }
 
   protected async completeSale(payments: PaymentInput[]): Promise<void> {
@@ -638,7 +803,6 @@ export class SellComponent implements OnInit {
     this.success.set(null);
     const customerId = this.cart.customerId();
     const lines = this.cart.toSaleLines();
-    // Offline: complete locally into the outbox — never claim "completed".
     if (!this.connectivity.online()) {
       await this.queueSale(customerId, lines, payments);
       this.busy.set(false);
@@ -651,8 +815,6 @@ export class SellComponent implements OnInit {
       this.success.set({ text: 'Sale completed', tone: 'success', orderId });
     } catch (err) {
       if (!(err instanceof PosRpcError)) {
-        // Network failure mid-request: the outcome is unknown but safe —
-        // queue with a client_ref so the replay is exactly-once.
         await this.queueSale(customerId, lines, payments);
       } else {
         this.error.set(err.message);
@@ -663,7 +825,6 @@ export class SellComponent implements OnInit {
     }
   }
 
-  /** Complete the sale locally into the offline outbox (FIFO, exactly-once replay). */
   private async queueSale(
     customerId: string | null,
     lines: ReturnType<CartService['toSaleLines']>,
@@ -675,7 +836,6 @@ export class SellComponent implements OnInit {
     this.success.set({ text: 'Sale queued — will sync when online', tone: 'warning' });
   }
 
-  /** One-tap reset after the success/queued celebration. */
   protected newSale(): void {
     this.success.set(null);
     this.error.set(null);
@@ -706,7 +866,6 @@ export class SellComponent implements OnInit {
     this.error.set(null);
     this.notice.set(null);
     try {
-      // Parked orders carry no payments; the cashier collects at settle time.
       await this.pos.postSale(this.cart.customerId(), this.cart.toSaleLines(), [], true);
       this.cart.clear();
       this.notice.set('Parked to the cashier queue');
@@ -738,6 +897,7 @@ export class SellComponent implements OnInit {
 
   protected clearCart(): void {
     this.cart.clear();
+    this.overrideFor.set(null);
     this.error.set(null);
     this.notice.set(null);
   }
@@ -750,19 +910,19 @@ export class SellComponent implements OnInit {
         return;
       }
       const lines = await this.pos.orderLines(orderId);
-      const variants = await this.pos.variantsByIds(lines.map(l => l.variant_id));
-      const byId = new Map(variants.map(v => [v.variant_id, v]));
+      const variants = await this.pos.variantsByIds(lines.map(line => line.variant_id));
+      const byId = new Map(variants.map(variant => [variant.variant_id, variant]));
       this.cart.clear();
-      for (const l of lines) {
-        const variant = byId.get(l.variant_id);
+      for (const savedLine of lines) {
+        const variant = byId.get(savedLine.variant_id);
         if (!variant) continue;
         this.cart.addVariant(variant);
-        this.cart.setQuantity(variant.variant_id!, Number(l.quantity));
-        if (l.custom_price !== null) {
+        this.cart.setQuantity(variant.variant_id!, Number(savedLine.quantity));
+        if (savedLine.custom_price !== null) {
           this.cart.setCustomPrice(
             variant.variant_id!,
-            l.custom_price,
-            l.price_override_reason ?? ''
+            savedLine.custom_price,
+            savedLine.price_override_reason ?? ''
           );
         }
       }

@@ -1,7 +1,7 @@
 // paystack-charge: initiate a subscription payment via M-Pesa STK push.
 // POST { tier_id, billing_cycle, phone } with a user JWT.
 // The company comes from the JWT claims — never from the client.
-// Mirrors backend/src/services/payments/paystack.service.ts (one-off charge model).
+// Replaces archive/vendure/backend/src/services/payments/paystack.service.ts (one-off charge model).
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -13,7 +13,7 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-Deno.serve(async (req) => {
+Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') {
     return Response.json({ error: 'method_not_allowed' }, { status: 405, headers: cors });

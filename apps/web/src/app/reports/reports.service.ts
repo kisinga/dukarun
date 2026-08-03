@@ -8,6 +8,11 @@ export type DailyCustomerStats = Database['public']['Views']['rpt_daily_customer
 export type LowStockVariant = Database['public']['Views']['low_stock_variants']['Row'];
 export type ExpiringBatch = Database['public']['Views']['expiring_batches']['Row'];
 
+export interface DashboardSalesSnapshot {
+  summary: DailySummary[];
+  productSales: DailyProductSales[];
+}
+
 /**
  * Reports data source. The rpt_* views are materialized and refresh HOURLY —
  * figures can be up to an hour stale (the UI says so under the stats).
@@ -18,6 +23,22 @@ export class ReportsService {
 
   private get db() {
     return this.supabase.client;
+  }
+
+  /**
+   * Live operational snapshot for the dashboard. Unlike rpt_* materialized
+   * views, this reads the source tables and is current as soon as a sale posts.
+   */
+  async dashboardSales(since: string): Promise<DashboardSalesSnapshot> {
+    const { data, error } = await this.db.rpc('dashboard_sales_snapshot', {
+      p_since: since,
+    });
+    if (error) throw error;
+    const snapshot = data as unknown as Partial<DashboardSalesSnapshot> | null;
+    return {
+      summary: snapshot?.summary ?? [],
+      productSales: snapshot?.productSales ?? [],
+    };
   }
 
   /** Daily summary rows from `since` (yyyy-mm-dd, inclusive), ascending. */

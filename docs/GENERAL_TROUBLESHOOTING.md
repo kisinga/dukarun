@@ -1,47 +1,47 @@
-# General Troubleshooting
+# Troubleshooting
 
-## SSH tunnels
-
-- Observability: `ssh -L 3301:localhost:3301 user@server`
-- Vendure admin: `ssh -L 3000:localhost:3000 user@server`
-
-## Backend: `EACCES permission denied, mkdir '/app/static/assets'`
-
-The app runs as a non-root user but the asset directory was created as root.
-
-The backend image's `docker-entrypoint.sh` creates `ASSET_UPLOAD_DIR`, chowns it, then starts the app. Rebuild the backend image to pick up the entrypoint.
-
-Use `ASSET_UPLOAD_DIR=/usr/src/app/static/assets` for the standard backend Dockerfile. If your platform uses a different `WORKDIR` (e.g. `/app`), set `ASSET_UPLOAD_DIR` to match and mount the volume at the same path.
-
-## Reset Vendure superadmin password
+## Local Supabase
 
 ```bash
-psql -U vendure -d vendure
+npx supabase status
+npm run sb:stop
+npm run sb:start
 ```
 
-```sql
-BEGIN;
-DELETE FROM public.session WHERE "userId" = 1;
-DELETE FROM public.authentication_method WHERE "userId" = 1;
-DELETE FROM public.user_roles_role WHERE "userId" = 1;
-DELETE FROM public.history_entry WHERE "administratorId" = 1;
-DELETE FROM public.administrator WHERE id = 1;
-DELETE FROM public."user" WHERE id = 1;
-COMMIT;
-```
+If startup fails, confirm Docker is running and ports `54321`–`54327` are free. Use
+`npm run sb:reset` only when losing local database state is acceptable.
 
-## Start fresh (destroys all data)
+## Authentication and tenant context
 
-```bash
-docker compose down -v
-docker compose -f docker-compose.services.yml down -v
-docker container prune -f
+- Inspect the browser network response from `/auth/v1` before debugging Angular guards.
+- Confirm the user has a `company_members` row and that custom access-token hooks are enabled.
+- RLS denials are expected when `company_id`/role claims are absent; never bypass them in the UI.
+- For local OTP testing, use the test values configured in `supabase/config.toml`.
 
-# Remove specific volumes, or all unused volumes:
-docker volume prune -f
-# docker volume rm dukarun_postgres_data dukarun_timescaledb_audit_data \
-#   dukarun_redis_data dukarun_backend_assets dukarun_backend_uploads \
-#   dukarun_signoz_data dukarun_clickhouse_data
+## Frontend configuration
 
-docker network prune -f
-```
+Production build logs must show `[env:<app>] wrote ...environment.generated.ts`. If a deployed
+app calls `127.0.0.1:54321`, set `SUPABASE_URL` and `SUPABASE_ANON_KEY` in Cloudflare Pages,
+clear its build cache, and redeploy.
+
+The anon key is public. The service-role key is not and must never be configured in Pages.
+
+## Database changes
+
+- Applied migrations are immutable; add a new migration to correct behavior.
+- Run `npm run sb:lint`, `npm run sb:test`, and `npm run sb:types` after schema/RPC changes.
+- If CI reports stale types, regenerate against a reset local stack and commit the result.
+
+## POS and dashboard freshness
+
+- A completed online sale should commit through `post_sale`, then trigger a background dashboard
+  refetch through Realtime invalidation.
+- An offline sale remains in the IndexedDB outbox and is deliberately excluded from server stats
+  until replay succeeds.
+- If a supplier balance appears stale, verify the purchase/payment RPC posted accounts payable,
+  then inspect the relevant Realtime subscription and refetch rather than editing totals locally.
+
+## Historical Vendure issues
+
+The former Vendure troubleshooting guide is preserved at
+`archive/vendure/GENERAL_TROUBLESHOOTING.md`.

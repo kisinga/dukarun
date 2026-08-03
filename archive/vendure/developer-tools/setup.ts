@@ -336,7 +336,7 @@ async function testDatabaseConnection(): Promise<CheckResult> {
   // Try to connect using pg_isready via docker exec first
   try {
     const result = spawnSync('docker', [
-      'compose', '-f', 'docker-compose.services.yml',
+      'compose', '-f', 'archive/vendure/docker-compose.services.yml',
       'exec', '-T', 'postgres_db',
       'pg_isready', '-U', user, '-d', database,
     ], {
@@ -376,7 +376,7 @@ async function testDatabaseConnection(): Promise<CheckResult> {
       socket.destroy();
       resolve({
         passed: false,
-        message: `Cannot connect to database at ${host}:${port}. Run 'npm run services:up' first.`,
+        message: `Cannot connect to database at ${host}:${port}. Run 'npm run legacy:services:up' first.`,
       });
     });
 
@@ -391,7 +391,7 @@ function startServices(): boolean {
   log.step('Starting infrastructure services...');
 
   try {
-    execSync('docker compose -f docker-compose.services.yml up -d', {
+    execSync('docker compose -f archive/vendure/docker-compose.services.yml up -d', {
       cwd: ROOT_DIR,
       stdio: 'inherit',
     });

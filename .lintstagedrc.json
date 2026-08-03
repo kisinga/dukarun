@@ -1,19 +1,8 @@
 {
-  "backend/**/*.{ts,js,json}": [
-    "sh -c 'for f in \"$@\"; do (cd backend && npx prettier --write \"${f#backend/}\"); done' _"
+  "{apps,packages,scripts,supabase/functions}/**/*.{ts,js,mjs,json,html,scss,css,md}": [
+    "prettier --write"
   ],
-  "frontend/**/*.{ts,js,json,scss,css}": [
-    "sh -c 'for f in \"$@\"; do (cd frontend && npx prettier --write \"${f#frontend/}\"); done' _"
-  ],
-  "frontend/**/*.html": [
-    "sh -c 'for f in \"$@\"; do (cd frontend && npx prettier --write --parser angular \"${f#frontend/}\" || true); done' _"
-  ],
-  "frontend/src/app/**/*.ts": [
-    "sh -c 'cd frontend && npm run boundary-check'"
-  ],
-  "frontend/src/app/**/*.{html,ts,scss}": [
-    "sh -c 'files=\"\"; for f in \"$@\"; do files=\"$files ${f#frontend/}\"; done; cd frontend && node scripts/design-guard.mjs $files' _"
-  ],
+  "{*.md,*.json,docs/**/*.md,.github/**/*.md}": ["prettier --write"],
   "apps/web/src/app/**/*.ts": [
     "sh -c 'files=\"\"; for f in \"$@\"; do files=\"$files ${f#apps/web/}\"; done; cd apps/web && node scripts/design-guard.mjs $files' _"
   ]

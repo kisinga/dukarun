@@ -1,7 +1,10 @@
 import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { NgIcon } from '@ng-icons/core';
-import { formatKes, parseKesToCents } from '../../core/money';
+import { parseKesToCents } from '../../core/money';
+import { ButtonComponent } from '../../shared/ui/button.component';
+import { FormFieldComponent } from '../../shared/ui/form-field.component';
+import { IconComponent } from '../../shared/ui/icon.component';
+import { MoneyComponent } from '../../shared/ui/money.component';
 import type { PaymentInput } from '../pos.service';
 
 interface Tender {
@@ -18,124 +21,227 @@ interface Tender {
  */
 @Component({
   selector: 'app-checkout-panel',
-  imports: [FormsModule, NgIcon],
+  imports: [FormsModule, ButtonComponent, FormFieldComponent, IconComponent, MoneyComponent],
   template: `
     <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 md:p-4">
       <div
-        class="card h-full max-h-dvh w-full max-w-full overflow-y-auto rounded-none bg-base-100 shadow-overlay md:h-auto md:max-h-[90vh] md:w-full md:max-w-md md:rounded-box"
+        class="card flex h-full max-h-dvh w-full max-w-full flex-col overflow-hidden rounded-none bg-base-100 shadow-overlay md:h-auto md:max-h-[90vh] md:w-full md:max-w-lg md:rounded-box"
       >
-        <div class="card-body">
-          <div class="flex items-center justify-between">
+        <header class="flex items-start justify-between gap-3 border-b border-base-300/60 p-4">
+          <div>
             <h2 class="type-title">{{ title() }}</h2>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="cancelled.emit()">
-              <ng-icon name="heroXMark" />
-            </button>
+            <p class="type-caption mt-1">Amount due</p>
+            <p class="type-hero mt-0.5"><app-money [cents]="total()" /></p>
           </div>
-          <p class="type-hero mt-1">{{ fmt(total()) }}</p>
+          <button
+            appButton
+            variant="ghost"
+            size="md"
+            [iconOnly]="true"
+            type="button"
+            aria-label="Close payment"
+            (click)="cancelled.emit()"
+          >
+            <app-icon name="heroXMark" size="lg" />
+          </button>
+        </header>
 
-          <div role="tablist" class="tabs tabs-boxed mt-2">
-            @for (m of methods(); track m) {
-              <a role="tab" class="tab" [class.tab-active]="mode() === m" (click)="setMode(m)">{{
-                methodLabel(m)
-              }}</a>
+        <div class="flex-1 overflow-y-auto p-4">
+          <p class="type-caption mb-2">Payment method</p>
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-4" role="tablist">
+            @for (method of methods(); track method) {
+              <button
+                appButton
+                [variant]="mode() === method ? 'soft' : 'outline'"
+                size="md"
+                type="button"
+                role="tab"
+                [attr.aria-selected]="mode() === method"
+                (click)="setMode(method)"
+              >
+                {{ methodLabel(method) }}
+              </button>
             }
-            <a
+            <button
+              appButton
+              [variant]="mode() === 'credit' ? 'soft' : 'outline'"
+              size="md"
+              type="button"
               role="tab"
-              class="tab"
-              [class.tab-active]="mode() === 'credit'"
-              [class.tab-disabled]="!creditAllowed()"
+              [disabled]="!creditAllowed()"
+              [attr.aria-selected]="mode() === 'credit'"
+              [attr.title]="creditAllowed() ? null : 'Select a customer before using credit'"
               (click)="setMode('credit')"
-              >Credit</a
             >
+              Credit
+            </button>
           </div>
 
           @if (mode() === 'credit') {
-            <p class="mt-4 text-sm text-base-content/70">
-              The full amount goes on the customer's tab (accounts receivable).
-            </p>
+            <div class="mt-4 rounded-box bg-info/10 p-4 text-sm">
+              <p class="font-semibold">Charge the full amount to this customer</p>
+              <p class="mt-1 text-base-content/70">
+                This sale will be recorded as money the customer owes.
+              </p>
+            </div>
           } @else {
             <div class="mt-4 flex flex-col gap-3">
-              @for (tender of tenders(); track $index) {
-                <div class="flex items-end gap-2">
-                  <label class="form-control w-28">
-                    <span class="label-text">Method</span>
-                    <select
-                      class="select select-bordered select-sm"
-                      [ngModel]="tender.method"
-                      (ngModelChange)="patchTender($index, { method: $event })"
-                    >
-                      @for (m of methods(); track m) {
-                        <option [value]="m">{{ methodLabel(m) }}</option>
-                      }
-                    </select>
-                  </label>
-                  <label class="form-control flex-1">
-                    <span class="label-text">Amount (KES)</span>
-                    <input
-                      type="text"
-                      inputmode="decimal"
-                      class="input input-bordered input-sm"
-                      [ngModel]="tender.amountText"
-                      (ngModelChange)="patchTender($index, { amountText: $event })"
-                    />
-                  </label>
-                  @if (tender.method !== 'cash') {
-                    <label class="form-control flex-1">
-                      <span class="label-text">Reference</span>
-                      <input
-                        type="text"
-                        class="input input-bordered input-sm"
-                        placeholder="e.g. QGH7X2K1"
-                        [ngModel]="tender.reference"
-                        (ngModelChange)="patchTender($index, { reference: $event })"
-                      />
-                    </label>
-                  }
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-sm"
-                    [disabled]="tenders().length === 1"
-                    (click)="removeTender($index)"
-                  >
-                    <ng-icon name="heroXMark" />
-                  </button>
+              @if (mode() === 'cash' && tenders().length === 1) {
+                <div>
+                  <p class="type-caption mb-2">Cash received</p>
+                  <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    @for (amount of cashSuggestions(); track amount) {
+                      <button
+                        appButton
+                        [variant]="paidCents() === amount ? 'soft' : 'outline'"
+                        size="md"
+                        type="button"
+                        (click)="useCashAmount(amount)"
+                      >
+                        @if (amount === total()) {
+                          Exact
+                        } @else {
+                          <app-money [cents]="amount" />
+                        }
+                      </button>
+                    }
+                  </div>
                 </div>
               }
-              <button type="button" class="btn btn-ghost btn-sm self-start" (click)="addTender()">
-                <ng-icon name="heroPlus" /> Split payment
-              </button>
 
-              <div class="text-sm tabular-nums">
-                <span [class.text-error]="paidCents() !== total()">
-                  Paid {{ fmt(paidCents()) }} of {{ fmt(total()) }}
-                </span>
+              @for (tender of tenders(); track $index) {
+                <div class="rounded-box border border-base-300/70 p-3">
+                  <div class="grid items-end gap-3 sm:grid-cols-2">
+                    @if (tenders().length > 1) {
+                      <app-form-field label="Method">
+                        <select
+                          class="select select-bordered min-h-11 w-full"
+                          [ngModel]="tender.method"
+                          (ngModelChange)="patchTender($index, { method: $event })"
+                        >
+                          @for (method of methods(); track method) {
+                            <option [value]="method">{{ methodLabel(method) }}</option>
+                          }
+                        </select>
+                      </app-form-field>
+                    }
+                    <app-form-field label="Amount (KES)">
+                      <input
+                        type="text"
+                        inputmode="decimal"
+                        class="input input-bordered min-h-11 w-full"
+                        [ngModel]="tender.amountText"
+                        (ngModelChange)="patchTender($index, { amountText: $event })"
+                      />
+                    </app-form-field>
+                    @if (tender.method !== 'cash') {
+                      <app-form-field label="Reference" hint="Optional transaction code.">
+                        <input
+                          type="text"
+                          class="input input-bordered min-h-11 w-full uppercase"
+                          placeholder="e.g. QGH7X2K1"
+                          [ngModel]="tender.reference"
+                          (ngModelChange)="patchTender($index, { reference: $event })"
+                        />
+                      </app-form-field>
+                    }
+                  </div>
+                  @if (tenders().length > 1) {
+                    <button
+                      appButton
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      class="mt-2 text-base-content/60 hover:text-error"
+                      (click)="removeTender($index)"
+                    >
+                      <app-icon name="heroXMark" />
+                      Remove payment
+                    </button>
+                  }
+                </div>
+              }
+
+              @if (methods().length > 1) {
+                <button
+                  appButton
+                  variant="ghost"
+                  size="md"
+                  type="button"
+                  class="self-start"
+                  (click)="addTender()"
+                >
+                  <app-icon name="heroPlus" />
+                  Split payment
+                </button>
+              }
+
+              <div
+                class="flex flex-wrap items-center justify-between gap-2 rounded-box bg-base-200 p-3"
+              >
+                <div>
+                  <p class="type-caption">Paid</p>
+                  <p
+                    class="font-semibold"
+                    [class.text-error]="paidCents() < total()"
+                    [class.text-success]="paidCents() >= total()"
+                  >
+                    <app-money [cents]="paidCents()" />
+                  </p>
+                </div>
                 @if (changeCents() > 0) {
-                  <span class="ml-2 font-semibold text-success">
-                    Change: {{ fmt(changeCents()) }}
-                  </span>
+                  <div class="text-right">
+                    <p class="type-caption">Change to give</p>
+                    <p class="text-lg font-bold text-success">
+                      <app-money [cents]="changeCents()" />
+                    </p>
+                  </div>
+                } @else if (paidCents() < total()) {
+                  <div class="text-right">
+                    <p class="type-caption">Remaining</p>
+                    <p class="font-semibold text-error">
+                      <app-money [cents]="total() - paidCents()" />
+                    </p>
+                  </div>
+                } @else {
+                  <span class="badge badge-success">Ready</span>
                 }
               </div>
             </div>
           }
 
           @if (error()) {
-            <p class="mt-2 text-sm text-error">{{ error() }}</p>
+            <div class="alert alert-error mt-3 py-3" role="alert">
+              <app-icon name="heroExclamationTriangle" />
+              <span>{{ error() }}</span>
+            </div>
           }
-
-          <div class="card-actions mt-4 justify-end">
-            <button type="button" class="btn btn-ghost min-h-11" (click)="cancelled.emit()">
-              Cancel
-            </button>
-            <button
-              type="button"
-              class="btn btn-primary min-h-11"
-              [disabled]="!canConfirm() || busy()"
-              (click)="confirm()"
-            >
-              {{ busy() ? 'Processing…' : 'Confirm' }}
-            </button>
-          </div>
         </div>
+
+        <footer class="flex gap-2 border-t border-base-300/60 bg-base-100 p-4">
+          <button
+            appButton
+            variant="ghost"
+            size="md"
+            type="button"
+            class="flex-1"
+            [disabled]="busy()"
+            (click)="cancelled.emit()"
+          >
+            Cancel
+          </button>
+          <button
+            appButton
+            size="md"
+            type="button"
+            class="flex-[2]"
+            [loading]="busy()"
+            [disabled]="!canConfirm()"
+            (click)="confirm()"
+          >
+            {{ mode() === 'credit' ? 'Charge customer' : 'Complete sale' }}
+          </button>
+        </footer>
       </div>
     </div>
   `,
@@ -153,7 +259,6 @@ export class CheckoutPanelComponent {
   readonly confirmed = output<PaymentInput[]>();
   readonly cancelled = output<void>();
 
-  protected readonly fmt = formatKes;
   protected readonly mode = signal<string>('cash');
   protected readonly tenders = signal<Tender[]>([]);
   protected readonly error = signal<string | null>(null);
@@ -172,9 +277,7 @@ export class CheckoutPanelComponent {
     this.initialized = true;
     const first = (this.methods()[0] ?? 'cash') as Tender['method'];
     this.mode.set(first);
-    this.tenders.set([
-      { method: first, amountText: (this.total() / 100).toFixed(2), reference: '' },
-    ]);
+    this.tenders.set([{ method: first, amountText: this.amountText(this.total()), reference: '' }]);
     this.error.set(null);
   }
 
@@ -185,7 +288,7 @@ export class CheckoutPanelComponent {
       this.tenders.set([
         {
           method: mode as Tender['method'],
-          amountText: (this.total() / 100).toFixed(2),
+          amountText: this.amountText(this.total()),
           reference: '',
         },
       ]);
@@ -202,7 +305,7 @@ export class CheckoutPanelComponent {
     const next = (this.methods().find(m => !used.has(m)) ?? 'cash') as Tender['method'];
     this.tenders.update(ts => [
       ...ts,
-      { method: next, amountText: (remaining / 100).toFixed(2), reference: '' },
+      { method: next, amountText: this.amountText(remaining), reference: '' },
     ]);
   }
 
@@ -213,6 +316,18 @@ export class CheckoutPanelComponent {
   protected paidCents = computed(() =>
     this.tenders().reduce((sum, t) => sum + (parseKesToCents(t.amountText) ?? 0), 0)
   );
+
+  protected readonly cashSuggestions = computed(() => {
+    const total = this.total();
+    const roundUp = (unit: number) => Math.ceil(total / unit) * unit;
+    return [...new Set([total, roundUp(5_000), roundUp(10_000), roundUp(50_000), roundUp(100_000)])]
+      .filter(amount => amount >= total)
+      .slice(0, 4);
+  });
+
+  protected useCashAmount(amount: number): void {
+    this.patchTender(0, { amountText: this.amountText(amount) });
+  }
 
   /** Cash change when a single cash tender covers (or exceeds) the total. */
   protected changeCents = computed(() => {
@@ -236,6 +351,11 @@ export class CheckoutPanelComponent {
 
   protected methodLabel(code: string): string {
     return code === 'mpesa' ? 'M-Pesa' : code.charAt(0).toUpperCase() + code.slice(1);
+  }
+
+  private amountText(cents: number): string {
+    const kes = cents / 100;
+    return Number.isInteger(kes) ? String(kes) : kes.toFixed(2);
   }
 
   protected confirm(): void {

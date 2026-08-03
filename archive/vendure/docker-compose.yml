@@ -20,8 +20,8 @@ services:
   # ========================================
   backend:
     build:
-      context: .
-      dockerfile: ./backend/Dockerfile
+      context: ../..
+      dockerfile: ./archive/vendure/backend/Dockerfile
     platform: linux/amd64
     restart: unless-stopped
     networks:
@@ -119,8 +119,8 @@ services:
   # ========================================
   frontend:
     build:
-      context: .
-      dockerfile: ./frontend/Dockerfile
+      context: ../..
+      dockerfile: ./archive/vendure/frontend/Dockerfile
     platform: linux/amd64
     restart: unless-stopped
     networks:
@@ -154,8 +154,8 @@ services:
   # ========================================
   super-admin:
     build:
-      context: .
-      dockerfile: ./super-admin/Dockerfile
+      context: ../..
+      dockerfile: ./archive/vendure/super-admin/Dockerfile
     platform: linux/amd64
     restart: unless-stopped
     networks:
@@ -182,8 +182,8 @@ services:
 
   storefront:
     build:
-      context: .
-      dockerfile: ./storefront/Dockerfile
+      context: ../..
+      dockerfile: ./archive/vendure/storefront/Dockerfile
     platform: linux/amd64
     restart: unless-stopped
     networks:
