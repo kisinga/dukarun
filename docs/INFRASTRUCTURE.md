@@ -51,6 +51,25 @@ Never run `sb:reset` against production. Add behavior and permission tests in
 `supabase/tests/database` with every financial or tenant-boundary change. Regenerate
 `packages/shared-types/database.types.ts` after schema changes.
 
+### Cashier-session boundary
+
+An open cashier session is a database invariant for completed sales and money movement, not a
+frontend convention. Migration `20260803001000_0031_cashier_session_enforcement.sql` enforces the
+boundary on order completion and journal posting, while the dashboard mirrors it with shared
+Realtime state and a 30-second fallback refresh.
+
+| Allowed with till closed | Requires an open session                                               |
+| ------------------------ | ---------------------------------------------------------------------- |
+| Build or park a sale     | Complete or settle a sale, including credit sales                      |
+| Save a proforma/draft    | Collect customer debt or pay a supplier                                |
+| Record a credit purchase | Record a paid purchase, expense, transfer, refund, or payment reversal |
+
+Governed journal lines receive `meta.openSessionId`; completed orders receive
+`cashier_session_id`. RPCs and service-role integrations must not try to supply or bypass those
+values—the database derives them from the company's single open session. Closing the session
+locks against concurrent governed posting, so a transaction either belongs to that session in
+full or rolls back.
+
 ## Frontend environment generation
 
 Angular cannot read Cloudflare environment variables directly at runtime. Each active app has

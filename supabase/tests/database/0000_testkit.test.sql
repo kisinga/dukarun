@@ -66,6 +66,70 @@ begin
 end;
 $$;
 
+-- Financial fixtures opt in explicitly: production now requires an open
+-- cashier session for completed sales and money-moving operations.
+create or replace function testkit.ensure_open_session()
+returns uuid language plpgsql set search_path = '' as $$
+declare
+  v_company_id uuid := public.current_company_id();
+  v_session_id uuid;
+  v_declarations jsonb;
+begin
+  select s.id into v_session_id
+  from public.cashier_sessions s
+  where s.company_id = v_company_id and s.status = 'open';
+
+  if v_session_id is not null then
+    return v_session_id;
+  end if;
+
+  select coalesce(
+    jsonb_agg(jsonb_build_object(
+      'account_code', pm.ledger_account_code,
+      'declared', public.account_balance(v_company_id, pm.ledger_account_code)
+    )),
+    '[]'::jsonb
+  ) into v_declarations
+  from public.payment_methods pm
+  where pm.company_id = v_company_id
+    and pm.is_cashier_controlled
+    and pm.enabled;
+
+  return public.open_cashier_session(v_declarations);
+end;
+$$;
+
+create or replace function testkit.close_open_session()
+returns uuid language plpgsql set search_path = '' as $$
+declare
+  v_company_id uuid := public.current_company_id();
+  v_session_id uuid;
+  v_declarations jsonb;
+begin
+  select s.id into v_session_id
+  from public.cashier_sessions s
+  where s.company_id = v_company_id and s.status = 'open';
+
+  if v_session_id is null then
+    return null;
+  end if;
+
+  select coalesce(
+    jsonb_agg(jsonb_build_object(
+      'account_code', pm.ledger_account_code,
+      'declared', public.account_balance(v_company_id, pm.ledger_account_code)
+    )),
+    '[]'::jsonb
+  ) into v_declarations
+  from public.payment_methods pm
+  where pm.company_id = v_company_id
+    and pm.is_cashier_controlled
+    and pm.enabled;
+
+  return public.close_cashier_session(v_session_id, v_declarations);
+end;
+$$;
+
 -- Helpers may be called while the session role is authenticated.
 grant usage on schema testkit to authenticated, anon;
 grant execute on all functions in schema testkit to authenticated, anon;

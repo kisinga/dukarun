@@ -5,6 +5,7 @@ import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { parseKesToCents } from '../../core/money';
 import { PermissionsService } from '../../core/permissions.service';
+import { CashierSessionService } from '../../core/cashier-session.service';
 import { CartService, type CartLine } from '../cart.service';
 import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
 import { ConnectivityService } from '../offline/connectivity.service';
@@ -18,6 +19,7 @@ import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { PrintService, type PrintFormat } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { SellCartLineComponent } from './sell-cart-line.component';
+import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 import {
   Customer,
   PaymentInput,
@@ -40,6 +42,7 @@ import {
     MoneyComponent,
     PageLayoutComponent,
     SellCartLineComponent,
+    SessionRequiredNoticeComponent,
   ],
   template: `
     <app-page
@@ -63,6 +66,10 @@ import {
         >
           {{ sync.queuedCount() + sync.failedCount() }} pending sync
         </a>
+      }
+
+      @if (!cashierSession.isOpen()) {
+        <app-session-required-notice action="taking payment or completing a sale" />
       }
 
       <div class="pb-24 lg:pb-0">
@@ -236,6 +243,8 @@ import {
                           <span class="badge badge-primary badge-sm">
                             {{ quantityInCart(v.variant_id) }}
                           </span>
+                        } @else if (unavailable(v)) {
+                          <span class="badge badge-error badge-sm whitespace-nowrap">Out</span>
                         } @else {
                           <span class="badge badge-ghost gap-1 text-primary">
                             <app-icon name="heroPlus" />
@@ -251,7 +260,7 @@ import {
                           <app-money [cents]="v.price ?? 0" />
                         </span>
                         <span
-                          class="text-right text-xs"
+                          class="text-right text-xs whitespace-nowrap"
                           [class.text-error]="unavailable(v)"
                           [class.text-base-content/50]="!unavailable(v)"
                         >
@@ -273,7 +282,7 @@ import {
               </div>
             </div>
 
-            <div id="current-sale" class="card scroll-mt-4 bg-base-100">
+            <div id="current-sale" class="card scroll-mt-4 overflow-hidden bg-base-100">
               <div
                 class="flex items-center justify-between gap-3 border-b border-base-content/15 px-3 py-2.5 sm:px-4 sm:py-3"
               >
@@ -461,7 +470,7 @@ import {
                     <p class="type-caption">Amount due</p>
                     <p class="mt-1 type-hero"><app-money [cents]="cart.total()" /></p>
                   </div>
-                  <span class="badge badge-ghost">
+                  <span class="badge badge-ghost whitespace-nowrap">
                     {{ cartItemCount() }} {{ cartItemCount() === 1 ? 'item' : 'items' }}
                   </span>
                 </div>
@@ -470,8 +479,8 @@ import {
                   appButton
                   size="md"
                   class="mt-4 hidden w-full lg:flex"
-                  [disabled]="cart.isEmpty() || busy()"
-                  (click)="checkoutOpen.set(true)"
+                  [disabled]="cart.isEmpty() || busy() || !cashierSession.isOpen()"
+                  (click)="openCheckout()"
                 >
                   <app-icon name="heroBanknotes" />
                   Take payment
@@ -519,8 +528,8 @@ import {
             appButton
             size="md"
             class="min-w-40 flex-1"
-            [disabled]="cart.isEmpty() || busy()"
-            (click)="checkoutOpen.set(true)"
+            [disabled]="cart.isEmpty() || busy() || !cashierSession.isOpen()"
+            (click)="openCheckout()"
           >
             Take payment
             <app-icon name="heroChevronRight" />
@@ -528,7 +537,7 @@ import {
         </div>
       </div>
 
-      @if (checkoutOpen()) {
+      @if (checkoutOpen() && cashierSession.isOpen()) {
         <app-checkout-panel
           [total]="cart.total()"
           [creditAllowed]="creditAllowed()"
@@ -548,6 +557,7 @@ export class SellComponent implements OnInit {
   protected readonly sync = inject(SyncService);
   protected readonly print = inject(PrintService);
   protected readonly perms = inject(PermissionsService);
+  protected readonly cashierSession = inject(CashierSessionService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly pos = inject(PosService);
   private readonly route = inject(ActivatedRoute);
@@ -796,11 +806,28 @@ export class SellComponent implements OnInit {
     return [customer.first_name, customer.last_name].filter(Boolean).join(' ');
   }
 
+  protected async openCheckout(): Promise<void> {
+    this.error.set(null);
+    try {
+      await this.cashierSession.assertOpen('taking payment');
+      this.checkoutOpen.set(true);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+    }
+  }
+
   protected async completeSale(payments: PaymentInput[]): Promise<void> {
-    this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
     this.success.set(null);
+    try {
+      await this.cashierSession.assertOpen('completing a sale');
+    } catch (err) {
+      this.checkoutOpen.set(false);
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+      return;
+    }
+    this.busy.set(true);
     const customerId = this.cart.customerId();
     const lines = this.cart.toSaleLines();
     if (!this.connectivity.online()) {

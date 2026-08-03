@@ -20,9 +20,10 @@ import { MoneyComponent } from '../../shared/ui/money.component';
   selector: 'app-sell-cart-line',
   imports: [FormsModule, ButtonComponent, IconComponent, MoneyComponent],
   providers: [provideIcons({ heroChevronDown, heroChevronUp, heroMinus, heroPencilSquare })],
+  host: { class: 'block min-w-0' },
   template: `
-    <article class="px-3 py-2.5 sm:px-4 sm:py-3">
-      <div class="flex min-w-0 items-start gap-2">
+    <article class="sale-line px-3 py-2.5 sm:px-4 sm:py-3">
+      <div class="sale-line-summary flex min-w-0 items-start gap-2">
         <button
           appButton
           variant="ghost"
@@ -58,7 +59,7 @@ import { MoneyComponent } from '../../shared/ui/money.component';
       </div>
 
       <div
-        class="mt-2 grid grid-cols-[minmax(7.75rem,0.8fr)_minmax(9.5rem,1.2fr)] gap-2 border-t border-base-content/15 pt-2 sm:grid-cols-2 sm:gap-3 sm:pt-3"
+        class="sale-line-controls mt-2 grid grid-cols-[minmax(7.75rem,0.8fr)_minmax(9rem,1.2fr)] gap-2 border-t border-base-content/15 pt-2 sm:grid-cols-2 sm:gap-3 sm:pt-3"
       >
         <div>
           <p class="type-caption mb-1">Quantity</p>
@@ -166,6 +167,31 @@ import { MoneyComponent } from '../../shared/ui/money.component';
         </div>
       </div>
     </article>
+  `,
+  styles: `
+    :host {
+      container-type: inline-size;
+    }
+
+    @container (min-width: 46rem) {
+      .sale-line {
+        display: grid;
+        grid-template-columns: minmax(15rem, 1fr) minmax(21rem, 24rem);
+        align-items: end;
+        gap: 1.25rem;
+      }
+
+      .sale-line-summary {
+        align-self: center;
+      }
+
+      .sale-line-controls {
+        grid-template-columns: 8.5rem minmax(11.75rem, 1fr);
+        margin-top: 0;
+        padding-top: 0;
+        border-top: 0;
+      }
+    }
   `,
 })
 export class SellCartLineComponent {

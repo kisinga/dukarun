@@ -26,6 +26,7 @@ select testkit.create_user('22222222-2222-2222-2222-222222222222', 'staff@credit
 select testkit.add_member((select company_id from cr_company), '22222222-2222-2222-2222-222222222222', 'Staff', '{SettleOrder,OverridePrice}');
 
 select testkit.as_user((select company_id from cr_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- 1. Unapproved customer cannot take credit.
 select throws_ok(

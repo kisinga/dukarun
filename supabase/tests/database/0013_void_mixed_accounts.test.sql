@@ -17,6 +17,7 @@ insert into public.customers (id, company_id, first_name, is_credit_approved, cr
 select 'c0000000-0000-0000-0000-0000000000dd', company_id, 'Credit Jane', true, 0 from vd_company;
 
 select testkit.as_user((select company_id from vd_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- Credit sale 13000 + partial repayment 5000 -> AR has D 13000 AND C 5000.
 create temp table vd_sale as

@@ -16,6 +16,8 @@ import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { StatusBadgeComponent, type BadgeType } from '../shared/ui/status-badge.component';
 import { AgingInfo, LedgerAccount, MoneyCustomer, MoneyService } from '../money/money.service';
+import { CashierSessionService } from '../core/cashier-session.service';
+import { SessionRequiredNoticeComponent } from '../shared/ui/session-required-notice.component';
 
 type SupplierWithAp = MoneyCustomer & { ap_balance: number } & AgingInfo;
 type PurchaseRow = {
@@ -48,6 +50,7 @@ interface PurchaseLineForm {
     StatusBadgeComponent,
     StatCardComponent,
     PageLayoutComponent,
+    SessionRequiredNoticeComponent,
   ],
   template: `
     <app-page title="Suppliers" subtitle="Record incoming stock and keep supplier credit clear.">
@@ -213,6 +216,9 @@ interface PurchaseLineForm {
               </fieldset>
 
               @if (!purchaseOnCredit.value) {
+                @if (!cashierSession.isOpen()) {
+                  <app-session-required-notice action="recording a paid purchase" />
+                }
                 <app-form-field label="Paid from" class="sm:max-w-sm">
                   <select
                     class="select select-bordered select-sm w-full"
@@ -317,7 +323,11 @@ interface PurchaseLineForm {
                 type="submit"
                 class="self-start"
                 [loading]="busy()"
-                [disabled]="suppliers().length === 0 || variants().length === 0"
+                [disabled]="
+                  suppliers().length === 0 ||
+                  variants().length === 0 ||
+                  (!purchaseOnCredit.value && !cashierSession.isOpen())
+                "
               >
                 {{ purchaseOnCredit.value ? 'Record credit purchase' : 'Record paid purchase' }}
               </button>
@@ -380,6 +390,9 @@ interface PurchaseLineForm {
                 @if (suppliersOwed().length === 0) {
                   <p class="mt-2 text-sm text-base-content/60">No supplier balances are due.</p>
                 } @else {
+                  @if (!cashierSession.isOpen()) {
+                    <app-session-required-notice action="paying a supplier" />
+                  }
                   <form
                     (submit)="$event.preventDefault(); paySupplier()"
                     class="mt-3 flex flex-col gap-3"
@@ -414,7 +427,12 @@ interface PurchaseLineForm {
                         }
                       </select>
                     </app-form-field>
-                    <button appButton type="submit" [loading]="busy()">
+                    <button
+                      appButton
+                      type="submit"
+                      [loading]="busy()"
+                      [disabled]="!cashierSession.isOpen()"
+                    >
                       Record supplier payment
                     </button>
                   </form>
@@ -496,6 +514,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
   protected readonly perms = inject(PermissionsService);
+  protected readonly cashierSession = inject(CashierSessionService);
 
   protected readonly fmt = formatKes;
   protected readonly String = String;
@@ -626,6 +645,14 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   }
 
   protected async recordPurchase(): Promise<void> {
+    if (!this.purchaseOnCredit.value) {
+      try {
+        await this.cashierSession.assertOpen('recording a paid purchase');
+      } catch (err) {
+        this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+        return;
+      }
+    }
     const parsed: {
       variant_id: string;
       quantity: number;
@@ -675,6 +702,12 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   }
 
   protected async paySupplier(): Promise<void> {
+    try {
+      await this.cashierSession.assertOpen('paying a supplier');
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+      return;
+    }
     const cents = parseKesToCents(this.payAmount.value);
     if (cents === null || cents <= 0) {
       this.error.set('Enter a valid amount');

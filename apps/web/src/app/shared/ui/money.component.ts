@@ -1,10 +1,10 @@
 import { Component, computed, input } from '@angular/core';
-import { formatKes } from '../../core/money';
+import { formatKes, formatMoneyAmount } from '../../core/money';
 
 /**
  * Canonical money renderer (The Counter — money talks first).
- * Cents in, KES out; tabular-nums always; semantic color carries money
- * meaning only (`in` = received, `out` = owed/spent). Never decorate.
+ * Repeated UI amounts omit the redundant KES prefix by default. The full
+ * currency remains available to assistive technology and explicit contexts.
  */
 @Component({
   selector: 'app-money',
@@ -13,6 +13,7 @@ import { formatKes } from '../../core/money';
       class="tabular-nums"
       [class.text-success]="direction() === 'in'"
       [class.text-error]="direction() === 'out'"
+      [attr.aria-label]="masked() ? 'Amount hidden' : accessibleAmount()"
     >
       @if (masked()) {
         •••
@@ -26,8 +27,13 @@ export class MoneyComponent {
   /** Amount in integer cents. */
   readonly cents = input.required<number>();
   readonly direction = input<'in' | 'out' | 'none'>('none');
+  /** Show the currency code when the surrounding label does not establish it. */
+  readonly showCurrency = input(false);
   /** Hide the amount (sensitive figures without permission). */
   readonly masked = input(false);
 
-  protected readonly formatted = computed(() => formatKes(this.cents()));
+  protected readonly formatted = computed(() =>
+    this.showCurrency() ? formatKes(this.cents()) : formatMoneyAmount(this.cents())
+  );
+  protected readonly accessibleAmount = computed(() => formatKes(this.cents()));
 }

@@ -6,6 +6,7 @@ import { PermissionsService } from '../core/permissions.service';
 import { ThemeService } from '../core/theme.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CashierSessionService } from '../core/cashier-session.service';
 
 interface NavItem {
   route: string;
@@ -65,17 +66,17 @@ interface NavSection {
             <a
               routerLink="/money/cashier"
               class="badge badge-md min-h-0 cursor-pointer gap-1.5 border-0 px-3 py-2 font-semibold"
-              [class.badge-success]="tillOpen()"
-              [class.badge-ghost]="!tillOpen()"
-              [title]="tillOpen() ? 'Till open — cashier sessions' : 'No open till'"
+              [class.badge-success]="cashierSession.isOpen()"
+              [class.badge-ghost]="!cashierSession.isOpen()"
+              [title]="cashierSession.isOpen() ? 'Till open — cashier sessions' : 'No open till'"
             >
               <span
                 class="h-2 w-2 shrink-0 rounded-full"
-                [class.bg-success]="tillOpen()"
-                [class.animate-pulse]="tillOpen()"
-                [class.bg-base-content/30]="!tillOpen()"
+                [class.bg-success]="cashierSession.isOpen()"
+                [class.animate-pulse]="cashierSession.isOpen()"
+                [class.bg-base-content/30]="!cashierSession.isOpen()"
               ></span>
-              {{ tillOpen() ? 'till open' : 'till closed' }}
+              {{ cashierSession.isOpen() ? 'till open' : 'till closed' }}
             </a>
 
             <button
@@ -203,9 +204,9 @@ export class ShellComponent implements OnInit {
   protected readonly perms = inject(PermissionsService);
   protected readonly approvals = inject(ApprovalsService);
   protected readonly notifications = inject(NotificationsService);
+  protected readonly cashierSession = inject(CashierSessionService);
 
   protected readonly company = signal<Company | null>(null);
-  protected readonly tillOpen = signal(false);
 
   protected readonly sections: NavSection[] = [
     {
@@ -281,18 +282,7 @@ export class ShellComponent implements OnInit {
     } catch {
       // brand falls back to 'Dukarun'
     }
-    await this.refreshTill();
-    // Light polling keeps the till badge honest without a subscription.
-    setInterval(() => void this.refreshTill(), 30_000);
-  }
-
-  private async refreshTill(): Promise<void> {
-    const { data } = await this.supabase.client
-      .from('cashier_sessions')
-      .select('id')
-      .eq('status', 'open')
-      .limit(1);
-    this.tillOpen.set((data?.length ?? 0) > 0);
+    await this.cashierSession.start();
   }
 
   protected closeDrawer(): void {

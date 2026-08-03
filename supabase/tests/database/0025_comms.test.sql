@@ -16,6 +16,7 @@ insert into public.customers (id, company_id, first_name, phone, is_credit_appro
 select 'c0000000-0000-0000-0000-0000000000aa', company_id, 'Owing Jane', '0711000000', true, 0 from cm_company;
 
 select testkit.as_user((select company_id from cm_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- 1. In-app notification lands and is member-readable.
 reset role;

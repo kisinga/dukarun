@@ -3,10 +3,15 @@
  * format to KES only at display time.
  */
 export function formatKes(cents: number): string {
-  return `KES ${(cents / 100).toLocaleString('en-KE', {
+  return `KES ${formatMoneyAmount(cents)}`;
+}
+
+/** Numeric money display for places where the surrounding UI already establishes KES. */
+export function formatMoneyAmount(cents: number): string {
+  return (cents / 100).toLocaleString('en-KE', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`;
+  });
 }
 
 /** Parse a user-typed KES amount ("2450", "2,450.50") into cents. Null when invalid. */

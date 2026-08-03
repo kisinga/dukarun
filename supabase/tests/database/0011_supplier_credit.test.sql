@@ -17,6 +17,7 @@ insert into public.customers (id, company_id, first_name, is_supplier, supplier_
 select 'c0000000-0000-0000-0000-0000000000f1', company_id, 'Brookside', true, 100000 from sp_company;
 
 select testkit.as_user((select company_id from sp_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- 1-3. Cash purchase: batch created, movement recorded, DR INVENTORY/CR CASH_ON_HAND.
 create temp table pur1 as

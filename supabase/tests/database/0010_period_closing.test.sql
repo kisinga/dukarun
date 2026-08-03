@@ -17,11 +17,24 @@ insert into public.product_variants (id, product_id, company_id, name, kind, sku
 select 'aa000000-0000-0000-0000-0000000000ee', 'a0000000-0000-0000-0000-0000000000ee', company_id, 'Default', 'service', 'SVC', 10000, false from pc_company;
 
 select testkit.as_user((select company_id from pc_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- Seed activity.
 select public.post_sale(null,
   '[{"variant_id":"aa000000-0000-0000-0000-0000000000ee","quantity":1,"unit_price":10000}]',
   '[{"method":"cash","amount":10000}]');
+-- End the fixture session without creating a reconciliation: this test's next
+-- assertion specifically exercises the missing-reconciliation gate.
+reset role;
+update public.cashier_sessions
+set status = 'closed', closed_at = now()
+where company_id = (select company_id from pc_company) and status = 'open';
+delete from public.reconciliation_accounts
+where reconciliation_id in (
+  select id from public.reconciliations where company_id = (select company_id from pc_company)
+);
+delete from public.reconciliations where company_id = (select company_id from pc_company);
+select testkit.as_user((select company_id from pc_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 1. Close without any verified reconciliation fails.
 select throws_ok(

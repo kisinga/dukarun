@@ -15,6 +15,7 @@ import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { MoneyComponent } from '../../shared/ui/money.component';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
+import { CashierSessionService } from '../../core/cashier-session.service';
 
 @Component({
   selector: 'app-money-cashier',
@@ -55,8 +56,8 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 
           <h3 class="mt-4 font-semibold">Close session — blind count</h3>
           <p class="text-xs text-base-content/60">
-            This count is blind — you won't see the expected amount. Count what's actually in
-            the drawer and enter it per account.
+            This count is blind — you won't see the expected amount. Count what's actually in the
+            drawer and enter it per account.
           </p>
           <div class="mt-2 flex flex-col gap-2">
             @for (account of accounts(); track account.account_code) {
@@ -240,6 +241,7 @@ import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
   `,
 })
 export class MoneyCashierComponent implements OnInit {
+  private readonly cashierSessionState = inject(CashierSessionService);
   private readonly money = inject(MoneyService);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
@@ -314,6 +316,7 @@ export class MoneyCashierComponent implements OnInit {
       this.notice.set(successMessage);
       for (const a of this.accounts()) this.declared[a.account_code] = '0.00';
       await this.load();
+      await this.cashierSessionState.refresh();
       return true;
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Request failed');

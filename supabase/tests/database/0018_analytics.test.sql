@@ -18,6 +18,7 @@ insert into public.inventory_batches (company_id, variant_id, quantity, remainin
 select company_id, 'aa000000-0000-0000-0000-0000000000a1', 10, 10, 12000 from rpt_company;
 
 select testkit.as_user((select company_id from rpt_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- Two sales today: 2x Rice (revenue 40000, cogs 24000) + split payment.
 select public.post_sale(null,

@@ -39,6 +39,7 @@ select 'c0000000-0000-0000-0000-000000000001', company_id, 'Walk-in', '071234567
 --      Revenue: 12*20000 + 5000 = 245000. COGS: 10*10000 + 2*15000 = 130000.
 -- ---------------------------------------------------------------------------
 select testkit.as_user((select company_id from pos_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 create temp table sale1 as
 select public.post_sale(

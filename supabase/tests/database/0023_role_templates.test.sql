@@ -39,6 +39,7 @@ select ok(
 
 -- 4. apply_role_template instantiates it as a company role.
 select testkit.as_user((select company_id from tm_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 create temp table applied as
 select public.apply_role_template(

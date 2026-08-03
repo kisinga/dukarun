@@ -9,6 +9,7 @@ create temp table pr_company as select testkit.provision('11111111-1111-1111-111
 grant select on pg_temp.pr_company to authenticated;
 
 select testkit.as_user((select company_id from pr_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- 1. create_product creates the family row (no sellable fields).
 create temp table prod1 as

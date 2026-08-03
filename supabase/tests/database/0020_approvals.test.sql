@@ -24,6 +24,7 @@ insert into public.customers (id, company_id, first_name, is_credit_approved, cr
 select 'c0000000-0000-0000-0000-0000000000b1', company_id, 'Ltd Jane', true, 10000 from ap_company;
 
 select testkit.as_user((select company_id from ap_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- ---------------------------------------------------------------------------
 -- 1-4. below_wholesale: draft saves, completion blocked, approval unblocks.

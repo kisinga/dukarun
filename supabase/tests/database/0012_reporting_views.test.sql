@@ -22,6 +22,7 @@ insert into public.customers (id, company_id, first_name, is_credit_approved, cr
 select 'c0000000-0000-0000-0000-0000000000aa', company_id, 'AR Jane', true, 0 from vw_company;
 
 select testkit.as_user((select company_id from vw_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- 1-2. AR view reflects credit sales net of allocations.
 create temp table vw_sale as

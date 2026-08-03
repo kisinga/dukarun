@@ -14,6 +14,8 @@ import { MobileFabComponent } from '../shared/ui/mobile-fab.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
+import { CashierSessionService } from '../core/cashier-session.service';
+import { SessionRequiredNoticeComponent } from '../shared/ui/session-required-notice.component';
 
 type CustomerWithAr = MoneyCustomer & { ar_balance: number } & AgingInfo;
 type CreditOrder = {
@@ -38,6 +40,7 @@ type CreditOrder = {
     MobileFabComponent,
     ListSearchBarComponent,
     StatusBadgeComponent,
+    SessionRequiredNoticeComponent,
   ],
   template: `
     <app-page title="Customers">
@@ -221,6 +224,9 @@ type CreditOrder = {
                     <!-- Credit orders + repayment -->
                     <div>
                       <h3 class="section-title mb-2">Credit orders</h3>
+                      @if (!cashierSession.isOpen() && creditOrders().length > 0) {
+                        <app-session-required-notice action="collecting a repayment" />
+                      }
                       @if (creditOrders().length === 0) {
                         <p class="text-xs text-base-content/60">No credit sales.</p>
                       } @else {
@@ -235,7 +241,13 @@ type CreditOrder = {
                               ><app-money [cents]="o.total" [masked]="!perms.has('ViewFinancials')"
                             /></span>
                             @if (perms.has('SettleOrder')) {
-                              <button appButton (click)="startRepay(o.id, o.total)">Repay</button>
+                              <button
+                                appButton
+                                [disabled]="!cashierSession.isOpen()"
+                                (click)="startRepay(o.id, o.total)"
+                              >
+                                Repay
+                              </button>
                             }
                           </div>
                           @if (repayFor() === o.id) {
@@ -268,7 +280,13 @@ type CreditOrder = {
                                   [formControl]="repayReference"
                                 />
                               </app-form-field>
-                              <button appButton type="submit" [disabled]="busy()">Allocate</button>
+                              <button
+                                appButton
+                                type="submit"
+                                [disabled]="busy() || !cashierSession.isOpen()"
+                              >
+                                Allocate
+                              </button>
                               <button
                                 appButton
                                 variant="ghost"
@@ -334,6 +352,7 @@ type CreditOrder = {
   `,
 })
 export class CustomersComponent implements OnInit {
+  protected readonly cashierSession = inject(CashierSessionService);
   private readonly money = inject(MoneyService);
   private readonly pos = inject(PosService);
   protected readonly perms = inject(PermissionsService);
@@ -478,12 +497,22 @@ export class CustomersComponent implements OnInit {
   }
 
   protected startRepay(orderId: string, total: number): void {
+    if (!this.cashierSession.isOpen()) {
+      this.error.set('Open a cashier session before collecting a repayment.');
+      return;
+    }
     this.repayFor.set(orderId);
     this.repayAmount.setValue((total / 100).toFixed(2));
     this.repayReference.setValue('');
   }
 
   protected async repay(orderId: string): Promise<void> {
+    try {
+      await this.cashierSession.assertOpen('collecting a repayment');
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+      return;
+    }
     const cents = parseKesToCents(this.repayAmount.value);
     if (cents === null || cents <= 0) {
       this.error.set('Enter a valid repayment amount');

@@ -13,6 +13,7 @@ insert into public.product_variants (id, product_id, company_id, name, kind, sku
 select 'aa000000-0000-0000-0000-0000000000aa', 'a0000000-0000-0000-0000-0000000000aa', company_id, 'Default', 'service', 'SVC', 5000, false from idem_company;
 
 select testkit.as_user((select company_id from idem_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- 1. First post with a client_ref succeeds and stores the ref.
 create temp table sale_a as

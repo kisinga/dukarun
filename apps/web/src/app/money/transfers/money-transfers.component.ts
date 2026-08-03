@@ -6,14 +6,26 @@ import { ButtonComponent } from '../../shared/ui/button.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { JournalListComponent } from '../journal-list.component';
 import { JournalEntryWithLines, LedgerAccount, MoneyService } from '../money.service';
+import { CashierSessionService } from '../../core/cashier-session.service';
+import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 
 @Component({
   selector: 'app-money-transfers',
-  imports: [ReactiveFormsModule, JournalListComponent, FormFieldComponent, ButtonComponent],
+  imports: [
+    ReactiveFormsModule,
+    JournalListComponent,
+    FormFieldComponent,
+    ButtonComponent,
+    SessionRequiredNoticeComponent,
+  ],
   template: `
     <div class="mb-3 flex items-center justify-end">
       <button appButton variant="ghost" (click)="load()">Refresh</button>
     </div>
+
+    @if (!cashierSession.isOpen()) {
+      <app-session-required-notice action="moving money between accounts" />
+    }
 
     <div class="card mb-4 bg-base-100">
       <div class="card-body p-4">
@@ -65,7 +77,12 @@ import { JournalEntryWithLines, LedgerAccount, MoneyService } from '../money.ser
             </p>
           }
           <div class="sm:col-span-2">
-            <button appButton type="submit" [loading]="busy()" [disabled]="sameAccount()">
+            <button
+              appButton
+              type="submit"
+              [loading]="busy()"
+              [disabled]="sameAccount() || !cashierSession.isOpen()"
+            >
               Post transfer
             </button>
           </div>
@@ -85,6 +102,7 @@ import { JournalEntryWithLines, LedgerAccount, MoneyService } from '../money.ser
 })
 export class MoneyTransfersComponent implements OnInit {
   private readonly money = inject(MoneyService);
+  protected readonly cashierSession = inject(CashierSessionService);
 
   protected readonly accounts = signal<LedgerAccount[]>([]);
   protected readonly entries = signal<JournalEntryWithLines[]>([]);
@@ -131,6 +149,12 @@ export class MoneyTransfersComponent implements OnInit {
   }
 
   protected async submit(): Promise<void> {
+    try {
+      await this.cashierSession.assertOpen('moving money between accounts');
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+      return;
+    }
     const principalCents = parseKesToCents(this.principal.value);
     if (principalCents === null || principalCents <= 0) {
       this.error.set('Enter a valid principal amount');

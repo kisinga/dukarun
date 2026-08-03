@@ -27,6 +27,7 @@ select testkit.as_user(
   '11111111-1111-1111-1111-111111111111',
   'Admin'
 );
+select testkit.ensure_open_session();
 
 select is(
   jsonb_array_length(public.dashboard_sales_snapshot() -> 'summary'),

@@ -17,6 +17,7 @@ insert into public.product_variants (id, product_id, company_id, name, kind, sku
 select 'aa000000-0000-0000-0000-0000000000bb', 'a0000000-0000-0000-0000-0000000000bb', company_id, 'Default', 'service', 'SVC', 10000, false from mops_company;
 
 select testkit.as_user((select company_id from mops_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- Seed cash via a sale so transfer/expense sources have balances (not required
 -- by the ledger, but keeps scenarios realistic).

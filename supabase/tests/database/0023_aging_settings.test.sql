@@ -18,6 +18,7 @@ insert into public.customers (id, company_id, first_name, is_supplier)
 select 'c0000000-0000-0000-0000-0000000000e2', company_id, 'Old Supplier', true from age_company;
 
 select testkit.as_user((select company_id from age_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- Credit sale today + an OLD credit sale (backdated entry).
 create temp table age_sale as

@@ -4,10 +4,17 @@ import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { formatKes } from '../../core/money';
 import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
 import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
+import { CashierSessionService } from '../../core/cashier-session.service';
+import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 
 @Component({
   selector: 'app-cashier-queue',
-  imports: [CheckoutPanelComponent, PageHeaderComponent, EmptyStateComponent],
+  imports: [
+    CheckoutPanelComponent,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    SessionRequiredNoticeComponent,
+  ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
@@ -20,6 +27,9 @@ import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
         }
         @if (notice()) {
           <p class="mb-2 text-sm text-success">{{ notice() }}</p>
+        }
+        @if (!cashierSession.isOpen()) {
+          <app-session-required-notice action="settling a parked order" />
         }
 
         @if (parked().length === 0) {
@@ -37,7 +47,11 @@ import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
                   <span class="text-sm text-base-content/60">{{ time(order.created_at) }}</span>
                   <span class="text-sm">{{ customerName(order) }}</span>
                   <span class="ml-auto font-bold tabular-nums">{{ fmt(order.total) }}</span>
-                  <button class="btn btn-primary btn-sm" (click)="settling.set(order)">
+                  <button
+                    class="btn btn-primary btn-sm"
+                    [disabled]="!cashierSession.isOpen()"
+                    (click)="startSettlement(order)"
+                  >
                     Settle
                   </button>
                 </div>
@@ -47,7 +61,7 @@ import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
         }
       </div>
 
-      @if (settling(); as order) {
+      @if (cashierSession.isOpen() && settling(); as order) {
         <app-checkout-panel
           [total]="order.total"
           [creditAllowed]="order.customer_id !== null"
@@ -63,6 +77,7 @@ import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
 })
 export class CashierQueueComponent implements OnInit {
   private readonly pos = inject(PosService);
+  protected readonly cashierSession = inject(CashierSessionService);
 
   protected readonly fmt = formatKes;
   protected readonly parked = signal<OrderWithCustomer[]>([]);
@@ -91,6 +106,13 @@ export class CashierQueueComponent implements OnInit {
   }
 
   protected async settle(orderId: string, payments: PaymentInput[]): Promise<void> {
+    try {
+      await this.cashierSession.assertOpen('settling an order');
+    } catch (err) {
+      this.settling.set(null);
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
@@ -104,6 +126,16 @@ export class CashierQueueComponent implements OnInit {
       this.settling.set(null);
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  protected async startSettlement(order: OrderWithCustomer): Promise<void> {
+    this.error.set(null);
+    try {
+      await this.cashierSession.assertOpen('settling an order');
+      this.settling.set(order);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
     }
   }
 

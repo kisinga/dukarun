@@ -5,14 +5,26 @@ import { ButtonComponent } from '../../shared/ui/button.component';
 import { FormFieldComponent } from '../../shared/ui/form-field.component';
 import { JournalListComponent } from '../journal-list.component';
 import { JournalEntryWithLines, LedgerAccount, MoneyService } from '../money.service';
+import { CashierSessionService } from '../../core/cashier-session.service';
+import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 
 @Component({
   selector: 'app-money-expenses',
-  imports: [ReactiveFormsModule, JournalListComponent, FormFieldComponent, ButtonComponent],
+  imports: [
+    ReactiveFormsModule,
+    JournalListComponent,
+    FormFieldComponent,
+    ButtonComponent,
+    SessionRequiredNoticeComponent,
+  ],
   template: `
     <div class="mb-3 flex items-center justify-end">
       <button appButton variant="ghost" (click)="load()">Refresh</button>
     </div>
+
+    @if (!cashierSession.isOpen()) {
+      <app-session-required-notice action="recording an expense" />
+    }
 
     <div class="card mb-4 bg-base-100">
       <div class="card-body p-4">
@@ -51,7 +63,14 @@ import { JournalEntryWithLines, LedgerAccount, MoneyService } from '../money.ser
             />
           </app-form-field>
           <div class="sm:col-span-2">
-            <button appButton type="submit" [loading]="busy()">Post expense</button>
+            <button
+              appButton
+              type="submit"
+              [loading]="busy()"
+              [disabled]="!cashierSession.isOpen()"
+            >
+              Post expense
+            </button>
           </div>
         </form>
         @if (error()) {
@@ -69,6 +88,7 @@ import { JournalEntryWithLines, LedgerAccount, MoneyService } from '../money.ser
 })
 export class MoneyExpensesComponent implements OnInit {
   private readonly money = inject(MoneyService);
+  protected readonly cashierSession = inject(CashierSessionService);
 
   protected readonly accounts = signal<LedgerAccount[]>([]);
   protected readonly entries = signal<JournalEntryWithLines[]>([]);
@@ -100,6 +120,12 @@ export class MoneyExpensesComponent implements OnInit {
   }
 
   protected async submit(): Promise<void> {
+    try {
+      await this.cashierSession.assertOpen('recording an expense');
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+      return;
+    }
     const cents = parseKesToCents(this.amount.value);
     if (cents === null || cents <= 0) {
       this.error.set('Enter a valid amount');

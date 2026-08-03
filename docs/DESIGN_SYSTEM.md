@@ -28,6 +28,10 @@ Numbers are the heroes of every screen.
 
 - `tabular-nums` on every amount; amounts right-aligned; the total is the largest text on
   any checkout/payment screen.
+- Do not repeat `KES` on every value in a list, table, product grid, or transaction panel.
+  Establish currency once in the surrounding context when ambiguity is possible; compact
+  amounts are the default. Receipts, exports, free-standing text, and cross-currency views
+  must retain an explicit currency code.
 - Semantic colour is **money meaning only**: `success` = received/positive, `error` =
   owed/overdue/failed, `warning` = needs attention, `info`/primary = neutral emphasis.
   Never decorative — no gradient-tinted stat cards, no red asterisks-as-decoration.
@@ -134,8 +138,9 @@ Compose pages from these — never hand-roll what a primitive owns:
   Use `soft`, not `primary`, for a selected method/filter so the CTA remains singular.
   Variants never change button geometry. No raw `btn btn-*` strings for standard actions
   (tight table-row clusters may stay raw by exception).
-- **`<app-money [cents]>`** — the only way to render money: tabular-nums KES formatting,
-  `direction="in|out"` for money-meaning colour, `masked` for hidden figures. Never
+- **`<app-money [cents]>`** — the only way to render money: compact tabular-nums by default,
+  `[showCurrency]="true"` only where context does not already establish KES,
+  `direction="in|out"` for money-meaning colour, and `masked` for hidden figures. Never
   `{{ formatKes(...) }}` in templates (string composition in TS, e.g. option labels, is fine).
 - **`<app-icon>`** — icons on the 4-size scale (see Icons).
 - Plus the existing shells: `app-page-header` (inside `app-page`), `app-stat-bar`,

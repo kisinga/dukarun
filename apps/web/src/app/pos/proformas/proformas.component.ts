@@ -7,10 +7,18 @@ import { CheckoutPanelComponent } from '../checkout/checkout-panel.component';
 import { OrderWithCustomer, PaymentInput, PosService } from '../pos.service';
 import { PrintService } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
+import { CashierSessionService } from '../../core/cashier-session.service';
+import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
 
 @Component({
   selector: 'app-proformas',
-  imports: [RouterLink, CheckoutPanelComponent, PageHeaderComponent, EmptyStateComponent],
+  imports: [
+    RouterLink,
+    CheckoutPanelComponent,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    SessionRequiredNoticeComponent,
+  ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
@@ -29,6 +37,9 @@ import { ReceiptDataService } from '../../shared/print/receipt-data.service';
         }
         @if (notice()) {
           <p class="mb-2 text-sm text-success">{{ notice() }}</p>
+        }
+        @if (!cashierSession.isOpen() && drafts().length > 0) {
+          <app-session-required-notice action="converting a proforma to a sale" />
         }
 
         @if (drafts().length === 0) {
@@ -52,7 +63,11 @@ import { ReceiptDataService } from '../../shared/print/receipt-data.service';
                       Print
                     </button>
                   }
-                  <button class="btn btn-primary btn-sm" (click)="converting.set(draft)">
+                  <button
+                    class="btn btn-primary btn-sm"
+                    [disabled]="!cashierSession.isOpen()"
+                    (click)="startConversion(draft)"
+                  >
                     Convert to Sale
                   </button>
                 </div>
@@ -62,7 +77,7 @@ import { ReceiptDataService } from '../../shared/print/receipt-data.service';
         }
       </div>
 
-      @if (converting(); as draft) {
+      @if (cashierSession.isOpen() && converting(); as draft) {
         <app-checkout-panel
           [total]="draft.total"
           [creditAllowed]="draft.customer_id !== null"
@@ -81,6 +96,7 @@ export class ProformasComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly receiptData = inject(ReceiptDataService);
   private readonly print = inject(PrintService);
+  protected readonly cashierSession = inject(CashierSessionService);
 
   protected readonly fmt = formatKes;
   protected readonly drafts = signal<OrderWithCustomer[]>([]);
@@ -131,9 +147,16 @@ export class ProformasComponent implements OnInit {
   }
 
   protected async convert(orderId: string, payments: PaymentInput[]): Promise<void> {
-    this.busy.set(true);
     this.error.set(null);
     this.notice.set(null);
+    try {
+      await this.cashierSession.assertOpen('converting a proforma to a sale');
+    } catch (err) {
+      this.converting.set(null);
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
+      return;
+    }
+    this.busy.set(true);
     try {
       await this.pos.convertDraft(orderId, payments);
       this.converting.set(null);
@@ -147,6 +170,16 @@ export class ProformasComponent implements OnInit {
       this.converting.set(null);
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  protected async startConversion(draft: OrderWithCustomer): Promise<void> {
+    this.error.set(null);
+    try {
+      await this.cashierSession.assertOpen('converting a proforma to a sale');
+      this.converting.set(draft);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Open a cashier session first');
     }
   }
 

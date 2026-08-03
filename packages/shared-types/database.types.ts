@@ -2743,6 +2743,10 @@ export type Database = {
         Returns: undefined;
       };
       assert_platform_admin: { Args: never; Returns: undefined };
+      cashier_session_required_for_source: {
+        Args: { p_source_type: string };
+        Returns: boolean;
+      };
       close_accounting_period: { Args: { p_end_date: string }; Returns: string };
       close_cashier_session: {
         Args: { p_declarations: Json; p_session_id: string };
@@ -3021,6 +3025,10 @@ export type Database = {
       remove_team_member: { Args: { p_membership_id: string }; Returns: string };
       require_asset_leaf_account: {
         Args: { p_code: string; p_company_id: string };
+        Returns: string;
+      };
+      require_open_cashier_session: {
+        Args: { p_company_id: string };
         Returns: string;
       };
       revert_variance: {

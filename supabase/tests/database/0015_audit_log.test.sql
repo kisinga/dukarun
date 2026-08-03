@@ -19,6 +19,7 @@ select ok(
 
 -- 2-3. Product create/update captured with new/old snapshots.
 select testkit.as_user((select company_id from au_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 create temp table au_prod as
 select public.create_product('Audit Bread') as id;

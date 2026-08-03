@@ -10,6 +10,7 @@ select testkit.provision('11111111-1111-1111-1111-111111111111', 'Manual Co') as
 grant select on pg_temp.mp_company to authenticated;
 
 select testkit.as_user((select company_id from mp_company), '11111111-1111-1111-1111-111111111111', 'Admin');
+select testkit.ensure_open_session();
 
 -- 1-2. Exactly the three real money accounts are manually transactable.
 select is(
