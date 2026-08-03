@@ -1,15 +1,30 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { formatKes, parseKesToCents } from '../core/money';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
-import { CompanySettings, PaymentMethodRow, SettingsService } from './settings.service';
+import {
+  CompanySettings,
+  PaymentMethodRow,
+  SettingsService,
+  StockLocationRow,
+} from './settings.service';
+import { EntitlementsService } from '../core/entitlements.service';
+import { PermissionsService } from '../core/permissions.service';
+import { ButtonComponent } from '../shared/ui/button.component';
+import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
 
 type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
 
 @Component({
   selector: 'app-settings',
-  imports: [ReactiveFormsModule, RouterLink, PageHeaderComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    PageHeaderComponent,
+    ButtonComponent,
+    DeleteConfirmationModalComponent,
+  ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
@@ -151,6 +166,161 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
             </div>
           </div>
 
+          <!-- Locations -->
+          <div class="card mb-4 bg-base-100">
+            <div class="card-body p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="card-title text-lg">Stock locations</h2>
+                    @if (entitlements.snapshot(); as plan) {
+                      <span class="badge badge-outline badge-sm">{{
+                        plan.tierName ?? 'No plan'
+                      }}</span>
+                    }
+                  </div>
+                  <p class="type-caption mt-1">
+                    Locations separate where purchases are received and stock is held.
+                    @if (locationLimit(); as limit) {
+                      {{ locations().length }} of {{ limit }} used.
+                    }
+                  </p>
+                </div>
+                @if (perms.has('ManageStockAdjustments')) {
+                  <button
+                    appButton
+                    variant="outline"
+                    [disabled]="!canAddLocation()"
+                    (click)="startLocationCreate()"
+                  >
+                    Add location
+                  </button>
+                }
+              </div>
+
+              @if (!entitlements.enabled('multipleLocations') && locations().length > 0) {
+                <div class="alert mt-3 border border-info/20 bg-info/5 text-sm">
+                  <span class="flex-1">
+                    Multiple locations are not included in your current plan. You can still rename
+                    and maintain the default location.
+                  </span>
+                  <a routerLink="/billing" class="link whitespace-nowrap font-semibold"
+                    >View plans</a
+                  >
+                </div>
+              } @else if (!canAddLocation() && locationLimit() !== null) {
+                <div class="alert mt-3 border border-warning/20 bg-warning/5 text-sm">
+                  <span class="flex-1">Your plan's stock-location limit has been reached.</span>
+                  <a routerLink="/billing" class="link whitespace-nowrap font-semibold">Upgrade</a>
+                </div>
+              }
+
+              @if (locationFormOpen()) {
+                <form
+                  (submit)="$event.preventDefault(); saveLocation()"
+                  class="mt-3 grid gap-3 rounded-box border border-base-300 bg-base-200/40 p-3 sm:grid-cols-2"
+                >
+                  <label class="form-control">
+                    <span class="label-text">Location name</span>
+                    <input class="input input-bordered input-sm" [formControl]="locationName" />
+                  </label>
+                  <label class="form-control">
+                    <span class="label-text">Code</span>
+                    <input
+                      class="input input-bordered input-sm uppercase"
+                      placeholder="e.g. WESTLANDS"
+                      [formControl]="locationCode"
+                    />
+                  </label>
+                  <label class="label cursor-pointer justify-start gap-2 py-0 sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm"
+                      [formControl]="locationDefault"
+                    />
+                    <span class="label-text">Use as the default receiving location</span>
+                  </label>
+                  <div class="flex gap-2 sm:col-span-2">
+                    <button
+                      appButton
+                      type="submit"
+                      [loading]="locationBusy()"
+                      [disabled]="
+                        locationName.value.trim().length === 0 ||
+                        locationCode.value.trim().length === 0
+                      "
+                    >
+                      {{ editingLocation() ? 'Save location' : 'Create location' }}
+                    </button>
+                    <button appButton variant="ghost" type="button" (click)="closeLocationForm()">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              }
+
+              @if (locationMessage(); as message) {
+                <p
+                  class="mt-2 text-sm"
+                  [class.text-success]="message.ok"
+                  [class.text-error]="!message.ok"
+                >
+                  {{ message.text }}
+                </p>
+              }
+
+              <div class="table-scroll mt-3">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Location</th>
+                      <th>Code</th>
+                      <th>Status</th>
+                      <th class="text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (location of locations(); track location.id) {
+                      <tr>
+                        <td class="font-medium">{{ location.name }}</td>
+                        <td class="font-mono text-xs">{{ location.code }}</td>
+                        <td>
+                          @if (location.is_default) {
+                            <span class="badge badge-primary badge-sm">Default</span>
+                          } @else {
+                            <span class="badge badge-ghost badge-sm">Additional</span>
+                          }
+                        </td>
+                        <td class="whitespace-nowrap text-right">
+                          @if (perms.has('ManageStockAdjustments')) {
+                            <button
+                              appButton
+                              variant="ghost"
+                              size="sm"
+                              (click)="startLocationEdit(location)"
+                            >
+                              Edit
+                            </button>
+                            @if (!location.is_default) {
+                              <button
+                                appButton
+                                variant="error"
+                                size="sm"
+                                (click)="startLocationDelete(location)"
+                              >
+                                Delete
+                              </button>
+                            }
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <!-- Cash control threshold -->
           <div class="card mb-4 bg-base-100">
             <div class="card-body p-4">
@@ -251,20 +421,50 @@ type SectionKey = 'profile' | 'pos' | 'inventory' | 'cash';
         } @else {
           <p class="text-sm text-base-content/60">Loading…</p>
         }
+
+        <app-delete-confirmation-modal
+          [data]="locationDeleteData()"
+          title="Delete stock location?"
+          entityType="location"
+          verb="delete"
+          confirmButtonText="Delete location"
+          (confirm)="confirmLocationDelete()"
+          (cancel)="deletingLocation.set(null)"
+        />
       </div>
     </main>
   `,
 })
 export class SettingsComponent implements OnInit {
   private readonly settingsService = inject(SettingsService);
+  protected readonly entitlements = inject(EntitlementsService);
+  protected readonly perms = inject(PermissionsService);
 
   protected readonly fmt = formatKes;
   protected readonly settings = signal<CompanySettings | null>(null);
   protected readonly paymentMethods = signal<PaymentMethodRow[]>([]);
+  protected readonly locations = signal<StockLocationRow[]>([]);
   protected readonly loadError = signal<string | null>(null);
   protected readonly busy = signal(false);
   private readonly messages = signal<Map<string, { ok: boolean; text: string }>>(new Map());
   protected readonly pmMsg = signal<{ ok: boolean; text: string } | null>(null);
+  protected readonly locationMessage = signal<{ ok: boolean; text: string } | null>(null);
+  protected readonly locationBusy = signal(false);
+  protected readonly locationFormOpen = signal(false);
+  protected readonly editingLocation = signal<StockLocationRow | null>(null);
+  protected readonly deletingLocation = signal<StockLocationRow | null>(null);
+  protected readonly locationLimit = computed(() => this.entitlements.limit('maxStockLocations'));
+  protected readonly canAddLocation = computed(() => {
+    if (this.locations().length === 0) return true;
+    if (!this.entitlements.enabled('multipleLocations')) return false;
+    const limit = this.locationLimit();
+    return limit === null || this.locations().length < limit;
+  });
+  protected readonly locationDeleteData = computed(() => ({
+    entityName: this.deletingLocation()?.name ?? 'location',
+    warningDetails: ['Locations with inventory or purchase history cannot be deleted.'],
+  }));
+  private readonly locationDeleteModal = viewChild(DeleteConfirmationModalComponent);
 
   protected readonly name = new FormControl('', { nonNullable: true });
   protected readonly slug = new FormControl('', { nonNullable: true });
@@ -280,15 +480,21 @@ export class SettingsComponent implements OnInit {
   protected readonly batchExpiry = new FormControl(false, { nonNullable: true });
 
   protected readonly varianceThreshold = new FormControl('', { nonNullable: true });
+  protected readonly locationName = new FormControl('', { nonNullable: true });
+  protected readonly locationCode = new FormControl('', { nonNullable: true });
+  protected readonly locationDefault = new FormControl(false, { nonNullable: true });
 
   async ngOnInit(): Promise<void> {
     try {
-      const [settings, methods] = await Promise.all([
+      const [settings, methods, locations] = await Promise.all([
         this.settingsService.getSettings(),
         this.settingsService.paymentMethods(),
+        this.settingsService.stockLocations(),
+        this.entitlements.refresh(),
       ]);
       this.settings.set(settings);
       this.paymentMethods.set(methods);
+      this.locations.set(locations);
       this.name.setValue(settings.name);
       this.slug.setValue(settings.public_slug ?? '');
       this.whatsapp.setValue(settings.public_whatsapp_number ?? '');
@@ -303,6 +509,98 @@ export class SettingsComponent implements OnInit {
     } catch (err) {
       this.loadError.set(err instanceof Error ? err.message : 'Failed to load settings');
     }
+  }
+
+  protected startLocationCreate(): void {
+    if (!this.canAddLocation()) return;
+    this.editingLocation.set(null);
+    this.locationName.setValue('');
+    this.locationCode.setValue('');
+    this.locationDefault.setValue(false);
+    this.locationMessage.set(null);
+    this.locationFormOpen.set(true);
+  }
+
+  protected startLocationEdit(location: StockLocationRow): void {
+    this.editingLocation.set(location);
+    this.locationName.setValue(location.name);
+    this.locationCode.setValue(location.code);
+    this.locationDefault.setValue(location.is_default);
+    this.locationMessage.set(null);
+    this.locationFormOpen.set(true);
+  }
+
+  protected closeLocationForm(): void {
+    this.locationFormOpen.set(false);
+    this.editingLocation.set(null);
+  }
+
+  protected async saveLocation(): Promise<void> {
+    const name = this.locationName.value.trim();
+    const code = this.locationCode.value.trim();
+    if (!name || !code) return;
+    this.locationBusy.set(true);
+    this.locationMessage.set(null);
+    try {
+      const editing = this.editingLocation();
+      if (editing) {
+        await this.settingsService.updateStockLocation(
+          editing.id,
+          code,
+          name,
+          this.locationDefault.value
+        );
+      } else {
+        await this.settingsService.createStockLocation(code, name, this.locationDefault.value);
+      }
+      await this.reloadLocations();
+      this.closeLocationForm();
+      this.locationMessage.set({
+        ok: true,
+        text: editing ? 'Location updated' : 'Location created',
+      });
+    } catch (err) {
+      this.locationMessage.set({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Location save failed',
+      });
+    } finally {
+      this.locationBusy.set(false);
+    }
+  }
+
+  protected startLocationDelete(location: StockLocationRow): void {
+    this.deletingLocation.set(location);
+    this.locationDeleteModal()?.show();
+  }
+
+  protected async confirmLocationDelete(): Promise<void> {
+    const location = this.deletingLocation();
+    if (!location) return;
+    this.locationBusy.set(true);
+    this.locationMessage.set(null);
+    try {
+      await this.settingsService.deleteStockLocation(location.id);
+      this.locationDeleteModal()?.hide();
+      this.deletingLocation.set(null);
+      await this.reloadLocations();
+      this.locationMessage.set({ ok: true, text: 'Location deleted' });
+    } catch (err) {
+      this.locationMessage.set({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Location delete failed',
+      });
+    } finally {
+      this.locationBusy.set(false);
+    }
+  }
+
+  private async reloadLocations(): Promise<void> {
+    const [locations] = await Promise.all([
+      this.settingsService.stockLocations(),
+      this.entitlements.refresh(),
+    ]);
+    this.locations.set(locations);
   }
 
   protected msg(key: string): { ok: boolean; text: string } | null {

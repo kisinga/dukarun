@@ -12,9 +12,20 @@ export type AccountingPeriod = Database['public']['Tables']['accounting_periods'
 export type PeriodLock = Database['public']['Tables']['period_locks']['Row'];
 export type Purchase = Database['public']['Tables']['purchases']['Row'];
 export type PurchasePayment = Database['public']['Tables']['purchase_payments']['Row'];
+export type PurchaseDraft = Database['public']['Tables']['purchase_drafts']['Row'];
+export type PurchaseLine = Database['public']['Tables']['purchase_lines']['Row'];
 export type MoneyCustomer = Database['public']['Tables']['customers']['Row'];
 export type ReconAccount = Database['public']['Tables']['reconciliation_accounts']['Row'];
 export type Reconciliation = Database['public']['Tables']['reconciliations']['Row'];
+export type CustomerStatementRow = {
+  id: string;
+  date: string;
+  reference: string;
+  description: string;
+  debit: number;
+  credit: number;
+  balance: number;
+};
 
 export type ReconAccountWithParent = ReconAccount & {
   reconciliations: Pick<Reconciliation, 'scope' | 'scope_ref_id' | 'created_at'> | null;
@@ -32,6 +43,7 @@ export type JournalEntryWithLines = JournalEntry & {
   ledger_journal_lines: JournalLineWithAccount[];
 };
 export type SessionWithCounts = CashierSession & { cash_drawer_counts: DrawerCount[] };
+export type LedgerAccountWithBalance = LedgerAccount & { balance: number };
 
 /** Declaration item for cashier sessions and manual reconciliation. */
 export interface Declaration {
@@ -99,6 +111,53 @@ export class MoneyService {
       .limit(limit);
     if (error) throw error;
     return data;
+  }
+
+  async ledgerAccountsWithBalances(): Promise<LedgerAccountWithBalance[]> {
+    const [{ data: accounts, error: accountError }, { data: lines, error: lineError }] =
+      await Promise.all([
+        this.db.from('ledger_accounts').select('*').order('code'),
+        this.db.from('ledger_journal_lines').select('account_id, debit, credit'),
+      ]);
+    if (accountError) throw accountError;
+    if (lineError) throw lineError;
+    const balances = new Map<string, number>();
+    for (const line of lines ?? []) {
+      balances.set(
+        line.account_id,
+        (balances.get(line.account_id) ?? 0) + line.debit - line.credit
+      );
+    }
+    return (accounts ?? []).map(account => ({
+      ...account,
+      balance: balances.get(account.id) ?? 0,
+    }));
+  }
+
+  async journalPage(input: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    sourceType?: string;
+    from?: string;
+    to?: string;
+  }): Promise<{ rows: JournalEntryWithLines[]; count: number }> {
+    let query = this.db
+      .from('ledger_journal_entries')
+      .select('*, ledger_journal_lines(*, ledger_accounts(code, name))', { count: 'exact' });
+    if (input.search?.trim()) {
+      const pattern = `%${input.search.trim().replace(/[%_,()]/g, ' ')}%`;
+      query = query.or(`memo.ilike.${pattern},source_id.ilike.${pattern}`);
+    }
+    if (input.sourceType) query = query.eq('source_type', input.sourceType);
+    if (input.from) query = query.gte('posted_at', `${input.from}T00:00:00`);
+    if (input.to) query = query.lt('posted_at', `${input.to}T23:59:59.999`);
+    const start = (input.page - 1) * input.pageSize;
+    const { data, error, count } = await query
+      .order('posted_at', { ascending: false })
+      .range(start, start + input.pageSize - 1);
+    if (error) throw error;
+    return { rows: data ?? [], count: count ?? 0 };
   }
 
   async openSession(): Promise<CashierSession | null> {
@@ -239,12 +298,69 @@ export class MoneyService {
     return data;
   }
 
-  async purchasesWithPayments(): Promise<(Purchase & { paid: number })[]> {
+  async customerStatement(customerId: string): Promise<CustomerStatementRow[]> {
+    const { data: orders, error: orderError } = await this.db
+      .from('orders')
+      .select('id, code, total, created_at')
+      .eq('customer_id', customerId)
+      .eq('is_credit_sale', true)
+      .in('status', ['completed', 'voided'])
+      .order('created_at');
+    if (orderError) throw orderError;
+    const ids = (orders ?? []).map(order => order.id);
+    const { data: payments, error: paymentError } = ids.length
+      ? await this.db
+          .from('payments')
+          .select('id, order_id, amount, reference, status, created_at')
+          .in('order_id', ids)
+          .order('created_at')
+      : { data: [], error: null };
+    if (paymentError) throw paymentError;
+    const { data: adjustments, error: adjustmentError } = await this.db
+      .from('ledger_journal_lines')
+      .select(
+        'id, debit, credit, meta, ledger_journal_entries!inner(posted_at, memo, source_type, source_id), ledger_accounts!inner(code)'
+      )
+      .eq('ledger_journal_entries.source_type', 'BalanceAdjustment')
+      .eq('ledger_accounts.code', 'ACCOUNTS_RECEIVABLE')
+      .contains('meta', { customerId });
+    if (adjustmentError) throw adjustmentError;
+    const entries = [
+      ...(orders ?? []).map(order => ({
+        id: order.id,
+        date: order.created_at,
+        reference: order.code,
+        description: 'Credit sale',
+        debit: order.total,
+        credit: 0,
+      })),
+      ...(payments ?? []).map(payment => ({
+        id: payment.id,
+        date: payment.created_at,
+        reference: payment.reference || 'Payment',
+        description: payment.status === 'reversed' ? 'Reversed payment' : 'Payment received',
+        debit: payment.status === 'reversed' ? payment.amount : 0,
+        credit: payment.status === 'reversed' ? 0 : payment.amount,
+      })),
+      ...(adjustments ?? []).map(line => ({
+        id: line.id,
+        date: line.ledger_journal_entries.posted_at,
+        reference: line.ledger_journal_entries.source_id,
+        description: line.ledger_journal_entries.memo || 'Balance adjustment',
+        debit: line.debit,
+        credit: line.credit,
+      })),
+    ].sort((a, b) => a.date.localeCompare(b.date));
+    let balance = 0;
+    return entries.map(entry => ({ ...entry, balance: (balance += entry.debit - entry.credit) }));
+  }
+
+  async purchasesWithPayments(limit = 500): Promise<(Purchase & { paid: number })[]> {
     const { data: purchases, error: e1 } = await this.db
       .from('purchases')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(limit);
     if (e1) throw e1;
     if (!purchases || purchases.length === 0) return [];
     const { data: payments, error: e2 } = await this.db
@@ -260,6 +376,26 @@ export class MoneyService {
       paidBy.set(p.purchase_id, (paidBy.get(p.purchase_id) ?? 0) + p.amount);
     }
     return purchases.map(p => ({ ...p, paid: paidBy.get(p.id) ?? 0 }));
+  }
+
+  async purchaseDrafts(): Promise<PurchaseDraft[]> {
+    const { data, error } = await this.db
+      .from('purchase_drafts')
+      .select('*')
+      .eq('status', 'draft')
+      .order('updated_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  }
+
+  async purchaseLines(purchaseId: string): Promise<PurchaseLine[]> {
+    const { data, error } = await this.db
+      .from('purchase_lines')
+      .select('*')
+      .eq('purchase_id', purchaseId)
+      .order('created_at');
+    if (error) throw error;
+    return data;
   }
 
   // --- RPCs (errors are P0001 with human-readable messages — display verbatim) ---
@@ -349,6 +485,65 @@ export class MoneyService {
     return data;
   }
 
+  async postCustomerPayment(
+    customerId: string,
+    amount: number,
+    methodCode: string,
+    reference?: string
+  ): Promise<void> {
+    const { error } = await this.db.rpc('post_customer_payment', {
+      p_customer_id: customerId,
+      p_amount: amount,
+      p_method_code: methodCode,
+      ...(reference ? { p_reference: reference } : {}),
+    });
+    if (error) throw rpcError(error);
+  }
+
+  async postRefund(
+    orderId: string,
+    amount: number,
+    methodCode: string,
+    reason: string
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('post_refund', {
+      p_order_id: orderId,
+      p_amount: amount,
+      p_method_code: methodCode,
+      p_reason: reason,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async reversePayment(paymentId: string): Promise<string> {
+    const { data, error } = await this.db.rpc('post_payment_reversal', {
+      p_payment_id: paymentId,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async adjustCustomerBalance(customerId: string, amount: number, reason: string): Promise<string> {
+    const { data, error } = await this.db.rpc('post_balance_adjustment', {
+      p_customer_id: customerId,
+      p_amount: amount,
+      p_reason: reason,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async adjustSupplierBalance(customerId: string, amount: number, reason: string): Promise<string> {
+    const { data, error } = await this.db.rpc('post_supplier_balance_adjustment', {
+      p_supplier_id: customerId,
+      p_amount: amount,
+      p_reason: reason,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
   async updateCustomerCredit(
     customerId: string,
     creditLimit: number,
@@ -408,10 +603,19 @@ export class MoneyService {
 
   async recordPurchase(
     supplierId: string,
-    lines: { variant_id: string; quantity: number; unit_cost: number; expiry_date?: string }[],
+    lines: {
+      variant_id: string;
+      quantity: number;
+      unit_cost: number;
+      expiry_date?: string;
+      batch_number?: string;
+    }[],
     isCredit: boolean,
     reference?: string,
-    accountCode?: string
+    accountCode?: string,
+    notes?: string,
+    purchaseDate?: string,
+    stockLocationId?: string
   ): Promise<string> {
     const { data, error } = await this.db.rpc('record_purchase', {
       p_supplier_id: supplierId,
@@ -419,6 +623,66 @@ export class MoneyService {
       p_is_credit: isCredit,
       ...(reference ? { p_reference: reference } : {}),
       ...(accountCode ? { p_account_code: accountCode } : {}),
+      ...(notes ? { p_notes: notes } : {}),
+      ...(purchaseDate ? { p_purchase_date: purchaseDate } : {}),
+      ...(stockLocationId ? { p_stock_location_id: stockLocationId } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async savePurchaseDraft(input: {
+    draftId?: string;
+    supplierId: string;
+    lines: {
+      variant_id: string;
+      quantity: number;
+      unit_cost: number;
+      expiry_date?: string;
+      batch_number?: string;
+    }[];
+    reference?: string;
+    notes?: string;
+    purchaseDate?: string;
+  }): Promise<string> {
+    const { data, error } = await this.db.rpc('save_purchase_draft', {
+      p_supplier_id: input.supplierId,
+      p_lines: input.lines as never,
+      ...(input.draftId ? { p_draft_id: input.draftId } : {}),
+      ...(input.reference ? { p_reference: input.reference } : {}),
+      ...(input.notes ? { p_notes: input.notes } : {}),
+      ...(input.purchaseDate ? { p_purchase_date: input.purchaseDate } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async confirmPurchaseDraft(
+    draftId: string,
+    isCredit: boolean,
+    accountCode?: string,
+    stockLocationId?: string
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('confirm_purchase_draft', {
+      p_draft_id: draftId,
+      p_is_credit: isCredit,
+      ...(accountCode ? { p_account_code: accountCode } : {}),
+      ...(stockLocationId ? { p_stock_location_id: stockLocationId } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async cancelPurchaseDraft(draftId: string): Promise<void> {
+    const { error } = await this.db.rpc('cancel_purchase_draft', { p_draft_id: draftId });
+    if (error) throw rpcError(error);
+  }
+
+  async payPurchase(purchaseId: string, amount: number, accountCode: string): Promise<string> {
+    const { data, error } = await this.db.rpc('pay_purchase', {
+      p_purchase_id: purchaseId,
+      p_amount: amount,
+      p_account_code: accountCode,
     });
     if (error) throw rpcError(error);
     return data;

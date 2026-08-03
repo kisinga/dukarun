@@ -8,8 +8,8 @@
 -- ---------------------------------------------------------------------------
 insert into public.subscription_tiers (code, name, price_monthly, price_yearly, features, limits)
 values
-  ('trial', 'Trial', 0, 0, '{}', '{"maxAdmins": 1, "maxProducts": 100, "maxStockLocations": 1, "maxOrdersPerMonth": 500, "smsPerPeriod": 50}'),
-  ('standard', 'Standard', 150000, 1500000, '{}', '{"maxAdmins": 5, "maxProducts": 5000, "maxStockLocations": 3, "maxOrdersPerMonth": 10000, "smsPerPeriod": 500}')
+  ('trial', 'Trial', 0, 0, '{"multipleLocations": false}', '{"maxAdmins": 1, "maxProducts": 100, "maxStockLocations": 1, "maxOrdersPerMonth": 500, "smsPerPeriod": 50}'),
+  ('standard', 'Standard', 150000, 1500000, '{"multipleLocations": true}', '{"maxAdmins": 5, "maxProducts": 5000, "maxStockLocations": 3, "maxOrdersPerMonth": 10000, "smsPerPeriod": 500}')
 on conflict (code) do nothing;
 
 -- ---------------------------------------------------------------------------

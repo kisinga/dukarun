@@ -8,6 +8,11 @@ select testkit.create_user('22222222-2222-2222-2222-222222222222', 'cashier@team
 create temp table tm_company as select testkit.provision('11111111-1111-1111-1111-111111111111', 'Team Co') as company_id;
 grant select on pg_temp.tm_company to authenticated;
 
+-- This suite exercises team CRUD, so place its fixture on a tier that allows a team.
+update public.companies set subscription_tier_id =
+  (select id from public.subscription_tiers where code = 'standard'), subscription_status = 'active'
+where id = (select company_id from tm_company);
+
 select testkit.as_user((select company_id from tm_company), '11111111-1111-1111-1111-111111111111', 'Admin');
 
 -- 1. Admin role has ManageTeam after provisioning.

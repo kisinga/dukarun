@@ -12,6 +12,7 @@ export type Order = Database['public']['Tables']['orders']['Row'];
 export type OrderLine = Database['public']['Tables']['order_lines']['Row'];
 export type Payment = Database['public']['Tables']['payments']['Row'];
 export type InventoryBatch = Database['public']['Tables']['inventory_batches']['Row'];
+export type StockLocation = Database['public']['Tables']['stock_locations']['Row'];
 
 /** Display name for a catalog row; hides the synthetic 'Default' variant name. */
 export function variantLabel(v: Pick<Variant, 'product_name' | 'variant_name'>): string {
@@ -48,8 +49,7 @@ export type OrderLineWithProduct = OrderLine & {
 
 /** void_sale result: voided immediately, or parked for approval (supervisor path). */
 export type VoidResult =
-  | { status: 'voided'; entry_id?: string }
-  | { status: 'approval_required'; approval_id?: string };
+  { status: 'voided'; entry_id?: string } | { status: 'approval_required'; approval_id?: string };
 
 /**
  * RPC failure with the PostgREST/PostgreSQL error code preserved.
@@ -173,14 +173,29 @@ export class PosService {
       kind?: string;
       allow_fractional?: boolean;
       track_inventory?: boolean;
+      opening_quantity?: number;
+      opening_unit_cost?: number;
+      opening_location_id?: string;
+      batch_number?: string;
+      expiry_date?: string;
     }[];
   }): Promise<string> {
-    const { data, error } = await this.client.rpc('create_product_with_variants', {
+    const { data, error } = await this.client.rpc('create_catalog_product', {
       p_name: input.name,
       p_variants: input.variants as never,
       ...(input.barcode ? { p_barcode: input.barcode } : {}),
     });
     if (error) throw rpcError(error);
+    return data;
+  }
+
+  async listStockLocations(): Promise<StockLocation[]> {
+    const { data, error } = await this.client
+      .from('stock_locations')
+      .select('*')
+      .order('is_default', { ascending: false })
+      .order('name');
+    if (error) throw error;
     return data;
   }
 
@@ -380,6 +395,43 @@ export class PosService {
     return data;
   }
 
+  async ordersPage(input: {
+    statuses: string[];
+    since?: string;
+    until?: string;
+    search?: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ rows: OrderWithCustomer[]; count: number }> {
+    let customerIds: string[] = [];
+    const term = input.search?.trim().replace(/[%_,()]/g, ' ') ?? '';
+    if (term) {
+      const { data, error } = await this.client
+        .from('customers')
+        .select('id')
+        .or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`)
+        .limit(100);
+      if (error) throw error;
+      customerIds = (data ?? []).map(row => row.id);
+    }
+    let query = this.client
+      .from('orders')
+      .select('*, customers(first_name, last_name)', { count: 'exact' })
+      .in('status', input.statuses);
+    if (input.since) query = query.gte('created_at', input.since);
+    if (input.until) query = query.lt('created_at', input.until);
+    if (term) {
+      const customerFilter = customerIds.length ? `,customer_id.in.(${customerIds.join(',')})` : '';
+      query = query.or(`code.ilike.%${term}%${customerFilter}`);
+    }
+    const start = (input.page - 1) * input.pageSize;
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(start, start + input.pageSize - 1);
+    if (error) throw error;
+    return { rows: data ?? [], count: count ?? 0 };
+  }
+
   /** Full order history for one customer (all statuses). */
   async customerOrders(customerId: string, limit = 20): Promise<OrderWithCustomer[]> {
     const { data, error } = await this.client
@@ -475,6 +527,14 @@ export class PosService {
     const { data, error } = await this.client.rpc('convert_draft', {
       p_order_id: orderId,
       p_payments: payments as never,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async deleteProforma(orderId: string): Promise<string> {
+    const { data, error } = await this.client.rpc('delete_proforma', {
+      p_order_id: orderId,
     });
     if (error) throw rpcError(error);
     return data;

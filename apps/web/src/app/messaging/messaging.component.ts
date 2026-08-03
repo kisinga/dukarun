@@ -3,6 +3,7 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
+import { PaginationComponent } from '../shared/ui/pagination.component';
 import { NotificationsService, OutboxMessage } from '../notifications/notifications.service';
 
 const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> = {
@@ -13,7 +14,13 @@ const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> =
 
 @Component({
   selector: 'app-messaging',
-  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, StatusBadgeComponent],
+  imports: [
+    ReactiveFormsModule,
+    PageHeaderComponent,
+    EmptyStateComponent,
+    StatusBadgeComponent,
+    PaginationComponent,
+  ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
@@ -114,7 +121,7 @@ const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> =
                 </tr>
               </thead>
               <tbody>
-                @for (m of outbox(); track m.id) {
+                @for (m of pagedOutbox(); track m.id) {
                   <tr>
                     <td class="text-xs">{{ m.channel }}</td>
                     <td class="font-mono text-xs">{{ m.recipient }}</td>
@@ -133,6 +140,18 @@ const STATUS_TYPE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> =
                 }
               </tbody>
             </table>
+            <div class="p-3 pt-0">
+              <app-pagination
+                [currentPage]="outboxPage()"
+                [totalPages]="outboxTotalPages()"
+                [totalItems]="outbox().length"
+                [itemsPerPage]="outboxPageSize()"
+                itemLabel="messages"
+                [showItemsPerPage]="true"
+                (pageChange)="outboxPage.set($event)"
+                (itemsPerPageChange)="outboxPageSize.set($event); outboxPage.set(1)"
+              />
+            </div>
           </div>
         }
       </div>
@@ -149,6 +168,8 @@ export class MessagingComponent implements OnInit {
   protected readonly body = new FormControl('', { nonNullable: true });
   protected readonly usage = signal<{ used: number; limit: number | null } | null>(null);
   protected readonly outbox = signal<OutboxMessage[]>([]);
+  protected readonly outboxPage = signal(1);
+  protected readonly outboxPageSize = signal(10);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
@@ -156,6 +177,14 @@ export class MessagingComponent implements OnInit {
   protected readonly nearCap = computed(() => {
     const u = this.usage();
     return !!u && u.limit !== null && u.used >= u.limit * 0.8 && u.used < u.limit;
+  });
+  protected readonly outboxTotalPages = computed(() =>
+    Math.max(1, Math.ceil(this.outbox().length / this.outboxPageSize()))
+  );
+  protected readonly pagedOutbox = computed(() => {
+    const page = Math.min(this.outboxPage(), this.outboxTotalPages());
+    const start = (page - 1) * this.outboxPageSize();
+    return this.outbox().slice(start, start + this.outboxPageSize());
   });
 
   async ngOnInit(): Promise<void> {

@@ -5,6 +5,10 @@ import { AuthService } from '../core/auth.service';
 export type Company = Database['public']['Tables']['companies']['Row'];
 export type Tier = Database['public']['Tables']['subscription_tiers']['Row'];
 export type AuditRow = Database['public']['Tables']['audit_log']['Row'];
+export type OutboxRow = Database['public']['Tables']['outbox']['Row'];
+export type FailedOutboxRow = OutboxRow & {
+  companies: Pick<Company, 'name' | 'code'> | null;
+};
 
 export interface PlatformStats {
   companies_total: number;
@@ -16,6 +20,12 @@ export interface PlatformStats {
   orders_today: number;
   revenue_today: number;
   mrr_estimate: number;
+}
+export interface OperationsSnapshot {
+  pending_companies: number;
+  failed_outbox: number;
+  active_memberships: number;
+  unbalanced_journals: number;
 }
 
 function rpcError(error: { message: string; code?: string }): Error {
@@ -35,6 +45,43 @@ export class PlatformService {
     const { data, error } = await this.db.rpc('platform_stats');
     if (error) throw rpcError(error);
     return data as unknown as PlatformStats;
+  }
+
+  async operationsSnapshot(): Promise<OperationsSnapshot> {
+    const { data, error } = await this.db.rpc('platform_operations_snapshot');
+    if (error) throw rpcError(error);
+    return data as unknown as OperationsSnapshot;
+  }
+
+  async failedOutbox(): Promise<FailedOutboxRow[]> {
+    const { data, error } = await this.db
+      .from('outbox')
+      .select('*, companies(name, code)')
+      .eq('status', 'failed')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    return data;
+  }
+
+  async pendingCompanies(): Promise<Company[]> {
+    const { data, error } = await this.db
+      .from('companies')
+      .select('*')
+      .eq('status', 'unapproved')
+      .order('created_at');
+    if (error) throw error;
+    return data;
+  }
+
+  async broadcast(title: string, body: string, link?: string): Promise<number> {
+    const { data, error } = await this.db.rpc('platform_broadcast', {
+      p_title: title,
+      p_body: body,
+      ...(link ? { p_link: link } : {}),
+    });
+    if (error) throw rpcError(error);
+    return data;
   }
 
   async companies(query = ''): Promise<Company[]> {
@@ -115,6 +162,7 @@ export class PlatformService {
     price_monthly: number;
     price_yearly: number;
     limits?: Record<string, number>;
+    features?: Record<string, boolean>;
     tier_id?: string;
     is_active?: boolean;
   }): Promise<void> {
@@ -124,6 +172,7 @@ export class PlatformService {
       p_price_monthly: input.price_monthly,
       p_price_yearly: input.price_yearly,
       ...(input.limits ? { p_limits: input.limits as never } : {}),
+      ...(input.features ? { p_features: input.features as never } : {}),
       ...(input.tier_id ? { p_tier_id: input.tier_id } : {}),
       ...(input.is_active !== undefined ? { p_is_active: input.is_active } : {}),
     });

@@ -2,7 +2,12 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { parseKesToCents } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
-import { AgingInfo, MoneyCustomer, MoneyService } from '../money/money.service';
+import {
+  AgingInfo,
+  CustomerStatementRow,
+  MoneyCustomer,
+  MoneyService,
+} from '../money/money.service';
 import { OrderWithCustomer, PosService } from '../pos/pos.service';
 import { ButtonComponent } from '../shared/ui/button.component';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
@@ -13,6 +18,7 @@ import { ListSearchBarComponent } from '../shared/ui/list-search-bar.component';
 import { MobileFabComponent } from '../shared/ui/mobile-fab.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
+import { PaginationComponent } from '../shared/ui/pagination.component';
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { SessionRequiredNoticeComponent } from '../shared/ui/session-required-notice.component';
@@ -41,6 +47,7 @@ type CreditOrder = {
     ListSearchBarComponent,
     StatusBadgeComponent,
     SessionRequiredNoticeComponent,
+    PaginationComponent,
   ],
   template: `
     <app-page title="Customers">
@@ -118,7 +125,11 @@ type CreditOrder = {
 
       <!-- Search -->
       <div class="mb-3">
-        <app-list-search-bar placeholder="Search name or phone…" [(searchQuery)]="query" />
+        <app-list-search-bar
+          placeholder="Search name or phone…"
+          [searchQuery]="query()"
+          (searchQueryChange)="query.set($event); customerPage.set(1)"
+        />
       </div>
 
       <!-- List -->
@@ -130,7 +141,7 @@ type CreditOrder = {
         />
       } @else {
         <div class="flex flex-col gap-2">
-          @for (c of filtered(); track c.id) {
+          @for (c of pagedCustomers(); track c.id) {
             <div class="card bg-base-100">
               <div class="card-body p-4">
                 <div class="flex flex-wrap items-center gap-3">
@@ -230,6 +241,42 @@ type CreditOrder = {
                       @if (creditOrders().length === 0) {
                         <p class="text-xs text-base-content/60">No credit sales.</p>
                       } @else {
+                        @if (perms.has('SettleOrder')) {
+                          <form
+                            (submit)="$event.preventDefault(); bulkRepay(c.id)"
+                            class="mb-3 grid gap-2 rounded-field border border-base-300 bg-base-200/50 p-2 sm:grid-cols-3"
+                          >
+                            <app-form-field label="Payment received (KES)"
+                              ><input
+                                class="input input-bordered input-sm"
+                                inputmode="decimal"
+                                [formControl]="bulkAmount"
+                            /></app-form-field>
+                            <app-form-field label="Method"
+                              ><select
+                                class="select select-bordered select-sm"
+                                [formControl]="bulkMethod"
+                              >
+                                @for (m of methods(); track m) {
+                                  <option [value]="m">{{ m }}</option>
+                                }
+                              </select></app-form-field
+                            >
+                            <app-form-field label="Reference"
+                              ><input
+                                class="input input-bordered input-sm"
+                                [formControl]="bulkReference"
+                            /></app-form-field>
+                            <button
+                              appButton
+                              type="submit"
+                              class="sm:col-span-3 sm:justify-self-start"
+                              [disabled]="busy() || !cashierSession.isOpen()"
+                            >
+                              Allocate oldest first
+                            </button>
+                          </form>
+                        }
                         @for (o of creditOrders(); track o.id) {
                           <div class="flex items-center gap-2 py-1 text-sm">
                             <span class="font-mono">{{ o.code }}</span>
@@ -340,10 +387,87 @@ type CreditOrder = {
                       </table>
                     }
                   </div>
+
+                  <div class="mt-3 border-t pt-3 print:mt-0 print:border-0">
+                    <div class="mb-2 flex items-center justify-between gap-2">
+                      <div>
+                        <h3 class="section-title">Customer statement</h3>
+                        <p class="type-caption">Sales, repayments and running balance.</p>
+                      </div>
+                      <button appButton variant="ghost" (click)="printStatement()">
+                        Print statement
+                      </button>
+                    </div>
+                    @if (statement().length === 0) {
+                      <p class="text-xs text-base-content/60">No credit statement activity.</p>
+                    } @else {
+                      <div class="overflow-x-auto rounded-box border border-base-300/70">
+                        <table class="table table-sm">
+                          <thead>
+                            <tr>
+                              <th>Date</th>
+                              <th>Reference</th>
+                              <th>Description</th>
+                              <th class="text-right">Charge</th>
+                              <th class="text-right">Payment</th>
+                              <th class="text-right">Balance</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (row of statement(); track row.id) {
+                              <tr>
+                                <td>{{ date(row.date) }}</td>
+                                <td class="font-mono text-xs">{{ row.reference }}</td>
+                                <td>{{ row.description }}</td>
+                                <td class="text-right"><app-money [cents]="row.debit" /></td>
+                                <td class="text-right"><app-money [cents]="row.credit" /></td>
+                                <td class="text-right font-semibold">
+                                  <app-money [cents]="row.balance" />
+                                </td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    }
+                    @if (perms.has('OverrideCustomerBalance')) {
+                      <form
+                        (submit)="$event.preventDefault(); adjustBalance(c.id)"
+                        class="mt-3 flex flex-wrap items-end gap-2 print:hidden"
+                      >
+                        <app-form-field label="Balance adjustment (KES)"
+                          ><input
+                            class="input input-bordered input-sm w-32"
+                            placeholder="Use - to reduce"
+                            [formControl]="adjustmentAmount"
+                        /></app-form-field>
+                        <app-form-field label="Reason"
+                          ><input
+                            class="input input-bordered input-sm"
+                            [formControl]="adjustmentReason"
+                        /></app-form-field>
+                        <button appButton variant="outline" type="submit" [disabled]="busy()">
+                          Post adjustment
+                        </button>
+                      </form>
+                    }
+                  </div>
                 }
               </div>
             </div>
           }
+        </div>
+        <div class="mt-3">
+          <app-pagination
+            [currentPage]="customerPage()"
+            [totalPages]="customerTotalPages()"
+            [totalItems]="filtered().length"
+            [itemsPerPage]="customerPageSize()"
+            itemLabel="customers"
+            [showItemsPerPage]="true"
+            (pageChange)="customerPage.set($event)"
+            (itemsPerPageChange)="customerPageSize.set($event); customerPage.set(1)"
+          />
         </div>
       }
 
@@ -361,10 +485,13 @@ export class CustomersComponent implements OnInit {
   protected readonly expandedFor = signal<string | null>(null);
   protected readonly orders = signal<OrderWithCustomer[]>([]);
   protected readonly creditOrders = signal<CreditOrder[]>([]);
+  protected readonly statement = signal<CustomerStatementRow[]>([]);
   protected readonly methods = signal<string[]>(['cash', 'mpesa', 'bank']);
   protected readonly repayFor = signal<string | null>(null);
 
   protected readonly query = signal('');
+  protected readonly customerPage = signal(1);
+  protected readonly customerPageSize = signal(10);
   protected readonly formOpen = signal(false);
   protected readonly editing = signal<CustomerWithAr | null>(null);
 
@@ -377,6 +504,11 @@ export class CustomersComponent implements OnInit {
   protected readonly repayAmount = new FormControl('', { nonNullable: true });
   protected readonly repayMethod = new FormControl('cash', { nonNullable: true });
   protected readonly repayReference = new FormControl('', { nonNullable: true });
+  protected readonly bulkAmount = new FormControl('', { nonNullable: true });
+  protected readonly bulkMethod = new FormControl('cash', { nonNullable: true });
+  protected readonly bulkReference = new FormControl('', { nonNullable: true });
+  protected readonly adjustmentAmount = new FormControl('', { nonNullable: true });
+  protected readonly adjustmentReason = new FormControl('', { nonNullable: true });
 
   protected readonly creditLimit = new FormControl('', { nonNullable: true });
   protected readonly termsDays = new FormControl(0, { nonNullable: true });
@@ -392,6 +524,14 @@ export class CustomersComponent implements OnInit {
     return this.customers().filter(
       c => this.name(c).toLowerCase().includes(q) || (c.phone ?? '').toLowerCase().includes(q)
     );
+  });
+  protected readonly customerTotalPages = computed(() =>
+    Math.max(1, Math.ceil(this.filtered().length / this.customerPageSize()))
+  );
+  protected readonly pagedCustomers = computed(() => {
+    const page = Math.min(this.customerPage(), this.customerTotalPages());
+    const start = (page - 1) * this.customerPageSize();
+    return this.filtered().slice(start, start + this.customerPageSize());
   });
 
   async ngOnInit(): Promise<void> {
@@ -426,12 +566,14 @@ export class CustomersComponent implements OnInit {
       this.approved.setValue(customer.is_credit_approved);
     }
     try {
-      const [orders, creditOrders] = await Promise.all([
+      const [orders, creditOrders, statement] = await Promise.all([
         this.pos.customerOrders(customerId),
         this.money.creditOrders(customerId),
+        this.money.customerStatement(customerId),
       ]);
       this.orders.set(orders);
       this.creditOrders.set(creditOrders);
+      this.statement.set(statement);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load orders');
     }
@@ -538,6 +680,73 @@ export class CustomersComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected async bulkRepay(customerId: string): Promise<void> {
+    try {
+      await this.cashierSession.assertOpen('collecting a repayment');
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Open a cashier session first');
+      return;
+    }
+    const amount = parseKesToCents(this.bulkAmount.value);
+    if (amount === null || amount <= 0) {
+      this.error.set('Enter a valid payment amount');
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.money.postCustomerPayment(
+        customerId,
+        amount,
+        this.bulkMethod.value,
+        this.bulkReference.value.trim() || undefined
+      );
+      this.bulkAmount.setValue('');
+      this.bulkReference.setValue('');
+      this.notice.set('Payment allocated to the oldest outstanding orders');
+      await this.load();
+      this.creditOrders.set(await this.money.creditOrders(customerId));
+      this.statement.set(await this.money.customerStatement(customerId));
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Payment failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async adjustBalance(customerId: string): Promise<void> {
+    const raw = Number(this.adjustmentAmount.value.replace(/,/g, '').trim());
+    const amount = Math.round(raw * 100);
+    if (!Number.isFinite(amount) || amount === 0 || !this.adjustmentReason.value.trim()) {
+      this.error.set('Enter a non-zero adjustment and a reason');
+      return;
+    }
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.money.adjustCustomerBalance(
+        customerId,
+        amount,
+        this.adjustmentReason.value.trim()
+      );
+      this.adjustmentAmount.setValue('');
+      this.adjustmentReason.setValue('');
+      this.notice.set('Customer balance adjusted');
+      await this.load();
+      this.statement.set(await this.money.customerStatement(customerId));
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Adjustment failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected printStatement(): void {
+    window.print();
   }
 
   protected async saveCredit(c: CustomerWithAr): Promise<void> {

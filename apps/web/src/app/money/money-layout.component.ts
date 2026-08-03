@@ -37,6 +37,7 @@ interface MoneyTab {
 })
 export class MoneyLayoutComponent {
   protected readonly tabs: MoneyTab[] = [
+    { route: '/money/ledger', label: 'Ledger' },
     { route: '/money/cashier', label: 'Cashier' },
     { route: '/money/expenses', label: 'Expenses' },
     { route: '/money/transfers', label: 'Transfers' },

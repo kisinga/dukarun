@@ -59,6 +59,7 @@ read-only retention, and incident recovery. It is not part of the active workspa
 - [Local infrastructure](docs/INFRASTRUCTURE.md)
 - [Production deployment](docs/DEPLOYMENT.md)
 - [Design system](docs/DESIGN_SYSTEM.md)
+- [Transaction workflows](docs/TRANSACTION_WORKFLOWS.md)
 - [Migration runbook](docs/V1_V2_MIGRATION.md)
 - [Documentation index](docs/README.md)
 

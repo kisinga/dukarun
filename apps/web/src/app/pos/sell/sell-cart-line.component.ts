@@ -22,7 +22,10 @@ import { MoneyComponent } from '../../shared/ui/money.component';
   providers: [provideIcons({ heroChevronDown, heroChevronUp, heroMinus, heroPencilSquare })],
   host: { class: 'block min-w-0' },
   template: `
-    <article class="sale-line px-3 py-2.5 sm:px-4 sm:py-3">
+    <article
+      class="sale-line px-3 py-2.5 sm:px-4 sm:py-3"
+      [class.sale-line--floor-rejected]="floorRejected()"
+    >
       <div class="sale-line-summary flex min-w-0 items-start gap-2">
         <button
           appButton
@@ -122,8 +125,10 @@ import { MoneyComponent } from '../../shared/ui/money.component';
                 [iconOnly]="true"
                 type="button"
                 class="join-item"
-                [disabled]="!canDecrease()"
+                [class.border-error]="floorRejected()"
+                [class.text-error]="floorRejected()"
                 [attr.aria-label]="'Reduce price of ' + label()"
+                [attr.aria-describedby]="floorRejected() ? floorMessageId() : null"
                 (click)="priceStep.emit(-1)"
               >
                 <app-icon name="heroChevronDown" />
@@ -164,6 +169,16 @@ import { MoneyComponent } from '../../shared/ui/money.component';
               Base <app-money [cents]="line().unitPrice" />
             </p>
           }
+          @if (floorRejected()) {
+            <p
+              [id]="floorMessageId()"
+              class="mt-1 text-right text-xs font-medium text-error"
+              aria-live="assertive"
+            >
+              {{ hasWholesaleFloor() ? 'Wholesale floor' : 'Minimum price' }}
+              <app-money [cents]="minimumPrice()" />
+            </p>
+          }
         </div>
       </div>
     </article>
@@ -171,6 +186,34 @@ import { MoneyComponent } from '../../shared/ui/money.component';
   styles: `
     :host {
       container-type: inline-size;
+    }
+
+    .sale-line--floor-rejected {
+      animation: price-floor-shake 320ms ease-in-out;
+      background: color-mix(in oklab, var(--color-error) 8%, transparent);
+      box-shadow: inset 3px 0 0 color-mix(in oklab, var(--color-error) 75%, transparent);
+    }
+
+    @keyframes price-floor-shake {
+      0%,
+      100% {
+        transform: translateX(0);
+      }
+      25% {
+        transform: translateX(-4px);
+      }
+      50% {
+        transform: translateX(4px);
+      }
+      75% {
+        transform: translateX(-2px);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .sale-line--floor-rejected {
+        animation: none;
+      }
     }
 
     @container (min-width: 46rem) {
@@ -198,6 +241,7 @@ export class SellCartLineComponent {
   readonly line = input.required<CartLine>();
   readonly label = input.required<string>();
   readonly canOverridePrice = input(false);
+  readonly floorRejected = input(false);
 
   readonly quantityStep = output<1 | -1>();
   readonly quantityChanged = output<number>();
@@ -218,9 +262,16 @@ export class SellCartLineComponent {
     return this.line().customPrice !== null;
   }
 
-  protected canDecrease(): boolean {
-    const wholesaleFloor = Math.ceil((this.line().variant.wholesale_price ?? 0) / 100) * 100;
-    return this.effectivePrice() > wholesaleFloor;
+  protected minimumPrice(): number {
+    return Math.max(100, Math.ceil((this.line().variant.wholesale_price ?? 0) / 100) * 100);
+  }
+
+  protected hasWholesaleFloor(): boolean {
+    return (this.line().variant.wholesale_price ?? 0) > 0;
+  }
+
+  protected floorMessageId(): string {
+    return `wholesale-floor-${this.line().variant.variant_id}`;
   }
 
   protected emitQuantity(event: Event): void {

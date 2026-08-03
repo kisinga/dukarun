@@ -51,6 +51,7 @@ export class ShellComponent {
     { route: '/', label: 'Dashboard' },
     { route: '/companies', label: 'Companies' },
     { route: '/tiers', label: 'Tiers' },
+    { route: '/operations', label: 'Operations' },
     { route: '/audit', label: 'Audit log' },
   ];
 

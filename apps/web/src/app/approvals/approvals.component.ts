@@ -1,9 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { formatKes } from '../core/money';
 import { PosService, variantLabel } from '../pos/pos.service';
 import { EmptyStateComponent } from '../shared/ui/empty-state.component';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
+import { PaginationComponent } from '../shared/ui/pagination.component';
 import { Approval, ApprovalsService } from './approvals.service';
 
 type DecisionTarget = { approval: Approval; action: 'approve' | 'deny' };
@@ -17,14 +18,11 @@ const TYPE_BADGE: Record<string, string> = {
 
 @Component({
   selector: 'app-approvals',
-  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent],
+  imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, PaginationComponent],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
       <div class="page">
-        <app-page-header
-          title="Approvals"
-          [subtitle]="approvals.pending().length + ' pending'"
-        />
+        <app-page-header title="Approvals" [subtitle]="approvals.pending().length + ' pending'" />
 
         @if (error()) {
           <p class="mb-2 text-sm text-error">{{ error() }}</p>
@@ -54,7 +52,7 @@ const TYPE_BADGE: Record<string, string> = {
           />
         } @else {
           <div class="flex flex-col gap-2">
-            @for (a of approvals.pending(); track a.id) {
+            @for (a of pagedPending(); track a.id) {
               <div class="card bg-base-100">
                 <div class="card-body p-4">
                   <div class="flex flex-wrap items-center gap-3">
@@ -121,6 +119,16 @@ const TYPE_BADGE: Record<string, string> = {
               </div>
             }
           </div>
+          <div class="mt-3">
+            <app-pagination
+              [currentPage]="pendingPage()"
+              [totalPages]="pendingTotalPages()"
+              [totalItems]="approvals.pending().length"
+              [itemsPerPage]="pageSize()"
+              itemLabel="requests"
+              (pageChange)="pendingPage.set($event)"
+            />
+          </div>
         }
 
         <!-- Decided -->
@@ -140,7 +148,7 @@ const TYPE_BADGE: Record<string, string> = {
                 </tr>
               </thead>
               <tbody>
-                @for (a of approvals.decided(); track a.id) {
+                @for (a of pagedDecided(); track a.id) {
                   <tr>
                     <td>
                       <span class="badge badge-xs" [class]="typeBadge(a.type)">{{
@@ -163,6 +171,16 @@ const TYPE_BADGE: Record<string, string> = {
                 }
               </tbody>
             </table>
+            <div class="p-3 pt-0">
+              <app-pagination
+                [currentPage]="decidedPage()"
+                [totalPages]="decidedTotalPages()"
+                [totalItems]="approvals.decided().length"
+                [itemsPerPage]="pageSize()"
+                itemLabel="decisions"
+                (pageChange)="decidedPage.set($event)"
+              />
+            </div>
           </div>
         }
       </div>
@@ -178,6 +196,25 @@ export class ApprovalsComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly pageSize = signal(10);
+  protected readonly pendingPage = signal(1);
+  protected readonly decidedPage = signal(1);
+  protected readonly pendingTotalPages = computed(() =>
+    Math.max(1, Math.ceil(this.approvals.pending().length / this.pageSize()))
+  );
+  protected readonly decidedTotalPages = computed(() =>
+    Math.max(1, Math.ceil(this.approvals.decided().length / this.pageSize()))
+  );
+  protected readonly pagedPending = computed(() => {
+    const page = Math.min(this.pendingPage(), this.pendingTotalPages());
+    const start = (page - 1) * this.pageSize();
+    return this.approvals.pending().slice(start, start + this.pageSize());
+  });
+  protected readonly pagedDecided = computed(() => {
+    const page = Math.min(this.decidedPage(), this.decidedTotalPages());
+    const start = (page - 1) * this.pageSize();
+    return this.approvals.decided().slice(start, start + this.pageSize());
+  });
 
   private readonly orderCodeMap = signal<Map<string, string>>(new Map());
   private readonly variantLabelMap = signal<Map<string, string>>(new Map());

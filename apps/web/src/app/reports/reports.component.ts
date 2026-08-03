@@ -7,7 +7,7 @@ import { PaginationComponent } from '../shared/ui/pagination.component';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { DailySummary, ReportsService } from './reports.service';
 
-type Tab = 'sales' | 'products' | 'customers';
+type Tab = 'sales' | 'products' | 'customers' | 'inventory';
 
 type ProductRow = {
   variantId: string;
@@ -24,6 +24,14 @@ type CustomerRow = {
   orders: number;
   revenue: number;
   arDelta: number;
+};
+type InventoryRow = {
+  variantId: string;
+  label: string;
+  stock: number;
+  value: number;
+  retailValue: number;
+  potentialMargin: number;
 };
 
 @Component({
@@ -75,6 +83,13 @@ type CustomerRow = {
             [class.tab-active]="tab() === 'customers'"
             (click)="tab.set('customers')"
             >Customers</a
+          >
+          <a
+            role="tab"
+            class="tab min-h-11"
+            [class.tab-active]="tab() === 'inventory'"
+            (click)="tab.set('inventory')"
+            >Inventory</a
           >
         </div>
 
@@ -233,6 +248,64 @@ type CustomerRow = {
             </div>
           }
         }
+
+        @if (tab() === 'inventory') {
+          <div class="mb-3 grid gap-2 sm:grid-cols-3">
+            <div class="card bg-base-100">
+              <div class="card-body p-3">
+                <span class="type-caption">Stock at cost</span
+                ><strong class="text-xl">{{ fmt(inventoryTotals().cost) }}</strong>
+              </div>
+            </div>
+            <div class="card bg-base-100">
+              <div class="card-body p-3">
+                <span class="type-caption">Potential retail</span
+                ><strong class="text-xl">{{ fmt(inventoryTotals().retail) }}</strong>
+              </div>
+            </div>
+            <div class="card bg-base-100">
+              <div class="card-body p-3">
+                <span class="type-caption">Potential margin</span
+                ><strong class="text-xl text-success">{{ fmt(inventoryTotals().margin) }}</strong>
+              </div>
+            </div>
+          </div>
+          @if (inventory().length === 0) {
+            <app-empty-state
+              [compact]="true"
+              icon="heroArchiveBox"
+              title="No stock valuation"
+              description="Opening stock and received purchases appear here."
+            />
+          } @else {
+            <div class="card overflow-hidden bg-base-100">
+              <div class="table-scroll">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Variant</th>
+                      <th class="text-right">On hand</th>
+                      <th class="text-right">Cost value</th>
+                      <th class="text-right">Retail value</th>
+                      <th class="text-right">Potential margin</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of inventory(); track row.variantId) {
+                      <tr>
+                        <td class="font-medium">{{ row.label }}</td>
+                        <td class="text-right">{{ row.stock }}</td>
+                        <td class="text-right">{{ fmt(row.value) }}</td>
+                        <td class="text-right">{{ fmt(row.retailValue) }}</td>
+                        <td class="text-right text-success">{{ fmt(row.potentialMargin) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+        }
       </div>
     </main>
   `,
@@ -249,6 +322,7 @@ export class ReportsComponent implements OnInit {
   protected readonly summary = signal<DailySummary[]>([]);
   protected readonly products = signal<ProductRow[]>([]);
   protected readonly customers = signal<CustomerRow[]>([]);
+  protected readonly inventory = signal<InventoryRow[]>([]);
   protected readonly error = signal<string | null>(null);
   protected readonly page = signal(1);
   protected readonly pageSize = 15;
@@ -272,6 +346,16 @@ export class ReportsComponent implements OnInit {
       { orders: 0, revenue: 0, cogs: 0, margin: 0 }
     )
   );
+  protected readonly inventoryTotals = computed(() =>
+    this.inventory().reduce(
+      (acc, row) => ({
+        cost: acc.cost + row.value,
+        retail: acc.retail + row.retailValue,
+        margin: acc.margin + row.potentialMargin,
+      }),
+      { cost: 0, retail: 0, margin: 0 }
+    )
+  );
 
   async ngOnInit(): Promise<void> {
     await this.load();
@@ -282,14 +366,33 @@ export class ReportsComponent implements OnInit {
     this.page.set(1);
     try {
       const since = this.from.value;
-      const [summary, productSales, customerStats] = await Promise.all([
+      const [summary, productSales, customerStats, stock, catalog] = await Promise.all([
         this.reports.salesSummary(since),
         this.reports.productSales(since),
         this.reports.customerStats(since),
+        this.pos.productStock(),
+        this.pos.fetchActiveVariants(),
       ]);
       this.summary.set(summary);
       await this.aggregateProducts(productSales);
       await this.aggregateCustomers(customerStats);
+      this.inventory.set(
+        catalog
+          .filter(v => v.kind !== 'service' && v.track_inventory && v.variant_id)
+          .map(v => {
+            const current = stock.get(v.variant_id!) ?? { stock: 0, stock_value: 0 };
+            const retail = Math.round(current.stock * (v.price ?? 0));
+            return {
+              variantId: v.variant_id!,
+              label: variantLabel(v),
+              stock: current.stock,
+              value: current.stock_value,
+              retailValue: retail,
+              potentialMargin: retail - current.stock_value,
+            };
+          })
+          .sort((a, b) => b.value - a.value)
+      );
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load reports');
     }

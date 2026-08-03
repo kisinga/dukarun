@@ -32,8 +32,8 @@ select is(
 
 select is(
   (select count(*)::int from public.ledger_accounts where company_id = (select company_id from provision_result)),
-  21,
-  'provisioning seeds 21 ledger accounts'
+  22,
+  'provisioning seeds 22 ledger accounts'
 );
 
 select is(

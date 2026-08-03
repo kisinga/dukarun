@@ -644,8 +644,33 @@ export type Database = {
           },
         ];
       };
+      etl_id_map: {
+        Row: {
+          company_id: string;
+          created_at: string;
+          new_id: string;
+          old_id: string;
+          old_type: string;
+        };
+        Insert: {
+          company_id: string;
+          created_at?: string;
+          new_id: string;
+          old_id: string;
+          old_type: string;
+        };
+        Update: {
+          company_id?: string;
+          created_at?: string;
+          new_id?: string;
+          old_id?: string;
+          old_type?: string;
+        };
+        Relationships: [];
+      };
       inventory_batches: {
         Row: {
+          batch_number: string | null;
           company_id: string;
           created_at: string;
           expiry_date: string | null;
@@ -659,6 +684,7 @@ export type Database = {
           variant_id: string;
         };
         Insert: {
+          batch_number?: string | null;
           company_id: string;
           created_at?: string;
           expiry_date?: string | null;
@@ -672,6 +698,7 @@ export type Database = {
           variant_id: string;
         };
         Update: {
+          batch_number?: string | null;
           company_id?: string;
           created_at?: string;
           expiry_date?: string | null;
@@ -1749,6 +1776,203 @@ export type Database = {
           },
         ];
       };
+      purchase_drafts: {
+        Row: {
+          company_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          lines: Json;
+          notes: string | null;
+          posted_purchase_id: string | null;
+          purchase_date: string;
+          reference: string | null;
+          status: string;
+          supplier_id: string;
+          total_cost: number;
+          updated_at: string;
+        };
+        Insert: {
+          company_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          lines: Json;
+          notes?: string | null;
+          posted_purchase_id?: string | null;
+          purchase_date?: string;
+          reference?: string | null;
+          status?: string;
+          supplier_id: string;
+          total_cost: number;
+          updated_at?: string;
+        };
+        Update: {
+          company_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          lines?: Json;
+          notes?: string | null;
+          posted_purchase_id?: string | null;
+          purchase_date?: string;
+          reference?: string | null;
+          status?: string;
+          supplier_id?: string;
+          total_cost?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'purchase_drafts_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'purchase_drafts_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'public_storefronts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'purchase_drafts_posted_purchase_id_fkey';
+            columns: ['posted_purchase_id'];
+            isOneToOne: false;
+            referencedRelation: 'purchases';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'purchase_drafts_supplier_id_fkey';
+            columns: ['supplier_id'];
+            isOneToOne: false;
+            referencedRelation: 'customer_ar_balances';
+            referencedColumns: ['customer_id'];
+          },
+          {
+            foreignKeyName: 'purchase_drafts_supplier_id_fkey';
+            columns: ['supplier_id'];
+            isOneToOne: false;
+            referencedRelation: 'customers';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'purchase_drafts_supplier_id_fkey';
+            columns: ['supplier_id'];
+            isOneToOne: false;
+            referencedRelation: 'supplier_ap_balances';
+            referencedColumns: ['supplier_id'];
+          },
+        ];
+      };
+      purchase_lines: {
+        Row: {
+          batch_number: string | null;
+          company_id: string;
+          created_at: string;
+          expiry_date: string | null;
+          id: string;
+          inventory_batch_id: string | null;
+          line_total: number;
+          purchase_id: string;
+          quantity: number;
+          unit_cost: number;
+          variant_id: string;
+        };
+        Insert: {
+          batch_number?: string | null;
+          company_id: string;
+          created_at?: string;
+          expiry_date?: string | null;
+          id?: string;
+          inventory_batch_id?: string | null;
+          line_total: number;
+          purchase_id: string;
+          quantity: number;
+          unit_cost: number;
+          variant_id: string;
+        };
+        Update: {
+          batch_number?: string | null;
+          company_id?: string;
+          created_at?: string;
+          expiry_date?: string | null;
+          id?: string;
+          inventory_batch_id?: string | null;
+          line_total?: number;
+          purchase_id?: string;
+          quantity?: number;
+          unit_cost?: number;
+          variant_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'purchase_lines_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'purchase_lines_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'public_storefronts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'purchase_lines_inventory_batch_id_fkey';
+            columns: ['inventory_batch_id'];
+            isOneToOne: false;
+            referencedRelation: 'expiring_batches';
+            referencedColumns: ['batch_id'];
+          },
+          {
+            foreignKeyName: 'purchase_lines_inventory_batch_id_fkey';
+            columns: ['inventory_batch_id'];
+            isOneToOne: false;
+            referencedRelation: 'inventory_batches';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'purchase_lines_purchase_id_fkey';
+            columns: ['purchase_id'];
+            isOneToOne: false;
+            referencedRelation: 'purchases';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'purchase_lines_variant_id_fkey';
+            columns: ['variant_id'];
+            isOneToOne: false;
+            referencedRelation: 'low_stock_variants';
+            referencedColumns: ['variant_id'];
+          },
+          {
+            foreignKeyName: 'purchase_lines_variant_id_fkey';
+            columns: ['variant_id'];
+            isOneToOne: false;
+            referencedRelation: 'product_stock';
+            referencedColumns: ['variant_id'];
+          },
+          {
+            foreignKeyName: 'purchase_lines_variant_id_fkey';
+            columns: ['variant_id'];
+            isOneToOne: false;
+            referencedRelation: 'product_variants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'purchase_lines_variant_id_fkey';
+            columns: ['variant_id'];
+            isOneToOne: false;
+            referencedRelation: 'variant_catalog';
+            referencedColumns: ['variant_id'];
+          },
+        ];
+      };
       purchase_payments: {
         Row: {
           account_code: string;
@@ -1808,7 +2032,10 @@ export type Database = {
           created_by: string | null;
           id: string;
           is_credit: boolean;
+          notes: string | null;
+          purchase_date: string;
           reference: string | null;
+          stock_location_id: string | null;
           supplier_id: string;
           total_cost: number;
         };
@@ -1818,7 +2045,10 @@ export type Database = {
           created_by?: string | null;
           id?: string;
           is_credit?: boolean;
+          notes?: string | null;
+          purchase_date?: string;
           reference?: string | null;
+          stock_location_id?: string | null;
           supplier_id: string;
           total_cost: number;
         };
@@ -1828,7 +2058,10 @@ export type Database = {
           created_by?: string | null;
           id?: string;
           is_credit?: boolean;
+          notes?: string | null;
+          purchase_date?: string;
           reference?: string | null;
+          stock_location_id?: string | null;
           supplier_id?: string;
           total_cost?: number;
         };
@@ -1845,6 +2078,13 @@ export type Database = {
             columns: ['company_id'];
             isOneToOne: false;
             referencedRelation: 'public_storefronts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'purchases_stock_location_id_fkey';
+            columns: ['stock_location_id'];
+            isOneToOne: false;
+            referencedRelation: 'stock_locations';
             referencedColumns: ['id'];
           },
           {
@@ -2062,6 +2302,7 @@ export type Database = {
           company_id: string;
           created_at: string;
           id: string;
+          is_default: boolean;
           name: string;
           updated_at: string;
         };
@@ -2070,6 +2311,7 @@ export type Database = {
           company_id: string;
           created_at?: string;
           id?: string;
+          is_default?: boolean;
           name: string;
           updated_at?: string;
         };
@@ -2078,6 +2320,7 @@ export type Database = {
           company_id?: string;
           created_at?: string;
           id?: string;
+          is_default?: boolean;
           name?: string;
           updated_at?: string;
         };
@@ -2743,6 +2986,7 @@ export type Database = {
         Returns: undefined;
       };
       assert_platform_admin: { Args: never; Returns: undefined };
+      cancel_purchase_draft: { Args: { p_draft_id: string }; Returns: string };
       cashier_session_required_for_source: {
         Args: { p_source_type: string };
         Returns: boolean;
@@ -2754,6 +2998,15 @@ export type Database = {
       };
       complete_order: {
         Args: { p_actor: string; p_order_id: string; p_payments: Json };
+        Returns: string;
+      };
+      confirm_purchase_draft: {
+        Args: {
+          p_account_code?: string;
+          p_draft_id: string;
+          p_is_credit: boolean;
+          p_stock_location_id?: string;
+        };
         Returns: string;
       };
       consume_fifo: {
@@ -2780,6 +3033,15 @@ export type Database = {
         };
         Returns: string;
       };
+      create_catalog_product: {
+        Args: {
+          p_barcode?: string;
+          p_image_path?: string;
+          p_name: string;
+          p_variants: Json;
+        };
+        Returns: string;
+      };
       create_customer: {
         Args: {
           p_email?: string;
@@ -2803,18 +3065,25 @@ export type Database = {
         };
         Returns: string;
       };
+      create_stock_location: {
+        Args: { p_code: string; p_is_default?: boolean; p_name: string };
+        Returns: string;
+      };
       credit_reminder_scan: { Args: never; Returns: number };
       current_company_id: { Args: never; Returns: string };
+      current_entitlements: { Args: never; Returns: Json };
       current_role_name: { Args: never; Returns: string };
       current_user_has_permission: {
         Args: { p_permission: string };
         Returns: boolean;
       };
-      dashboard_sales_snapshot: {
-        Args: { p_since?: string };
-        Returns: Json;
-      };
       custom_access_token_hook: { Args: { event: Json }; Returns: Json };
+      dashboard_sales_snapshot: { Args: { p_since?: string }; Returns: Json };
+      delete_proforma: { Args: { p_order_id: string }; Returns: string };
+      delete_stock_location: {
+        Args: { p_location_id: string };
+        Returns: string;
+      };
       deny_request: {
         Args: { p_approval_id: string; p_reason?: string };
         Returns: string;
@@ -2822,6 +3091,10 @@ export type Database = {
       do_void: {
         Args: { p_order_id: string; p_reason: string };
         Returns: string;
+      };
+      feature_enabled: {
+        Args: { p_company_id: string; p_feature: string };
+        Returns: boolean;
       };
       flush_outbox_trigger: { Args: never; Returns: undefined };
       increment_sms_usage: {
@@ -2841,6 +3114,14 @@ export type Database = {
         Returns: string;
       };
       open_cashier_session: { Args: { p_declarations: Json }; Returns: string };
+      pay_purchase: {
+        Args: {
+          p_account_code: string;
+          p_amount: number;
+          p_purchase_id: string;
+        };
+        Returns: string;
+      };
       pay_supplier: {
         Args: {
           p_account_code: string;
@@ -2849,6 +3130,11 @@ export type Database = {
         };
         Returns: string;
       };
+      platform_broadcast: {
+        Args: { p_body: string; p_link?: string; p_title: string };
+        Returns: number;
+      };
+      platform_operations_snapshot: { Args: never; Returns: Json };
       platform_set_company_status: {
         Args: { p_company_id: string; p_status: string };
         Returns: string;
@@ -2881,6 +3167,15 @@ export type Database = {
       post_balance_adjustment: {
         Args: { p_amount: number; p_customer_id: string; p_reason: string };
         Returns: string;
+      };
+      post_customer_payment: {
+        Args: {
+          p_amount: number;
+          p_customer_id: string;
+          p_method_code: string;
+          p_reference?: string;
+        };
+        Returns: Json;
       };
       post_expense: {
         Args: {
@@ -3016,7 +3311,10 @@ export type Database = {
           p_account_code?: string;
           p_is_credit: boolean;
           p_lines: Json;
+          p_notes?: string;
+          p_purchase_date?: string;
           p_reference?: string;
+          p_stock_location_id?: string;
           p_supplier_id: string;
         };
         Returns: string;
@@ -3037,6 +3335,17 @@ export type Database = {
       };
       save_draft: {
         Args: { p_customer_id: string; p_draft_id?: string; p_lines: Json };
+        Returns: string;
+      };
+      save_purchase_draft: {
+        Args: {
+          p_draft_id?: string;
+          p_lines: Json;
+          p_notes?: string;
+          p_purchase_date?: string;
+          p_reference?: string;
+          p_supplier_id: string;
+        };
         Returns: string;
       };
       send_sms_hook: { Args: { event: Json }; Returns: Json };
@@ -3134,6 +3443,15 @@ export type Database = {
           p_image_path?: string;
           p_name?: string;
           p_product_id: string;
+        };
+        Returns: string;
+      };
+      update_stock_location: {
+        Args: {
+          p_code: string;
+          p_is_default?: boolean;
+          p_location_id: string;
+          p_name: string;
         };
         Returns: string;
       };

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
@@ -9,6 +9,8 @@ import { PrintService } from '../../shared/print/print.service';
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { CashierSessionService } from '../../core/cashier-session.service';
 import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
+import { ButtonComponent } from '../../shared/ui/button.component';
+import { DeleteConfirmationModalComponent } from '../../shared/ui/delete-confirmation-modal.component';
 
 @Component({
   selector: 'app-proformas',
@@ -18,6 +20,8 @@ import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required
     PageHeaderComponent,
     EmptyStateComponent,
     SessionRequiredNoticeComponent,
+    ButtonComponent,
+    DeleteConfirmationModalComponent,
   ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
@@ -64,6 +68,15 @@ import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required
                     </button>
                   }
                   <button
+                    appButton
+                    variant="error"
+                    size="sm"
+                    [disabled]="busy()"
+                    (click)="startDelete(draft)"
+                  >
+                    Delete
+                  </button>
+                  <button
                     class="btn btn-primary btn-sm"
                     [disabled]="!cashierSession.isOpen()"
                     (click)="startConversion(draft)"
@@ -88,6 +101,16 @@ import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required
           (cancelled)="converting.set(null)"
         />
       }
+
+      <app-delete-confirmation-modal
+        [data]="deleteData()"
+        title="Delete proforma?"
+        entityType="proforma"
+        verb="delete"
+        confirmButtonText="Delete proforma"
+        (confirm)="confirmDelete()"
+        (cancel)="deleting.set(null)"
+      />
     </main>
   `,
 })
@@ -101,12 +124,18 @@ export class ProformasComponent implements OnInit {
   protected readonly fmt = formatKes;
   protected readonly drafts = signal<OrderWithCustomer[]>([]);
   protected readonly converting = signal<OrderWithCustomer | null>(null);
+  protected readonly deleting = signal<OrderWithCustomer | null>(null);
   protected readonly methods = signal<string[]>(['cash', 'mpesa', 'bank']);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly approvalPending = signal(false);
   protected readonly printerEnabled = signal(false);
+  protected readonly deleteData = computed(() => ({
+    entityName: this.deleting()?.code ?? 'proforma',
+    warningDetails: ['The proforma and its line items will be permanently removed.'],
+  }));
+  private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
 
   async ngOnInit(): Promise<void> {
     this.printerEnabled.set(await this.receiptData.printerEnabled());
@@ -144,6 +173,30 @@ export class ProformasComponent implements OnInit {
 
   protected edit(orderId: string): void {
     void this.router.navigate(['/pos/sell'], { queryParams: { draft: orderId } });
+  }
+
+  protected startDelete(draft: OrderWithCustomer): void {
+    this.deleting.set(draft);
+    this.deleteModal()?.show();
+  }
+
+  protected async confirmDelete(): Promise<void> {
+    const draft = this.deleting();
+    if (!draft) return;
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      await this.pos.deleteProforma(draft.id);
+      this.deleteModal()?.hide();
+      this.deleting.set(null);
+      this.notice.set(`Proforma ${draft.code} deleted`);
+      await this.load();
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Failed to delete proforma');
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected async convert(orderId: string, payments: PaymentInput[]): Promise<void> {

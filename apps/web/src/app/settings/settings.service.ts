@@ -4,6 +4,7 @@ import { SupabaseService } from '../core/supabase.service';
 import { rpcError } from '../pos/pos.service';
 
 export type PaymentMethodRow = Database['public']['Tables']['payment_methods']['Row'];
+export type StockLocationRow = Database['public']['Tables']['stock_locations']['Row'];
 
 /**
  * Company settings. The companies table has a COLUMN-LIMITED update grant:
@@ -89,5 +90,49 @@ export class SettingsService {
         : {}),
     });
     if (error) throw rpcError(error);
+  }
+
+  async stockLocations(): Promise<StockLocationRow[]> {
+    const { data, error } = await this.db
+      .from('stock_locations')
+      .select('*')
+      .order('is_default', { ascending: false })
+      .order('name');
+    if (error) throw error;
+    return data;
+  }
+
+  async createStockLocation(code: string, name: string, isDefault: boolean): Promise<string> {
+    const { data, error } = await this.db.rpc('create_stock_location', {
+      p_code: code,
+      p_name: name,
+      p_is_default: isDefault,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async updateStockLocation(
+    id: string,
+    code: string,
+    name: string,
+    isDefault: boolean
+  ): Promise<string> {
+    const { data, error } = await this.db.rpc('update_stock_location', {
+      p_location_id: id,
+      p_code: code,
+      p_name: name,
+      p_is_default: isDefault,
+    });
+    if (error) throw rpcError(error);
+    return data;
+  }
+
+  async deleteStockLocation(id: string): Promise<string> {
+    const { data, error } = await this.db.rpc('delete_stock_location', {
+      p_location_id: id,
+    });
+    if (error) throw rpcError(error);
+    return data;
   }
 }

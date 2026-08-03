@@ -20,6 +20,7 @@ import { PageLayoutComponent } from '../../shared/ui/page-layout.component';
 import { StatCardComponent } from '../../shared/ui/stat-card.component';
 
 type TopVariant = { variantId: string; label: string; revenue: number; margin: number };
+type SalesChartPoint = DailySummary & { day: string; revenue: number; heightPercent: number };
 
 @Component({
   selector: 'app-dashboard',
@@ -129,10 +130,18 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
               class="flex flex-wrap items-end justify-between gap-2 border-b border-base-300 px-4 py-3"
             >
               <div>
-                <h2 class="section-title">Sales performance</h2>
-                <p class="type-caption mt-1">Daily revenue and margin over the last 7 days.</p>
+                <h2 class="section-title">Sales trend</h2>
+                <p class="type-caption mt-1">Live completed-sale revenue · last 7 days.</p>
               </div>
-              <span class="type-caption">Live totals</span>
+              <button
+                appButton
+                variant="ghost"
+                size="sm"
+                [attr.aria-expanded]="salesChartExpanded()"
+                (click)="salesChartExpanded.set(!salesChartExpanded())"
+              >
+                {{ salesChartExpanded() ? 'Show less' : 'Expand' }}
+              </button>
             </div>
 
             @if (initialLoading()) {
@@ -143,7 +152,7 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
                 <span class="loading loading-spinner loading-sm"></span>
                 Loading sales
               </div>
-            } @else if (week().length === 0) {
+            } @else if (!salesChartHasData()) {
               <app-empty-state
                 [embedded]="true"
                 [compact]="true"
@@ -152,35 +161,82 @@ type TopVariant = { variantId: string; label: string; revenue: number; margin: n
                 description="Revenue and margin appear after the first completed sale."
               />
             } @else {
-              <div class="table-scroll">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Day</th>
-                      <th class="text-right">Orders</th>
-                      <th class="text-right">Revenue</th>
-                      <th class="text-right">Margin</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (day of week(); track day.day) {
-                      <tr>
-                        <td class="font-medium">{{ shortDay(day.day) }}</td>
-                        <td class="text-right font-medium">{{ day.orders ?? 0 }}</td>
-                        <td class="text-right font-medium">
-                          <app-money [cents]="day.revenue ?? 0" />
-                        </td>
-                        <td
-                          class="text-right font-medium"
-                          [class.text-success]="(day.margin ?? 0) > 0"
-                          [class.text-error]="(day.margin ?? 0) < 0"
-                        >
-                          <app-money [cents]="day.margin ?? 0" />
-                        </td>
-                      </tr>
+              <div class="px-4 pb-3 pt-2">
+                <div class="mb-2 flex items-end justify-between gap-3">
+                  <div>
+                    <p class="type-caption">7-day revenue</p>
+                    <p class="type-title tabular-nums">{{ fmt(weekRevenue()) }}</p>
+                  </div>
+                  <p class="type-caption text-right">
+                    {{ weekOrders() }} orders · {{ fmt(weekMargin()) }} margin
+                  </p>
+                </div>
+
+                <div
+                  class="relative overflow-hidden rounded-box border border-base-300/70 bg-base-200/30"
+                  [class.h-32]="!salesChartExpanded()"
+                  [class.h-60]="salesChartExpanded()"
+                >
+                  @if (salesChartExpanded()) {
+                    <span class="absolute inset-x-0 top-1/3 border-t border-base-300/60"></span>
+                    <span class="absolute inset-x-0 top-2/3 border-t border-base-300/60"></span>
+                  }
+                  <div
+                    class="relative grid h-full grid-cols-7 items-end gap-2 px-4 pb-2 pt-3 sm:gap-3 sm:px-6"
+                    role="img"
+                    aria-label="Sales revenue for the last seven days"
+                  >
+                    @for (point of salesChartPoints(); track point.day) {
+                      <div class="group flex h-full min-w-0 items-end justify-center">
+                        <div
+                          class="w-full max-w-12 rounded-t-field bg-primary/80 transition-all group-hover:bg-primary"
+                          [style.height.%]="point.heightPercent"
+                          [attr.title]="shortDay(point.day) + ': ' + fmt(point.revenue)"
+                        ></div>
+                      </div>
                     }
-                  </tbody>
-                </table>
+                  </div>
+                </div>
+
+                <div class="mt-2 grid grid-cols-7 gap-1 text-center">
+                  @for (point of salesChartPoints(); track point.day) {
+                    <div class="min-w-0">
+                      <p class="truncate text-xs font-medium text-base-content/60">
+                        {{ chartDay(point.day) }}
+                      </p>
+                      @if (salesChartExpanded()) {
+                        <p class="mt-0.5 truncate text-xs tabular-nums">
+                          {{ compactKes(point.revenue) }}
+                        </p>
+                      }
+                    </div>
+                  }
+                </div>
+
+                @if (salesChartExpanded()) {
+                  <div class="table-scroll mt-3 border-t border-base-300/70 pt-2">
+                    <table class="table table-xs">
+                      <thead>
+                        <tr>
+                          <th>Day</th>
+                          <th class="text-right">Orders</th>
+                          <th class="text-right">Revenue</th>
+                          <th class="text-right">Margin</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (day of week(); track day.day) {
+                          <tr>
+                            <td>{{ shortDay(day.day) }}</td>
+                            <td class="text-right">{{ day.orders ?? 0 }}</td>
+                            <td class="text-right"><app-money [cents]="day.revenue ?? 0" /></td>
+                            <td class="text-right"><app-money [cents]="day.margin ?? 0" /></td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
               </div>
             }
           </article>
@@ -374,6 +430,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly loading = signal(false);
   protected readonly liveConnected = signal(false);
   protected readonly lastUpdated = signal<Date | null>(null);
+  protected readonly salesChartExpanded = signal(false);
 
   protected readonly summary = signal<DailySummary[]>([]);
   protected readonly topVariants = signal<TopVariant[]>([]);
@@ -392,7 +449,46 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly today = computed(() =>
     this.summary().find(day => day.day === this.todayIso())
   );
-  protected readonly week = computed(() => this.summary());
+  protected readonly week = computed<DailySummary[]>(() => {
+    const byDay = new Map(
+      this.summary()
+        .filter(row => row.day)
+        .map(row => [row.day!, row])
+    );
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = this.daysAgoIso(6 - index);
+      return (
+        byDay.get(day) ?? {
+          day,
+          company_id: this.company()?.id ?? null,
+          orders: 0,
+          revenue: 0,
+          cogs: 0,
+          margin: 0,
+        }
+      );
+    });
+  });
+  protected readonly weekRevenue = computed(() =>
+    this.week().reduce((total, day) => total + (day.revenue ?? 0), 0)
+  );
+  protected readonly weekMargin = computed(() =>
+    this.week().reduce((total, day) => total + (day.margin ?? 0), 0)
+  );
+  protected readonly weekOrders = computed(() =>
+    this.week().reduce((total, day) => total + (day.orders ?? 0), 0)
+  );
+  protected readonly salesChartHasData = computed(() => this.weekRevenue() > 0);
+  protected readonly salesChartPoints = computed<SalesChartPoint[]>(() => {
+    const days = this.week();
+    const max = Math.max(...days.map(day => day.revenue ?? 0), 1);
+    return days.map(day => ({
+      ...day,
+      day: day.day!,
+      revenue: day.revenue ?? 0,
+      heightPercent: ((day.revenue ?? 0) / max) * 100,
+    }));
+  });
   protected readonly initialLoading = computed(() => this.loading() && !this.lastUpdated());
 
   private liveChannel: RealtimeChannel | null = null;
@@ -525,6 +621,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
       day: 'numeric',
       month: 'short',
     });
+  }
+
+  protected chartDay(day: string): string {
+    return new Date(`${day}T12:00:00+03:00`).toLocaleDateString('en-KE', {
+      timeZone: 'Africa/Nairobi',
+      weekday: 'narrow',
+    });
+  }
+
+  protected compactKes(cents: number): string {
+    const value = cents / 100;
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace('.0', '')}m`;
+    if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace('.0', '')}k`;
+    return Math.round(value).toLocaleString('en-KE');
   }
 
   protected updatedTime(value: Date): string {

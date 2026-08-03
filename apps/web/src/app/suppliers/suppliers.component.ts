@@ -4,7 +4,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { formatKes, parseKesToCents } from '../core/money';
 import { PermissionsService } from '../core/permissions.service';
 import { SupabaseService } from '../core/supabase.service';
-import { PosService, Variant, variantLabel } from '../pos/pos.service';
+import { PosService, StockLocation, Variant, variantLabel } from '../pos/pos.service';
 import { PrintService } from '../shared/print/print.service';
 import { ReceiptDataService } from '../shared/print/receipt-data.service';
 import { ButtonComponent } from '../shared/ui/button.component';
@@ -13,9 +13,16 @@ import { FormFieldComponent } from '../shared/ui/form-field.component';
 import { IconComponent } from '../shared/ui/icon.component';
 import { MoneyComponent } from '../shared/ui/money.component';
 import { PageLayoutComponent } from '../shared/ui/page-layout.component';
+import { PaginationComponent } from '../shared/ui/pagination.component';
 import { StatCardComponent } from '../shared/ui/stat-card.component';
 import { StatusBadgeComponent, type BadgeType } from '../shared/ui/status-badge.component';
-import { AgingInfo, LedgerAccount, MoneyCustomer, MoneyService } from '../money/money.service';
+import {
+  AgingInfo,
+  LedgerAccount,
+  MoneyCustomer,
+  MoneyService,
+  PurchaseDraft,
+} from '../money/money.service';
 import { CashierSessionService } from '../core/cashier-session.service';
 import { SessionRequiredNoticeComponent } from '../shared/ui/session-required-notice.component';
 
@@ -35,6 +42,7 @@ interface PurchaseLineForm {
   quantity: number;
   unitCost: string; // KES text
   expiryDate: string; // yyyy-mm-dd or ''
+  batchNumber: string;
 }
 
 @Component({
@@ -51,6 +59,7 @@ interface PurchaseLineForm {
     StatCardComponent,
     PageLayoutComponent,
     SessionRequiredNoticeComponent,
+    PaginationComponent,
   ],
   template: `
     <app-page title="Suppliers" subtitle="Record incoming stock and keep supplier credit clear.">
@@ -144,7 +153,7 @@ interface PurchaseLineForm {
               (submit)="$event.preventDefault(); recordPurchase()"
               class="mt-2 flex flex-col gap-4"
             >
-              <div class="grid gap-3 sm:grid-cols-2">
+              <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <app-form-field label="Supplier" [required]="true">
                   <select
                     class="select select-bordered select-sm w-full"
@@ -161,6 +170,30 @@ interface PurchaseLineForm {
                     class="input input-bordered input-sm w-full"
                     placeholder="Optional"
                     [formControl]="purchaseReference"
+                  />
+                </app-form-field>
+                <app-form-field label="Purchase date">
+                  <input
+                    type="date"
+                    class="input input-bordered input-sm w-full"
+                    [formControl]="purchaseDate"
+                  />
+                </app-form-field>
+                <app-form-field label="Receive into">
+                  <select
+                    class="select select-bordered select-sm w-full"
+                    [formControl]="purchaseLocation"
+                  >
+                    @for (location of locations(); track location.id) {
+                      <option [value]="location.id">{{ location.name }}</option>
+                    }
+                  </select>
+                </app-form-field>
+                <app-form-field label="Notes" class="sm:col-span-2 lg:col-span-4">
+                  <input
+                    class="input input-bordered input-sm w-full"
+                    placeholder="Delivery condition, invoice notes…"
+                    [formControl]="purchaseNotes"
                   />
                 </app-form-field>
               </div>
@@ -243,7 +276,7 @@ interface PurchaseLineForm {
                   <div
                     class="grid gap-2 rounded-box border border-base-300 bg-base-200/50 p-3 sm:grid-cols-12"
                   >
-                    <app-form-field label="Product" class="sm:col-span-5">
+                    <app-form-field label="Product" class="sm:col-span-4">
                       <select
                         class="select select-bordered select-sm w-full"
                         [(ngModel)]="line.variantId"
@@ -278,6 +311,13 @@ interface PurchaseLineForm {
                         type="date"
                         class="input input-bordered input-sm w-full"
                         [(ngModel)]="line.expiryDate"
+                        [ngModelOptions]="{ standalone: true }"
+                      />
+                    </app-form-field>
+                    <app-form-field label="Batch" class="sm:col-span-1">
+                      <input
+                        class="input input-bordered input-sm w-full"
+                        [(ngModel)]="line.batchNumber"
                         [ngModelOptions]="{ standalone: true }"
                       />
                     </app-form-field>
@@ -318,24 +358,70 @@ interface PurchaseLineForm {
                 </p>
               </div>
 
-              <button
-                appButton
-                type="submit"
-                class="self-start"
-                [loading]="busy()"
-                [disabled]="
-                  suppliers().length === 0 ||
-                  variants().length === 0 ||
-                  (!purchaseOnCredit.value && !cashierSession.isOpen())
-                "
-              >
-                {{ purchaseOnCredit.value ? 'Record credit purchase' : 'Record paid purchase' }}
-              </button>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  appButton
+                  type="submit"
+                  [loading]="busy()"
+                  [disabled]="
+                    suppliers().length === 0 ||
+                    variants().length === 0 ||
+                    (!purchaseOnCredit.value && !cashierSession.isOpen())
+                  "
+                >
+                  {{
+                    activeDraftId()
+                      ? 'Confirm draft purchase'
+                      : purchaseOnCredit.value
+                        ? 'Record credit purchase'
+                        : 'Record paid purchase'
+                  }}
+                </button>
+                <button
+                  appButton
+                  variant="outline"
+                  type="button"
+                  [disabled]="busy()"
+                  (click)="saveDraft()"
+                >
+                  {{ activeDraftId() ? 'Update draft' : 'Save draft' }}
+                </button>
+                @if (activeDraftId()) {
+                  <button appButton variant="ghost" type="button" (click)="clearPurchaseForm()">
+                    Close draft
+                  </button>
+                }
+              </div>
             </form>
           </div>
         </section>
 
         <aside class="flex flex-col gap-4">
+          @if (drafts().length > 0) {
+            <section class="card bg-base-100">
+              <div class="card-body p-4">
+                <h2 class="section-title">Purchase drafts</h2>
+                <div class="mt-2 divide-y divide-base-200">
+                  @for (draft of drafts(); track draft.id) {
+                    <div class="flex items-center gap-2 py-2">
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium">
+                          {{ supplierName(draft.supplier_id) }}
+                        </p>
+                        <p class="type-caption">
+                          {{ draft.reference || 'No reference' }} · {{ fmt(draft.total_cost) }}
+                        </p>
+                      </div>
+                      <button appButton variant="ghost" (click)="openDraft(draft)">Open</button
+                      ><button appButton variant="ghost" (click)="cancelDraft(draft.id)">
+                        Cancel
+                      </button>
+                    </div>
+                  }
+                </div>
+              </div>
+            </section>
+          }
           <section class="card bg-base-100">
             <div class="card-body p-4">
               <div class="flex items-center justify-between gap-2">
@@ -468,13 +554,11 @@ interface PurchaseLineForm {
                     <th>Reference</th>
                     <th class="text-right">Total</th>
                     <th class="text-right">Status</th>
-                    @if (printerEnabled()) {
-                      <th></th>
-                    }
+                    <th class="text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @for (p of purchases(); track p.id) {
+                  @for (p of pagedPurchases(); track p.id) {
                     <tr>
                       <td class="whitespace-nowrap text-sm">{{ time(p.created_at) }}</td>
                       <td class="font-medium">{{ supplierName(p.supplier_id) }}</td>
@@ -489,17 +573,72 @@ interface PurchaseLineForm {
                           [label]="purchaseStatusLabel(p)"
                         />
                       </td>
-                      @if (printerEnabled()) {
-                        <td class="text-right">
+                      <td class="whitespace-nowrap text-right">
+                        @if (printerEnabled()) {
                           <button appButton variant="ghost" (click)="printPurchase(p.id)">
                             Print PO
                           </button>
-                        </td>
-                      }
+                        }
+                        @if (p.is_credit && p.paid < p.total_cost && perms.has('ViewFinancials')) {
+                          <button appButton variant="ghost" (click)="startPurchasePayment(p)">
+                            Pay
+                          </button>
+                        }
+                      </td>
                     </tr>
+                    @if (payPurchaseId() === p.id) {
+                      <tr class="row-detail">
+                        <td colspan="8">
+                          <form
+                            (submit)="$event.preventDefault(); paySelectedPurchase()"
+                            class="flex flex-wrap items-end gap-2"
+                          >
+                            <app-form-field label="Amount (KES)"
+                              ><input
+                                class="input input-bordered input-sm w-32"
+                                [formControl]="selectedPayAmount" /></app-form-field
+                            ><app-form-field label="Pay from"
+                              ><select
+                                class="select select-bordered select-sm"
+                                [formControl]="selectedPayAccount"
+                              >
+                                @for (a of accounts(); track a.code) {
+                                  <option [value]="a.code">{{ a.name }}</option>
+                                }
+                              </select></app-form-field
+                            ><button
+                              appButton
+                              type="submit"
+                              [disabled]="busy() || !cashierSession.isOpen()"
+                            >
+                              Record payment</button
+                            ><button
+                              appButton
+                              variant="ghost"
+                              type="button"
+                              (click)="payPurchaseId.set(null)"
+                            >
+                              Cancel
+                            </button>
+                          </form>
+                        </td>
+                      </tr>
+                    }
                   }
                 </tbody>
               </table>
+            </div>
+            <div class="p-3 pt-0">
+              <app-pagination
+                [currentPage]="purchasePage()"
+                [totalPages]="purchaseTotalPages()"
+                [totalItems]="purchases().length"
+                [itemsPerPage]="purchasePageSize()"
+                itemLabel="purchases"
+                [showItemsPerPage]="true"
+                (pageChange)="purchasePage.set($event)"
+                (itemsPerPageChange)="purchasePageSize.set($event); purchasePage.set(1)"
+              />
             </div>
           </div>
         }
@@ -523,6 +662,11 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly variants = signal<Variant[]>([]);
   protected readonly label = variantLabel;
   protected readonly purchases = signal<PurchaseRow[]>([]);
+  protected readonly purchasePage = signal(1);
+  protected readonly purchasePageSize = signal(10);
+  protected readonly drafts = signal<PurchaseDraft[]>([]);
+  protected readonly locations = signal<StockLocation[]>([]);
+  protected readonly activeDraftId = signal<string | null>(null);
   protected readonly createOpen = signal(false);
 
   protected readonly newName = new FormControl('', { nonNullable: true });
@@ -530,6 +674,11 @@ export class SuppliersComponent implements OnInit, OnDestroy {
 
   protected readonly purchaseSupplier = new FormControl('', { nonNullable: true });
   protected readonly purchaseReference = new FormControl('', { nonNullable: true });
+  protected readonly purchaseNotes = new FormControl('', { nonNullable: true });
+  protected readonly purchaseDate = new FormControl(new Date().toISOString().slice(0, 10), {
+    nonNullable: true,
+  });
+  protected readonly purchaseLocation = new FormControl('', { nonNullable: true });
   protected readonly purchaseOnCredit = new FormControl(false, { nonNullable: true });
   protected readonly purchaseAccount = new FormControl('', { nonNullable: true });
   protected lines: PurchaseLineForm[] = [this.emptyLine()];
@@ -537,6 +686,9 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   protected readonly paySupplierId = new FormControl('', { nonNullable: true });
   protected readonly payAmount = new FormControl('', { nonNullable: true });
   protected readonly payAccount = new FormControl('', { nonNullable: true });
+  protected readonly payPurchaseId = signal<string | null>(null);
+  protected readonly selectedPayAmount = new FormControl('', { nonNullable: true });
+  protected readonly selectedPayAccount = new FormControl('', { nonNullable: true });
 
   protected readonly busy = signal(false);
   protected readonly loading = signal(false);
@@ -555,6 +707,14 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       this.purchases().filter(purchase => purchase.is_credit && purchase.paid < purchase.total_cost)
         .length
   );
+  protected readonly purchaseTotalPages = computed(() =>
+    Math.max(1, Math.ceil(this.purchases().length / this.purchasePageSize()))
+  );
+  protected readonly pagedPurchases = computed(() => {
+    const page = Math.min(this.purchasePage(), this.purchaseTotalPages());
+    const start = (page - 1) * this.purchasePageSize();
+    return this.purchases().slice(start, start + this.purchasePageSize());
+  });
 
   private liveChannel: RealtimeChannel | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -579,17 +739,21 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     }
     this.loading.set(true);
     try {
-      const [suppliers, accounts, variants, purchases] = await Promise.all([
+      const [suppliers, accounts, variants, purchases, drafts, locations] = await Promise.all([
         this.money.suppliersWithAp(),
         this.money.transactableAccounts(),
         this.pos.fetchActiveVariants(),
         this.money.purchasesWithPayments(),
+        this.money.purchaseDrafts(),
+        this.pos.listStockLocations(),
       ]);
       this.suppliers.set(suppliers);
       this.accounts.set(accounts);
       // Purchases stock goods only (services are rejected server-side).
       this.variants.set(variants.filter(v => v.kind !== 'service'));
       this.purchases.set(purchases as PurchaseRow[]);
+      this.drafts.set(drafts);
+      this.locations.set(locations);
       if (!this.purchaseSupplier.value && suppliers.length > 0)
         this.purchaseSupplier.setValue(suppliers[0].id);
       const suppliersWithBalance = suppliers.filter(s => s.ap_balance > 0);
@@ -602,6 +766,10 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       if (!this.purchaseAccount.value && accounts.length > 0)
         this.purchaseAccount.setValue(accounts[0].code);
       if (!this.payAccount.value && accounts.length > 0) this.payAccount.setValue(accounts[0].code);
+      if (!this.selectedPayAccount.value && accounts.length > 0)
+        this.selectedPayAccount.setValue(accounts[0].code);
+      if (!this.purchaseLocation.value && locations.length > 0)
+        this.purchaseLocation.setValue(locations[0].id);
       if (this.lines.every(l => !l.variantId) && this.variants().length > 0)
         this.lines = [{ ...this.emptyLine(), variantId: this.variants()[0].variant_id ?? '' }];
       this.error.set(null);
@@ -658,6 +826,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       quantity: number;
       unit_cost: number;
       expiry_date?: string;
+      batch_number?: string;
     }[] = [];
     for (const l of this.lines) {
       const unitCost = parseKesToCents(l.unitCost);
@@ -670,6 +839,7 @@ export class SuppliersComponent implements OnInit, OnDestroy {
         quantity: l.quantity,
         unit_cost: unitCost,
         ...(l.expiryDate ? { expiry_date: l.expiryDate } : {}),
+        ...(l.batchNumber.trim() ? { batch_number: l.batchNumber.trim() } : {}),
       });
     }
     this.busy.set(true);
@@ -679,15 +849,34 @@ export class SuppliersComponent implements OnInit, OnDestroy {
       const isCredit = this.purchaseOnCredit.value;
       const total = this.purchaseTotal();
       const supplierName = this.selectedSupplierName();
-      await this.money.recordPurchase(
-        this.purchaseSupplier.value,
-        parsed,
-        isCredit,
-        this.purchaseReference.value.trim() || undefined,
-        isCredit ? undefined : this.purchaseAccount.value
-      );
-      this.purchaseReference.setValue('');
-      this.lines = [{ ...this.emptyLine(), variantId: this.variants()[0]?.variant_id ?? '' }];
+      if (this.activeDraftId()) {
+        await this.money.savePurchaseDraft({
+          draftId: this.activeDraftId()!,
+          supplierId: this.purchaseSupplier.value,
+          lines: parsed,
+          reference: this.purchaseReference.value.trim() || undefined,
+          notes: this.purchaseNotes.value.trim() || undefined,
+          purchaseDate: this.purchaseDate.value,
+        });
+        await this.money.confirmPurchaseDraft(
+          this.activeDraftId()!,
+          isCredit,
+          isCredit ? undefined : this.purchaseAccount.value,
+          this.purchaseLocation.value || undefined
+        );
+      } else {
+        await this.money.recordPurchase(
+          this.purchaseSupplier.value,
+          parsed,
+          isCredit,
+          this.purchaseReference.value.trim() || undefined,
+          isCredit ? undefined : this.purchaseAccount.value,
+          this.purchaseNotes.value.trim() || undefined,
+          this.purchaseDate.value,
+          this.purchaseLocation.value || undefined
+        );
+      }
+      this.clearPurchaseForm();
       await this.load();
       this.notice.set(
         isCredit
@@ -699,6 +888,127 @@ export class SuppliersComponent implements OnInit, OnDestroy {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected async saveDraft(): Promise<void> {
+    const parsed = this.parsedLines();
+    if (!parsed) return;
+    this.busy.set(true);
+    this.error.set(null);
+    this.notice.set(null);
+    try {
+      const id = await this.money.savePurchaseDraft({
+        draftId: this.activeDraftId() || undefined,
+        supplierId: this.purchaseSupplier.value,
+        lines: parsed,
+        reference: this.purchaseReference.value.trim() || undefined,
+        notes: this.purchaseNotes.value.trim() || undefined,
+        purchaseDate: this.purchaseDate.value,
+      });
+      this.activeDraftId.set(id);
+      this.notice.set('Purchase draft saved');
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Draft save failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected openDraft(draft: PurchaseDraft): void {
+    this.activeDraftId.set(draft.id);
+    this.purchaseSupplier.setValue(draft.supplier_id);
+    this.purchaseReference.setValue(draft.reference ?? '');
+    this.purchaseNotes.setValue(draft.notes ?? '');
+    this.purchaseDate.setValue(draft.purchase_date);
+    const lines = Array.isArray(draft.lines)
+      ? (draft.lines as unknown as Array<Record<string, unknown>>)
+      : [];
+    this.lines = lines.map(line => ({
+      variantId: String(line['variant_id'] ?? ''),
+      quantity: Number(line['quantity'] ?? 1),
+      unitCost: (Number(line['unit_cost'] ?? 0) / 100).toFixed(2),
+      expiryDate: String(line['expiry_date'] ?? ''),
+      batchNumber: String(line['batch_number'] ?? ''),
+    }));
+  }
+
+  protected async cancelDraft(id: string): Promise<void> {
+    if (!window.confirm('Cancel this purchase draft?')) return;
+    try {
+      await this.money.cancelPurchaseDraft(id);
+      if (this.activeDraftId() === id) this.clearPurchaseForm();
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Cancel failed');
+    }
+  }
+
+  protected clearPurchaseForm(): void {
+    this.activeDraftId.set(null);
+    this.purchaseReference.setValue('');
+    this.purchaseNotes.setValue('');
+    this.purchaseDate.setValue(new Date().toISOString().slice(0, 10));
+    this.lines = [{ ...this.emptyLine(), variantId: this.variants()[0]?.variant_id ?? '' }];
+  }
+
+  protected startPurchasePayment(purchase: PurchaseRow): void {
+    this.payPurchaseId.set(purchase.id);
+    this.selectedPayAmount.setValue(((purchase.total_cost - purchase.paid) / 100).toFixed(2));
+  }
+
+  protected async paySelectedPurchase(): Promise<void> {
+    const id = this.payPurchaseId();
+    const amount = parseKesToCents(this.selectedPayAmount.value);
+    if (!id || amount === null || amount <= 0) {
+      this.error.set('Enter a valid payment amount');
+      return;
+    }
+    try {
+      await this.cashierSession.assertOpen('paying a supplier');
+      this.busy.set(true);
+      await this.money.payPurchase(id, amount, this.selectedPayAccount.value);
+      this.payPurchaseId.set(null);
+      this.notice.set('Purchase payment recorded');
+      await this.load();
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'Payment failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  private parsedLines():
+    | {
+        variant_id: string;
+        quantity: number;
+        unit_cost: number;
+        expiry_date?: string;
+        batch_number?: string;
+      }[]
+    | null {
+    const parsed: {
+      variant_id: string;
+      quantity: number;
+      unit_cost: number;
+      expiry_date?: string;
+      batch_number?: string;
+    }[] = [];
+    for (const line of this.lines) {
+      const unitCost = parseKesToCents(line.unitCost);
+      if (!line.variantId || !(line.quantity > 0) || unitCost === null) {
+        this.error.set('Every line needs a variant, quantity and valid unit cost');
+        return null;
+      }
+      parsed.push({
+        variant_id: line.variantId,
+        quantity: line.quantity,
+        unit_cost: unitCost,
+        ...(line.expiryDate ? { expiry_date: line.expiryDate } : {}),
+        ...(line.batchNumber.trim() ? { batch_number: line.batchNumber.trim() } : {}),
+      });
+    }
+    return parsed;
   }
 
   protected async paySupplier(): Promise<void> {
@@ -844,6 +1154,6 @@ export class SuppliersComponent implements OnInit, OnDestroy {
   }
 
   private emptyLine(): PurchaseLineForm {
-    return { variantId: '', quantity: 1, unitCost: '', expiryDate: '' };
+    return { variantId: '', quantity: 1, unitCost: '', expiryDate: '', batchNumber: '' };
   }
 }

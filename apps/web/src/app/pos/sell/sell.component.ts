@@ -20,6 +20,7 @@ import { PrintService, type PrintFormat } from '../../shared/print/print.service
 import { ReceiptDataService } from '../../shared/print/receipt-data.service';
 import { SellCartLineComponent } from './sell-cart-line.component';
 import { SessionRequiredNoticeComponent } from '../../shared/ui/session-required-notice.component';
+import { BarcodeScannerComponent } from '../../shared/ui/barcode-scanner.component';
 import {
   Customer,
   PaymentInput,
@@ -43,6 +44,7 @@ import {
     PageLayoutComponent,
     SellCartLineComponent,
     SessionRequiredNoticeComponent,
+    BarcodeScannerComponent,
   ],
   template: `
     <app-page
@@ -163,33 +165,45 @@ import {
                   }
                 </div>
 
-                <div class="relative mt-3">
-                  <span
-                    class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base-content/50"
-                  >
-                    <app-icon name="heroMagnifyingGlass" size="lg" />
-                  </span>
-                  <input
-                    type="search"
-                    class="input input-bordered min-h-11 w-full pr-12 pl-11"
-                    placeholder="Search or scan barcode…"
-                    autocomplete="off"
-                    [formControl]="search"
-                  />
-                  @if (search.value) {
-                    <button
-                      appButton
-                      variant="ghost"
-                      size="md"
-                      [iconOnly]="true"
-                      type="button"
-                      class="absolute inset-y-0 right-0 my-auto mr-1"
-                      aria-label="Clear product search"
-                      (click)="clearSearch()"
+                <div class="mt-3 flex gap-2">
+                  <div class="relative min-w-0 flex-1">
+                    <span
+                      class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base-content/50"
                     >
-                      <app-icon name="heroXMark" />
-                    </button>
-                  }
+                      <app-icon name="heroMagnifyingGlass" size="lg" />
+                    </span>
+                    <input
+                      type="search"
+                      class="input input-bordered min-h-11 w-full pr-12 pl-11"
+                      placeholder="Search or scan barcode…"
+                      autocomplete="off"
+                      [formControl]="search"
+                    />
+                    @if (search.value) {
+                      <button
+                        appButton
+                        variant="ghost"
+                        size="md"
+                        [iconOnly]="true"
+                        type="button"
+                        class="absolute inset-y-0 right-0 my-auto mr-1"
+                        aria-label="Clear product search"
+                        (click)="clearSearch()"
+                      >
+                        <app-icon name="heroXMark" />
+                      </button>
+                    }
+                  </div>
+                  <button
+                    appButton
+                    variant="outline"
+                    size="md"
+                    type="button"
+                    class="min-h-11"
+                    (click)="scannerOpen.set(true)"
+                  >
+                    <app-icon name="heroCamera" /> <span class="hidden sm:inline">Scan</span>
+                  </button>
                 </div>
 
                 <div class="mt-4 flex items-center justify-between gap-2">
@@ -328,6 +342,9 @@ import {
                         [line]="line"
                         [label]="cart.lineLabel(line)"
                         [canOverridePrice]="canOverridePrices()"
+                        [floorRejected]="
+                          priceFloorFeedback()?.variantId === line.variant.variant_id
+                        "
                         (quantityStep)="stepQty(line.variant.variant_id!, $event)"
                         (quantityChanged)="onQtyInput(line.variant.variant_id!, $event)"
                         (priceStep)="adjustPrice(line, $event)"
@@ -548,6 +565,25 @@ import {
           (cancelled)="checkoutOpen.set(false)"
         />
       }
+      @if (scannerOpen()) {
+        <app-barcode-scanner (scanned)="barcodeScanned($event)" (close)="scannerOpen.set(false)" />
+      }
+      @if (priceFloorFeedback(); as feedback) {
+        <div class="toast toast-bottom toast-end z-50" aria-live="assertive">
+          <div class="alert alert-error max-w-sm shadow-overlay">
+            <app-icon name="heroExclamationTriangle" />
+            <div>
+              <p class="font-semibold">Price not changed</p>
+              <p class="text-sm">
+                Minimum allowed for {{ feedback.label }} is <app-money [cents]="feedback.floor" />.
+                @if (feedback.wholesale) {
+                  This is the wholesale floor.
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      }
     </app-page>
   `,
 })
@@ -564,6 +600,7 @@ export class SellComponent implements OnInit {
 
   protected readonly search = new FormControl('', { nonNullable: true });
   protected readonly searchQuery = signal('');
+  protected readonly scannerOpen = signal(false);
   protected readonly results = signal<Variant[]>([]);
   protected readonly topVariants = signal<Variant[]>([]);
   protected readonly searchMode = computed(() => this.searchQuery().trim().length >= 2);
@@ -582,6 +619,12 @@ export class SellComponent implements OnInit {
   protected readonly overrideFor = signal<string | null>(null);
   protected readonly overridePrice = new FormControl('', { nonNullable: true });
   protected readonly overrideReason = new FormControl('', { nonNullable: true });
+  protected readonly priceFloorFeedback = signal<{
+    variantId: string;
+    label: string;
+    floor: number;
+    wholesale: boolean;
+  } | null>(null);
 
   protected readonly checkoutOpen = signal(false);
   protected readonly methods = signal<string[]>(['cash', 'mpesa', 'bank']);
@@ -596,6 +639,7 @@ export class SellComponent implements OnInit {
   protected readonly printerEnabled = signal(false);
   protected readonly brokenImages = signal<Set<string>>(new Set());
   protected readonly creditAllowed = computed(() => this.cart.customerId() !== null);
+  private priceFloorTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.search.valueChanges
@@ -666,6 +710,11 @@ export class SellComponent implements OnInit {
     this.results.set([]);
   }
 
+  protected barcodeScanned(value: string): void {
+    this.scannerOpen.set(false);
+    this.search.setValue(value);
+  }
+
   protected addVariant(variant: Variant): void {
     if (this.unavailable(variant)) return;
     this.cart.addVariant(variant);
@@ -714,7 +763,11 @@ export class SellComponent implements OnInit {
     const baseWhole = Math.round(line.unitPrice / 100) * 100;
     const currentWhole = Math.round((line.customPrice ?? line.unitPrice) / 100) * 100;
     const step = Math.max(100, Math.round((line.unitPrice * 0.03) / 100) * 100);
-    const wholesaleFloor = Math.ceil((line.variant.wholesale_price ?? 0) / 100) * 100;
+    const wholesaleFloor = this.wholesaleFloor(line);
+    if (direction < 0 && currentWhole <= wholesaleFloor) {
+      this.rejectBelowWholesale(line, wholesaleFloor);
+      return;
+    }
     const next = Math.max(wholesaleFloor, currentWhole + direction * step);
 
     if (next === currentWhole) return;
@@ -754,9 +807,9 @@ export class SellComponent implements OnInit {
     const line = this.cart.lines().find(item => item.variant.variant_id === variantId);
     if (!line) return;
     const wholeCents = Math.round(enteredCents / 100) * 100;
-    const wholesaleFloor = Math.ceil((line.variant.wholesale_price ?? 0) / 100) * 100;
+    const wholesaleFloor = this.wholesaleFloor(line);
     if (wholeCents < wholesaleFloor) {
-      this.error.set(`Price cannot be lower than wholesale (KES ${wholesaleFloor / 100})`);
+      this.rejectBelowWholesale(line, wholesaleFloor);
       return;
     }
 
@@ -774,6 +827,24 @@ export class SellComponent implements OnInit {
   protected resetPrice(line: CartLine): void {
     this.cart.setCustomPrice(line.variant.variant_id!, null, '');
     if (this.overrideFor() === line.variant.variant_id) this.overrideFor.set(null);
+  }
+
+  private wholesaleFloor(line: CartLine): number {
+    return Math.max(100, Math.ceil((line.variant.wholesale_price ?? 0) / 100) * 100);
+  }
+
+  private rejectBelowWholesale(line: CartLine, floor: number): void {
+    if (this.priceFloorTimer) clearTimeout(this.priceFloorTimer);
+    this.priceFloorFeedback.set(null);
+    requestAnimationFrame(() => {
+      this.priceFloorFeedback.set({
+        variantId: line.variant.variant_id!,
+        label: this.cart.lineLabel(line),
+        floor,
+        wholesale: (line.variant.wholesale_price ?? 0) > 0,
+      });
+      this.priceFloorTimer = setTimeout(() => this.priceFloorFeedback.set(null), 3000);
+    });
   }
 
   protected toggleCustomerPicker(): void {

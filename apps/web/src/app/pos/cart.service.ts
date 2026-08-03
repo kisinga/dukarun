@@ -98,8 +98,17 @@ export class CartService {
     this.patch(variantId, { quantity: normalized });
   }
 
-  setCustomPrice(variantId: string, priceCents: number | null, reason: string): void {
+  setCustomPrice(variantId: string, priceCents: number | null, reason: string): boolean {
+    const line = this.lines().find(item => item.variant.variant_id === variantId);
+    if (!line) return false;
+    if (
+      priceCents !== null &&
+      (!(priceCents > 0) || priceCents < (line.variant.wholesale_price ?? 0))
+    ) {
+      return false;
+    }
     this.patch(variantId, { customPrice: priceCents, overrideReason: reason });
+    return true;
   }
 
   removeLine(variantId: string): void {

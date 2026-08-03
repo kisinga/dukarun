@@ -14,6 +14,8 @@ const LIMIT_KEYS = [
   ['smsPerPeriod', 'SMS/mo'],
 ] as const;
 
+const FEATURE_KEYS = [['multipleLocations', 'Multiple stock locations']] as const;
+
 @Component({
   selector: 'app-tiers',
   imports: [ReactiveFormsModule, PageHeaderComponent, EmptyStateComponent, StatusBadgeComponent],
@@ -83,6 +85,20 @@ const LIMIT_KEYS = [
                 />
               </label>
             }
+            <fieldset class="sm:col-span-2">
+              <legend class="label-text mb-1 font-semibold">Features</legend>
+              @for (field of featureFields; track field.key) {
+                <label class="label cursor-pointer justify-start gap-2 py-1">
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm"
+                    [checked]="features()[field.key] === true"
+                    (change)="setFeature(field.key, $any($event.target).checked)"
+                  />
+                  <span class="label-text">{{ field.label }}</span>
+                </label>
+              }
+            </fieldset>
             @if (editing()) {
               <label class="label cursor-pointer justify-start gap-2">
                 <input type="checkbox" class="checkbox checkbox-sm" [formControl]="isActive" />
@@ -118,6 +134,7 @@ const LIMIT_KEYS = [
               <th class="text-right">Monthly</th>
               <th class="text-right">Yearly</th>
               <th>Limits</th>
+              <th>Features</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -130,6 +147,7 @@ const LIMIT_KEYS = [
                 <td class="text-right">{{ fmt(t.price_monthly) }}</td>
                 <td class="text-right">{{ fmt(t.price_yearly) }}</td>
                 <td class="text-xs text-base-content/60">{{ limitSummary(t) }}</td>
+                <td class="text-xs text-base-content/60">{{ featureSummary(t) }}</td>
                 <td>
                   <app-status-badge
                     size="xs"
@@ -153,6 +171,7 @@ export class TiersComponent implements OnInit {
 
   protected readonly fmt = formatKes;
   protected readonly limitFields = LIMIT_KEYS.map(([key, label]) => ({ key, label }));
+  protected readonly featureFields = FEATURE_KEYS.map(([key, label]) => ({ key, label }));
   protected readonly tiers = signal<Tier[]>([]);
   protected readonly formOpen = signal(false);
   protected readonly editing = signal<Tier | null>(null);
@@ -163,6 +182,7 @@ export class TiersComponent implements OnInit {
   protected readonly priceYearly = new FormControl('', { nonNullable: true });
   protected readonly isActive = new FormControl(true, { nonNullable: true });
   protected readonly limits = signal<Record<string, number | undefined>>({});
+  protected readonly features = signal<Record<string, boolean>>({});
 
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -186,6 +206,10 @@ export class TiersComponent implements OnInit {
     this.limits.update(l => ({ ...l, [key]: num }));
   }
 
+  protected setFeature(key: string, enabled: boolean): void {
+    this.features.update(features => ({ ...features, [key]: enabled }));
+  }
+
   protected startCreate(): void {
     this.editing.set(null);
     this.code.setValue('');
@@ -193,6 +217,7 @@ export class TiersComponent implements OnInit {
     this.priceMonthly.setValue('');
     this.priceYearly.setValue('');
     this.limits.set({});
+    this.features.set({});
     this.formOpen.set(true);
   }
 
@@ -204,6 +229,7 @@ export class TiersComponent implements OnInit {
     this.priceYearly.setValue((tier.price_yearly / 100).toFixed(2));
     this.isActive.setValue(tier.is_active);
     this.limits.set({ ...(tier.limits as Record<string, number>) });
+    this.features.set({ ...(tier.features as Record<string, boolean>) });
     this.formOpen.set(true);
   }
 
@@ -238,6 +264,7 @@ export class TiersComponent implements OnInit {
         price_monthly: monthly,
         price_yearly: yearly,
         limits,
+        features: this.features(),
         ...(editing ? { tier_id: editing.id, is_active: this.isActive.value } : {}),
       });
       this.notice.set(editing ? 'Tier updated' : 'Tier created');
@@ -255,5 +282,11 @@ export class TiersComponent implements OnInit {
     return LIMIT_KEYS.filter(([key]) => limits[key])
       .map(([key, label]) => `${label}: ${limits[key]}`)
       .join(' · ');
+  }
+
+  protected featureSummary(tier: Tier): string {
+    const features = (tier.features ?? {}) as Record<string, boolean>;
+    const enabled = FEATURE_KEYS.filter(([key]) => features[key]).map(([, label]) => label);
+    return enabled.length > 0 ? enabled.join(' · ') : 'Core only';
   }
 }

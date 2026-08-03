@@ -48,6 +48,11 @@ export const routes: Routes = [
           import('./money/money-layout.component').then(m => m.MoneyLayoutComponent),
         children: [
           {
+            path: 'ledger',
+            loadComponent: () =>
+              import('./money/ledger/money-ledger.component').then(m => m.MoneyLedgerComponent),
+          },
+          {
             path: 'cashier',
             loadComponent: () =>
               import('./money/cashier/money-cashier.component').then(m => m.MoneyCashierComponent),

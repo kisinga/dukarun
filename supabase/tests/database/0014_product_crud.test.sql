@@ -111,7 +111,7 @@ select throws_ok(
       '[{"variant_id":"%s","quantity":1,"unit_cost":1000}]', false)$$,
     (select id from svc_var)
   ),
-  'P0001', 'cannot_stock_service: variant ' || (select id from svc_var),
+  'P0001', 'invalid_purchase_variant',
   'record_purchase rejects service variants'
 );
 

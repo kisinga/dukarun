@@ -19,6 +19,21 @@ import { NgIcon } from '@ng-icons/core';
             <span class="font-semibold text-base-content">{{ totalItems() }}</span>
             {{ itemLabel() }}
           </span>
+          @if (showItemsPerPage()) {
+            <span class="hidden h-4 w-px bg-base-300 sm:inline-block"></span>
+            <label class="flex items-center gap-2 text-sm text-base-content/60">
+              <span>Show</span>
+              <select
+                class="select select-bordered h-8 min-h-8 w-20 select-xs"
+                [value]="itemsPerPage()"
+                (change)="onItemsPerPageSelect($event)"
+              >
+                @for (option of pageOptions(); track option) {
+                  <option [value]="option">{{ option }}</option>
+                }
+              </select>
+            </label>
+          }
         </div>
 
         <div class="flex items-center justify-center gap-2 lg:justify-end">
@@ -56,6 +71,10 @@ import { NgIcon } from '@ng-icons/core';
             }
           </div>
 
+          <span class="badge badge-primary px-4 font-bold sm:hidden">
+            {{ currentPage() }} / {{ totalPages() }}
+          </span>
+
           <div class="join">
             <button
               class="join-item btn btn-square btn-sm"
@@ -87,8 +106,11 @@ export class PaginationComponent {
   readonly totalItems = input.required<number>();
   readonly itemsPerPage = input.required<number>();
   readonly itemLabel = input<string>('items');
+  readonly showItemsPerPage = input<boolean>(false);
+  readonly pageOptions = input<number[]>([10, 25, 50, 100]);
 
   readonly pageChange = output<number>();
+  readonly itemsPerPageChange = output<number>();
 
   protected readonly startItem = computed(() => (this.currentPage() - 1) * this.itemsPerPage() + 1);
   protected readonly endItem = computed(() =>
@@ -108,5 +130,10 @@ export class PaginationComponent {
 
   protected onPageChange(page: number): void {
     if (page >= 1 && page <= this.totalPages()) this.pageChange.emit(page);
+  }
+
+  protected onItemsPerPageSelect(event: Event): void {
+    const value = Number.parseInt((event.target as HTMLSelectElement).value, 10);
+    if (Number.isFinite(value) && value > 0) this.itemsPerPageChange.emit(value);
   }
 }

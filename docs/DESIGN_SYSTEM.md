@@ -145,7 +145,8 @@ Compose pages from these — never hand-roll what a primitive owns:
 - **`<app-icon>`** — icons on the 4-size scale (see Icons).
 - Plus the existing shells: `app-page-header` (inside `app-page`), `app-stat-bar`,
   `app-stat-card`, `app-status-badge`, `app-empty-state`, `app-list-search-bar`,
-  `app-pagination`, `app-entity-avatar`, `app-mobile-fab`, `app-delete-confirmation-modal`.
+  `app-pagination`, `app-data-table-shell`, `app-entity-avatar`, `app-mobile-fab`,
+  `app-delete-confirmation-modal`.
 
 Global recipes in `styles.scss` complement them: `.card`, `.form-field` (used by
 `app-form-field`), `.section-title`, `.modal-box`, `.nav-item`, table header chrome.
@@ -161,10 +162,12 @@ Every list page is the same four blocks, top to bottom — no improvisation:
    "Record Adjustment"…). Never in the table footer, never a bare floating row.
 2. **`<app-list-search-bar>`** — search input + `[badges]` + `[filters]` slots. No custom
    search rows, no bare `input-bordered`.
-3. **Data surface** — desktop: `card` (global recipe) containing `table table-zebra` with
+3. **Data surface** — desktop: `<app-data-table-shell>` containing a semantic table with
    row-click navigation to the detail view (no "View" buttons); mobile: a per-domain card
    component. Empty state = `<app-empty-state>`.
-4. **`<app-pagination>`** — the shared component. No hand-rolled `join` pagination.
+4. **`<app-pagination>`** — the shared component. Primary datasets use database counts,
+   `.range()` pagination and the page-size selector. Client-side slicing is reserved for
+   already-loaded embedded detail lists. No hand-rolled `join` pagination.
 
 Pages without countable state may omit stats (rare); pages whose entities originate
 elsewhere (orders from the POS) omit the create action.

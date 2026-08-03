@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, viewChild } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { PageHeaderComponent } from '../shared/ui/page-header.component';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { normalizeKenyanPhone } from '../core/phone';
@@ -6,6 +6,9 @@ import { ALL_PERMISSIONS, MembershipWithRole, Role, TeamService } from './team.s
 import { StatusBadgeComponent } from '../shared/ui/status-badge.component';
 import { DeleteConfirmationModalComponent } from '../shared/ui/delete-confirmation-modal.component';
 import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
+import { PaginationComponent } from '../shared/ui/pagination.component';
+import { EntitlementsService } from '../core/entitlements.service';
+import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-team',
@@ -15,6 +18,8 @@ import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
     StatusBadgeComponent,
     DeleteConfirmationModalComponent,
     EntityAvatarComponent,
+    PaginationComponent,
+    RouterLink,
   ],
   template: `
     <main class="dashboard-main min-h-screen bg-base-200 p-4">
@@ -37,6 +42,15 @@ import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
             <p class="text-xs text-base-content/60">
               The person must have logged in at least once before they can be added.
             </p>
+            @if (!canAddMember()) {
+              <div class="alert mt-2 border border-warning/20 bg-warning/5 text-sm">
+                <span class="flex-1">
+                  Your plan allows {{ memberLimit() }} active team member(s). Disable a member or
+                  upgrade to add another.
+                </span>
+                <a routerLink="/billing" class="link whitespace-nowrap font-semibold">View plans</a>
+              </div>
+            }
             <form
               (submit)="$event.preventDefault(); addMember()"
               class="mt-2 flex flex-wrap items-end gap-3"
@@ -61,7 +75,7 @@ import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
               <button
                 type="submit"
                 class="btn btn-primary btn-sm"
-                [disabled]="busy() || roles().length === 0"
+                [disabled]="busy() || roles().length === 0 || !canAddMember()"
               >
                 {{ busy() ? 'Adding…' : 'Add member' }}
               </button>
@@ -84,7 +98,7 @@ import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
                 </tr>
               </thead>
               <tbody>
-                @for (m of members(); track m.id) {
+                @for (m of pagedMembers(); track m.id) {
                   <tr>
                     <td>
                       <div class="flex items-center gap-2">
@@ -106,7 +120,7 @@ import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
                       @if (m.authorization_status === 'disabled') {
                         <button
                           class="btn btn-success btn-outline btn-xs"
-                          [disabled]="busy()"
+                          [disabled]="busy() || !canAddMember()"
                           (click)="setStatus(m, 'approved')"
                         >
                           Enable
@@ -132,6 +146,18 @@ import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
                 }
               </tbody>
             </table>
+          </div>
+          <div class="p-3 pt-0">
+            <app-pagination
+              [currentPage]="memberPage()"
+              [totalPages]="memberTotalPages()"
+              [totalItems]="members().length"
+              [itemsPerPage]="memberPageSize()"
+              itemLabel="members"
+              [showItemsPerPage]="true"
+              (pageChange)="memberPage.set($event)"
+              (itemsPerPageChange)="memberPageSize.set($event); memberPage.set(1)"
+            />
           </div>
         </div>
 
@@ -223,10 +249,21 @@ import { EntityAvatarComponent } from '../shared/ui/entity-avatar.component';
 })
 export class TeamComponent implements OnInit {
   private readonly team = inject(TeamService);
+  protected readonly entitlements = inject(EntitlementsService);
 
   protected readonly allPermissions = ALL_PERMISSIONS;
   protected readonly members = signal<MembershipWithRole[]>([]);
   protected readonly roles = signal<Role[]>([]);
+  protected readonly memberPage = signal(1);
+  protected readonly memberPageSize = signal(10);
+  protected readonly memberTotalPages = computed(() =>
+    Math.max(1, Math.ceil(this.members().length / this.memberPageSize()))
+  );
+  protected readonly pagedMembers = computed(() => {
+    const page = Math.min(this.memberPage(), this.memberTotalPages());
+    const start = (page - 1) * this.memberPageSize();
+    return this.members().slice(start, start + this.memberPageSize());
+  });
   protected readonly removingMember = signal<MembershipWithRole | null>(null);
   private readonly deleteModal = viewChild(DeleteConfirmationModalComponent);
 
@@ -241,6 +278,14 @@ export class TeamComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly memberLimit = computed(() => this.entitlements.limit('maxAdmins'));
+  protected readonly activeMemberCount = computed(
+    () => this.members().filter(member => member.authorization_status === 'approved').length
+  );
+  protected readonly canAddMember = computed(() => {
+    const limit = this.memberLimit();
+    return limit === null || this.activeMemberCount() < limit;
+  });
 
   async ngOnInit(): Promise<void> {
     await this.load();
@@ -253,6 +298,7 @@ export class TeamComponent implements OnInit {
       this.roles.set(roles);
       if (!this.memberRole.value && roles.length > 0) this.memberRole.setValue(roles[0].id);
       this.error.set(null);
+      await this.entitlements.refresh();
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to load team');
     }
